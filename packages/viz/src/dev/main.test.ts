@@ -41,7 +41,7 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
+import { WAIT_BANDS, bandOf, waitBandsAt } from '../live/bands.js';
 import type { VizRecording } from '../contract/types.js';
 import { buildLayout, type ShaftGeometry } from '../render/layout.js';
 import type { VizFloor } from '../contract/types.js';
@@ -790,6 +790,103 @@ describe('index.html styles the count without restating a band', () => {
     for (const band of WAIT_BANDS) {
       expect(markup).not.toContain(band.legendLabel);
       expect(markup).not.toContain(band.color);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The cold-start wait — § D247 § 6
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The wait ladder grades the **player's** wait in the mood bar's own words, and the grading is
+ * checked against the mood bar.
+ *
+ * The joke only works if it is true. `WAIT_LADDER` is deliberately not derived from `WAIT_BANDS` —
+ * it is chrome about a person staring at a browser, not a statistic about a run, and routing it
+ * through the run-figure machinery would make it one. What it must not do is **misname a band**: a
+ * screen that called twenty seconds *tapping foot* would be teaching a reader this product's own
+ * vocabulary wrongly, on the one surface where they are paying attention to it.
+ *
+ * This is the pin. Two rules, and the first is the one that catches a draft: a rung may only name a
+ * band the elapsed time has actually reached, and a rung that names any band must name the one the
+ * reader is in. The drafted ladder failed both — it put *tapping foot* at 20 s (the band starts at
+ * 30 s) and *taking the stairs* at 45 s (it starts at 120 s), which is wrong by a factor of nearly
+ * three.
+ *
+ * The ladder lives inside `main()`, which no Node test can call, so it is read as text. That is
+ * this file's own established method — `bodyOf` above does the same for the legend wiring.
+ */
+describe('the cold-start ladder names the band the player is actually in', () => {
+  /** `WAIT_LADDER`'s rungs, out of `main.ts`'s source, with the comments between them removed. */
+  async function rungs(): Promise<readonly { readonly afterMs: number; readonly text: string }[]> {
+    const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const declared = source.indexOf('const WAIT_LADDER');
+    expect(declared, 'main.ts has no WAIT_LADDER').toBeGreaterThan(-1);
+    // From the opening bracket, not from the name: the type annotation in between spells `afterMs`
+    // too, and splitting on it produced a phantom first rung with no sentence in it.
+    const start = source.indexOf('Object.freeze([', declared);
+    expect(start).toBeGreaterThan(declared);
+    const end = source.indexOf('\n  ]);', start);
+    expect(end).toBeGreaterThan(start);
+    const block = source
+      .slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
+      .replace(/\/\/[^\n]*/gu, ' ');
+    return block
+      .split(/afterMs:\s*/u)
+      .slice(1)
+      .map((part) => ({
+        afterMs: Number((/^([\d_]+)/u.exec(part)?.[1] ?? '0').replace(/_/gu, '')),
+        // Concatenated, because a rung's sentence is written as several adjoined literals and a
+        // band word can fall across the join.
+        text: [...part.matchAll(/'([^']*)'/gu)].map((match) => match[1]).join(''),
+      }));
+  }
+
+  it('never names a band the wait has not reached', async () => {
+    for (const rung of await rungs()) {
+      for (const band of WAIT_BANDS) {
+        if (!rung.text.includes(band.label)) continue;
+        expect(
+          rung.afterMs / 1000,
+          `"${band.label}" is claimed at ${String(rung.afterMs / 1000)} s and starts at ${String(band.fromS)} s`,
+        ).toBeGreaterThanOrEqual(band.fromS);
+      }
+    }
+  });
+
+  it('names the band the reader is in, whenever it names one at all', async () => {
+    for (const rung of await rungs()) {
+      const named = WAIT_BANDS.filter((band) => rung.text.includes(band.label));
+      if (named.length === 0) continue;
+      const here = bandOf(rung.afterMs / 1000);
+      expect(
+        named.map((band) => band.label),
+        `the rung at ${String(rung.afterMs / 1000)} s does not name ${here.label}`,
+      ).toContain(here.label);
+    }
+  });
+
+  it('is a ladder that climbs, and reaches the measured cold start', async () => {
+    const ladder = await rungs();
+    expect(ladder.length).toBeGreaterThanOrEqual(4);
+    for (const [index, rung] of ladder.entries()) {
+      expect(rung.text.length, `rung ${String(index)} has no sentence`).toBeGreaterThan(20);
+      if (index > 0) expect(rung.afterMs).toBeGreaterThan(ladder[index - 1]?.afterMs ?? 0);
+    }
+    // The first rung has to arrive before a player concludes the button did nothing, and the last
+    // has to be past 32.2 s — the measured cold start — or the ladder stops exactly where the
+    // waiting stops being explainable.
+    expect(ladder[0]?.afterMs).toBeLessThanOrEqual(5_000);
+    expect(ladder[ladder.length - 1]?.afterMs).toBeGreaterThan(32_200);
+  });
+
+  it('promises no progress it cannot measure', async () => {
+    // There is no progress to report — a container is starting and will not say how far — and a bar
+    // or a percentage here is the same defect as a figure a run does not support.
+    for (const rung of await rungs()) {
+      expect(rung.text).not.toMatch(/%|per cent|percent|almost there|nearly done/iu);
     }
   });
 });

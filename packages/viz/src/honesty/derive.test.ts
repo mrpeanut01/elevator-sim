@@ -341,15 +341,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'menu/types.ts#MENU_SCREENS',
         /*
-         * The account screen's *shape*, not its sentences. `EMPTY_FORM` and `SIGNED_OUT` are blank
-         * records whose only string is the mode id `sign-in`, which the two-adjacent-words scanner
-         * reads as prose; `MAX_DISPLAY_NAME` is the integer 32. Every sentence these records ever
-         * carry comes from `formIssues`, `postingRefusal` or `signedIn`, and `MENU` drives all
-         * three — including `postingRefusal`'s two arms, which is the distinction it exists for.
+         * The account screen's shape used to be here — `EMPTY_FORM`, `SIGNED_OUT` and
+         * `MAX_DISPLAY_NAME` — and it is gone rather than moved.
+         *
+         * They were producers by accident: the two-adjacent-words scanner read the mode id
+         * `sign-in` as prose, and `MAX_DISPLAY_NAME`'s span reached the `'sign-in' | 'register'`
+         * union beneath it. § D241 § 7 deleted the mode, because a form that asked for a display
+         * name only when the address was new would tell the person filling it in whether the
+         * address was new. With no mode there is no string in any of the three, so the derivation
+         * no longer finds them and an exclusion for them would be a ghost.
          */
-        'menu/account.ts#EMPTY_FORM',
-        'menu/account.ts#SIGNED_OUT',
-        'menu/account.ts#MAX_DISPLAY_NAME',
       ],
     },
     {
@@ -418,11 +419,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         /*
          * Returns a boolean, or a record whose prose came from somewhere already driven.
          * `canSubmitForm` answers *may this be sent* and is derived only through `formIssues`,
-         * which `MENU` drives directly. `signedOut` passes the **caller's** notice through
-         * unchanged and authors nothing — its one literal is the empty state it copies.
+         * which `MENU` drives directly.
+         *
+         * `linkRetryInMsOf` returns a **number of milliseconds** out of a 429 body. Its one
+         * literal is the wire code `too-many-link-requests`, which the scanner reads as two
+         * adjacent words and which no player ever sees: the sentence beside that refusal is the
+         * server's, carried by `Failure.detail` and shown unrewritten, because § D242 § 4 has the
+         * server word it — it names a duration and deliberately does not name which of the two
+         * budgets was spent.
+         *
+         * `signedOut` is no longer here and is not a gap: it passes the caller's notice through
+         * unchanged and its one literal was `SIGNED_OUT`'s mode id, which § D241 § 7 deleted, so
+         * the derivation no longer finds it at all.
          */
         'menu/account.ts#canSubmitForm',
-        'menu/account.ts#signedOut',
+        'menu/account.ts#linkRetryInMsOf',
         /*
          * Transport plumbing. `createClient` no longer authors a sentence — its three own wordings
          * moved to `CLIENT_FAILURES`, which `MENU` drives — and everything else it carries is the

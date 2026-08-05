@@ -3473,22 +3473,42 @@ const MENU: SurfaceAdapter = {
      *
      * Driven for the same reason the broken selection above is: every sentence here is one a
      * player only ever meets when something has gone wrong, which is where careless wording
-     * actually lives. `postingRefusal` gets **both** of its arms — signed out, and signed in but
-     * unconfirmed — because collapsing them is the specific mistake it exists to avoid.
+     * actually lives.
+     *
+     * **`postingRefusal` has one arm now, and the second was not dropped from this sweep — it was
+     * deleted from the product.** § D241 § 5 removed `confirmed` along with the password: a mailed
+     * link cannot issue a session to somebody who has not proved they can read the address, so the
+     * flag would have been true for everybody who could ever observe it. What replaced it is the
+     * *naming* prompt, which is a prompt rather than a gate, so it is driven through `signedIn`'s
+     * notice below instead of through a refusal.
+     *
+     * Both of `formIssues`'s questions are driven, because they are asked at different moments and
+     * a sweep that only saw the address would never read a word about the name.
      */
-    const account = updateForm(SIGNED_OUT, { mode: 'register', email: 'nope', password: 'short' });
-    for (const [index, issue] of formIssues(account.form).entries()) {
-      seeds.push({
-        field: `account.issue.${String(index)}.${issue.field}`,
-        text: issue.message,
-        role: 'reason',
-      });
+    const player = {
+      id: 'u1',
+      email: 'p@example.test',
+      displayName: 'player-9f2c1a4b7e05',
+      displayNameChosen: false,
+    };
+    const badAddress = updateForm(SIGNED_OUT, { email: 'nope' });
+    const badName = updateForm(signedIn(SIGNED_OUT, 'token', player), { displayName: 'x' });
+    for (const [stage, state] of [
+      ['address', badAddress],
+      ['name', badName],
+    ] as const) {
+      for (const [index, issue] of formIssues(state).entries()) {
+        seeds.push({
+          field: `account.${stage}.issue.${String(index)}.${issue.field}`,
+          text: issue.message,
+          role: 'reason',
+        });
+      }
     }
-    const player = { id: 'u1', email: 'p@example.test', displayName: 'A player', confirmed: false };
     for (const [label, state] of [
       ['signed-out', SIGNED_OUT],
-      ['unconfirmed', signedIn(SIGNED_OUT, 'token', player)],
-      ['confirmed', signedIn(SIGNED_OUT, 'token', { ...player, confirmed: true })],
+      ['unnamed', signedIn(SIGNED_OUT, 'token', player)],
+      ['named', signedIn(SIGNED_OUT, 'token', { ...player, displayName: 'A player', displayNameChosen: true })],
     ] as const) {
       const refusal = postingRefusal(state);
       if (refusal !== undefined) {
