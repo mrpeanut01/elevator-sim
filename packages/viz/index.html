@@ -998,6 +998,35 @@
       .menu-board-name { font: 600 13px var(--sans); color: var(--text); }
       .menu-board-figures { font: 400 11px var(--mono); color: var(--dim); }
       .menu-board-seed { font: 400 11px var(--mono); color: var(--dim); }
+
+      /* § D222 — the inactive control says so on its own label line.
+         `controls/render.ts` emits `.control-lock` for every inactive control and for no
+         active one, so this rule is keyed on the state and never on a parameter id.
+
+         KB-15 twice over: the badge's own content is the gate id in words, so the tint is
+         the second signal here rather than the only one, and `.control-inactive` below it
+         still carries the whole sentence in the flow. Nothing here hides the reason — no
+         `display: none`, no hover gate — because a rule that hid it would take it from
+         touch and keyboard readers, which is the half of docs/10 R3 that is not negotiable. */
+      .control-lock {
+        display: inline-block; margin-right: 8px; padding: 0 6px;
+        border: 1px solid var(--warn); border-radius: 9px;
+        font: 500 10.5px var(--mono); line-height: 16px; color: var(--warn);
+        vertical-align: 1px; white-space: nowrap;
+      }
+      /* The dimming moves off the row and onto the parts of it that are actually dead.
+         `.control-disabled { opacity: 0.65 }` above dims the whole control — including the
+         badge and the reason, the two things a reader of a dead control is here for — and
+         opacity on a parent cannot be undone by a child, because it composites the subtree
+         as one group. So the value is overridden at higher specificity and re-applied to the
+         five parts that are genuinely inert. The row still reads as disabled; its explanation
+         is no longer the lowest-contrast text on it. */
+      .control.control-disabled { opacity: 1; }
+      .control-disabled .control-label,
+      .control-disabled .control-unit,
+      .control-disabled .control-input,
+      .control-disabled .control-reset,
+      .control-disabled .control-help { opacity: 0.65; }
     </style>
   </head>
   <body>

@@ -14242,3 +14242,90 @@ asserted. The lever if it ever needs pulling is the same one the honesty tiers u
 - **The document tier** — § D220 § 2's middle rung. It is what closes the rest of `UX.md` § 27's
   `⚠️ mount` marks, and it is not built.
 - **`midtown-office` trips a `rise-exceeds-class` advisory** — 76.9 m of rise (a −3.5 m garage to a 73.4 m top floor) against `geared-traction`'s reference rating of 76 m. Worth someone's attention and **not a defect**: `core` states in the warning itself that *the reference envelope is application guidance, not a hard limit*, so the building is legal and deliberately so. What it costs is that commissioning cannot blame a player for a warning the shipped building already raises, which is why its diagnostic key had to include the **message** and not just the code and path — keyed on code+path, commissioning that bank as `hydraulic`, rated for 18 m, raised the same code at the same path and was silently forgiven as pre-existing.
+
+## D222 — the rule that said *never a tooltip*, re-decided on a measurement
+
+**Date: 2026-08-05 · Written after the code, and says so.** A play-tester's issue (#17) against the
+Parameters tab: *greyed-out controls lack visual explanation of why they are disabled*, and the
+inline sentence under the control — `not in effect: it needs answer.dwellPolicy to be adaptive — it
+is fixed` — *is easy to miss*. The suggested fix was to **move the reason into a tooltip on a `?`
+icon, to reduce page length**.
+
+`controls/render.ts`'s `frame()` docstring already answered that, in as many words: *"not as a
+tooltip, not as a colour. docs/10 R3's shape: the thing that is suppressed is replaced by why, never
+by a blank."* The first draft of this work quoted that sentence and rejected the issue on it. **That
+is the wrong way to use a rule** — a documented rule is a decision somebody made once, and a
+play-tester reporting that the screen does not work is evidence about that decision. So the rule was
+re-opened and asked to justify itself against the complaint.
+
+### What the rule was defending, and what the measurement says about it
+
+R3's purpose is that **a reader is never left with an unexplained dead control**. The tooltip
+proposal was argued from page length. That argument is checkable, so it was checked rather than
+answered — on the shipped dispatcher space, at the defaults the tab opens with:
+
+| | |
+|---|---|
+| controls | **58** |
+| inactive at the defaults | **20** (34 %) |
+| reason prose, all twenty | **1 797 characters** |
+| `control-help` prose, all fifty-eight | **20 464 characters** |
+| the reason, as a share of the tab's prose | **8.1 %** |
+
+**The wall of fine print is the description, not the reason.** Hiding every reason on the tab
+shortens the page by a twelfth and costs every touch and keyboard reader the sentence. The premise
+of the suggested mechanism does not survive its own measurement, so R3 stands — and now stands
+measured rather than quoted. `DISPATCH_PARAMETERS` alone is 16 inactive of 41, so this is not an
+artefact of one schema.
+
+### What the tester was right about, which no rule covered
+
+The reason was emitted **last**, below `control-help`. On the twenty inactive rows that description
+is a median of **318** and a maximum of **727** characters, so the explanation for a dead control sat
+a paragraph away from the control. *Easy to miss* was a correct report of a real defect; the defect
+was **adjacency**, and R3 never said anything about it either way. Three changes, none of them a
+hiding place:
+
+1. **A badge on the label line** — `needs dispatch.callType`, from the declared `unmetGates` field,
+   emitted for every inactive control and no active one. Words, not an icon and not a tint, so
+   `UX.md` KB-15 holds by construction rather than by a legend.
+2. **The reason moved above the help**, adjacent to what it is about.
+3. **The reason is referenced.** It had no `id` and nothing pointed at it, while the input's
+   `aria-describedby` named the help alone — so a screen reader announced the control `disabled` and
+   then read a description that never mentions the gate. The state was announced and its cause was
+   for sighted readers only. `aria-describedby` now names the reason's id **first**, then the help.
+
+   The id helper is **not exported**, unlike `helpIdOf` and `inputIdOf` beside it, and the
+   repository chose that: exported, it tripped `honesty/derive.test.ts`, which requires every
+   string-returning export in `viz` to have an adapter in `surfaces.ts` or a written exclusion. The
+   guard was right — nothing outside the renderer needs to *name* the reason. `render.test.ts` reads
+   the id off the emitted element and requires `aria-describedby` to point at an id some element
+   carries, which fails on a **dangling** reference; an assertion rebuilt from the helper would not.
+
+The rule's letter is unchanged and its application is narrower than it was: the reason is still text
+in the flow, in its own element, and it is now also on the accessibility tree.
+
+### The two mechanisms considered and refused, and why
+
+- **A `?` tooltip.** A `title` is unreachable by touch and by keyboard, so it would have made the
+  reason invisible to exactly the readers who cannot see the 0.65 opacity either. Refused on
+  accessibility, not on the docstring.
+- **A `<details>` disclosure**, which *is* keyboard-reachable and would have been admissible. Refused
+  on a fact about the mount rather than on principle: `dev/parameterForm.ts` calls
+  `container.replaceChildren()` and rebuilds the whole tree on **every accepted edit**, so an opened
+  reason would close again on the next keystroke, and a reader would have to reopen it to watch a
+  cascade they had just caused. It buys 8.1 % of the page's prose at that price.
+
+### What this does not close
+
+**Two further defects were found in this file and not fixed here**, because the fix is outside the
+lane's ownership and neither is what #17 reported. They are recorded so that finding them again
+counts as confirmation rather than discovery:
+
+1. **No control has an accessible name.** `frame()` emits `<span class="control-label">`, not
+   `<label for>`, and no input carries `aria-label`. Every input on the tab is therefore announced
+   by its type and its description with **no name** — a defect strictly larger than the one this
+   entry closes.
+2. **The dependency graph** #17 also floats — *an expandable section showing which settings unlock
+   which others* — is not built. `unmetGates` and `activeWhen` already carry the edges, so the data
+   exists; whether the tab should draw them is a product call and not this lane's.

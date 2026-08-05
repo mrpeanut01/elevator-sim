@@ -182,6 +182,83 @@ describe('the shared frame — help, unit, reset, and the reason', () => {
     expect(nodes.find((e) => e.attrs['class'] === 'control-inactive')).toBeUndefined();
   });
 
+  it('badges the inactive control on its label line, with the gate id in words', () => {
+    // § D222. The complaint this closes is that the only inline signal was a visual state, and
+    // the sentence explaining it sat below a description running to 727 characters. KB-15: the
+    // badge is words, so it survives the tint being invisible.
+    const node = renderControl(controlNamed(space, 'orchard.lanternCount'));
+    const badge = flatten(node).find((e) => e.attrs['class'] === 'control-lock');
+    expect(badge?.text).toBe('needs orchard.nightHarvest');
+    expect(badge?.attrs['data-unmet-gates']).toBe('orchard.nightHarvest');
+  });
+
+  it('badges no active control — the signal means inactive, or it means nothing', () => {
+    for (const control of controlsFor(space, defaultValues(space))) {
+      const badge = flatten(renderControl(control)).find(
+        (e) => e.attrs['class'] === 'control-lock',
+      );
+      // Asserted over every control in the space and in both directions, so a badge that
+      // appeared on everything would fail here rather than read as a success on the one row
+      // the previous test looks at.
+      expect(badge === undefined).toBe(control.enabled);
+    }
+  });
+
+  it('puts the reason above the description, not below it', () => {
+    /*
+     * The ordering is the fix, not a detail: `control-help` is a median of 318 characters on the
+     * shipped schema's twenty inactive rows, so a reason emitted last was a paragraph away from
+     * the control it explains. Asserted on indices rather than on a snapshot of the frame, so
+     * adding a sixth child does not fail it.
+     */
+    const children = renderControl(controlNamed(space, 'orchard.lanternCount')).children;
+    const reason = children.findIndex((child) => child.attrs['class'] === 'control-inactive');
+    const help = children.findIndex((child) => child.attrs['class'] === 'control-help');
+    expect(reason).toBeGreaterThan(-1);
+    expect(help).toBeGreaterThan(-1);
+    expect(reason).toBeLessThan(help);
+  });
+
+  it('describes an inactive input by its reason first, then its help', () => {
+    /*
+     * The accessibility half of the same defect: `aria-describedby` named the help alone, so a
+     * screen reader said `disabled` and had no route to the sentence saying which gate to move.
+     *
+     * The reason's id is read **off the emitted element** rather than recomputed from a naming
+     * convention the renderer also uses. That is deliberate: this way the assertion fails if the
+     * attribute points at an id nothing carries, which is the shape the bug would take if the two
+     * ever drifted, and a test that rebuilt the id from the same helper could not see it.
+     */
+    const control = controlNamed(space, 'orchard.lanternCount');
+    const node = renderControl(control);
+    const nodes = flatten(node);
+    const reasonId = nodes.find((e) => e.attrs['class'] === 'control-inactive')?.attrs['id'];
+    expect(reasonId).toBeDefined();
+
+    const inputs = nodes.filter((e) => e.attrs['data-role'] !== undefined);
+    expect(inputs.length).toBeGreaterThan(0);
+    for (const input of inputs) {
+      // Reason first: the description runs to 727 characters on the shipped schema's inactive
+      // rows, and the reason is the clause a reader who cannot move the control needs first.
+      expect(input.attrs['aria-describedby']).toBe(`${reasonId ?? ''} ${helpIdOf(control.id)}`);
+      for (const id of (input.attrs['aria-describedby'] ?? '').split(' ')) {
+        expect(nodes.some((e) => e.attrs['id'] === id)).toBe(true);
+      }
+    }
+  });
+
+  it('omits the reason from aria-describedby when there is no reason', () => {
+    const control = controlNamed(space, 'orchard.irrigation');
+    const node = renderControl(control);
+    const inputs = flatten(node).filter((e) => e.attrs['data-role'] !== undefined);
+    expect(inputs.length).toBeGreaterThan(0);
+    for (const input of inputs) {
+      // Exactly the help, and nothing appended: an active control has no reason to point at, and
+      // a trailing separator would be a dangling reference of its own.
+      expect(input.attrs['aria-describedby']).toBe(helpIdOf(control.id));
+    }
+  });
+
   it('gives every input a unique DOM id derived from the parameter id', () => {
     const controls = controlsFor(space, defaultValues(space));
     const ids = controls
