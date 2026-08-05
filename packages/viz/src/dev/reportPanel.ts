@@ -125,6 +125,22 @@ import type { MountContext, Panel, ViewAt } from './mountTypes.js';
  * The view — every string and every colour this surface will show
  * -------------------------------------------------------------------------- */
 
+/**
+ * The verdict's colour, one arm per verdict.
+ *
+ * A `Record` rather than a ternary, for the reason `shift/report.ts` gives about `VERDICT_VOICE`:
+ * a fourth verdict must be a **compile error here** rather than silently inheriting whatever an
+ * `else` branch happened to say. That is not hypothetical — this was a two-arm ternary written
+ * when there were two verdicts, and `ungraded` (§ D234) landed in its `else`.
+ */
+const VERDICT_COLOUR: Readonly<Record<ShapedDayReport['verdict'], string>> = Object.freeze({
+  cleared: 'var(--ok)',
+  missed: 'var(--warn)',
+  // Neutral, and deliberately the same token the empty sheet below uses. A day nobody judged is
+  // not a day that went wrong, and amber is this palette's word for *went wrong*.
+  ungraded: 'var(--dim)',
+});
+
 /** One cell of the figure grid, ready to instantiate. */
 export interface FigureView {
   readonly label: string;
@@ -780,7 +796,19 @@ export function reportViewOf(
     lede: shaped.lede,
     figures: shaped.figures.map(figureViewOf),
     verdictLine: shaped.verdictLine,
-    verdictColour: shaped.verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)',
+    /*
+     * Three verdicts, three colours — and the third is **neutral**, not a warning.
+     *
+     * This was a two-arm ternary when `verdict` had two values, so `ungraded` (§ D234) fell to the
+     * `else` and a day nobody judged was drawn in the same amber as a day that missed its bars.
+     * *Too quiet to grade* is not a failure and must not be coloured as one; `var(--dim)` is the
+     * neutral this file already uses for the empty sheet a few hundred lines up, so the third arm
+     * is the existing vocabulary rather than a new colour.
+     *
+     * Written as an exhaustive record for the reason § D237 gives about `VERDICT_VOICE`: a fourth
+     * verdict must fail to compile here rather than silently inherit whatever the `else` says.
+     */
+    verdictColour: VERDICT_COLOUR[shaped.verdict],
     goals: shaped.goals.map(goalRowViewOf),
     diagnosis: diagnosisRowsOf(shaped.diagnosis),
     diagnosisHeading: shaped.diagnosisHeading,
