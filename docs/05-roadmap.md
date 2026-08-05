@@ -1967,9 +1967,24 @@ sheet named tomorrow's event and never today's, endless mode, the light palette 
 and the whole menu finally being recorded as a deviation from a handoff that has no concept of it
 ([`docs/12`](12-design-handoff.md) § 4.8).
 
-Still open and named: **Sandbox**, which is a missing *meaning* rather than a missing mode; the
-*Scenarios* / *Campaign* naming, which is a judgement about a surface the handoff drew; and two of
-the four designed modes — calendar and commissioning.
+**All four designed modes are built** — incidents, calendar, the daily challenge and commissioning —
+and each reaches a run through `shiftRunConfigOf` with a § D177 test on its own control. The saved
+library survives a reload at schema version 2. `docs/17` § 5's ledger stands at **six of seven
+closed**.
+
+**And the wave found the thing none of the checks above could see.** `dev/main.ts` ends with
+`if (typeof document !== 'undefined') void main();`, so under vitest **`main()` had never run in this
+repository's history**. A `let` declared below the `boot()` sequence that assigns it threw on boot's
+second statement, and **2 100 tests were green over a dead page**. Fourth occurrence of that exact
+mistake; two of the four are written up in prose in the file that carries them. It is now guarded
+twice — a text assertion over `boot()`'s body, and a browser tier whose first test loads the page and
+requires the stage to have been drawn ([§ D220](../DECISIONS.md), [§ D221](../DECISIONS.md)).
+
+Still open and named: **Sandbox as a mode** — the defect is closed and the label is finally
+printable and true, but whether it deserves a screen is undecided; **§ D220's document tier**, which
+is what closes the rest of `UX.md` § 27's `⚠️ mount` marks; and **`midtown-office`'s shipped
+`rise-exceeds-class` warning**, 76.9 m against a class rated 76, found by commissioning and left for
+`data/`'s owner.
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in

@@ -659,9 +659,12 @@ each other in both directions.
 account screens shipped in § D214 and were in **no ledger section at all** — 220 rows over 24
 surfaces, and none of them covered the screen a player now meets first.
 
-**Marks discipline for this whole section.** There is still no browser, so nothing here is `✅ run`
-and nothing here may become `✅ run` without one ([`docs/16`](../../docs/16-change-scope-contract.md)
-S10). The *decisions* are driven through `menu/screens.ts#screenOf`, which is a **model walk** —
+**Marks discipline for this whole section, amended 2026-08-05.** There *is* a browser now
+([§ D220](../../DECISIONS.md)), and **`BT-01` is the first `✅ run` mark in this file**. It is also
+the only one, and that is the point rather than a gap: the tier is deliberately one assertion wide.
+Everything else here stays `⚠️ mount`, because § D220 § 2's *document* tier — the rung that closes
+wiring claims — is not built. A mark may not become `✅ run` by being adjacent to one that is
+([`docs/16`](../../docs/16-change-scope-contract.md) S10). The *decisions* are driven through `menu/screens.ts#screenOf`, which is a **model walk** —
 stronger than the static sweep, weaker than a drive, and S9 forbids citing it as either. The
 *mounts* are `⚠️` and say so.
 
@@ -700,6 +703,19 @@ stronger than the static sweep, weaker than a drive, and S9 forbids citing it as
 | SE-02 | Selector | Every control moves the legs, and the ones that do not at the default cell name their own cell and the reason | ✅ test (§ D177, `selectorEditor.test.ts`; three are findings about the shipped calibration) |
 | SE-03 | Selector | The panel is **not offered** when the library declares no patterns, with the reason in its place | ✅ test (`selectorAvailability`, both arms driven) · ⚠️ mount |
 | SE-04 | Selector | No string implies switching helps — the learned selector was refused three times | ✅ test (lexical scan in `selectorSpec.test.ts`, plus the generic honesty sweep) |
+| CL-01 | Calendar | Five periods, each moving the legs at a named cell — including the quiet one, in the other direction | ✅ test (`calendar.test.ts`, § D177 on the legs; a public holiday produces fewer than half the legs and more than zero) |
+| CL-02 | Calendar | A period outside its own window changes nothing, byte-identically | ✅ test (asserted on the legs **and** on object identity of the building — inside by day number, outside by weekday) |
+| CL-03 | Calendar | A template the run is too short for is refused in words, not by a kernel throw | ✅ test (`evening-egress` at 300 s makes `core` throw outright; refused with the sentence `menu.ts` already uses) |
+| CL-04 | Calendar | The caption states what was **applied**, never what was asked for | ✅ test (a withheld template never appears; the population is what `expandFloors` counted on the edited building) · ⚠️ mount |
+| CM-01 | Commissioning | Three dimensions per bank, each moving the legs at a named cell | ✅ test (`commissioning/`; two cells where a control is inert are named with the reason — see CM-05) |
+| CM-02 | Commissioning | The capital figure is a limit and never a metric | ✅ test (four ways, including an import scan denying this module its own reporting layer, and a 22-pattern lexicon over every sentence 24 real reviews generate) |
+| CM-03 | Commissioning | Retrofit is the same mechanism with an empty editable set, not a second path | ✅ test (three scope refusals, each naming its bank and dimension; legs byte-identical to the shipped building) |
+| CM-04 | Commissioning | A refusal sits beside the control it refuses | ✅ test (`refusalsBeside` makes it a property of the model rather than a layout convention) · ⚠️ mount |
+| CM-05 | Commissioning | A control that is inert at a cell says so, rather than the suite moving to a cell where everything works | ✅ test (a third shaft at Garden Apartments is inert at 900 s and 1 800 s and live at 3 600 s, with the leg counts 5/20/48 pinned) |
+| PR-01 | Persistence | The saved library survives a reload, and an entry this build cannot read is dropped **by name** | ✅ test (`library.test.ts`, per shelf, with the shipped documents as positive controls) |
+| PR-02 | Persistence | A version-1 envelope still restores its week | ✅ test (nothing migrated, nothing defaulted; refusing would take a week away over a feature that build never had) |
+| PR-03 | Persistence | An over-budget save refuses with the size rather than silently stopping | ✅ test · ⚠️ mount |
+| BT-01 | Boot | The page loads and the stage draws | ✅ **run** (`boot.browser.test.ts` — the first test here that executes the shell; watched failing against the commit where it did not boot) |
 
 **What this section does not yet cover, said rather than left to be noticed:** focus order within a
 screen, the appearance of a disabled row's reason, whether the overlay traps focus, and — added with
