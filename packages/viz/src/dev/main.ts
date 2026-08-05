@@ -43,7 +43,14 @@ import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
-  busy,
+  formIssues,
+  linkRequested,
+  linkRetryInMsOf,
+  namingStage,
+  pending,
+  postingRefusal,
+  rateLimited,
+  retryAllowed,
   signedIn,
   signedOut,
   updateForm,
@@ -56,7 +63,12 @@ import {
   challengeRunConfigs,
   challengeSubmissionOf,
 } from '../menu/challenge.js';
-import { claimedMetricsOf, createClient, fetchTransport } from '../menu/client.js';
+import {
+  claimedMetricsOf,
+  createClient,
+  fetchTransport,
+  type LeaderboardClient,
+} from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
@@ -506,15 +518,120 @@ function boot(ui: Elements, resources: BrowserResources): void {
     document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
   const client = apiOrigin === '' ? undefined : createClient(apiOrigin, fetchTransport(fetch));
 
-  let accountState: AccountState = SIGNED_OUT;
+  /*
+   * The three unavailability sentences, rewritten — issue #29, and the fix is two fixes.
+   *
+   * **The jargon.** *"This build was not compiled against a server"* uses *compiled* as a transitive
+   * verb with a preposition, implies the player could obtain a different build (there is no
+   * download; this is a hosted URL), and exposes an HTTP verb — *fetch* — as game vocabulary. It
+   * reads as a stack trace on the first prose most players meet.
+   *
+   * **The untruth.** It was never a compile-time fact. § D215 § 4 reads a `<meta>` tag at run time,
+   * and § D243 injects that tag from the server that is serving the page — so the same bytes are a
+   * connected build behind the server and an unconnected one behind a CDN. Saying *compiled* named
+   * the wrong mechanism and named it confidently.
+   *
+   * And the reassurance was false on its own terms: *"everything else on this menu works without
+   * one"* was printed on a menu where two of the other five rows also do not (#28). So these say
+   * **which** rows need a server and which do not, by name, and the case they describe is still
+   * real — a bundle served from a CDN with no server beside it never passes through § D243's
+   * injection and lands here.
+   */
+  const NO_SERVER_ROWS =
+    'Scenarios, Free play and Settings do not need one; Leaderboard and Account do.';
+  /*
+   * Issue #34's empty state, in the one channel this file owns.
+   *
+   * A designed empty state teaches the shape of the thing, and the shape is the part a player
+   * cannot guess: what a board *is*, what is on a row, and what orders it. The three nouns the
+   * screen used without defining — configuration, seed, metric — are defined here in the order a
+   * reader meets them.
+   *
+   * The last sentence is § D106 generalised and it is not decoration: four figures sit side by side,
+   * one of them orders the rows, and none is ever folded into another. A composite score over these
+   * would rank the configuration that carried fewest people highest.
+   */
+  const NO_SERVER_BOARDS =
+    'This site has no leaderboard server behind it, so there are no boards to read. Here is what ' +
+    'one is. A board is a single exact configuration — the same building, dispatcher, traffic ' +
+    'template, arrival rate and run length — and its rows are that configuration played on ' +
+    'different seeds, one row per posted run, so two rows differ only in which passengers turned ' +
+    'up. A seed is the number those passengers are generated from: same seed, same people, same ' +
+    'minute-by-minute demand. Every row carries the average wait, the 95th-percentile wait, the ' +
+    'mean time to destination and the share waiting over a minute, side by side. One of the four ' +
+    'orders the rows; the other three are shown beside it and are never combined into a score. ' +
+    `Picking a different dispatcher moves you to a different board rather than up this one. ${NO_SERVER_ROWS}`;
+  /*
+   * Issue #32, and the half of it that has nothing to do with the missing server.
+   *
+   * Four of the five questions the screen never answered — what is scored, what *the same seeds*
+   * means, how long a week runs, how a run gets submitted — are properties of the game's design and
+   * not of this week's data. They are answerable with the server off, and this is where they get
+   * answered, because § D218 § 3 says the client never invents *which* challenge is current and
+   * says nothing about the client explaining what a challenge is.
+   *
+   * The claim about comparability is the one to keep honest: common random numbers make two runs
+   * comparable **as runs**, and this screen still never says one dispatcher beat another. Compare
+   * is the only surface allowed to say that, and only with a paired-t interval that excludes zero.
+   */
+  const NO_SERVER_CHALLENGE =
+    'This site has no challenge server behind it, so there is no challenge to load. Here is what ' +
+    'one is. Everybody gets the same building, the same run length and the same numbered seeds — ' +
+    'the same seed generates the same passengers arriving at the same moments, so the only thing ' +
+    'that differs between two players is the dispatcher they chose. A challenge is scored over its ' +
+    'whole seed set rather than a lucky single run, and you submit the set in one go or not at ' +
+    'all: a partial set is a different question, not a smaller score. A challenge opens and closes ' +
+    'on the server’s clock, and the board stays readable after it shuts. Ordering a board on ' +
+    'one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
+    `another — Compare is the only screen allowed to say that. ${NO_SERVER_ROWS}`;
+  const NO_SERVER_SIGN_IN =
+    'This site has no account server behind it, so there is nowhere to sign in and nothing is ' +
+    `sent anywhere. ${NO_SERVER_ROWS}`;
+  const NO_SERVER_POST =
+    'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
+    'screen and still in the report — nothing about it is lost.';
+  /*
+   * Issue #31's toggle, answered rather than ignored.
+   *
+   * There is no second mode to switch to any more (§ D241 § 7): asking for a name only when the
+   * address is new would tell the person filling in the form whether the address is new. A control
+   * that now does nothing must **say** it does nothing — a silent no-op is issue #21's defect in a
+   * different place.
+   */
+  const ONE_DOOR =
+    'There is one way in now, and it is the same one whether or not you have been here before: ' +
+    'type your address and a sign-in link is emailed to you. If the address is new, opening the ' +
+    'link creates the account. There is no password to choose and none to forget.';
+  /**
+   * What is said while a request is in flight, and what is said once it has been a while.
+   *
+   * § D243 § 4: the Container App runs at `minReplicas: 0` and a cold `/api/challenges` against the
+   * live app was measured at **28.7 s**. So the first request after a quiet spell is slow *and
+   * correct*, and the two failures available are giving up (which reports `unreachable` about a
+   * server that is starting) and saying nothing (which is indistinguishable from a hang). Neither
+   * is taken: nothing is cancelled, and the wording escalates on a timer beside the request.
+   */
+  const WAKING_UP =
+    'Still going. This site’s server shuts down when nobody is using it and takes about half ' +
+    'a minute to start again, so the first request after a quiet spell is slow. Nothing has ' +
+    'failed — leave this open.';
+  /** Late enough that an awake server never shows it, early enough to beat a player's patience. */
+  const WAKING_UP_AFTER_MS = 4_000;
+
+  /*
+   * The unavailability is said **on mount**, which is issue #30's own stated fix ordering.
+   *
+   * The screen used to be indistinguishable from a working login until the player pressed the
+   * button, at which point it admitted there had never been anywhere for the address to go. That
+   * ordering is the privacy problem rather than the layout one: whatever a player typed, they typed
+   * into a form with no stated purpose, and they could not have known before typing.
+   */
+  let accountState: AccountState = client === undefined ? signedOut(NO_SERVER_SIGN_IN) : SIGNED_OUT;
   let boardView: LeaderboardView = {
     boards: [],
     selected: undefined,
     page: undefined,
-    notice:
-      client === undefined
-        ? 'This build was not compiled against a leaderboard server, so there are no boards to show.'
-        : undefined,
+    notice: client === undefined ? NO_SERVER_BOARDS : undefined,
   };
   /** Requests are started here and never from a render — a render that fetched would loop. */
   let boardsRequested = false;
@@ -531,7 +648,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * countdown built by differencing two clocks would be the client answering a question the server
    * has already answered, one subtraction later.
    */
-  let challengeView: ChallengeScreenInput = { runsDone: 0 };
+  let challengeView: ChallengeScreenInput = {
+    runsDone: 0,
+    ...(client === undefined ? { notice: NO_SERVER_CHALLENGE } : {}),
+  };
   let challengeRequested = false;
   /**
    * The seed set this browser has simulated, paired with the seed each recording is *of*.
@@ -1016,7 +1136,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
 
       case 'account-mode':
-        accountState = updateForm(accountState, { mode: intent.register ? 'register' : 'sign-in' });
+        /*
+         * There is no mode to change any more, and the honest answer is a sentence rather than
+         * nothing. § D241 § 7 collapsed sign-in and register into one request; `MenuIntent` still
+         * carries this member, so this arm exists and says why the control it belongs to has
+         * stopped meaning anything. Deleting the member — and the toggle that dispatches it — is
+         * `menu/screens.ts`'s and `dev/menuPanel.ts`'s to do.
+         */
+        accountState = withNotice(accountState, ONE_DOOR);
         drawMenu();
         return;
 
@@ -1027,30 +1154,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       case 'account-submit': {
         if (client === undefined) {
-          accountState = withNotice(
-            accountState,
-            'This build was not compiled against a server, so there is nowhere to sign in.',
-          );
+          accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
           drawMenu();
           return;
         }
-        const form = accountState.form;
-        accountState = busy(accountState, true);
-        drawMenu();
-        const request =
-          form.mode === 'register'
-            ? client.register({
-                email: form.email.trim(),
-                displayName: form.displayName.trim(),
-                password: form.password,
-              })
-            : client.login({ email: form.email.trim(), password: form.password });
-        void request.then((result) => {
-          accountState = result.ok
-            ? signedIn(accountState, result.value.token, result.value.user)
-            : withNotice(accountState, result.detail);
+        /*
+         * The client's own rules first, and they are a courtesy rather than a gate: a malformed
+         * address refused here costs nobody a mail, and § D242 charges the per-address and
+         * per-caller budgets *before* it looks at the account — so a typo spent on the server is a
+         * budget spent on whoever owns that address.
+         */
+        const issues = formIssues(accountState);
+        if (issues.length > 0) {
+          accountState = withNotice(accountState, issues.map((issue) => issue.message).join(' '));
           drawMenu();
-        });
+          return;
+        }
+        void (namingStage(accountState) ? chooseDisplayName(client) : askForLink(client));
         return;
       }
 
@@ -1064,6 +1184,139 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
     }
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * Signing in — § D241, and the four things a link flow has to get right
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Say something now, and say something else if it takes a while. Returns the way to stop.
+   *
+   * § D243 § 4 measured a **28.7 s** cold start against the live app, so a request on this surface
+   * is allowed to take about half a minute and be perfectly healthy. Two obvious responses are both
+   * wrong. Cancelling it reports `unreachable` — *"the leaderboard server could not be reached"* —
+   * about a server that is reachable and starting, which is the one sentence in `CLIENT_FAILURES`
+   * that would be a lie here. Saying nothing for thirty seconds is indistinguishable from a hang,
+   * and a player who reloads mid-request has spent one of § D242's three per-address links.
+   *
+   * So nothing is cancelled — `menu/client.ts` sets no timeout and no `AbortSignal`, and asserts
+   * that about itself — and the *wording* escalates instead. The timer is beside the request rather
+   * than inside the client, because the client has no screen to write to.
+   */
+  function startWaiting(first: string): () => void {
+    accountState = pending(accountState, first);
+    drawMenu();
+    const timer = window.setTimeout(() => {
+      accountState = pending(accountState, WAKING_UP);
+      drawMenu();
+    }, WAKING_UP_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }
+
+  /**
+   * Ask for a sign-in link — the whole of what this screen collects.
+   *
+   * The 202 is shown in the **server's** words. It is identical whether or not the address has an
+   * account (§ D241 § 7), and a client that added *"welcome back"* or *"we have created your
+   * account"* to it would rebuild the account-enumeration oracle in prose after the server went to
+   * some trouble to close it on the wire.
+   *
+   * The 429 is the one refusal this file reads a field out of. § D242 gives a duration and
+   * deliberately does not say **which** of the two budgets was spent, because naming it would leak
+   * whether anybody else has been asking about the address; the duration is carried into the state
+   * so the form stops offering a second request the server has already promised to refuse.
+   */
+  async function askForLink(api: LeaderboardClient): Promise<void> {
+    const done = startWaiting('Asking for a sign-in link…');
+    const result = await api.requestLink(accountState.form.email.trim());
+    done();
+    if (result.ok) {
+      accountState = linkRequested(accountState, result.value);
+      drawMenu();
+      return;
+    }
+    const retryInMs = linkRetryInMsOf(result);
+    if (retryInMs === undefined) {
+      accountState = withNotice(accountState, result.detail);
+      drawMenu();
+      return;
+    }
+    accountState = rateLimited(accountState, result.detail, retryInMs);
+    drawMenu();
+    // The gate lifts on its own. A refusal a player has to guess their way out of is a refusal that
+    // teaches them the screen is broken.
+    window.setTimeout(() => {
+      accountState = retryAllowed(accountState);
+      drawMenu();
+    }, retryInMs);
+  }
+
+  /**
+   * Name yourself, once — § D241 § 7, and the second request the oracle forced.
+   *
+   * A name cannot travel with the link request, because a form that asked for one *only when the
+   * address was new* would say whether the address was new. So the account is minted with a
+   * generated name, `displayNameChosen` says so on the wire, and this is the rename over a session
+   * that already proves the address.
+   *
+   * **409 is reported as taken**, unlike a taken address, and the asymmetry is deliberate: a
+   * display name is drawn on every board, so it is already public.
+   */
+  async function chooseDisplayName(api: LeaderboardClient): Promise<void> {
+    const token = accountState.token;
+    if (token === undefined) return;
+    const done = startWaiting('Saving your name…');
+    const result = await api.setDisplayName(token, accountState.form.displayName.trim());
+    done();
+    accountState = result.ok
+      ? signedIn(accountState, token, result.value)
+      : withNotice(accountState, result.detail);
+    drawMenu();
+  }
+
+  /**
+   * Redeem a mailed link out of the URL fragment, then get rid of it.
+   *
+   * ## Why the token is in the fragment, and why this is the half that finishes the job
+   *
+   * § D241 § 4. A fragment is **never transmitted**, so a mail client, a scanner or a corporate
+   * link-rewriting appliance that fetches the URL cannot carry the token anywhere, let alone spend
+   * it; and it keeps the token out of access logs, ingress traces and `Referer`. That property is
+   * about the *link*. It says nothing about the address bar the player is now looking at, which is
+   * shoulder-surfable, copy-pasteable into a bug report and preserved by a reload — so the fragment
+   * is cleared here.
+   *
+   * **Cleared before the request, not after it.** A reload during a 28.7-second cold start would
+   * otherwise re-send a token that the first attempt is in the middle of spending, and the second
+   * attempt would come back `link-spent` — a correct refusal to an honest player, produced by this
+   * file rather than by anything they did.
+   *
+   * The token is never put into a notice, a log or a URL this build constructs. The three refusals
+   * that can come back — expired, spent, invalid — are the server's own sentences, and each is
+   * worded around whether asking again will help.
+   */
+  async function redeemLinkFromHash(): Promise<void> {
+    const linkToken = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('sign-in');
+    if (linkToken === null || linkToken === '') return;
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    // Opening a link is a request to sign in, so the screen that shows the outcome is the one the
+    // player is put on. A result written to a panel nobody navigates to is a result nobody reads.
+    menuState = navigate(menuState, 'account');
+    if (client === undefined) {
+      accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
+      drawMenu();
+      return;
+    }
+    const done = startWaiting('Signing you in…');
+    const result = await client.redeem(linkToken);
+    done();
+    accountState = result.ok
+      ? signedIn(accountState, result.value.token, result.value.user)
+      : signedOut(result.detail);
+    drawMenu();
   }
 
   /**
@@ -1085,10 +1338,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * diverging queue is caught as a wrong claim rather than silently corrected and ranked anyway.
    */
   async function submitScore(): Promise<void> {
+    /*
+     * Issue #21: all three of these were a bare `return`.
+     *
+     * **Post this run** is drawn as a filled primary action, and a filled primary action that
+     * consumes a click and produces nothing at all is worse than a disabled one — the player
+     * cannot tell whether it worked, whether it is still going, or whether the screen is broken.
+     * `menu/screens.ts` disables the row and supplies a `disabledWhy` for each of these cases, and
+     * that is the right place for the affordance; this is the backstop for every route that reaches
+     * the handler anyway, and it costs three sentences.
+     *
+     * The sentences are distinct on purpose, for `leaderboardBody`'s own reason: *there is no
+     * server* is about the deployment, *there is no run* is about the screen, and *nobody is
+     * signed in* is about the player. One sentence for all three would tell a signed-in player
+     * with a finished run to sign in.
+     */
     const recording = state.recording;
-    if (client === undefined || recording === undefined) return;
+    if (recording === undefined) {
+      accountState = withNotice(
+        accountState,
+        'There is no finished run to post yet. Run a shift from Scenarios or Free play, then come ' +
+          'back — the run on screen is what gets posted.',
+      );
+      drawMenu();
+      return;
+    }
+    if (client === undefined) {
+      accountState = withNotice(accountState, NO_SERVER_POST);
+      drawMenu();
+      return;
+    }
     const token = accountState.token;
-    if (token === undefined) return;
+    if (token === undefined) {
+      accountState = withNotice(accountState, postingRefusal(accountState) ?? NO_SERVER_SIGN_IN);
+      drawMenu();
+      return;
+    }
 
     /*
      * The fourth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
@@ -1102,8 +1387,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
 
-    accountState = busy(accountState, true);
-    drawMenu();
+    // Same escalation as the sign-in path: the server this posts to is the one § D243 measured at
+    // 28.7 s cold, and a primary action that goes quiet for half a minute reads as the dead button
+    // #21 is about.
+    const done = startWaiting('Posting this run…');
     const result = await client.submit(token, {
       run: {
         buildingId: state.buildingId,
@@ -1115,6 +1402,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       claimed: claim.claimed,
     });
+    done();
     accountState = withNotice(
       accountState,
       result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
@@ -1130,7 +1418,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     account: () => accountState,
     leaderboard: () => boardView,
     viewMode: () => state.mode,
-    challenge: () => (client === undefined ? undefined : challengeView),
+    /*
+     * Handed over **even with no server** — issue #32, and the change is one word.
+     *
+     * This returned `undefined` when there was no client, which sent `challengeBody` down its own
+     * fallback and printed the sentence #29 is about. The screen now always has a
+     * `ChallengeScreenInput`, so the sentence a player reads is `challengeView.notice`, which this
+     * file authored: what a challenge is, what is scored, what *the same seeds* buys, and how a set
+     * is submitted. None of that depended on the server, and four of #32's five questions were
+     * unanswerable only because the screen had nowhere to put the answer.
+     */
+    challenge: () => challengeView,
     calendarPeriodId: () => state.calendar?.id ?? '',
     commissioning: () => commissioningInput(),
     runState: () => {
@@ -1402,6 +1700,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   applyTheme();
   renderAll();
   runShift();
+  /*
+   * The mailed link, redeemed on the way in.
+   *
+   * After `runShift()` so a slow redemption never delays the thing the page is for, and **before**
+   * `urlWritable` so the fragment is gone before anything else writes an address. It clears the
+   * fragment synchronously and then awaits, so nothing later in this file can observe the token and
+   * nothing this build writes can carry it.
+   */
+  void redeemLinkFromHash();
   urlWritable = true;
   /*
    * The one write boot itself owes — the `SH-09` residual (§ D198). The flip above happens after

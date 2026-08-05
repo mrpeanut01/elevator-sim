@@ -16588,3 +16588,217 @@ One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix 
 joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
 and, following the file's own discipline, both values are asserted explicitly below the comparison
 rather than waved away.
+
+---
+
+## D246 — the viewer was stale against its own server, and the password field was the dangerous half
+
+**Date: 2026-08-05 · Written with the code, and says so.** § D241 deleted the password path from the
+server and § D243 gave the shipped page a `<meta name="elevator-sim-api">` so the viewer could
+finally reach it. Between those two landing and this one, the account screen was in the worst state
+it has ever been in: a **live** email-and-password form, now pointed at a server that answers, whose
+`POST /api/login` is a 404. This is the client half, and what it deleted rather than disabled.
+
+### 1. The password field was not a layout problem, and "disabled" would not have fixed it
+
+Play-tester issue **#30** reports the screen in its rendered order — **Sign in**, **Back**, **Create
+an account**, `Email`, `Password` — and files the ordering. The ordering is real and it is the small
+half. The large half is that an `<input type="password">` which is presented as functional, accepts
+input, and is wired to nothing is **a keystroke collector by accident**. People reuse passwords, and
+the player has no way to learn the field goes nowhere until after they have typed into it.
+
+So the field is **gone**: not greyed, not `readonly`, not behind a notice — on the same footing
+§ D241 § 5 deleted `passwordIssues` and `SCRYPT_PARAMS` rather than deprecating them.
+`menu/account.ts` has no `password` on its form, no `MIN_PASSWORD_LENGTH`, no `MAX_PASSWORD_LENGTH`
+and no state in which the word can appear; `client.test.ts` asserts that over **every** state the
+reducers can produce, by `JSON.stringify`, rather than over the type.
+
+And the type is not the mechanism either, because the field lived in a **panel** and the type lived
+in a model. A sweep scoped to `menu/` would have gone green with the password box still on screen.
+So the mechanism is a lexical sweep of every non-test module under `packages/viz/src` — comments
+blanked, because half a dozen modules now *discuss* there being no password — for a string literal
+that **is** the word: `'password'` as an input type, `'Password'` as a label, `'password'` as a form
+key. It has a positive control, because a walk that reads nothing passes every rule.
+
+### 2. The mode toggle was not relabelled, it was removed, and the reason is the enumeration oracle
+
+Issue **#31** is that *Create an account* keeps the **Sign in** button label and prints the sign-in
+error. The obvious fix is to derive the label from the mode. It is the wrong fix, because **there is
+no mode**.
+
+§ D241 § 7: asking for a display name **only when the address is new** tells the person filling in
+the form whether the address is new — the account-enumeration oracle the server closes by answering
+`POST /api/auth/request-link` with identical bytes either way, rebuilt in the interface. One door:
+type an address, a link is emailed, opening it signs you in, and if the address was new the link
+created the account. The name is asked for afterwards, over a session that already proves the
+address, and `displayNameChosen` on the wire is what makes it exactly once — a client that
+recognised the server's generated `player-<12 hex>` **by its shape** would be a second place
+deciding what a generated name looks like, and would stop asking anybody anything the first time
+that generator changed.
+
+`AccountForm` therefore has two fields and never both at once, and `formIssues` takes the **state**
+rather than the form, because which field is live is a fact about the session. That is the split
+that let #31 happen: a caller decided the mode, and the sentence and the button label were decided
+somewhere else.
+
+### 3. What #29 reported is true, and its *diagnosis* is not — the correction is the load-bearing part
+
+Issue **#29** files three sentences of the form *"This build was not compiled against a server"* as
+build jargon aimed at whoever compiled the binary. That is right: it uses *compiled* as a transitive
+verb with a preposition most readers have never seen, it implies the player could obtain a different
+build (there is no download — it is a hosted URL), and *"there is no challenge to fetch"* exposes an
+HTTP verb as game vocabulary.
+
+**It is also false, and not in the way the issue says.** It was never a compile-time fact. § D215 § 4
+reads a `<meta>` tag **at run time** and § D243 has the server inject that tag into the page it is
+already serving — so the *same bytes* are a connected build behind the server and an unconnected one
+behind a CDN. The sentence named the wrong mechanism, confidently, on the first prose most players
+read. A rewrite that only removed the jargon would have kept the untruth.
+
+The second half of #29 is the sharper one and it stands unmodified: *"Everything else on this menu
+works without one"* was printed on a menu where **two of the other five rows** — Leaderboard and
+Account — also do not (issue **#28**). The one sentence written to reassure the player was the one
+sentence that was wrong. All three replacements now name which rows need a server and which do not,
+by name, and none of them claims a build fact.
+
+**The case they describe is still real.** A bundle served from a CDN with no server beside it never
+passes through § D243's injection, gets no tag, and lands here. This is a rewording of a live path,
+not the removal of a dead one.
+
+### 4. Two screens can teach their own subject with the server off, and one of them could not reach the page at all
+
+Issues **#32** and **#34** are the same finding on two screens: an empty state that is *blank* rather
+than *empty*. Four of #32's five questions — what is scored, what *the same seeds* means, how long a
+week runs, how a set is submitted — are properties of the game's design and answerable with no
+server at all. #34's is the same: what a board is, what a row carries, what orders it.
+
+The challenge screen could not answer them for a mechanical reason worth recording. `dev/main.ts`
+handed `menu/screens.ts` an `undefined` challenge input whenever there was no client, so
+`challengeBody` fell through to its own hard-coded fallback and there was **nowhere to put an
+answer**. The fix is one word — the input is always supplied — and the prose then has a channel.
+
+Both explanations are held as non-exported constants in `dev/main.ts` rather than as new exports.
+`honesty/derive.test.ts` requires an adapter for any exported text producer, and this lane does not
+own `honesty/surfaces.ts`; the constants are still read by the R10 static pass, which reaches inside
+function bodies.
+
+What they say is bounded by the same discipline as everything else here. The board explanation ends
+on § D106 generalised — four figures side by side, one orders the rows, none is folded into another
+— and the challenge explanation says outright that ordering a board is a fact about what was posted
+and **never** a claim that one dispatcher beats another, because Compare is the only surface allowed
+to say that and only with a paired-t interval excluding zero. Neither screen gained a composite
+score, and the server's own `note` is still printed verbatim wherever there is a board to print it
+beside.
+
+### 5. Three silent returns, and the one control that now says why it does nothing
+
+Issue **#21**: **Post this run** is drawn as a filled primary action and, clicked with no server,
+produced nothing at all — no toast, no navigation, no error. `submitScore` opened with three bare
+`return`s: no client, no recording, no session. `menu/screens.ts` disables the row and supplies a
+`disabledWhy` for each, which is the right place for the affordance; this is the backstop for every
+route that reaches the handler anyway, and it costs three sentences. They are **three** and not one,
+for `leaderboardBody`'s own reason: *there is no server* is about the deployment, *there is no run*
+is about the screen, and *nobody is signed in* is about the player, and one sentence for all three
+would tell a signed-in player with a finished run to sign in.
+
+The `account-mode` intent is answered the same way. `MenuIntent` still carries it, so the arm exists;
+it now says what happened to the second door instead of silently doing nothing, which is #21's defect
+wearing #31's clothes.
+
+### 6. One export was deleted on the way past, and it is worth naming why
+
+`menu/account.ts#busy` set a boolean and gave a screen no way to say anything while a request ran.
+Once `pending` existed — see § D247 — every caller moved, and what was left was an export with no
+non-test caller. It is deleted rather than kept for symmetry. It had a caller before this change, so
+it is **not** a twelfth dead seam and the running count in `CLAUDE.md` does not move; it is recorded
+because the rule applies to a four-line reducer in `menu/` exactly as it applied to the deck API.
+
+---
+
+## D247 — a cold start is a correct answer that takes half a minute, and a link token is cleared before it is spent
+
+**Date: 2026-08-05 · Written with the code.** Two client-side consequences of facts measured
+elsewhere: § D243 § 4's **28.7 s** cold `GET /api/challenges` against the live app, and § D241 § 4's
+fragment-borne link token. Both are cases where the obvious implementation is wrong in a way that
+only shows up in the deployment.
+
+### 1. Nothing is cancelled, because the failure it would report is a lie
+
+The Container App runs at `minReplicas: 0`. The first request after a quiet spell takes about half a
+minute **and succeeds**. Two obvious responses are both wrong, in opposite directions.
+
+A client-side deadline — `AbortSignal.timeout(10_000)`, the default nobody argues about — turns that
+into `CLIENT_FAILURES.unreachable`: *"The leaderboard server could not be reached."* That sentence is
+false, and it is the one wording on this surface that tells the player to give up. It would also fire
+**only in production**, because a development server answers instantly.
+
+Saying nothing for thirty seconds is the other failure and it is not much better: it is
+indistinguishable from a hang, and a player who reloads mid-request has spent one of § D242's three
+per-address links on a request that was working.
+
+So `menu/client.ts` sets **no timeout and no `AbortSignal`**, and asserts that about itself
+lexically, over its own source with comments stripped — because the file's docstring explains at
+length the very thing the scan forbids, and because *"we do not time out"* is a claim about every
+future edit rather than about this one. The behavioural half is asserted too: a transport that never
+resolves is still unsettled eight microtask turns later, which is where anything that was going to
+give up on its own would have done it.
+
+The wording escalates instead, on a timer **beside** the request rather than inside the client — the
+client has no screen to write to. `menu/account.ts#pending` is what made that expressible: *busy* and
+*has a sentence* had to be able to hold at the same time, and `withNotice` clears `busy` by
+construction because it is what ends a request. Four seconds is late enough that an awake server
+never shows the escalation and early enough to beat a player's patience.
+
+### 2. The fragment is cleared before the request, not after it
+
+§ D241 § 4 puts the token in the URL **fragment** because a fragment is never transmitted: a mail
+client, a scanner or a corporate link-rewriting appliance that fetches the URL cannot carry the token
+anywhere, let alone spend it, and it stays out of access logs, ingress traces and `Referer`. That
+property is about the **link**. It says nothing about the address bar the player is now looking at,
+which is shoulder-surfable, pasteable into a bug report, and preserved by a reload.
+
+So `dev/main.ts` clears it — and clears it **before** awaiting the redemption, which is the ordering
+that matters and the one a reader would get wrong. With the clear after the response, a reload during
+a 28.7-second cold start re-sends a token the first attempt is in the middle of spending, and the
+second attempt comes back `link-spent`: a correct refusal, generated by this file, shown to a player
+who did nothing but reload a slow page. The redemption is kicked off after boot's `runShift()`, so a
+slow sign-in never delays the thing the page is for, and before `urlWritable`, so nothing else writes
+an address while the token is still in it.
+
+The token is passed to `redeem` and reaches nothing else: no notice, no log, no URL this build
+constructs. `client.test.ts` asserts it is in the **POST body** and not in the request URL, and that
+each of the three refusals — `link-expired`, `link-spent`, `link-invalid` — carries the server's own
+sentence with no part of the token anywhere in the serialised failure.
+
+The three are kept distinct rather than collapsed, because *whether asking again will help* differs
+between them: expired and spent both mean *ask again*, invalid means *that is not one of ours*. The
+`405` on `GET /api/auth/redeem` is kept distinct from all three for the same reason — folding it into
+`link-invalid` would tell a player their link was broken when a scanner had merely looked at it.
+
+### 3. A 429 disables the form, and the client does not say which budget was spent
+
+§ D242 charges two budgets — three per address per fifteen minutes, thirty per caller — and its
+refusal **names a duration and deliberately does not name which budget**, because *"this address has
+had too many"* is the enumeration oracle by a longer route.
+
+The client reads `retryInMs` and nothing else out of that body. `menu/client.ts` carries a refusal's
+whole body and does not parse it — one job, carry rather than interpret — so the read is
+`menu/account.ts#linkRetryInMsOf`, on exactly the footing `challengeNotOpenOf` reads the 409 next
+door. It checks the **code** as well as the field, so a stray `retryInMs` on some unrelated 400
+cannot silently disable the form, and it refuses a duration that is missing, non-numeric, zero,
+negative or `NaN` — a gate held open by `NaN` milliseconds is a form that never comes back.
+
+`canSubmitForm` is false while it is set, so a rate-limited player cannot spend a second request the
+server has already promised to refuse, and the shell lifts the gate on its own when the wait is over.
+`rateLimited` deliberately does **not** set `linkSent`: nothing was sent, and telling somebody to
+check their inbox for a message that does not exist is how a refusal becomes a wait with no end.
+
+### 4. The 202 is shown in the server's words, and that is a rule rather than laziness
+
+`POST /api/auth/request-link` answers **identical bytes** whether or not the account exists, and its
+`detail` is the only place the expiry is put into words. So the client shows it unchanged and refuses
+a 202 that carries no sentence as `unexpected-response` rather than supplying a fallback — a client
+fallback here would be a second answer to *how long have I got*, drifting the first time § D241 § 3's
+fifteen minutes moved. `client.test.ts` asserts the notice contains no *welcome back*, *account
+created* or *already have*: the server went to some trouble to close the oracle on the wire, and
+prose is a perfectly good place to reopen it.

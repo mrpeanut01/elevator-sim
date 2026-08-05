@@ -18,6 +18,24 @@
  * It does not compute a score, and it does not decide whether a run is quotable. The server
  * re-simulates and measures for itself (§ D214 § 3); a client-side figure is a *claim*, and this
  * module's job is to carry the claim, not to believe it.
+ *
+ * ## Sign-in is a mailed link, and there is nothing here that takes a password
+ *
+ * § D241. `/api/register`, `/api/login` and `/api/confirm` are gone from the server and the two
+ * methods that called them are gone from here; {@link LeaderboardClient.requestLink} and
+ * {@link LeaderboardClient.redeem} replace them. The absence is asserted rather than described —
+ * `client.test.ts` reads the server's own source and fails if a password rule ever returns while
+ * this half is still an email-only form.
+ *
+ * ## Nothing here gives up early, and that is a decision rather than an omission
+ *
+ * The server runs at `minReplicas: 0` and a cold `GET /api/challenges` against the live app was
+ * measured at **28.7 s** (§ D243 § 4). So this module sets **no timeout and no `AbortSignal`**: a
+ * client that gave up at five or ten seconds would turn the first request after an idle period into
+ * `unreachable`, which is the one failure sentence that is wrong here — the server is reachable and
+ * is starting. Telling the player something is happening is the *caller's* job, and `dev/main.ts`
+ * does it on a timer beside the request rather than by cutting it short. `client.test.ts` asserts
+ * the absence lexically, because *"we do not time out"* is a claim about every future edit.
  */
 
 import type {
@@ -32,13 +50,37 @@ import type {
  * The wire types
  * -------------------------------------------------------------------------- */
 
-/** A signed-in player, as the server describes them. */
+/**
+ * A signed-in player, as the server describes them.
+ *
+ * **`confirmed` is gone, and its absence is the point.** § D241 § 5: it existed because a password
+ * issues a session to somebody who has not proved they can read the address. A mailed link cannot —
+ * the session in this client's hand was minted by redeeming a token that arrived at the address —
+ * so the flag would have been `true` for everybody who could ever observe it, and a gate that
+ * cannot fire is this repository's most-repeated defect.
+ *
+ * `displayNameChosen` replaces it and does the opposite job: it is `false` exactly once per
+ * account, and it is on the wire so the viewer can ask for a name **once** rather than recognising
+ * a generated one by its shape — which would be a second place deciding what one looks like.
+ */
 export interface AccountSummary {
   readonly id: string;
   readonly email: string;
   readonly displayName: string;
-  /** Unconfirmed accounts may play; they may not post a score. § D214 § 5. */
-  readonly confirmed: boolean;
+  /** False until the player has named themselves. § D241 § 7 — prompt exactly once. */
+  readonly displayNameChosen: boolean;
+}
+
+/**
+ * What `POST /api/auth/request-link` answers — **identical bytes whether or not the account
+ * exists**, which is the account-enumeration oracle the whole flow is shaped around.
+ *
+ * `detail` is the server's own sentence and is shown unrewritten. It is the one place the expiry is
+ * put into words, and rewording it here would be a second answer to *how long have I got*.
+ */
+export interface LinkRequested {
+  readonly detail: string;
+  readonly expiresInMs: number;
 }
 
 /** The run half of a submission — the same fields Free Play selects, by construction. */
@@ -259,14 +301,49 @@ export function fetchTransport(fetchLike: typeof fetch): Transport {
  * -------------------------------------------------------------------------- */
 
 export interface LeaderboardClient {
-  register(input: {
-    email: string;
-    displayName: string;
-    password: string;
-  }): Promise<Result<{ token: string; user: AccountSummary }>>;
-  login(input: { email: string; password: string }): Promise<Result<{ token: string; user: AccountSummary }>>;
+  /**
+   * Ask for a sign-in link. **There is no second door** — no register, no login, no password.
+   *
+   * `/api/register`, `/api/login` and `/api/confirm` are gone (§ D241 § 5), and this method is not
+   * a rename of any of them: it does not know or say whether the address is new, and the 202 it
+   * returns is byte-identical either way. A client that offered *sign in* and *create an account*
+   * as separate actions would rebuild that oracle in the interface, which is why there is one
+   * method here and not two.
+   *
+   * Refusals worth handling by name: **400** `invalid-address` with `issues`, and **429**
+   * `too-many-link-requests`, whose body carries `retryInMs` — read it with
+   * `menu/account.ts#linkRetryInMsOf`, on the same footing `challengeNotOpenOf` reads the 409.
+   */
+  requestLink(email: string): Promise<Result<LinkRequested>>;
+  /**
+   * Spend a mailed link and take the session it mints.
+   *
+   * A **POST**, deliberately: § D241 § 4's second mechanism. Mail clients, corporate link-rewriters
+   * and scanners fetch every URL in a message, and nothing that follows a link issues a POST — so
+   * a prefetch cannot spend a player's link. The first mechanism is the caller's: the token arrives
+   * in the URL **fragment**, which is never transmitted, and the caller clears it once redeemed.
+   *
+   * The three 400s — `link-expired`, `link-spent`, `link-invalid` — are distinguished *for the
+   * person holding the link*, because whether asking again will help differs. Each arrives with the
+   * server's own sentence.
+   *
+   * The link token is a credential. It is passed here and is never put in a notice, a log or a URL
+   * this client builds.
+   */
+  redeem(linkToken: string): Promise<Result<{ token: string; user: AccountSummary }>>;
   logout(token: string): Promise<Result<null>>;
   me(token: string): Promise<Result<AccountSummary>>;
+  /**
+   * Choose the name that goes on every board.
+   *
+   * A second request rather than a field on the link request, and § D241 § 7 is why: a form that
+   * asked for a name **only when the address was new** would tell the person filling it in whether
+   * the address was new.
+   *
+   * **409 `name-taken` is reported as such and a taken address never is**, and the asymmetry is not
+   * an oversight: a display name is printed on every board, so it is already public.
+   */
+  setDisplayName(token: string, displayName: string): Promise<Result<AccountSummary>>;
   submit(
     token: string,
     submission: { run: RunSubmission; claimed: ClaimedMetrics },
@@ -348,15 +425,31 @@ export function createClient(origin: string, transport: Transport): LeaderboardC
       : undefined;
   };
 
+  const user = (body: unknown): AccountSummary | undefined =>
+    (body as Record<string, unknown> | null)?.['user'] as AccountSummary | undefined;
+
   return {
-    register: (input) =>
-      call({ method: 'POST', url: `${base}/api/register`, token: undefined, body: input }, session),
-    login: (input) => call({ method: 'POST', url: `${base}/api/login`, token: undefined, body: input }, session),
+    requestLink: (email) =>
+      call({ method: 'POST', url: `${base}/api/auth/request-link`, token: undefined, body: { email } }, (body) => {
+        const record = body as Record<string, unknown> | null;
+        // `detail` decides the shape, because it is the only field a screen has to show. A 202 with
+        // no sentence in it is a build this client does not understand, and drawing "check your
+        // email" over it would be inventing the one wording § D241 § 7 keeps on the server.
+        return typeof record?.['detail'] === 'string'
+          ? {
+              detail: record['detail'],
+              expiresInMs: typeof record['expiresInMs'] === 'number' ? record['expiresInMs'] : 0,
+            }
+          : undefined;
+      }),
+    // The link token travels in the **body** of a POST and never in the URL: a query string reaches
+    // access logs, ingress traces and `Referer`, and this one is a credential.
+    redeem: (linkToken) =>
+      call({ method: 'POST', url: `${base}/api/auth/redeem`, token: undefined, body: { token: linkToken } }, session),
     logout: (token) => call({ method: 'POST', url: `${base}/api/logout`, token, body: {} }, () => null),
-    me: (token) =>
-      call({ method: 'GET', url: `${base}/api/me`, token, body: undefined }, (body) =>
-        (body as Record<string, unknown> | null)?.['user'] as AccountSummary | undefined,
-      ),
+    me: (token) => call({ method: 'GET', url: `${base}/api/me`, token, body: undefined }, user),
+    setDisplayName: (token, displayName) =>
+      call({ method: 'POST', url: `${base}/api/me/display-name`, token, body: { displayName } }, user),
     submit: (token, submission) =>
       call({ method: 'POST', url: `${base}/api/scores`, token, body: submission }, (body) => {
         const record = body as Record<string, unknown> | null;
