@@ -17098,3 +17098,366 @@ repeating tick, so a band change is announced exactly once: a polite region rewr
 a screen reader talking over the player for half a minute. Nothing animates, so there is nothing for
 `settings.reduceMotion` to suppress — a change of words is what a reader who asked for less motion
 still wants.
+## D254 — access zoning was asked about the pickup floor, and a credential does not govern where you may be collected
+
+**Date: 2026-08-05 · Written after the code, and the measurement is the reason it is written at
+all.** `packages/core/src/model/car/estimateCost.ts`'s `infeasibilityOf` had two access-zoning
+checks. Check 4 asked about the request's *destination* and was right. Check 3 asked about the
+request's own `floorId`:
+
+```ts
+if (!isAccessPermitted(snapshot.shaft, request.credentialGroup, request.floorId)) {
+  return 'accessDenied';
+}
+```
+
+For a **hall call**, `request.floorId` is the landing the car is being summoned *to* — the pickup.
+And `isAccessPermitted` (`model/car/types.ts`) ends `return credentialGroup !== undefined &&
+permitted.has(credentialGroup)`, so an **undefined** credential fails against any floor that
+declares `permittedCredentialGroups`. Under `dispatch.callType: 'up-down-buttons'` a landing call
+carries no credential *by construction* — `costRequestFor` drops it — so every car in the bank
+answered `accessDenied` and the call was never collected.
+
+This is recorded as a **modelling error**, not a threshold that was set wrong, and one layer subtler
+than the rule `CLAUDE.md` states. The rule says the three kinds of zoning must never be collapsed
+into one field, and they were not: service, access and operational zoning are three separate
+questions here and always were. What was collapsed is the **pickup floor and the destination floor
+into one access question**.
+
+### Why the pickup is not an access question
+
+A credential governs *where you may go*. It does not govern *where you may be collected*, and there
+is no lift in the world that behaves as this one did.
+
+- Under conventional control the reader is **inside the car** and gates the car-call buttons. The
+  landing buttons are live for anybody standing there. (CIBSE Guide D, § 10, on security and lift
+  control.)
+- Under destination control the landing terminal takes credential and destination **together**, and
+  authorizes the *destination*. (ISO 8100-32.)
+- Where entry to a lift lobby really is restricted, the control is a locked door or a turnstile —
+  building fabric, upstream of the lift, and gating *arrival* at a floor rather than departure from
+  it.
+
+A resident already standing on floor 40 pressing "down" is through whatever control protects floor
+40; the lift has nothing left to authorize. Refusing would also make every restricted floor
+un-evacuable by lift, which no code permits.
+
+The issue report offered a fourth reading — that a restricted *pickup* might model something real
+and deserve its own field. It is not adopted, and the reason is this repository's own rule: no
+shipped building uses `accessZones` for anything but tenancy, so a field for it would be
+configurable, unit-testable and called by nothing. That is the dead seam this project counts, and
+building one to preserve a defect would be the worst version of it.
+
+### What was done
+
+Check 3 is **deleted**, not narrowed, and `accessDenied` is deleted with it from
+`INFEASIBILITY_REASONS`, `INELIGIBILITY_REASONS` and `STRUCTURAL_INELIGIBILITY`.
+
+Narrowing was considered and rejected. The only request whose `floorId` *is* a destination is a car
+call, and `costRequestFor` — the one production builder of a `CostRequest` — sets `kind: 'hall'`
+unconditionally. A branch scoped to car calls would have had **no non-test caller anywhere in the
+tree**: a twelfth dead seam, created deliberately, in the file this repository's standing
+requirement is about. There is one access question in this model and `destinationAccessDenied` is
+its name.
+
+### Why this does not loosen the credential model
+
+Because the credential model was never in `estimateCost`. The runner enforces it **per passenger,
+with the passenger's real credential**, twice:
+
+- `Simulation.#bankCanCarry` — `isAccessPermitted(passenger.credentialGroup,
+  passenger.destinationFloorId)` — stops a rider heading a call their badge cannot complete;
+- `Simulation.#carCanCarry` — the same question at the doorway — stops them boarding a car sent for
+  somebody else.
+
+So a rider whose destination their badge does not reach is refused whether or not any dispatcher
+ever priced their call. Check 4 authorizes a *disclosed* destination one step earlier than that,
+which is the whole of what a destination call type buys, and `#kioskAllows` — the bare
+`destination-entry` kiosk, which has nothing to identify anybody with — is now the only shipped
+producer of a structural access refusal. `sim/simulation.test.ts` asserts the refusal from three
+sides: an unauthorised destination is refused from an unrestricted pickup, from a restricted one,
+and unbadged.
+
+**That argument is not left as an argument, because the failure mode it rules out is worse than the
+defect.** A version of this fix that deleted one check while wrongly believing the other covered the
+case would produce runs that look perfect and quietly walk an unbadged visitor onto floor 45 — the
+defect stranded people loudly, and a hole here would be silent. So it is measured, in
+`sim/accessZoning.test.ts`, over the **record** rather than a summary, because a statistic cannot
+say which floor somebody got out at: five access-zoned buildings × three conventional dispatchers ×
+two seeds, **31 431 legs ridden to their end, 7 047 of them alighting on a restricted floor, and
+zero carrying a credential that floor does not permit.** Both counts carry floors under them, so a
+run that stopped delivering anybody to a restricted floor could not satisfy it vacuously.
+
+### The measurement
+
+60 cells — five shipped buildings × four dispatchers × three seeds — run before and after, on the
+same seeds:
+
+| | cells | outcome |
+|---|---|---|
+| `garden-apartments`, `midtown-office` (no `accessZones`) | 24 | **byte-identical**, every field |
+| `destination-eta` on the three zoned buildings | 9 | **byte-identical**, every field |
+| conventional arms on the three zoned buildings | 27 | **all moved**, every one `timed-out` → `completed` |
+
+Every one of the 27 goes to 100 % delivery. `mixed-use-high-rise`/`collective`/424242 — the cell the
+issue reported — goes from 642 of 725 delivered to **725 of 725**, exactly reproducing the
+controlled isolation the reporter ran by setting `accessZones: []` and changing nothing else.
+`vertical-city` goes 1 855 → 1 976, `secure-tower` 455 → 473.
+
+The 33 unmoved cells are the control, and they are what says this is the access check rather than a
+perturbation of dispatch. The same split appears independently in
+`traffic/transportIdentity.test.ts`: nine of its fifteen pinned identity cells moved and six did not,
+and the six are exactly the two unzoned buildings.
+
+The correctness oracle (`sim/oracle.test.ts`, the closed-form Barney/CIBSE round-trip comparison) is
+unmoved and green.
+
+---
+
+## D255 — nine pinned identity cells re-measured, and the six that held are the evidence
+
+**Date: 2026-08-05 · Written after the measurement.** [§ D254](DECISIONS.md) moves runs rather than
+record keys, which makes this re-pin a different shape from [§ D205](DECISIONS.md)'s and
+[§ D245](DECISIONS.md)'s. Those moved **all fifteen** cells because the result grew a field. This
+moves **nine**, and the six it does not move are the point.
+
+Re-measured together, in one run of one tree, following the instruction
+`dayStartIdentity.test.ts` already carried — *"if a future change moves the results, these move with
+`BASELINE_STRUCTURAL` and the two tables are regenerated together"*:
+
+| table | file | moved |
+|---|---|---|
+| `BASELINE_STRUCTURAL` | `traffic/transportIdentity.test.ts` | 6 of 12 |
+| `MOVED_STRUCTURAL` | `traffic/transportIdentity.test.ts` | 3 of 3 |
+| `BASELINE_HEADLINE` | `traffic/transportIdentity.test.ts` | 9 of 15 |
+| `SUPERSEDED_STRUCTURAL` | `traffic/dayStartIdentity.test.ts` | 9 of 15 |
+
+The nine are `mixed-use-high-rise`, `secure-tower` and `vertical-city` under `nearest-car`, `eta`
+and `collective`. The six that held are `garden-apartments` and `midtown-office` — same digest, same
+eight headline reals to the last place — and they declare no access zones.
+
+**§ D244's one-key claim survives, and was re-checked rather than inherited.** `dayStartIdentity`'s
+whole point is that deleting `startOfDayS` from a current result reproduces the superseded digest
+exactly, for all fifteen. Both tables were regenerated from the same run, so that is still a
+measurement; the byte-for-byte hour-stripped comparison was re-run for all fifteen cells and holds.
+
+Two core censuses moved with them, and one of them is a result rather than a re-pin:
+
+- `sim/doubleDeckSeam.test.ts`'s shuttle-move census. It pinned `[paired, single]` per dispatcher
+  and asserted that **two** of three shipped dispatchers save moves and one draws — adding, in its
+  own comment, *"if a change makes this three, that is a result and it should be read as one."* It
+  is now **three**. The draw was `eta` at 245/245, measured on a `vertical-city` whose shuttle was
+  starved by § D254's refusal; served properly, `eta` saves 23 moves (273 against 296) and every
+  shipped dispatcher is better off paired than single. Re-pinned, still pinned, and read as a
+  result.
+- `config/doubleDeck.test.ts`'s per-deck dwell-sizing bound. It was a flat 5 % on
+  `|projected − boarded|`, calibrated at 700 vs 701 and 339 vs 338 — near-exact agreement on a
+  building that was barely being served. Served properly the lower deck now **fills**, 72 times at
+  this seed, and the projection reads 839 against 794. **The bound was re-pointed at the mechanism
+  rather than widened past it**, and is stricter in the case that matters: the projection may never
+  be *short* by more than 5 % (the direction that under-sizes a stop and which nothing legitimate
+  produces), and any *overshoot* must be within `doubleDeckDeckFullRefusals`. With no refusals that
+  collapses to `projected <= boarded`, which is tighter than the 5 % it replaces.
+
+## D256 — H-ACCESS-1 is REFUTED, and the published record is smaller than the fear and worse than nothing
+
+**Date: 2026-08-05 · Written after the measurement, and nothing here is regenerated.**
+[§ D254](DECISIONS.md) changes what every access-zoned building does under every conventional
+dispatcher, and this repository publishes 993 pinned interval estimates, eight Pareto fronts and six
+coverage rows. The first question was *how much of that was measured on a simulator that could not
+collect people from restricted floors*. It was measured rather than assumed, and the answer has two
+halves that point in opposite directions.
+
+### The reassuring half, and it is the larger one
+
+**Not one interval pin moved. Not one Pareto front moved. Phase 8's verdict is untouched.**
+
+- `benchmark/matrix.test.ts` is **green in full**: all **352** `matrix` pins, including the 132 on
+  `secure-up-peak`, `mixed-use-up-peak` and `vertical-city-up-peak`, and all **8** `PINNED_FRONTS`
+  entries, membership, dominated set, identity classes and verdict counts alike.
+- `benchmark/accessControl.test.ts`'s *"reproduces every pinned estimate, at full precision"* is
+  **green**: all six `access-control` intervals hold, including H-ACCESS-2's difference-of-differences
+  **`+0.982 [+0.584, +1.380]`** — the figure `CLAUDE.md` and seven other places rest the "the saving
+  is entirely in the credential" correction on.
+
+The reason is not luck and is worth stating, because it is what a reader will want to check. **Every
+matrix cell on a zoned building is an *up-peak* cell.** Up-peak traffic is incoming: every pickup is
+the ground lobby, which on all three buildings is the one floor outside every access zone. The
+defective check only ever fired on a *restricted pickup*, so it never fired in these cells.
+
+`benchmark/mixedUseHighRise.ts` says exactly this, and it turns out to have been right for a reason
+it did not know: *"Every pickup must originate somewhere unrestricted, and on this building that
+means the ground lobby… So incoming-only up-peak is the one regime in which a conventional baseline
+can be measured here at all. It is not a convenient choice — it is the only one."* That constraint
+was adopted because conventional arms were unquotable everywhere else — a symptom of the defect —
+and it had the accidental effect of confining every published interval to the regime the defect does
+not touch. **The published intervals were protected by the defect's own symptom.** That is luck, and
+it should be recorded as luck rather than as design.
+
+So `CLAUDE.md`'s headline — *"`nearest-car` is on the Pareto front at six of eight cells"* — stands,
+at the same n, with the same two exceptions, and § D106's argument that energy is an axis and never
+a score is unaffected. `benchmark/matrixFront.test.ts`, which mechanically checks that claim
+wherever it appears in a `.md` or a `.ts`, is green.
+
+### The half that is worse than a moved number
+
+**H-ACCESS-1 is REFUTED, by its own apparatus, and the study now says so itself.**
+
+The hypothesis (`benchmark/accessControl.ts`) reads: *"Under conventional dispatch an
+access-controlled building with down and interfloor traffic is **not servable at all**; under
+credential-aware dispatch it is."* Re-run at its own n = 30, unchanged in any other way:
+
+| row | pinned | measured now |
+|---|---|---|
+| `secure-tower/eta` | 30 of 30 not completed · 18.17 undelivered/run · 33.5 % unserved · **not quotable** | **0 of 30 not completed · 0 undelivered · 0.00 % unserved · quotable** |
+| `secure-tower/destination-entry-bare` | 30 of 30 · 52.23 undelivered · **100 %** unserved · 28.97 kiosk-refused | 30 of 30 · 36.50 undelivered · **61.2 %** unserved · 36.50 kiosk-refused |
+| the other four rows | all zero, quotable | **unchanged** |
+
+`study.coverage.verdict` returns **`'REFUTED'`** where `'CONFIRMED'` is pinned.
+
+This is not a number that moved. It is a **claim that was never true**, stated as fact in
+`CLAUDE.md`, `docs/01`, `docs/05`, `docs/07`, `docs/09`, `docs/10`, `docs/11` and in the docstrings
+of six `benchmark/` modules, and it was measuring a bug in `estimateCost`. Conventional dispatch
+serves every access-zoned building this project ships, at 100 % delivery, on every seed tried — and
+`sim/simulation.test.ts` now asserts the *identity* of the two arms on `secure-tower` under `eta`:
+same status, same legs, same wait to the last significant figure. **What the credential buys there
+is nothing at all**, on 30 of 36 conventional (building, dispatcher, seed) cells measured. The six
+that differ are `energy-aware`, which prices `rideTime` and therefore reacts to the disclosed
+destination — and it differs in *both* directions, so it is not an authorization advantage either.
+
+### What survives of access control, and it is real
+
+The bare-kiosk row above. Under `dispatch.callType: 'destination-entry'` with no panel, the
+passenger types a destination into a terminal that has nothing to identify them with, the group is
+asked *"may an unbadged passenger reach floor 27?"*, and every car answers `destinationAccessDenied`.
+That refuses **61.2 %** of journeys on `secure-tower` and is untouched by § D254 — it is authorization
+of a *destination*, which is the only access question a lift is asked.
+
+It also got **cleaner**. The pinned row had 52.23 undelivered against 28.97 kiosk refusals, so 23
+journeys per run were collateral — riders stranded by a pickup refusal that had nothing to do with
+their credential. The measured row has 36.50 against 36.50: **every undelivered leg is now a
+credential refusal and nothing else.** § T50-D1 built `#kioskAllows` to stop exactly that collateral
+and could only remove the share the call value caused; this removes the rest.
+
+### What is withdrawn, and what is deliberately not regenerated
+
+**Nothing in this commit regenerates a published figure, and that is a decision rather than an
+omission.** `regeneratePins.ts` states the discipline — *"a re-run that disagrees with the file is a
+question, not an answer"* — and the questions H-ACCESS-1's refutation raises are not this lane's to
+answer. The premise *"conventional dispatch cannot serve an access-zoned building"* is load-bearing
+for the **design** of five studies, not merely for their numbers: it is why
+`arms.ts`'s `secure-interfloor-mix` carries `admissibleReplications: 0`, why
+`collectiveAdoption.ts` forces `callType: 'mobile-credential'` on nine of its fifteen rungs, why
+`enRouteDiversion.ts` and `doubleDeck.ts` do the same, and why `matrix.ts` lists
+`secure-interfloor-mix` and `mixed-use-mixed-40-30-30` in `EXCLUDED_CELLS`. Those exclusions may now
+be admissible cells, which would *add* rows to the matrix and pin groups to `published.ts`. That is
+a re-design of the experiment matrix and it needs its own criterion, written before the numbers.
+
+So, withdrawn and named rather than quietly replaced:
+
+1. **H-ACCESS-1's verdict and its two `secure-tower` `PINNED_COVERAGE` rows** — refuted, and the
+   coverage table in `docs/05-roadmap.md` § H-ACCESS-1 and `docs/07-handoff.md` (*"0 of 30
+   replications with a quotable AWT, 18.2 undelivered journeys per run, 33.5 % unserved"*) is
+   withdrawn with them.
+2. **Every prose statement that conventional dispatch cannot serve an access-zoned building at any
+   budget.** It is false. It appears in `CLAUDE.md`, six `docs/`, and the docstrings of
+   `benchmark/{accessControl,destinationLiveness,mixedUseHighRise,collectiveAdoption,enRouteDiversion,doubleDeck,arms}.ts`.
+   `simulation.ts`'s two copies and `estimateCost.ts`'s are corrected in this commit; the rest are
+   named here and not yet rewritten.
+3. **The two `EXCLUDED_CELLS` rationales**, which cite the defect as their mechanism.
+4. **`arms.ts`'s `admissibleReplications: 0`** for `secure-interfloor-mix`, whose stated ground —
+   *"there is no budget at which a conventional arm has a quotable AWT here"* — is no longer true.
+
+The experiments suite is **red at exactly these points and green everywhere else**, and it is left
+red on purpose. `CLAUDE.md`'s working agreement is that a criterion which now fails *is the finding*;
+a suite made green by re-pinning a refuted hypothesis would have destroyed the only evidence that it
+was refuted.
+
+The full list, from `npx vitest run --project experiments` — **12 failures in 7 files, out of 1 300
+tests**, and every one of them asserts some form of *"conventional dispatch cannot serve an
+access-zoned building"*:
+
+| file | n | what it asserts, and why it fails |
+|---|---|---|
+| `benchmark/accessControl.test.ts` | 5 | H-ACCESS-1's verdict and its two `secure-tower` coverage rows. **Refuted**, above. |
+| `benchmark/mixedUseHighRise.test.ts` | 2 | § 1's *"unserved fraction RISES as the load falls"* and *"every baseline without a quotable AWT at every rate"*. Both were the defect's signature. |
+| `benchmark/destinationLiveness.test.ts` | 1 | `eligibility.byReason.accessDenied > 0` on the conventional arm. The reason no longer exists, and the refusals it counted were the defect. |
+| `benchmark/doubleDeck.test.ts` | 1 | *"the building's own mixed scenario is structurally closed to a paired comparison"*, on `vertical-city`. Same mechanism, third building. |
+| `benchmark/saturationCensus.test.ts` | 1 | *"the conventional arms are invalid from replication zero on Secure Tower interfloor-mix"*. |
+| `validation/adversarial.test.ts` | 1 | the `access lockout` fixture. Its conservation claim — *never silently dropped* — is worth keeping; its **fixture** needs to become the bare kiosk, which is the surviving lockout. |
+| `validation/goldenRuns.test.ts` | 1 | the negative control needs *a* golden that times out, and the golden that used to was one of these runs. A fixture question, not a result. |
+
+The bottom two are the cheapest and least contentious to re-point, and they are fixtures rather than
+findings. The top five are the finding.
+
+One failure was fixed rather than left, because it was caused by this commit and not by the
+measurement: `validation/documentation.test.ts` asserts that `estimateCost.ts` still carries the
+*descriptive* sentence *"authorize and optimize in one step"*, which § D60's exclusion depends on
+being present and true. Rewriting the header dropped it. It is restored, on the destination check
+where it now belongs — the guard caught a real thing in the exact direction it was written for.
+
+**One failure is not ours and is recorded so nobody re-derives it.**
+`benchmark/weightSetSelection.test.ts` (Phase 6c) failed on one run at **658 099 ms** against its own
+`TIMEOUT_MS = 600_000`, on a machine at load average 595 with several agents' suites in flight. It
+passed on the run before. It also **cannot** be affected: `SELECTION_BUILDING` is `midtown-office`
+and `DEADBAND_BUILDING` is `garden-apartments`, the two buildings that declare no `accessZones` and
+that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untouched.
+
+### The consequence for `packages/viz`, which this lane may not edit but measured anyway
+
+The viz suite fails on this branch — **27 tests across 13 files, out of 2 493**. They fall into two
+kinds. Neither is a defect in the viewer, and both are handed over rather than fixed here.
+
+**All but two are a stale *fixture*.** `live/honesty`, `mode/disclosure`, `dev/leftRail`,
+`dev/rightRail`, `frame/overlay`, `live/noMeans`, `render/describeFrame`, `record/document`,
+`campaign/*` and `access/lockedOut` all need a run that is *suppressed*, *saturated* or *locked
+out*, and each of them reaches for an access-zoned building because those reliably were. They no
+longer are. The tests say so themselves — *"really is suppressed, or the rest of this proves
+nothing"* — which is the precondition check doing exactly its job, and `access/lockedOut` is the
+honest one of the group: there are no locked-out landings any more, which is the whole point of
+§ D254. They need a genuinely suppressed fixture, and one is easy: `midtown-office` at its default
+rate is unzoned, untouched by this change, and reports `awtIsValid: false` on every seed measured.
+
+**`campaign/campaign.test.ts` is where this meets issue #86 and should be read with it.** Its stage-5
+case is titled *"the credential is named, and the lesson is that it is not congestion"* — the viewer
+teaching the player the very lesson that was an artefact. The lesson is now wrong in the other
+direction, and what the player should be told is nothing at all, because the stage is clearable on
+the dispatcher the game selected for them.
+
+**Two are a real question, and it is worth stating precisely.** `authoring/authoring.test.ts` asserts
+the standing requirement against the building editor — *"an access zone changes the run"*, *"one more
+floor inside the zone"*. Both now fail, and **the control is not unwired**. The reason is
+`traffic/generator.ts`: `credentialGroupFor` issues each rider a credential drawn from the zones the
+building declares, and `planDemand` *"has already dropped every pair for which no credential works"*.
+So the traffic model only ever generates journeys somebody is entitled to make. While the pickup was
+being checked, adding a zone changed the run by stranding landing calls regardless of credential —
+the control was observable **through the defect**. With the defect gone, a well-formed zone changes
+nothing on the legs, because everybody bound for a restricted floor holds a badge for it.
+
+Measured directly: `midtown-office`, seed 424 242, with a synthetic zone over floors 8–13 permitting
+a group named `nobody-has-this` — 205 of 699 legs are bound for those floors, all 205 alight there,
+and every one of them carries `nobody-has-this`. The run is byte-identical to the unzoned one under
+both `collective` and `destination-eta`.
+
+That is arguably the right model — a card reader constrains where people may go, and this traffic
+model does not generate people attempting journeys they are barred from — but it means the editor's
+access-zone control has no observable effect on a conventional run, and the test for it needs
+something that does: `credentialAssignment: 'none'`, which the generator already supports, or a
+destination call type that must be *told* the credential. Whoever owns that panel should decide
+which, and the standing requirement says they may not simply delete the test.
+
+### The lesson, in the form this repository already keeps
+
+This is the *stated-mechanism* defect (§ D30, § D60) one level deeper. That one found a **claim about
+why** something performed better which no measurement supported. This one found a claim about **what
+the system can do at all** — *"not servable"* — which was true of the code and false of every
+building it describes, and which nine documents repeated because the simulator kept agreeing with
+them. The apparatus and the claim were the same defect, so no amount of re-measuring could separate
+them.
+
+The check that would have caught it is the one `CLAUDE.md` already states for controls, pointed at a
+building instead: **strip the feature and require the run to change for the reason you claim.** The
+issue reporter ran it in one line — set `accessZones: []`, change nothing else, same seed and
+dispatcher — and `mixed-use-high-rise` went from `timed-out` with 642 of 725 delivered to `completed`
+with 725 of 725. A structural refusal that a *configuration* change makes disappear is not a
+property of the fabric.

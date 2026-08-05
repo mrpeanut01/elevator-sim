@@ -897,7 +897,31 @@ optimization and true as a claim about the credential.** The prior was stated in
 `benchmark/accessControl.ts` before the result, so it could not be adopted afterwards, and every
 replication run was an attempt to make the refutation fail.
 
-**H-ACCESS-1 — coverage. CONFIRMED, categorically, with no interval.** Secure Tower at
+> ## ⚠️ H-ACCESS-1 IS WITHDRAWN — REFUTED 2026-08-05, [§ D256](../DECISIONS.md)
+>
+> **Everything in this subsection measured a defect in `Car.estimateCost`, not a property of
+> conventional dispatch.** Access zoning was applied to a hall call's **pickup** floor; a
+> conventional landing call carries no credential by construction, so every car refused every
+> landing raised inside an access zone and the building could not be operated at all
+> ([§ D254](../DECISIONS.md)).
+>
+> Re-run at the same n = 30, the same seed and the same arms, with only that check corrected, the
+> conventional row reads **30 of 30 quotable · 0.0 undelivered · 0.00 % unserved**, and
+> `study.coverage.verdict` returns **`REFUTED`**. Conventional dispatch serves every access-zoned
+> building this project ships, at 100 % delivery. On `secure-tower` under `eta` the credential arm
+> is now **byte-identical** to the conventional one.
+>
+> What survives is the **bare-kiosk** row, and it is the genuine article — a destination call type
+> with nothing to identify the passenger, refused `destinationAccessDenied` — at **61.2 %** unserved.
+> It also got cleaner: 36.5 undelivered against 36.5 kiosk refusals, so every stranded leg is now a
+> credential refusal and none is collateral, where the pinned row had 23 per run of collateral.
+>
+> The table below is **left standing and not regenerated**, because § D256's point is that these
+> numbers existed. The pins in `PINNED_COVERAGE` are withdrawn rather than replaced: what should
+> take their place is a question about the design of the experiment, not about its arithmetic.
+
+**H-ACCESS-1 — coverage. ~~CONFIRMED, categorically, with no interval.~~ WITHDRAWN — see above.**
+Secure Tower at
 interfloor-mix, 30 replications — `benchmark/accessControl.ts`'s own coverage budget, seed
 20 260 726, re-run 2026-07-28 on the tree carrying the `C35` fix and pinned in that module's
 `PINNED_COVERAGE`:

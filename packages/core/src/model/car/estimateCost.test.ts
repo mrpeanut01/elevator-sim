@@ -761,35 +761,83 @@ describe('feasible', () => {
     expect(estimate.etaSeconds).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it('is false for a denied credential, and true for a permitted one at the same floor', () => {
+  /**
+   * **The pickup floor is not an access question, and this test used to assert that it was.**
+   *
+   * It read: a hall call at restricted floor 9 is infeasible for `staff`, and infeasible for an
+   * unbadged caller. Both assertions were wrong about lifts, and the second was catastrophic —
+   * under `up-down-buttons` *every* landing call is unbadged by construction, so every car
+   * refused every landing call raised inside an access zone and no access-zoned building could
+   * be served by any conventional dispatcher (§ D254).
+   *
+   * The credential governs where you may **go**. Floor 9 asks nothing of somebody already
+   * standing on floor 9.
+   */
+  it('collects from a restricted floor whatever the credential, because a pickup is not an access question', () => {
     const car = makeCar({ shaft: securedShaft() });
 
-    const denied = car.estimateCost({ floorId: '9', direction: 'up', credentialGroup: 'staff' });
-    expect(denied.feasible).toBe(false);
-    expect(denied.infeasibleReason).toBe('accessDenied');
+    // Floor 9 is restricted to `exec`. All three of these are people standing on floor 9 who
+    // pressed a button, and a lift collects all three.
+    expect(car.estimateCost({ floorId: '9', direction: 'up', credentialGroup: 'staff' }).feasible).toBe(
+      true,
+    );
+    expect(car.estimateCost({ floorId: '9', direction: 'up' }).feasible).toBe(true);
+    expect(car.estimateCost({ floorId: '9', direction: 'up', credentialGroup: 'exec' }).feasible).toBe(
+      true,
+    );
 
-    const unbadged = car.estimateCost({ floorId: '9', direction: 'up' });
-    expect(unbadged.infeasibleReason).toBe('accessDenied');
-
-    const permitted = car.estimateCost({ floorId: '9', direction: 'up', credentialGroup: 'exec' });
-    expect(permitted.feasible).toBe(true);
-
-    // An unrestricted floor needs no credential at all: unrestricted means no check, which is
-    // not the same as a permit list that happens to contain everyone.
+    // And an unrestricted floor is unaffected, as it always was.
     expect(car.estimateCost({ floorId: '3', direction: 'up' }).feasible).toBe(true);
   });
 
   it('keeps service zoning and access zoning as separate answers', () => {
     const car = makeCar({ shaft: securedShaft() });
 
-    // Floor 30: no shaft goes there, for anybody. Floor 9: the shaft goes there, but only
-    // for one credential group. Two different questions, two different reasons.
+    // Floor 30: no shaft goes there, for anybody — a physical fact about the pickup, and the
+    // one question the pickup floor *is* asked. Floor 9: the shaft goes there, and access
+    // zoning has nothing to say about being collected from it.
     expect(car.estimateCost({ floorId: '30', credentialGroup: 'exec' }).infeasibleReason).toBe(
       'serviceZone',
     );
     expect(car.estimateCost({ floorId: '9', credentialGroup: 'staff' }).infeasibleReason).toBe(
-      'accessDenied',
+      undefined,
     );
+
+    // Access zoning answers about the destination, and the two reasons stay distinct there:
+    // floor 30 is unreachable by any shaft, floor 9 is reachable but not by `staff`.
+    expect(
+      car.estimateCost({ floorId: '3', destinationFloorId: '30', credentialGroup: 'exec' })
+        .infeasibleReason,
+    ).toBe('destinationServiceZone');
+    expect(
+      car.estimateCost({ floorId: '3', destinationFloorId: '9', credentialGroup: 'staff' })
+        .infeasibleReason,
+    ).toBe('destinationAccessDenied');
+  });
+
+  /**
+   * The other half of § D254, and the one a careless fix breaks: moving the question off the
+   * pickup must not take it off the destination too.
+   */
+  it('still refuses a destination the credential may not reach, from any pickup', () => {
+    const car = makeCar({ shaft: securedShaft() });
+
+    // Unrestricted pickup, restricted destination, wrong badge — refused.
+    expect(
+      car.estimateCost({ floorId: '3', destinationFloorId: '9', credentialGroup: 'staff' }).feasible,
+    ).toBe(false);
+    // Unbadged is refused for the same destination: an undisclosed credential authorizes nothing.
+    expect(car.estimateCost({ floorId: '3', destinationFloorId: '9' }).feasible).toBe(false);
+    // *Restricted* pickup, restricted destination, wrong badge — still refused. The fix admits
+    // the pickup, it does not admit the journey.
+    expect(
+      car.estimateCost({ floorId: '9', destinationFloorId: '9', credentialGroup: 'staff' })
+        .infeasibleReason,
+    ).toBe('destinationAccessDenied');
+    // And the right badge travels.
+    expect(
+      car.estimateCost({ floorId: '3', destinationFloorId: '9', credentialGroup: 'exec' }).feasible,
+    ).toBe(true);
   });
 
   it('checks the destination too when destination entry supplies one', () => {

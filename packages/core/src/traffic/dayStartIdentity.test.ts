@@ -69,6 +69,14 @@ const DISPATCHER_IDS = ['nearest-car', 'eta', 'collective'] as const;
  * **If a future change moves the results, these move with `BASELINE_STRUCTURAL` and the two tables
  * are regenerated together.** A superseded table that cannot be reproduced is the § D201 defect, and
  * the moment that happens this table must be deleted rather than carried.
+ *
+ * **That happened, and the two tables were regenerated together.** § D254 moved nine of the fifteen
+ * results — the three buildings that declare `accessZones`, under all three conventional
+ * dispatchers — by taking the credential question off the hall call's pickup floor. Both tables
+ * were re-measured in the same run of the same tree, so the one-key claim this file exists to make
+ * is still a measurement and not an inheritance: deleting `startOfDayS` from a current result still
+ * reproduces the entry below exactly, for all fifteen. The six cells on `garden-apartments` and
+ * `midtown-office` were re-measured too and came back **identical**, which is the control.
  */
 const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
@@ -79,16 +87,16 @@ const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'midtown-office|eta': '7a26950af349e3f7573bfc0a63ff11efac034fbbfdf617a822dbc4500c9b852c',
   'midtown-office|collective': '1387235946badd1db220427c45e166a6aa4b1c6bc241696fad602e9000f13b71',
   'mixed-use-high-rise|nearest-car':
-    'faa196eed76f6dce35c66cb5fcd558013434444d5edef6592b3c7ba2545a8160',
-  'mixed-use-high-rise|eta': 'de9175e1234aa8b59147d4d9a7a1cbf50377eb3e8589c590af1f8a5b25b77dae',
+    'c99da9cf45e473c66f41afbb78fc7a440e0a2c2135325f775ce151cc067aa9ce',
+  'mixed-use-high-rise|eta': 'b14a02635ad23a4db09c20b408c77846af6b7580d485818e557c69cda44e1437',
   'mixed-use-high-rise|collective':
-    '475da70ec7d63c70e6c295613a5bcf5c84f6aa2b6b75bc12fe9b4ec3bb4c9029',
-  'secure-tower|nearest-car': 'b9e84186667c2d36b66ad5f0780cd8c5182a54ac50e55c0a042160de5127b133',
-  'secure-tower|eta': '80355745cc6cf5f44b0f76c644ec79ef2777ce4308418cc11ef1a6570bc80e28',
-  'secure-tower|collective': '6cc88ec607ffddaac4d923aa177794147d7a7bfd19a59cac99c83644ca8d590e',
-  'vertical-city|nearest-car': '7be18e22844a6e82588f3949b302b21610a0fd5ce299734f8ff682f36f780055',
-  'vertical-city|eta': 'db9695ba7c6e35976101fda19bf1a337b496afc4a8f683f9106b258f2be0be02',
-  'vertical-city|collective': '611deab45802ff9cbef16f611a07b0ccfcbe4844b454af95f37b8aeddb8a3078',
+    '995058e616e2aad10a213e62b145110cce7c30d599dafebf09eb068d3a69aa62',
+  'secure-tower|nearest-car': 'aace27e171c5eef6163e476e1354d5d1d6426a34a9ac1ad843f5d31bf1365e93',
+  'secure-tower|eta': '793a0f7573d11881676c19aa3df5d51647c34d9474a38a37117379b028c5d4ab',
+  'secure-tower|collective': '64592076343f41c10545f3402ac86638e48ddc0ba8b996f7c81d0ac8fe1cd68d',
+  'vertical-city|nearest-car': 'e16858399b0b6fd77957f50ce6b2724fd51fa343207be90d9f186a2e98379142',
+  'vertical-city|eta': 'ca54a212ce9f699487c888b1d748437d151d99ca4df7ff9862e11c22e77b3b3b',
+  'vertical-city|collective': 'f73069c0137c0f0ce0eb328bf3e3f6e72d0bef85c68c6d7ba023293c7cc50a1a',
 };
 
 /**

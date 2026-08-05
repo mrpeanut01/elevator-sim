@@ -100,6 +100,39 @@ import {
  * reports `serviceZone` whether or not it is also overloaded, because retuning a threshold
  * will never make it reach floor 30.
  *
+ * ## Access zoning is asked about the destination, and only about the destination
+ *
+ * There is **one** access question here, not two, and it is check 3: *may this credential
+ * reach the floor this passenger is going to?* The floor they are being collected **from** is
+ * not an access question at all, and asking it was this module's most expensive defect
+ * (DECISIONS.md § D254).
+ *
+ * A credential governs *where you may go*, never *where you may be collected*. Someone
+ * standing on floor 40 pressing "down" is already through whatever control protects floor 40
+ * — a badged lobby door, a turnstile, a reception desk — and the lift has nothing left to
+ * authorize. That is also what the hardware does: under conventional control the reader is
+ * **inside the car** and gates the car-call buttons (CIBSE Guide D § 10 on security and lift
+ * control), and under destination control the landing terminal takes credential and
+ * destination together and gates the *destination* (ISO 8100-32). No installation of either
+ * kind refuses to collect somebody from the floor they are standing on; refusing would make
+ * a restricted floor uneavacuable by lift, which no code permits.
+ *
+ * The consequence of asking it here was total rather than marginal. Under
+ * `dispatch.callType: 'up-down-buttons'` a landing call carries no credential *by
+ * construction* — `costRequestFor` drops it — and `isAccessPermitted` answers `false` for an
+ * undefined credential against any floor that declares `permittedCredentialGroups`. So every
+ * car in the bank refused every landing call raised on a restricted floor, and every
+ * access-zoned building was unserviceable by every conventional dispatcher: 642 of 725
+ * delivered on `mixed-use-high-rise`, against 725 of 725 with the same seed and the same
+ * dispatcher once the zones are stripped.
+ *
+ * **This does not loosen the credential model, because the credential model was never here.**
+ * The runner enforces it per passenger with the passenger's real credential, at the landing
+ * (`Simulation.#bankCanCarry`) and again at the doorway (`Simulation.#carCanCarry`), so a
+ * rider whose destination their badge does not reach is refused whether or not a dispatcher
+ * ever priced their call. Check 3 authorizes a *disclosed* destination one step earlier than
+ * that, which is the whole of what a destination call type buys.
+ *
  * Pure.
  */
 export function infeasibilityOf(
@@ -115,18 +148,24 @@ export function infeasibilityOf(
   }
 
   // 2. Service zoning — physical. No credential or dispatcher weight overrides it.
+  //    Asked about the pickup floor, because that *is* a physical question: a shaft that does
+  //    not open onto floor 30 cannot collect anybody from floor 30.
   if (shaftFloor(snapshot.shaft, request.floorId) === undefined) {
     return 'serviceZone';
   }
 
-  // 3. Access zoning — credential. A different question with a different answer; the two
-  //    are checked separately and never merged into one flag.
-  if (!isAccessPermitted(snapshot.shaft, request.credentialGroup, request.floorId)) {
-    return 'accessDenied';
-  }
-
-  // 4. The destination, when destination entry means we already know it. Checking it here is
-  //    what lets a destination dispatcher authorize and optimize in the same step.
+  // 3. The destination, when the call type discloses one — service zoning and access zoning
+  //    on it, kept as two answers. See the header: this is the only place access zoning is
+  //    asked, and the pickup floor is deliberately not asked about.
+  //
+  //    Checking it here is what lets a destination dispatcher
+  //    authorize and optimize in one step.
+  //
+  //    **That is a description of this function and it is true. It is not a claim that the one
+  //    step is why destination dispatch performs better**, which is false — measured, the
+  //    destination buys *less* where access is controlled (DECISIONS.md § D30, § D60). The
+  //    distinction is asserted in both directions by
+  //    `experiments/validation/documentation.test.ts`.
   const destinationFloorId = request.destinationFloorId;
   if (destinationFloorId !== undefined) {
     if (shaftFloor(snapshot.shaft, destinationFloorId) === undefined) {
@@ -137,7 +176,7 @@ export function infeasibilityOf(
     }
   }
 
-  // 5. The load cell. Overload first: it is the stronger condition and the more actionable
+  // 4. The load cell. Overload first: it is the stronger condition and the more actionable
   //    report — a car that will not start is not merely declining new work.
   if (snapshot.load.isOverloaded) {
     return 'overload';

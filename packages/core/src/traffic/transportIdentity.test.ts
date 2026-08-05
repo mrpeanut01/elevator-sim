@@ -105,6 +105,27 @@ import {
  * whole result — byte for byte, not by digest — to equal one produced against `data/` with every
  * `startOfDayMin` stripped out. So the delta here is one key wide, and that is a measurement.
  * `headlineDrift` is empty for all fifteen, as before.
+ *
+ * ## And re-pinned a third time for § D254 — nine of fifteen, and the six that held are the point
+ *
+ * The two re-pins above moved **all fifteen** digests because the *record* grew a key. This one is
+ * the opposite shape: the runs themselves moved, and only some of them. Access zoning was being
+ * applied to a hall call's **pickup** floor, so on every building that declares `accessZones` a
+ * conventional landing call — which carries no credential by construction — was refused by every
+ * car in the bank, and the building was unserviceable. § D254 asks the credential question about
+ * the destination instead.
+ *
+ * So the nine cells on `mixed-use-high-rise`, `secure-tower` and `vertical-city` moved, and every
+ * one of them moved in the same direction: `timed-out` to `completed`, with every passenger
+ * delivered. `mixed-use-high-rise|collective`, for instance, goes from 642 of 725 delivered to 725
+ * of 725, and its longest wait from 1 096.7 s to 123.6 s.
+ *
+ * **The six cells on `garden-apartments` and `midtown-office` did not move by one bit** — same
+ * digest, same eight headline reals to the last place. Those two buildings declare no access
+ * zones, and that is the controlled half of this re-pin: it is what says the change is the access
+ * check and not a perturbation of the dispatcher. `mixed-use-high-rise|nearest-car`'s own
+ * `onTimeout: 'report'` allowance above is now unnecessary for the reason it was granted — that
+ * arm delivers everybody — and is kept because the flag is what the pins were taken under.
  */
 const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
@@ -115,13 +136,13 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'midtown-office|eta': 'eddb3f97da5dbd23457c3b2fe2ee95c9476f354d44c09ef0bfa1fda44c0ec412',
   'midtown-office|collective': '434a08434d9d1c1e2197e9e0efe7926680b5ea9e11614ed5f556b6281d48d6ba',
   'mixed-use-high-rise|nearest-car':
-    '8545af3acd905fa8c64632575c87e174b3818860f229d5cf57e07d85d73a0c42',
-  'mixed-use-high-rise|eta': '7d4b6c4ab0187392d74e364c6c5bf1129181e0cc32a7b616163280f568310a2b',
+    '129b89a1c877a09a520b82f9f3452f98bf070137d2585b6fcaf144c9bb332b9e',
+  'mixed-use-high-rise|eta': '4bd639964c8dcc727adef90a94b457042f58506c9cd902f1b260fb7ccbd35da3',
   'mixed-use-high-rise|collective':
-    'a681df6762f89072a8f126b734e4ba3b0bf9351fdaed13ee2a0ed9870668da4d',
-  'secure-tower|nearest-car': 'e6fea58f3032fe0f3309d339e964e07ce211e14dd672005b9d3981221dbb14bd',
-  'secure-tower|eta': 'fd4d6196669f4e090a2e40a8fa5a4d01eb8181996994a60d02e4646b0925d135',
-  'secure-tower|collective': 'e04832994728d3e68fe78366884e102ded086dbdc05bb8af11999f5d85f1f88e',
+    '15341e131d854be514d06c5fdb4fa905fe964e29c6b2dffdbf62d13d755155ff',
+  'secure-tower|nearest-car': '140d67af62ffc1e9c85b9e78ea9f82f48f2e57abf602decf55017f26f5e30888',
+  'secure-tower|eta': '96327524c4e5129fce937eb76116e73b86af8f3a671cc041c5dc3810d1b67ebe',
+  'secure-tower|collective': '259356762940596271b96914ccfa0ab705ef1228d342b7c141c3081566a1f9c9',
 };
 
 /**
@@ -138,9 +159,9 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * is unchanged.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '00d85222f14b0dc8b76c84ad7db560269c8fc61f29cb811bcb46862dc6c3f2fd',
-  'vertical-city|eta': '695da40fa92c2b38ce1050e857e23d901f37419fccf4b8055680849c655748f0',
-  'vertical-city|collective': '7632fd8ac6e489bd2523bb46246b165d8225ee26a71ca432f8e49cfd79b4a655',
+  'vertical-city|nearest-car': '1c2501bd145de12e760ac2308f9750bb6adcdf54c66adb0732cb82c74d8f9127',
+  'vertical-city|eta': '449c4ee9b5ef3370f45cd27e20c6d83c5c6b6b3a61bdd2da753a3b5363de2a93',
+  'vertical-city|collective': 'a0448d161f89e23c343097b2df2f78f11cadd6030c4bb424b8be2cbda1eec1b3',
 };
 
 /**
@@ -186,15 +207,15 @@ const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>
   'midtown-office|nearest-car': { waitMeanS: 1625.3073142849905, waitP95S: 2778.5301723158727, rideMeanS: 101.4917970264325, ttdMeanS: 1726.7991113114228, workKJ: 1485.6773233378524, workPerLegKJ: 7.541509255522094, handlingPct: 4.035087719298246, longestWaitS: 2906.760720955624 },
   'midtown-office|eta': { waitMeanS: 803.5837920145476, waitP95S: 1451.3328596031365, rideMeanS: 103.1891892481786, ttdMeanS: 906.772981262727, workKJ: 2143.0568396923136, workPerLegKJ: 10.87846111518941, handlingPct: 4.7953216374269, longestWaitS: 1482.5906698639715 },
   'midtown-office|collective': { waitMeanS: 791.9363372638369, waitP95S: 1415.12165477437, rideMeanS: 100.09924603990174, ttdMeanS: 892.0355833037382, workKJ: 2285.0767835145743, workPerLegKJ: 11.599374535606977, handlingPct: 4.619883040935672, longestWaitS: 1436.744534680982 },
-  'mixed-use-high-rise|nearest-car': { waitMeanS: 214.79895769937508, waitP95S: 817.0781674975711, rideMeanS: 85.44825863703696, ttdMeanS: 361.4013442351988, workKJ: 23504.058602911486, workPerLegKJ: 106.35320634801577, handlingPct: 7.732864674868189, longestWaitS: 1962.5880445794123 },
-  'mixed-use-high-rise|eta': { waitMeanS: 142.68115763876253, waitP95S: 678.3951693817187, rideMeanS: 87.32512167858219, ttdMeanS: 273.12609344906105, workKJ: 24407.92515308621, workPerLegKJ: 110.44310024020909, handlingPct: 7.996485061511424, longestWaitS: 1221.4802668737561 },
-  'mixed-use-high-rise|collective': { waitMeanS: 65.38810805406801, waitP95S: 348.45548910819133, rideMeanS: 85.25698304659325, ttdMeanS: 177.7481384380594, workKJ: 33565.92654763983, workPerLegKJ: 152.57239339836286, handlingPct: 9.92970123022847, longestWaitS: 1096.7338414201085 },
-  'secure-tower|nearest-car': { waitMeanS: 72.4930266924905, waitP95S: 220.07902498224018, rideMeanS: 104.8894473507938, ttdMeanS: 177.38247404328436, workKJ: 4096.166816972333, workPerLegKJ: 35.00997279463533, handlingPct: 6.552419354838709, longestWaitS: 1076.1934052835004 },
-  'secure-tower|eta': { waitMeanS: 45.207463696766915, waitP95S: 159.40554814190463, rideMeanS: 90.30623461546863, ttdMeanS: 137.13810845064097, workKJ: 7239.030602709389, workPerLegKJ: 58.85390733910073, handlingPct: 10.383064516129032, longestWaitS: 1039.9714662955998 },
-  'secure-tower|collective': { waitMeanS: 45.207463696766915, waitP95S: 159.40554814190463, rideMeanS: 90.30623461546863, ttdMeanS: 137.13810845064097, workKJ: 7239.030602709389, workPerLegKJ: 58.85390733910073, handlingPct: 10.383064516129032, longestWaitS: 1039.9714662955998 },
-  'vertical-city|nearest-car': { waitMeanS: 134.4278217079031, waitP95S: 313.52651799960944, rideMeanS: 86.43287051347059, ttdMeanS: 351.612126023367, workKJ: 47832.64322089375, workPerLegKJ: 59.12564056970797, handlingPct: 10.92694904849601, longestWaitS: 1523.5322558070939 },
-  'vertical-city|eta': { waitMeanS: 45.0333047611517, waitP95S: 86.67601262739815, rideMeanS: 81.49757654126381, ttdMeanS: 209.91356423350703, workKJ: 68339.09132618485, workPerLegKJ: 80.39893097198217, handlingPct: 11.49989768774299, longestWaitS: 1287.7649265606756 },
-  'vertical-city|collective': { waitMeanS: 38.905844782544634, waitP95S: 86.9190792748077, rideMeanS: 77.2260836021643, ttdMeanS: 193.0443670458902, workKJ: 69517.1657090653, workPerLegKJ: 83.25409066953928, handlingPct: 11.888684264374874, longestWaitS: 1162.7707143022799 },
+  'mixed-use-high-rise|nearest-car': { waitMeanS: 142.10544033145624, waitP95S: 387.1291283536797, rideMeanS: 85.83881085871421, ttdMeanS: 299.71599213814886, workKJ: 18554.753508457314, workPerLegKJ: 67.22736778426562, handlingPct: 8.787346221441124, longestWaitS: 411.2582877419493 },
+  'mixed-use-high-rise|eta': { waitMeanS: 17.327972060875723, waitP95S: 45.84432718605183, rideMeanS: 83.81718832889898, ttdMeanS: 127.62874763554764, workKJ: 28689.576776790745, workPerLegKJ: 108.67263930602554, handlingPct: 9.622144112478031, longestWaitS: 97.87760181883891 },
+  'mixed-use-high-rise|collective': { waitMeanS: 23.84993103248671, waitP95S: 67.51164623159896, rideMeanS: 80.36325778673698, ttdMeanS: 131.01089136245614, workKJ: 31561.450258943398, workPerLegKJ: 119.09981229789962, handlingPct: 9.666080843585236, longestWaitS: 123.61383347847595 },
+  'secure-tower|nearest-car': { waitMeanS: 117.50578060891134, waitP95S: 236.49202767237338, rideMeanS: 99.05396066082899, ttdMeanS: 230.9134610017266, workKJ: 3692.412283657347, workPerLegKJ: 27.351202101165534, handlingPct: 6.754032258064516, longestWaitS: 261.24994780096097 },
+  'secure-tower|eta': { waitMeanS: 33.834449274537576, waitP95S: 86.58687220630071, rideMeanS: 99.94210694401706, ttdMeanS: 141.43631161356444, workKJ: 6256.948630612125, workPerLegKJ: 46.00697522508916, handlingPct: 10.483870967741936, longestWaitS: 92.86280434382616 },
+  'secure-tower|collective': { waitMeanS: 27.69737216856337, waitP95S: 103.06062675292485, rideMeanS: 93.31256304889672, ttdMeanS: 128.22673467578974, workKJ: 7141.873618804888, workPerLegKJ: 52.902767546702876, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
+  'vertical-city|nearest-car': { waitMeanS: 132.3612250003804, waitP95S: 450.8375837775556, rideMeanS: 87.32429712411934, ttdMeanS: 365.30942858725524, workKJ: 51285.39244586513, workPerLegKJ: 62.39098837696488, handlingPct: 11.847759361571516, longestWaitS: 614.7212331603102 },
+  'vertical-city|eta': { waitMeanS: 27.93732451789864, waitP95S: 81.04027255941901, rideMeanS: 82.1993051894896, ttdMeanS: 190.43948716341964, workKJ: 64693.002379474885, workPerLegKJ: 73.2650083572762, handlingPct: 12.072846326989973, longestWaitS: 130.57283536186333 },
+  'vertical-city|collective': { waitMeanS: 33.004990520236795, waitP95S: 90.01929999607432, rideMeanS: 78.64133260719593, ttdMeanS: 186.5091247249759, workKJ: 77951.89587917822, workPerLegKJ: 86.22997331767502, handlingPct: 12.318395743810107, longestWaitS: 426.01312542571054 },
 };
 
 /** The eight reported figures, and where each lives in a summary. */
