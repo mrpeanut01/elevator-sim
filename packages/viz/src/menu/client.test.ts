@@ -524,6 +524,21 @@ describe('the account form', () => {
     expect(state.notice).not.toMatch(/welcome back|created|new account|already have/iu);
   });
 
+  it('takes back “a link is on its way” when the address changes, and keeps the budget', () => {
+    const sent = linkRequested(updateForm(SIGNED_OUT, { email: 'ada@example.test' }), {
+      detail: 'If that address can receive mail…',
+      expiresInMs: 900_000,
+    });
+    // A typo corrected after the request would otherwise leave a player watching an inbox they do
+    // not own for a message that went somewhere else.
+    expect(updateForm(sent, { email: 'ada@example.tes' }).linkSent).toBe(false);
+    expect(updateForm(sent, { email: 'ada@example.test' }).linkSent).toBe(true);
+    // The rate limit is not form state: § D242 charged it on the server, and a gate a player could
+    // lift by pressing a key is not a gate.
+    const limited = rateLimited(sent, 'Too many.', 60_000);
+    expect(updateForm(limited, { email: 'someone@else.test' }).retryInMs).toBe(60_000);
+  });
+
   it('does not say a link was sent when the server refused to send one', () => {
     // A player told to check their inbox for a message that was never sent waits forever, and then
     // asks for another link they are also not allowed to have.

@@ -132,9 +132,20 @@ export function namingStage(state: AccountState): boolean {
  * -------------------------------------------------------------------------- */
 
 export function updateForm(state: AccountState, patch: Partial<AccountForm>): AccountState {
+  /*
+   * Changing the address takes back *a link is on its way*, because it is no longer about the
+   * address in the box. Leaving it standing would tell somebody who had just corrected a typo to go
+   * and check an inbox they do not own.
+   *
+   * `retryInMs` is deliberately **not** cleared by typing. It is a budget the server has already
+   * charged (§ D242), not a fact about the form, and a gate a player could lift by pressing a key
+   * would be no gate at all.
+   */
+  const addressChanged = patch.email !== undefined && patch.email !== state.form.email;
   return Object.freeze({
     ...state,
     form: Object.freeze({ ...state.form, ...patch }),
+    ...(addressChanged ? { linkSent: false } : {}),
     notice: undefined,
   });
 }
