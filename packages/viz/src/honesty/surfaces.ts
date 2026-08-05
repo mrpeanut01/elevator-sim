@@ -1204,6 +1204,31 @@ const BATCH_REPORT: SurfaceAdapter = {
       }
     }
     for (const [index, comparison] of report.comparisons.entries()) {
+      /*
+       * The roll-up and its remedy — seeded like any other batch string, and **with no `comparison`
+       * shape**, which is the honest classification rather than a convenience.
+       *
+       * `checkSingleRunComparative`'s batch clauses read `RenderedText.comparison` to ask *"does
+       * this string name a winner the row was not entitled to?"*. The summary names no arm at all:
+       * it counts rows by verdict and points at the row that does. Attaching a shape here would
+       * mean inventing a `favours` and a `pairs` for a sentence that has neither, and the search
+       * would then be checking a fiction. What it is still swept for is everything textual — R10's
+       * word list and R13's frequency form — which is what a counting sentence can actually break.
+       */
+      seeds.push({
+        field: `comparisons[${String(index)}].summary.sentence`,
+        text: comparison.summary.sentence,
+        role: 'prose',
+        declaredCount: comparison.rows[0]?.totalPairs ?? 0,
+      });
+      if (comparison.summary.remedy !== null) {
+        seeds.push({
+          field: `comparisons[${String(index)}].summary.remedy`,
+          text: comparison.summary.remedy,
+          role: 'reason',
+          declaredCount: comparison.rows[0]?.totalPairs ?? 0,
+        });
+      }
       for (const row of comparison.rows) {
         const energyAxis = BATCH_METRIC_CLASS[row.metric] === 'axis';
         const shape = {

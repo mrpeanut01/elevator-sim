@@ -658,16 +658,54 @@ const SCORE_WORD =
  *    inside a scoring construction. Measured reason: `nearest-car` is on the Pareto front at six
  *    of eight matrix cells *because it carries fewer people*, so any blend ranks the weakest
  *    dispatcher first.
+ *
+ * ## The narrowing on the wait side, which is {@link ENERGY_QUANTITY}'s narrowing again
+ *
+ * `ENERGY_QUANTITY`'s docstring records the first half of this: a bare `\benergy\b` made every
+ * sentence naming `energy-aware` an R11 violation, and *"a rule that fires on a profile's name is
+ * not a rule about combining axes"*.
+ *
+ * The wait side had the same hole and nothing had walked into it, because the batch report named
+ * its arms by **slug** — `eta`, `collective` — and no slug contains a wait word. Naming them the
+ * way the rest of the product does put *Minimum estimated wait* into the value of every energy row,
+ * and the search reported 21 violations across 11 cases on sentences that aggregate nothing:
+ *
+ * > `in 50 runs, Minimum estimated wait's drive work (proxy) differed from Conventional`
+ * > `collective's by −651.8 kJ to −155.5 kJ.`
+ *
+ * So {@link withoutProfileNames} removes the shipped display names before either pattern is
+ * applied. It is a **derivation from `data/dispatcher-profiles.json`**, not an allow-list: a
+ * fourteenth profile is covered by the file it is authored in.
+ *
+ * **What it costs, stated rather than glossed.** A genuine blend that leaned on a profile name to
+ * supply its wait token — *"kJ per second of Minimum estimated wait"* — would now be missed. That
+ * is the same trade the energy side already took, it is falsifiable, and `faults.ts#energyScore`
+ * still injects *"drive work in kJ per second of wait saved"* into an energy-axis value with no
+ * profile name in it, so the clause keeps something it must catch.
  */
 function checkEnergyWaitBlend(
-  _context: HonestyContext,
+  context: HonestyContext,
   texts: readonly RenderedText[],
 ): readonly HonestyViolation[] {
   const found: HonestyViolation[] = [];
+  /*
+   * Longest first: *Conventional collective, en-route pickup* contains *Conventional collective*,
+   * and removing the shorter one first leaves the remainder of the longer behind.
+   */
+  const profileNames = context.dispatcherProfiles.profiles
+    .map((profile) => profile.name)
+    .filter((name) => name !== '')
+    .sort((left, right) => right.length - left.length);
+  const withoutProfileNames = (text: string): string => {
+    let out = text;
+    for (const name of profileNames) out = out.split(name).join('·');
+    return out;
+  };
   for (const text of texts) {
     const isNote = text.field.endsWith('.note');
+    const quantitiesOnly = withoutProfileNames(text.text);
     if (text.energyAxis === true && !isNote) {
-      if (ENERGY_QUANTITY.test(text.text) && WAIT_QUANTITY.test(text.text)) {
+      if (ENERGY_QUANTITY.test(quantitiesOnly) && WAIT_QUANTITY.test(quantitiesOnly)) {
         found.push(
           violation(
             'energy-wait-blend',
@@ -679,8 +717,8 @@ function checkEnergyWaitBlend(
         continue;
       }
     }
-    if (!SCORE_WORD.test(text.text)) continue;
-    if (!ENERGY_QUANTITY.test(text.text) || !WAIT_QUANTITY.test(text.text)) continue;
+    if (!SCORE_WORD.test(quantitiesOnly)) continue;
+    if (!ENERGY_QUANTITY.test(quantitiesOnly) || !WAIT_QUANTITY.test(quantitiesOnly)) continue;
     found.push(
       violation(
         'energy-wait-blend',
