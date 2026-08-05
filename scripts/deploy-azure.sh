@@ -74,14 +74,23 @@ if [ -n "$(git status --porcelain)" ]; then
   fi
 fi
 
-SUBSCRIPTION="$(az account show --query id -o tsv)"
-ACR="elevsimacr$(echo "$SUBSCRIPTION" | tr -d '-' | head -c 8)"
-REGISTRY="${ACR}.azurecr.io"
-IMAGE="${REGISTRY}/elevator-sim:${TAG}"
+# The registry is **discovered, not derived**, and that is a scar rather than a preference.
+#
+# It used to be named from the subscription id, which is stable — so deleting the resource group
+# and redeploying recreated the *same* registry name seconds later. ARM reported
+# `provisioningState: Succeeded`, DNS resolved, and the data plane answered `GET /v2/` with a bare
+# 404 instead of the 401-plus-`WWW-Authenticate` a registry is supposed to issue. The CLI's
+# rendering of that is "did not issue a challenge", which reads like a network fault and is not one:
+# the routing for a recycled name had not been re-established, and no amount of retrying fixes it.
+#
+# So: reuse whatever registry is already in the group, and when there is none, create one under a
+# fresh random name that has never been used before. Idempotent across re-deploys, immune to
+# recycling across teardowns. `ELEVSIM_ACR` overrides if you want a specific one.
+ACR="${ELEVSIM_ACR:-$(az acr list --resource-group "$GROUP" --query "[0].name" -o tsv 2>/dev/null || true)}"
 
 echo "subscription : $(az account show --query name -o tsv)"
 echo "group        : ${GROUP}"
-echo "image        : ${IMAGE}"
+echo "location     : ${LOCATION}"
 echo
 
 # --------------------------------------------------------------------------- infrastructure that must exist first
@@ -91,15 +100,22 @@ echo
 # deployment. So it is created here, filled here, and only then handed to the template.
 az group create --name "$GROUP" --location "$LOCATION" --output none
 
-# Created only when absent, rather than created-and-ignore-the-error. An earlier version wrapped
-# this in `2>/dev/null || true`, which swallowed a genuine failure and let the script run on to a
-# push against a registry that did not exist — where it failed with an authentication error that
-# said nothing about the real cause.
-if ! az acr show --name "$ACR" --resource-group "$GROUP" --output none 2>/dev/null; then
+# Errors are **not** swallowed here. An earlier version wrapped the create in `2>/dev/null || true`,
+# which hid a genuine failure and let the script run on to push against a registry that did not
+# exist, where it failed with an authentication error that said nothing about the cause.
+if [ -z "$ACR" ]; then
+  ACR="elevsimacr$(openssl rand -hex 5)"
   echo "creating registry ${ACR}"
   az acr create --resource-group "$GROUP" --name "$ACR" --location "$LOCATION" \
     --sku Basic --admin-enabled false --output none
+else
+  echo "reusing registry ${ACR}"
 fi
+
+REGISTRY="${ACR}.azurecr.io"
+IMAGE="${REGISTRY}/elevator-sim:${TAG}"
+echo "image        : ${IMAGE}"
+echo
 
 # --------------------------------------------------------------------------- build and push
 
