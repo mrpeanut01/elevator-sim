@@ -16894,6 +16894,41 @@ passed on the run before. It also **cannot** be affected: `SELECTION_BUILDING` i
 and `DEADBAND_BUILDING` is `garden-apartments`, the two buildings that declare no `accessZones` and
 that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untouched.
 
+### The consequence for `packages/viz`, which this lane may not edit but measured anyway
+
+Ten viz tests fail on this branch, and they fall into two kinds. Neither is a defect in the viewer,
+and both are handed over rather than fixed here.
+
+**Nine are a stale *fixture*.** `dev/leftRail`, `dev/rightRail`, `frame/overlay` and
+`mode/disclosure` all need a run whose AWT is *suppressed*, and each of them reaches for an
+access-zoned building because those reliably saturated. They no longer do. The tests say so
+themselves — *"really is suppressed, or the rest of this proves nothing"* — which is the precondition
+check doing exactly its job. They need a genuinely saturated fixture, and one is easy: `midtown-office`
+at its default rate is unzoned, untouched by this change, and reports `awtIsValid: false` on every
+seed measured.
+
+**One is a real question, and it is worth stating precisely.** `authoring/authoring.test.ts` asserts
+the standing requirement against the building editor — *"an access zone changes the run"*, *"one more
+floor inside the zone"*. Both now fail, and **the control is not unwired**. The reason is
+`traffic/generator.ts`: `credentialGroupFor` issues each rider a credential drawn from the zones the
+building declares, and `planDemand` *"has already dropped every pair for which no credential works"*.
+So the traffic model only ever generates journeys somebody is entitled to make. While the pickup was
+being checked, adding a zone changed the run by stranding landing calls regardless of credential —
+the control was observable **through the defect**. With the defect gone, a well-formed zone changes
+nothing on the legs, because everybody bound for a restricted floor holds a badge for it.
+
+Measured directly: `midtown-office`, seed 424 242, with a synthetic zone over floors 8–13 permitting
+a group named `nobody-has-this` — 205 of 699 legs are bound for those floors, all 205 alight there,
+and every one of them carries `nobody-has-this`. The run is byte-identical to the unzoned one under
+both `collective` and `destination-eta`.
+
+That is arguably the right model — a card reader constrains where people may go, and this traffic
+model does not generate people attempting journeys they are barred from — but it means the editor's
+access-zone control has no observable effect on a conventional run, and the test for it needs
+something that does: `credentialAssignment: 'none'`, which the generator already supports, or a
+destination call type that must be *told* the credential. Whoever owns that panel should decide
+which, and the standing requirement says they may not simply delete the test.
+
 ### The lesson, in the form this repository already keeps
 
 This is the *stated-mechanism* defect (§ D30, § D60) one level deeper. That one found a **claim about
