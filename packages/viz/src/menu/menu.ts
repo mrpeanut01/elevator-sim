@@ -39,8 +39,13 @@ import {
  * named default is a sixth hard-coded list (§ D213) and would break the moment that building was
  * renamed. A catalogue with no buildings is a broken install, and {@link freePlayIssues} says so
  * rather than this function inventing an id that does not exist.
+ *
+ * *Runnable* is asserted against the real `data/` load in `menu.test.ts`, because it was not true:
+ * the length was a fixed index into the ladder and the opening template's period is longer than
+ * the rung it landed on. See {@link openingDurationS}.
  */
 export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): MenuState {
+  const demandTemplateId = catalogue.demandTemplates[0]?.id ?? '';
   return Object.freeze({
     screen: ROOT_SCREEN,
     history: Object.freeze([]),
@@ -48,11 +53,11 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
     freePlay: Object.freeze({
       buildingId: catalogue.buildings[0]?.id ?? '',
       dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
-      demandTemplateId: catalogue.demandTemplates[0]?.id ?? '',
+      demandTemplateId,
       // `null` is "this building's own profile", which is the honest default: the player has not
       // yet expressed a rate, and picking one for them would pin a number `data/` may change.
       arrivalRatePctPop5min: null,
-      durationS: FREE_PLAY_DURATIONS_S[1] ?? 900,
+      durationS: openingDurationS(catalogue, demandTemplateId),
       seed,
     }),
     challenge: Object.freeze({
@@ -67,6 +72,30 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
       metric: 'awtS',
     }),
   });
+}
+
+/**
+ * The shortest offered length the opening template can actually be measured over.
+ *
+ * **Derived, not indexed** — § D213's rule, applied to a number rather than a list. The opening
+ * length was `FREE_PLAY_DURATIONS_S[1]`, 15 minutes, while the first shipped template
+ * (`rise-and-fall`) declares a 30-minute period; so {@link freePlayIssues} refused the state
+ * {@link initialMenuState} had just built, and the first thing a new player met on the Free play
+ * screen was a disabled *Start* under a refusal. An index cannot know that. This can, and stays
+ * correct when a template's period changes or the ladder moves.
+ *
+ * The ladder is sorted rather than assumed ascending, so *shortest that fits* keeps meaning that
+ * if the offered lengths are ever reordered.
+ *
+ * When no offered length is long enough the longest is returned and {@link freePlayIssues} still
+ * refuses it — which is the honest answer, because that selection genuinely cannot be measured and
+ * quietly inventing a length outside the ladder would refuse at Start instead, one screen later.
+ */
+function openingDurationS(catalogue: MenuCatalogue, demandTemplateId: string): number {
+  const minimum =
+    catalogue.demandTemplates.find((entry) => entry.id === demandTemplateId)?.minimumDurationS ?? 0;
+  const offered = [...FREE_PLAY_DURATIONS_S].sort((left, right) => left - right);
+  return offered.find((seconds) => seconds >= minimum) ?? offered.at(-1) ?? 900;
 }
 
 /* -------------------------------------------------------------------------- *

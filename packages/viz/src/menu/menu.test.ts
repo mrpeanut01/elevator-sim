@@ -235,6 +235,22 @@ describe('the free-play selection', () => {
     }
   });
 
+  it('opens on a Free play selection the menu would actually let you start', async () => {
+    /*
+     * The test above proves every template *has* a workable length. It did not prove the opening
+     * state *picks* one, and it did not: `durationS` was a fixed index into the ladder, 15 minutes,
+     * while the first shipped template declares a 30-minute period. So the menu refused the state
+     * it had just built, and a new player's first sight of Free play was a disabled Start under a
+     * refusal — the screen GitHub issue #13 is about.
+     *
+     * Against the real `data/` load rather than `CATALOGUE`, because the defect was a disagreement
+     * between two shipped numbers and a fixture can be authored not to have it.
+     */
+    const config = await loadConfig(DATA_DIR);
+    const catalogue = catalogueOf(config as unknown as CatalogueSource);
+    expect(freePlayIssues(initialMenuState(catalogue).freePlay, catalogue)).toEqual([]);
+  });
+
   it('accepts every offered duration and rate', () => {
     for (const durationS of FREE_PLAY_DURATIONS_S) {
       const state = updateFreePlay(initialMenuState(CATALOGUE), { durationS });
