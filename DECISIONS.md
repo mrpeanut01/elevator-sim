@@ -13945,3 +13945,104 @@ Written before the code, and chosen so the shipped product fails it today:
    four of five is rejected — partial reproduction is not reproduction.
 5. `Compare` is reachable from the challenge surface, because the honest answer to *"is my dispatcher
    better"* lives there and nowhere else.
+
+---
+
+## D219 — what the second wave built, and the three things mounting it found
+
+**Date: 2026-08-05 · Written after the code, and says so.** § D216 is the contract and § D217 is the
+first wave's verdict. This entry is the second wave's, and it exists for the reason § D217 gives:
+*"an entry written before the code is a criterion; one written after is a report, and the two must
+not be confused."*
+
+Six of `docs/17` § 5's seven findings are now closed. What follows is the three that were closed by
+building something the audit did not know was missing, because those are the ones worth reading.
+
+### 1. `patternSwitching` had no seam, and the surface would have hidden it
+
+`docs/17` § 5 clause 6 is *the weight-set selector has no surface*. The obvious reading is that the
+model was fine and the panel was absent. Half of it was.
+
+A profile's `selection` block already reached a run: `shiftRunConfigOf` builds the driving profile
+with `profileFromSpec(…, {base})`, which spreads the base. **`patternSwitching` did not.** The block
+was loaded, carried through to `SimulationConfig.dispatcherProfiles`, resolved by `resolveWeightSets`
+— and **nothing in the viewer could write it**. An arm-map editor over that would have been the
+twelfth instance of this repository's signature defect, with a slider on it: five selects that a
+player moves, an authored library they appear to bind, and a run that never reads the binding.
+
+It is instructive for the same reason the eleventh (the deck API) was: nothing about it looked
+neglected. The block is authored in `data/`, the detector's ramps are calibrated against eight
+measured operating points, the resolver is tested, and the loader carries it correctly. **The
+configuration was right, the resolution was right, and nothing could change either.**
+
+Closed by `dispatcherProfilesWithSelector`, which writes the file the arms resolve from and returns
+the file object *by identity* when the map is unchanged — so `viewerSelector.test.ts`'s existing
+`expect(config.dispatcherProfiles).toBe(file)` stays true rather than being relaxed to accommodate
+the new writer.
+
+### 2. Two of six sliders are inert at the default cell, and that is a finding about `data/`
+
+The § D177 test moves each control and requires the legs to differ, at `midtown-office` 900 s on
+`collective`. Four sliders move the legs there. Two do not, and neither is a broken control:
+
+- **`lobbyArrivalRateGain`** — *raising* it moves nothing, because Midtown's lobby rate is already
+  past `up-peak`'s ramp `oneAt` of 0.012, so a larger gain saturates a membership already at 1. The
+  contrast that works is **lowering** it to 0.
+- **`interfloorRateGain`** — needs a hospital directional split *and* a 60 s observation window
+  before the `interfloor` arm outscores `two-way` at all.
+- **`switchMargin`** — only bites after the dwell expires, and nothing on a 900 s run reaches a
+  120 s dwell's expiry often enough to matter; the contrast needs `hysteresisS: 0`.
+
+Each row names its own operating point and its reason in the test. **The alternative was to pick a
+cell where all six move and say nothing**, which would have passed the same assertion while hiding
+that three of the six knobs do nothing a player would notice on the building the product opens on.
+
+Also pinned there: `contextual` at its defaults is **legs-identical** to `fuzzy`. That is what
+`selection.policy`'s own declaration claims, and it is what makes the gain contrasts mean anything.
+
+### 3. A `?? 0` in the config board was a wrong accusation waiting for its mask to move
+
+Found while building the challenge board's claim, not by looking for it. `dev/main.ts#submitScore`
+sent `pctOverLongWait: recording.summary.pctOverLongWait ?? 0`. The figure is `null` when it was
+**never measured** — `core` produces `NaN` for a share with no denominator — so the fallback turned
+*unmeasured* into *zero per cent*, and the server, which measures the same run and gets `NaN`,
+compares `NaN` against `0` and refuses the submission as `metrics-do-not-reproduce`.
+
+That is this product's **one accusation**, spent on a client fallback, telling an honest player their
+figures did not replay — true, and useless. Today the run in question usually fails `awtIsValid` and
+the quotability refusal fires first, so the bug is masked. A masked wrong accusation is exactly the
+kind that surfaces after the mask moves.
+
+There is no number that fixes it: `NaN` is what the server measures, and `JSON.stringify(NaN)` is
+`null`, so it does not survive the wire either. `claimedMetricsOf` refuses instead, naming the
+figure. A genuine zero still posts — that is the distinction the `??` collapsed.
+
+### 4. Endless, and the sentence reusing a path cost
+
+`c5` and `c8` both promise *endless mode* and nothing implemented one. It is now nine lines, because
+`openEndless` opens a week carrying a contract id no contract answers to and every consumer already
+handled that. The mode needed a **value**, not a branch.
+
+Reusing the path was right. Reusing the *wording* was not: the no-contract report line read *"Your
+own building — nothing is being banked"*, so pressing **Keep going** on Midtown Office would have
+told a player they were on their own building — false in the one way a reader acts on, since they
+would go looking for the scenario they think they lost. The two sentences are now separate, and the
+rule generalises: **a sentinel that reuses a code path does not inherit that path's prose.**
+
+The same wave found the coach ribbon's `Sandbox` eyebrow and its *free play* progress line were
+**unreachable** — both tested `week.contractId === undefined` on a field typed `string`. TypeScript
+does not object to that comparison, which is why a strict build carried it. `GAPS.md` had filed
+Sandbox as a label with no feature behind it and missed the sharper fact: the label was not merely
+unbacked, it could not be printed.
+
+### 5. What is still open
+
+- **Sandbox**, which is a missing *meaning* rather than a missing mode. Nobody has decided what it
+  is, and building the wrong thing is worse than the label.
+- **Two surfaces called Campaign, and a third called Scenarios** (§ 5 clause 2). The Campaign tab is
+  relabelled **Lab** and the campaign screen says which one it is, but renaming a surface the handoff
+  drew is a disagreement the handoff should settle.
+- **Calendar and commissioning**, two of the four modes § 4 designs. Incidents is built and calendar
+  is the next one, because it attaches at the same `growth.ts` seam incidents proved.
+- **The saved library does not survive a reload**, which is a schema-version decision rather than an
+  omission.

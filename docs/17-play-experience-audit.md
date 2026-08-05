@@ -296,12 +296,24 @@ Each is a real thing found by walking the product, left with an owner rather tha
    shape.
 2. **Two surfaces called Campaign, and a third called Scenarios.** The scope model separates them;
    the words on screen do not. § 3.3.
-3. **The leaderboard's competitive axis is the seed.** Mitigated by saying so; fixed by § 4.3.
-4. **`showEnergyAxis` and `theme` reach nothing**, and are carried in a register with a staleness
-   assertion so an entry cannot outlive its bug.
+3. ~~**The leaderboard's competitive axis is the seed.**~~ **Closed.** § 4.3's challenge board is
+   built and wired end to end ([§ D218](../DECISIONS.md) is the criterion, dated before the code):
+   the server fixes the building, the traffic, the run length and a seed set, and the dispatcher is
+   what varies. The config board stays and keeps saying what it is. The § 5.5 tension is answered
+   structurally rather than promised — a seed set with its `n` on every row, four metrics never
+   blended, and Compare still the only surface allowed to order two dispatchers.
+4. ~~**`showEnergyAxis` and `theme` reach nothing**~~, and were carried in a register with a
+   staleness assertion so an entry could not outlive its bug. **Both closed**, and the register is
+   pinned empty rather than deleted — an empty list nothing checks is how a list stops being read.
+   `theme` took two waves: the shell first, then the stage, because a light shell around a dark
+   stage is the same defect wearing a smaller radius.
 5. **Sandbox is a string with no feature behind it.** Endless is built — § 3.6.
-6. **The weight-set selector has no surface**, so the product's one genuine mid-run mechanism is
-   invisible to the player it was built for.
+6. ~~**The weight-set selector has no surface**~~ — **closed, and mounting it found that half the
+   seam did not exist.** A profile's `selection` block already reached a run; `patternSwitching` was
+   loaded, carried, and writable by nothing in the viewer, so an arm-map editor over it would have
+   been a slider on a dead seam. Two of the six sliders were inert at the default cell and each now
+   names its own operating point and the reason — findings about the shipped calibration, not about
+   the panel.
 7. ~~**Compare is unreachable from the moment a player wants it** — the report never points at it.~~ **Closed.** `ReportNextStep` is on `DayReport`, so *both* sheets carry it: the pointer was first built for the Free Play sheet alone, which answered the finding for the mode that provokes the question least. A player finishing a campaign day has just read a levers card saying *try a different dispatcher — a smarter one is free*, and the sheet's own small print refuses to answer it.
 
 ---
