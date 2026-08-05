@@ -18,7 +18,6 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { hashPassword } from '../accounts/credentials.js';
 import { issuedChallengeFor } from '../challenge/schedule.js';
 import { challengeScoreOf, type SeedResult } from '../challenge/submission.js';
 import type { ClaimedMetrics, SubmittedRun } from '../leaderboard/submission.js';
@@ -51,7 +50,7 @@ async function fixture(): Promise<{
     const created = await store.createUser({
       email: `${name}@example.test`,
       displayName: name,
-      password: hashPassword('a passphrase of adequate length'),
+      displayNameChosen: true,
     });
     if (!created.ok) throw new Error(created.reason);
     return created.user.id;
@@ -79,33 +78,115 @@ describe('accounts', () => {
 
   it('refuses a second account on the same address or the same name', async () => {
     const { store } = await fixture();
-    const password = hashPassword('a passphrase of adequate length');
-    expect(await store.createUser({ email: 'ADA@example.test', displayName: 'Other', password })).toMatchObject({
-      ok: false,
-      reason: 'email-taken',
-    });
+    expect(
+      await store.createUser({ email: 'ADA@example.test', displayName: 'Other', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'email-taken' });
     // Case-insensitively for the name too — two rows that render identically on a board are two
     // rows a reader cannot tell apart.
-    expect(await store.createUser({ email: 'new@example.test', displayName: 'ada', password })).toMatchObject({
-      ok: false,
-      reason: 'name-taken',
+    expect(
+      await store.createUser({ email: 'new@example.test', displayName: 'ada', displayNameChosen: true }),
+    ).toMatchObject({ ok: false, reason: 'name-taken' });
+  });
+
+  it('carries no credential column at all, because § D241 left none to carry', async () => {
+    const { store, ada } = await fixture();
+    const row = JSON.stringify(await store.userById(ada));
+    // Asserted over the serialised row rather than field by field, so a column reintroduced later
+    // fails here rather than in a breach. There is no digest, no salt and no scrypt cost: the only
+    // credential this product has is a link in a mailbox, and it is not stored.
+    for (const gone of ['saltHex', 'hashHex', 'password', 'confirmed']) {
+      expect(row, gone).not.toContain(gone);
+    }
+  });
+
+  it('starts with a placeholder name and remembers that it is one', async () => {
+    const { store } = await fixture();
+    const created = await store.createUser({
+      email: 'fresh@example.test',
+      displayName: 'player-000000000000',
+      displayNameChosen: false,
     });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    expect(created.user.displayNameChosen).toBe(false);
+    // The flag exists so the viewer can prompt exactly once. Without it the client would have to
+    // recognise a generated name by its shape, which is a second place deciding what one looks like.
+    expect((await store.userById(created.user.id))?.displayNameChosen).toBe(false);
   });
 
-  it('starts unconfirmed, and confirms only against the address that was mailed', async () => {
+  it('renames a player, and a rename is what makes the name theirs', async () => {
     const { store, ada } = await fixture();
-    expect((await store.userById(ada))?.confirmed).toBe(false);
-    // The address is half the key. A confirmation that matched on id alone would confirm whatever
-    // address the account holds *now*, which is how a confirmation flow becomes a takeover flow.
-    expect(await store.confirmUser(ada, 'someone-else@example.test')).toBe(false);
-    expect((await store.userById(ada))?.confirmed).toBe(false);
-    expect(await store.confirmUser(ada, 'ADA@example.test')).toBe(true);
-    expect((await store.userById(ada))?.confirmed).toBe(true);
+    const renamed = await store.setDisplayName(ada, 'Ada Lovelace');
+    expect(renamed).toMatchObject({ ok: true });
+    if (!renamed.ok) return;
+    expect(renamed.user.displayName).toBe('Ada Lovelace');
+    expect(renamed.user.displayNameChosen).toBe(true);
   });
 
-  it('never returns a password in any field of a user row', async () => {
+  it('refuses a rename onto somebody else’s name, case-insensitively', async () => {
     const { store, ada } = await fixture();
-    expect(JSON.stringify(await store.userById(ada))).not.toContain('a passphrase of adequate length');
+    expect(await store.setDisplayName(ada, 'bo')).toMatchObject({ ok: false, reason: 'name-taken' });
+    // ...and renaming to your own name is not a clash with yourself, which the naive check gets
+    // wrong and which a player hits the moment they fix their own capitalisation.
+    expect(await store.setDisplayName(ada, 'ADA')).toMatchObject({ ok: true });
+  });
+
+  it('refuses a rename for a user that does not exist', async () => {
+    const { store } = await fixture();
+    expect(await store.setDisplayName('nobody', 'Somebody')).toMatchObject({ ok: false, reason: 'no-such-user' });
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Sign-in links
+ * -------------------------------------------------------------------------- */
+
+describe('a sign-in link', () => {
+  it('is spendable exactly once', async () => {
+    const { store, ada } = await fixture();
+    await store.createLoginToken({ jti: 'jti-1', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    // The first redemption wins and the second gets nothing. This is the claim a signature cannot
+    // make — `verifyLoginToken` would accept the same token a thousand times — so it is made here.
+    expect(await store.consumeLoginToken('jti-1')).toBe(true);
+    expect(await store.consumeLoginToken('jti-1')).toBe(false);
+  });
+
+  it('refuses one that was never issued, without throwing', async () => {
+    const { store } = await fixture();
+    expect(await store.consumeLoginToken('never-issued')).toBe(false);
+  });
+
+  it('refuses an expired one on the injected clock, and sweeps it away', async () => {
+    const { store, tick, ada } = await fixture();
+    await store.createLoginToken({ jti: 'jti-2', userId: ada, expiresAtMs: 1_770_000_000_000 + 1000 });
+    tick(1001);
+    expect(await store.consumeLoginToken('jti-2')).toBe(false);
+    // Gone, not merely refused: the primary key makes that a real constraint, so re-issuing the
+    // same identity would fail if the sweep had only refused it. A table of links that can never
+    // authenticate anything is a table that only grows.
+    await expect(
+      store.createLoginToken({ jti: 'jti-2', userId: ada, expiresAtMs: 1_770_000_100_000 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('keeps two outstanding links for one player apart', async () => {
+    const { store, ada } = await fixture();
+    // A player who asks twice must not lock themselves out by spending the first: the second link
+    // is a different row and is still good.
+    await store.createLoginToken({ jti: 'jti-a', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    await store.createLoginToken({ jti: 'jti-b', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    expect(await store.consumeLoginToken('jti-a')).toBe(true);
+    expect(await store.consumeLoginToken('jti-b')).toBe(true);
+  });
+
+  it('goes away with the account it belongs to', async () => {
+    const { store, ada } = await fixture();
+    await store.createLoginToken({ jti: 'jti-fk', userId: ada, expiresAtMs: 1_770_000_060_000 });
+    // A real foreign key, for the reason `challenge_entries` has one: a link naming an account that
+    // does not exist is a row that could only ever fail, and it would fail at redemption time.
+    await expect(
+      store.createLoginToken({ jti: 'jti-orphan', userId: 'nobody', expiresAtMs: 1_770_000_060_000 }),
+    ).rejects.toThrow();
   });
 });
 

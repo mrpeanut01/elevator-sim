@@ -10,10 +10,12 @@
  * **No secret, no server.** `requireSecret` throws and this does not catch it. § D214 § 5: a
  * placeholder default is how a development secret reaches production.
  *
- * **No outbox in production.** The dev mailer writes confirmation links to a file in the clear, so a
- * production server configured with it would be publishing account-takeover links to disk. That
- * combination is refused here rather than trusted to be noticed — the mailer module's own docstring
- * promises this refusal exists, and this is it.
+ * **No outbox in production.** The dev mailer writes sign-in links to a file in the clear, so a
+ * production server configured with it would be publishing account-takeover links to disk. Since
+ * § D241 that is literal rather than nearly so: the mailed link *is* the credential, and a directory
+ * full of them is a directory full of working keys. That combination is refused here rather than
+ * trusted to be noticed — the mailer module's own docstring promises this refusal exists, and this
+ * is it.
  *
  * **No server ships a challenge it cannot run.** § D218's rotation names buildings, templates and
  * durations, and a challenge naming an id this server does not ship would fail at the moment a
@@ -54,7 +56,7 @@ export interface BootstrapOptions {
   readonly sql: Sql;
   /** `process.env`, or whatever a test wants it to be. */
   readonly env: Readonly<Record<string, string | undefined>>;
-  /** The public origin confirmation links point at, e.g. `https://elevator.example`. */
+  /** The public origin sign-in links point at, e.g. `https://elevator.example`. */
   readonly publicOrigin: string;
   /** Injected so a test is not at the mercy of the clock, and a server is. */
   readonly now?: () => number;
@@ -93,7 +95,8 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const mailer = options.mailer ?? acsMailerFrom(options.env) ?? new OutboxMailer(options.env['ELEVATOR_SIM_OUTBOX'] ?? '.outbox.jsonl');
   if (options.env['NODE_ENV'] === 'production' && mailer instanceof OutboxMailer) {
     throw new UnsafeConfigurationError(
-      'The development mailer writes confirmation links to a file in the clear. Configure a real ' +
+      'The development mailer writes sign-in links to a file in the clear, and since § D241 each ' +
+        'one signs somebody in. Configure a real ' +
         'mailer before running in production, or unset NODE_ENV=production. Set ' +
         'ELEVATOR_SIM_ACS_ENDPOINT (managed identity) or ELEVATOR_SIM_ACS_CONNECTION_STRING, ' +
         'together with ELEVATOR_SIM_MAIL_FROM.',
@@ -119,7 +122,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     challengeFactsFor: challengeFactsResolver(config),
     secret,
     now,
-    confirmUrl: (token) => `${options.publicOrigin.replace(/\/$/u, '')}/api/confirm?token=${encodeURIComponent(token)}`,
+    signInUrl: signInUrlFor(options.publicOrigin),
   };
 
   return {
@@ -131,6 +134,34 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
       await store.close();
     },
   };
+}
+
+/** The fragment key the viewer reads a sign-in token out of. Named once; the client mirrors it. */
+export const SIGN_IN_FRAGMENT_KEY = 'sign-in';
+
+/**
+ * Where a sign-in link points: **the viewer, with the token in the URL fragment**.
+ *
+ * Both halves are security decisions and neither is a formatting preference.
+ *
+ * **The viewer and not the API**, because a link in a mailbox is fetched by machines. Mail clients
+ * prefetch, scanners and link-rewriting appliances resolve every URL in a message before a human
+ * sees it, and a link that pointed at a redeeming endpoint would be spent by whichever robot got
+ * there first — a login that fails for exactly the people whose employer is careful about links.
+ * This URL resolves to a page. `http/api.ts`'s redeem route is a `POST`, which is the second and
+ * independent reason the same thing cannot happen.
+ *
+ * **The fragment and not the query string**, because a fragment is never transmitted. It does not
+ * appear in the request line, so it cannot reach an access log, a proxy, an ingress trace or a
+ * `Referer` header sent to anything the page later loads. A token in `?token=` is a token in a log
+ * file on the way to being a token in a support ticket.
+ *
+ * The viewer reads {@link SIGN_IN_FRAGMENT_KEY} out of `location.hash`, posts it to
+ * `/api/auth/redeem`, and clears the hash.
+ */
+export function signInUrlFor(publicOrigin: string): (token: string) => string {
+  const origin = publicOrigin.replace(/\/$/u, '');
+  return (token) => `${origin}/#${SIGN_IN_FRAGMENT_KEY}=${encodeURIComponent(token)}`;
 }
 
 /**

@@ -91,6 +91,11 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
     // of the choice rather than the convenient one — and when the viewer is served from this same
     // origin, as it is in the shipped container, there is no cross-origin request to permit at all.
     allowOrigin: env['ELEVATOR_SIM_ALLOW_ORIGIN'] ?? 'null',
+    // Off unless an operator says there is a proxy in front, because `x-forwarded-for` is a request
+    // header and believing it by default would hand every caller a free rate-limit key. § D242 and
+    // `serve.ts`'s own note say what it costs either way. It is `'true'` and not "any non-empty
+    // value", so `ELEVATOR_SIM_TRUST_PROXY=false` means what a reader thinks it means.
+    trustProxy: env['ELEVATOR_SIM_TRUST_PROXY']?.trim().toLowerCase() === 'true',
     static: viewer,
   });
 

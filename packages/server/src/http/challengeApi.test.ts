@@ -43,7 +43,6 @@ import type { ApiRequest, ApiResponse } from './api.js';
 
 const DATA_DIR = new URL('../../../../data/', import.meta.url).pathname;
 const SECRET = 'a'.repeat(48);
-const PASSWORD = 'a passphrase of adequate length';
 
 let server: Server;
 let outbox: OutboxMailer;
@@ -87,6 +86,10 @@ async function call(
     query: new Map(Object.entries(options.query ?? {})),
     body: options.body,
     token: options.token,
+    // A fresh caller per request. § D242's per-caller budget is driven in `api.test.ts`; sharing
+    // one address across this file would put its sign-ins into one bucket and the first symptom
+    // would be an unrelated 429 in a challenge test.
+    clientIp: `198.51.100.${String((calls += 1) % 250)}`,
   };
   const response = await server.api(request);
   clock += 10_000;
@@ -97,21 +100,21 @@ function bodyOf(response: ApiResponse): Record<string, unknown> {
   return response.body as Record<string, unknown>;
 }
 
+let calls = 0;
 let accounts = 0;
-/** A confirmed account, through the mailbox rather than around it. */
+/** A signed-in account, through the mailbox rather than around it (§ D241). */
 async function registerConfirmed(): Promise<{ token: string }> {
   accounts += 1;
   const email = `challenger${String(accounts)}@example.test`;
-  const registered = await call('POST', '/api/register', {
-    body: { email, displayName: `Challenger ${String(accounts)}`, password: PASSWORD },
-  });
-  expect(registered.status, JSON.stringify(registered.body)).toBe(201);
+  const asked = await call('POST', '/api/auth/request-link', { body: { email } });
+  expect(asked.status, JSON.stringify(asked.body)).toBe(202);
   const link = /https:\/\/\S+/u.exec((await outbox.delivered()).at(-1)?.body ?? '')?.[0] ?? '';
-  const confirmed = await call('GET', '/api/confirm', {
-    query: { token: new URL(link).searchParams.get('token') ?? '' },
-  });
-  expect(confirmed.status).toBe(200);
-  return { token: String(bodyOf(registered)['token']) };
+  // Out of the fragment, which is where a sign-in token travels: it is never transmitted to a
+  // server, so it cannot reach an access log on its way to the person who asked for it.
+  const token = new URLSearchParams(new URL(link).hash.slice(1)).get('sign-in') ?? '';
+  const redeemed = await call('POST', '/api/auth/redeem', { body: { token } });
+  expect(redeemed.status, JSON.stringify(redeemed.body)).toBe(200);
+  return { token: String(bodyOf(redeemed)['token']) };
 }
 
 /**
@@ -277,27 +280,32 @@ describe('posting a challenge entry', () => {
     expect(String(bodyOf(refused)['detail'])).toContain(issuedChallengeFor(2).id);
   }, 120_000);
 
-  it('needs a confirmed account, and a session at all', async () => {
+  it('needs a session, and an unredeemed link is not one', async () => {
     const challenge = issuedChallengeFor(0);
     const anonymous = await call('POST', '/api/challenge-scores', {
       body: { challengeId: challenge.id, dispatcherProfileId: 'collective', claimed: [] },
     });
     expect(anonymous.status).toBe(401);
 
+    // § D241 replaced the *unconfirmed account* arm this test used to have. That arm existed
+    // because a password issued a session to somebody who had not proved they could read the
+    // address; a magic link cannot, so the thing to check is that asking for a link — on its own,
+    // without redeeming it — grants nothing at all.
     accounts += 1;
-    const registered = await call('POST', '/api/register', {
-      body: {
-        email: `unconfirmed${String(accounts)}@example.test`,
-        displayName: `Unconfirmed ${String(accounts)}`,
-        password: PASSWORD,
-      },
+    const asked = await call('POST', '/api/auth/request-link', {
+      body: { email: `unredeemed${String(accounts)}@example.test` },
     });
-    const unconfirmed = await call('POST', '/api/challenge-scores', {
-      token: String(bodyOf(registered)['token']),
+    expect(asked.status).toBe(202);
+    expect(bodyOf(asked)['token']).toBeUndefined();
+
+    const link = /https:\/\/\S+/u.exec((await outbox.delivered()).at(-1)?.body ?? '')?.[0] ?? '';
+    const signInToken = new URLSearchParams(new URL(link).hash.slice(1)).get('sign-in') ?? '';
+    // The sign-in token is not a session token, and presenting it as one authenticates nothing.
+    const asBearer = await call('POST', '/api/challenge-scores', {
+      token: signInToken,
       body: { challengeId: challenge.id, dispatcherProfileId: 'collective', claimed: [] },
     });
-    expect(unconfirmed.status).toBe(403);
-    expect(bodyOf(unconfirmed)['error']).toBe('not-confirmed');
+    expect(asBearer.status).toBe(401);
   });
 
   it('charges a cooldown scaled by the number of replays it just commanded', async () => {

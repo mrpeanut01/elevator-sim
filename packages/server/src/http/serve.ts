@@ -3,8 +3,9 @@
  *
  * It is deliberately thin and deliberately dull, because it is the one piece the tests do not
  * drive through the API: `api.test.ts` calls `handle()` directly with no port bound, which is only
- * a fair test if this file contains no decisions. So it contains four — a body-size cap, a JSON
- * parse, a bearer-token read and a CORS answer — and each is stated here rather than left implicit.
+ * a fair test if this file contains no decisions. So it contains five — a body-size cap, a JSON
+ * parse, a bearer-token read, a CORS answer and **who the caller is** — and each is stated here
+ * rather than left implicit.
  */
 
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
@@ -39,6 +40,21 @@ export interface ServeOptions {
    * startup crash for anyone running the API on its own.
    */
   readonly static?: StaticBundle | undefined;
+  /**
+   * Whether `x-forwarded-for` may be believed. **Default `false`.**
+   *
+   * § D242's per-caller budget is only a budget if the key cannot be chosen by the caller, and
+   * `x-forwarded-for` is a request header — anyone can send one, with anything in it. Trusting it
+   * unconditionally does not merely weaken the limit, it *removes* it, because a sender who varies
+   * the header gets a fresh budget per request while looking like a hundred different people.
+   *
+   * So it is believed only when an operator says there is a proxy in front, and even then only its
+   * **left-most** entry, which is the address the first trusted hop saw. Behind Azure Container
+   * Apps' ingress that is the real client; with no proxy the socket address is, and the default
+   * being the socket address means an operator who has not thought about it gets the answer that
+   * cannot be forged rather than the one that is convenient.
+   */
+  readonly trustProxy?: boolean | undefined;
 }
 
 export function serve(options: ServeOptions): NodeServer {
@@ -111,6 +127,7 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     query: new Map(url.searchParams),
     body,
     token: bearerOf(incoming.headers.authorization),
+    clientIp: clientIpOf(incoming, options.trustProxy ?? false),
   };
 
   let result;
@@ -154,4 +171,25 @@ export function bearerOf(header: string | undefined): string | undefined {
   if (header === undefined) return undefined;
   const match = /^Bearer\s+(\S+)$/u.exec(header.trim());
   return match?.[1];
+}
+
+/**
+ * Who is calling, for § D242's per-caller budget.
+ *
+ * The socket address unless {@link ServeOptions.trustProxy} says otherwise, and then the
+ * **left-most** `x-forwarded-for` entry — the address the first trusted hop saw. Right-most would be
+ * the proxy itself, which is one bucket for the whole internet; taking an arbitrary middle entry is
+ * taking whatever the caller wrote there.
+ *
+ * `undefined` rather than a placeholder when there is nothing to say, so the decision about what an
+ * unattributable caller costs is made once, in the route that charges, and not twice.
+ */
+export function clientIpOf(incoming: IncomingMessage, trustProxy: boolean): string | undefined {
+  if (trustProxy) {
+    const header = incoming.headers['x-forwarded-for'];
+    const raw = Array.isArray(header) ? header[0] : header;
+    const first = raw?.split(',')[0]?.trim();
+    if (first !== undefined && first.length > 0) return first;
+  }
+  return incoming.socket.remoteAddress ?? undefined;
 }

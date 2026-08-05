@@ -17,6 +17,26 @@
  * output or it does not, and `../` has nothing to traverse because no filesystem call ever sees it.
  * The bundle is a few hundred kilobytes and the process is a container that restarts to deploy, so
  * reading it once costs nothing worth optimising and removes a whole class of defect.
+ *
+ * ## It also tells the page that this server exists — § D243
+ *
+ * `viz`'s `dev/main.ts` builds its API client from `<meta name="elevator-sim-api">` and has
+ * **no default origin**, deliberately: a client that fell back to the page's own origin would work
+ * in development and fail in a build served from a CDN, which is the class of bug that only
+ * reproduces where it cannot be debugged (§ D215 § 4). The bundle therefore ships without the tag.
+ *
+ * The consequence, measured on the deployment rather than reasoned about: `GET /api/challenges` on
+ * the live app answers **200** with real data out of Azure PostgreSQL, the served `index.html`
+ * carries **no such tag**, and so every account, leaderboard and challenge screen in the shipped
+ * viewer dead-ends against a working API on its own origin. That is the root cause behind play-tester
+ * issues #21, #28, #29, #30, #32 and #34 — and it would have made a magic-link flow unreachable
+ * however carefully it was built.
+ *
+ * The fix belongs here and not in `viz/index.html`, because the fact being declared is **this
+ * process's**, not the bundle's: a bundle does not know whether an API is beside it, and this server
+ * does — it is serving both. So {@link loadStaticBundle} injects the tag into `index.html` as it
+ * reads it. A bundle served from a CDN with no server never passes through this function, never gets
+ * a tag, and keeps exactly today's behaviour, which is the property § D215 § 4 was protecting.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -69,6 +89,54 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = Object.freeze({
 /** Vite's hashed-asset shape: `name-8charhash.ext`. Conservative — a miss only costs a revalidation. */
 const HASHED = /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/u;
 
+/** The tag `viz`'s `dev/main.ts` reads its API origin out of. Named once, on both sides. */
+export const API_ORIGIN_META_NAME = 'elevator-sim-api';
+
+/**
+ * The value injected: `"/"`, meaning **the origin that served this page**.
+ *
+ * Not the configured `ELEVATOR_SIM_ORIGIN`, and the difference is not cosmetic. The client builds
+ * every request as `` `${origin.replace(/\/$/, '')}/api/…` ``, so `"/"` becomes the empty string and
+ * the requests become `/api/challenges` — same-origin, absolute-path, resolved by the browser
+ * against whatever host actually served the page.
+ *
+ * An absolute origin would have to be *right*, and it has two ways to be wrong that this has none
+ * of. It would be stale the moment a custom domain is put in front — which `infra/azure/main.bicep`
+ * emits an output specifically warning about — and every mismatch, down to `http` versus `https` or
+ * `localhost` versus `127.0.0.1`, turns a same-origin call into a cross-origin one that
+ * `ELEVATOR_SIM_ALLOW_ORIGIN`'s deliberately-restrictive default then refuses. A relative value is
+ * correct in local development, in a staging slot, behind a custom domain and behind a rewrite,
+ * with no configuration to keep in step.
+ *
+ * It is also the choice that does not trust the `Host` header. Deriving the tag per request from
+ * `Host` would be equally configuration-free and would let a request with a forged `Host` produce a
+ * page pointing its API at somebody else's server — a shared cache in front of it turns that from
+ * self-inflicted into an attack.
+ */
+export const SAME_ORIGIN_API = '/';
+
+const API_ORIGIN_META_TAG = `<meta name="${API_ORIGIN_META_NAME}" content="${SAME_ORIGIN_API}" />`;
+
+/**
+ * Put the tag in a document's `<head>`, unless it already declares one.
+ *
+ * Idempotent on purpose. A bundle that already carries the tag has been told its origin by somebody
+ * who knew something this server does not, and a second tag would leave `querySelector` picking
+ * whichever came first — a coin toss between two answers is worse than either.
+ *
+ * The insertion is after the opening `<head>`, so the tag precedes anything that could act on it,
+ * and it falls back to prefixing the document when there is no `<head>` at all — a document with no
+ * head is not a viewer build, but silently dropping the tag would be the failure this whole section
+ * exists to stop, one level down.
+ */
+export function withApiOriginTag(html: string): string {
+  if (new RegExp(`name=["']${API_ORIGIN_META_NAME}["']`, 'iu').test(html)) return html;
+  const head = /<head[^>]*>/iu.exec(html);
+  if (head === null) return `${API_ORIGIN_META_TAG}\n${html}`;
+  const at = head.index + head[0].length;
+  return `${html.slice(0, at)}\n    ${API_ORIGIN_META_TAG}${html.slice(at)}`;
+}
+
 /**
  * Read a build output directory into memory.
  *
@@ -87,9 +155,17 @@ export async function loadStaticBundle(root: string): Promise<StaticBundle> {
         await walk(child, urlPath);
       } else if (entry.isFile()) {
         const extension = extname(entry.name).toLowerCase();
+        const raw = await readFile(child);
+        // Only the document, and only at the root. Every other byte of the build is passed through
+        // untouched — a rewrite that touched a hashed asset would change content whose name promises
+        // it never changes, which is the one thing `immutable` may not be wrong about.
+        const isDocument = urlPath === '/index.html';
         bundle.set(urlPath, {
-          body: await readFile(child),
+          body: isDocument ? Buffer.from(withApiOriginTag(raw.toString('utf8')), 'utf8') : raw,
           contentType: CONTENT_TYPES[extension] ?? 'application/octet-stream',
+          // Unchanged by the injection, and it must be: `index.html` keeps its name across deploys,
+          // so it is `no-cache` whatever is in it, and the rewritten document inherits exactly the
+          // caching the original had rather than acquiring its own.
           immutable: HASHED.test(entry.name),
         });
       }

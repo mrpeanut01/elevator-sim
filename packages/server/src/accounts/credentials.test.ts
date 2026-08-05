@@ -1,84 +1,34 @@
 /**
  * The security claims, driven rather than asserted.
  *
- * Every test here breaks something on purpose: a wrong password, a tampered token, a token replayed
- * against a different address, an expired one, a server with no secret. A credentials module whose
- * tests only ever supply correct inputs has demonstrated that the happy path works, which is the
- * half nobody was worried about.
+ * Every test here breaks something on purpose: a tampered token, a token replayed against a
+ * different address, an expired one, a server with no secret. A credentials module whose tests only
+ * ever supply correct inputs has demonstrated that the happy path works, which is the half nobody
+ * was worried about.
+ *
+ * **The password suite is gone because the passwords are** (§ D241). What replaced it is not a
+ * smaller set of tests: a magic link is the *whole* credential, so the arms below are the arms that
+ * decide whether an account can be taken, and one of them — single use — is deliberately **not**
+ * here. It cannot be, because a signature cannot express it; `http/api.test.ts` drives it against
+ * the store, and this file's job is to say clearly that the signature does not.
  */
+
+import { createHmac } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
 import {
-  CONFIRMATION_TTL_MS,
+  LOGIN_TTL_MS,
   MissingSecretError,
   constantTimeEquals,
-  hashPassword,
   newSessionToken,
-  passwordIssues,
-  passwordMatches,
   requireSecret,
-  signConfirmation,
-  verifyConfirmation,
+  signLoginToken,
+  verifyLoginToken,
 } from './credentials.js';
 
 const SECRET = 'a'.repeat(48);
 const NOW = 1_770_000_000_000;
-
-/* -------------------------------------------------------------------------- *
- * Passwords
- * -------------------------------------------------------------------------- */
-
-describe('passwords', () => {
-  it('accepts the right one and refuses the wrong one', () => {
-    const stored = hashPassword('correct horse battery staple');
-    expect(passwordMatches('correct horse battery staple', stored)).toBe(true);
-    expect(passwordMatches('correct horse battery stapl', stored)).toBe(false);
-    expect(passwordMatches('', stored)).toBe(false);
-  });
-
-  it('never keeps the password, in any field', () => {
-    const password = 'a passphrase nobody should find';
-    const stored = hashPassword(password);
-    // The whole record, serialised, must not contain it. A field added later that echoed the
-    // password back would fail here rather than in a breach.
-    expect(JSON.stringify(stored)).not.toContain(password);
-    expect(Object.values(stored).join(' ')).not.toContain(password);
-  });
-
-  it('salts, so the same password twice gives different digests', () => {
-    const first = hashPassword('the same passphrase twice');
-    const second = hashPassword('the same passphrase twice');
-    expect(first.hashHex).not.toBe(second.hashHex);
-    expect(first.saltHex).not.toBe(second.saltHex);
-    // ...and both still verify. A salt that broke verification would be caught by nothing above.
-    expect(passwordMatches('the same passphrase twice', first)).toBe(true);
-    expect(passwordMatches('the same passphrase twice', second)).toBe(true);
-  });
-
-  it('fails a corrupt stored record rather than throwing', () => {
-    // A corrupt row must fail the login, not crash the endpoint and reveal which rows are corrupt.
-    for (const stored of [
-      { saltHex: 'zz', hashHex: 'zz' },
-      { saltHex: '', hashHex: '' },
-      { saltHex: 'ab', hashHex: 'ab' },
-    ]) {
-      expect(() => passwordMatches('anything at all here', stored)).not.toThrow();
-      expect(passwordMatches('anything at all here', stored)).toBe(false);
-    }
-  });
-
-  it('requires length and nothing else', () => {
-    expect(passwordIssues('short')).toHaveLength(1);
-    expect(passwordIssues('x'.repeat(201))).toHaveLength(1);
-    // A long passphrase of one character class is fine. Composition rules push people to
-    // `Password1!` and are not what makes a secret strong.
-    expect(passwordIssues('all lowercase words and spaces')).toEqual([]);
-    // The upper bound is a denial-of-service guard: scrypt will happily spend a second on a
-    // megabyte, and this endpoint is unauthenticated.
-    expect(passwordIssues('x'.repeat(200))).toEqual([]);
-  });
-});
 
 /* -------------------------------------------------------------------------- *
  * The secret
@@ -108,71 +58,130 @@ describe('the signing secret', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * Confirmation tokens
+ * Sign-in tokens
  * -------------------------------------------------------------------------- */
 
-describe('confirmation tokens', () => {
-  const token = (): string =>
-    signConfirmation({ userId: 'u1', email: 'player@example.test', secret: SECRET, nowMs: NOW });
+describe('sign-in tokens', () => {
+  const issue = (): ReturnType<typeof signLoginToken> =>
+    signLoginToken({ userId: 'u1', email: 'player@example.test', secret: SECRET, nowMs: NOW });
 
   it('round-trips the claims it was signed with', () => {
-    const claims = verifyConfirmation(token(), SECRET, NOW);
-    expect(claims).toMatchObject({ userId: 'u1', email: 'player@example.test' });
+    const link = issue();
+    const claims = verifyLoginToken(link.token, SECRET, NOW);
+    expect(claims).toMatchObject({ userId: 'u1', email: 'player@example.test', jti: link.jti });
   });
 
   it('refuses a token signed with a different secret', () => {
-    expect(verifyConfirmation(token(), 'b'.repeat(48), NOW)).toBe('bad-signature');
+    expect(verifyLoginToken(issue().token, 'b'.repeat(48), NOW)).toBe('bad-signature');
   });
 
   it('refuses a tampered payload', () => {
-    const [body = '', signature = ''] = token().split('.');
+    const [body = '', signature = ''] = issue().token.split('.');
     const forged = Buffer.from(
-      JSON.stringify({ u: 'someone-else', e: 'attacker@example.test', x: NOW + 1000 }),
+      JSON.stringify({ u: 'someone-else', e: 'attacker@example.test', j: 'anything', x: NOW + 1000 }),
       'utf8',
     ).toString('base64url');
-    // The payload is swapped and the signature kept. This is the attack the HMAC exists for.
-    expect(verifyConfirmation(`${forged}.${signature}`, SECRET, NOW)).toBe('bad-signature');
+    // The payload is swapped and the signature kept. This is the attack the HMAC exists for, and
+    // under a magic link it is an attempt to mint a session for an account the attacker names.
+    expect(verifyLoginToken(`${forged}.${signature}`, SECRET, NOW)).toBe('bad-signature');
     expect(body.length).toBeGreaterThan(0);
   });
 
   it('cannot be replayed against a different address', () => {
-    // The email is INSIDE the signature. Without that, a token issued for one address could confirm
-    // whatever address the account later claimed — which is how a confirmation flow becomes an
-    // account-takeover flow.
-    const claims = verifyConfirmation(token(), SECRET, NOW);
-    expect(claims).not.toBe('bad-signature');
+    // The email is INSIDE the signature, so a token carries the address it was mailed to and cannot
+    // be presented as a login for another one. `api.ts` checks the claim against the stored account
+    // rather than trusting it, and this is the half that makes that check meaningful.
+    const claims = verifyLoginToken(issue().token, SECRET, NOW);
+    expect(typeof claims).not.toBe('string');
     if (typeof claims === 'string') return;
     expect(claims.email).toBe('player@example.test');
   });
 
-  it('expires', () => {
-    const expired = signConfirmation({
+  it('expires, and expires in minutes rather than hours', () => {
+    const link = signLoginToken({
       userId: 'u1',
       email: 'player@example.test',
       secret: SECRET,
       nowMs: NOW,
       ttlMs: 1000,
     });
-    expect(verifyConfirmation(expired, SECRET, NOW + 999)).not.toBe('expired');
-    expect(verifyConfirmation(expired, SECRET, NOW + 1001)).toBe('expired');
+    expect(verifyLoginToken(link.token, SECRET, NOW + 999)).not.toBe('expired');
+    expect(verifyLoginToken(link.token, SECRET, NOW + 1001)).toBe('expired');
+
+    // The shipped TTL, asserted as a bound rather than as a number, because the number may move and
+    // the bound may not: a login link is not a confirmation link and must not inherit its day.
+    expect(LOGIN_TTL_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
+    expect(LOGIN_TTL_MS).toBeLessThanOrEqual(60 * 60 * 1000);
+    expect(verifyLoginToken(issue().token, SECRET, NOW + LOGIN_TTL_MS + 1)).toBe('expired');
   });
 
   it('checks the signature before the expiry', () => {
     // A forged token must not be able to learn whether its payload parsed. Both are wrong here and
     // the signature is what is reported.
-    const stale = signConfirmation({
+    const stale = signLoginToken({
       userId: 'u1',
       email: 'e@example.test',
       secret: 'c'.repeat(48),
-      nowMs: NOW - CONFIRMATION_TTL_MS * 2,
+      nowMs: NOW - LOGIN_TTL_MS * 2,
     });
-    expect(verifyConfirmation(stale, SECRET, NOW)).toBe('bad-signature');
+    expect(verifyLoginToken(stale.token, SECRET, NOW)).toBe('bad-signature');
+  });
+
+  it('gives every token a distinct identity, which is what single use is hung on', () => {
+    const seen = new Set<string>();
+    for (let index = 0; index < 200; index += 1) {
+      const link = issue();
+      expect(seen.has(link.jti)).toBe(false);
+      seen.add(link.jti);
+      // Two links for the same account are two different strings. Without that, spending one would
+      // spend the other, and a player who asked twice would lock themselves out.
+      expect(link.token).not.toBe('');
+    }
+  });
+
+  it('says the expiry it signed, so the caller can store the same one', () => {
+    const link = signLoginToken({
+      userId: 'u1',
+      email: 'player@example.test',
+      secret: SECRET,
+      nowMs: NOW,
+      ttlMs: 60_000,
+    });
+    expect(link.expiresAtMs).toBe(NOW + 60_000);
+    const claims = verifyLoginToken(link.token, SECRET, NOW);
+    if (typeof claims === 'string') expect.unreachable('should have verified');
+    else expect(claims.expiresAtMs).toBe(link.expiresAtMs);
+  });
+
+  it('verifies a spent token exactly as happily as an unspent one — which is why the store exists', () => {
+    // The negative result this module is honest about. Nothing about an HMAC changes when a token is
+    // used, so verifying twice succeeds twice, and single use is a fact about `login_tokens` or it
+    // is not a fact. `api.test.ts` is where the second redemption is refused.
+    const link = issue();
+    expect(verifyLoginToken(link.token, SECRET, NOW)).toMatchObject({ jti: link.jti });
+    expect(verifyLoginToken(link.token, SECRET, NOW)).toMatchObject({ jti: link.jti });
   });
 
   it('refuses garbage without throwing', () => {
-    for (const bad of ['', '.', 'nodot', 'a.b', '...', Buffer.from('{').toString('base64url') + '.x']) {
-      expect(() => verifyConfirmation(bad, SECRET, NOW)).not.toThrow();
-      expect(typeof verifyConfirmation(bad, SECRET, NOW)).toBe('string');
+    for (const bad of ['', '.', 'nodot', 'a.b', '...', `${Buffer.from('{').toString('base64url')}.x`]) {
+      expect(() => verifyLoginToken(bad, SECRET, NOW)).not.toThrow();
+      expect(typeof verifyLoginToken(bad, SECRET, NOW)).toBe('string');
+    }
+  });
+
+  it('refuses a well-signed token whose payload is missing a field', () => {
+    // Signed by this server, so the HMAC passes — and then the claims do not typecheck. A token
+    // that verified with a missing `jti` would be a token nothing could spend, i.e. a token with
+    // no single-use guarantee at all.
+    for (const payload of [
+      { u: 'u1', e: 'p@example.test', x: NOW + 1000 },
+      { u: 'u1', j: 'j1', x: NOW + 1000 },
+      { e: 'p@example.test', j: 'j1', x: NOW + 1000 },
+      { u: 'u1', e: 'p@example.test', j: 'j1' },
+    ]) {
+      const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+      const signature = createHmac('sha256', SECRET).update(body).digest('base64url');
+      expect(verifyLoginToken(`${body}.${signature}`, SECRET, NOW)).toBe('malformed');
     }
   });
 });
