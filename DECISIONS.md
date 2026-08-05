@@ -14217,7 +14217,4 @@ works:
   screen is undecided, and nobody has needed one.
 - **The document tier** — § D220 § 2's middle rung. It is what closes the rest of `UX.md` § 27's
   `⚠️ mount` marks, and it is not built.
-- **`midtown-office` ships with a `rise-exceeds-class` warning**: 76.9 m of rise against
-  `geared-traction`'s rated 76. Real, in `data/`, found by commissioning and left alone by it —
-  either the garage's −3.5 m should not count toward a bank's rise, or the building should name a
-  class rated for it.
+- **`midtown-office` trips a `rise-exceeds-class` advisory** — 76.9 m of rise (a −3.5 m garage to a 73.4 m top floor) against `geared-traction`'s reference rating of 76 m. Worth someone's attention and **not a defect**: `core` states in the warning itself that *the reference envelope is application guidance, not a hard limit*, so the building is legal and deliberately so. What it costs is that commissioning cannot blame a player for a warning the shipped building already raises, which is why its diagnostic key had to include the **message** and not just the code and path — keyed on code+path, commissioning that bank as `hydraulic`, rated for 18 m, raised the same code at the same path and was silently forgiven as pre-existing.

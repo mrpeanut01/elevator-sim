@@ -1983,9 +1983,11 @@ requires the stage to have been drawn ([§ D220](../DECISIONS.md), [§ D221](../
 
 Still open and named: **Sandbox as a mode** — the defect is closed and the label is finally
 printable and true, but whether it deserves a screen is undecided; **§ D220's document tier**, which
-is what closes the rest of `UX.md` § 27's `⚠️ mount` marks; and **`midtown-office`'s shipped
-`rise-exceeds-class` warning**, 76.9 m against a class rated 76, found by commissioning and left for
-`data/`'s owner.
+is what closes the rest of `UX.md` § 27's `⚠️ mount` marks; and — **not a defect, and named because it looked like one** — `midtown-office`'s
+`rise-exceeds-class` advisory, 76.9 m against a reference rating of 76. `core` says in the warning
+itself that the envelope is guidance rather than a limit, so the building is legal; what it cost is
+that commissioning's diagnostic key had to include the **message** rather than only the code and
+path, or commissioning that bank as a class rated for 18 m would have been forgiven as pre-existing.
 
 **Closed since this table was last written:** **Phase 8's full experiment matrix and Pareto front at
 a real budget, and with it Phase 7's acceptance interval at 50–200 replications** — both landed in
