@@ -16588,3 +16588,223 @@ One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix 
 joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
 and, following the file's own discipline, both values are asserted explicitly below the comparison
 rather than waved away.
+
+---
+
+## D248 — the menu asked for the option that was already showing, and the tests could not see it
+
+**Date: 2026-08-05 · Written after the code, and after the browser drive that measured it.**
+
+`dev/menuPanel.ts` rewrote a dispatched intent to carry the option the player chose for exactly two
+of the six `MenuIntent` members that carry one:
+
+```ts
+row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+  ? { ...row.intent, value }
+  : row.intent
+```
+
+`set-calendar`, `set-commissioning`, `set-constraint` and `set-challenge` fell into the fallback arm
+and were dispatched unrewritten. A select's affordance is built **before** anybody picks anything, so
+its intent has to name the value the row is currently showing — that is what puts the right option in
+the box. Dispatching it back is therefore a **no-op by construction**, and it is the same no-op
+whichever option was picked.
+
+### 1. What it cost, measured rather than reasoned
+
+Driven on the shipped page at 1280×720:
+
+| screen | before | picked | after |
+|---|---|---|---|
+| Scenarios → Calendar | `''` | `vacation` | `''` |
+| Commissioning → `Under` | `retrofit` | `new-build` | `retrofit` |
+| Commissioning → `main — shafts` | `2` | `1` | `2` |
+| Commissioning → `main — machine class` | `hydraulic` | *(any)* | `hydraulic` |
+
+GitHub issues #44 (*"the Calendar dropdown reverts to An ordinary week — none of the five described
+weeks can be selected"*) and #42 (*"every dropdown on the Commissioning screen is inert"*, filed
+**Blocker**), one line apart. After the change, on the same page: the Calendar holds `vacation` and
+the shell's caption names the week; `Under` moves to `new-build`, shafts 2 → 4, machine class
+hydraulic → gearless-traction with the speed ladder following to 2.50 m/s, and the constraint's
+review now refuses two of the choices in words.
+
+### 2. It is **not** a dead seam, and saying so precisely matters
+
+The standing requirement counts eleven dead seams in code plus two in `data/`, and this is not the
+twelfth. Everything downstream was live and correct: `state.calendar` reaches `shiftRunConfigOf`,
+`calendarDayFor` and `calendarPatch`; the shell's arm calls `runShift()`; `state.commissioning`
+reaches `commissionedBuilding`. What was missing was one rewrite in the middle of a live chain.
+
+That distinction changes what the fix has to be. A dead seam is closed by building a caller; a live
+chain with a hole in it is closed by three lines — and by the tests that would have found the hole,
+which are the deliverable.
+
+### 3. The rewrite is now exhaustive, because the expression could not be
+
+`menu/screens.ts#withChosenValue` is a switch over `MenuIntent` with no `default`, returning a
+`MenuIntent`. Under `noImplicitReturns` a seventh member that carries a chosen value cannot be added
+without an arm. The ternary it replaces had a `: row.intent` fallback, which is a **silent default
+over the same union** — which is precisely how four members joined it without anything noticing.
+
+Two smaller decisions inside it. `set-calendar` and `set-constraint` write `periodId` and
+`constraintId` rather than a shared `value`, spelled out rather than reached through a common key,
+because those are ids of two different vocabularies and a generic field would make them look
+interchangeable. And the pass-through arm — fourteen kinds — is a hand-written list, which is the
+shape this repository keeps finding stale, so **nothing trusts it**: see § 4.
+
+### 4. Why the existing tiers were all blind, and which one is at fault
+
+`docs/16` S9 names four tiers — static sweep < model walk < document recorder < browser. Three
+existed and all three were green.
+
+- **The model walk** (`playthrough/walk.test.ts`) presses every option of every select on every
+  screen. It builds the intent it presses with **the same condition the panel used**, and skips any
+  row whose intent is neither `set-free-play` nor `set-setting`. So the four broken transports were
+  the four it asserted nothing about. *A walk that reproduces the transport cannot measure it* — the
+  fixture-shaped failure § D183's disclosure suite already paid for, arriving in a walk.
+- **The scope suite** (`scope/scope.test.ts`) does move `viewer.calendar` and `viewer.commissioning`
+  to the legs, and correctly. Its probes write the `ViewerState` field **directly**. It measures the
+  half of the chain that worked.
+- **The document recorder** (`dev/menuPanel.test.ts`) had never been pointed at a `<select>`.
+
+So the replacement is derived and sits at two tiers. `menu/screens.test.ts` walks `screenOf` over
+every screen under an arm that populates the fabric *and* challenge screens — both had been rendering
+their *nothing loaded* fallbacks, which is how an optional input becomes a coverage hole — takes
+every `select`, `toggle` and `text` row it finds, and requires that choosing a different option
+produces a different intent. Two of its cases go all the way to the legs. `dev/menuPanel.test.ts`
+drives the real element: the panel builds it, the element's own `change` listener runs, and the
+intent the host received is read back. Both were watched failing against the old ternary before
+being trusted.
+
+### 5. The legs case had to move buildings, and the reason is a measurement already on file
+
+`legsOf` on Garden Apartments at 900 s reported the fabric control **dead** when a shaft was added:
+the building produces 20 legs and two hydraulic cars answer every one, so a third car is never
+assigned. `scope/probes.test-helper.ts` had hit this and written it down. The case moved to
+`midtown-office` at 1 800 s rather than lowering the bar — *"one building where nothing you change
+makes any difference"* is `docs/10` § 0's M1, and an instrument that does not know it produces a
+false accusation, which is the most expensive kind of wrong an instrument like this can be.
+
+---
+
+## D249 — the full-screen menu was not a dialog, and the focus was lost on every redraw
+
+**Date: 2026-08-05 · Written after the code.** GitHub issues #33 and #68.
+
+Measured on the shipped page with an overlay covering the viewport: `role` null, `aria-modal` null,
+no accessible name, `body[inert]` false, **7 focusable controls inside the overlay and 624 in the
+document**. Six Tab presses from the first menu row landed on `BODY`, then a link, then a button,
+then a `<select>` — every one of them behind the screen the player was looking at.
+
+#68 is what that costs, and it is why this is not an accessibility nicety. The reporter tabbed out
+of the **Settings** screen — the one whose own note reads *"These change how the simulation is
+drawn, never what it computes"* — reached the seed field behind the overlay, typed `424242`, and
+re-seeded the run. The seed is the one input the whole provenance and replay story rests on
+(invariant 5), and it was overwritten from the screen that promises it cannot change a run.
+
+### 1. The half that was not the Tab key
+
+The obvious reading is *the ring is too short and Tab falls off the end*. Driving it showed
+something worse underneath: `fill` replaces every child of the overlay on **every** redraw, so the
+focused element is destroyed by every state change — and the overlay is appended last to
+`document.body`, so the next Tab from `<body>` walks into the shell rather than into the menu.
+
+So the reporter did not need to tab past the end. Toggling anything put them at `<body>`, and one
+Tab from there was already outside. A trap without focus restoration would have closed nothing.
+
+The restoration needs an identity that survives the redraw, and the element cannot be it. Each
+control now carries `data-menu-control` — the affordance's own `id`, already *"stable, and unique
+within a screen"* by `MenuAffordance`'s contract, so no second naming scheme is introduced — and a
+redraw puts the reader back on the control with the same key. Never while `hidden`: `closeMenu` hides
+the overlay and later draws still run, and without that guard leaving the menu would pull focus into
+a screen nobody can see, which is #68 with the sign flipped.
+
+### 2. The ring is built, not queried
+
+The list of focusable controls is the one the panel just built, in draw order, rather than a
+`querySelectorAll` over the result. Two reasons, and the second decided it: a selector would be a
+second, unasserted answer to *what is focusable in here* that could drift from what was drawn, and
+this package's document tier deliberately has no selector engine — so a trap built on one could not
+be driven under Node, and the only evidence for it would be a browser run that skips on most
+machines.
+
+Disabled buttons are excluded. A ring whose last member cannot be focused is a ring Tab walks
+straight past, so including a refused **Start** would have re-opened the hole at exactly the moment
+the screen is refusing something.
+
+### 3. Two halves are open, and they are open rather than approximated
+
+**`inert`/`aria-hidden` on the shell behind** needs `dev/main.ts`. Without it a pointer still
+reaches past the overlay, and so does anything focusable inside it that the panel did not build — a
+link inside a notice, say. The trap holds the keyboard; it is not the whole of a modal.
+
+**Escape** needs a `MenuIntent` that closes the menu and an arm in the shell's exhaustive switch to
+perform it. Adding the member without the arm would compile — `dispatchMenu` returns `void`, so a
+missing case is not an error — and ship a control nothing performs, which is the defect this package
+has shipped eleven times. Binding Escape to `back` instead was considered and refused: it would work
+on five screens and do nothing on the root, which is exactly where #40's reporter is standing.
+
+### 4. What the document tier can and cannot say about this
+
+The recorder grew four members — `hidden`, `contains`, `focus`, and the document's `activeElement` —
+because `renderMenu` started calling them, which is the rule it has always been grown by. It is
+still not a browser: `focus` moves a variable, and `press` calls the root's own handler rather than
+dispatching through a capture and bubble phase. **So what it proves is that the trap decides
+correctly given where focus is, and not that a browser routes the key there.** The second claim was
+measured separately, in Chromium: twelve Tab presses cycle the root's seven controls and never
+leave, Shift+Tab wraps the other way, toggling *Reduce motion* leaves the reader on
+`settings.playback-speed` where they were, and after **Open the doors** the overlay is hidden with
+focus outside it.
+
+---
+
+## D250 — an empty `SINK_MISSING` is not the claim that four controls are visible
+
+**Date: 2026-08-05 · Written after the measurement.** GitHub issue #70, and a finding about the
+instrument rather than about the setting.
+
+The issue makes two claims. Driven at 1280×720 on the current tip, **one is refuted**: all four
+preferences survive a reload. Tick *Reduce motion*, set *Playback speed* to 8× and *Theme* to light,
+reload, and the slot holds `{"reduceMotion":true,"showEnergyAxis":false,"playbackSpeed":8,"theme":"light"}`
+before and after, with the reloaded screen showing the checkbox ticked, `8` and `light`, and
+`data-theme="light"` on the document. The reporter's evidence was that `localStorage` carries no key
+for any of them, which is true and is not the question: all four live inside `elevator-sim.session`.
+
+The other claim is right for one of its three subjects, and for a reason the report does not give.
+`reduceMotion` pauses playback and suppresses autoplay on the next `adopt`; `playbackSpeed`
+multiplies the transport chip's rate. Neither writes a DOM attribute or a text node — which is what
+the reporter diffed — so their **measurement** is sound and their conclusion is not.
+
+### `showEnergyAxis` reaches a function, and the function reaches no screen
+
+`render/runSummary.ts#summaryFigureIds` honours it. Its only shipped caller is
+`mode/disclosure.ts#disclosureItems`. *Its* only shipped caller is `dev/main.ts#drawParity`, which
+turns the item list into `parityRefusal` — a string that is **empty whenever mode parity holds**,
+which is the shipped state and is separately proved. Measured: with a run on screen, the whole
+shell's rendered text is **byte-identical** with the switch on and off.
+
+The two energy cells a player actually reads are `shift/report.ts#energyFigures`, emitted
+unconditionally, and `DayReportInput` has no field for the preference — so the Day report *cannot*
+honour it. The fix is one required field and one caller, and it is filed rather than reached for,
+because `shift/` and `dev/main.ts` were not this lane's.
+
+### The finding worth more than the setting
+
+`GAPS.md` § 3 carried a row saying this setting *reaches nothing*, and it was retired when the
+setting acquired a sink — `summaryFigureIds` — and left `scope/probes.test-helper.ts`'s
+`SINK_MISSING`. `scope.test.ts` then asserted, in its own words, *"it is empty, because all four
+settings now reach something"*.
+
+Both statements are true and the pair was read as something neither says. **`scope.test.ts`'s
+presentation-control check asks whether a control's declared sink *moves*, and a sink is a function.
+A pure function that no surface calls satisfies it perfectly.** The register measures *is this
+control connected to a decision*, and it was read as *can a player see it work*, which is the same
+gap between *reachable* and *has a non-test caller* that the standing requirement exists for,
+arriving one layer up — in the instrument built to catch it.
+
+Nothing here weakens the check; a sink probe is still much better than nothing, and it is what caught
+the other three. What is recorded is its ceiling: **a sink is evidence about a seam, never about a
+screen**, and the tier that can tell the difference is the one that reads the rendered text. The
+`GAPS.md` row is rewritten to say all of that, and `Settings.showEnergyAxis` now carries what it
+reaches today in its own docstring, because a stated mechanism goes stale exactly the way a
+published number does.
