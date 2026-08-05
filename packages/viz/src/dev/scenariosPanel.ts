@@ -47,6 +47,7 @@ import { takeContract } from '../shift/week.js';
 
 import { el, fill } from './dom.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import { shiftLengthForContract } from './state.js';
 
 /* -------------------------------------------------------------------------- *
  * The art — the only thing taken from the handoff's PRESETS table
@@ -255,6 +256,31 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
     context.update({
       week: takeContract(view.state.week, card.contractId),
       buildingId: card.buildingId,
+      /*
+       * The scenario's own shift — § D234, issue #27.
+       *
+       * Garden Apartments does not reach the twenty arrivals a goal needs in thirty minutes: over
+       * twelve seeds the median is 18 and seven of the twelve are under the line, so the scenario
+       * whose brief says *"nothing here is hard"* graded nothing and reported *"Shift missed"* over
+       * a day that carried everybody inside a minute. `shiftLengthForContract` carries the
+       * measurement and the reason the threshold was not lowered instead.
+       *
+       * Seeded here and nowhere else on this surface, because taking an assignment is the one
+       * moment a player has asked for *this scenario* rather than for *this shift length*. The
+       * select stays live afterwards.
+       */
+      shiftLengthS: shiftLengthForContract(card.contractId),
+      /*
+       * The mode comes back with the week — § D231.
+       *
+       * A player who pressed **Free play** or **Keep going** and then picked a card off this list
+       * has taken an assignment, and an assignment is a week. Without this the state kept
+       * `playMode: 'free-play'`, and `advancesTheWeek` would then refuse to bank the very shifts
+       * the card was counting: a scenario with a live goal rail and a `0 of 1 banked` counter
+       * nailed to zero, which is issue #77's complaint arriving through a mode field instead of
+       * through a contract id.
+       */
+      playMode: 'shift-week',
       outOfServiceCarIds: [],
       recording: undefined,
       report: undefined,

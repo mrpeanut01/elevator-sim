@@ -97,6 +97,7 @@ import {
   phaseAt,
   playheadPctOf,
   tickLabelsOf,
+  timeOfDayAt,
   timelineOf,
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
@@ -161,7 +162,6 @@ import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
-  DEFAULT_SHIFT_LENGTH_S,
   SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
@@ -171,6 +171,7 @@ import {
   disclosureOf,
   initialState,
   profileById,
+  resolvedBuildingOf,
   shiftRunConfigOf,
   weekForSession,
   withBuilding,
@@ -1449,7 +1450,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       resources,
       recording,
       simTimeS,
-      building,
+      /*
+       * The **last run's** building while a run is on screen, and the building the state is
+       * pointing at when there is not — § D234, issue #36.
+       *
+       * `building` is `shiftRunConfigOf`'s: grown to the day, commissioned, with the day's
+       * incidents on it, and therefore the right thing to describe the recording beside it. It is
+       * the wrong thing to describe when the recording has been cleared and nothing has re-run,
+       * which is exactly what *Take the next assignment* does — it moves `buildingId`, drops the
+       * recording, and does not run. The header then drew the new building's name against the old
+       * building's specs, and the picture underneath was the old building's frame stretched over
+       * the new one's box.
+       */
+      building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
     };
   }
@@ -1685,9 +1698,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
     setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+    // `view.building`, not the boot-scope binding: the two differ exactly when there is no
+    // recording, which is the case § D234 is about. Reading the binding here is what put the
+    // tutorial's geometry under the next scenario's name.
     setText(
       ui.header.buildingSub,
-      building === undefined ? '' : statLineOf(building),
+      view.building === undefined ? '' : statLineOf(view.building),
     );
     setText(ui.header.clock, view.recording === undefined ? '06:00' : clockAt(view.simTimeS));
     const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
@@ -1696,7 +1712,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ui.header.dayLabel,
       `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
     );
-    const population = building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
+    const population =
+      view.building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
@@ -2010,6 +2027,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * an open dropdown unmounted underneath the reader is the same interruption as an unmounted
    * textbox, minus the lost characters.
    */
+  /** The focused element as a `(tagName, role)` pair — the DOM half of {@link spaceBelongsToFocus}. */
+  function activationRoleOf(active: Element | null): ActivationRole {
+    return {
+      tagName: active?.tagName ?? '',
+      role: active?.getAttribute('role')?.trim().toLowerCase() ?? '',
+    };
+  }
+
   function focusIsInAControl(): boolean {
     const active = document.activeElement;
     return (
@@ -2142,7 +2167,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
     const context2d = canvas.getContext('2d');
-    if (recording === undefined || playback === undefined || context2d === null) return;
+    if (context2d === null) return;
 
     const box = canvas.parentElement?.getBoundingClientRect();
     const width = Math.max(360, Math.floor(box?.width ?? 800));
@@ -2153,6 +2178,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
       canvas.height = Math.floor(height * ratio);
     }
     context2d.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    /*
+     * **No run, no picture** — § D234, issue #36's second half, and the reason the early return
+     * moved below the resize rather than being deleted.
+     *
+     * This function used to return before touching the canvas at all when there was no recording,
+     * so the last frame stayed painted at the backing size it was painted at. Pressing *Take the
+     * next assignment* left a 360×260 bitmap of Garden Apartments stretched across a 750×405 box —
+     * measured by the reporter — with its title, its shafts and its overflowing status strip still
+     * legible under the next scenario's name. Every other surface was already in the correct *no
+     * run yet* empty state; only the canvas was lying.
+     *
+     * The buffer is resized first and *then* cleared, in that order: clearing a stale-sized buffer
+     * and leaving it stale would fix the picture and keep the blur the moment anything drew again.
+     * The alt text goes with it, because a screen reader was being told about the previous run too.
+     */
+    if (recording === undefined || playback === undefined) {
+      context2d.clearRect(0, 0, width, height);
+      setHidden(ui.stage.alarm, true);
+      canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
+      return;
+    }
 
     const frame = playback.frame();
     const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
@@ -2446,7 +2493,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const pct = playheadPctOf(recording, view.simTimeS);
     ui.transport.playhead.style.left = `${pct.toFixed(2)}%`;
     ui.transport.timeline.setAttribute('aria-valuenow', String(Math.round(pct * 10)));
-    ui.transport.timeline.setAttribute('aria-valuetext', clockAt(view.simTimeS));
+    /*
+     * **Seconds, and the frame step is why** — § D234, issue #69.
+     *
+     * The play-tester pressed the `,` advertised on the step button's own tooltip five times and
+     * reported that it does nothing. Driven in the browser tier, it does exactly what it promises:
+     * the playhead moved `5.15 % → 5.10 %`, the same distance the button's own click moves it. What
+     * is true is that **nothing on the page could show it**. One display frame at the default ×60
+     * is one simulated second — 0.06 % of a 1 800 s run, under half a pixel of timeline, and this
+     * slider's `aria-valuetext` was `hh:mm`. So the one reader the tooltip makes a promise to, and
+     * the only reader with no pixels to check it against, was told the shortcut exists and given a
+     * readout that could not move under it.
+     *
+     * `hh:mm:ss` here rather than a wider `aria-valuenow` scale, because `valuemax` lives in
+     * `index.html` and because a time is what this slider is *of*: `aria-valuetext` exists exactly
+     * so a slider announces its own units instead of a percentage. The header clock stays `hh:mm` —
+     * it is a caption on a day, not a readout on a control.
+     */
+    ui.transport.timeline.setAttribute('aria-valuetext', clockWithSecondsAt(view.simTimeS));
   }
 
   function fillLandingSelect(recording: VizRecording): void {
@@ -2568,6 +2632,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
       switch (event.key) {
         case ' ':
+          /*
+           * **Space belongs to a focused control first** — § D234, found while driving issue #69.
+           *
+           * This arm was an unconditional `event.preventDefault()`, and that is not a spare
+           * keystroke: `preventDefault` on a `keydown` of Space over a focused `<button>`
+           * **suppresses the button's own activation**. Measured in the browser tier — Space with
+           * `#step-back` focused toggled play/pause and did **not** step back — so the two controls
+           * the play-tester was alternating between were fighting each other for one key, and the
+           * one that lost is the one the platform promises.
+           *
+           * The timeline is deliberately *not* in the exempt set: `role="slider"` does not activate
+           * on Space in any platform convention, so a reader who has tabbed to the transport bar
+           * still gets play/pause from it. `KX-04`'s three `instanceof` guards above already
+           * excused inputs, textareas and selects; this is the fourth kind of control that owns the
+           * key, and the first one that owns it by *activation* rather than by typing.
+           */
+          if (spaceBelongsToFocus(activationRoleOf(document.activeElement))) break;
           event.preventDefault();
           playback?.toggle();
           drawTransportChrome(viewAt());
@@ -2638,6 +2719,95 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * Space, and who owns it — § D234, issue #69
+ * ========================================================================== */
+
+/** What the focused element is, as far as *does Space activate this?* is concerned. */
+export interface ActivationRole {
+  /** Upper-case, as `Element.tagName` gives it. `''` when nothing is focused. */
+  readonly tagName: string;
+  /** An explicit `role`, lower-cased, or `''`. An author's `role` outranks the tag. */
+  readonly role: string;
+}
+
+/**
+ * The ARIA roles whose platform contract is *Space activates me*.
+ *
+ * `slider` is deliberately absent and is the one worth naming: the transport timeline carries
+ * `role="slider"`, sliders are driven by arrows in every platform convention, and a reader who has
+ * tabbed onto the bar should still get play/pause from the space bar. `link` is absent too —
+ * a link is <kbd>Enter</kbd>.
+ */
+const SPACE_ACTIVATES_ROLES: ReadonlySet<string> = new Set([
+  'button',
+  'checkbox',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'switch',
+  'tab',
+]);
+
+/**
+ * Whether <kbd>Space</kbd> belongs to whatever is focused rather than to the transport — issue #69.
+ *
+ * ## The defect, found by driving rather than by reading
+ *
+ * `wireKeyboard`'s Space arm called `event.preventDefault()` unconditionally. On a focused
+ * `<button>` that **cancels the button's own activation** — the browser synthesises the click from
+ * the default action, and the default action had been prevented. Measured in the browser tier:
+ * Space with `#step-back` focused toggled play/pause and did not step a frame. So a reader
+ * alternating between the two transport controls the issue is about had them fighting for one key,
+ * and the loser was the one the platform guarantees.
+ *
+ * ## Why the answer is a role and not an `instanceof`
+ *
+ * The three guards above this in the handler are `instanceof HTMLInputElement` and friends, which
+ * is right for *typing*: a textarea owns every printable key by being a textarea. Activation is not
+ * a fact about a constructor — a `<div role="button">` owns Space and an `<a>` does not, and both
+ * are `HTMLElement`. Keeping the question as a `(tagName, role)` pair also keeps this decision
+ * testable without a document, which is the split the rest of `dev/` keeps.
+ *
+ * An `<input>` reaches this predicate as `INPUT` and would answer `true` for a checkbox — but it
+ * never gets here, because `KX-04`'s guard has already returned. Answering correctly anyway costs
+ * nothing and means the predicate is true on its own terms rather than only in context.
+ */
+export function spaceBelongsToFocus(focus: ActivationRole): boolean {
+  if (focus.role !== '') return SPACE_ACTIVATES_ROLES.has(focus.role);
+  return focus.tagName === 'BUTTON' || focus.tagName === 'SUMMARY' || focus.tagName === 'INPUT';
+}
+
+/* ========================================================================== *
+ * The transport clock — § D234, issue #69
+ * ========================================================================== */
+
+/**
+ * `hh:mm:ss` at a playhead position — the timeline slider's `aria-valuetext`, and the only place
+ * in the product that prints a second.
+ *
+ * `live/timeline.ts`'s `clockAt` is `hh:mm` and stays `hh:mm`: it is the header's *caption on a
+ * day*, and putting seconds on it would make a chrome line tick sixty times a minute for no
+ * reader's benefit. This is a *readout on a control*, and the control advertises a shortcut that
+ * moves the playhead by one simulated second at the shipped speed. A readout that could not
+ * resolve its own control's smallest move is what made the shortcut look dead.
+ *
+ * Built from `timeOfDayAt` rather than from a second copy of the day-start offset, so the two
+ * clocks cannot come to disagree about what 06:00 means.
+ */
+export function clockWithSecondsAt(simTimeS: number): string {
+  const wrapped = ((timeOfDayAt(simTimeS) % 86_400) + 86_400) % 86_400;
+  const hours = Math.floor(wrapped / 3600);
+  const minutes = Math.floor((wrapped % 3600) / 60);
+  const seconds = Math.floor(wrapped % 60);
+  return (
+    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:` +
+    String(seconds).padStart(2, '0')
+  );
+}
 
 /* ========================================================================== *
  * When the report is allowed to open itself — § D233
@@ -2859,7 +3029,22 @@ export function deepLinkStateOf(
   if (isRailSegment(segment)) patch.railSegment = segment;
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
-  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
+  /*
+   * The **state's** opening length when the link names none, not the module constant — § D234.
+   *
+   * These two were `DEFAULT_SHIFT_LENGTH_S` and `deepLinkDefaultsOf(...).shiftLengthS`, two
+   * constants that happened to be equal, and `deepLinkSearchOf` omits `duration` whenever it equals
+   * the second. The moment `c1` gained an authored shift (issue #27) they stopped agreeing, and the
+   * round trip broke in the direction that is hardest to see: a link produced from an untouched page
+   * omitted `duration`, and applying it silently ran a 1 800 s shift where the page had run 3 600 —
+   * *"a different run wearing the same address"*, which is the failure this pair exists to prevent
+   * and which `main.test.ts` caught.
+   *
+   * `state` here is `initialState`'s, and `deepLinkDefaultsOf` reads the same function, so the
+   * writer's *default* and the reader's *fallback* are now one value by construction rather than by
+   * two literals staying in step.
+   */
+  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? state.shiftLengthS };
 }
 
 /**

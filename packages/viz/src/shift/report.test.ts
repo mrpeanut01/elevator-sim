@@ -59,7 +59,14 @@ import {
   type WeekDayReport,
 } from './report.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from './week.js';
-import { DAY_START_S, WEEKDAYS, type Observations, type ShiftGoal } from './types.js';
+import {
+  DAY_START_S,
+  WAKE_UP_ARRIVALS,
+  WEEKDAYS,
+  type DayReport,
+  type Observations,
+  type ShiftGoal,
+} from './types.js';
 import { readGoals } from './goals.js';
 
 /**
@@ -699,11 +706,15 @@ describe('one judgement, four sentences — issue #53', () => {
   const ALWAYS_MET = barrier(0, 'at-least');
   const NEVER_MET = barrier(101, 'at-least');
 
-  function sheetWith(recording: VizRecording, goals: readonly ShiftGoal[]): WeekDayReport {
+  function sheetWith(
+    recording: VizRecording,
+    goals: readonly ShiftGoal[],
+    observations: Observations = observationsOfRun(recording),
+  ): WeekDayReport {
     return weekDay(
       dayReportOf({
         recording,
-        observations: observationsOfRun(recording),
+        observations,
         goals,
         week: { ...openWeek('c2'), day: 4, dayIdx: 3, streak: 2 },
         contract: contractById('c2'),
@@ -711,6 +722,18 @@ describe('one judgement, four sentences — issue #53', () => {
         subject: { kind: 'week-day' },
       }),
     );
+  }
+
+  /**
+   * The same run with too few arrivals to read — § D234's third verdict.
+   *
+   * The **observations** are moved and the recording is not, for the reason the sweep below exists:
+   * the third verdict has to be reachable while everything else about the day is held fixed, or the
+   * disjointness it is swept into is a claim about three different runs rather than about three
+   * answers to one question.
+   */
+  function tooQuiet(recording: VizRecording): Observations {
+    return { ...observationsOfRun(recording), arrived: 4, carried: 4 };
   }
 
   /** Up to the first sentence break — the words a reader takes in before anything else. */
@@ -761,32 +784,59 @@ describe('one judgement, four sentences — issue #53', () => {
 
   it('keeps every sentence about the day on the same side of the verdict', () => {
     /*
-     * The general form, swept over both verdicts × both saturation states × three real runs. The
+     * The general form, swept over every verdict × both saturation states × three real runs. The
      * property is **disjointness**: no sentence the sheet uses to say a day cleared may ever appear
      * on a sheet that says it did not, and vice versa. A single shared string is the defect.
+     *
+     * **Widened to three verdicts by § D234**, not relaxed for one. `ungraded` is the day nobody
+     * read, and it is the arm most likely to reintroduce § D237's defect, because it used to live
+     * *inside* the missed branch: the sheet said *too quiet to grade* under a banner reading
+     * **Shift missed**, and the streak reset underneath. So it is swept like the other two, and the
+     * check below is pairwise over all three rather than one comparison between two.
      */
-    const said: Record<'cleared' | 'missed', Set<string>> = { cleared: new Set(), missed: new Set() };
+    const said: Record<DayReport['verdict'], Set<string>> = {
+      cleared: new Set(),
+      missed: new Set(),
+      ungraded: new Set(),
+    };
+    const lineOf: Record<DayReport['verdict'], string> = {
+      cleared: 'Shift cleared',
+      missed: 'Shift missed',
+      ungraded: 'Too quiet to grade',
+    };
     for (const recording of [clean, saturated, missedWithoutSaturating]) {
       for (const goals of [ALWAYS_MET, NEVER_MET, goalsForDay(4), goalsForDay(12)]) {
-        const report = sheetWith(recording, goals);
-        expect(report.verdictLine).toBe(
-          report.verdict === 'cleared' ? 'Shift cleared' : 'Shift missed',
-        );
-        for (const sentence of [
-          headlineOf(report),
-          report.verdictLine,
-          report.diagnosisHeading,
-          report.streakLine,
-        ]) {
-          said[report.verdict].add(sentence);
+        // The same goals read against a full morning and against one too quiet to grade, so the
+        // third verdict is reached without changing anything else about the day.
+        for (const observations of [observationsOfRun(recording), tooQuiet(recording)]) {
+          const report = sheetWith(recording, goals, observations);
+          expect(report.verdictLine).toBe(lineOf[report.verdict]);
+          for (const sentence of [
+            headlineOf(report),
+            report.verdictLine,
+            report.diagnosisHeading,
+            report.streakLine,
+          ]) {
+            said[report.verdict].add(sentence);
+          }
         }
       }
     }
-    // Both halves were reached, so the disjointness below is not vacuous.
+    // Every arm was reached, so the disjointness below is not vacuous on any of the three.
     expect(said.cleared.size).toBeGreaterThan(0);
     expect(said.missed.size).toBeGreaterThan(0);
-    for (const sentence of said.cleared) {
-      expect(said.missed.has(sentence), `"${sentence}" is said on both verdicts`).toBe(false);
+    expect(said.ungraded.size).toBeGreaterThan(0);
+    const verdicts = ['cleared', 'missed', 'ungraded'] as const;
+    for (const one of verdicts) {
+      for (const other of verdicts) {
+        if (one === other) continue;
+        for (const sentence of said[one]) {
+          expect(
+            said[other].has(sentence),
+            `"${sentence}" is said on both ${one} and ${other}`,
+          ).toBe(false);
+        }
+      }
     }
   });
 
@@ -814,27 +864,44 @@ describe('one judgement, four sentences — issue #53', () => {
 
   it('does not claim a goal was missed on a day nothing was graded at all', () => {
     /*
-     * Under `WAKE_UP_ARRIVALS` legs every reading is `pending`, and `week.ts` counts unjudged as not
-     * passed — so the verdict is `missed` with nothing to have missed. Saying which bars went unmet
-     * would be false; saying nothing would be `docs/10` R3's blank. It says why.
+     * Under `WAKE_UP_ARRIVALS` legs every reading is `pending`, so nothing was judged.
+     *
+     * **This used to assert `verdict === 'missed'`, and § D234 is why it does not any more.** That
+     * was the state the sheet was in when a play-tester carried 18 of 18 people with 100 % away
+     * inside a minute and read *"Shift missed. Streak reset."* — the words were already careful
+     * (*too quiet to grade*) and the banner over them said the opposite, which is § D237's defect
+     * living inside the arm that had noticed it. `ungraded` is now a verdict, so the banner, the
+     * headline, the diagnosis heading and the streak line all come through one key.
+     *
+     * The half that has not moved is the one this test was written for: saying which bars went
+     * unmet would be false, and saying nothing would be `docs/10` R3's blank. It still says why.
      */
-    const quiet: Observations = { ...observationsOfRun(clean), arrived: 4, carried: 4 };
-    const report = weekDay(
-      dayReportOf({
-        recording: clean,
-        observations: quiet,
-        goals: goalsForDay(4),
-        week: openWeek('c2'),
-        contract: contractById('c2'),
-        event: SHIFT_EVENTS.ordinary,
-        subject: { kind: 'week-day' },
-      }),
-    );
+    const report = sheetWith(clean, goalsForDay(4), tooQuiet(clean));
     expect(report.goals.every((reading) => reading.state === 'pending')).toBe(true);
-    expect(report.verdict).toBe('missed');
+    expect(report.verdict).toBe('ungraded');
+    expect(report.verdictLine).toBe('Too quiet to grade');
     expect(report.lede).toContain('Too quiet to grade');
-    expect(report.lede).toContain('no goal was met and none was missed');
+    // The two counts that make the refusal actionable: what arrived, and what it needed.
+    expect(report.lede).toContain(`${String(WAKE_UP_ARRIVALS)}`);
+    expect(report.lede).toContain('4 people called');
+    // And no goal named, on a day none was read.
+    for (const reading of report.goals) {
+      expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
+    }
     expect(report.lede).not.toContain('A day it could handle');
+  });
+
+  it('does not spend the streak on a day nobody judged — § D234', () => {
+    /*
+     * The sheet and `closeDay` turn on the same `wasGraded`, so this sentence is a statement about
+     * the week rather than a kindness. *"Streak reset"* names something taken away, and an ungraded
+     * day takes nothing.
+     */
+    const report = sheetWith(clean, goalsForDay(4), tooQuiet(clean));
+    expect(report.streakLine).not.toContain('Streak reset');
+    expect(report.streakLine).toContain('Nothing was graded');
+    // The week under it carries `streak: 2`, and the line says so rather than saying nothing.
+    expect(report.streakLine).toContain('2');
   });
 
   it('resets the streak from the same verdict the banner prints', () => {

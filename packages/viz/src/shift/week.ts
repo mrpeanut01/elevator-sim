@@ -184,6 +184,28 @@ export function outcomeOf(input: DayOutcomeInput): DayOutcome {
 }
 
 /**
+ * Whether a day was **judged at all** — § D234, issue #27.
+ *
+ * `DayOutcome.allMet` answers *did it pass*, and returns `false` for two different days: one that
+ * was asked for 87 % and carried 61 %, and one whose building never woke up. The product said the
+ * same thing about both — *"Shift missed. Streak reset."* — over a day that carried 18 of 18 people
+ * with 100 % away inside a minute and a 36 s worst wait.
+ *
+ * **Derived from {@link DayOutcome.readings} rather than stored beside `allMet`**, and that is the
+ * decision rather than the implementation: `readings` is already persisted, so a session written by
+ * an older build answers this correctly with no schema change and no migration, and there is no way
+ * for a restored day to carry a `graded` flag that disagrees with the readings under it. A second
+ * stored field would have been a second answer to a question one of them already contains.
+ *
+ * A day with no goals is not graded, for `allMet`'s own reason: `every` over an empty array is
+ * `true`, and a shift with nothing to prove must not be indistinguishable from one that proved
+ * everything.
+ */
+export function wasGraded(readings: readonly GoalReading[]): boolean {
+  return readings.length > 0 && readings.every((reading) => reading.state !== 'pending');
+}
+
+/**
  * Close the day and hand back the week it produced.
  *
  * Total, and does not throw: a `contractId` that names no contract (restored state from an older
@@ -226,8 +248,26 @@ export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
       ? week.banked
       : { streak: week.streak, cleanRun: week.cleanRun, completed: week.completed };
 
-  const streak = outcome.allMet ? base.streak + 1 : 0;
-  // The banked count survives a missed day. See the module docstring, rule 1.
+  /*
+   * ## A day nobody judged costs nothing — § D234, issue #27
+   *
+   * The rule copied from the design is *the streak resets on a **missed** day*, and until now this
+   * line read `outcome.allMet ? base.streak + 1 : 0`, which resets it on an **ungraded** one too.
+   * Those are different events and the product said the same thing about both: a play-tester
+   * carried 18 of 18 with 100 % away inside a minute and was told *"Streak reset"* — a sentence
+   * that names something taken away from somebody who had nothing.
+   *
+   * So an ungraded day leaves the streak where it was. It is still not a clean day: `allMet` is
+   * `false` when anything is `pending`, so `cleanRun` does not move and nothing clears — *unjudged
+   * is not passed* is untouched, and this is its other half. **Unjudged is not failed either.**
+   *
+   * The banked count survives a missed day regardless. See the module docstring, rule 1.
+   */
+  const streak = outcome.allMet
+    ? base.streak + 1
+    : wasGraded(outcome.readings)
+      ? 0
+      : base.streak;
   const cleanRun = outcome.allMet ? base.cleanRun + 1 : base.cleanRun;
   const contract = contractById(week.contractId);
 

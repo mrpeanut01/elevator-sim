@@ -16022,3 +16022,147 @@ than about whether a write would be redundant.
 The DOM read is a three-`instanceof` helper beside the decision, which stays pure — the split every
 panel in `dev/` keeps, and the reason this file's other navigation decisions were testable and this
 one was not.
+
+## D234 — four things the product said about itself that were not true, and one it could not show
+
+**Date: 2026-08-05 · Written after the code.** Play-test issues #27, #36, #37 and #69. They arrived
+as four unrelated reports and are one entry because the same rule settles all four: **a surface may
+not make a claim the run underneath it does not keep** — and the fourth adds a corollary the others
+did not need: *a claim nothing on screen can resolve is not kept either.*
+
+### #27 — the tutorial was unwinnable on its own defaults, and said the wrong word about it
+
+**Measured before it was fixed, and the measurement is the reason the obvious repair was refused.**
+Garden Apartments, day 1, `collective`, the building's own demand, the shipped 1 800 s shift, twelve
+seeds:
+
+```
+arrivals: 8, 13, 14, 17, 17, 18, 18, 19, 20, 20, 26, 35     median 18
+```
+
+`WAKE_UP_ARRIVALS` is 20, so **seven of twelve fall below the line at which anything is graded**. At
+3 600 s the same twelve give `20, 24, 28, 32, 36, 38, 40, 42, 45, 48, 49, 51` — every one graded. The
+play-tester's report is exactly this: two days, 18/18 and 15/15 carried, 100 % away inside a minute,
+three em dashes and **"Shift missed. Streak reset."** on the scenario whose own brief says *nothing
+here is hard*.
+
+Two fixes, and the second matters more than the first.
+
+**The shift, not the threshold.** `ScenarioContract` gains an optional `shiftLengthS` and `c1` is the
+only contract that names one. Lowering `WAKE_UP_ARRIVALS` was the obvious alternative and is the
+wrong repair *in this project's own terms*: the bars are a carried **share** and a served-inside-a-
+minute **share**, and grading those over eight legs is the thin sample `awtIsValid` exists to refuse,
+one layer up. Moving `DEFAULT_SHIFT_LENGTH_S` was rejected too — 1 800 s is `rise-and-fall`'s own
+horizon and the horizon every published figure in `docs/05` was measured over. It **seeds** rather
+than pins: the select stays live, and the player may still shorten the day.
+
+**Ungraded is a third state, and it costs nothing.** `DayOutcome.allMet` collapsed *you were asked
+for 87 % and carried 61 %* and *the building never woke up* into one `false`. `goals.ts` already
+models the distinction — `pending` is its own state, because *"a `carryPct` of 100 % over three
+riders is arithmetic, not competence"* — and the week threw it away. Now: `week.ts`'s `wasGraded`
+leaves the streak untouched on an ungraded day, the sheet's verdict is a third value
+(**"Too quiet to grade"**), the streak line says *nothing was lost*, and the lede names the two
+numbers and the remedy. *Unjudged is not passed* is untouched; this is its other half — **unjudged
+is not failed either.**
+
+`wasGraded` is **derived from `DayOutcome.readings` rather than stored beside `allMet`**, and that is
+the decision rather than the implementation: `readings` is already persisted, so a session written by
+an older build answers correctly with no schema change, and no restored day can carry a flag that
+disagrees with the readings under it.
+
+### #36 — the new building's name over the old building's specs, and a stretched stale canvas
+
+`reportPanel.ts`'s *Take the next assignment* moves `buildingId`, clears the recording, and — unlike
+*Open the doors on tomorrow* beside it — **does not run**. The shell had nothing to describe a
+building with: `drawHeader` read the boot-scope `building`, which is `shiftRunConfigOf`'s and is only
+assigned by `runShift`. So the header drew `Midtown Office · 6 floors · 2 cars · 0.63 m/s · 135
+people` — the name from the state, the geometry from the tutorial — at the campaign's one reward
+moment, telling the player the 1 710-person tower is the size of the building they just left.
+
+`resolvedBuildingOf` is the missing answer, and `viewAt` uses it **exactly when there is no
+recording**. The **shipped** building, not a grown one: nothing has run, so there is no day to have
+grown it to.
+
+The canvas was the same defect in paint. `drawStage` returned before touching the context when there
+was no recording, so the previous frame stayed at the backing size it was painted at — a 360×260
+bitmap of Garden Apartments stretched across a 750×405 box. It now resizes **and then** clears; that
+order matters, because clearing a stale-sized buffer fixes the picture and keeps the blur.
+
+The fix is in `dev/main.ts` rather than in the button, and that is ownership rather than preference:
+the honest empty stage is the better answer anyway, because § D232 has just decided that a run
+nobody asked for should not appear.
+
+### #37 — four cards quoted a figure the building file contradicts
+
+`docs/12` § 4.4's rule is *where a handoff stat line disagrees with the file, **the file wins***, and
+`statLineOf` has generated the stat line from the building since this module was written. That is
+exactly why the drift was visible: the card's prose and the file's numbers sit two lines apart.
+
+| card | prose said | the file says |
+|---|---|---|
+| `c4` | *Forty floors … a transfer level at 20* | 60 expanded floors; two `isTransferFloor` floors, `G` and **31** |
+| `c3` | *Thirty-one floors* | 30 |
+| `c5` | *A hundred and one floors* | 100 |
+| `c1` | *the next four* | seven others |
+
+`c4` is the one that could not be a convention: twenty floors apart, beside a stat line reading
+`60 floors`. All four are corrected at source with the file's own figure. **This is § 4.4 applied to
+the prose for the first time** — it had only ever been applied to the stat line.
+
+**Two halves of #37 are not closed here and are not mine to close.** The section heading
+*"Scenarios — five buildings, any order"*, the intro's *"the other four"* and the footnote *"All five
+ship with the simulator in `data/buildings/`"* — including the repo path leaking to a player — are
+all in `packages/viz/index.html`.
+
+### #69 — the shortcut worked, and nothing on the page could show it
+
+**Driven in the browser tier, and the issue's central claim does not reproduce.** On a paused run,
+with focus on the body:
+
+```
+','          playhead 5.15 %  ->  5.10 %
+'.'                    5.10 %  ->  5.15 %
+#step-back click       5.15 %  ->  5.10 %      (the same distance)
+'['          speed chip ×60 -> ×10
+ArrowRight             5.10 %  ->  5.38 %
+Space while running    Pause -> Play
+```
+
+So `,`/`.`, `[`/`]`, the arrows and Space are all wired, and *"the entire playback layer is
+mouse-only"* is false. **What is true is that the reader could not tell.** One display frame at the
+shipped ×60 is **one simulated second** — 0.06 % of a 1 800 s run, under half a pixel of timeline —
+and every clock the page prints is `hh:mm`. A careful tester pressed the advertised key five times,
+saw nothing anywhere change, and concluded the binding was dead. That is the product's fault and not
+theirs.
+
+The fix is where the promise is made: the timeline slider's `aria-valuetext` becomes `hh:mm:ss`. It
+is a **readout on a control** and `aria-valuetext` exists precisely so a slider announces its own
+units — and the reader the tooltip makes the promise to is the one with no pixels to check it
+against. The header clock stays `hh:mm`; it is a caption on a day, not a readout on a control.
+
+**Driving also found a real defect the issue did not report.** The Space arm called
+`event.preventDefault()` unconditionally, which on a focused `<button>` **cancels that button's own
+activation** — Space over `#step-back` toggled playback and did not step a frame, so the two controls
+the issue is about were fighting for one key and the platform's contract lost.
+`spaceBelongsToFocus` is the guard, keyed on `(tagName, role)` rather than on a constructor: a
+`<div role="button">` owns Space and an `<a>` does not, and both are `HTMLElement`. `role="slider"`
+is deliberately **not** in the set — sliders are driven by arrows everywhere, so a reader who has
+tabbed to the transport bar still gets play/pause from it.
+
+**No `UX.md` row was stale.** `KX-05`'s *"✅ run — one display frame each way, pausing first"* and
+`TP-06`'s *"shares one handler with `KX-05`"* are both **true**, and re-verified by driving rather
+than by reading. What no row covered was Space over a focused button, and there is one now.
+
+`dev/keyboard.browser.test.ts` is the evidence, and it asserts the **playhead**, not a registered
+handler — the issue's whole claim was that a handler existed and did nothing.
+
+### One thing found in passing, and it had hidden itself
+
+`boot.browser.test.ts` read its origin from `httpServer.address().port`, which reported **5173**
+while Vite was serving **5174** — `vite.config.ts` declares `{ port: 5174, strictPort: true }` and
+the suite's `port: 0` override does not survive the merge. Every navigation got
+`ERR_CONNECTION_REFUSED` and the whole tier died in `beforeAll`. It went unseen because the tier
+skips itself where there is no Chromium, which is most machines: **a tier that skips silently can
+also fail silently the first time somebody gives it a browser.** Both files now read `resolvedUrls`,
+which is Vite's own answer to *where am I*, and both pass — including § D220's *draws the stage*,
+which is what confirms § D232's paused first frame still paints.

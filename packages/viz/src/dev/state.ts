@@ -74,7 +74,7 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
-import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { SHIFT_EVENTS, eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
@@ -116,6 +116,26 @@ export const SHIFT_LENGTHS: readonly { readonly seconds: number; readonly label:
   ]);
 
 export const DEFAULT_SHIFT_LENGTH_S = 1800;
+
+/**
+ * The shift a scenario opens on — its own, when it authors one, else the shipped default.
+ * § D234, issue #27.
+ *
+ * Called from exactly two places, and the pair is the decision: {@link initialState}, because the
+ * page opens on `CONTRACTS[0]`, and `scenariosPanel`'s `take`, because taking an assignment
+ * restarts the week and is the one moment a player has asked for this scenario rather than for
+ * this shift length.
+ *
+ * It is deliberately **not** called from `withBuilding`. Changing building from the coach select is
+ * not taking an assignment — the player is on day 4 with a streak and they still are — and
+ * re-seeding there would throw away a length they had chosen, which is the inert-control failure
+ * with the sign flipped: the control would move and then move back on its own.
+ *
+ * `ScenarioContract.shiftLengthS` says why one building needs this at all, with the measurement.
+ */
+export function shiftLengthForContract(contractId: string): number {
+  return contractById(contractId)?.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S;
+}
 
 /** A dispatcher the reader saved. */
 export interface SavedDispatcher {
@@ -477,7 +497,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     buildingId,
     dispatcherId,
     pattern: 'building',
-    shiftLengthS: DEFAULT_SHIFT_LENGTH_S,
+    // The opening scenario's own shift, which for `c1` is an hour — § D234. The page opens on
+    // `CONTRACTS[0]`, so the length the tutorial is graded over is the length it opens on.
+    shiftLengthS: shiftLengthForContract(contractForBuilding(buildingId)?.id ?? ''),
     // `undefined`, not a default template. The campaign owns the run until Free Play says
     // otherwise, and every published figure in this repository was measured with no override.
     freePlay: undefined,
@@ -565,6 +587,46 @@ export function buildingConfigOf(
   const mine = saved.find((entry) => entry.id === id);
   if (mine !== undefined) return mine.config;
   return resources.entries.find((entry) => entry.config.id === id)?.config;
+}
+
+/**
+ * The building the state is *pointing at*, resolved — for the chrome to describe before a run
+ * exists. § D234, issue #36.
+ *
+ * ## What this is not, and why the distinction is the whole of the fix
+ *
+ * `ShiftRunConfig.building` is the building a run **resolved to**: grown to the day, commissioned,
+ * with the day's incidents written onto it. That is the right thing for the header to describe
+ * while a recording is on screen, and `dev/main.ts` holds it from the last `runShift`.
+ *
+ * It is the wrong thing to describe when there is **no** recording, and the shell had nothing else.
+ * Pressing *Take the next assignment* moves `buildingId` and clears the recording without running,
+ * so the header drew the new building's **name** — read from `state.buildingId` — beside the
+ * previous building's **specs**, held from the last run: `Midtown Office · 6 floors · 2 cars ·
+ * 0.63 m/s · 135 people`, where Midtown Office is 21 floors, 4 cars, 2.5 m/s and 1,710 people. A
+ * player reading that is told the next challenge is the size of the tutorial.
+ *
+ * So: the **shipped** building, not a grown one. Nothing has been run, so there is no day to have
+ * grown it to, and quoting today's population against a run that has not happened would be the
+ * caption-that-does-not-describe-the-picture failure in the other direction.
+ *
+ * `undefined` when the id resolves to nothing, which is the same answer `buildingConfigOf` gives
+ * and the same one the chrome already handles.
+ */
+export function resolvedBuildingOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): ResolvedBuilding | undefined {
+  // The shipped set first and by identity, so the ordinary case costs no parse: `resources.entries`
+  // already carries each one resolved against the shipped specs.
+  const shipped = resources.entries.find((entry) => entry.config.id === state.buildingId);
+  if (shipped !== undefined) return shipped.resolved;
+  const saved = state.savedBuildings.find((entry) => entry.id === state.buildingId);
+  if (saved === undefined) return undefined;
+  return resolveBuilding(
+    parseBuilding(saved.config as unknown),
+    specsWithSaved(resources, state.savedClasses),
+  );
 }
 
 /** The building's display name, without loading the whole document to read it. */

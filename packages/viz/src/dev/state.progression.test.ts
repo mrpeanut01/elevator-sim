@@ -32,9 +32,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { goalsForDay, readGoals } from '../shift/goals.js';
-import type { GoalObservations, PlayMode, WeekState } from '../shift/types.js';
+import type { GoalObservations, WeekState } from '../shift/types.js';
 import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
-import { PLAY_MODES } from '../scope/types.js';
+import { PLAY_MODES, type PlayMode } from '../scope/types.js';
 
 import type { BrowserResources } from './data.js';
 import {

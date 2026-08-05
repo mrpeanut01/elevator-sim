@@ -92,8 +92,9 @@ export function weekdayOf(dayIdx: number): Weekday {
 /**
  * One of the design's five scenarios, bound to one of the five shipped buildings.
  *
- * Every prose field is **verbatim from the handoff** (`design.html` :1381–1417) and is asserted so
- * in `contracts.test.ts`. The one thing the handoff hard-codes and this type does not carry is the
+ * Every prose field is the handoff's (`design.html` :1381–1417), corrected where it quotes a figure
+ * `data/buildings/` contradicts — see `contracts.ts` for the four and the file's own numbers
+ * (issue #37). The one thing the handoff hard-codes and this type does not carry is the
  * building's stat line — *"21 floors · 4 cars · 2.5 m/s · 1,710 people"* — because
  * `docs/12-design-handoff.md` § 4.4 requires it be generated from the building JSON rather than
  * authored. See `statLineOf`.
@@ -106,12 +107,48 @@ export interface ScenarioContract {
   /** `Scenario 1`. The eyebrow. */
   readonly label: string;
   readonly title: string;
-  /** What this building teaches that the other four cannot. */
+  /** What this building teaches that none of the others can. */
   readonly teaches: string;
   readonly brief: string;
   /** Clean shifts that bank toward clearing it. 1–3. */
   readonly needClean: number;
   readonly reward: string;
+  /**
+   * The shift this scenario is **graded over**, in simulated seconds — or absent for the shipped
+   * default. § D234, issue #27.
+   *
+   * ## Why a contract may name one at all
+   *
+   * Nothing is graded below {@link WAKE_UP_ARRIVALS} arrivals, and Garden Apartments does not reach
+   * twenty in thirty minutes. **Measured, not argued**: over twelve seeds at the shipped defaults —
+   * day 1, `collective`, the building's own demand, 1 800 s — the arrival counts are
+   * `8, 13, 14, 17, 17, 18, 18, 19, 20, 20, 26, 35`. The median is 18 and **seven of twelve fall
+   * below the threshold**, which is why the play-tester's two perfect days both read *"Shift
+   * missed. Streak reset."* over 18/18 and 15/15 carried at 100 % away inside a minute. At 3 600 s
+   * the same twelve seeds give `20, 24, 28, 32, 36, 38, 40, 42, 45, 48, 49, 51` — every one of them
+   * graded.
+   *
+   * So the designated tutorial was, on its own shipped defaults, unwinnable more often than not,
+   * and the remedy was a dropdown two controls to the left presented as a convenience about how
+   * long you want to watch.
+   *
+   * ## Why the threshold was not lowered instead, which was the obvious other fix
+   *
+   * Because it would be the wrong repair, and wrong in this project's own terms. The bars a shift
+   * is graded on are a carried **share** and a served-inside-a-minute **share**; grading those over
+   * eight legs is exactly the thin sample `awtIsValid` exists to refuse, one layer up. Twenty is
+   * already generous. What was wrong was the amount of demand the tutorial was asked to produce,
+   * not the amount it had to produce before anyone would look.
+   *
+   * ## Why it seeds rather than pins
+   *
+   * A contract naming a length **seeds** `ViewerState.shiftLengthS` when the assignment is taken.
+   * The select stays live and the player may still shorten the day — which is a real choice, and
+   * `docs/12` § 4.1's whole argument for the control existing. What they may no longer do is meet
+   * an ungraded morning by accident on the one scenario whose own copy says *"nothing here is
+   * hard"*.
+   */
+  readonly shiftLengthS?: number;
 }
 
 /**
@@ -348,7 +385,16 @@ export interface DayOutcome {
   /** The sparkline's bar height, and the *best day so far* figure. An observation. */
   readonly minutePct: number;
   readonly readings: readonly GoalReading[];
-  /** Every goal `met`. **False when anything is `pending`** — unjudged is not passed. */
+  /**
+   * Every goal `met`. **False when anything is `pending`** — unjudged is not passed.
+   *
+   * It is **not** the whole verdict, and § D234 is why: it collapses two different days into one
+   * `false`. *You were asked for 87 % and carried 61 %* and *the building never woke up, so nobody
+   * looked* are not the same event, and the product said the same thing about both — *"Shift
+   * missed. Streak reset."* over 18 of 18 carried with 100 % away inside a minute. `week.ts`'s
+   * `wasGraded` is the other half, derived from {@link readings} rather than stored beside this
+   * one so a restored session cannot carry the two disagreeing.
+   */
   readonly allMet: boolean;
 }
 
@@ -518,8 +564,23 @@ export interface DayReport {
   readonly metaLines: readonly string[];
   readonly lede: string;
   readonly figures: readonly ReportFigure[];
-  /** `cleared` when every goal was met, `missed` otherwise — including when any goal is pending. */
-  readonly verdict: 'cleared' | 'missed';
+  /**
+   * `cleared` when every goal was met, `missed` when one was read and not met, and `ungraded` when
+   * none was read at all.
+   *
+   * **Three, and the third is § D234's.** This said *"`missed` otherwise — including when any goal
+   * is pending"*, and that sentence was the defect rather than a description of it: a day under
+   * {@link WAKE_UP_ARRIVALS} arrivals has every goal `pending`, so a play-tester who carried 18 of
+   * 18 people with 100 % away inside a minute was told *"Shift missed. Streak reset."* — a claim
+   * about how the day went, on a day nobody looked at.
+   *
+   * `ungraded` is not a softer `missed`. It is the other half of *unjudged is not passed*: such a
+   * day is still not clean, still banks nothing and still clears nothing — it simply no longer
+   * **costs** anything either. `report.ts`'s `VERDICT_VOICE` is keyed on this union, so the third
+   * member is what makes the third set of sentences reachable, and § D237's property — every
+   * sentence about a day comes through the verdict — extends to it rather than around it.
+   */
+  readonly verdict: 'cleared' | 'missed' | 'ungraded';
   readonly verdictLine: string;
   readonly streakLine: string;
   /** `Scenario 2 — The morning rush · 1 of 2 clean shifts banked`. */

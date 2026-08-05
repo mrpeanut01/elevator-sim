@@ -11,9 +11,15 @@
  * *numbers* (which are a prototype's), and {@link statLineOf} derives the numbers from the
  * building the reader is actually about to run.
  *
- * Every prose field below is byte-for-byte the handoff's (`design.html` :1381–1417) and
- * `contracts.test.ts` asserts it against the vendored copy is not attempted — the vendored file is
- * a record, not a fixture — but the strings are pinned here and reviewed against it.
+ * Every prose field below is the handoff's (`design.html` :1381–1417), and it is no longer
+ * byte-for-byte: four cards quoted a number the file contradicts, and § 4.4's rule that **the file
+ * wins** does not stop at the stat line. `c4` said *"Forty floors … a transfer level at 20"* over a
+ * building that expands to 60 floors with its sky lobby at 31; `c3` said *"Thirty-one"* over 30 and
+ * `c5` *"A hundred and one"* over 100; and `c1` counted *"the next four"* on a list that is now
+ * eight (issue #37). Each correction is annotated where it sits, with the file's own figure.
+ *
+ * `contracts.test.ts` asserts the prose against the vendored copy is not attempted — the vendored
+ * file is a record, not a fixture — so these strings are pinned here and reviewed against it.
  *
  * ## All five are open, and there is no state in which they are not
  *
@@ -67,9 +73,24 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'Learn the ropes',
     teaches: 'a call, a car, a wait',
     brief:
-      'Six floors, two hydraulic cars at 0.63 m/s, and a gentle trickle of residents. Nothing here is hard — it exists so the next four have something to be different from.',
+      'Six floors, two hydraulic cars at 0.63 m/s, and a gentle trickle of residents. Nothing here is hard — it exists so the seven that follow have something to be different from.',
     needClean: 1,
     reward: 'Minimum estimated wait · Energy aware · one spare shaft',
+    /*
+     * An hour, and the only contract that names one — § D234, issue #27.
+     *
+     * 120 residents on a gentle trickle do not produce twenty calls in thirty minutes: over twelve
+     * seeds at the shipped defaults the median is **18**, and seven of the twelve are under the
+     * `WAKE_UP_ARRIVALS` line. So the scenario whose own brief says *"nothing here is hard"* was
+     * the one scenario a player could not clear without changing a control nothing points them at,
+     * and it told them *"Shift missed. Streak reset."* over a perfect day while it happened.
+     *
+     * Named here rather than by moving `DEFAULT_SHIFT_LENGTH_S`: 1 800 s is `rise-and-fall`'s own
+     * horizon and the horizon every published figure in `docs/05-roadmap.md` was measured over, and
+     * moving it would silently change what the viewer's opening run is comparable with. This is a
+     * fact about one small building, so it is authored on that building's contract.
+     */
+    shiftLengthS: 3600,
   }),
   Object.freeze({
     id: 'c2',
@@ -89,7 +110,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'Two banks, one lobby',
     teaches: 'zoning, and calls nobody may legally answer',
     brief:
-      'Thirty-one floors split across a low and a high bank, with credentialed floors above 21. A call a car cannot legally take looks nothing like a slow one — and must never be reported as one.',
+      'Thirty floors split across a low and a high bank, with credentialed floors above 21. A call a car cannot legally take looks nothing like a slow one — and must never be reported as one.',
     needClean: 2,
     reward: 'Destination disclosure · Fairness first · one spare shaft',
   }),
@@ -100,7 +121,22 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'The sky lobby',
     teaches: 'transfers, and why a two-leg journey waits twice',
     brief:
-      'Forty floors, an 8 m/s shuttle and a transfer level at 20. A rider changing cars is waiting twice and must be counted once — get that wrong and every figure below flatters you.',
+      /*
+       * **Sixty floors, transfer level 31** — issue #37, and the file wins (`docs/12` § 4.4).
+       *
+       * The handoff wrote *"Forty floors … and a transfer level at 20"*. `mixed-use-high-rise.json`
+       * expands to **60** floors and declares exactly two `isTransferFloor` floors: `G` and `31`,
+       * the sky lobby. So the card carried a floor count twenty out from the stat line printed two
+       * lines beneath it, and named a transfer level the building does not have — the two numbers
+       * a reader would use to decide whether to take the assignment.
+       *
+       * `docs/12` § 4.4's rule is *where a handoff stat line disagrees with the file, the file
+       * wins*, and § 4.7 records a deviation rather than absorbing it. This is that rule applied to
+       * the **prose** for the first time: the stat line has been generated from the building since
+       * this module was written, which is exactly why the drift was visible side by side. The
+       * shuttle's 8 m/s is the file's own and is unchanged.
+       */
+      'Sixty floors, an 8 m/s shuttle and a sky lobby at 31. A rider changing cars is waiting twice and must be counted once — get that wrong and every figure below flatters you.',
     needClean: 2,
     reward: 'Predictive balanced · Contract-net auction · two more shafts',
   }),
@@ -111,7 +147,7 @@ export const CONTRACTS: readonly ScenarioContract[] = Object.freeze([
     title: 'Vertical City',
     teaches: 'supertall traffic, and knowing when to stop',
     brief:
-      'A hundred and one floors, 4,887 occupants, six local zones hanging off three two-level sky lobbies, and eight double-deck shuttles at 10 m/s. Every journey above floor 25 is two legs — three when the destination zone is anchored to the far lobby level. Clear three shifts here and the week simply keeps going.',
+      'A hundred floors, 4,887 occupants, six local zones hanging off three two-level sky lobbies, and eight double-deck shuttles at 10 m/s. Every journey above floor 25 is two legs — three when the destination zone is anchored to the far lobby level. Clear three shifts here and the week simply keeps going.',
     needClean: 3,
     reward: 'Multi-round auction · Landing-panel destination dispatch · endless mode',
   }),
