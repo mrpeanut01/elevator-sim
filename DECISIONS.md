@@ -14046,3 +14046,93 @@ unbacked, it could not be printed.
   is the next one, because it attaches at the same `growth.ts` seam incidents proved.
 - **The saved library does not survive a reload**, which is a schema-version decision rather than an
   omission.
+
+---
+
+## D220 — a browser tier, and the three claims it is allowed to make
+
+**Date: 2026-08-05 · Architecture, written before the code.** [`docs/05`](docs/05-roadmap.md) states
+the convention this reverses in terms: *"There is **no browser automation in this repository** — no
+Playwright, no Puppeteer, no jsdom, and all four `vitest.config.ts` projects are
+`environment: 'node'`."* Reversing a stated convention needs an argument rather than a capability, so
+here is the argument, the boundary, and the criterion — before any of it is built.
+
+### 1. What changed: the suite has never executed the shell, and that is now measured
+
+`dev/main.ts` ends with `if (typeof document !== 'undefined') void main();`. Under vitest there is no
+`document`, so **`main()` has never once run in this repository's history.** Every test of the viewer
+imports the module for its pure exports and stops there.
+
+On 2026-08-05 that stopped being a theoretical gap. `boot()`'s sequence assigns `stageTheme`, whose
+`let` was declared ~500 lines below it, so the page threw
+`Cannot access 'stageTheme' before initialization` on boot's **second statement** and rendered
+nothing. **2 100 tests were green over a dead product.** It is the fourth occurrence of that exact
+mistake in this package — `started`, `carBadgeHits`, then `stageTheme` and `baseSpeed` — and two of
+the four are written up in prose in the file that carries them.
+
+That is the evidence. Not *"a browser would be nice"*: a specific class of defect, four instances, a
+100 % miss rate, and a suite whose greenness is uninformative about whether the page exists.
+
+### 2. Three kinds of claim, and only one of them needs a browser
+
+`UX.md` § 27 carries its unmade claims as one mark, `⚠️ mount`, and that conflates three things:
+
+| Kind | Example | Needs |
+|---|---|---|
+| **Wiring** | the affordance list renders; a click dispatches the intent the model named; `hidden` flips both ways; focus lands on the first row | a **document** |
+| **Paint** | the overlay covers the drawer in a real stacking context; nothing overflows at 320 px; the light palette's contrast measured from pixels rather than from hex arithmetic | a **browser** |
+| **Judgement** | *"the report reads as an account of a day"* | a **human**, permanently |
+
+S9's ladder already names the first two — *document recorder* and *browser* — and this decision is
+what makes them exist rather than being tiers nothing occupies.
+
+### 3. The boundary, mechanised rather than promised
+
+*"No jsdom"* was never arbitrary, and the narrow version must not quietly become the broad one. The
+reason is that **a fake-DOM test of a decision is worse than a node test of a pure function**, and a
+fake DOM invites a suite to test the fake. So:
+
+- decisions stay in pure modules and stay tested under `node`;
+- the document tier asserts **only that a mount writes what the model already decided**;
+- and that boundary is checked rather than remembered: the document-tier project **may not import
+  from `menu/`, `shift/`, `scope/`, `authoring/`, `honesty/` or `core`** — only from `dev/` and
+  `render/`. A test that reached a decision module would be re-testing a decision through a slower
+  and less honest instrument, which is the thing the convention was protecting.
+
+### 4. What the browser tier may claim, and what it may not
+
+It may claim **the page exists and drew**. It may claim things about **layout and paint** that no
+model can answer.
+
+It may **not** become the place run behaviour is checked. § D163 already refuses *"a test that
+renders to a canvas mock and never opens a browser"* as a substitute for driving; the inverse refusal
+is added here — **a browser test may not assert a metric, a mean, or any figure the honesty search or
+the replay harness already owns.** A screenshot diff is not evidence about a simulator, and a browser
+tier that grew into one would be slower, flakier and less able to say why.
+
+**No screenshots in the first tier.** A pixel diff fails on a font hint and is repaired by
+re-baselining, which is a control that trains its owner to override it.
+
+### 5. The criterion, chosen so the shipped product fails it today
+
+1. **A test loads the built page and requires the stage canvas to have been drawn to.** It fails
+   against `882dedd` — the commit where the viewer did not boot — and passes against its fix. That
+   regression is the whole justification, so it is the first thing asserted and the first thing
+   watched failing.
+2. **The document tier closes at least half of § 27's `⚠️ mount` marks**, and each closed mark says
+   which tier closed it. A mark that changes from `⚠️` to `✅ test` without naming its instrument is
+   the mark discipline § D18 exists for.
+3. **The import boundary in § 3 is asserted by a test**, not by review — in the idiom
+   `boundaries.test.ts` already uses for `node:` imports in browser code.
+4. **The browser tier runs in CI and is allowed to be slow, but not to be flaky.** A tier that is
+   retried to green is a tier that reports nothing; if it flakes twice it comes out, and the removal
+   is recorded here rather than being a quiet `.skip`.
+5. **`UX.md` § 27 keeps a permanently-open row** for the judgement kind. Closing the first two tiers
+   must not make the third look closed.
+
+### 6. What this does not do
+
+It does not make the browser the primary instrument. The order of value is measured, not assumed:
+one boot test is worth more than the whole of the rest of the tier, because it is the one that would
+have caught a defect that actually shipped. Everything after it is worth less per line, and the tier
+should stay small enough that its cost is obviously paid for.
