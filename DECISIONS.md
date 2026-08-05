@@ -14605,3 +14605,197 @@ existed — verified by running it alone against an unmodified copy. It derives 
 port nothing is on. It is invisible in normal runs because the tier skips without
 `ELEVATOR_SIM_CHROMIUM`. The one-line fix is `server.resolvedUrls`, which is what
 `dev/compareLab.browser.test.ts` uses; the file was outside this lane's ownership and was left.
+## D227 — a refusal goes stale the same way a mechanism claim does, and it is the more dangerous half
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #66, reproduced and then found to be
+a stronger finding than the report knew.
+
+### What was reported
+
+The traffic editor's **Mean group size** row sits inside `#traffic-rows` with the four working
+sliders, in the same `slider-head` / `slider-value` / `slider-sub` styling, and is not a control —
+the panel has exactly four `input[type=range]`. Under it, in warning colour: *"not a control here —
+writes PatternSpec.batchMean, which no field of SimulationDemandOptions carries … Moving it would
+change this summary line and no passenger."* Its own tooltip, a few pixels away, said the opposite:
+the field is *"written by widening the traffic file this run resolves against."*
+
+The reporter filed it as a copy defect — two explanations of one control contradicting each other in
+class names — and offered three fixes, of which *"make it work"* was the first.
+
+### What was actually true
+
+**The tooltip was right and the refusal was stale.** `authoring/patternSpec.ts`'s
+`trafficProfilesWithPattern` widens the traffic profile the run resolves against, and `dev/state.ts`'s
+`shiftRunConfigOf` has called it on the way to `SimulationConfig.trafficProfiles` since wave 13. That
+is a **named non-test caller**. The refusal described the world as it stood when it was written and
+was never revisited when the thing it refused got built — `trafficProfilesWithPattern`'s own
+docstring even carries the retraction, *"this docstring said it had none, and that was true when it
+was written and false the moment step 3 landed"*, and the row quoting the retracted sentence was left
+saying it.
+
+### The rule
+
+`docs/05-roadmap.md`'s standing requirement is *name the non-test caller*, and the version that
+applies to a control is *name the field it writes*. **It binds in both directions.** A control that
+writes nothing must say so; a control that writes something may not claim it writes nothing.
+
+This repository counts dead seams — behaviour that is configurable, unit-tested and never called —
+and has eleven in code plus two in `data/`. **This is the mirror image and it is deliberately not
+added to that count:** the seam was live, the wiring was correct end to end, and what was dead was
+the documentation of it. It belongs to the family CLAUDE.md's *"a stated mechanism goes stale the
+same way"* paragraph names, and it is the more dangerous half of the pair — a dead seam merely does
+nothing, while a stale refusal actively instructs the reader not to touch the parameter. The
+parameter here is the one CLAUDE.md calls out by name: **passengers arrive in batches, not one at a
+time**, and `data/traffic-profiles.json`'s own comment says batch size *"materially changes loading
+and stop patterns."*
+
+### Why the fix is a run and not a sentence
+
+The refusal's assertion in `trafficEditor.test.ts` was **inverted, not deleted** — and inverting it
+is a strengthening rather than a weakening, because the old test was holding a refusal in place after
+the thing it refused had been built. A sentence can only be pinned by another sentence, so what pins
+it now is the standing requirement itself: at `midtown-office` under `office-standard` over 900 s the
+legs differ when the mean does, both arms carry several hundred legs so the instrument cannot pass by
+going silent, and the served-leg count **falls** as the mean rises — the direction the model
+requires, which a mere *different* would not have caught.
+
+### One deferred question, now decided
+
+`trafficProfilesWithPattern`'s docstring said *"whoever next touches this panel should decide"*
+between widening the file and writing `demand.batchSize`. Decided: **the file**, for this control.
+`demand.batchSize` is a whole `BatchSizeCurve` — `distribution`, `weights` and `mean` — so a single
+mean slider writing one would silently replace the profile's authored distribution shape with
+whatever default the override carried. Widening moves the one number the slider is named after and
+leaves the curve the reference data declares. An editor that offered the shape as well would want the
+override; this one offers a mean, so it writes a mean.
+
+## D228 — the commissioning screen is wired end to end except at the one point where a value crosses
+
+**Date: 2026-08-05 · A finding, not a fix.** Play-tester issues #42, #45, #46, #48 and #49 all land
+on one screen. #45 is closed in `commissioning/` — see § D229. The other four have their root causes
+reproduced here, in files outside this lane's ownership, and are recorded rather than left in a
+report so the diagnosis is not repeated by whoever picks them up.
+
+### #42 — every dropdown on the screen is inert
+
+**Root cause: `dev/menuPanel.ts`'s `affordance`.**
+
+```ts
+const withValue = (value: string): MenuIntent =>
+  row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+    ? { ...row.intent, value }
+    : row.intent;
+```
+
+Only two intent kinds have the chosen option patched in. `menu/screens.ts`'s `commissioningBody`
+builds each select's intent carrying **the value the row already has** — `{ kind:
+'set-commissioning', bankId, dimension: id, value }` at `screens.ts:930`, and `{ kind:
+'set-constraint', constraintId: state.constraintId }` at `:905`. So the change event fires, the
+prepared intent is dispatched unchanged, `dev/main.ts`'s reducer writes the current value back, and
+`drawMenu` re-renders identically. That is precisely the reported symptom: *"the panel visibly
+re-renders — it just re-renders with the old values."*
+
+A no-op by construction, not a race and not a validation refusal. `set-challenge` and `set-calendar`
+carry values through the same path and want checking with it.
+
+### #46 — the panel shows the previous scenario's fabric under the new building's name
+
+**Root cause: `ViewerState.commissioning` is keyed to nothing.** It is a bare `CommissioningChoices`
+array; `commissioning: []` appears exactly once in the tree — `dev/state.ts`'s `initialState` — and
+`withBuilding` does not touch it. `dev/main.ts`'s `commissioningInput` reads
+`state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning`, so once
+the array is non-empty it survives every building change and is drawn under the new building's name
+and budget.
+
+**#42 is what arms it.** The reducer at `main.ts:897` seeds `state.commissioning` from
+`asBuiltChoices` before writing the unchanged value back, so *touching* an inert dropdown latches the
+current building's choices into state permanently. The two issues are one mechanism, which is why
+fixing #42 alone would make #46 worse rather than better: a reader who can finally change a shaft
+count would carry it onto the next building. The choices want a building id beside them, or clearing
+in `withBuilding`.
+
+### #48 — no commit, no cancel, no preview, no brief
+
+Whole-screen composition, `menu/screens.ts`'s `commissioningBody`: it emits the constraint select,
+three selects per bank, and a Back row. There is no commit affordance because `set-commissioning`
+writes `ViewerState` on every change, so there is no staged value for a commit to apply or a cancel
+to discard. The screen's promise — *"choose the fabric before the week opens, then live with it"* —
+is enforced by `scope/permits.ts` forbidding `within-day` for `commissioning`, which is real and
+invisible.
+
+Nothing in `commissioning/` needs to change for this. The refusal machinery, the capital review and
+the as-built diff — `movedChoices`, `movedChoiceText` — already produce everything a preview or a
+staged-commit summary would draw. What is missing is a screen that draws them.
+
+### #49 — machine classes are unexplained, and two claims that do not reproduce
+
+The jargon half is real and is one line in `dev/main.ts`: `optionsFor` maps
+`classes.map((entry) => ({ id: entry.id, name: entry.name }))`, dropping the `detail` field that
+`menuPanel.ts`'s `selectRow` already renders as `` `${name} — ${detail}` `` and that the constraint
+select already uses. A `note` on `CommissionableClass` with no reader would have been a twelfth dead
+seam, so it is **not** added here; the change is `detail:` at the call site, plus a note derived from
+the band, rise and capacity the class already declares.
+
+Two of the issue's claims are **refuted**, and `commissioning.test.ts` now asserts against them:
+
+- *"Every machine class offers the identical speed list (2.50 → 7.00 m/s)."* False, and always was.
+  `speedChoices` has always returned the class's own declared band. The reporter saw only
+  `gearless-traction`'s because the machine-class select could not be moved — issue #42.
+- *"The lowest speed offered is 2.50 m/s, yet three shipped buildings run below it."* False.
+  `hydraulic` offers 0.5–0.75 m/s, including the 0.63 Garden Apartments runs at.
+
+The third claim — that car capacity is not offered — is accurate. It would be a fourth
+`COMMISSIONING_DIMENSION`, which is a compile error at every exhaustive site by design, and a fourth
+row in `commissioningBody`.
+
+## D229 — a ladder that cannot contain the value it is showing will show the wrong one
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #45, whose stated cause is right and
+whose consequence is larger than it reports.
+
+### What was wrong
+
+`commissioning/choices.ts`'s `speedChoices` cut each class's declared band into exactly four equal
+steps. That ladder is what the rated-speed select's **options** are; the row's **value** is the
+bank's as-built speed, from `asBuiltChoices`. A `<select>` whose value matches no option shows its
+first option instead — so on every building whose speed did not land on a cut point, the screen
+printed the bottom of the class band under the sentence *"the shafts, the machines and their speeds
+are what the building already has."*
+
+Measured over the shipped set: **nine of the fourteen banks across eight buildings.** Secure Tower's
+4 m/s and Chancery House's 5 m/s both read `2.50 m/s`, contradicting the header on the same screen.
+Midtown Office agreed only because 2.5 is `geared-traction`'s band maximum, which is the accident the
+reporter noticed and correctly distrusted.
+
+### The rule
+
+**A control that displays a current value must be able to offer that value.** The band is right and
+`docs/16` S7's *not offered rather than offered and refused* is right; what was wrong is a ladder
+whose members were an artefact of an interpolation count.
+
+The step is now the smallest of `{0.05, 0.1, 0.25, 0.5, 1, 2, 5}` that cuts the band into at most ten
+intervals, and the class's **declared `typical`** is always offered, because it is the one speed
+inside the band the reference data names. `gearless-traction`'s 2.5–7.0 therefore goes in halves and
+contains 3, 4 and 5 — the speeds the shipped buildings are actually written at. Round numbers also
+answer the readability half of issue #49: `3.63 m/s` is not a speed anybody specifies, and five of
+them read as an interpolation rather than as a set of settings.
+
+### The residual gap, named rather than left to be discovered
+
+This construction covers every shipped building and **cannot be made airtight from inside this
+function**, because a ladder over a continuum can always miss an arbitrary authored value.
+`buildingEditor.ts`'s `speedChipsOf` — the same computation for the same purpose, one panel over —
+carries the line that closes it: it also adds *the value the document already holds*. `speedChoices`
+is not handed that value, because `dev/main.ts`'s `optionsFor` calls it with the class alone, and an
+optional parameter nothing passes would be a control seam with no caller.
+
+So the guarantee is carried by a test instead. `commissioning.test.ts` asserts, over every bank of
+every building **read off disk** rather than from a name list — § D192's rule, because a hand-written
+list of eight stops covering the ninth the day it lands — that its as-built speed is on the ladder its
+class offers. A building authored off the ladder fails that test rather than misreporting itself, and
+the fix at that point is one argument at the call site.
+
+`speedChoices` had **no direct test** before this. It was exercised only through
+`playthrough/walk.test.ts`'s reconstruction of the options, which builds the same list the screen
+does and never compares it against the value the screen shows — an instrument that reproduced the
+defect faithfully and therefore could not see it.

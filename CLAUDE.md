@@ -167,6 +167,18 @@ not be silently deleted, and `model/car/estimateCost.ts`'s exclusion — its sen
 and true — is asserted in **both** directions. If you write a sentence about *why* something
 performs better, either measure it or say it is unmeasured.
 
+**A stated *refusal* goes stale the same way, and it is the more dangerous half.** The traffic
+editor drew *mean group size* as a refusal — *"no field of `SimulationDemandOptions` carries it …
+moving it would change this summary line and no passenger"* — for every wave after
+`trafficProfilesWithPattern` made it live, which `shiftRunConfigOf` has called since wave 13. **It is
+not a twelfth dead seam:** the seam was live and correctly wired end to end, and what was dead was
+the sentence describing it. That is worse than a dead seam rather than better — a dead seam merely
+does nothing, while a stale refusal tells the reader not to touch the control, and this one guarded
+the parameter this file names outright (*passengers arrive in batches, not one at a time*). So the
+standing requirement binds **both ways**: a control that writes nothing must say so, and a control
+that writes something may not claim it writes nothing. A refusal is pinned by a run, never by
+another sentence. See [§ D227](DECISIONS.md).
+
 **A published number goes stale the same way.** Three figures in this repository did not reproduce
 from the code that was supposed to produce them — one measured before a seam was wired and never
 regenerated, two hand-transcribed through a double rounding — and no test noticed, because nothing
