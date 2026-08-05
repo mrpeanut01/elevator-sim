@@ -176,6 +176,15 @@ is not being read honestly.
 | **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
 | **9 — Experience layer** | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built; clause 1 (the honesty property under **search**) green at 60 cases / 271 985 strings / 0 violations after finding two, clause 2 (mode parity) **derived** from the code, clause 3 re-derived in the always-on tier, clause 5 discharged **by driving a browser**. **Clause 4 — name the non-test caller — was satisfied in prose and mechanised by nothing at acceptance; mechanised in wave 12 ([§ D192](../DECISIONS.md))**. Unbuilt and named: U6, U7's rider models, Basic's curated three-dimension subset |
 
+**The play experience is above the phases and has its own two documents.**
+[`docs/16-change-scope-contract.md`](16-change-scope-contract.md) is the contract — *when may this
+control move?*, four answers, and the rule that a control appearing on a screen without anybody
+having decided will not typecheck. [`docs/17-play-experience-audit.md`](17-play-experience-audit.md)
+is the audit of the product against it, mode by mode, with seven findings of which five are closed.
+Read § 1 of the first before adding any control: the structural fact everything rests on is that the
+kernel runs the whole day and plays the recording back, **so a control does not steer a day — it
+discards one and simulates a different one**, which makes the retry the product's most-used verb.
+
 **Every sub-phase now has a measurement rather than a deferral, and Phase 6 is still ⚠️ because one
 of them was refused.** Phase 7's one undelivered scope bullet — the fuzzy traffic-pattern detector —
 was carried as not-done in [the roadmap](05-roadmap.md) rather than folded into the ✅ for as long as
@@ -183,7 +192,17 @@ was carried as not-done in [the roadmap](05-roadmap.md) rather than folded into 
 code read. It is read now: `dispatch/selector.ts` is the mechanism, the block is its arm set, and
 `weightSetsByPattern`'s dangling `energy-saver` is repointed to the shipped `energy-aware` with the
 selector **refusing** a dangling name rather than falling back silently
-([§ D141](../DECISIONS.md), [§ D142](../DECISIONS.md)). Phase 6c got the same treatment in the other
+([§ D141](../DECISIONS.md), [§ D142](../DECISIONS.md)).
+
+> **And the half of that seam nobody checked, found on 2026-08-05.** *"It is read now"* was true of
+> `core` and false of the product: `dispatch/selector.ts` reads the block, the loader carries it, and
+> **nothing in the viewer could write it** — so a player had no way to reach the mechanism at all.
+> That is the standing requirement's own defect one layer up from where it was looked for, and it is
+> why `dispatcherProfilesWithSelector` and the selector panel exist ([§ D219](../DECISIONS.md)). The
+> lesson worth carrying: *a shipped path reads it* and *a player can reach it* are different claims,
+> and closing the first does not close the second.
+
+Phase 6c got the same treatment in the other
 direction: it is `⬜ IMPLEMENTED, MEASURED, AND NOT ACCEPTED` in the roadmap, with its criterion
 ([§ D139](../DECISIONS.md)) dated before its code, rather than swept into a neighbouring tick.
 Phase 8's eighth track was carried this way until it landed; it is now ✅ with the study that
