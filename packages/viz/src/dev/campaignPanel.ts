@@ -21,6 +21,12 @@
  * - an unchanged choice is then W3's own liveness control on a scoreboard: two identical arms, no
  *   row resolved, nothing cleared.
  *
+ * **The panel no longer *opens* on that control** ([§ D226](../../../../DECISIONS.md)). It used to,
+ * on every stage, because every shipped stage starts on `collective` — so a first-time player's
+ * only available action was a run that could not clear the stage and was reported as though they
+ * had failed it. `openingProfileFor` picks the smallest admissible change instead, the control is
+ * one dropdown click away, and `controlOrVerdictRow` reports it *as a control* when it is run.
+ *
  * ## One replication is replayed, and the report says which
  *
  * A fail state's *frequency* comes from the batch. Its *diagnosis* cannot: a batch discards each
@@ -38,7 +44,7 @@ import { batchReport, type BatchReport } from '../batch/report.js';
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { briefingFor, type StageBriefing } from '../campaign/brief.js';
-import { admitProfile } from '../campaign/dimensions.js';
+import { admitProfile, movedDimensions } from '../campaign/dimensions.js';
 import {
   evidenceFrom,
   failStateCounts,
@@ -140,8 +146,12 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   for (const [index, stage] of loaded.campaign.stages.entries()) {
     ui.stage.append(new Option(`${String(index + 1)}. ${stage.name}`, stage.id));
   }
+  /*
+   * `Name (slug)` — see `dev/batchPanel.ts`'s picker for the finding. This list had the same
+   * defect: `your setting` offered thirteen raw ids against a rail that names the same thirteen.
+   */
   for (const profile of resources.dispatcherProfiles.profiles) {
-    ui.profile.append(new Option(profile.id, profile.id));
+    ui.profile.append(new Option(`${profile.name} (${profile.id})`, profile.id));
   }
 
   function currentStage(): CampaignStage | undefined {
@@ -150,6 +160,113 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
 
   function profileById(id: string): DispatcherProfile | undefined {
     return resources.dispatcherProfiles.profiles.find((profile) => profile.id === id);
+  }
+
+  /** `Nearest car (nearest-car)` — the picker's own form, for the status line beside it. */
+  function labelFor(id: string): string {
+    const profile = profileById(id);
+    return profile === undefined ? id : `${profile.name} (${profile.id})`;
+  }
+
+  /**
+   * The setting this stage opens on — **and it is no longer the stage's own baseline.**
+   *
+   * Every one of the ten shipped stages starts on `collective`, and this panel used to select the
+   * starting profile as the player's setting too. So the first thing a first-time player could do
+   * was run `collective` against `collective`: an hour-long-looking minute of computation on two
+   * arms that are the same system, which is **mathematically incapable** of clearing the stage,
+   * reported afterwards as *"stage not cleared"* — the same words a genuine failure gets. The one
+   * sentence explaining it lived several screens down the left briefing column and read as a
+   * tautology (*"'collective' runs the same system as 'collective'"*), so a player who did not
+   * read the whole column concluded they had done something wrong, or that the tab was broken.
+   *
+   * The identical-arms run is still **available** — it is W3's own liveness control, and a reader
+   * is entitled to run it — and this panel now reports it *as a control* rather than as a failure.
+   * What changed is only what the tab opens on.
+   *
+   * The choice is **derived, not authored**, on two rules in order:
+   *
+   * 1. `admitProfile` must admit it. A stage names the dimensions it opens, and a default that
+   *    moved one it did not would land the player on a refusal with Run disabled — a worse first
+   *    screen than the one this replaces.
+   * 2. Of those, the one that moves the **fewest declared dimensions**, ties going to the file's
+   *    own order.
+   *
+   * Rule 2 was added after driving it. File order alone opens stage 1 on `nearest-car`, which
+   * differs from `collective` on three dimensions at once and is the weakest dispatcher this
+   * project ships — so a player's first Lab run went from an unwinnable *0 of 2* to a winnable
+   * *0 of 2*, which is honest and teaches nothing. The smallest admissible change is the
+   * instructive one: it is the *change one thing* experiment the whole tab is built around, and on
+   * stage 1 it is `eta`, which is `collective` with its one hard constraint dropped.
+   *
+   * Where no admissible alternative exists the baseline is kept, and the status line says what
+   * that means before the player presses anything.
+   */
+  function openingProfileFor(stage: CampaignStage): string {
+    return smallestAdmissibleChange(stage) ?? stage.dispatcher.startingProfileId;
+  }
+
+  /**
+   * The admissible profile nearest the baseline, or `undefined` when there is none.
+   *
+   * **Two shipped stages have none**, which the walk over all ten found rather than assumed:
+   * `stage-8-the-headline-address` and `stage-10-the-bed-and-the-visitor` open dimension sets that
+   * no shipped dispatcher sits inside — stage 8's, for instance, omits
+   * `constraints.noDirectionReversal`, which `collective` declares and every alternative moves. On
+   * those two the weight editor is not one way to play, it is the **only** way, and the panel says
+   * so rather than telling a player to change a setting that cannot be changed.
+   */
+  function smallestAdmissibleChange(stage: CampaignStage): string | undefined {
+    const baseline = profileById(stage.dispatcher.startingProfileId);
+    if (baseline === undefined) return undefined;
+    const editable = editableIdsOf(stage.dispatcher.editable, loaded.space.ids);
+    let best: { readonly id: string; readonly moved: number } | undefined;
+    for (const profile of resources.dispatcherProfiles.profiles) {
+      if (profile.id === baseline.id) continue;
+      if (!admitProfile(loaded.space, baseline, profile, editable).admissible) continue;
+      const moved = movedDimensions(loaded.space, baseline, profile).length;
+      /* Strictly fewer, so a tie leaves the earlier profile in place — the file's own order. */
+      if (best === undefined || moved < best.moved) best = { id: profile.id, moved };
+    }
+    return best?.id;
+  }
+
+  /** What a player can actually do about two identical arms on this stage. */
+  function wayOutOf(stage: CampaignStage): string {
+    if (smallestAdmissibleChange(stage) !== undefined) {
+      return 'Change “your setting” for a stage you can clear.';
+    }
+    const opened = editableIdsOf(stage.dispatcher.editable, loaded.space.ids).length;
+    return (
+      `No shipped dispatcher stays inside the ${String(opened)} dimensions this stage opens, so ` +
+      'the weight editor is the way to play it: tick “edit the weights”, move one of them, and ' +
+      'run that against the baseline.'
+    );
+  }
+
+  /**
+   * What this stage is about to run, at the top of the panel where a player looks first.
+   *
+   * The briefing column already carries all of this, and carrying it is not the same as it being
+   * read: the tester's report is explicit that they did not see the identical-arms sentence until
+   * after the run, because it was several screens of dense monospace down. The bar beside the Run
+   * button is where a player looks before pressing it.
+   */
+  function drawIntent(): void {
+    const stage = currentStage();
+    if (stage === undefined) return;
+    const baselineId = stage.dispatcher.startingProfileId;
+    if (ui.profile.value === baselineId && !ui.edit.checked) {
+      ui.status.textContent =
+        `both settings are ${labelFor(baselineId)} — the two arms are the same system, so no ` +
+        'measure can separate them and “beat the baseline” cannot be reached however long it ' +
+        `runs. That is this surface’s control run, and it is worth doing once. ${wayOutOf(stage)}`;
+      return;
+    }
+    ui.status.textContent =
+      `this stage runs its baseline, ${labelFor(baselineId)}, against your setting, ` +
+      `${labelFor(ui.profile.value)}${ui.edit.checked ? ', with your weight edits' : ''} — ` +
+      'both on the same passengers. Press Run this stage.';
   }
 
   function fail(text: string): void {
@@ -552,6 +669,69 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     return met ? 'figure-observation' : 'figure-warning';
   }
 
+  /**
+   * The headline row — **and a run of a setting against itself is reported as the control it is.**
+   *
+   * `judgeStage` is untouched and its verdict is unchanged: a stage whose goals were not reached
+   * was not cleared, and this row still prints `verdict.headline` verbatim, so nothing is softened
+   * and nothing is hidden. What changes is the **label a player reads first**. *"Stage not
+   * cleared"* over two arms that are the same system tells a player they failed at something no
+   * configuration of theirs could have passed, and that is a false thing to teach even though
+   * every word in the sentence is true.
+   *
+   * The identical case is detected on the **resolved** ids, so an edited `collective` against
+   * shipped `collective` is correctly two settings rather than one — `runBatch` puts the resolved
+   * profile's id on the arm for that reason.
+   *
+   * And the control is **read**, not assumed. Two identical arms see identical passengers and
+   * produce identical numbers, so every paired difference is exactly zero and no row may exclude
+   * it. A row that did would mean the arms did not share a trace or the run is not deterministic —
+   * a failure of the apparatus, not of the player — so it is said in those words rather than
+   * quietly rendered as a win.
+   */
+  function controlOrVerdictRow(
+    stage: CampaignStage,
+    verdict: StageReport,
+    report: BatchReport,
+  ): HTMLElement {
+    const provenance =
+      `seed ${verdict.seed} — every one of these ${String(verdict.replications)} runs replays ` +
+      `from it. ${report.crnSentence}`;
+    const ids = new Set(report.arms.map((arm) => arm.dispatcherProfileId));
+    if (report.arms.length < 2 || ids.size > 1) {
+      return row(
+        verdict.cleared ? 'stage cleared' : 'stage not cleared',
+        verdict.headline,
+        provenance,
+        verdict.cleared ? 'figure-observation' : 'figure-warning',
+      );
+    }
+    const separated = report.comparisons
+      .flatMap((comparison) => comparison.rows)
+      .filter((item) => item.verdict === 'resolved' || item.verdict === 'under-budget');
+    const name = report.arms[0]?.dispatcherProfileName ?? '';
+    if (separated.length > 0) {
+      return row(
+        'the control did not hold — report this',
+        `Both arms ran ${name}, so every paired difference should have been exactly zero, and ` +
+          `${String(separated.length)} of the measures below came back with an interval that ` +
+          'excludes it. Two identical settings cannot differ unless the two arms saw different ' +
+          `passengers or a run is not reproducible. ${verdict.headline}`,
+        provenance,
+        'figure-suppressed figure-warning',
+      );
+    }
+    return row(
+      'control run — the two settings are the same',
+      `Both arms ran ${name}. They are identical by construction, so no measure can separate ` +
+        'them and “beat the baseline” is unreachable here however long it runs — this is not a ' +
+        'stage you failed, it is the check this surface is built to survive, and it held. ' +
+        `${verdict.headline} ${wayOutOf(stage)}`,
+      provenance,
+      'figure-observation',
+    );
+  }
+
   function draw(
     stage: CampaignStage,
     verdict: StageReport,
@@ -559,16 +739,7 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
     states: readonly FailStateReport[],
   ): void {
     ui.output.replaceChildren();
-    ui.output.append(
-      row(
-        verdict.cleared ? 'stage cleared' : 'stage not cleared',
-        verdict.headline,
-        // R7, on the results surface as well as the briefing: the seed is text and can be pasted.
-        `seed ${verdict.seed} — every one of these ${String(verdict.replications)} runs replays from it. ` +
-          `${report.crnSentence}`,
-        verdict.cleared ? 'figure-observation' : 'figure-warning',
-      ),
-    );
+    ui.output.append(controlOrVerdictRow(stage, verdict, report));
     if (report.budgetNote !== null) {
       ui.output.append(row('replication budget', report.budgetNote, undefined, 'figure-warning'));
     }
@@ -625,21 +796,34 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       );
     }
     for (const comparison of report.comparisons) {
+      /*
+       * **The same explanation once, and the next step named** — `dev/batchPanel.ts`'s finding,
+       * and this surface draws the same rows so it had the same wall of text: three suppressed
+       * estimate rows, each carrying a byte-identical 624-character paragraph. R3 requires the
+       * reason; it does not require it three times. The dedupe is on exact equality, so two rows
+       * whose notes merely resemble each other keep both.
+       */
+      const seen = new Map<string, string>();
       for (const item of comparison.rows) {
+        const first = seen.get(item.note);
+        if (first === undefined && item.note !== '') seen.set(item.note, item.label);
         ui.output.append(
           row(
             item.label,
             item.sentence,
-            item.note,
+            first === undefined ? item.note : `The same reason as “${first}” above, in the same words.`,
             item.verdict === 'suppressed' || item.verdict === 'unmeasured'
               ? 'figure-suppressed figure-warning'
               : 'figure-observation',
           ),
         );
       }
+      if (comparison.summary.remedy !== null) {
+        ui.output.append(
+          row('what would move it', comparison.summary.remedy, undefined, 'figure-warning'),
+        );
+      }
     }
-    /* The stage is on screen; the briefing is redrawn so the goals and their bars stay beside it. */
-    void stage;
   }
 
   /**
@@ -654,30 +838,46 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   function failStateDisclosure(states: readonly FailStateReport[]) {
     const recording = lastDemonstration;
     if (recording === undefined) return [];
-    return disclosureItems({ recording, failStates: states });
+    /*
+     * `dispatcherName` is handed over because this panel **has** it. `DisclosureInput` says the
+     * field is optional *"because a `VizRecording` carries the id and nothing else — a recording
+     * loaded from a file has no `data/` beside it"*, and that is not this caller's situation: the
+     * stage resolved a real `DispatcherProfile` to run the batch. Without it the run-identity row
+     * read `Garden Apartments · nearest-car` in Basic mode — the slug, on the one surface § 4 says
+     * replaces it with the display name.
+     */
+    const stage = currentStage();
+    const outcome = stage === undefined ? undefined : candidateProfileFor(stage);
+    return disclosureItems({
+      recording,
+      failStates: states,
+      ...(outcome?.ok === true ? { dispatcherName: outcome.profile.name } : {}),
+    });
   }
 
   ui.stage.addEventListener('change', () => {
     const stage = currentStage();
-    if (stage !== undefined) ui.profile.value = stage.dispatcher.startingProfileId;
+    if (stage !== undefined) ui.profile.value = openingProfileFor(stage);
     ui.output.replaceChildren();
     ui.error.textContent = '';
-    ui.status.textContent = '';
     resetWeights();
     drawBrief();
     drawWeights();
+    drawIntent();
   });
   ui.profile.addEventListener('change', () => {
     ui.error.textContent = '';
     resetWeights();
     drawBrief();
     drawWeights();
+    drawIntent();
   });
   ui.edit.addEventListener('change', () => {
     ui.error.textContent = '';
     if (ui.edit.checked) resetWeights();
     drawWeights();
     drawBrief();
+    drawIntent();
   });
   /*
    * One route from an input back to the model, exactly as `dev/parameterForm.ts` has: the value is
@@ -715,18 +915,21 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
   const first = loaded.campaign.stages[0];
   if (first !== undefined) {
     ui.stage.value = first.id;
-    ui.profile.value = first.dispatcher.startingProfileId;
+    ui.profile.value = openingProfileFor(first);
   }
   setRunning(false);
   ui.progress.hidden = true;
   resetWeights();
   drawBrief();
   drawWeights();
+  drawIntent();
 
   return {
     refresh: () => {
       drawBrief();
       drawWeights();
+      /* Only while nothing is on screen: a finished run's timing line is not to be overwritten. */
+      if (ui.output.childElementCount === 0) drawIntent();
     },
   };
 }
