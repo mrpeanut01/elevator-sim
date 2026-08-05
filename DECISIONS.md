@@ -14799,3 +14799,99 @@ the fix at that point is one argument at the call site.
 `playthrough/walk.test.ts`'s reconstruction of the options, which builds the same list the screen
 does and never compares it against the value the screen shows — an instrument that reproduced the
 defect faithfully and therefore could not see it.
+
+## D230 — the disclosure selector is a control, and a control that binds nothing is the defect this repository counts
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #43, which is two findings in one
+report; issues #24 and #52 are recorded here too, because all three are the same question asked of
+three different surfaces — *does this thing the screen offers actually do anything?*
+
+### #43 — Casual view changed nothing on the building tab
+
+The reporter measured it rather than asserted it: *"Engineer: innerText 2936 chars, 2523 elements /
+Casual: innerText 2936 chars, 2523 elements → byte-for-byte identical."* The cause is flat —
+**nothing in `dev/buildingEditor.ts` read `state.mode` at all**, on the most complex authoring
+surface the product has and the one a reader out of their depth would reach for the selector on.
+
+**This is the standing requirement with the hat on the other way round.** The eleven counted dead
+seams are *behaviour* with no caller. This is a *control* with no reader: the mode selector was
+wired, tested, and honoured elsewhere, and this panel simply never asked. It passes every check this
+repository runs — the panel renders, the selector moves, `mode/parity.ts` is green — because parity
+proves the two modes produce the same **run**, which is exactly what a disclosure control must do,
+and nothing proved they produce a different **screen**.
+
+So the rule generalises: *move the control and require the run to change* is for a control that
+configures a run. **For a disclosure control the analogue is: move it and require the rendering to
+change**, on the surface it claims to simplify. That is now asserted per-surface for this panel in
+`buildingEditor.test.ts`, in the reporter's own terms — the two modes may not be byte-for-byte
+identical.
+
+### #43 — and the captions were schema paths, which is the same finding from the other end
+
+Every caption read `floors[].heightM`, `banks[].cars[]`, or — on **both** occupancy rows —
+`floors[].population = capacity × occupancy`, a sentence true of the pair and descriptive of
+neither.
+
+The paths are there under a real and load-bearing discipline: *name the field it writes*, so a row's
+claim is checkable and cannot drift into decoration. **That discipline is not weakened here.** It
+was simply pointed at the wrong reader, and the selector exists precisely to say which reader is
+looking. Engineer keeps every path unchanged; Casual gets the unit, the range and the consequence.
+Nothing is deleted, and the checkable claim is one mode away rather than absent — which is also what
+makes the fix close both halves of the issue with one change.
+
+The `playerFieldOf` and `specSubOf` helpers are **module-private on purpose**: `honesty/derive`
+requires a `surfaces.ts` adapter for every exported prose producer, and both reach the sweep through
+`specRowsOf`, which the `EDITORS` adapter already covers by name. That is better than an exclusion.
+The residual gap, named rather than left: the adapter seeds `specRowsOf`'s **default** arm, so the
+engineer captions are driven and the casual ones reach only the static sweep. One argument at the
+seeding site closes it.
+
+### #43 § 4 — one stale count and one leaked package name
+
+`MATRIX_EMPTY` read *"core's own semantics for a floor no zone covers, and what four of the five
+shipped buildings declare."* `core` is a source package. And the count was wrong in both halves:
+**eight** buildings ship and **three** of them declare no access zone. The count is dropped rather
+than corrected — it told a player nothing they could act on, and a hand-written tally over `data/` is
+a number that goes stale the next time a building lands, which is how it got wrong in the first
+place.
+
+### #24 — the capital figure never said what a capital unit was
+
+Three questions in the report — what a unit corresponds to, what moves the figure before you commit,
+what happens when a configuration exceeds the allowance — and `commissioning/` knew all three answers
+and printed none. On a screen whose controls did not respond (§ D228, #42), a player could not even
+find the price list by trial and error.
+
+Two constraints shaped the copy. It **says plainly that a unit is not money**, because `choices.ts`
+is explicit that it *"is not currency, it is not a measurement of anything real"* — copy implying a
+real-world cost would be inventing an engineering claim the reference data does not make. And the
+figures are **interpolated from `CAPITAL_UNITS_PER_SHAFT`, `CAPITAL_UNITS_PER_MPS` and
+`CAPITAL_UNITS_PER_RATED_RISE_M`** rather than typed, so the legend cannot drift from the arithmetic
+it describes — *pin a published number to the code that produces it*, at the smallest scale there is.
+
+It rides on the **refusing** branch as well as the two quiet ones. The screen has three notice slots
+and this module owns one; a legend visible only when nothing is wrong would be missing from the exact
+moment a player is asking what happens if they exceed the allowance.
+
+### #52 — the elevation could not draw the shafts its own instruction line tells you to drag
+
+Two defects, and only one of them is in this lane.
+
+**The one that is:** `.elev-shaft` is `flex: 1; min-width: 0` inside a stage pinned at
+`min-width: 400px`, so the bars divided a **fixed** column between them. Four shafts got about 24 px
+each; pressing *add a shaft* four more times took them to about 13 px, the summary line correctly
+said `8 shafts in 1 bank`, and the picture did not change. The grid's own instruction is *"drag a
+shaft's top or bottom edge to restrict it to a band of floors"* — which is how a player creates
+zoning — so a bar too thin to put a pointer on is a documented interaction that is not offered.
+`elevationStageWidthPx` now grows the stage with the shaft count and each bar carries a 14 px floor,
+which `.elevation-body`'s existing `overflow: auto` then carries. Asserted as a monotonicity plus a
+geometric floor rather than as pixel values.
+
+**The one that is not:** the reporter's own measurement, `.elevation clientWidth 335 scrollWidth 412
+overflow-x: visible`, is about `.elevation-head` — a **static sibling** of the scrolling body, with
+`min-width: 400px` and hard-coded column widths, inside a container with no `overflow-x`. So the
+header clips with no scrollbar, and it cannot scroll with the body even now that the body has
+something to scroll. That is `index.html`, reported rather than edited, with the rules named in this
+lane's report. It also means the grid has **two sources of truth for one set of column widths** — the
+static head and the JS-built rows — which is the underlying defect and wants the head built from the
+same constants.
