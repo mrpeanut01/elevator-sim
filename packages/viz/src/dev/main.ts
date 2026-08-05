@@ -615,18 +615,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const NO_SERVER_POST =
     'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
     'screen and still in the report — nothing about it is lost.';
-  /*
-   * Issue #31's toggle, answered rather than ignored.
-   *
-   * There is no second mode to switch to any more (§ D241 § 7): asking for a name only when the
-   * address is new would tell the person filling in the form whether the address is new. A control
-   * that now does nothing must **say** it does nothing — a silent no-op is issue #21's defect in a
-   * different place.
-   */
-  const ONE_DOOR =
-    'There is one way in now, and it is the same one whether or not you have been here before: ' +
-    'type your address and a sign-in link is emailed to you. If the address is new, opening the ' +
-    'link creates the account. There is no password to choose and none to forget.';
   /**
    * What is said while a request is in flight, and what is said once it has been a while.
    *
@@ -1268,18 +1256,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       case 'post-challenge':
         void postChallenge();
-        return;
-
-      case 'account-mode':
-        /*
-         * There is no mode to change any more, and the honest answer is a sentence rather than
-         * nothing. § D241 § 7 collapsed sign-in and register into one request; `MenuIntent` still
-         * carries this member, so this arm exists and says why the control it belongs to has
-         * stopped meaning anything. Deleting the member — and the toggle that dispatches it — is
-         * `menu/screens.ts`'s and `dev/menuPanel.ts`'s to do.
-         */
-        accountState = withNotice(accountState, ONE_DOOR);
-        drawMenu();
         return;
 
       case 'account-form':
