@@ -45,6 +45,7 @@
 import {
   parseBuilding,
   resolveBuilding,
+  type BuildingConfig,
   type ElevatorSpecs,
 } from '@elevator-sim/core/browser';
 
@@ -117,7 +118,14 @@ import { speedLadderOf } from './machinesEditor.js';
 import type { BrowserResources } from './data.js';
 import type { BuildingEditorElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { allBuildingIds, allClasses, buildingConfigOf, classById } from './state.js';
+import {
+  allBuildingIds,
+  allClasses,
+  buildingConfigOf,
+  classById,
+  withBuilding,
+  type ViewerState,
+} from './state.js';
 
 /* -------------------------------------------------------------------------- *
  * Geometry constants
@@ -1090,6 +1098,63 @@ const MATRIX_DISPATCHER_NOTE =
   'Which dispatchers can read a credential at all is a third question again — the note beside the ' +
   'dispatcher list answers it for the pairing you have selected.';
 
+/* -------------------------------------------------------------------------- *
+ * Saving, and the two halves of it that were missing — issue #54
+ * -------------------------------------------------------------------------- */
+
+/** A building the reader saved: the id it took, and the document it became. */
+export interface SavedBuildingResult {
+  readonly id: string;
+  readonly config: BuildingConfig;
+}
+
+/**
+ * Turn the working copy into a saved building, or throw the loader's own refusal.
+ *
+ * Split out of the click handler so the thing the button does is testable without a document, and
+ * so the **name** can be asserted end to end. Issue #54 reported that a typed name did not reach the
+ * saved entry; it does — `buildingFromSpec` writes `spec.name`, falling back to *My building* only
+ * on an empty one — and the reason the reporter could not tell is the actual defect: **the save said
+ * nothing at all**, so there was no moment at which a wrong name could have been noticed. The
+ * confirmation that fixes that is composed in the mount, which is where this panel's other prose
+ * lives and the only place it can go without a `honesty/surfaces.ts` adapter.
+ */
+export function savedBuildingFrom(
+  spec: BuildingSpec,
+  state: ViewerState,
+  resources: BrowserResources,
+): SavedBuildingResult {
+  const id = nextSavedId('bld', allBuildingIds(resources, state.savedBuildings));
+  const named: BuildingSpec = { ...spec, id };
+  const specs = specsWithSaved(resources, state.savedClasses);
+  return {
+    id,
+    config: parseBuilding(buildingFromSpec(named, { specs }) as unknown, `${id}.json`),
+  };
+}
+
+/**
+ * The state that has the saved building **running**, so the creative loop closes.
+ *
+ * `withBuilding` rather than a bare `buildingId` write, and that is the load-bearing part. A drawn
+ * tower belongs to no scenario, and a raw assignment would leave the week's `contractId` in place —
+ * which is the forgery `state.ts`'s own docstring describes: the ribbon reads *Scenario · day 4* and
+ * `closeDay` banks an invented building against a real assignment. `withBuilding` puts it on
+ * `SANDBOX_CONTRACT_ID` instead. The building has to be in `savedBuildings` **before** the call,
+ * because that is where `withBuilding` looks the id up.
+ */
+export function stateRunningSaved(
+  state: ViewerState,
+  resources: BrowserResources,
+  saved: SavedBuildingResult,
+): ViewerState {
+  const savedBuildings = [
+    ...state.savedBuildings.filter((entry) => entry.id !== saved.id),
+    { id: saved.id, config: saved.config },
+  ];
+  return withBuilding({ ...state, savedBuildings }, resources, saved.id);
+}
+
 export function mountBuildingEditor(
   elements: BuildingEditorElements,
   context: MountContext,
@@ -1318,28 +1383,84 @@ export function mountBuildingEditor(
     patch({ bandByCar: {}, noLobby: {} });
   });
 
+  /* --- the save, its confirmation, and the action that closes the loop ----- */
+
+  /*
+   * Two nodes the shipped `index.html` does not carry, built here rather than there — issue #54.
+   *
+   * The complaint was that the editor's terminal action is *"indistinguishable from a dead button"*:
+   * no toast, no banner, no state change, and the only way to discover it had worked was to inspect
+   * the building select on another tab. So the save now says so, in the reader's own words and
+   * naming the building they named — and it offers the one verb the panel was missing, because a
+   * building you cannot run is not a thing that exists yet.
+   *
+   * They go in `.editor-actions`, beside Save, because that is where a reader who has just pressed
+   * Save is already looking. The **other half** of #54 — that the row sits ~1130 px down a 900 px
+   * viewport, and that Save and Close are adjacent with no visual distinction between *keep this
+   * for ever* and *throw it away* — is a layout question in `index.html` and its stylesheet, and is
+   * reported rather than fixed here.
+   */
+  const savedNote = el(doc, 'span', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { color: 'var(--ok)', 'font-size': '11.5px' },
+  });
+  const runSaved = el(doc, 'button', {
+    className: 'primary',
+    text: 'Run a day on it',
+    title:
+      'Makes the building you just saved the one the week runs, and runs a day on it. It belongs ' +
+      'to no scenario, so the week keeps its day and stops claiming to be an assignment.',
+    attrs: { type: 'button' },
+  });
+  setHidden(savedNote, true);
+  setHidden(runSaved, true);
+  elements.save.parentElement?.append(savedNote, runSaved);
+
+  /** The building the confirmation is about. Cleared the moment the reader edits again. */
+  let confirmedId = '';
+
+  function forgetConfirmation(): void {
+    confirmedId = '';
+    setText(savedNote, '');
+    setHidden(savedNote, true);
+    setHidden(runSaved, true);
+  }
+
+  runSaved.addEventListener('click', () => {
+    const at = view;
+    if (at === undefined || confirmedId === '') return;
+    const config = buildingConfigOf(at.resources, at.state.savedBuildings, confirmedId);
+    if (config === undefined) return;
+    // Through `stateRunningSaved`, never a bare `buildingId` write — see its docstring for the
+    // week-contract forgery a raw assignment reintroduces.
+    context.update(stateRunningSaved(at.state, at.resources, { id: confirmedId, config }));
+    forgetConfirmation();
+    context.openTab('run');
+    context.runShift();
+  });
+
   elements.save.addEventListener('click', () => {
     const at = view;
     const current = spec();
     if (at === undefined || current === undefined) return;
     try {
-      const id = nextSavedId('bld', allBuildingIds(at.resources, at.state.savedBuildings));
-      const named: BuildingSpec = { ...current, id };
-      const specs = specsWithSaved(at.resources, at.state.savedClasses);
-      const config = parseBuilding(
-        buildingFromSpec(named, { specs }) as unknown,
-        `${id}.json`,
-      );
+      const saved = savedBuildingFrom(current, at.state, at.resources);
       context.update({
-        savedBuildings: [...at.state.savedBuildings, { id, config }],
-        editingBuildingId: id,
-        buildingSpec: named,
+        savedBuildings: [...at.state.savedBuildings, { id: saved.id, config: saved.config }],
+        editingBuildingId: saved.id,
+        buildingSpec: { ...current, id: saved.id },
       });
       setText(elements.error, '');
+      confirmedId = saved.id;
+      setText(savedNote, `Saved — “${saved.config.name}” is now in your buildings.`);
+      setHidden(savedNote, false);
+      setHidden(runSaved, false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setText(elements.error, message);
       context.fail(message);
+      forgetConfirmation();
     }
   });
 
@@ -2124,7 +2245,18 @@ export function mountBuildingEditor(
       check.warnings.length === 0 ? 'var(--faint)' : 'var(--warn)',
     );
 
-    setHidden(elements.dirty, !specIsDirty(current, sourceBuildingOf(at)));
+    const dirty = specIsDirty(current, sourceBuildingOf(at));
+    setHidden(elements.dirty, !dirty);
+
+    /*
+     * The confirmation is about a building, not about a moment, so it goes as soon as it stops being
+     * true of what is on screen — the reader edited again, or moved to another building. A *"Saved"*
+     * line still sitting over a changed draft is the same defect as the silent save with the sign
+     * flipped: it would say the thing in the buildings list is what you are looking at.
+     */
+    if (confirmedId !== '' && (dirty || state.editingBuildingId !== confirmedId)) {
+      forgetConfirmation();
+    }
   }
 
   return { render };
