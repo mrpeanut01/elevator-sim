@@ -15881,3 +15881,144 @@ lane's files:
 2. `src/live/timeline.ts` holds a sixth copy — `{ bg: '#161e2a', fg: '#6d7b8d' }` per phase — so the
    timeline's segment labels are 3.15:1 in both modes.
 3. `--band-3` at 4.47:1 on `--panel`, which § D235 measured and deliberately did not move.
+## D231 — a free-play run may not write the week, and the sheet saying so was not enough
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-test issue #64, reproduced from the
+source and then pinned by a test that is red without the fix.
+
+### What was reported, and what was actually happening
+
+A player banks a clean shift on Scenario 1, presses **Free play** to try a silly dispatcher, and
+comes back to a week whose Day-1 history entry is the free-play run's. The reporter's own
+`localStorage` dump is the evidence: `history: [{ arrived: 355, carried: 355, minutePct: 100 }]`
+before, `history: [{ arrived: 523, carried: 523, minutePct: 93 }]` after. **It survives a reload.**
+The Day report sheet on screen at that moment reads *"one run, not part of a week — nothing is
+banked"*.
+
+The mechanism is two lines of `dev/main.ts`'s `closeShift`, forty lines apart:
+
+```ts
+const week = closeDay(state.week, outcome);        // unconditional
+…
+subject: state.playMode === 'free-play' ? { kind: 'single-run' } : { kind: 'week-day' },
+```
+
+So the **sheet's shape** branched on the mode and the **week's arithmetic** did not, and
+`saveSessionNow()` two lines below `closeDay` put the result on disk. This is the same defect as the
+comment already standing in that function — *"three panels, two answers"*, where the sheet said *your
+own building* while the rail counted the shift as banked. That fix corrected what the sheet **said**.
+This corrects what the run **does**, which is the layer the earlier fix stopped one short of.
+
+### The rule
+
+**A run writes `ViewerState.week` only if its play mode owns one.** `advancesTheWeek` is that
+predicate, in `dev/state.ts`, as an exhaustive `switch` over `PLAY_MODES` — so a ninth mode is a
+compile error rather than a silent `false`, or worse a silent `true`, which is the direction that
+loses somebody's week. `scope/types.ts` makes the same argument for the union itself.
+
+`shift-week` and `endless` advance; `free-play` does not. **Endless banking nothing and still
+advancing the week is not a contradiction**: `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no
+contract, so `closeDay` already banks nothing and clears nothing there — what endless *has* is a
+week, with days and 11 %/day growth and a seven-day history, and *"the same week with no assignment:
+it grows"* is the menu row's own promise. A mode that stopped closing days would stop growing the
+building, which is the whole of what **Keep going** is for.
+
+### Why a guard on `closeDay` alone was not the fix
+
+Measured rather than assumed, by reading the other callers. `enterFreePlay` replaces `state.week`
+with a fresh day-one week **the moment Free Play starts** — deliberately, because that is what makes
+a free-play run reproducible from its own selection and postable to a leaderboard. So *any* later
+save would have written that scaffolding over the campaign's banked days, and `closeShift` is not
+`saveSessionNow`'s only caller: **changing a setting saves too.** A player who entered Free Play and
+flipped the theme lost the week without a single run finishing.
+
+So there are two functions and they are both necessary: `closedWeekOf` decides what a closed day
+produces, and `weekForSession` decides what the slot is written with — *whatever the slot already
+has*, when the mode does not own a week. The settings and the Free Play selection still persist,
+because those belong to the player rather than to the week.
+
+### The evidence
+
+`dev/state.progression.test.ts`, built on the issue's own numbers. The central assertion is an
+**identity** check — `expect(closedWeekOf(state, outcome)).toBe(week)` — rather than a deep compare,
+so a `WeekState` that grows an eighth counter cannot quietly start being rebuilt on a free-play
+close. It is watched failing: with the guard removed, *leaves the banked week untouched* and *keeps
+every field the issue watched* go red and the other seven stay green.
+
+## D232 — the game may not play itself, and a navigation is not a progression event
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #39, and the half
+[§ D223](DECISIONS.md) named as *"the next thing to do here"* and could not reach from its own lane.
+
+### Two mechanisms, one symptom
+
+The reporter opened the deployed app cold, read the menu, pressed nothing, and came back to
+`376 carried today`, all four goals ticked, `1 clean days running` and `1/3 banked this scenario`.
+
+1. **`boot()` ends `restoreSession(); applyTheme(); renderAll(); runShift();`**, and the shell opens
+   **on the menu overlay** over a viewer that is already loaded. So the run started under the
+   overlay, `adopt` autoplayed it, `tick` found `playback.state === 'ended'` — `state.tab` opens on
+   `'run'`, so the guard there did not stop it — and `closeShift` banked a clean day. The footer read
+   `running` on a page nobody had touched.
+2. **`openTab` was `if (tab === 'report') closeShift();`** at any playhead, so merely navigating to
+   the sheet filed the day, incremented `week.attempt`, and could clear a contract.
+
+### What was decided, and what was deliberately not
+
+**`playerHasChosen`, latched in `closeMenu`.** Three arms close the overlay — **Start**, **Open the
+doors**, **Keep going** — and each is a mode being entered, so latching in `closeMenu` makes the set
+complete by construction rather than by a list somebody maintains. Until it latches, `adopt` hands
+`autoplay: false` and `closeShift` returns early.
+
+**Boot still runs its shift, and that is a choice against the issue's own suggestion.** Deleting the
+boot run would empty the stage, and § D220's browser tier reads the *bitmap* — *draws the stage*,
+`distinctColours > 8` — as the only thing a caught boot failure cannot fake. A blank canvas would
+make that assertion unable to tell *no run yet* from *dead product*, which is the exact property the
+tier was built for. A deep link would also arrive at an empty page, and a deep link is somebody
+sending a finding to somebody else. So the run is made and drawn, paused at 06:00, and the footer
+says `paused` — which is what a cold load *is*, and is the issue's own "start state until the player
+chooses something".
+
+**The `openTab` guard is § D223's, verbatim: file only when the playhead has reached `endedAt`.** It
+asks `reportPanel.ts`'s exported `runProgressOf` rather than deriving a second answer, because that
+is the predicate deciding whether the sheet may be a whole-day account — two answers to it would let
+the tab bank a day the sheet on it is simultaneously declining to report, which is § D223's
+two-answers screen one layer down.
+
+The arm stays reachable and is not dead: a run that ended while the reader was on another surface
+never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected clock rather than
+off the frame loop — so its playhead *is* at `endedAt` when the reader opens the sheet, and the day
+files then.
+
+### What this does not close
+
+A player who chooses **Campaign** lands on the scenarios tab with boot's recording still loaded, and
+if they then open the run tab and play it, it files. That is correct rather than residual: they have
+entered the campaign, the run on screen is that campaign's day 1 on `CONTRACTS[0]`'s building, and
+they watched it. Nothing files unwatched.
+
+## D233 — a finished run may open the sheet, and may not move the page out from under a reader
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #67.
+
+`closeShift` ended with `if (state.tab !== 'report') state = { ...state, tab: 'report' };`,
+unconditional. At ×60 a 30-minute shift ends about every thirty real seconds, and with the loop chip
+on it never stops — so on the Simulation tab the pane was yanked to the Day report on that cadence.
+Two reported consequences, and the second is the serious one: a click on the **Dispatcher** tab was
+overridden a moment later and had to be made twice, and a reader typing in the **Seed** field had the
+textbox unmounted mid-word with the characters going nowhere, no error, and nothing to undo.
+
+**The auto-open is kept.** It is the design's own behaviour — the day ending opens the sheet — and
+`docs/12`'s standing rule is that the handoff wins disagreements about what the screen does. What the
+handoff never described is a reader who is already somewhere else, so `reportOpensItself` refuses
+exactly the two cases the issue reports and nothing else: **the reader is not on the run**, and **the
+caret is inside an input, a textarea or a select**. A reader watching the run with their hands off
+the keyboard is taken to the report exactly as before.
+
+Being on the report tab already is deliberately **not** a refusal case. It is a no-op the caller
+skips anyway, and answering `true` there keeps the predicate a statement about the destination rather
+than about whether a write would be redundant.
+
+The DOM read is a three-`instanceof` helper beside the decision, which stays pure — the split every
+panel in `dev/` keeps, and the reason this file's other navigation decisions were testable and this
+one was not.

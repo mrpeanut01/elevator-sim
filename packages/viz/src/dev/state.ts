@@ -85,8 +85,8 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, openWeek, takeContract, withContract } from '../shift/week.js';
-import type { ShiftEvent, WeekState } from '../shift/types.js';
+import { SANDBOX_CONTRACT_ID, closeDay, openWeek, takeContract, withContract } from '../shift/week.js';
+import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -294,6 +294,92 @@ export interface ViewerState {
   readonly report: ShapedDayReport | undefined;
   /** What the last run refused to configure, from `shiftRunPatch`. Shown, never swallowed. */
   readonly withheld: readonly string[];
+}
+
+/* -------------------------------------------------------------------------- *
+ * Whose progress is this? — § D231
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Whether a run in this play mode may write {@link ViewerState.week} — § D231.
+ *
+ * ## The defect this exists to end, which was data loss rather than a wrong caption
+ *
+ * `dev/main.ts`'s `closeShift` shaped the report sheet's `subject` on `playMode` and called
+ * `closeDay(state.week, outcome)` **above that branch, unconditionally**. So a Free Play run — the
+ * one whose own sheet prints *"one run, not part of a week — nothing is banked"* — closed a day
+ * into the week, and `saveSessionNow()` on the next line wrote it to `localStorage`. A player who
+ * had banked clean shifts on a scenario and then pressed **Free play** to try a silly dispatcher
+ * came back to a week whose Day-1 history entry was the free-play run's, and it survived a reload
+ * (issue #64).
+ *
+ * It is the same class as `closeShift`'s own *"three panels, two answers"* comment one layer down:
+ * there, the sheet said *your own building* while the rail counted the shift as banked; here, the
+ * sheet says *nothing is banked* while the week is being overwritten. The comment fixed what the
+ * sheet **said**. This fixes what the run **does**.
+ *
+ * ## Why an exhaustive switch and not `mode === 'free-play'`
+ *
+ * A ninth {@link PlayMode} must be a compile error here rather than a silent `false` — or, worse,
+ * a silent `true`, which is the direction that loses somebody's week. `scope/types.ts` makes the
+ * same argument for the union itself: *a named category is a compile error when a fifth one
+ * appears.*
+ *
+ * ## Endless banks nothing and still advances the week, which is not a contradiction
+ *
+ * `week.ts`'s `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no contract, so
+ * `closeDay` already banks nothing and clears nothing there. What endless *does* have is a week —
+ * days, growth, a streak, a seven-day history — and *"the same week with no assignment: it grows"*
+ * is the menu row's own promise. A mode that stopped closing days would stop growing the building,
+ * which is the whole of what a player pressed **Keep going** for.
+ *
+ * Free Play is the opposite: `enterFreePlay` opens a *fresh* week at day 1 precisely so the run is
+ * reproducible from its own selection and postable to a leaderboard. That week is scaffolding for
+ * one run, and writing it over the campaign's is the bug.
+ */
+export function advancesTheWeek(mode: PlayMode): boolean {
+  switch (mode) {
+    case 'shift-week':
+    case 'endless':
+      return true;
+    case 'free-play':
+    case 'ranked':
+    case 'stage-campaign':
+    case 'incidents':
+    case 'calendar':
+    case 'commissioning':
+      return false;
+  }
+}
+
+/**
+ * The week a closed day produces — the whole of {@link advancesTheWeek}'s consequence, in one
+ * place a test can reach.
+ *
+ * Returns {@link ViewerState.week} **unchanged, by identity** when the mode does not advance it, so
+ * *"the scenario week is untouched"* is checkable with `toBe` rather than with a deep compare that
+ * a future field could slip past.
+ */
+export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState {
+  if (!advancesTheWeek(state.playMode)) return state.week;
+  return closeDay(state.week, outcome);
+}
+
+/**
+ * The week that belongs in the saved session — § D231, and the other half of the same guard.
+ *
+ * `saveSessionNow` writes the whole of `ViewerState`, and `closeShift` is not its only caller:
+ * changing a setting saves too. So a guard on `closeDay` alone still lost the week the moment a
+ * free-play player flipped the theme, because `enterFreePlay` has *already* replaced
+ * `state.week` in memory by then. The week on disk is the campaign's and stays the campaign's
+ * until a mode that owns one closes a day.
+ *
+ * `stored` is what `loadSession` last read back, or `undefined` on a first visit — in which case
+ * there is nothing to protect and the current week is written, which is the ordinary path.
+ */
+export function weekForSession(state: ViewerState, stored: WeekState | undefined): WeekState {
+  if (advancesTheWeek(state.playMode)) return state.week;
+  return stored ?? state.week;
 }
 
 /**

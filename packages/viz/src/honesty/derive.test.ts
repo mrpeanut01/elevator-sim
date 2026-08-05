@@ -192,6 +192,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#initialState',
         'dev/state.ts#SHIFT_LENGTHS',
         'dev/state.ts#shiftRunConfigOf',
+        /*
+         * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
+         * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
+         * they are hyphenated. They return a boolean and two `WeekState`s between them and author
+         * no sentence at all. What a player is *told* about a free-play run is the report sheet's
+         * `single-run` framing, which the `REPORT_PANEL` adapter already drives on both subjects.
+         */
+        'dev/state.ts#advancesTheWeek',
+        'dev/state.ts#closedWeekOf',
+        'dev/state.ts#weekForSession',
       ],
     },
     {

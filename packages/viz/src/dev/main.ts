@@ -124,7 +124,7 @@ import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf } from '../shift/report.js';
-import { HISTORY_DAYS, closeDay, outcomeOf } from '../shift/week.js';
+import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -150,7 +150,7 @@ import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { mountParameterForm } from './parameterForm.js';
-import { mountReport } from './reportPanel.js';
+import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
@@ -165,12 +165,14 @@ import {
   SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  closedWeekOf,
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
   initialState,
   profileById,
   shiftRunConfigOf,
+  weekForSession,
   withBuilding,
   type ViewerState,
 } from './state.js';
@@ -407,6 +409,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * fired.
    */
   let calendarCaption = '';
+  /**
+   * Whether the player has entered a play mode — § D232, and the guard on every progression write.
+   *
+   * `false` for exactly as long as the menu overlay has never been dismissed. The shell opens **on
+   * the menu**, over a viewer that is already loaded and running, and boot's own `runShift()` sits
+   * below that overlay: a play-tester opened the deployed app, read the menu for two minutes,
+   * pressed nothing, and came back to `376 carried today`, all four goals ticked, `1 clean days
+   * running` and `1/3 banked this scenario` (issue #39). A full shift had run to completion and
+   * banked a clean day behind an opaque overlay.
+   *
+   * Two things follow from this flag and they are separate:
+   *
+   * 1. **The boot run does not play itself.** {@link adopt} hands `autoplay: false` while this is
+   *    false, so the stage is drawn at 06:00 and stays there. The picture survives — the browser
+   *    tier reads the bitmap and § D220's *draws the stage* is a claim about a frame, not about a
+   *    moving one — and the footer says `paused` rather than `running`, which is what a cold load
+   *    is.
+   * 2. **Nothing files.** {@link closeShift} returns early, so no day is closed, no attempt is
+   *    counted and no contract is cleared before the player has chosen anything.
+   *
+   * It is **not** the same question as *"is the menu hidden right now?"*. Re-opening the menu
+   * mid-week must not un-choose the mode the player is in; this latches once and never goes back.
+   */
+  let playerHasChosen = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -759,7 +785,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
-    const written = saveSession(sessionStore, state, menuState);
+    /*
+     * **A mode that does not own a week does not write one** — § D231, issue #64's other half.
+     *
+     * Guarding `closeDay` alone was not enough. `enterFreePlay` replaces `state.week` with a fresh
+     * day-one week *the moment Free Play starts*, so any later save — and changing a setting saves
+     * — would have written that scaffolding over the campaign's banked days. The settings and the
+     * Free Play selection still persist, because those belong to the player rather than to the
+     * week; only the week itself is held back, and what is held back is whatever the slot already
+     * has.
+     */
+    const stored = loadSession(sessionStore);
+    const written = saveSession(
+      sessionStore,
+      { ...state, week: weekForSession(state, stored.ok ? stored.snapshot.week : undefined) },
+      menuState,
+    );
     /*
      * The refusal reaches the player, which is the whole reason the budget exists. A library that
      * outgrew the slot and stopped being written **in silence** would be the gap this closed,
@@ -1147,8 +1188,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     renderMenu(menuRoot, menuHost);
   }
 
+  /**
+   * Leave the menu — and the one place {@link playerHasChosen} is latched.
+   *
+   * Every arm that closes the overlay is a mode being entered: **Start** (free play), **Open the
+   * doors** (the campaign) and **Keep going** (endless). There is no fourth way out, so this is the
+   * complete set of moments at which a run stops being scenery and starts being somebody's day.
+   */
   function closeMenu(): void {
     menuRoot.hidden = true;
+    playerHasChosen = true;
   }
 
   drawMenu();
@@ -1196,7 +1245,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const revealed = new Set(state.revealedTabs);
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
-      if (tab === 'report') closeShift();
+      /*
+       * **A navigation files a day only when the day has been played out** — § D232, closing the
+       * half § D223 named and could not reach from its own lane.
+       *
+       * This arm was `if (tab === 'report') closeShift();` at any playhead. § D223 is precise about
+       * why that is wrong and about why it is *not* a lie: the simulator runs a day to its end and
+       * then plays it back, so what got banked was the true outcome of a day that really was
+       * simulated in full. What was wrong is that **a navigation had a progression side effect the
+       * reader did not ask for** — it incremented `week.attempt`, and it could bank a clean shift
+       * and clear a contract, on a run nobody had watched a second of.
+       *
+       * The guard is § D223's own: file only when the playhead has reached `endedAt`. That is the
+       * same instant the sheet itself agrees to be a whole-day account at, so the tab can no longer
+       * bank a day the sheet is simultaneously declining to report — the running sheet and the
+       * filed one now cover exactly the two sides of one condition.
+       *
+       * `tick` still files the ordinary way, from the transport reaching the end on the run tab.
+       * This arm remains reachable and necessary: a run that ended while the reader was on another
+       * surface never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected
+       * clock rather than off the frame loop — so its playhead *is* at `endedAt` by the time the
+       * reader opens the sheet, and the day files then.
+       */
+      if (tab === 'report' && playheadHasRunOut()) closeShift();
       renderAll();
       ui.tabs[tab].focus();
     },
@@ -1900,8 +1971,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * clause 4, because *asked* now includes the menu's own switch and not only the operating
        * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
        * asked for the same thing by a different route and was being ignored.
+       *
+       * **And nothing plays until a mode has been chosen** — § D232, issue #39. Boot's own
+       * `runShift()` lands under the menu overlay, so a page nobody had touched read
+       * `running · 0 arrived, 0 carried` on load and had carried 376 people by the time the reader
+       * finished the menu. The recording is still made and still drawn — the stage shows the
+       * building at 06:00, which is the start state a cold load should sit at — it simply does not
+       * start moving on its own behind a screen the player has not left yet.
        */
-      autoplay: shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
+      autoplay:
+        playerHasChosen &&
+        shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
     filedRunId = undefined;
@@ -1922,9 +2002,47 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The report is built from the **whole** recording rather than from the playhead: a day's account
    * is the day's, and a reader who paused at 09:00 has not made the afternoon not happen.
    */
+  /**
+   * Whether the caret is somewhere a navigation would throw work away.
+   *
+   * The DOM read, kept apart from {@link reportOpensItself}'s decision for the reason every panel
+   * in `dev/` states: a decision that needs a `document` cannot be tested. A `<select>` counts —
+   * an open dropdown unmounted underneath the reader is the same interruption as an unmounted
+   * textbox, minus the lost characters.
+   */
+  function focusIsInAControl(): boolean {
+    const active = document.activeElement;
+    return (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement
+    );
+  }
+
+  /**
+   * Whether the run on screen has been played to its end — the one test, asked in one place.
+   *
+   * `runProgressOf` is `dev/reportPanel.ts`'s and is imported rather than re-derived. It is the
+   * predicate that decides whether the sheet is allowed to be a whole-day account (§ D223), and
+   * *"may this day be filed"* has to be the same question or the tab banks a day the sheet on it is
+   * declining to report. Two answers to that is § D223's own two-answers screen, one layer down.
+   */
+  function playheadHasRunOut(): boolean {
+    return runProgressOf(viewAt()).kind === 'played-out';
+  }
+
   function closeShift(): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
+    /*
+     * Nothing is filed before the player has entered a mode — § D232, issue #39.
+     *
+     * The shell opens on the menu over a viewer that has already run boot's shift. Without this, a
+     * cold load with the overlay still up reached `tick`, found `playback.state === 'ended'`, and
+     * closed a day: `1 clean days running` and `1/3 banked this scenario` on a page nobody had
+     * touched. The run itself is real and stays on screen; what it may not do is count.
+     */
+    if (!playerHasChosen) return;
     filedRunId = recording.runId;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
@@ -1939,7 +2057,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
       carried: observations.carried,
       arrived: observations.arrived,
     });
-    const week = closeDay(state.week, outcome);
+    /*
+     * **The week is written only by a mode that owns one** — § D231, issue #64.
+     *
+     * This line was `closeDay(state.week, outcome)`, unconditional, *above* the `playMode` branch
+     * forty lines down that shapes the sheet's `subject`. So a Free Play run advanced and wrote the
+     * scenario week while the sheet it produced printed *"one run, not part of a week — nothing is
+     * banked"* — and `saveSessionNow()` below put it in `localStorage`, where it survived a reload
+     * and took the player's banked shifts with it.
+     *
+     * The decision is `dev/state.ts`'s and is asserted there against a week with a banked day in
+     * it, because a decision made inside this closure needs a document, a canvas and a click to
+     * reach — which is why this one went four modes without a test.
+     */
+    const week = closedWeekOf(state, outcome);
     const report = dayReportOf({
       recording,
       observations,
@@ -1977,7 +2108,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * navigation ends up fighting itself.
      */
     state = { ...state, week, report };
-    if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    /*
+     * **The sheet opens itself only over a reader who is not doing something else** — § D233,
+     * issue #67.
+     *
+     * This was `if (state.tab !== 'report') state = { ...state, tab: 'report' };`, unconditional.
+     * At ×60 a shift ends about every thirty real seconds, so on the Simulation tab the pane was
+     * yanked to the Day report on that cadence: a play-tester typing in the **Seed** field had the
+     * textbox unmounted mid-word with the characters going nowhere and nothing to undo, and a click
+     * on the **Dispatcher** tab was overridden a moment later by a navigation they had not asked
+     * for.
+     *
+     * The auto-open is the handoff's own behaviour (`closeDay` fires at the end of the day and
+     * opens the sheet) and is kept, because the handoff wins disagreements about what the screen
+     * does. What it never described is a reader who has already gone somewhere else. So the two
+     * cases the issue reports are exactly the two the predicate refuses, and the ordinary case —
+     * watching the run, hands off — is unchanged.
+     */
+    if (reportOpensItself({ tab: state.tab, focusIsInAControl: focusIsInAControl() })) {
+      state = { ...state, tab: 'report' };
+    }
     // A closed day is the thing a player would most mind losing to a reload, so it is the moment
     // the session is written. `nextDay` goes through here on its way to the next sheet.
     saveSessionNow();
@@ -2488,6 +2638,47 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * When the report is allowed to open itself — § D233
+ * ========================================================================== */
+
+/** What decides whether a finished run may move the pane. Both facts are about the *reader*. */
+export interface ReportOpenInput {
+  /** The surface the reader is on when the run ends. */
+  readonly tab: TabName;
+  /** Whether the caret is inside an input, a textarea or a select. */
+  readonly focusIsInAControl: boolean;
+}
+
+/**
+ * Whether a run reaching its end may switch the pane to the Day report — `issue #67`.
+ *
+ * Two refusals, and each is one of the two the issue reports:
+ *
+ * - **The reader is not on the run.** They clicked *Dispatcher* while the shift was finishing, and
+ *   a moment later the selected tab was *Day report* — a click overridden by a timer they do not
+ *   control. A reader who has navigated has answered *where should I be* more recently than the
+ *   transport has.
+ * - **The reader is typing.** The Seed textbox was unmounted mid-word and the characters went
+ *   nowhere, with no error and nothing to undo. Silently discarding input is the worst class of
+ *   interruption, and it is the one a fixed cadence guarantees: at ×60 a shift ends roughly every
+ *   thirty real seconds, and with the loop chip on it never stops.
+ *
+ * Everything else is unchanged, deliberately. The design's own behaviour is that the day ending
+ * opens the sheet, and `docs/12`'s standing rule is that the handoff wins disagreements about what
+ * the screen does — so a reader watching the run, hands off the keyboard, still gets taken to the
+ * report the moment it is worth reading. What the handoff never described is a reader who is
+ * already somewhere else, and that is the whole of what this refuses.
+ *
+ * Being on the report tab already is *not* a refusal case: it is a no-op the caller skips anyway,
+ * and answering `true` there keeps the predicate a statement about the destination rather than
+ * about whether a write is redundant.
+ */
+export function reportOpensItself(input: ReportOpenInput): boolean {
+  if (input.focusIsInAControl) return false;
+  return input.tab === 'run' || input.tab === 'report';
+}
 
 /* ========================================================================== *
  * The bank filter — SG-15
