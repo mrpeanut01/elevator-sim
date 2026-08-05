@@ -55,11 +55,41 @@
  * `#report-forecast-name` and `#report-taught`, not to the box drawn around them, so hiding the
  * field alone would leave the words *Tomorrow* and *What this taught* standing over nothing. Until
  * the markup carries an id of its own, {@link cardOf} climbs one level, and it climbs exactly one.
+ *
+ * ## A sheet is a statement about a whole day, so it waits for the whole day — § D223
+ *
+ * The simulator runs a day to its end and then plays it back, so `main.ts`'s `closeShift` can file a
+ * complete account of a run the reader is four minutes into — and it does, because opening this tab
+ * is one of the two ways `closeShift` is reached. Every other surface on the screen reads the
+ * **playhead**: the header's clock, the footer's `n arrived, n carried`, the left rail's goals. Issue
+ * #16 is what that costs. A player re-ran a filed selection, opened this tab at once, and read
+ * `06:00 FILLING` and `0 carried` in the chrome beside `CARRIED 360` on the sheet — one screen, two
+ * answers to *how did today go?*.
+ *
+ * The figures were not stale. `runId` is `building-profile-seed`, so a re-run of the same selection
+ * is bit-identical and the sheet was a true account **of the recording**. What was false was the
+ * sheet presenting itself as *the state of the run on screen* while the run on screen was at 06:00.
+ *
+ * So there is a third state, and {@link runProgressOf} is the whole of the test: while the playhead
+ * is short of `endedAt`, a filed sheet is replaced by a sheet that says the day is still running and
+ * names the time it has reached. **It carries no figure at all**, and that is not timidity — every
+ * cell on this grid is a whole-run quantity. `CARRIED`, `DEEPEST QUEUE` and `TOOK THE STAIRS` come
+ * from observations folded at `endedAt`; `AVERAGE WAIT`, `WORST WAIT` and the energy pair come from
+ * `VizSummary`, which is summarised once over the whole run and cannot be re-derived at a playhead.
+ * A part-day mean is exactly the thin sample CLAUDE.md's `awtIsValid` grounds exist to refuse, and
+ * inventing one to avoid an empty box is the `docs/10` R3 failure with extra steps. The surface that
+ * *does* read a shift while it runs is the left rail, and the copy points there.
+ *
+ * Two consequences, both deliberate. Scrubbing back after a day has been filed and re-opening this
+ * tab shows the running sheet again — the screen is at 09:14, so the sheet declines to be at 18:00,
+ * which is the property being bought rather than a lapse in it. And with the transport looping, the
+ * playhead reaches `endedAt` only in passing, so the sheet is mostly the running one; a run on repeat
+ * has no *finished* instant to agree with.
  */
 
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
-import type { ReportNextStep, ShapedDayReport } from '../shift/report.js';
+import { clockOf, type ReportNextStep, type ShapedDayReport } from '../shift/report.js';
 import type {
   ClearedAward,
   DayReport,
@@ -172,7 +202,13 @@ export type FramingView = WeekFramingView | SingleRunFramingView;
 
 /** Everything the sheet shows, in one value. The empty state is a member of this type, not a hole. */
 export interface ReportView {
-  /** `false` before any shift has been closed. The sheet is drawn either way — it is never hidden. */
+  /**
+   * Whether this sheet is presenting an account of a run.
+   *
+   * `false` on **both** of the two sheets that are not one: before any shift has been closed, and
+   * while the run a closed shift is an account *of* has not been played out (see the module
+   * docstring). The sheet is drawn in every case — it is never hidden.
+   */
   readonly filed: boolean;
   /**
    * Where the question this sheet may not answer is answered — on **both** shapes of sheet.
@@ -403,6 +439,73 @@ export function emptyReportView(): ReportView {
 }
 
 /**
+ * The run on screen, mid-day — the state a filed sheet may not be drawn over. See the module
+ * docstring.
+ *
+ * The two clock strings are `shift/report.ts`'s {@link clockOf}, not this module's: there is no
+ * arithmetic in this file, and *what time is it in this building* has exactly one implementation
+ * that the header band, the transport ticks and this sheet all read.
+ */
+export interface WatchingRun {
+  readonly kind: 'watching';
+  /** Where the playhead is, as `HH:MM` on the shift clock. */
+  readonly atClock: string;
+  /** Where the run ends, as `HH:MM`. */
+  readonly endsAtClock: string;
+}
+
+/**
+ * How much of the run on screen has been watched — the one thing this surface needs from outside the
+ * report to know whether the report is a statement about what is on the screen.
+ */
+export type RunProgress = { readonly kind: 'played-out' } | WatchingRun;
+
+/**
+ * Read the playhead against the run it is in.
+ *
+ * `Playback.simTimeS` is clamped into `[startedAt, endedAt]` and reaches `endedAt` exactly when the
+ * transport reports `ended`, so the comparison is an equality in the case that matters rather than a
+ * tolerance. No recording is `played-out` rather than `watching`: there is then no clock on the
+ * screen for the sheet to disagree with, and `reportViewOf` has already answered the no-run case
+ * with the empty sheet.
+ */
+export function runProgressOf(view: Pick<ViewAt, 'recording' | 'simTimeS'>): RunProgress {
+  const recording = view.recording;
+  if (recording === undefined || view.simTimeS >= recording.endedAt) return { kind: 'played-out' };
+  return {
+    kind: 'watching',
+    atClock: clockOf(view.simTimeS),
+    endsAtClock: clockOf(recording.endedAt),
+  };
+}
+
+/**
+ * The sheet a day still being watched gets — issue #16's fix, and § D223.
+ *
+ * Built on {@link emptyReportView} rather than beside it, because the half these two share is the
+ * half that must not drift: *no figure, no goal, no verdict, nothing to advance to*. What differs is
+ * the words, and the words are the whole point — the empty sheet's lede tells a reader to press
+ * *Run this shift*, which is advice for something this reader has already done.
+ *
+ * The copy names three things that exist: the timeline (a click on it seeks — `main.ts`'s `scrubTo`),
+ * the left rail, and the playhead's own clock. It promises no figure, because there is none it could
+ * keep — see the module docstring on why a part-day cell cannot be honestly drawn.
+ */
+function watchingReportView(progress: WatchingRun): ReportView {
+  const { atClock, endsAtClock } = progress;
+  return {
+    ...emptyReportView(),
+    title: 'The day is still running',
+    lede:
+      `This sheet reports a whole day at once, and you are watching ${atClock} of a shift that ` +
+      `runs to ${endsAtClock}. It waits for the playhead: a finished day’s figures beside a clock ` +
+      `reading ${atClock} would be two answers to one question. The day is already simulated end ` +
+      'to end, so play it through — or click the far end of the timeline — and the sheet is here. ' +
+      'The left rail reads the shift while it runs.',
+  };
+}
+
+/**
  * The framing, which is the only place the two shapes differ.
  *
  * Exhaustive over `of`: a third shape of sheet is a compile error here rather than a card that
@@ -425,7 +528,20 @@ function framingOf(report: ShapedDayReport): FramingView {
 }
 
 /**
- * The whole sheet, filed or not. The only decision this surface makes.
+ * The whole sheet — nothing filed, still being watched, or filed. The only decision this surface
+ * makes.
+ *
+ * The three arms are ordered by what a reader is owed. *Nothing has been run* outranks everything,
+ * because a sheet cannot be about a run that does not exist. *The run is still on screen* comes
+ * next, and it outranks a filed sheet on purpose: the report may be true of the recording and still
+ * be the wrong thing to draw, because the rest of the screen is describing an instant the sheet is
+ * hours past. See the module docstring.
+ *
+ * `progress` defaults to `played-out` so that a caller holding only a report — the honesty sweep
+ * enumerating this surface's strings, a test asserting the filed sheet — gets the filed sheet.
+ * `mountReport` never takes the default: it reads the playhead off the same {@link ViewAt} the
+ * header and the footer are drawn from, which is what makes *two answers on one screen*
+ * unconstructible rather than unlikely.
  *
  * **The bare `DayReport` arm is a transition, and it is not a guess.** `types.ts`'s `DayReport` is
  * by construction the week-day sheet — it declares `streakLine`, `contractLine`, `forecast` and
@@ -434,8 +550,12 @@ function framingOf(report: ShapedDayReport): FramingView {
  * yet been widened to `ShapedDayReport`; when it is, this arm and the `'of' in report` test both
  * go, and nothing else in the function changes.
  */
-export function reportViewOf(report: ShapedDayReport | DayReport | undefined): ReportView {
+export function reportViewOf(
+  report: ShapedDayReport | DayReport | undefined,
+  progress: RunProgress = { kind: 'played-out' },
+): ReportView {
   if (report === undefined) return emptyReportView();
+  if (progress.kind === 'watching') return watchingReportView(progress);
   const shaped: ShapedDayReport = 'of' in report ? report : { ...report, of: 'week-day' };
   return {
     filed: true,
@@ -486,8 +606,15 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
      * Read through the view rather than off the report. The banner belongs to the week-day framing,
      * so asking the drawn view for it is the one question that stays correct whichever shape of
      * sheet the state is holding — and a single run has no award to take by construction.
+     *
+     * The *drawn* view, playhead included: a banner that is not on the screen may not be actioned
+     * from it. Without `runProgressOf` here this handler would read a cleared award off a sheet the
+     * render is refusing to draw, which is the same disagreement one layer down.
      */
-    const framing = view === undefined ? undefined : reportViewOf(view.state.report).framing;
+    const framing =
+      view === undefined
+        ? undefined
+        : reportViewOf(view.state.report, runProgressOf(view)).framing;
     const nextId =
       framing?.kind === 'week-day' ? (framing.cleared?.nextContractId ?? null) : null;
     if (view !== undefined && nextId !== null) {
@@ -640,7 +767,12 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   return {
     render(view: ViewAt): void {
       latest = view;
-      const drawn = reportViewOf(view.state.report);
+      /*
+       * The playhead is read off the same `ViewAt` that `drawHeader` and `drawFooter` are given in
+       * the same `renderAll`, so the sheet and the chrome cannot be describing different instants —
+       * issue #16, § D223.
+       */
+      const drawn = reportViewOf(view.state.report, runProgressOf(view));
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
        * the same value, so a slot can never be left showing yesterday's sentence on a sheet that

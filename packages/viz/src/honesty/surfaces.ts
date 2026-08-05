@@ -169,6 +169,7 @@ import {
   figureViewOf,
   goalRowViewOf,
   reportViewOf,
+  runProgressOf,
 } from '../dev/reportPanel.js';
 import {
   buildingPlateOf,
@@ -2495,6 +2496,7 @@ const REPORT_PANEL: SurfaceAdapter = {
     'dev/reportPanel.ts#goalRowViewOf',
     'dev/reportPanel.ts#diagnosisRowsOf',
     'dev/reportPanel.ts#emptyReportView',
+    'dev/reportPanel.ts#runProgressOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -2618,6 +2620,25 @@ const REPORT_PANEL: SurfaceAdapter = {
     seeds.push({ field: 'emptyReportView.lede', text: empty.lede, role: 'prose' });
     if (empty.framing.kind === 'week-day') {
       seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
+    }
+
+    /*
+     * The third sheet — issue #16, § D223.
+     *
+     * A filed report drawn while the playhead is short of `endedAt` is replaced by a sheet that
+     * says the day is not over, because the header, the footer and the rail are all describing an
+     * instant the filed sheet is hours past. Driven here for exactly the reason the empty sheet is:
+     * a state of this surface that the search does not reach is an unchecked one, and its lede is
+     * the only sentence on the surface that names two clock times of its own composition.
+     */
+    const filed = bundle.days[0]?.report;
+    if (filed !== undefined) {
+      const running = reportViewOf(
+        filed,
+        runProgressOf({ recording: context.recording, simTimeS: context.recording.startedAt }),
+      );
+      seeds.push({ field: 'runningReportView.title', text: running.title, role: 'label' });
+      seeds.push({ field: 'runningReportView.lede', text: running.lede, role: 'prose' });
     }
 
     return singleRun(this.id, seeds);
