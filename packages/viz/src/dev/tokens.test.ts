@@ -110,6 +110,11 @@ const PAIRS: readonly (readonly [string, string])[] = Object.freeze([
   ['--band-1', tokens.BAND_WAITING],
   ['--band-2', tokens.BAND_LONG],
   ['--band-3', tokens.BAND_ABANDONED],
+  // § D236 — the stage key's swatches. Pinned here for the reason every row above is: a legend
+  // drawn in a colour the canvas does not use is a legend that lies about the picture.
+  ['--car-heavy', tokens.CAR_HEAVY],
+  ['--waiting-up', tokens.WAITING_UP],
+  ['--waiting-down', tokens.WAITING_DOWN],
 ]);
 
 describe('the stylesheet and the renderer share one palette', () => {
@@ -154,6 +159,87 @@ describe('the stylesheet and the renderer share one palette', () => {
       void value;
       expect(root.get(property), `${property} must be a literal`).toMatch(/^#[0-9a-f]{3,8}$/i);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The rules below the blocks — § D235, and the half `PAIRS` above cannot see
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every colour literal in the file that is **not** inside one of the two token blocks.
+ *
+ * The blocks above are stripped first, so what is left is the ~900 rules and the markup's inline
+ * styles. Matches a hex (`#abc`, `#aabbcc`, `#aabbccdd`) or a functional colour (`rgb(`, `rgba(`,
+ * `hsl(`, `hsla(`), and deliberately **not** `color-mix(`, which takes its colour from a token by
+ * construction and is the sanctioned way to write a tint.
+ *
+ * Comments are stripped too. This file's own prose quotes a dozen hex values while arguing about
+ * them, and a check that could be satisfied by rewording a comment is not checking the page.
+ */
+function literalColoursOutsideTheBlocks(html: string): readonly string[] {
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html);
+  if (style === null) throw new Error('index.html has no <style> block');
+  const withoutComments = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
+  const rules = withoutComments(style[1] ?? '')
+    .replace(/:root\s*\{[\s\S]*?\}/, ' ')
+    .replace(/:root\[data-theme=['"]light['"]\]\s*\{[\s\S]*?\}/, ' ');
+  const markup = withoutComments(html.slice(style.index + style[0].length));
+  return [
+    ...`${rules}\n${markup}`.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/g),
+  ].map((match) => match[0]);
+}
+
+/**
+ * The literals a token cannot express, each with the reason it is not a theming defect.
+ *
+ * Two, and both are the same idea: a **scrim** is black in both modes. A modal backdrop that
+ * inverted with the page would be a white veil over a white page, and the drawer's drop shadow is
+ * a shadow rather than a colour. Neither carries a claim and neither has a token, so neither is a
+ * copy of the palette waiting to drift.
+ */
+const SCRIMS = ['rgb('] as const;
+
+describe('no rule paints a colour the palette does not own — § D235', () => {
+  it('leaves no hex literal anywhere below the two token blocks', async () => {
+    /*
+     * The failure this closes, in the reporter's words: *"hard-coded dark colours survive the
+     * token switch"*. The light block was complete and correct and forty-eight elements stayed
+     * dark anyway, because the colours that repainted them were not tokens at all — `#151d29`
+     * under the **selected** tab (its `--text` label landed at **1.06:1**), `#c6d0dc` on the
+     * coaching line the app writes for a new player (**1.31:1**), `#a6b2c1`, `#0f141d`, `#0d1219`,
+     * `#06121f`, and five gradients.
+     *
+     * `PAIRS` above cannot see any of that: it reads the two blocks and asserts they agree with
+     * `render/tokens.ts`. A palette can be perfect and be applied to a tenth of the page. This is
+     * the other half — the one that says the rules *use* it.
+     */
+    const strays = literalColoursOutsideTheBlocks(await indexHtml()).filter(
+      (literal) => literal.startsWith('#'),
+    );
+    expect(strays, 'a hex colour outside `:root` — declare a token, or use `color-mix`').toEqual([]);
+  });
+
+  it('leaves no functional colour either, except the two scrims', async () => {
+    // `rgb(255 255 255 / 0.04)` and `rgb(63 178 127 / 0.09)` are the same defect wearing a
+    // different syntax: a white wash is nothing on a white page, and the second is a fourth copy
+    // of the settling band. Both are `color-mix(in srgb, var(--token) N%, transparent)` now.
+    const strays = literalColoursOutsideTheBlocks(await indexHtml()).filter(
+      (literal) => !literal.startsWith('#'),
+    );
+    expect(new Set(strays)).toEqual(new Set(SCRIMS));
+  });
+
+  it('negative control: the scan reaches the rules and the markup, not just the blocks', async () => {
+    // A scan that matched nothing because its regex was wrong would pass both assertions above
+    // silently. So: the two scrims *are* found, and a hex planted in each half is found too.
+    const html = await indexHtml();
+    expect(literalColoursOutsideTheBlocks(html).length).toBeGreaterThan(0);
+    expect(literalColoursOutsideTheBlocks(html.replace('.card {', '.x { color: #abcdef } .card {')))
+      .toContain('#abcdef');
+    expect(literalColoursOutsideTheBlocks(html.replace('</style>', '</style><i style="color:#fedcba">')))
+      .toContain('#fedcba');
   });
 });
 

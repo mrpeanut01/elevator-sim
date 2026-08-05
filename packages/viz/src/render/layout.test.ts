@@ -123,6 +123,76 @@ describe('buildLayout', () => {
     expect(Number.isFinite(empty.yForHeight(0))).toBe(true);
   });
 
+  /* ------------------------------------------------------------------ *
+   * The plot's share of the canvas — § D236, issues #73 and #41
+   * ------------------------------------------------------------------ */
+
+  /** `dev/main.ts`'s own request, which is the one that produced the defect. */
+  const asShipped = (width: number, cars: number) =>
+    buildLayout({
+      width,
+      height: 640,
+      floors: FLOORS,
+      shafts: Array.from({ length: cars }, (_, index) => shaft(String.fromCharCode(65 + index))),
+      gutterRightPx: 280,
+      overlayWidthPx: width >= 900 ? 250 : 0,
+    });
+
+  it('draws the whole bank on a phone, where it used to draw one shaft of it', () => {
+    /*
+     * The regression test for issue #73, at the exact number `dev/main.ts` produces: `drawStage`
+     * floors the canvas at 360 px, and 360 − 24 padding − 72 left gutter − 280 rider gutter is
+     * **negative**. `Math.max(1, …)` made that a one-pixel plot and `capacity`'s own `Math.max(1,
+     * …)` made it one shaft — so a phone drew shaft A of Chancery House's six with three quarters
+     * of the canvas blank beside it, on every building in the game.
+     */
+    expect(asShipped(360, 2).columns).toHaveLength(2);
+    expect(asShipped(360, 6).columns).toHaveLength(6);
+    expect(asShipped(360, 6).hiddenShaftCount).toBe(0);
+    // And a building that genuinely does not fit still says so rather than being cropped in
+    // silence — RS-05 is unchanged, it just no longer fires on a six-car bank.
+    expect(asShipped(360, 35).columns.length).toBeGreaterThan(1);
+    expect(asShipped(360, 35).hiddenShaftCount).toBeGreaterThan(0);
+  });
+
+  it('never lets the gutters take more than their share, at any width', () => {
+    for (const width of [200, 360, 420, 500, 606, 766, 1232, 1872]) {
+      const built = asShipped(width, 6);
+      const inner = width - 2 * built.paddingPx;
+      expect(built.plot.width / inner, `plot share at ${String(width)}`).toBeGreaterThanOrEqual(
+        0.449,
+      );
+    }
+  });
+
+  it('is inert at desktop widths — no picture that fitted has moved', () => {
+    // The clamp is a floor, not a redesign. At 1232 px (a 1920 × 1080 window) the shipped request
+    // already leaves the plot 49 % of the canvas, so the gutters come through untouched.
+    const wide = asShipped(1232, 6);
+    expect(wide.plot.x).toBe(12 + 72);
+    expect(wide.plot.width).toBe(1232 - 24 - 72 - 280 - 250);
+  });
+
+  it('spends the air between shafts before it spends a shaft', () => {
+    /*
+     * Issue #41: Vertical City's thirty-five cars against a 1 232 px canvas. At the roomy 10 px
+     * gap, 36 % of the plot's width is air at exactly the moment there is not enough of it.
+     *
+     * The counts are asserted as *improvements* rather than pinned, because the exact number is a
+     * function of four constants and pinning it would make this a transcription. What must hold is
+     * the direction and the invariant under it: no shaft is ever narrower than the legible
+     * minimum, so this buys shafts out of the gaps and never out of legibility.
+     */
+    const crowded = asShipped(1232, 35);
+    expect(crowded.columns.length).toBeGreaterThan(22);
+    expect(crowded.columns[0]?.width ?? 0).toBeGreaterThanOrEqual(18);
+
+    // A bank that fits keeps the roomy gap: the fallback is a fallback.
+    const roomy = asShipped(1232, 6);
+    const gap = (roomy.columns[1]?.x ?? 0) - (roomy.columns[0]?.x ?? 0) - (roomy.columns[0]?.width ?? 0);
+    expect(gap).toBeCloseTo(10, 6);
+  });
+
   it('finds the row nearest a pixel, for hover and click', () => {
     const row = layout.rows[2];
     if (row === undefined) throw new Error('missing row');
