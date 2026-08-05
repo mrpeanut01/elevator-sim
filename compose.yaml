@@ -4,13 +4,35 @@
 #   docker compose logs -f app
 #   docker compose down              # add -v to discard the database too
 #
-# ## Why this is amd64 on an Apple Silicon machine
+# ## Why this is amd64 on an Apple Silicon machine, measured rather than assumed
 #
 # `platform: linux/amd64` is the point of this file rather than an incidental setting. Azure
-# Container Apps runs amd64, and a dev stack that ran arm64 would be testing a different binary from
-# the one that deploys — the class of difference that only ever shows up in production. It costs
-# emulation overhead on an M-series Mac, which is the right trade for a simulator whose bottleneck
-# is a human clicking things.
+# Container Apps runs amd64, and a dev stack on arm64 would exercise a different binary from the one
+# that deploys — the class of difference that only ever shows up in production, and one this
+# repository has already lost a wave to (§ D196/§ D201).
+#
+# Docker warns that an emulated image "may have slow performance or fail". Both halves were measured
+# on this image, re-simulating `midtown-office` / `rise-and-fall` for 1 800 s, five runs after a
+# warm-up:
+#
+#   | image                    | ms per simulation | AWT              |
+#   |--------------------------|-------------------|------------------|
+#   | amd64 (emulated, = prod) | 239.7             | 733.5578102771   |
+#   | arm64 (native)           | 144.8             | 733.5578102771   |
+#
+# **1.66× slower, and bit-identical to ten decimal places** on AWT, WT95 and TTD alike — a direct
+# confirmation of § D202's finding that this simulator is bit-portable across architectures.
+#
+# So the "may fail" half does not apply here: the production image has **no native addons at all**
+# (`pg`, `@azure/communication-email` and `@azure/identity` are pure JavaScript), and that is where
+# emulation failures come from. The "slow performance" half is real and costs 95 ms on an operation
+# the server performs when verifying a leaderboard submission. The suite does not run in this
+# container — `npm test` runs natively on the host — so nothing in the development loop pays it
+# except a human waiting a sixth of a second longer.
+#
+# If you ever want the native build anyway: `docker compose build --build-arg '' && ...` is not the
+# way — change both `platform:` keys below to `linux/arm64`. Do that for speed on a branch, not for
+# anything whose numbers you intend to trust.
 #
 # ## What differs from production, deliberately
 #
