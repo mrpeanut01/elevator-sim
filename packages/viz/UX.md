@@ -667,11 +667,14 @@ stronger than the static sweep, weaker than a drive, and S9 forbids citing it as
 
 | # | Surface | Requirement | State |
 |---|---|---|---|
-| MU-01 | Main menu | Five destinations, each with a line saying what it is | ✅ test (`screenOf`, driven per screen in the honesty sweep) · ⚠️ mount |
+| MU-01 | Main menu | Six destinations, each with a line saying what it is | ✅ test (`screenOf`, driven per screen in the honesty sweep) · ⚠️ mount |
 | MU-02 | Main menu | Every screen offers a way back, and `back` from anywhere reaches the root | ✅ test (`menu.test.ts`, and the reducer's history is a stack) |
 | MU-03 | Main menu | The menu can be **re-entered** after Start or Campaign | ✅ test (`#open-menu` exists and `ELEMENT_IDS` requires it) · ⚠️ the click path |
 | MU-04 | Main menu | It is drawn as an overlay above the drawer, and scrolls on a short viewport | ✅ test (every emitted class has a rule; `z-index` > the drawer's) · ⚠️ appearance |
 | MU-05 | Campaign screen | Says which of the two things called Campaign this is, and selects the surface | ✅ test · ⚠️ mount |
+| MU-06 | Campaign screen | **Keep going** opens an endless week: day one, the same growth and events, nothing banked | ✅ test (`enterEndless.test.ts` — the day loop measured on the legs, and `closeDay` banking nothing) · ⚠️ mount |
+| MU-07 | Coach ribbon | Names which of the three kinds of week it is over — a scenario, endless, or a building the reader drew | ✅ test (`weekLabel.test.ts`; two of the three branches were **unreachable** before it) · ⚠️ mount |
+| MU-08 | Coach ribbon | A saved week that could not be restored is explained, and a first visit is not | ✅ test (`persist/notice.test.ts`, driven by the honesty sweep through the real loader) · ⚠️ placement, and see `GAPS.md` § 3 |
 | FP-01 | Free play | Six axes, every one derived from `data/` rather than listed | ✅ test (`catalogue.test.ts`, both directions) |
 | FP-02 | Free play | Start is disabled **and explained** on a broken selection, with every reason at once | ✅ test (`freePlayIssues`, driven whole and broken in the honesty sweep) |
 | FP-03 | Free play | Start actually runs the selection | ✅ test (`enterFreePlay.test.ts`, compared on the legs) |
@@ -687,10 +690,24 @@ stronger than the static sweep, weaker than a drive, and S9 forbids citing it as
 | AC-02 | Account | An unconfirmed account is shown as playable, with what is still gated | ✅ test (`postingRefusal`, both arms driven) |
 | AC-03 | Account | The password is a real `password` input, cleared on mode change, never in `localStorage` | ✅ test (`account.ts`) · ⚠️ the input type |
 | AC-04 | Account | With no server configured, the screen says there is none rather than drawing a dead form | ✅ test |
+| CH-01 | Challenge | One axis — the dispatcher — and the screen says the rest is the server's | ✅ test (`screenOf`, driven in the honesty sweep on the arm that carries the most prose) · ⚠️ mount |
+| CH-02 | Challenge | The window is **drawn, never computed**: state and both durations come from the server | ✅ test (`challenge.test.ts` asserts no clock is read, lexically over the module's own source) |
+| CH-03 | Challenge | Every seed is run before anything is posted, and a partial set is refused with a reason | ✅ test (`challengeSubmissionOf`, one refusal per branch) |
+| CH-04 | Challenge | Posting is refused for four distinct reasons and never a collapsed one | ✅ test (`screenOf`, each arm driven) · ⚠️ mount |
+| CH-05 | Challenge | Every row shows the count it was computed over, and the four metrics are never blended | ✅ test (server-side, `challenge.test.ts`; the note travels in the body and is rendered unrewritten) · ⚠️ mount |
+| CH-06 | Challenge | Compare is reachable from the board, with the sentence saying why it answers what the board cannot | ✅ test (the `compare` pointer is on every board response) · ⚠️ mount |
+| SE-01 | Selector | The three policies, the six scalars and the five arms, each refused **beside the control** when the run will not read it | ✅ test (`selectorEditor.test.ts`, `selectorSpec.test.ts`) · ⚠️ mount |
+| SE-02 | Selector | Every control moves the legs, and the ones that do not at the default cell name their own cell and the reason | ✅ test (§ D177, `selectorEditor.test.ts`; three are findings about the shipped calibration) |
+| SE-03 | Selector | The panel is **not offered** when the library declares no patterns, with the reason in its place | ✅ test (`selectorAvailability`, both arms driven) · ⚠️ mount |
+| SE-04 | Selector | No string implies switching helps — the learned selector was refused three times | ✅ test (lexical scan in `selectorSpec.test.ts`, plus the generic honesty sweep) |
 
 **What this section does not yet cover, said rather than left to be noticed:** focus order within a
-screen, the appearance of a disabled row's reason, and whether the overlay traps focus. All three
-need a browser, and all three belong to § 26's list the day one exists.
+screen, the appearance of a disabled row's reason, whether the overlay traps focus, and — added with
+the light mode — whether the two palettes are *legible* rather than merely distinct. The first three
+need a browser. The fourth needs an eye: `render/theme.test.ts` asserts a contrast floor and
+partition preservation arithmetically, which is what can be checked without one, and nothing in this
+repository has seen the light palette rendered. All four belong to § 26's list the day a browser
+exists.
 
 ---
 
