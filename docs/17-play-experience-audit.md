@@ -287,13 +287,27 @@ avoid it is that the number is spent before the week and never displayed as an o
 
 ---
 
-## 5. Open findings this wave did not close
+## 5. Findings, and where each stands
+
+**Five of the seven are closed** — 1, 3, 4, 6 and 7 — and each is struck through with what closed it
+rather than deleted, because a finding that quietly disappears is indistinguishable from one nobody
+looked at again. What is left is a naming judgement the handoff should settle (2) and a label whose
+*meaning* nobody has decided (5).
 
 Each is a real thing found by walking the product, left with an owner rather than absorbed.
 
-1. **The Day report is shaped like a day of a week even in free play.** It names a scenario and a
-   banked count on a run banking nothing. The lines are individually honest; the sheet is the wrong
-   shape.
+1. ~~**The Day report is shaped like a day of a week even in free play.**~~ **Closed.**
+   `ShapedDayReport` is two shapes with one core: a single run drops the week's five statements —
+   the streak line, the contract line, the cleared banner, the forecast and *what this taught* — and
+   adds a title of its own, two meta lines naming the selection, an attempt line worded *at this
+   selection* rather than *at this day*, and the sentence *one run, not part of a week*. The half
+   worth stating is what is **shared**: the figure grid, the diagnosis, the levers and the small
+   print are the same values on both sheets rather than two lists that agree today, because nothing
+   about which figures may be published changes with the subject.
+
+   `DayReportInput.subject` is **required**, which is the fix rather than a detail: the defect was a
+   caller that inferred a week from *there is no contract*, and a required field is a caller that
+   has to say.
 2. **Two surfaces called Campaign, and a third called Scenarios** — **half closed, and the half that
    is left is a judgement rather than a bug.** The batch tab is relabelled **Lab** with its id
    unchanged, so the two unrelated *modes* no longer wear one word, and the whole deviation is now
