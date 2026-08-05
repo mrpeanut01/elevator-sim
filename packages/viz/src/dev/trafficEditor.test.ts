@@ -44,6 +44,7 @@ import {
   previewSegmentsOf,
   previewTemplateOf,
   previewTicksOf,
+  useThisPatternStateOf,
 } from './trafficEditor.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
@@ -324,6 +325,25 @@ describe('mean group size is not decoration — the standing requirement, issue 
     expect(alone).not.toHaveLength(0);
     expect(crowds).not.toHaveLength(0);
     expect(JSON.stringify(crowds)).not.toBe(JSON.stringify(alone));
+  });
+
+  it('offers a way to run what is on screen — issue #65', () => {
+    /*
+     * The panel's verbs were **Close** and **Save as a new pattern**, so a reader who had moved four
+     * sliders had to know that filing also selects. Three states, and the label says which.
+     *
+     * `'building'` is the state worth being careful about: it is not an id in `savedPatterns`, it is
+     * *the building's own traffic profile*, and it is the demand every published figure here was
+     * measured under. A reader sitting on it, having changed nothing, is already running what the
+     * editor shows — so the control goes off rather than offering to select something that has no
+     * entry to select.
+     */
+    const source = specFromTrafficProfile(RESOURCES.trafficProfiles, 'office-standard');
+    expect(useThisPatternStateOf(source, source, 'building', 'building')).toBe('alreadyDriving');
+    expect(
+      useThisPatternStateOf({ ...source, ratePctPop5min: 21 }, source, 'building', 'building'),
+    ).toBe('saveFirst');
+    expect(useThisPatternStateOf(source, source, 'building', 'pat-1')).toBe('select');
   });
 
   it('and it moves in the direction the model says it should', () => {

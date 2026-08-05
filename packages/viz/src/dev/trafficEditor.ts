@@ -72,7 +72,13 @@ import {
 } from '../authoring/patternSpec.js';
 import { DAY_START_S, PHASE_PALETTE, QUIET_PALETTE, hhmm } from '../live/timeline.js';
 
-import { sliderHandlesOf, nextSavedId, updateSliderRow, type SliderHandles } from './dispatcherEditor.js';
+import {
+  sliderHandlesOf,
+  nextSavedId,
+  updateSliderRow,
+  type RunThisState,
+  type SliderHandles,
+} from './dispatcherEditor.js';
 import { chipRow, el, fill, setHidden, setText, slider, toggle } from './dom.js';
 import type { BrowserResources } from './data.js';
 import type { TrafficEditorElements } from './elementMap.js';
@@ -400,6 +406,65 @@ export function sourcePatternOf(resources: BrowserResources, state: ViewerState)
 }
 
 /* -------------------------------------------------------------------------- *
+ * "Use this pattern" — the verb the editor did not have (issue #65)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the *use this* control should do — `dispatcherEditor.ts`'s {@link RunThisState} for a demand
+ * pattern, and the same three states for the same reason.
+ *
+ * The one difference is what *already driving* means. `ViewerState.pattern` carries `'building'` for
+ * **the building's own traffic profile**, which is not an id in `savedPatterns` and is the case
+ * every published figure in this repository was measured under. So a reader sitting on the
+ * building's own demand, having changed nothing, is already running what the editor shows, and the
+ * button must say that rather than offer to select a pattern that does not exist as an entry.
+ *
+ * Prose-free and exported, with the copy in the mount, for the reason
+ * {@link runThisDispatcherStateOf} states: an exported label would be a new unclassified surface in
+ * `honesty/derive`.
+ */
+export function useThisPatternStateOf(
+  spec: PatternSpec,
+  source: PatternSpec,
+  runningPatternId: string,
+  editingPatternId: string,
+): RunThisState {
+  if (patternIsDirty(spec, source)) return 'saveFirst';
+  return editingPatternId === runningPatternId ? 'alreadyDriving' : 'select';
+}
+
+/*
+ * The *use this* copy. Module-private, as `dispatcherEditor.ts`'s `RUN_THIS_COPY` is.
+ *
+ * `already-driving` is worded for this panel rather than borrowed, because the state means something
+ * specific here: `ViewerState.pattern` carries `'building'` for **the building's own traffic
+ * profile**, which is not an entry in `savedPatterns` and is the demand every published figure in
+ * this repository was measured under. Saying *already running* over that is the accurate sentence.
+ */
+const USE_THIS_COPY: Readonly<
+  Record<RunThisState, { readonly label: string; readonly title: string }>
+> = Object.freeze({
+  saveFirst: Object.freeze({
+    label: 'Save it and use it',
+    title:
+      'Files this as a pattern of your own and points the shift at it, then runs the day again. A ' +
+      'pattern that has not been saved cannot drive the run: the shift resolves demand by id.',
+  }),
+  alreadyDriving: Object.freeze({
+    label: 'Already running',
+    title:
+      'The shift is already on the demand shown here. Move a slider to make a pattern of your own ' +
+      '— leaving it alone is what keeps a run comparable with this project’s published figures.',
+  }),
+  select: Object.freeze({
+    label: 'Use this pattern',
+    title:
+      'Points the shift at the pattern shown here and runs the day again on the same building ' +
+      'and seed.',
+  }),
+});
+
+/* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
 
@@ -429,7 +494,37 @@ export function mountTrafficEditor(
     context.openTab('run');
   });
 
+  /* *Now use this* — issue #65, beside the two verbs that were the whole of the panel's vocabulary. */
+  const useThis = el(doc, 'button', { className: 'primary', attrs: { type: 'button' } });
+  elements.save.parentElement?.append(useThis);
+
+  useThis.addEventListener('click', () => {
+    const at = view;
+    const current = spec();
+    if (at === undefined || current === undefined) return;
+    const action = useThisPatternStateOf(
+      current,
+      sourcePatternOf(at.resources, at.state),
+      at.state.pattern,
+      at.state.editingPatternId,
+    );
+    if (action === 'alreadyDriving') return;
+    if (action === 'saveFirst') {
+      // `save` already points the shift at what it files — see its `pattern: id`, and the comment
+      // there about a pattern the run cannot be pointed at being this repository's own dead seam.
+      savePattern();
+    } else {
+      context.update({ pattern: at.state.editingPatternId });
+      context.openTab('run');
+    }
+    context.runShift();
+  });
+
   elements.save.addEventListener('click', () => {
+    savePattern();
+  });
+
+  function savePattern(): void {
     const at = view;
     const current = spec();
     if (at === undefined || current === undefined) return;
@@ -451,7 +546,7 @@ export function mountTrafficEditor(
     });
     setText(elements.error, '');
     context.openTab('run');
-  });
+  }
 
   /* --- the rows ----------------------------------------------------------- */
 
@@ -599,7 +694,15 @@ export function mountTrafficEditor(
       setText(elements.error, '');
     }
 
-    setHidden(elements.dirty, !patternIsDirty(current, sourcePatternOf(at.resources, state)));
+    const source = sourcePatternOf(at.resources, state);
+    setHidden(elements.dirty, !patternIsDirty(current, source));
+
+    /* The *now use this* verb, relabelled for whichever of the three states the panel is in. */
+    const action = useThisPatternStateOf(current, source, state.pattern, state.editingPatternId);
+    setText(useThis, USE_THIS_COPY[action].label);
+    useThis.title = USE_THIS_COPY[action].title;
+    useThis.disabled = action === 'alreadyDriving';
+
     setText(
       elements.footnote,
       'A shift runs the building’s own traffic profile until you pick or save a pattern here — ' +

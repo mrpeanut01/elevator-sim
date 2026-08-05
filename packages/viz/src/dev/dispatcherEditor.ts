@@ -396,6 +396,83 @@ export function flagLineOf(profile: DispatcherProfile): string {
 }
 
 /* -------------------------------------------------------------------------- *
+ * "Now use this" — the verb the editor did not have (issue #65)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the *run this* control should say and do, given what is on screen.
+ *
+ * Issue #65: *"Having tuned thirteen weight sliders there is no way to run what you just built
+ * without hunting back to the right rail and finding your saved copy."* The panel's only verbs were
+ * **Close** and **Save as a new dispatcher**, and the second only happens to run the result — it is
+ * a filing action that also selects, which is not a thing a reader can be expected to infer.
+ *
+ * Three states, and the label says which one you are in rather than making the reader guess:
+ *
+ * - **the spec differs from the profile it was opened from** — nothing can run an unsaved weight
+ *   vector, because the run resolves a dispatcher by id. So the honest label is *save it and run
+ *   it*, naming both halves of what the press will do.
+ * - **it matches, and is already what is driving** — the button is off and says so. An enabled
+ *   control whose press changes nothing is the defect this repository counts.
+ * - **it matches, and something else is driving** — a plain selection.
+ *
+ * ## Why this returns a state rather than a label
+ *
+ * The copy lives beside the button, in the mount, as a module-private table. `honesty/derive`
+ * classifies every **exported** producer of player-facing prose and requires an adapter in
+ * `honesty/surfaces.ts` for each; the four mounts are excluded there as the DOM half of a split
+ * whose pure half is driven. Returning a label from here would be a new exported prose surface
+ * needing a `surfaces.ts` entry, so the decision is exported prose-free and testable, and the
+ * wording sits where the rest of this panel's wording sits. That is the same move
+ * `TRANSPORT_LANDING_TITLE` makes in `buildingEditor.ts`, for the same reason.
+ *
+ * It is a real limitation and worth saying plainly: copy in a mount reaches the static sweep and
+ * not the driven one. Promoting these three labels into the `EDITORS` adapter would be strictly
+ * better — see this lane's report.
+ */
+export type RunThisState = 'saveFirst' | 'alreadyDriving' | 'select';
+
+export function runThisDispatcherStateOf(
+  spec: DispatcherSpec,
+  source: DispatcherProfile | undefined,
+  runningId: string,
+  editingId: string,
+): RunThisState {
+  // No source means the profile being edited no longer exists — the reader deleted it. There is
+  // nothing to point the run at, so the honest offer is to file it again rather than to select.
+  if (source === undefined || specIsDirty(spec, source)) return 'saveFirst';
+  return editingId === runningId ? 'alreadyDriving' : 'select';
+}
+
+/*
+ * The *now use this* copy. Module-private for the reason stated above, and for the one
+ * `TRANSPORT_LANDING_TITLE` states in `buildingEditor.ts`: an exported string literal here becomes
+ * an unclassified prose surface in `honesty/derive`.
+ */
+const RUN_THIS_COPY: Readonly<
+  Record<RunThisState, { readonly label: string; readonly title: string }>
+> = Object.freeze({
+  saveFirst: Object.freeze({
+    label: 'Save it and run it',
+    title:
+      'Files these weights as a dispatcher of your own and makes it the one driving, then runs the ' +
+      'shift again. A weight vector that has not been saved cannot drive: the run resolves a ' +
+      'dispatcher by id.',
+  }),
+  alreadyDriving: Object.freeze({
+    label: 'Already driving',
+    title:
+      'This is the dispatcher the shift is already running. Move a weight to make it a new one.',
+  }),
+  select: Object.freeze({
+    label: 'Run this dispatcher',
+    title:
+      'Makes the dispatcher shown here the one the shift runs, and runs it again on the same ' +
+      'building, seed and traffic.',
+  }),
+});
+
+/* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
 
@@ -446,6 +523,42 @@ export function mountDispatcherEditor(
 
   elements.save.addEventListener('click', () => {
     save();
+  });
+
+  /*
+   * *Now use this* — issue #65. Built here rather than in `index.html` for the reason the building
+   * editor's confirmation is: it goes in `.editor-actions`, beside the two verbs that were the whole
+   * of the panel's vocabulary, and adding a node is a smaller change than reserving one.
+   */
+  const runThis = el(doc, 'button', {
+    className: 'primary',
+    attrs: { type: 'button' },
+  });
+  elements.save.parentElement?.append(runThis);
+
+  runThis.addEventListener('click', () => {
+    const at = view;
+    const current = spec();
+    if (at === undefined || current === undefined) return;
+    const source = allDispatchers(at.resources, at.state.savedDispatchers).find(
+      (profile) => profile.id === at.state.editingDispatcherId,
+    );
+    const action = runThisDispatcherStateOf(
+      current,
+      source,
+      at.state.dispatcherId,
+      at.state.editingDispatcherId,
+    );
+    if (action === 'alreadyDriving') return;
+    if (action === 'saveFirst') {
+      // `save` already selects what it files — see its `dispatcherId: id`. It also opens the run
+      // tab, which is where a reader who pressed *run it* is going anyway.
+      save();
+    } else {
+      context.update({ dispatcherId: at.state.editingDispatcherId });
+      context.openTab('run');
+    }
+    context.runShift();
   });
 
   function save(): void {
@@ -645,6 +758,17 @@ export function mountDispatcherEditor(
     );
     setText(elements.advice, adviceFor(current));
     setHidden(elements.dirty, !specIsDirty(current, source));
+
+    /* The *now use this* verb, relabelled for whichever of the three states the panel is in. */
+    const action = runThisDispatcherStateOf(
+      current,
+      source,
+      state.dispatcherId,
+      state.editingDispatcherId,
+    );
+    setText(runThis, RUN_THIS_COPY[action].label);
+    runThis.title = RUN_THIS_COPY[action].title;
+    runThis.disabled = action === 'alreadyDriving';
 
     /* Your dispatchers. */
     fill(
