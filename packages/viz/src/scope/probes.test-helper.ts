@@ -169,6 +169,7 @@ export interface ScopeProbe {
 }
 
 const card = (hasMaths: boolean): HonestyCard => ({
+  basis: 'now',
   glyph: '✓',
   title: 'title',
   plain: 'plain',

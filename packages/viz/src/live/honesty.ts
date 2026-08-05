@@ -31,7 +31,7 @@
  *   hundred, and Garden Apartments at `collective`, seed 42 is the measured case: a legitimately
  *   quotable AWT computed over **five** legs.
  *
- * ## Why casual and engineer can disagree about the glyph
+ * ## Why casual and engineer can disagree about the glyph — and where that stopped being true
  *
  * They are answering different questions and the design says so — *casual gets a lever, not a
  * lecture*. Casual asks **is the building coping right now**, which is an observation at the
@@ -39,6 +39,23 @@
  * run. A building that is coping at 04:12 of a run that saturated later shows `✓` to a casual
  * reader and `⚠` to an engineer, and both are true. What neither of them ever does is show a
  * mean.
+ *
+ * **That argument holds for every playhead inside the run and fails at the last one.** *"Is the
+ * building coping right now"* has no useful answer once there is no *now* left: a run that
+ * completes runs on until the last passenger is delivered, so its final frame has an empty lobby by
+ * construction, `fallingBehindAt` is false there whatever happened, and the casual card read
+ * `✓ Comfortably keeping up` over a shift that ended `saturated` with 781 of 1 392 riders past the
+ * 900 s horizon. That is § 4's line crossed — *"Basic mode may hide complexity. It may never hide a
+ * failure"* — and a refused statistic is on § 4's own never-hide list, which `mode/types.ts`'s
+ * `disclosureClassOf` states as `suppression → must-show`. The casual card was the one **mounted**
+ * surface where that clause was not kept.
+ *
+ * So the card takes a {@link WaitBandBasis} like the mood card beside it. On `'now'` nothing has
+ * changed. On `'whole-run'` the casual card answers **did it cope**, which is the run's own verdict
+ * rather than a second opinion about it: the same `meansAreSuppressed` gate the engineer reads, in
+ * casual words. R3's *"Basic mode may shorten the reason; it may not remove it"* is then kept in
+ * both halves — casual shortens the refusal to one sentence, and the verbatim reason is still one
+ * control away behind *show me the maths*. See [`DECISIONS.md` § D239](../../../../DECISIONS.md).
  *
  * ## The prototype's `waiting > 40`, re-sourced
  *
@@ -57,7 +74,7 @@ import { meansAreSuppressed } from '../frame/overlay.js';
 
 import { WAIT_BANDS, waitBandsAt } from './bands.js';
 import { hhmm, timeOfDayAt } from './timeline.js';
-import type { DisclosureMode, HonestyCard } from './types.js';
+import type { DisclosureMode, HonestyCard, WaitBandBasis } from './types.js';
 
 /**
  * `overlayAt`'s own fallback sentence, for a run flagged saturated with no written reason.
@@ -95,23 +112,45 @@ export function fallingBehindAt(recording: VizRecording, simTimeS: SimTime): boo
   return bands.total > offered;
 }
 
-/** The card, at a playhead position, in one of the two disclosure modes. */
+/**
+ * The card, at a playhead position, in one of the two disclosure modes.
+ *
+ * `basis` is the mood card's, and it decides **the casual card only**: `'now'` while the playhead
+ * is inside the run, `'whole-run'` once it has reached the end. The engineer card reads a verdict
+ * about the whole run either way and does not move. The parameter defaults to the live reading so
+ * every caller written before it existed keeps the card it had.
+ */
 export function honestyAt(
   recording: VizRecording,
   simTimeS: SimTime,
   mode: DisclosureMode,
+  basis: WaitBandBasis = 'now',
 ): HonestyCard {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
   const suppressed = meansAreSuppressed(recording);
   const fallingBehind = fallingBehindAt(recording, t);
   const engineer = mode === 'engineer';
-  // Casual reads the playhead; engineer reads the verdict. See the module docstring.
-  const warning = engineer ? suppressed : fallingBehind;
+  const shiftOver = basis === 'whole-run';
+  /*
+   * Casual reads the playhead while there is one, and the run's own verdict once there is not;
+   * engineer reads the verdict throughout. See the module docstring for why the first clause has
+   * two halves rather than one.
+   */
+  const warning = engineer || shiftOver ? suppressed : fallingBehind;
 
   return {
+    basis,
     glyph: warning ? '⚠' : '✓',
-    title: engineer ? engineerTitle(suppressed) : casualTitle(fallingBehind),
-    plain: engineer ? engineerPlain(recording, suppressed) : casualPlain(fallingBehind),
+    title: engineer
+      ? engineerTitle(suppressed)
+      : shiftOver
+        ? closedTitle(suppressed)
+        : casualTitle(fallingBehind),
+    plain: engineer
+      ? engineerPlain(recording, suppressed)
+      : shiftOver
+        ? closedPlain(recording, suppressed)
+        : casualPlain(fallingBehind),
     hasMaths: engineer,
     maths: engineer ? mathsOf(recording, suppressed) : undefined,
     bg: warning ? WARNING_BG : CALM_BG,
@@ -137,6 +176,51 @@ function casualPlain(fallingBehind: boolean): string {
         'or ride out a rough morning and read the post-mortem.'
     : 'Cars are clearing calls faster than people turn up. Push the traffic pattern harder, or ' +
         'bank the shift and take tomorrow.';
+}
+
+/**
+ * The casual card once the shift is over — the design has none, because its card only ran live.
+ *
+ * It answers *did it cope*, and it answers it with the run's own gate rather than with a second
+ * opinion about the run: `meansAreSuppressed` is the one authority on whether this shift's averages
+ * may be quoted (`docs/10` R9), and a casual reader is entitled to the *fact* of a refusal even
+ * though the rule behind it stays behind *show me the maths*.
+ */
+function closedTitle(suppressed: boolean): string {
+  return suppressed ? 'That one got away from you' : 'The lifts kept up today';
+}
+
+/**
+ * The casual sentence for a closed shift.
+ *
+ * The suppressed branch splits the way {@link engineerPlain} splits and for the same measured
+ * reason: *the queues never settled* is true of exactly one of the five grounds `awtIsValid` fails
+ * on, and *the trend test sees a queue still growing at the horizon, the censoring test sees one
+ * that has not cleared by it; neither sees a queue that grew enormously and drained just in time.*
+ * So the saturation wording is used only where saturation fired.
+ *
+ * Neither branch prints a figure. The rail's four stat rows and the mood card beside this one are
+ * head counts and carry the numbers; a second copy of a count here would be a second count.
+ */
+function closedPlain(recording: VizRecording, suppressed: boolean): string {
+  if (!suppressed) {
+    return (
+      'The queues settled, so the shift’s averages are ones the simulator will stand behind. The ' +
+      'counts on this rail are what actually happened; read them beside it.'
+    );
+  }
+  if (recording.summary.saturated) {
+    return (
+      'The queues never settled, so there is no single number for what the wait was — asking for ' +
+      'one would only tell you when we stopped watching. Every count on this rail is real; the ' +
+      'average is the thing we are withholding.'
+    );
+  }
+  return (
+    'This shift does not pass every check an average has to pass, so the simulator withholds the ' +
+    'average rather than printing one you could not lean on. Every count on this rail is real; ' +
+    'switch to Engineer for the rule that refused it.'
+  );
 }
 
 /** The design's engineer strings, re-keyed onto the flag that actually decides. */
