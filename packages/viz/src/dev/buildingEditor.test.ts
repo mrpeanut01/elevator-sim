@@ -37,6 +37,8 @@ import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { SANDBOX_CONTRACT_ID } from '../shift/week.js';
 
 import {
+  SHAFT_LEFT_PX,
+  elevationStageWidthPx,
   CAPACITY_TICK_PCT,
   OCCUPANCY_MAX_PCT,
   accessMatrixOf,
@@ -822,6 +824,137 @@ describe('the escalator note', () => {
     // A machine the tower has outgrown is counted as unwritten, which is what the reader needs to
     // know: it is declared in the editor and absent from the run.
     expect(transportNoteOf({ ...LOBBIES, floors: 4 })).toMatch(/1 of 2 escalators written/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Adding a shaft changes the picture — issue #52
+ * -------------------------------------------------------------------------- */
+
+/**
+ * *Move the control and require the drawing to change*, which is the elevation's form of the rule.
+ *
+ * The report: adding four shafts took the building from 4 to 8, the summary line correctly said
+ * `8 shafts in 1 bank`, and *"the grid still shows only the same clipped sliver."* The cause is that
+ * `.elev-shaft` is `flex: 1; min-width: 0` inside a stage pinned at `min-width: 400px`, so the bars
+ * divided a fixed column between them — the picture could not grow, only subdivide.
+ *
+ * The elevation is the surface whose own instruction line says *"drag a shaft's top or bottom edge
+ * to restrict it to a band of floors"*, so a bar too thin to put a pointer on is a documented
+ * interaction that is not offered.
+ */
+describe('the elevation makes room for the shafts it is told to draw — issue #52', () => {
+  it('grows the stage as shafts are added, rather than subdividing a fixed column', () => {
+    const widths = [1, 2, 4, 8, 12].map((cars) => elevationStageWidthPx(cars));
+    // Monotone, and strictly so once the floor is cleared: adding a shaft may never shrink the
+    // picture, and past the floor it must actually widen it.
+    for (let index = 1; index < widths.length; index += 1) {
+      expect(widths[index]).toBeGreaterThanOrEqual(widths[index - 1] as number);
+    }
+    expect(elevationStageWidthPx(12)).toBeGreaterThan(elevationStageWidthPx(4));
+    expect(elevationStageWidthPx(8)).toBeGreaterThan(elevationStageWidthPx(4));
+  });
+
+  it('never goes below the width the fixed columns need', () => {
+    // A one-shaft building must still lay out FLOOR, SKY, OCCUPIED and PEOPLE.
+    expect(elevationStageWidthPx(1)).toBeGreaterThanOrEqual(400);
+    expect(elevationStageWidthPx(0)).toBeGreaterThanOrEqual(400);
+    expect(elevationStageWidthPx(-3)).toBeGreaterThanOrEqual(400);
+  });
+
+  it('leaves every shaft a bar wide enough to put a pointer on', () => {
+    /*
+     * The property that matters, stated as the geometry rather than as a number: whatever the shaft
+     * count, the stage must hold that many bars at the minimum width, their gaps, and the fixed
+     * columns to their left. `35` is the largest shipped car count (Vertical City), so the ceiling
+     * the editor's own `cars` slider allows is comfortably inside what this covers.
+     */
+    for (const cars of [1, 2, 4, 8, 12, 35]) {
+      const room = elevationStageWidthPx(cars) - SHAFT_LEFT_PX - 8;
+      const perShaft = (room - (cars - 1) * 6) / cars;
+      expect(perShaft, `${String(cars)} shafts get ${perShaft.toFixed(1)}px each`).toBeGreaterThanOrEqual(
+        14,
+      );
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Casual view is not a label — issue #43
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The standing requirement pointed at a **disclosure** control.
+ *
+ * *Move the control and require the run to change* has no meaning for the view selector — `mode/`
+ * exists to prove the two modes produce **the same run**, and a disclosure control that changed one
+ * would be a difficulty setting. So the analogue is the one the reporter measured: move it and
+ * require the **rendering** to change. Their finding was that it does not — *"Engineer: innerText
+ * 2936 chars, 2523 elements / Casual: innerText 2936 chars, 2523 elements → byte-for-byte
+ * identical"* — and the cause is that nothing in `buildingEditor.ts` read `state.mode` at all.
+ *
+ * That is this repository's most-repeated defect wearing a different hat. A control that binds
+ * nothing passes every other check here, and the eleven counted instances were all *behaviour* with
+ * no caller; this one is a *control* with no reader. The test that would have caught it is this one.
+ */
+describe('the view selector reaches the building tab — issue #43', () => {
+  const captions = (showFieldPaths: boolean): readonly string[] =>
+    specRowsOf(TOWER, showFieldPaths).map((entry) => entry.sub);
+
+  it('renders different captions in the two modes', () => {
+    // The reporter's measurement, as an assertion: the two modes may not be byte-for-byte identical.
+    expect(captions(true)).not.toStrictEqual(captions(false));
+    expect(captions(false).join('')).not.toBe(captions(true).join(''));
+  });
+
+  it('shows no schema path to a casual reader, and every one to an engineer', () => {
+    /*
+     * `floors[].heightM` and `banks[].cars[]` are the field names of a file the player will never
+     * open. They stay in Engineer, because *name the field it writes* is what keeps a row's claim
+     * checkable — the discipline is right and it was simply pointed at the wrong reader.
+     */
+    for (const caption of captions(false)) {
+      expect(caption, `casual caption "${caption}" leaks a schema path`).not.toMatch(/\[\]/);
+    }
+    const engineer = captions(true).join(' ');
+    expect(engineer).toContain('floors[].heightM');
+    expect(engineer).toContain('banks[].cars[]');
+  });
+
+  it('tells the two occupancy rows apart, which the shared caption did not', () => {
+    /*
+     * Both read `floors[].population = capacity × occupancy` — true of the pair and a description of
+     * neither. *How many desks fit* and *how many are let* are different questions.
+     */
+    const casual = specRowsOf(TOWER, false);
+    const capacity = casual.find((entry) => entry.row.key === 'capacityPerFloor')?.sub;
+    const occupancy = casual.find((entry) => entry.row.key === 'occupancyPct')?.sub;
+    expect(capacity).toBeDefined();
+    expect(occupancy).toBeDefined();
+    expect(capacity).not.toBe(occupancy);
+    expect(capacity).toMatch(/built to hold/);
+    expect(occupancy).toMatch(/let today/);
+  });
+
+  it('gives every row a caption in both modes, so neither is the empty one', () => {
+    for (const showFieldPaths of [true, false]) {
+      const rows = specRowsOf(TOWER, showFieldPaths);
+      expect(rows).toHaveLength(SPEC_ROWS.length);
+      for (const entry of rows) expect(entry.sub.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('lets the over-capacity warning win in both modes — it is not an engineer’s detail', () => {
+    // The building telling a reader it is let past what it was designed for is not a caption about
+    // what the row writes, so the disclosure split does not get to hide it.
+    const overfull: BuildingSpec = { ...TOWER, occupancyPct: 115 };
+    for (const showFieldPaths of [true, false]) {
+      const row = specRowsOf(overfull, showFieldPaths).find(
+        (entry) => entry.row.key === 'occupancyPct',
+      );
+      expect(row?.overCapacity).toBe(true);
+      expect(row?.sub).toContain('over design capacity');
+    }
   });
 });
 

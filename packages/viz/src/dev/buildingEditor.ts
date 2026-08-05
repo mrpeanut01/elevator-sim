@@ -153,6 +153,51 @@ const ROW_MAX_PX = 24;
 /** How tall the scroller is allowed to get before the rows start scrolling inside it. */
 const BODY_MAX_PX = 420;
 
+/**
+ * The narrowest a shaft bar may be drawn — issue #52.
+ *
+ * The grid's own instruction line says *"drag a shaft's top or bottom edge to restrict it to a band
+ * of floors"*, which is how a player creates zoning. `.elev-shaft` is `flex: 1; min-width: 0`, so
+ * the bars divided a **fixed** column between them: four shafts got about 24 px each, and pressing
+ * *add a shaft* four more times took them to about 13 px. The list below correctly said `8 shafts in
+ * 1 bank` and the picture did not change, so the editor appeared to stop responding at exactly the
+ * point a player started doing something ambitious.
+ *
+ * 14 px is two grip targets plus the band border — narrow, but a thing you can see and put a pointer
+ * on. Below that the drag the instruction names is not offerable, so the stage grows instead and
+ * `.elevation-body`'s existing `overflow: auto` carries it.
+ */
+const SHAFT_MIN_PX = 14;
+
+/** The gap `.elev-shafts` puts between bars. Mirrors the stylesheet's `gap: 6px`. */
+const SHAFT_GAP_PX = 6;
+
+/** What `.elev-shafts` leaves at the right-hand end. Mirrors the stylesheet's `right: 8px`. */
+const SHAFT_RIGHT_PX = 8;
+
+/** The stage's floor width, below which the fixed columns stop fitting. */
+const STAGE_MIN_PX = 400;
+
+/**
+ * How wide the elevation's content box has to be for this many shafts — issue #52.
+ *
+ * Exported and pure because it is the whole of the fix and the thing worth asserting: **adding a
+ * shaft has to make the picture bigger.** It could not before, because the stage was a flat
+ * `min-width: 400px` and the bars shared whatever the container happened to leave.
+ *
+ * The three constants below it mirror `.elev-shafts`'s and `.elev-shaft`'s own geometry in
+ * `index.html`. That duplication is real and is called out rather than hidden: this lane does not
+ * own the stylesheet, and a width computed here that disagreed with the rule there would draw bars
+ * that overlap the PEOPLE column. See this lane's report for the rule that would remove it.
+ */
+export function elevationStageWidthPx(carCount: number): number {
+  const bars = Math.max(0, carCount);
+  if (bars === 0) return STAGE_MIN_PX;
+  const needed =
+    SHAFT_LEFT_PX + SHAFT_RIGHT_PX + bars * SHAFT_MIN_PX + (bars - 1) * SHAFT_GAP_PX;
+  return Math.max(STAGE_MIN_PX, needed);
+}
+
 /** Row height for a given floor count: as tall as fits, within the readable band. */
 export function elevationRowHeightPx(rowCount: number): number {
   if (rowCount <= 0) return ROW_MAX_PX;
@@ -200,6 +245,64 @@ export function specFieldOf(key: SpecRow['key']): string {
   }
 }
 
+/**
+ * The same five rows captioned for a reader who has not opened the JSON — issue #43.
+ *
+ * ## Two defects, one cause
+ *
+ * The report is that every caption on the flagship authoring surface is a **schema path**
+ * (`floors[].heightM`, `banks[].cars[]`), and that **Casual view changes nothing on this tab** —
+ * measured byte for byte, 2 936 characters and 2 523 elements in both modes.
+ *
+ * They are the same defect. `specFieldOf` was written under this repository's real and load-bearing
+ * discipline — *name the field it writes*, so the row's claim is checkable and cannot drift into
+ * decoration — and that discipline is why the path is there. But it answers a question **an
+ * engineer** has, and the mode selector exists precisely to say which reader is being served. The
+ * path was shown to both because nothing on this tab had ever asked which one was looking.
+ *
+ * So: **Engineer keeps the field path, unchanged.** Casual gets the unit, the range and the
+ * consequence — which is what the issue asks for, and what the row's own `help` has always said at
+ * length. Nothing is deleted; the checkable claim is one mode away rather than absent.
+ *
+ * ## The two occupancy rows are now told apart
+ *
+ * `capacityPerFloor` and `occupancyPct` both read `floors[].population = capacity × occupancy`,
+ * which is true of the pair and describes neither. *How many desks fit* and *how many are let* are
+ * different questions and now carry different captions.
+ */
+function playerFieldOf(key: SpecRow['key']): string {
+  switch (key) {
+    case 'floors':
+      return 'Served floors, not counting the lobby. Every extra floor is another possible stop.';
+    case 'floorHeightM':
+      return 'Slab to slab — about 3.6 m in an office, 3.0 m in flats. Taller floors, longer trips.';
+    case 'capacityPerFloor':
+      return 'How many people the floor was built to hold. This is the number the lifts were sized for.';
+    case 'occupancyPct':
+      return 'How much of that capacity is let today. This is the number the lifts actually carry.';
+    case 'cars':
+      return 'Lifts answering as one group. The most expensive thing in the building.';
+  }
+}
+
+/**
+ * Which caption a row shows.
+ *
+ * A boolean rather than a `DisclosureMode`, deliberately: the disclosure split in `src/mode/` is
+ * another lane's this wave, and a caption choice does not need to import a vocabulary that is being
+ * revised. `mountBuildingEditor` reads `state.mode === 'advanced'` and passes the answer.
+ *
+ * **Module-private, with {@link playerFieldOf}.** `honesty/derive` requires a `surfaces.ts` adapter
+ * for every *exported* producer of player-facing prose, and that file is outside this lane. Both
+ * reach the sweep through {@link specRowsOf}, which the `EDITORS` adapter already covers by name —
+ * strictly better than an exclusion, since the captions are swept rather than waived. What the
+ * adapter seeds is `specRowsOf`'s **default** arm, so the engineer captions are driven and the
+ * casual ones are not yet; see this lane's report for the one-line widening.
+ */
+function specSubOf(key: SpecRow['key'], showFieldPaths: boolean): string {
+  return showFieldPaths ? specFieldOf(key) : playerFieldOf(key);
+}
+
 export interface SpecRowView {
   readonly row: SpecRow;
   readonly heading: string;
@@ -213,7 +316,21 @@ export interface SpecRowView {
   readonly track: string;
 }
 
-export function specRowsOf(spec: BuildingSpec): readonly SpecRowView[] {
+/**
+ * The five rows, captioned for whichever reader is looking.
+ *
+ * `showFieldPaths` defaults to `true` so every existing caller — and every existing assertion —
+ * keeps the engineer's caption it was written against. The mount passes the mode; see
+ * {@link specSubOf}.
+ *
+ * The over-capacity note wins over both, in both modes. It is not a caption about what the row
+ * writes, it is the building telling the reader it is let past what it was designed for, and that
+ * is not an engineer's detail.
+ */
+export function specRowsOf(
+  spec: BuildingSpec,
+  showFieldPaths = true,
+): readonly SpecRowView[] {
   let group = '';
   return SPEC_ROWS.map((row): SpecRowView => {
     const heading = row.group === group ? '' : row.group;
@@ -225,7 +342,7 @@ export function specRowsOf(spec: BuildingSpec): readonly SpecRowView[] {
       heading,
       raw,
       value: formatSpecValue(spec, row),
-      sub: over ? overCapacityNote(spec) : specFieldOf(row.key),
+      sub: over ? overCapacityNote(spec) : specSubOf(row.key, showFieldPaths),
       subColor: over ? 'var(--over)' : 'var(--faint)',
       overCapacity: over,
       track: specTrackOf(spec, row),
@@ -1084,10 +1201,17 @@ const TRANSPORT_TRANSFER_TITLE =
 const TRANSPORT_BLOCKED_TITLE =
   'The other landing already stands here. The loader refuses a connection whose two ends name one floor — a machine that starts and ends on the same floor moves nobody.';
 
+/*
+ * Issue #43 § 4: this said *"core’s own semantics"* — `core` is a source package and means nothing to
+ * a player — and *"what four of the five shipped buildings declare"*, which was wrong in both halves.
+ * Eight buildings ship and **three** of them declare no access zone. The count is dropped rather than
+ * corrected: it told a player nothing they could act on, and a hand-written tally over `data/` is a
+ * number that goes stale the next time a building lands. See § D230.
+ */
 const MATRIX_EMPTY =
-  'No access zone, so every floor is open to every credential — core’s own semantics for a floor no ' +
-  'zone covers, and what four of the five shipped buildings declare. Add a zone to restrict the ' +
-  'floors it names; every floor outside it stays unrestricted.';
+  'No access zone, so every floor is open to every credential — that is what a floor no zone covers ' +
+  'means, here and in the run. Add a zone to restrict the floors it names; every floor outside it ' +
+  'stays unrestricted.';
 
 const MATRIX_LEGEND =
   'A row is a floor, a column is a credential group. ● this group opens the floor · ▩ it does not · ' +
@@ -1554,7 +1678,9 @@ export function mountBuildingEditor(
         position: 'relative',
         height: `${String(rows.length * rowHeight)}px`,
         'min-height': '160px',
-        'min-width': '400px',
+        // Grows with the shaft count, so `.elevation-body`'s `overflow: auto` gives the reader the
+        // bars the instruction line tells them to drag. See `elevationStageWidthPx` — issue #52.
+        'min-width': `${String(elevationStageWidthPx(cars.length))}px`,
       },
     });
 
@@ -1745,7 +1871,13 @@ export function mountBuildingEditor(
     }
 
     carNodes.set(car.car, { band, label, gripTop, gripBottom });
-    return el(doc, 'div', { className: 'elev-shaft', children: [band] });
+    return el(doc, 'div', {
+      className: 'elev-shaft',
+      // Beats `.elev-shaft`'s `min-width: 0`, which is what let the bars shrink to a sliver as the
+      // reader added shafts. The stage is widened to match — `elevationStageWidthPx`, issue #52.
+      style: { 'min-width': `${String(SHAFT_MIN_PX)}px` },
+      children: [band],
+    });
   }
 
   function drawElevation(current: BuildingSpec): void {
@@ -2112,7 +2244,13 @@ export function mountBuildingEditor(
     setText(elements.editing, `Editing — ${current.name}`);
     if (elements.name.value !== current.name) elements.name.value = current.name;
 
-    drawSpecRows(specRowsOf(current));
+    /*
+     * The mode reaches this tab — issue #43. It did not before: nothing in this file read
+     * `state.mode`, so the selector the product offers as *the* way to hide complexity was inert on
+     * the most complex authoring surface it has. Casual gets the unit, the range and the
+     * consequence; Engineer keeps the field path the row writes.
+     */
+    drawSpecRows(specRowsOf(current, state.mode === 'advanced'));
     setText(elements.occupancy, occupancyLine(current));
 
     /* Machine class. */
