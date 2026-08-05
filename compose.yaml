@@ -1,0 +1,77 @@
+# Dev/test: the same image production runs, on the same architecture, against a real PostgreSQL.
+#
+#   docker compose up -d --build     # http://localhost:8787
+#   docker compose logs -f app
+#   docker compose down              # add -v to discard the database too
+#
+# ## Why this is amd64 on an Apple Silicon machine
+#
+# `platform: linux/amd64` is the point of this file rather than an incidental setting. Azure
+# Container Apps runs amd64, and a dev stack that ran arm64 would be testing a different binary from
+# the one that deploys — the class of difference that only ever shows up in production. It costs
+# emulation overhead on an M-series Mac, which is the right trade for a simulator whose bottleneck
+# is a human clicking things.
+#
+# ## What differs from production, deliberately
+#
+# `NODE_ENV` is set to `development` **explicitly**, overriding the `production` the image itself
+# declares, so `bootstrap` selects the outbox mailer and confirmation links land in a file inside
+# the container instead of being emailed. That is the supported development path, not a shortcut:
+# the outbox exists so the registration flow can be driven end to end with no domain, no credential
+# and no network.
+#
+# The override has to be written down because the image defaults the other way, and the first
+# version of this file left it out — the container refused to start, correctly, saying the dev
+# mailer writes confirmation links to a file in the clear. That refusal is `bootstrap.ts`'s and it
+# was right; production configures a real mailer through `infra/azure/main.bicep`.
+#
+# The database password below is a development credential in a file that is committed, which is
+# exactly what it looks like. Nothing it protects leaves this machine, and the production password
+# is generated at deploy time and never written down — see `infra/README.md` § 3.
+
+name: elevator-sim
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: elevator_sim
+    ports:
+      # Exposed so you can psql into it while the stack is up. Bound to loopback only.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `app` waits on this rather than on the container merely existing. PostgreSQL accepts
+      # connections a second or two after the process starts, and a server that raced it would fail
+      # its first query and look like a bug in the store.
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d elevator_sim']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
+    ports:
+      - '8787:8787'
+    environment:
+      # Overrides the image's own `production`. Without this the server refuses to start, because
+      # the only mailer available here is the one that writes confirmation links to a file.
+      NODE_ENV: development
+      ELEVATOR_SIM_DB: postgres://postgres:devpass@db:5432/elevator_sim
+      # 32-character floor, and this one says what it is. `requireSecret` refuses anything shorter;
+      # it has no default precisely so a value like this cannot reach production by being forgotten.
+      ELEVATOR_SIM_SECRET: development-only-signing-secret-not-for-production
+      ELEVATOR_SIM_ORIGIN: http://localhost:8787
+      ELEVATOR_SIM_OUTBOX: /tmp/outbox.jsonl
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
