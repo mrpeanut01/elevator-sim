@@ -14,11 +14,24 @@ revisited before Phase 0 starts.
 
 **Read this before planning any phase.** The most expensive defect this project has produced is
 not a wrong number. It is a behaviour that is *configurable, unit-tested in isolation, and dead in
-the shipped path* — and it has now happened **ten times in code, plus once in `data/`**. Four were
+the shipped path* — and it has now happened **eleven times in code, plus twice in `data/`**. Four were
 in Phase 5, all four
 simultaneously: `prepositionPlan`, `CapacityReassignmentMonitor`, `createAuctionPolicy` and the
 whole arrival-model predictor were built correctly, exported, weighted by a shipped profile, and
 called by nothing outside their own module.
+
+> **Two more since the count above was last written (2026-08-04/05), and they are the same shape at
+> two different layers.** `BuildingConfig.serviceEvents` — a working mid-run service-mode scheduler,
+> resolved in `config/parse.ts`, applied in `sim/`, tested, and called by **no shipped building** —
+> got its first caller from `shift/incidents.ts`. And `patternSwitching`, the whole weight-set
+> selector library, was **loaded, carried into `SimulationConfig`, resolved by `resolveWeightSets`,
+> and writable by nothing in the viewer**; mounting a five-select editor over it would have been the
+> defect with a control on top of it. Closed by `dispatcherProfilesWithSelector`
+> ([§ D219](../DECISIONS.md)).
+>
+> **The existing ordinals do not move.** *The ninth*, *the eleventh* and the rest name specific
+> instances elsewhere in these documents, and renumbering them would break every reference for the
+> sake of a running total. The total is the sentence above; the ordinals are names.
 
 **The fifth was Phase 7's `tuning/report`, and it is the instructive one** — because it happened
 *after* both guards below were installed, in a module those guards do not audit. Every function in
