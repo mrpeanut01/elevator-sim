@@ -703,7 +703,17 @@ function checkEnergyWaitBlend(
   };
   for (const text of texts) {
     const isNote = text.field.endsWith('.note');
-    const quantitiesOnly = withoutProfileNames(text.text);
+    /*
+     * Stripped **only when both patterns already match**, which is a hot-path decision rather than
+     * a stylistic one: this check runs over every rendered string of every case — 271 985 of them
+     * on the always-on corpus — and thirteen `split`/`join` passes per string is measurable work.
+     * Removing a profile name can only ever turn a match into a non-match, so a string that fails
+     * either pattern unstripped fails it stripped too, and skipping the work changes no verdict.
+     */
+    const quantitiesOnly =
+      ENERGY_QUANTITY.test(text.text) && WAIT_QUANTITY.test(text.text)
+        ? withoutProfileNames(text.text)
+        : text.text;
     if (text.energyAxis === true && !isNote) {
       if (ENERGY_QUANTITY.test(quantitiesOnly) && WAIT_QUANTITY.test(quantitiesOnly)) {
         found.push(

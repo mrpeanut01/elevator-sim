@@ -14418,3 +14418,190 @@ re-running one selection produces the same id. What re-arms the guard is `adopt`
 `filedRunId` on every recording it takes on. The conclusion the docstring draws was right and its
 reason was not, which is the failure mode CLAUDE.md's *"either measure it or say it is unmeasured"*
 paragraph exists for.
+
+## D225 — a batch that resolved to nothing, and the two sentences it was missing
+
+**Date: 2026-08-05.** Play-testers with no knowledge of this project's rules were given the shipped
+build. Four of their reports land on the Compare tab, and three of the four are the same thing from
+different angles: **the tab answers its own question badly, or not at all.**
+
+| Report | Reproduced | What it actually was |
+|---|---|---|
+| #57 — a bare toolbar over a blank panel | yes | `#batch-output` is genuinely empty at mount: 0 child elements, 0 characters |
+| #58 — dispatchers are raw slugs | yes | both Compare pickers, the Lab picker, and every sentence of the results prose |
+| #60 — the default batch answers none of the three wait metrics and repeats a 90-word paragraph three times | yes | one replication in fifty saturates at Chancery House; the three estimate rows each carried a **byte-identical** 624-character note |
+| #59 — no verdict line, and the resolving rows never say who won | **half** | the half that is real is not the half that was reported |
+
+### #59 is the one worth writing down, because the fix it asked for is forbidden
+
+The report asks for *"a one-line verdict at the top … plus per-row wording that names the direction
+(‘eta used 155–652 kJ less than collective’)"*.
+
+CLAUDE.md § Statistical discipline: **never declare one dispatcher better than another without a
+paired-t confidence interval that excludes zero.** This project has refused its own learned-control
+feature three separate times on that ground (§§ D145, D156, D162). A verdict line that names a
+winner whenever the numbers differ is the literature failure mode the rule exists for, and it was
+not built.
+
+But the report is **half wrong about the product**, and measuring which half is what made the fix
+obvious. Driving the shipped default:
+
+- The rows the tester wanted a winner on are `drive work (proxy)` and `drive work per ride
+  delivered` — both class **`axis`**. R11 forbids naming a winner on those *however* the interval
+  falls, because `nearest-car` sits on the Pareto front at six of eight matrix cells precisely
+  because it carries fewer people. The suggested wording is the one thing that row may never say.
+- The rows that genuinely `resolve` **already name the arm ahead**, in the sentence, and always
+  have: *"— the Minimum estimated wait arm is the one that came out ahead on this row"*. The default
+  batch produced none, so the tester never saw one.
+
+So the complaint decomposes into two real defects and one impossible request:
+
+1. **No roll-up.** Eight metric rows and twelve goal rows with nothing that stitches them together.
+2. **An axis row left its sign as arithmetic homework.** *"differed … by −651.8 kJ to −155.5 kJ"* and
+   stop. To learn which arm drove less you had to notice the interval was negative and work out
+   which arm was the subject of the subtraction — while the rows that resolved to *nothing* were the
+   ones written in plain English. The tab explained its non-answers and left its measurements in
+   sign notation.
+3. ~~Name a winner on an axis row.~~ Refused.
+
+### What was built instead
+
+**`BatchOutcomeSummary` counts and routes.** It reports how many measures separated the two settings
+and *which*, and never which arm — the row does that, under a gate the summary does not re-derive.
+Every field is read off a `BatchComparisonRow.verdict` that `compareMetric` already decided, so the
+object is **strictly weaker than the rows it summarises** and cannot assert an ordering they did not
+license. `report.test.ts` asserts both halves: that it names the measures, and that no arm is ever
+put ahead of another in it. On the shipped default it reads:
+
+> Minimum estimated wait against Conventional collective, over 50 runs on the same passengers. Of 8
+> measures, 3 came back with an interval containing zero, which is no difference this batch can
+> resolve — …; 3 could not be compared at all — …; 2 are energy axes, shown and never ranked — ….
+
+**An axis row states the sign in words and refuses the ranking in the same sentence.** Which figure
+is lower is a *measurement*; calling it the better one is a *claim*, and R11 forbids the second. The
+word withheld is the second one, and the sentence says so rather than leaving the refusal to a note
+a reader can quote apart from it — § D171's shape, applied to R11.
+
+### The remedy, and why the obvious one is wrong for half of it
+
+#60's *"suggests no remedy"* is the sharper half of that report, and the obvious answer is
+**backwards** for the case it was filed against. CLAUDE.md's 50–200 budget makes *run more
+replications* look like the answer to everything. It is the answer to exactly one of the two ways a
+row goes silent:
+
+- **An interval containing zero** — more replications narrow it. Budget 50–200. Correct.
+- **A suppressed row** — suppression is *complete case*: a row reports an estimate only when **every**
+  paired run stands behind one. At Chancery House one run in fifty saturates, so a hundred
+  replications is expected to lose **two**. More replications make it **more** likely, not less. The
+  lever is the load, and the panel already has it — `demand %pop/5 min` exists for this (§ D158).
+
+`remedyFor` emits whichever applies, and both when both do. What it never suggests is **re-rolling
+the seed until the batch separates**, which is choosing the outcome; the sentence that mentions
+seeds says so in as many words, and a test asserts it.
+
+### R3 shown once rather than three times
+
+The three suppressed rows carried a byte-identical 624-character note, and the arm row carried the
+same saturation quote a fourth time. `dev/batchPanel.ts` already had the rule one level down —
+`firstReason`'s *"R3 requires the reason to be shown; it does not require it fifty times, and a wall
+nobody reads is a worse way of hiding a fact than a blank would be."* The note is now drawn on the
+first row that carries it, and every later row with an **exactly equal** note points at that row by
+name. The dedupe is string equality rather than a similarity somebody tuned, so the two energy rows
+— whose arithmetic genuinely differs — keep both notes. `batch/report.ts` is untouched: the model
+still carries the reason on every row, and what changed is what the screen repeats.
+
+### Two things this does not close
+
+- **The goal rows still print slugs.** `scenario/goalReport.ts` builds its sentence as
+  `` `${arm.dispatcherProfileId}: …` ``. `BatchArmResult` now carries `dispatcherProfileName` beside
+  the id, so the fix is that one substitution — but `src/scenario/` was outside this lane's
+  ownership and was left rather than reached into.
+- **The toolbar's own labels.** `duration` carries no unit, and the demand field's placeholder is the
+  word `profile` in a numeric-looking box. Both are in `packages/viz/index.html`, which this lane did
+  not own; the empty state explains both in prose instead.
+
+### One claim in #57 that does **not** reproduce
+
+*"Cancel is present and looks live before anything is running."* It is not live: `setRunning(false)`
+at mount sets `cancel.disabled = true`, asserted in `dev/compareLab.browser.test.ts`. If it reads as
+live that is a CSS matter, not a behavioural one.
+
+## D226 — a stage that could not be cleared, and a rule that fired on a dispatcher's name
+
+**Date: 2026-08-05.** Two rules changed application here. Both changed because a measurement said the
+rule was pointing at the wrong thing, and neither was weakened to make something pass.
+
+### 1. The Lab no longer opens on a setting against itself
+
+`dev/campaignPanel.ts` selected the stage's own `startingProfileId` as the player's setting.
+**All ten shipped stages start on `collective`**, so the only thing a first-time player could do was
+run `collective` against `collective`: a minute of computation on two arms that are the same system,
+mathematically incapable of clearing the stage, reported afterwards as **"stage not cleared"** — the
+same words a genuine failure gets. The one sentence explaining it lived several screens down the
+left briefing column and read as a tautology (*"'collective' runs the same system as 'collective'"*),
+so the natural conclusions were *I did something wrong* or *this is broken*.
+
+The identical-arms run is W3's own liveness control and is **still available** — a reader is
+entitled to run it. Three things changed around it:
+
+- **The opening setting is derived**: of the shipped profiles `admitProfile` admits on this stage,
+  the one moving the **fewest declared dimensions**, ties to the file's order. Admissibility is not
+  optional — a stage names the dimensions it opens, and a default outside them would land the player
+  on a disabled Run button behind a refusal they did not cause.
+- **Fewest-dimensions was added after driving it.** File order alone opens stage 1 on `nearest-car`,
+  which moves three dimensions at once and is the weakest dispatcher this project ships: the first
+  Lab run went from an unwinnable *0 of 2 goals* to a winnable *0 of 2*, which is honest and teaches
+  nothing. The smallest admissible change is the *change one thing* experiment the tab is built
+  around. On stage 1 that is `eta` — `collective` with its one hard constraint dropped — and the
+  first run now reaches *1 of 2* with a real `beat-the-baseline` result behind it.
+- **The control is reported as a control, and it is read rather than assumed.** When both arms
+  resolve to one profile the headline says so instead of *"stage not cleared"*, and `judgeStage`'s
+  verdict is still printed verbatim beneath it, so nothing is softened. Two identical arms see
+  identical passengers, so every paired difference must be exactly zero: a row that excluded zero
+  would mean the arms did not share a trace or a run is not reproducible, and that is now said in
+  those words rather than rendered as a win.
+
+**Two shipped stages have no admissible alternative at all**, found by walking all ten rather than
+assumed: `stage-8-the-headline-address` and `stage-10-the-bed-and-the-visitor` open dimension sets no
+shipped dispatcher sits inside — stage 8's omits `constraints.noDirectionReversal`, which
+`collective` declares and every alternative moves. On those two the weight editor is not one way to
+play, it is the **only** way, and the status line says that instead of telling a player to change a
+setting that cannot be changed. `dev/compareLab.browser.test.ts` asserts this as a disjunction
+rather than by stage id, so an eleventh stage or a fourteenth profile cannot make it stale silently.
+
+### 2. R11's structural check fired on a dispatcher's display name
+
+`checkEnergyWaitBlend`'s structural clause forbids a string the surface marks as the energy axis from
+also carrying a wait quantity in its **value**. Naming the batch's arms the way the rest of the
+product names them put *Minimum estimated wait* into the value of every energy row, and the honesty
+search reported **21 violations across 11 cases** on sentences that aggregate nothing:
+
+> `in 50 runs, Minimum estimated wait's drive work (proxy) differed from Conventional collective's`
+> `by −651.8 kJ to −155.5 kJ.`
+
+This is `ENERGY_QUANTITY`'s own documented narrowing, on the other axis. That pattern's docstring
+records the first half: a bare `\benergy\b` made every sentence naming `energy-aware` an R11
+violation, and *"a rule that fires on a profile's name is not a rule about combining axes."* The wait
+side had the identical hole, and nothing had walked into it only because the batch report named its
+arms by slug and no slug contains a wait word.
+
+So the shipped display names are removed before either pattern is applied. It is a **derivation from
+`data/dispatcher-profiles.json`**, not an allow-list — a fourteenth profile is covered by the file it
+is authored in — and they are stripped longest-first, because *Conventional collective, en-route
+pickup* contains *Conventional collective*.
+
+**What it costs, stated rather than glossed:** a genuine blend leaning on a profile name to supply
+its wait token — *"kJ per second of Minimum estimated wait"* — would now be missed. That is the same
+trade the energy side already took, and it is falsifiable: `faults.ts#energyScore` still injects
+*"drive work in kJ per second of wait saved"* into an energy-axis value with no profile name in it,
+and the clause must still catch it. It does.
+
+### What this lane found and did not fix
+
+`dev/boot.browser.test.ts` **fails on a machine that has a Chromium**, and did so before this branch
+existed — verified by running it alone against an unmodified copy. It derives its origin from
+`server.httpServer.address()`, which reports 5173 while the server listens on the port
+`vite.config.ts` pins with `strictPort: true`, so every case fails with `ERR_CONNECTION_REFUSED` at a
+port nothing is on. It is invisible in normal runs because the tier skips without
+`ELEVATOR_SIM_CHROMIUM`. The one-line fix is `server.resolvedUrls`, which is what
+`dev/compareLab.browser.test.ts` uses; the file was outside this lane's ownership and was left.
