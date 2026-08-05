@@ -19,24 +19,36 @@
  * back. A preview built from a different override set would be a picture of a run nobody is about
  * to make, which is the whole failure mode § 4.1 exists to prevent.
  *
- * ## Two rows that write nothing, drawn as refusals rather than as sliders
+ * ## One row that writes nothing, drawn as a refusal rather than as a slider
  *
  * `docs/05-roadmap.md`'s standing requirement is *name the non-test caller*, and the version of it
- * that applies to a control is *name the field it writes*. Two rows in `PATTERN_ROWS` cannot:
+ * that applies to a control is *name the field it writes*. One row in `PATTERN_ROWS` cannot:
  *
- * - **`batchMean`** has no field. `SimulationDemandOptions` carries `batchSharesDestination` and no
- *   batch *size*: the mean comes off `data/traffic-profiles.json`'s `batchSize.mean` through
- *   `config.trafficProfiles`, and `demandFromSpec` does not write it. A slider bound to it would
- *   move `PatternSpec.batchMean`, change the summary line, and change no passenger.
  * - **`interfloorShare` under the two-way order.** `demandFromSpec` only writes a
  *   `directionalSplit` when the order declares one, and `two-way` declares none — the lunch
  *   template states the period's own mix, and `planDemand` **refuses** a `directionalSplit`
  *   alongside it rather than letting one win silently. So the row is live under the other two
  *   orders and inert under this one.
  *
- * Both are drawn as named refusals in the reader's register — `docs/10` § 11 W4's pattern, the same
- * one `renderUnsearchable` uses — rather than as controls that look live. What cannot be moved is
+ * It is drawn as a named refusal in the reader's register — `docs/10` § 11 W4's pattern, the same
+ * one `renderUnsearchable` uses — rather than as a control that looks live. What cannot be moved is
  * **said**, never dropped.
+ *
+ * ## `batchMean` was the second such row, and the refusal outlived the defect it described
+ *
+ * The refusal said *"no field of `SimulationDemandOptions` carries it"*, which was true when it was
+ * written and stopped being true in wave 13: `authoring/patternSpec.ts`'s
+ * {@link trafficProfilesWithPattern} widens the traffic file the run resolves against, and
+ * `dev/state.ts`'s `shiftRunConfigOf` calls it on the way to `SimulationConfig.trafficProfiles`.
+ * That is a **named non-test caller**, so the row has been live for as long as the sentence under it
+ * denied it — and the row's own tooltip said so, which is how issue #66 found it: the two
+ * explanations of the same control contradicted each other.
+ *
+ * The standing requirement cuts both ways. A control that writes nothing must say so; a control that
+ * writes something must not claim it writes nothing, because a reader who believes the refusal will
+ * never move the parameter `CLAUDE.md` calls out by name — *passengers arrive in batches, not one at
+ * a time*. `trafficEditor.test.ts` now moves it and requires the **legs** to change, which is the
+ * only form of the claim that cannot go stale the way the sentence did.
  */
 
 import {
@@ -60,7 +72,13 @@ import {
 } from '../authoring/patternSpec.js';
 import { DAY_START_S, PHASE_PALETTE, QUIET_PALETTE, hhmm } from '../live/timeline.js';
 
-import { sliderHandlesOf, nextSavedId, updateSliderRow, type SliderHandles } from './dispatcherEditor.js';
+import {
+  sliderHandlesOf,
+  nextSavedId,
+  updateSliderRow,
+  type RunThisState,
+  type SliderHandles,
+} from './dispatcherEditor.js';
 import { chipRow, el, fill, setHidden, setText, slider, toggle } from './dom.js';
 import type { BrowserResources } from './data.js';
 import type { TrafficEditorElements } from './elementMap.js';
@@ -111,14 +129,15 @@ export interface PatternRowView {
   readonly refusal: string | undefined;
 }
 
-/** What the engine will not read, for a given spec. The list, and the reason for each entry. */
+/**
+ * What the engine will not read, for a given spec. The list, and the reason for each entry.
+ *
+ * **`batchMean` is deliberately not in it** — see the module docstring. It was, on a reason that
+ * had already expired, and an entry added back here would have to name the caller it believes does
+ * not exist.
+ */
 export function inertPatternRows(spec: PatternSpec): Readonly<Record<string, string>> {
-  const out: Record<string, string> = {
-    batchMean:
-      'writes PatternSpec.batchMean, which no field of SimulationDemandOptions carries — the run ' +
-      'reads batchSize.mean off data/traffic-profiles.json. Moving it would change this summary ' +
-      'line and no passenger.',
-  };
+  const out: Record<string, string> = {};
   if (spec.order === 'two-way') {
     out['interfloorShare'] =
       'inert under two-way: the lunch template states the period’s own directional mix, and ' +
@@ -387,6 +406,65 @@ export function sourcePatternOf(resources: BrowserResources, state: ViewerState)
 }
 
 /* -------------------------------------------------------------------------- *
+ * "Use this pattern" — the verb the editor did not have (issue #65)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the *use this* control should do — `dispatcherEditor.ts`'s {@link RunThisState} for a demand
+ * pattern, and the same three states for the same reason.
+ *
+ * The one difference is what *already driving* means. `ViewerState.pattern` carries `'building'` for
+ * **the building's own traffic profile**, which is not an id in `savedPatterns` and is the case
+ * every published figure in this repository was measured under. So a reader sitting on the
+ * building's own demand, having changed nothing, is already running what the editor shows, and the
+ * button must say that rather than offer to select a pattern that does not exist as an entry.
+ *
+ * Prose-free and exported, with the copy in the mount, for the reason
+ * {@link runThisDispatcherStateOf} states: an exported label would be a new unclassified surface in
+ * `honesty/derive`.
+ */
+export function useThisPatternStateOf(
+  spec: PatternSpec,
+  source: PatternSpec,
+  runningPatternId: string,
+  editingPatternId: string,
+): RunThisState {
+  if (patternIsDirty(spec, source)) return 'saveFirst';
+  return editingPatternId === runningPatternId ? 'alreadyDriving' : 'select';
+}
+
+/*
+ * The *use this* copy. Module-private, as `dispatcherEditor.ts`'s `RUN_THIS_COPY` is.
+ *
+ * `already-driving` is worded for this panel rather than borrowed, because the state means something
+ * specific here: `ViewerState.pattern` carries `'building'` for **the building's own traffic
+ * profile**, which is not an entry in `savedPatterns` and is the demand every published figure in
+ * this repository was measured under. Saying *already running* over that is the accurate sentence.
+ */
+const USE_THIS_COPY: Readonly<
+  Record<RunThisState, { readonly label: string; readonly title: string }>
+> = Object.freeze({
+  saveFirst: Object.freeze({
+    label: 'Save it and use it',
+    title:
+      'Files this as a pattern of your own and points the shift at it, then runs the day again. A ' +
+      'pattern that has not been saved cannot drive the run: the shift resolves demand by id.',
+  }),
+  alreadyDriving: Object.freeze({
+    label: 'Already running',
+    title:
+      'The shift is already on the demand shown here. Move a slider to make a pattern of your own ' +
+      '— leaving it alone is what keeps a run comparable with this project’s published figures.',
+  }),
+  select: Object.freeze({
+    label: 'Use this pattern',
+    title:
+      'Points the shift at the pattern shown here and runs the day again on the same building ' +
+      'and seed.',
+  }),
+});
+
+/* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
 
@@ -416,7 +494,37 @@ export function mountTrafficEditor(
     context.openTab('run');
   });
 
+  /* *Now use this* — issue #65, beside the two verbs that were the whole of the panel's vocabulary. */
+  const useThis = el(doc, 'button', { className: 'primary', attrs: { type: 'button' } });
+  elements.save.parentElement?.append(useThis);
+
+  useThis.addEventListener('click', () => {
+    const at = view;
+    const current = spec();
+    if (at === undefined || current === undefined) return;
+    const action = useThisPatternStateOf(
+      current,
+      sourcePatternOf(at.resources, at.state),
+      at.state.pattern,
+      at.state.editingPatternId,
+    );
+    if (action === 'alreadyDriving') return;
+    if (action === 'saveFirst') {
+      // `save` already points the shift at what it files — see its `pattern: id`, and the comment
+      // there about a pattern the run cannot be pointed at being this repository's own dead seam.
+      savePattern();
+    } else {
+      context.update({ pattern: at.state.editingPatternId });
+      context.openTab('run');
+    }
+    context.runShift();
+  });
+
   elements.save.addEventListener('click', () => {
+    savePattern();
+  });
+
+  function savePattern(): void {
     const at = view;
     const current = spec();
     if (at === undefined || current === undefined) return;
@@ -438,7 +546,7 @@ export function mountTrafficEditor(
     });
     setText(elements.error, '');
     context.openTab('run');
-  });
+  }
 
   /* --- the rows ----------------------------------------------------------- */
 
@@ -586,7 +694,15 @@ export function mountTrafficEditor(
       setText(elements.error, '');
     }
 
-    setHidden(elements.dirty, !patternIsDirty(current, sourcePatternOf(at.resources, state)));
+    const source = sourcePatternOf(at.resources, state);
+    setHidden(elements.dirty, !patternIsDirty(current, source));
+
+    /* The *now use this* verb, relabelled for whichever of the three states the panel is in. */
+    const action = useThisPatternStateOf(current, source, state.pattern, state.editingPatternId);
+    setText(useThis, USE_THIS_COPY[action].label);
+    useThis.title = USE_THIS_COPY[action].title;
+    useThis.disabled = action === 'alreadyDriving';
+
     setText(
       elements.footnote,
       'A shift runs the building’s own traffic profile until you pick or save a pattern here — ' +

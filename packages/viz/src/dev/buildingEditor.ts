@@ -45,6 +45,7 @@
 import {
   parseBuilding,
   resolveBuilding,
+  type BuildingConfig,
   type ElevatorSpecs,
 } from '@elevator-sim/core/browser';
 
@@ -117,7 +118,14 @@ import { speedLadderOf } from './machinesEditor.js';
 import type { BrowserResources } from './data.js';
 import type { BuildingEditorElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
-import { allBuildingIds, allClasses, buildingConfigOf, classById } from './state.js';
+import {
+  allBuildingIds,
+  allClasses,
+  buildingConfigOf,
+  classById,
+  withBuilding,
+  type ViewerState,
+} from './state.js';
 
 /* -------------------------------------------------------------------------- *
  * Geometry constants
@@ -144,6 +152,51 @@ const ROW_MIN_PX = 11;
 const ROW_MAX_PX = 24;
 /** How tall the scroller is allowed to get before the rows start scrolling inside it. */
 const BODY_MAX_PX = 420;
+
+/**
+ * The narrowest a shaft bar may be drawn — issue #52.
+ *
+ * The grid's own instruction line says *"drag a shaft's top or bottom edge to restrict it to a band
+ * of floors"*, which is how a player creates zoning. `.elev-shaft` is `flex: 1; min-width: 0`, so
+ * the bars divided a **fixed** column between them: four shafts got about 24 px each, and pressing
+ * *add a shaft* four more times took them to about 13 px. The list below correctly said `8 shafts in
+ * 1 bank` and the picture did not change, so the editor appeared to stop responding at exactly the
+ * point a player started doing something ambitious.
+ *
+ * 14 px is two grip targets plus the band border — narrow, but a thing you can see and put a pointer
+ * on. Below that the drag the instruction names is not offerable, so the stage grows instead and
+ * `.elevation-body`'s existing `overflow: auto` carries it.
+ */
+const SHAFT_MIN_PX = 14;
+
+/** The gap `.elev-shafts` puts between bars. Mirrors the stylesheet's `gap: 6px`. */
+const SHAFT_GAP_PX = 6;
+
+/** What `.elev-shafts` leaves at the right-hand end. Mirrors the stylesheet's `right: 8px`. */
+const SHAFT_RIGHT_PX = 8;
+
+/** The stage's floor width, below which the fixed columns stop fitting. */
+const STAGE_MIN_PX = 400;
+
+/**
+ * How wide the elevation's content box has to be for this many shafts — issue #52.
+ *
+ * Exported and pure because it is the whole of the fix and the thing worth asserting: **adding a
+ * shaft has to make the picture bigger.** It could not before, because the stage was a flat
+ * `min-width: 400px` and the bars shared whatever the container happened to leave.
+ *
+ * The three constants below it mirror `.elev-shafts`'s and `.elev-shaft`'s own geometry in
+ * `index.html`. That duplication is real and is called out rather than hidden: this lane does not
+ * own the stylesheet, and a width computed here that disagreed with the rule there would draw bars
+ * that overlap the PEOPLE column. See this lane's report for the rule that would remove it.
+ */
+export function elevationStageWidthPx(carCount: number): number {
+  const bars = Math.max(0, carCount);
+  if (bars === 0) return STAGE_MIN_PX;
+  const needed =
+    SHAFT_LEFT_PX + SHAFT_RIGHT_PX + bars * SHAFT_MIN_PX + (bars - 1) * SHAFT_GAP_PX;
+  return Math.max(STAGE_MIN_PX, needed);
+}
 
 /** Row height for a given floor count: as tall as fits, within the readable band. */
 export function elevationRowHeightPx(rowCount: number): number {
@@ -192,6 +245,64 @@ export function specFieldOf(key: SpecRow['key']): string {
   }
 }
 
+/**
+ * The same five rows captioned for a reader who has not opened the JSON — issue #43.
+ *
+ * ## Two defects, one cause
+ *
+ * The report is that every caption on the flagship authoring surface is a **schema path**
+ * (`floors[].heightM`, `banks[].cars[]`), and that **Casual view changes nothing on this tab** —
+ * measured byte for byte, 2 936 characters and 2 523 elements in both modes.
+ *
+ * They are the same defect. `specFieldOf` was written under this repository's real and load-bearing
+ * discipline — *name the field it writes*, so the row's claim is checkable and cannot drift into
+ * decoration — and that discipline is why the path is there. But it answers a question **an
+ * engineer** has, and the mode selector exists precisely to say which reader is being served. The
+ * path was shown to both because nothing on this tab had ever asked which one was looking.
+ *
+ * So: **Engineer keeps the field path, unchanged.** Casual gets the unit, the range and the
+ * consequence — which is what the issue asks for, and what the row's own `help` has always said at
+ * length. Nothing is deleted; the checkable claim is one mode away rather than absent.
+ *
+ * ## The two occupancy rows are now told apart
+ *
+ * `capacityPerFloor` and `occupancyPct` both read `floors[].population = capacity × occupancy`,
+ * which is true of the pair and describes neither. *How many desks fit* and *how many are let* are
+ * different questions and now carry different captions.
+ */
+function playerFieldOf(key: SpecRow['key']): string {
+  switch (key) {
+    case 'floors':
+      return 'Served floors, not counting the lobby. Every extra floor is another possible stop.';
+    case 'floorHeightM':
+      return 'Slab to slab — about 3.6 m in an office, 3.0 m in flats. Taller floors, longer trips.';
+    case 'capacityPerFloor':
+      return 'How many people the floor was built to hold. This is the number the lifts were sized for.';
+    case 'occupancyPct':
+      return 'How much of that capacity is let today. This is the number the lifts actually carry.';
+    case 'cars':
+      return 'Lifts answering as one group. The most expensive thing in the building.';
+  }
+}
+
+/**
+ * Which caption a row shows.
+ *
+ * A boolean rather than a `DisclosureMode`, deliberately: the disclosure split in `src/mode/` is
+ * another lane's this wave, and a caption choice does not need to import a vocabulary that is being
+ * revised. `mountBuildingEditor` reads `state.mode === 'advanced'` and passes the answer.
+ *
+ * **Module-private, with {@link playerFieldOf}.** `honesty/derive` requires a `surfaces.ts` adapter
+ * for every *exported* producer of player-facing prose, and that file is outside this lane. Both
+ * reach the sweep through {@link specRowsOf}, which the `EDITORS` adapter already covers by name —
+ * strictly better than an exclusion, since the captions are swept rather than waived. What the
+ * adapter seeds is `specRowsOf`'s **default** arm, so the engineer captions are driven and the
+ * casual ones are not yet; see this lane's report for the one-line widening.
+ */
+function specSubOf(key: SpecRow['key'], showFieldPaths: boolean): string {
+  return showFieldPaths ? specFieldOf(key) : playerFieldOf(key);
+}
+
 export interface SpecRowView {
   readonly row: SpecRow;
   readonly heading: string;
@@ -205,7 +316,21 @@ export interface SpecRowView {
   readonly track: string;
 }
 
-export function specRowsOf(spec: BuildingSpec): readonly SpecRowView[] {
+/**
+ * The five rows, captioned for whichever reader is looking.
+ *
+ * `showFieldPaths` defaults to `true` so every existing caller — and every existing assertion —
+ * keeps the engineer's caption it was written against. The mount passes the mode; see
+ * {@link specSubOf}.
+ *
+ * The over-capacity note wins over both, in both modes. It is not a caption about what the row
+ * writes, it is the building telling the reader it is let past what it was designed for, and that
+ * is not an engineer's detail.
+ */
+export function specRowsOf(
+  spec: BuildingSpec,
+  showFieldPaths = true,
+): readonly SpecRowView[] {
   let group = '';
   return SPEC_ROWS.map((row): SpecRowView => {
     const heading = row.group === group ? '' : row.group;
@@ -217,7 +342,7 @@ export function specRowsOf(spec: BuildingSpec): readonly SpecRowView[] {
       heading,
       raw,
       value: formatSpecValue(spec, row),
-      sub: over ? overCapacityNote(spec) : specFieldOf(row.key),
+      sub: over ? overCapacityNote(spec) : specSubOf(row.key, showFieldPaths),
       subColor: over ? 'var(--over)' : 'var(--faint)',
       overCapacity: over,
       track: specTrackOf(spec, row),
@@ -1076,10 +1201,17 @@ const TRANSPORT_TRANSFER_TITLE =
 const TRANSPORT_BLOCKED_TITLE =
   'The other landing already stands here. The loader refuses a connection whose two ends name one floor — a machine that starts and ends on the same floor moves nobody.';
 
+/*
+ * Issue #43 § 4: this said *"core’s own semantics"* — `core` is a source package and means nothing to
+ * a player — and *"what four of the five shipped buildings declare"*, which was wrong in both halves.
+ * Eight buildings ship and **three** of them declare no access zone. The count is dropped rather than
+ * corrected: it told a player nothing they could act on, and a hand-written tally over `data/` is a
+ * number that goes stale the next time a building lands. See § D230.
+ */
 const MATRIX_EMPTY =
-  'No access zone, so every floor is open to every credential — core’s own semantics for a floor no ' +
-  'zone covers, and what four of the five shipped buildings declare. Add a zone to restrict the ' +
-  'floors it names; every floor outside it stays unrestricted.';
+  'No access zone, so every floor is open to every credential — that is what a floor no zone covers ' +
+  'means, here and in the run. Add a zone to restrict the floors it names; every floor outside it ' +
+  'stays unrestricted.';
 
 const MATRIX_LEGEND =
   'A row is a floor, a column is a credential group. ● this group opens the floor · ▩ it does not · ' +
@@ -1089,6 +1221,63 @@ const MATRIX_LEGEND =
 const MATRIX_DISPATCHER_NOTE =
   'Which dispatchers can read a credential at all is a third question again — the note beside the ' +
   'dispatcher list answers it for the pairing you have selected.';
+
+/* -------------------------------------------------------------------------- *
+ * Saving, and the two halves of it that were missing — issue #54
+ * -------------------------------------------------------------------------- */
+
+/** A building the reader saved: the id it took, and the document it became. */
+export interface SavedBuildingResult {
+  readonly id: string;
+  readonly config: BuildingConfig;
+}
+
+/**
+ * Turn the working copy into a saved building, or throw the loader's own refusal.
+ *
+ * Split out of the click handler so the thing the button does is testable without a document, and
+ * so the **name** can be asserted end to end. Issue #54 reported that a typed name did not reach the
+ * saved entry; it does — `buildingFromSpec` writes `spec.name`, falling back to *My building* only
+ * on an empty one — and the reason the reporter could not tell is the actual defect: **the save said
+ * nothing at all**, so there was no moment at which a wrong name could have been noticed. The
+ * confirmation that fixes that is composed in the mount, which is where this panel's other prose
+ * lives and the only place it can go without a `honesty/surfaces.ts` adapter.
+ */
+export function savedBuildingFrom(
+  spec: BuildingSpec,
+  state: ViewerState,
+  resources: BrowserResources,
+): SavedBuildingResult {
+  const id = nextSavedId('bld', allBuildingIds(resources, state.savedBuildings));
+  const named: BuildingSpec = { ...spec, id };
+  const specs = specsWithSaved(resources, state.savedClasses);
+  return {
+    id,
+    config: parseBuilding(buildingFromSpec(named, { specs }) as unknown, `${id}.json`),
+  };
+}
+
+/**
+ * The state that has the saved building **running**, so the creative loop closes.
+ *
+ * `withBuilding` rather than a bare `buildingId` write, and that is the load-bearing part. A drawn
+ * tower belongs to no scenario, and a raw assignment would leave the week's `contractId` in place —
+ * which is the forgery `state.ts`'s own docstring describes: the ribbon reads *Scenario · day 4* and
+ * `closeDay` banks an invented building against a real assignment. `withBuilding` puts it on
+ * `SANDBOX_CONTRACT_ID` instead. The building has to be in `savedBuildings` **before** the call,
+ * because that is where `withBuilding` looks the id up.
+ */
+export function stateRunningSaved(
+  state: ViewerState,
+  resources: BrowserResources,
+  saved: SavedBuildingResult,
+): ViewerState {
+  const savedBuildings = [
+    ...state.savedBuildings.filter((entry) => entry.id !== saved.id),
+    { id: saved.id, config: saved.config },
+  ];
+  return withBuilding({ ...state, savedBuildings }, resources, saved.id);
+}
 
 export function mountBuildingEditor(
   elements: BuildingEditorElements,
@@ -1318,28 +1507,84 @@ export function mountBuildingEditor(
     patch({ bandByCar: {}, noLobby: {} });
   });
 
+  /* --- the save, its confirmation, and the action that closes the loop ----- */
+
+  /*
+   * Two nodes the shipped `index.html` does not carry, built here rather than there — issue #54.
+   *
+   * The complaint was that the editor's terminal action is *"indistinguishable from a dead button"*:
+   * no toast, no banner, no state change, and the only way to discover it had worked was to inspect
+   * the building select on another tab. So the save now says so, in the reader's own words and
+   * naming the building they named — and it offers the one verb the panel was missing, because a
+   * building you cannot run is not a thing that exists yet.
+   *
+   * They go in `.editor-actions`, beside Save, because that is where a reader who has just pressed
+   * Save is already looking. The **other half** of #54 — that the row sits ~1130 px down a 900 px
+   * viewport, and that Save and Close are adjacent with no visual distinction between *keep this
+   * for ever* and *throw it away* — is a layout question in `index.html` and its stylesheet, and is
+   * reported rather than fixed here.
+   */
+  const savedNote = el(doc, 'span', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { color: 'var(--ok)', 'font-size': '11.5px' },
+  });
+  const runSaved = el(doc, 'button', {
+    className: 'primary',
+    text: 'Run a day on it',
+    title:
+      'Makes the building you just saved the one the week runs, and runs a day on it. It belongs ' +
+      'to no scenario, so the week keeps its day and stops claiming to be an assignment.',
+    attrs: { type: 'button' },
+  });
+  setHidden(savedNote, true);
+  setHidden(runSaved, true);
+  elements.save.parentElement?.append(savedNote, runSaved);
+
+  /** The building the confirmation is about. Cleared the moment the reader edits again. */
+  let confirmedId = '';
+
+  function forgetConfirmation(): void {
+    confirmedId = '';
+    setText(savedNote, '');
+    setHidden(savedNote, true);
+    setHidden(runSaved, true);
+  }
+
+  runSaved.addEventListener('click', () => {
+    const at = view;
+    if (at === undefined || confirmedId === '') return;
+    const config = buildingConfigOf(at.resources, at.state.savedBuildings, confirmedId);
+    if (config === undefined) return;
+    // Through `stateRunningSaved`, never a bare `buildingId` write — see its docstring for the
+    // week-contract forgery a raw assignment reintroduces.
+    context.update(stateRunningSaved(at.state, at.resources, { id: confirmedId, config }));
+    forgetConfirmation();
+    context.openTab('run');
+    context.runShift();
+  });
+
   elements.save.addEventListener('click', () => {
     const at = view;
     const current = spec();
     if (at === undefined || current === undefined) return;
     try {
-      const id = nextSavedId('bld', allBuildingIds(at.resources, at.state.savedBuildings));
-      const named: BuildingSpec = { ...current, id };
-      const specs = specsWithSaved(at.resources, at.state.savedClasses);
-      const config = parseBuilding(
-        buildingFromSpec(named, { specs }) as unknown,
-        `${id}.json`,
-      );
+      const saved = savedBuildingFrom(current, at.state, at.resources);
       context.update({
-        savedBuildings: [...at.state.savedBuildings, { id, config }],
-        editingBuildingId: id,
-        buildingSpec: named,
+        savedBuildings: [...at.state.savedBuildings, { id: saved.id, config: saved.config }],
+        editingBuildingId: saved.id,
+        buildingSpec: { ...current, id: saved.id },
       });
       setText(elements.error, '');
+      confirmedId = saved.id;
+      setText(savedNote, `Saved — “${saved.config.name}” is now in your buildings.`);
+      setHidden(savedNote, false);
+      setHidden(runSaved, false);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setText(elements.error, message);
       context.fail(message);
+      forgetConfirmation();
     }
   });
 
@@ -1433,7 +1678,9 @@ export function mountBuildingEditor(
         position: 'relative',
         height: `${String(rows.length * rowHeight)}px`,
         'min-height': '160px',
-        'min-width': '400px',
+        // Grows with the shaft count, so `.elevation-body`'s `overflow: auto` gives the reader the
+        // bars the instruction line tells them to drag. See `elevationStageWidthPx` — issue #52.
+        'min-width': `${String(elevationStageWidthPx(cars.length))}px`,
       },
     });
 
@@ -1624,7 +1871,13 @@ export function mountBuildingEditor(
     }
 
     carNodes.set(car.car, { band, label, gripTop, gripBottom });
-    return el(doc, 'div', { className: 'elev-shaft', children: [band] });
+    return el(doc, 'div', {
+      className: 'elev-shaft',
+      // Beats `.elev-shaft`'s `min-width: 0`, which is what let the bars shrink to a sliver as the
+      // reader added shafts. The stage is widened to match — `elevationStageWidthPx`, issue #52.
+      style: { 'min-width': `${String(SHAFT_MIN_PX)}px` },
+      children: [band],
+    });
   }
 
   function drawElevation(current: BuildingSpec): void {
@@ -1991,7 +2244,13 @@ export function mountBuildingEditor(
     setText(elements.editing, `Editing — ${current.name}`);
     if (elements.name.value !== current.name) elements.name.value = current.name;
 
-    drawSpecRows(specRowsOf(current));
+    /*
+     * The mode reaches this tab — issue #43. It did not before: nothing in this file read
+     * `state.mode`, so the selector the product offers as *the* way to hide complexity was inert on
+     * the most complex authoring surface it has. Casual gets the unit, the range and the
+     * consequence; Engineer keeps the field path the row writes.
+     */
+    drawSpecRows(specRowsOf(current, state.mode === 'advanced'));
     setText(elements.occupancy, occupancyLine(current));
 
     /* Machine class. */
@@ -2124,7 +2383,18 @@ export function mountBuildingEditor(
       check.warnings.length === 0 ? 'var(--faint)' : 'var(--warn)',
     );
 
-    setHidden(elements.dirty, !specIsDirty(current, sourceBuildingOf(at)));
+    const dirty = specIsDirty(current, sourceBuildingOf(at));
+    setHidden(elements.dirty, !dirty);
+
+    /*
+     * The confirmation is about a building, not about a moment, so it goes as soon as it stops being
+     * true of what is on screen — the reader edited again, or moved to another building. A *"Saved"*
+     * line still sitting over a changed draft is the same defect as the silent save with the sign
+     * flipped: it would say the thing in the buildings list is what you are looking at.
+     */
+    if (confirmedId !== '' && (dirty || state.editingBuildingId !== confirmedId)) {
+      forgetConfirmation();
+    }
   }
 
   return { render };

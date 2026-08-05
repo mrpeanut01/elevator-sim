@@ -185,7 +185,7 @@ export const PATTERN_ROWS: readonly PatternRow[] = Object.freeze([
     max: 4,
     step: 0.1,
     unit: ' people',
-    help: 'Mean of the geometric batch-size distribution — `traffic-profiles.json`’s `batchSize.mean`, written by widening the traffic file this run resolves against. Batch size changes loading and stopping far more than the mean rate does; this is the parameter most simulators get wrong by assuming passengers arrive one at a time.',
+    help: 'How many people arrive together — a couple, a meeting turning out, a lift-load off one bus. Writes `traffic-profiles.json`’s `batchSize.mean`, by widening the traffic file this run resolves against and leaving the profile’s own distribution shape alone. Group size changes loading and stopping far more than the arrival rate does; it is the parameter most simulators get wrong by assuming passengers arrive one at a time.',
   },
   {
     key: 'batchSharesDestination',
@@ -325,7 +325,15 @@ export function patternIsDirty(spec: PatternSpec, source: PatternSpec): boolean 
  * rather than left to be discovered. The **workaround below still works**, and is left standing
  * because replacing it is a behaviour change this repair is not making: widening the file is not
  * equivalent to writing an override, since the file reaches every source and the override is a
- * run-level curve. Whoever next touches this panel should decide between them deliberately.
+ * run-level curve.
+ *
+ * **That decision is now made rather than deferred** (issue #66's repair). The two are not
+ * interchangeable and the file is the right one *for this control*: `demand.batchSize` is a whole
+ * {@link BatchSizeCurve} — `distribution`, `weights` **and** `mean` — so writing one from a single
+ * slider would silently replace the profile's authored distribution shape with whatever default the
+ * override carried. Widening moves the one number the slider is named after and leaves the curve
+ * the reference data declares. An editor that offered the *shape* as well would want the override;
+ * this one offers a mean, so it writes a mean.
  *
  * What remains true, and is the reason the row exists at all: mean group size lives on the
  * **traffic profile** — `data/traffic-profiles.json`'s `batchSize.mean` — and the generator reads

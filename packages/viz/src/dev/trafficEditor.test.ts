@@ -13,11 +13,27 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { parseTrafficProfiles, type TrafficProfiles } from '@elevator-sim/core/browser';
+import {
+  parseBuilding,
+  parseDispatcherProfiles,
+  parseElevatorSpecs,
+  parseTrafficProfiles,
+  resolveBuilding,
+  type TrafficProfiles,
+} from '@elevator-sim/core/browser';
 
-import { DEFAULT_PATTERN, PATTERN_ROWS, type PatternSpec } from '../authoring/patternSpec.js';
+import {
+  DEFAULT_PATTERN,
+  PATTERN_ROWS,
+  specFromTrafficProfile,
+  trafficProfilesWithPattern,
+  type PatternSpec,
+} from '../authoring/patternSpec.js';
 import { DAY_START_S, hhmm } from '../live/timeline.js';
+import { recordRun } from '../record/recordRun.js';
 
+import type { BrowserResources } from './data.js';
+import { initialState, shiftRunConfigOf, type ViewerState } from './state.js';
 import {
   formatPatternValue,
   inertPatternRows,
@@ -28,14 +44,33 @@ import {
   previewSegmentsOf,
   previewTemplateOf,
   previewTicksOf,
+  useThisPatternStateOf,
 } from './trafficEditor.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
-const TRAFFIC: TrafficProfiles = parseTrafficProfiles(
-  JSON.parse(readFileSync(fileURLToPath(new URL('traffic-profiles.json', DATA)), 'utf8')) as unknown,
-);
+const read = (path: string): unknown =>
+  JSON.parse(readFileSync(fileURLToPath(new URL(path, DATA)), 'utf8')) as unknown;
+const TRAFFIC: TrafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
 const TEMPLATES = TRAFFIC.demandTemplates;
 const SHIFT_S = 1800;
+
+/** The run tier's fixture. Only the buildings the leg comparison at the bottom of this file names. */
+const RESOURCES: BrowserResources = (() => {
+  const elevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
+  const entries = ['garden-apartments', 'midtown-office'].map((id) => {
+    const config = parseBuilding(read(`buildings/${id}.json`));
+    return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
+  });
+  return {
+    elevatorSpecs,
+    trafficProfiles: TRAFFIC,
+    dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),
+    buildings: entries.map((entry) => entry.resolved),
+    entries,
+    trafficProfileIds: new Set(TRAFFIC.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+})();
 
 const TWO_WAY: PatternSpec = { ...DEFAULT_PATTERN, order: 'two-way' };
 
@@ -63,10 +98,31 @@ describe('the rows are the engine’s parameters', () => {
     expect(patternRowsOf(TWO_WAY).map((row) => row.row.key)).toContain('mixAmplitude');
   });
 
-  it('draws the mean group size as a refusal, because no demand field carries it', () => {
+  /*
+   * This assertion used to read the other way — `live` false, refusal naming
+   * `SimulationDemandOptions`. It is inverted rather than deleted, and inverting it is not a
+   * weakening: the sentence it pinned had **already expired**, so the old test was holding a
+   * refusal in place after the thing it refused had been built. `trafficProfilesWithPattern` is
+   * called by `dev/state.ts`'s `shiftRunConfigOf` on the way to `SimulationConfig.trafficProfiles`,
+   * which is a named non-test caller, and the run test at the bottom of this file is the part that
+   * cannot go stale the way the sentence did.
+   */
+  it('draws the mean group size as a live control, because the traffic file carries it', () => {
     const batch = patternRowsOf(DEFAULT_PATTERN).find((row) => row.row.key === 'batchMean');
-    expect(batch?.live).toBe(false);
-    expect(batch?.refusal).toContain('SimulationDemandOptions');
+    expect(batch?.live).toBe(true);
+    expect(batch?.refusal).toBeUndefined();
+    expect(inertPatternRows(DEFAULT_PATTERN)['batchMean']).toBeUndefined();
+    expect(inertPatternRows(TWO_WAY)['batchMean']).toBeUndefined();
+  });
+
+  it('says the same thing in the tooltip as in the row, which is what issue #66 caught', () => {
+    // The defect was two explanations of one control disagreeing: the tooltip claimed the field was
+    // written, the sub-line claimed no passenger moved. Whatever the row's verdict is, the help text
+    // beside it may not assert the opposite.
+    const row = PATTERN_ROWS.find((entry) => entry.key === 'batchMean');
+    expect(row?.help).toContain('batchSize.mean');
+    expect(row?.help).not.toContain('no field');
+    expect(row?.help).not.toContain('SimulationDemandOptions');
   });
 
   it('refuses the interfloor share under two-way and offers it under the other two', () => {
@@ -204,5 +260,99 @@ describe('the preview strip is the day this makes', () => {
     );
     expect(resolution.ok).toBe(false);
     if (!resolution.ok) expect(resolution.reason.length).toBeGreaterThan(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The standing requirement, pointed at the row that used to refuse
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Move the control and require the **run** to change — `docs/05-roadmap.md`'s standing requirement
+ * and § D177's rule, compared on the legs rather than on a window statistic.
+ *
+ * This is the assertion that would have caught issue #66 in either direction. A row drawn as live
+ * that moves no passenger is the dead seam this repository has shipped eleven times; a row drawn as
+ * a refusal that *did* move passengers is the same defect with the sign flipped, and that is the one
+ * that was actually here — the refusal outlived `trafficProfilesWithPattern`, which
+ * `shiftRunConfigOf` has called since wave 13.
+ *
+ * `midtown-office` under `office-standard` at 900 s, because **neither arm may be empty**: a
+ * fingerprint of zero legs equals any other fingerprint of zero legs, so an instrument that can go
+ * silent passes exactly when the control dies. This arm carries several hundred legs on both sides.
+ * Everything but the batch mean is held equal — same building, same seed, same dispatcher, same
+ * shift length, same selected pattern — so the mean is the only thing that moved.
+ */
+describe('mean group size is not decoration — the standing requirement, issue #66', () => {
+  const specAt = (batchMean: number): PatternSpec => ({
+    ...specFromTrafficProfile(RESOURCES.trafficProfiles, 'office-standard'),
+    batchMean,
+  });
+
+  const legsOf = (batchMean: number): readonly (readonly [string, string, number])[] => {
+    const state: ViewerState = {
+      ...initialState(RESOURCES, 20260805n),
+      buildingId: 'midtown-office',
+      shiftLengthS: 900,
+      savedPatterns: [{ id: 'pat-1', spec: specAt(batchMean) }],
+      pattern: 'pat-1',
+    };
+    return recordRun(shiftRunConfigOf(RESOURCES, state).config, {
+      recordDecisions: false,
+    }).recording.legs.map(
+      (leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const,
+    );
+  };
+
+  it('widens the traffic file the run resolves against, and only the profile named', () => {
+    const widened = trafficProfilesWithPattern(
+      RESOURCES.trafficProfiles,
+      'office-standard',
+      specAt(3.5),
+    );
+    expect(widened.profiles.find((entry) => entry.id === 'office-standard')?.batchSize.mean).toBe(
+      3.5,
+    );
+    for (const profile of widened.profiles.filter((entry) => entry.id !== 'office-standard')) {
+      const before = RESOURCES.trafficProfiles.profiles.find((entry) => entry.id === profile.id);
+      expect(profile.batchSize.mean).toBe(before?.batchSize.mean);
+    }
+  });
+
+  it('and the run itself moves — the legs differ when the mean does', () => {
+    const alone = legsOf(1);
+    const crowds = legsOf(4);
+    expect(alone).not.toHaveLength(0);
+    expect(crowds).not.toHaveLength(0);
+    expect(JSON.stringify(crowds)).not.toBe(JSON.stringify(alone));
+  });
+
+  it('offers a way to run what is on screen — issue #65', () => {
+    /*
+     * The panel's verbs were **Close** and **Save as a new pattern**, so a reader who had moved four
+     * sliders had to know that filing also selects. Three states, and the label says which.
+     *
+     * `'building'` is the state worth being careful about: it is not an id in `savedPatterns`, it is
+     * *the building's own traffic profile*, and it is the demand every published figure here was
+     * measured under. A reader sitting on it, having changed nothing, is already running what the
+     * editor shows — so the control goes off rather than offering to select something that has no
+     * entry to select.
+     */
+    const source = specFromTrafficProfile(RESOURCES.trafficProfiles, 'office-standard');
+    expect(useThisPatternStateOf(source, source, 'building', 'building')).toBe('alreadyDriving');
+    expect(
+      useThisPatternStateOf({ ...source, ratePctPop5min: 21 }, source, 'building', 'building'),
+    ).toBe('saveFirst');
+    expect(useThisPatternStateOf(source, source, 'building', 'pat-1')).toBe('select');
+  });
+
+  it('and it moves in the direction the model says it should', () => {
+    /*
+     * Not merely *different* — different is satisfied by a sign error. At a fixed arrival rate,
+     * bigger groups deliver the same demand in fewer, fuller batches, so the served-leg count over a
+     * fixed window must fall as the mean rises. Asserted as an ordering rather than as a figure,
+     * because the figure belongs to this arm and the ordering belongs to the model.
+     */
+    expect(legsOf(4).length).toBeLessThan(legsOf(1).length);
   });
 });
