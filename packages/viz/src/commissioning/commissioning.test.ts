@@ -28,7 +28,7 @@
  * than quietly making the prose above false.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { parseBuilding, type BuildingConfig } from '@elevator-sim/core/browser';
@@ -46,11 +46,13 @@ import {
   capitalOf,
   mixedFleetBanks,
   movedChoices,
+  speedChoices,
   withBankChoice,
 } from './choices.js';
 import { refusalsBeside, reviewCommissioning } from './refusals.js';
 import {
   COMMISSIONING_DIMENSIONS,
+  classById,
   commissionableClasses,
   constraintById,
   type BankChoice,
@@ -691,5 +693,106 @@ describe('the capital constraint', () => {
     });
     expect(review.refusals).toEqual([]);
     expect(review.capitalUnits).toBeLessThanOrEqual(review.budgetUnits);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The speed control can show what the building already has — issue #45
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A select whose value is not among its options shows its first option instead.**
+ *
+ * That is the whole of issue #45, and it is why this block asserts a *containment* rather than a
+ * list. `dev/main.ts`'s `optionsFor` builds the rated-speed options from
+ * {@link speedChoices} and sets the row's value to the bank's as-built speed; if the ladder omits
+ * that speed, the screen silently prints the bottom of the class band under the sentence *"the
+ * shafts, the machines and their speeds are what the building already has"*. Before the repair,
+ * **nine of the fourteen shipped banks** were in that state.
+ *
+ * The building list is **read off disk** rather than written here, on § D192's rule: a hand-written
+ * list of eight names is a list that stops covering the ninth building the day it lands, and this
+ * is exactly the property that has to hold for a building nobody has written yet.
+ */
+describe('every shipped bank can be shown at the speed it is authored at — issue #45', () => {
+  const BUILDING_IDS = readdirSync(join(DATA_DIR, 'buildings'))
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => file.replace(/\.json$/, ''))
+    .sort();
+
+  it('reads the building set from disk, so a new building is covered by arriving', () => {
+    expect(BUILDING_IDS.length).toBeGreaterThanOrEqual(8);
+    expect(BUILDING_IDS).toContain('secure-tower');
+  });
+
+  it.each(BUILDING_IDS)('%s — every bank’s rated speed is on its class’s ladder', (id) => {
+    const base = fromDisk(id);
+    const built = asBuiltChoices(base, CLASSES);
+    expect(built.length).toBeGreaterThan(0);
+    for (const choice of built) {
+      const machineClass = classById(CLASSES, choice.machineClassId);
+      expect(machineClass).toBeDefined();
+      // The comparison is `String(...)`, not a numeric one, because that is what the DOM does: the
+      // option's id is a string and the select matches on it. `4` and `4.0000001` are one number to
+      // a tolerance and two different options to a `<select>`.
+      const ladder = speedChoices(machineClass).map(String);
+      expect(ladder, `${id}/${choice.bankId} at ${String(choice.ratedSpeedMps)} m/s`).toContain(
+        String(choice.ratedSpeedMps),
+      );
+    }
+  });
+
+  it('names the three banks that were wrong before the repair, so a regression is legible', () => {
+    // Secure Tower is issue #45's own title case: header 4 m/s, screen 2.50 m/s.
+    const cases: readonly (readonly [string, string, number])[] = [
+      ['secure-tower', 'low', 4],
+      ['chancery-house', 'main', 5],
+      ['crown-hotel', 'main', 3],
+    ];
+    for (const [id, bankId, speed] of cases) {
+      const choice = asBuiltChoices(fromDisk(id), CLASSES).find(
+        (entry) => entry.bankId === bankId,
+      );
+      expect(choice?.ratedSpeedMps).toBe(speed);
+      expect(speedChoices(classById(CLASSES, choice?.machineClassId ?? '')).map(String)).toContain(
+        String(speed),
+      );
+    }
+  });
+
+  it('offers each class its own band and nothing outside it', () => {
+    /*
+     * Issue #49 reported that *"every machine class offers the identical speed list (2.50 → 7.00)"*
+     * and that *"the lowest speed offered is 2.50 m/s"*. Both are refuted here rather than assumed:
+     * the ladder has always been the class's own declared band, and the reporter only ever saw
+     * `gearless-traction`'s because the machine-class select could not be moved (issue #42). The
+     * assertion is kept because the claim is worth being able to check.
+     */
+    for (const machineClass of CLASSES) {
+      const ladder = speedChoices(machineClass);
+      expect(ladder.length).toBeGreaterThan(1);
+      expect(ladder[0]).toBe(machineClass.speedMinMps);
+      expect(ladder[ladder.length - 1]).toBe(machineClass.speedMaxMps);
+      expect(ladder).toContain(machineClass.speedTypicalMps);
+      for (const speed of ladder) {
+        expect(speed).toBeGreaterThanOrEqual(machineClass.speedMinMps);
+        expect(speed).toBeLessThanOrEqual(machineClass.speedMaxMps);
+      }
+    }
+    // Hydraulic offers 0.63 m/s — the speed Garden Apartments runs at, and well below the 2.50 the
+    // report called the floor of the list.
+    const hydraulic = speedChoices(classById(CLASSES, 'hydraulic'));
+    expect(hydraulic).toContain(0.63);
+    expect(Math.min(...hydraulic)).toBeLessThan(2.5);
+    // And no two classes offer the same list, which is the substance of the "identical" complaint.
+    const lists = CLASSES.map((entry) => JSON.stringify(speedChoices(entry)));
+    expect(new Set(lists).size).toBe(CLASSES.length);
+  });
+
+  it('keeps the ladder short enough to be a select rather than a scroll', () => {
+    for (const machineClass of CLASSES) {
+      expect(speedChoices(machineClass).length).toBeLessThanOrEqual(12);
+    }
+    expect(speedChoices(undefined)).toEqual([]);
   });
 });
