@@ -41,6 +41,9 @@ import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 
 import { commissionedBuilding } from './building.js';
 import {
+  CAPITAL_UNITS_PER_MPS,
+  CAPITAL_UNITS_PER_RATED_RISE_M,
+  CAPITAL_UNITS_PER_SHAFT,
   asBuiltChoices,
   budgetFor,
   capitalOf,
@@ -693,6 +696,81 @@ describe('the capital constraint', () => {
     });
     expect(review.refusals).toEqual([]);
     expect(review.capitalUnits).toBeLessThanOrEqual(review.budgetUnits);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A capital unit says what it is — issue #24
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The screen printed `1920 of the 1920 capital units allowed` and never said what a unit was.
+ *
+ * Three questions in the report, all of which this module knew the answer to and none of which it
+ * printed: what a unit corresponds to, what moves the figure **before** you commit, and what happens
+ * when a configuration exceeds the allowance. On a screen whose controls did not respond (#42), a
+ * player could not even find the price list by trial and error.
+ *
+ * The assertions below are about the two things copy like this gets wrong. It must be **accurate to
+ * the constants** — interpolated, not typed, so it cannot drift the first time a price moves — and
+ * it must not imply a real-world cost, because `choices.ts` is explicit that a unit *"is not
+ * currency, it is not a measurement of anything real"*, and inventing one would be an engineering
+ * claim the reference data does not make.
+ */
+describe('the capital figure explains itself — issue #24', () => {
+  const sentenceUnder = (constraint: CapitalConstraint, choices: CommissioningChoices): string =>
+    reviewCommissioning({
+      base: shipped('midtown-office'),
+      choices,
+      classes: CLASSES,
+      specs: RESOURCES.elevatorSpecs,
+      constraint,
+    }).sentence;
+
+  const asBuilt = (): CommissioningChoices => asBuiltChoices(shipped('midtown-office'), CLASSES);
+
+  it('says what drives the figure, with the numbers the arithmetic actually uses', () => {
+    const sentence = sentenceUnder(RETROFIT, asBuilt());
+    expect(sentence).toContain(String(CAPITAL_UNITS_PER_SHAFT));
+    expect(sentence).toContain(String(CAPITAL_UNITS_PER_MPS));
+    expect(sentence).toContain(String(CAPITAL_UNITS_PER_RATED_RISE_M));
+    // And names all three dimensions, which is the "before you commit" half of the question.
+    expect(sentence).toMatch(/shaft/i);
+    expect(sentence).toMatch(/speed/i);
+    expect(sentence).toMatch(/class/i);
+  });
+
+  it('says a unit is not money, rather than implying a cost the data does not claim', () => {
+    expect(sentenceUnder(RETROFIT, asBuilt())).toMatch(/rather than money/i);
+  });
+
+  it('says what happens past the allowance, on the arm where that is being answered', () => {
+    /*
+     * The legend rides on the refusing branch too. A player who has just been refused is exactly the
+     * player asking *what happens if I exceed it*, and a legend visible only when nothing is wrong
+     * would be missing from the one moment it is needed.
+     */
+    const over = withBankChoice(asBuilt(), {
+      ...bankOf(shipped('midtown-office')),
+      shafts: 12,
+      machineClassId: 'ultra-high-speed',
+      ratedSpeedMps: 20,
+    });
+    const sentence = sentenceUnder(NEW_BUILD, over);
+    expect(sentence).toMatch(/refused by name/);
+    expect(sentence).toMatch(/never quietly trimmed/);
+  });
+
+  it('carries the legend on every branch, so the screen never has it missing', () => {
+    const moved = withBankChoice(asBuilt(), { ...bankOf(shipped('midtown-office')), shafts: 5 });
+    for (const [constraint, choices] of [
+      [RETROFIT, asBuilt()],
+      [NEW_BUILD, asBuilt()],
+      [NEW_BUILD, moved],
+      [REFURBISHMENT, moved],
+    ] as const) {
+      expect(sentenceUnder(constraint, choices)).toContain('capital unit is');
+    }
   });
 });
 
