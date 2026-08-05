@@ -1265,11 +1265,31 @@ describe('the stage is drawn in whichever palette was resolved', () => {
     // The darkest hex fill on a light stage is still ink (`--text`, near-black); the *sky* strips
     // are the ones above 0x80, and on the dark stage there are none.
     expect(skyStrips.filter((colour) => luminance(colour) > 0x80).length).toBeGreaterThan(20);
-    expect(
-      [...coloursOf(drawWith(stageFor('dark')))].filter(
-        (colour) => /^#[0-9a-f]{6}$/.test(colour) && luminance(colour) > 0x80,
-      ).length,
-    ).toBeLessThan(6);
     expect(darkest).toBeLessThan(0x80);
+
+    /*
+     * The negative control, and it is a *characterisation* rather than a count.
+     *
+     * It used to read `toBeLessThan(6)` — the number of bright hex fills the dark stage happened
+     * to produce at the time — and § D235 raised three ink tokens past `0x80`, which turned it
+     * red without anything about the sky changing. A bound that moves when an unrelated token
+     * moves is measuring the wrong thing.
+     *
+     * What the claim actually is: on a dark stage the bright marks are all **ink and badges** —
+     * values the theme itself declares — and none of them is a sky strip, because sky strips are
+     * `render/sky.ts#mixHex` *interpolations* between two ramp stops and are equal to no named
+     * token. So every bright fill is required to be a member of the theme's own values. That is
+     * strictly stronger than the count it replaces: it would fail on one dark sky strip, which
+     * `toBeLessThan(6)` would have accepted five of.
+     */
+    const named = new Set(
+      Object.values(stageFor('dark')).flatMap((value) =>
+        typeof value === 'string' ? [value] : Array.isArray(value) ? (value as string[]) : [],
+      ),
+    );
+    const strayBright = [...coloursOf(drawWith(stageFor('dark')))].filter(
+      (colour) => /^#[0-9a-f]{6}$/.test(colour) && luminance(colour) > 0x80 && !named.has(colour),
+    );
+    expect(strayBright, 'a bright fill on the dark stage that no token declares').toEqual([]);
   });
 });

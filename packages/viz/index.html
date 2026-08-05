@@ -65,11 +65,27 @@
            `--edge-strong` — a hint's underline is lighter than a control's border on purpose. */
         --hint-underline: #3f4b5c;
 
-        /* Ink. */
+        /* Ink — the ladder, and the three rungs § D235 raised.
+
+           The artefact's values were `--dim: #8b98a9`, `--dimmer: #6d7b8d`, `--faint: #4d5a6b`,
+           and the bottom two of those do not carry text at a size a reader can read: `--faint`
+           measures 2.75:1 on `--bg`, 2.60:1 on `--panel` and 2.31:1 on `--raised`, and it is the
+           ink of sixteen rules below — the Compare/Lab/Parameters tab labels, the timeline's
+           o'clock ticks, `.decision-time`, `.legend-title`, `.eyebrow-note`, `.slider-sub`,
+           `.zmatrix th`. WCAG 2.2 AA asks 4.5:1 at those sizes; none of them is 24 px, or
+           18.66 px bold, so AA Large's 3:1 is not available to any of them either.
+
+           Each rung now clears **4.5:1 against all five surfaces above**, worst case on
+           `--raised`: 13.81 / 6.65 / 5.54 / 4.57. `--dim` moved only to keep a visible step above
+           `--dimmer`, which took `--dim`'s old value. `--fainter` did not move — nothing draws
+           it; see `render/tokens.ts#TEXT_FAINTER`.
+
+           `src/render/tokens.test-adjacent` — really `src/dev/tokens.test.ts` — pins every value
+           here to `render/tokens.ts`, and `render/theme.test.ts` holds the four to the floor. */
         --text: #e8edf4;
-        --dim: #8b98a9;
-        --dimmer: #6d7b8d;
-        --faint: #4d5a6b;
+        --dim: #9aa7b8;
+        --dimmer: #8b98a9;
+        --faint: #7c899a;
         --fainter: #3d4956;
 
         /* Accent. */
@@ -148,11 +164,14 @@
         --hint-underline: #8593a7;
 
         /* Ink: losing contrast from `--text` down. `--dim` is the *higher*-contrast secondary,
-           which is the order the dark palette already uses. */
+           which is the order the dark palette already uses. § D235's ladder in this mode: the
+           three sub-`--text` rungs clear 4.5:1 against `--bg`, which is the *darkest* light
+           surface and therefore the worst ground for dark ink — 7.08 / 5.61 / 4.67, against the
+           6.24 / 4.22 / 2.97 they replaced. */
         --text: #101720;
-        --dim: #4a5666;
-        --dimmer: #64707f;
-        --faint: #7e8998;
+        --dim: #424e5d;
+        --dimmer: #515d6c;
+        --faint: #5d6978;
         --fainter: #99a3b0;
 
         /* Accent. `--accent-soft` is the link colour, so it is darker than the accent here and
@@ -277,7 +296,7 @@
         border: 1px solid var(--edge); border-radius: var(--r-card);
         background: var(--panel); overflow: hidden;
       }
-      .card-raised { background: linear-gradient(#131924, #10151e); }
+      .card-raised { background: linear-gradient(var(--card), var(--panel)); }
 
       /* A hairline stack: rows separated by the grid gap showing through. */
       .stack { display: grid; gap: 1px; background: var(--edge); border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; }
@@ -316,7 +335,7 @@
       }
       .plate-row:last-child { border-bottom: 0; }
       .plate-key { color: var(--dimmer); }
-      .plate-value { color: #c6d0dc; text-align: right; }
+      .plate-value { color: var(--text); text-align: right; }
 
       /* The ghost button every rail segment ends with. */
       .ghost {
@@ -330,7 +349,7 @@
         background: var(--accent); color: var(--accent-ink); white-space: nowrap;
       }
       .secondary {
-        border: 1px solid var(--edge-strong); background: none; color: #c6d0dc;
+        border: 1px solid var(--edge-strong); background: none; color: var(--text);
         border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600;
         cursor: pointer; white-space: nowrap;
       }
@@ -366,7 +385,7 @@
         display: flex; align-items: center; gap: 14px;
         min-width: 0; width: 100%; overflow: hidden;
         padding: 10px 16px;
-        background: linear-gradient(#141a24, #10151e);
+        background: linear-gradient(var(--card), var(--panel));
         border-bottom: 1px solid var(--edge);
       }
       .brand { display: flex; align-items: center; gap: 9px; flex: none; }
@@ -448,7 +467,7 @@
       /* --- Main column, § 1.3 --- */
       .stagecol {
         display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden;
-        background: radial-gradient(120% 90% at 50% 0%, #111823, #0b0e14);
+        background: radial-gradient(120% 90% at 50% 0%, var(--panel), var(--bg));
       }
       .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 9px 14px 0; align-items: flex-end; }
       [role='tab'] {
@@ -456,9 +475,20 @@
         font-size: 12.5px; font-weight: 600; padding: 7px 13px;
         border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap;
       }
-      [role='tab'][aria-selected='true'] { background: #151d29; color: var(--text); }
+      /* § D235 / issue #76. The literal was `#151d29`, and it is the single worst thing the light
+         mode did: the pill stayed near-black while its label switched to `--text`'s near-black, so
+         the **selected** tab — the one thing that says where you are — rendered at **1.06:1**.
+         `--raised` is the token for *a plate that reads as above the surface behind it*, which is
+         exactly what a selected tab is, and it inverts with the page. */
+      [role='tab'][aria-selected='true'] { background: var(--raised); color: var(--text); }
       [role='tab'][hidden] { display: none; }
-      .tab-secondary { font-size: 11.5px; padding: 6px 10px; color: var(--faint); }
+      /* § 2.3's three retained surfaces. They are **peers in the tablist**, not a lesser tier, so
+         they carry the same ink as every other unselected tab and say they are a second group by
+         being smaller and by sitting in `.tabs-right`. They used to be `--faint`, which — even now
+         that `--faint` clears AA — is one rung quieter than their neighbours, and a reader's first
+         reading of *quieter than the tab beside it* is **disabled**, not *available*. Three of the
+         ten surfaces this product has looked switched off on first load (§ D235). */
+      .tab-secondary { font-size: 11.5px; padding: 6px 10px; color: var(--dimmer); }
       .tabs-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
       #drawer-toggle {
         display: none; align-items: center; align-self: center;
@@ -472,7 +502,7 @@
       .sheet {
         flex: 1; min-height: 0; overflow: auto;
         margin: 0 14px 8px; border: 1px solid var(--edge); border-radius: var(--r-card);
-        background: #0f141d; padding: 22px 24px;
+        background: var(--panel); padding: 22px 24px;
       }
 
       /* The coach ribbon, § 1.3 M2. */
@@ -480,15 +510,17 @@
         display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
         margin: 8px 14px; padding: 9px 13px;
         border: 1px solid var(--edge); border-left: 2px solid var(--accent);
-        border-radius: 10px; background: linear-gradient(90deg, #16202c, #10151e);
+        border-radius: 10px; background: linear-gradient(90deg, var(--raised), var(--panel));
       }
       .coach-rule { width: 1px; align-self: stretch; background: var(--edge); flex: none; }
       .coach-title { font-size: 13.5px; font-weight: 600; margin-top: 2px; white-space: nowrap; }
-      .coach-hint { font-size: 12.5px; color: #c6d0dc; line-height: 1.4; }
+      /* § D235 / issue #76: `#c6d0dc` was a dark-mode grey no token declares, and it is the line
+         the app writes for a **new player** — 1.31:1 on the light page. */
+      .coach-hint { font-size: 12.5px; color: var(--dim); line-height: 1.4; }
       .coach-progress { font: 500 10.5px var(--mono); color: var(--dim); margin-top: 3px; }
       .coach-controls { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
       .coach select {
-        background: var(--bg); border: 1px solid var(--edge-strong); color: #c6d0dc;
+        background: var(--bg); border: 1px solid var(--edge-strong); color: var(--text);
         border-radius: var(--r-control); padding: 5px 8px;
         font-size: 11.5px; font-weight: 600; cursor: pointer; max-width: 190px;
       }
@@ -507,13 +539,14 @@
         position: absolute; left: 14px; top: 14px;
         display: flex; align-items: center; gap: 9px;
         padding: 8px 13px; border-radius: 10px;
-        background: rgb(224 71 58 / 0.14); border: 1px solid rgb(224 71 58 / 0.5);
+        background: color-mix(in srgb, var(--band-3) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--band-3) 50%, transparent);
         backdrop-filter: blur(6px);
       }
       .alarm[hidden] { display: none; }
       .alarm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--band-3); animation: pulseAlarm 1.1s infinite; }
       .alarm-text { font-size: 12.5px; font-weight: 600; }
-      .alarm-sub { font: 500 11px var(--mono); color: #c9a29d; }
+      .alarm-sub { font: 500 11px var(--mono); color: var(--dim); }
 
       /* The wait-age legend, § 1.3 M4. */
       .legend {
@@ -557,8 +590,10 @@
       }
       .phase-seg span { font: 600 9.5px var(--mono); white-space: nowrap; letter-spacing: 0.04em; }
       #playhead {
-        position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
-        box-shadow: 0 0 8px rgb(255 255 255 / 0.7); pointer-events: none;
+        /* `--text`, not `#fff`: a white playhead on a light timeline is an invisible playhead,
+           and the playhead is the only mark that says where in the shift the reader is. */
+        position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--text) 70%, transparent); pointer-events: none;
       }
       .ticks {
         display: flex; justify-content: space-between;
@@ -632,7 +667,7 @@
       .history-bar { width: 100%; border-radius: 3px 3px 0 0; }
       .history-label { font: 500 9px var(--mono); color: var(--dimmer); }
 
-      .shift-head { padding: 11px 13px; background: linear-gradient(#16202c, #121924); border-bottom: 1px solid var(--edge); }
+      .shift-head { padding: 11px 13px; background: linear-gradient(var(--raised), var(--card)); border-bottom: 1px solid var(--edge); }
       .shift-event { font-size: 13px; font-weight: 600; line-height: 1.3; }
       .shift-note { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
       .goal { }
@@ -646,7 +681,7 @@
       .honesty { margin-top: 14px; border: 1px solid var(--edge); border-radius: var(--r-card); padding: 12px 13px; }
       .honesty-body { display: flex; gap: 8px; align-items: flex-start; }
       .honesty-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
-      .honesty-plain { font-size: 12px; color: #a6b2c1; line-height: 1.45; margin: 3px 0 0; }
+      .honesty-plain { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 3px 0 0; }
       #honesty-toggle {
         margin-top: 8px; background: none; border: 1px solid var(--edge-strong); color: var(--dim);
         border-radius: 20px; padding: 3px 10px; font: 500 11px var(--mono); cursor: pointer;
@@ -693,7 +728,7 @@
         margin: 26px 0 8px; text-transform: uppercase;
       }
       .report-meta { text-align: right; font: 500 11px/1.6 var(--mono); color: var(--dim); }
-      .report-lede { font-size: 15px; line-height: 1.6; color: #c6d0dc; margin: 18px 0 0; }
+      .report-lede { font-size: 15px; line-height: 1.6; color: var(--dim); margin: 18px 0 0; }
       .report-figures {
         display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 1px; background: var(--edge); border: 1px solid var(--edge);
@@ -714,7 +749,8 @@
       .report-cleared {
         display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
         margin: 0 0 12px; padding: 14px 16px;
-        border: 1px solid rgb(63 178 127 / 0.45); border-radius: 11px; background: rgb(63 178 127 / 0.08);
+        border: 1px solid color-mix(in srgb, var(--band-0) 45%, transparent); border-radius: 11px;
+        background: color-mix(in srgb, var(--band-0) 8%, transparent);
       }
       .report-cleared[hidden] { display: none; }
       .small-print { margin: 16px 0 0; padding: 14px 16px; border: 1px dashed var(--edge-strong); border-radius: 10px; }
@@ -729,7 +765,7 @@
       .scenario-art { width: 96px; flex: none; border-right: 1px solid var(--edge); }
       .scenario-body { padding: 13px 16px; flex: 1; min-width: 0; }
       .scenario-line { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
-      .scenario-brief { font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin: 7px 0 0; max-width: 660px; }
+      .scenario-brief { font-size: 12.5px; color: var(--dim); line-height: 1.5; margin: 7px 0 0; max-width: 660px; }
       .scenario-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 9px; font: 500 11px var(--mono); }
       .scenario-own { border-style: dashed; border-color: var(--edge-strong); background: var(--panel); }
 
@@ -759,7 +795,7 @@
         display: block; width: 100%; text-align: left; cursor: pointer; color: var(--text);
         border: 1px solid var(--edge); background: var(--panel); border-radius: 9px; padding: 9px 11px;
       }
-      .toggle[aria-pressed='true'] { background: rgb(63 178 127 / 0.09); }
+      .toggle[aria-pressed='true'] { background: color-mix(in srgb, var(--band-0) 9%, transparent); }
       .toggle-line { display: flex; gap: 8px; align-items: baseline; }
       .toggle-label { font-size: 12.5px; font-weight: 600; flex: 1; }
       .toggle-state { font: 600 10px var(--mono); flex: none; }
@@ -769,7 +805,7 @@
          in. `data-live` rather than a class: the panel writes it from the model's own `live`, and
          the dimming is the second signal beside the refusal, never the only one (KB-15). */
       .selector-line { font: 500 11px var(--mono); color: var(--accent-soft); line-height: 1.6; margin-top: 8px; }
-      .selector-note { font-size: 12px; color: #a6b2c1; line-height: 1.5; margin: 0; }
+      .selector-note { font-size: 12px; color: var(--dim); line-height: 1.5; margin: 0; }
       .selector-refusal { font: 500 10.5px var(--mono); color: var(--warn); line-height: 1.5; margin-top: 6px; }
       .selector-refusal[hidden] { display: none; }
       .selector-arm { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel); padding: 9px 11px; }
@@ -786,10 +822,10 @@
       .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
       .dirty[hidden] { display: none; }
       .summary-line { font: 500 11px var(--mono); color: var(--accent-soft); margin-top: 13px; line-height: 1.6; }
-      .advice { font-size: 12px; color: #a6b2c1; line-height: 1.45; margin: 6px 0 0; }
+      .advice { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 0; }
 
       /* The elevation, § 1.3 M11. */
-      .elevation { border: 1px solid var(--edge); border-radius: var(--r-panel); background: #0d1219; padding: 12px 12px 10px; }
+      .elevation { border: 1px solid var(--edge); border-radius: var(--r-panel); background: var(--bg); padding: 12px 12px 10px; }
       .elevation-head {
         display: flex; align-items: baseline; gap: 8px; padding: 0 8px 7px;
         font: 600 9px var(--mono); letter-spacing: 0.09em; color: var(--faint);
@@ -807,10 +843,12 @@
       .elev-occ-track { position: relative; width: 100%; height: 6px; border-radius: 3px; background: var(--bg); display: block; overflow: hidden; }
       .elev-people { width: 74px; flex: none; text-align: right; font: 500 10px var(--mono); white-space: nowrap; }
       .elev-shafts { position: absolute; top: 0; bottom: 0; right: 8px; display: flex; gap: 6px; }
-      .elev-shaft { flex: 1; min-width: 0; position: relative; background: rgb(255 255 255 / 0.04); border-radius: 5px; }
+      /* A 4 % wash of the ink rather than of white: on a light elevation a white wash is nothing,
+         and this is the only mark that says where a shaft is before a band is dragged onto it. */
+      .elev-shaft { flex: 1; min-width: 0; position: relative; background: color-mix(in srgb, var(--text) 4%, transparent); border-radius: 5px; }
       .elev-band {
         position: absolute; left: 0; right: 0; border: 1px solid var(--accent); border-radius: 5px;
-        background: rgb(79 158 232 / 0.07);
+        background: color-mix(in srgb, var(--accent) 7%, transparent);
         display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; overflow: hidden;
       }
       .elev-grip { height: 10px; flex: none; cursor: ns-resize; opacity: 0.5; border: 0; padding: 0; }
@@ -826,14 +864,16 @@
         font: 600 10px var(--mono); color: var(--dim);
         background: var(--bg); border: 1px solid var(--edge);
       }
-      .zone-floor[aria-pressed='true'] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+      /* `--accent-ink` and not `--bg`: this is text *on* the accent fill, and the token that
+         inverts with the fill is the one for it. `--bg` on `--accent` is 4.26:1 in light. */
+      .zone-floor[aria-pressed='true'] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
       .zone-floor[data-shared='true'] { border-style: dashed; }
       .zmatrix { overflow: auto; max-height: 320px; }
       .zmatrix table { border-collapse: collapse; font: 500 10px var(--mono); }
       .zmatrix th, .zmatrix td {
         border-bottom: 1px solid var(--hairline); padding: 2px 7px; text-align: left; white-space: nowrap;
       }
-      .zmatrix th { color: var(--faint); font-weight: 600; letter-spacing: 0.05em; position: sticky; top: 0; background: #0d1219; }
+      .zmatrix th { color: var(--faint); font-weight: 600; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--bg); }
       .zmatrix td.zcell-open { color: var(--ok); }
       .zmatrix td.zcell-closed { color: var(--over); }
       .zmatrix td.zcell-free { color: var(--faint); }
@@ -979,7 +1019,18 @@
       .menu-row[disabled], .menu-start[disabled] { opacity: 0.55; cursor: not-allowed; }
       .menu-row-name { font-weight: 600; }
       .menu-row-detail { font: 400 12px/1.45 var(--sans); color: var(--dim); }
-      .menu-start { background: var(--accent); border-color: var(--accent); color: #06121f; }
+      /* `--accent-ink` and not the `#06121f` literal that was here: the literal was a sixth grey
+         nothing declares, and it does not follow the light mode, where the accent fill is dark. */
+      .menu-start { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+      /* § D235 / issue #26. The detail line is the *only* thing that tells a new player the
+         difference between the two blue buttons on the Scenarios screen — "start the scored week"
+         against "sandbox the same week unscored" — and it inherited `.menu-row-detail`'s `--dim`,
+         which is styled for a dark card. On the accent fill that is **1.03:1** in dark and 1.46:1
+         in light: present in the DOM, invisible on the screen, at the exact point a player most
+         needs the sentence. `--accent-ink` is the token that exists for text on an accent fill and
+         inverts with the fill rather than with the page — 6.58:1 dark, 4.77:1 light. The hierarchy
+         against `.menu-row-name` is carried by weight and size, which survive a photocopier. */
+      .menu-start .menu-row-detail { color: var(--accent-ink); }
       .menu-back { background: transparent; margin-top: 4px; }
       .menu-select, .menu-text, .menu-seed, .menu-toggle {
         display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -1396,9 +1447,9 @@
                   <span style="font-size: 20px" aria-hidden="true">✓</span>
                   <div style="min-width: 0; flex: 1">
                     <div style="font-size: 15px; font-weight: 600">Scenario cleared</div>
-                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 2px" id="report-cleared-note"></div>
+                    <div style="font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-top: 2px" id="report-cleared-note"></div>
                   </div>
-                  <button type="button" class="primary" id="report-take-next" style="background: var(--ok); color: #062017">
+                  <button type="button" class="primary" id="report-take-next" style="background: var(--ok); color: var(--accent-ink)">
                     Take the next assignment
                   </button>
                 </div>
@@ -1411,15 +1462,15 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px" id="report-levers"></div>
 
                 <div style="display: flex; flex-wrap: wrap; gap: 9px; margin: 26px 0 0">
-                  <div style="flex: 1; min-width: 240px; padding: 13px 15px; border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(#16202c, #121924)">
+                  <div style="flex: 1; min-width: 240px; padding: 13px 15px; border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(var(--raised), var(--card))">
                     <div class="eyebrow">Tomorrow</div>
                     <div style="font-size: 14px; font-weight: 600; margin-top: 5px" id="report-forecast-name"></div>
-                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 3px" id="report-forecast-note"></div>
+                    <div style="font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-top: 3px" id="report-forecast-note"></div>
                     <div style="font: 500 11px var(--mono); color: var(--warn); margin-top: 7px" id="report-forecast-demand"></div>
                   </div>
                   <div style="flex: 1; min-width: 200px; padding: 13px 15px; border: 1px solid var(--edge); border-radius: 10px; background: var(--card)">
                     <div class="eyebrow">What this taught</div>
-                    <div style="font-size: 12.5px; color: #a6b2c1; line-height: 1.5; margin-top: 5px" id="report-taught"></div>
+                    <div style="font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-top: 5px" id="report-taught"></div>
                   </div>
                 </div>
 
@@ -1427,7 +1478,7 @@
                   <div class="eyebrow" style="letter-spacing: 0.08em; color: var(--dim)">
                     The small print, which is actually the point
                   </div>
-                  <p style="font-size: 12.5px; line-height: 1.55; color: #a6b2c1; margin: 7px 0 0" id="report-small-print"></p>
+                  <p style="font-size: 12.5px; line-height: 1.55; color: var(--dim); margin: 7px 0 0" id="report-small-print"></p>
                 </div>
 
                 <div style="display: flex; gap: 9px; margin: 22px 0 0; flex-wrap: wrap">
@@ -1445,7 +1496,7 @@
                 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
                   <div>
                     <div class="eyebrow">Scenarios — five buildings, any order</div>
-                    <p style="font-size: 13px; color: #a6b2c1; line-height: 1.5; margin: 6px 0 0; max-width: 640px">
+                    <p style="font-size: 13px; color: var(--dim); line-height: 1.5; margin: 6px 0 0; max-width: 640px">
                       Every scenario is open from the start. Bank the clean shifts one asks for, or just run
                       it and watch what breaks — each building teaches something the other four cannot.
                     </p>
@@ -1482,7 +1533,7 @@
                     </div>
                     <div style="display: grid; gap: 9px" id="dispatcher-terms"></div>
                     <div style="display: grid; gap: 6px; margin-top: 14px" id="dispatcher-flags"></div>
-                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1c2532">
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline)">
                       <div class="eyebrow" style="margin-bottom: 9px">Group levers — apply to whoever is driving</div>
                       <div style="border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden">
                         <div id="group-levers"></div>
@@ -1499,7 +1550,7 @@
                          Every node below is written by dev/selectorEditor.ts; the only static text
                          is the heading and the button, because everything else is either core's own
                          parameter copy or a refusal the model raised. -->
-                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #1c2532">
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline)">
                       <div class="eyebrow" style="margin-bottom: 9px">Traffic-pattern switching — the one thing that changes mid-shift</div>
                       <p class="selector-note" id="selector-unavailable" hidden></p>
                       <div id="selector-controls">
@@ -1573,7 +1624,7 @@
                 <div class="editor-panel">
                   <label class="field">name <input id="machines-name" /></label>
                   <div style="display: grid; gap: 10px; margin-top: 10px" id="machines-rows"></div>
-                  <div class="chip-row" style="margin-top: 12px; padding-top: 11px; border-top: 1px solid #1c2532">
+                  <div class="chip-row" style="margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline)">
                     <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 2px"
                           title="Contract speed in metres per second — the fastest a car of this class is allowed to run. It must sit inside the class's own speed band.">rated speed in service</span>
                     <span id="machines-speed-chips" class="chip-row"></span>
@@ -1609,7 +1660,7 @@
                     <div class="helpful" style="font: 500 11px var(--mono); color: var(--measured); margin-top: 10px; line-height: 1.6"
                          id="building-occupancy"
                          title="Capacity is what the building was designed to hold; occupancy is how much of it is let today. Population — the number the lifts must move — is the product of the two."></div>
-                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #1c2532">
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline)">
                       <div class="eyebrow helpful"
                            title="The machine class from data/elevator-specs.json. It sets the speed band, the rise the class can serve and the loads it is built in — choosing one is choosing the physics, not a label.">
                         Machine class
@@ -1620,7 +1671,7 @@
                       </button>
                       <div class="chip-row" style="margin-top: 7px" id="building-class-chips"></div>
                       <div style="font-size: 11.5px; color: var(--dim); line-height: 1.55; margin-top: 8px" id="building-class-plain"></div>
-                      <div style="font: 500 10.5px var(--mono); color: #5c6a7c; line-height: 1.6; margin-top: 4px" id="building-class-limits"></div>
+                      <div style="font: 500 10.5px var(--mono); color: var(--faint); line-height: 1.6; margin-top: 4px" id="building-class-limits"></div>
                       <div style="font: 500 11px var(--mono); line-height: 1.55; margin-top: 6px" id="building-class-warning"></div>
                     </div>
                     <div class="chip-row" style="margin-top: 12px">
@@ -1677,7 +1728,7 @@
                          id="elevation-legend"></div>
                     <div style="font: 500 10.5px var(--mono); color: var(--accent-soft); margin-top: 8px; line-height: 1.5" id="elevation-note"></div>
                     <div style="font: 500 10.5px var(--mono); color: var(--over); margin-top: 4px; line-height: 1.5" id="elevation-warning"></div>
-                    <div style="margin-top: 12px; padding-top: 11px; border-top: 1px solid #1c2532" class="chip-row">
+                    <div style="margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline)" class="chip-row">
                       <button type="button" class="secondary" id="elevation-add-shaft">+ Add a shaft</button>
                       <button type="button" class="secondary" id="elevation-remove-shaft">− Remove a shaft</button>
                     </div>
@@ -1733,7 +1784,7 @@
                       <button type="button" class="chip" id="building-group-add">add to this zone</button>
                     </div>
                   </div>
-                  <div style="margin-top: 13px; padding-top: 11px; border-top: 1px solid #1c2532">
+                  <div style="margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--hairline)">
                     <div class="eyebrow helpful"
                          title="Coverage: every floor against every credential group this building names. A row no column opens is a floor whose trips are never generated at all.">
                       Coverage — floors × credential groups

@@ -14895,3 +14895,133 @@ something to scroll. That is `index.html`, reported rather than edited, with the
 lane's report. It also means the grid has **two sources of truth for one set of column widths** — the
 static head and the JS-built rows — which is the underlying defect and wants the head built from the
 same constants.
+## D235 — the ink ladder had five rungs and a dark theme has room for four
+
+**Date: 2026-08-05 · Written after the code, and says so.** Three play-tester issues against the
+viewer's colour — #75 (dark), #76 (light) and #26 (the Scenarios menu). Every ratio below was
+recomputed from the shipped token values rather than taken from the reports, and two reported
+figures did not survive that; they are named at the end.
+
+### What reproduced
+
+`--faint`, the handoff's `#4d5a6b`, measured against the five surfaces it is drawn on:
+
+| ground | `--bg` | `--rail` | `--panel` | `--card` | `--raised` |
+|---|---|---|---|---|---|
+| `#4d5a6b` | **2.75** | **2.65** | **2.60** | **2.51** | **2.31** |
+
+WCAG 2.2 AA (1.4.3) asks **4.5:1** for text below 18.66 px bold / 24 px. `--faint` is the ink of
+**sixteen** text rules in `index.html` — the Compare/Lab/Parameters tab labels, the timeline's
+o'clock ticks, `.decision-time`, `.legend-title`, `.eyebrow-note`, `.slider-sub`,
+`.selector-arm-signature`, `.elevation-head`, `.zmatrix th`, `.zcell-free`, `.transport-caption`
+and five inline rules — every one of them between 9 px and 11.5 px. AA Large's 3:1 is available to
+none of them.
+
+A walk of every rendered text node at 1280 × 720 on a live run counted **32** elements in
+`rgb(77, 90, 107)` at 2.60–2.75:1, and **48** more in `--dimmer` `#6d7b8d` at **4.24–4.48:1** —
+which no report mentioned and which also fails, by a hair, at the 10–11 px those elements are set
+in. `--dimmer` on `--raised`, the ground under a selected `.pick`, is **3.77:1**.
+
+### Why the token moved rather than the sixteen rules
+
+`render/tokens.ts` justified `--faint`'s value with a distinction — *"the label gutter is scenery
+and an eyebrow is content, and the artefact draws them two different greys"* — and
+`render/theme.test.ts` used the same sentence to **exempt** `--faint` from its contrast floor, in
+the `SCENERY` group beside the hairlines. The distinction is real and the claim under it was false
+of this implementation twice over: `--faint` is content in sixteen stylesheet rules, and the
+gutter it names on the canvas is the floor id, which is the only mark that says which floor a car
+is standing at. **A token exempted from a floor on a description of itself that had stopped being
+true** is the same defect class this repository closes as a dead seam, wearing a palette's hat.
+
+So the exemption is withdrawn — `--faint` is in `CONTENT_ON_PANEL` now — and the value was raised
+to survive being there.
+
+### The ladder, and why three rungs moved for one issue
+
+Raising `--faint` past 4.5:1 puts it above where `--dimmer` was standing, so the rung above it had
+to move too, and the rung above that to keep a visible step. The result is a **four-rung** ladder
+where there were five, and that is the finding rather than a side effect: **a dark surface set
+running `#0b0e14` to `#16212f` does not hold five legible ink steps.** Below `--faint`'s new value
+there is no colour that clears 4.5:1 on `--raised`.
+
+| token | was | now | worst of the five dark surfaces |
+|---|---|---|---|
+| `--text` | `#e8edf4` | *unchanged* | 13.81 |
+| `--dim` | `#8b98a9` | `#9aa7b8` | 5.54 → **6.65** |
+| `--dimmer` | `#6d7b8d` | `#8b98a9` | 3.77 → **5.54** |
+| `--faint` | `#4d5a6b` | `#7c899a` | 2.31 → **4.57** |
+
+The light mode takes the same treatment against **`--bg`**, which is the darkest light surface and
+therefore the worst ground for dark ink — the mirror of `--raised` being the worst in dark:
+`--dim` `#4a5666` → `#424e5d` (6.24 → 7.08), `--dimmer` `#64707f` → `#515d6c` (4.22 → **5.61**),
+`--faint` `#7e8998` → `#5d6978` (2.97 → **4.67**). `oosOffText` follows `textDim`, because
+`OOS_OFF_TEXT = TEXT_DIM` in dark and `render/theme.test.ts` holds the two modes to the same
+collision set.
+
+`--fainter` did **not** move, and its exemption is now checkable rather than argued: **nothing
+draws it.** No rule in `index.html` names it and no function in `render/` reads `Theme.fainter`. A
+colour that carries no word has no legibility to fail. (It is, on that same evidence, a small dead
+seam — declared in five files and drawn by none. Recorded, not closed.)
+
+### `.tab-secondary` — a tier, not a contrast bug
+
+`--faint` clearing AA does not answer #75's second half, which is the sharper observation:
+*Compare*, *Lab* and *Parameters* were the only tabs styled a rung quieter than their neighbours,
+and **a reader's first reading of "quieter than the tab beside it" is disabled, not available.**
+Three of this product's ten surfaces looked switched off on first load. They carry `--dimmer` now,
+the same ink as every other unselected tab, and say they are a second group by being 11.5 px in
+`.tabs-right` rather than by being harder to read. Size and position are the second signal
+(KB-15); lower contrast is not one.
+
+### What was measured and deliberately not moved
+
+The **band palette and the status hues** stay at § 1.1 S7's values. Measured against `--panel`:
+`--band-3` **4.47:1**, `--over` 4.84, `--accent` 6.44, and in light against `--bg`, `--accent`
+4.26 and `--measured` 4.37. `--band-3` misses AA by 0.03 at `.decision-title`'s 11.5 px. It is not
+moved because the four bands are the one palette three surfaces must agree about — the rail's mood
+bar, the canvas's rider glyphs and the legend between them — the handoff is canonical for them,
+and **none of them is ever the only signal**: `render/riderQueue.ts` gives each band a distinct
+glyph and `decision-title` reads `no car for Level 12` in words. Stated here with the number so
+that finding it again counts as confirmation rather than discovery.
+
+### The two figures that did not reproduce
+
+- **#76's status-colour rows.** The report has `.stat-value`, `.goal-got`, `.decision-title` and
+  the mood chips rendering `rgb(63, 178, 127)` and `rgb(224, 176, 64)` — the *dark* bands — on
+  light surfaces at 1.77–2.48:1. The stylesheet's light block answers those correctly
+  (`--band-0: #1c7a55` is 4.94:1 on `--panel`), so the failure is not the token switch. It is that
+  `src/live/bands.ts` and `src/live/decisions.ts` hold **their own hex copies** of the dark band
+  palette, which `dev/leftRail.ts` writes into inline `style="color:…"` — and an inline style is
+  not reached by a `:root[data-theme]` block. Same symptom, different cause, and a fourth copy of
+  a palette. Not fixed here: those files are outside this lane's ownership. `src/live/timeline.ts`
+  has a fifth copy (`{ bg: '#161e2a', fg: '#6d7b8d' }` per phase) with the same problem.
+- **#26's ratio is exact.** `.menu-row-detail` is `var(--dim)` and `.menu-start` is `var(--accent)`
+  — `#8b98a9` on `#4f9ee8` is **1.03:1**, reproduced to two decimals. In light it is `#4a5666` on
+  `#1c6fc4`, **1.46:1**, which the report did not cover and which is the same defect. Both are
+  fixed by giving the primary variant `--accent-ink`, which is the token that exists for *text on
+  an accent fill and inverts with it rather than with the page*: **6.58:1** dark, **4.77:1** light.
+  `.menu-start`'s own `color: #06121f` literal — a sixth grey nothing declares — goes at the same
+  time.
+
+### What is asserted, so this cannot rot
+
+`render/theme.test.ts` gains two tests beside the existing `FLOOR` bound, which stays where it is:
+
+1. **The ladder against the standard.** The four greys are held to 4.5:1 against **all five**
+   surfaces in **both** modes. The existing bound measures one surface, and the incumbent failure
+   was worse on `--raised` (2.31) than on the `--panel` (2.60) that bound looks at — so a
+   one-surface check would have understated it. Iterating rather than naming a worst surface is
+   deliberate: which surface is worst inverts between the modes.
+2. **The ladder is still a ladder.** Four distinct values, strictly ordered against a fixed ground,
+   each a step of at least 5 % from the rung above. A floor alone would accept four greys that all
+   cleared 4.5:1 and were indistinguishable, which would satisfy #75 by deleting § 1.1 S8's
+   hierarchy.
+
+One existing assertion was **rewritten rather than relaxed**. `canvas.test.ts`'s sky test carried a
+negative control reading `toBeLessThan(6)` over the count of bright hex fills on the dark stage;
+three ink tokens crossing `0x80` turned it red with nothing about the sky changed. A bound that
+moves when an unrelated token moves is measuring the wrong thing, so it now asserts the claim it
+was standing in for: every bright fill on the dark stage is a value the theme itself **declares**,
+and therefore none of them is a sky strip — sky strips are `mixHex` interpolations equal to no
+named token. That is strictly stronger: it fails on one dark sky strip, where the count accepted
+five.

@@ -380,28 +380,26 @@ function contrast(a: string, b: string): number {
 const SURFACES = ['--bg', '--rail', '--panel', '--card', '--raised'];
 
 /**
- * Structure — rules, hairlines, the label gutter, the dotted underline under a term.
+ * Structure — rules, hairlines, the dotted underline under a term.
  *
- * Excluded from the floor with a reason rather than left out: `render/tokens.ts` makes the same
- * distinction one layer down (*"the label gutter is scenery and an eyebrow is content, and the
- * artefact draws them two different greys"*), and the shipped dark palette puts `--fainter` at
- * 1.99:1 on purpose. A floor that included these would be a floor the incumbent design fails.
+ * Excluded from the floor with a reason rather than left out, and the reason has to be *true of
+ * the token*, which is the half this list got wrong. `--faint` sat here on `render/tokens.ts`'s
+ * argument that *"the label gutter is scenery and an eyebrow is content"* — and `--faint` is the
+ * ink of sixteen text rules in `index.html`, so it was content wearing scenery's exemption. It is
+ * in {@link CONTENT_ON_PANEL} now and it was raised to survive being there (§ D235).
+ *
+ * `--fainter` stays, and its exemption is now checkable rather than asserted: **nothing draws
+ * it.** No rule in `index.html` names it and no function in `render/` reads `Theme.fainter`. A
+ * colour that carries no word has no legibility to fail.
  */
-const SCENERY = [
-  '--hairline',
-  '--edge',
-  '--edge-mid',
-  '--edge-strong',
-  '--hint-underline',
-  '--faint',
-  '--fainter',
-];
+const SCENERY = ['--hairline', '--edge', '--edge-mid', '--edge-strong', '--hint-underline', '--fainter'];
 
 /** Everything that carries a word or a number, and the surface it is drawn on. */
 const CONTENT_ON_PANEL = [
   '--text',
   '--dim',
   '--dimmer',
+  '--faint',
   '--accent',
   '--accent-soft',
   '--band-0',
@@ -419,6 +417,21 @@ const CONTENT_ON_PANEL = [
 const CONTENT_ON_ACCENT = ['--accent-ink'];
 
 const FLOOR = 4;
+
+/**
+ * The four greys that carry prose, in ladder order — `--text` down to `--faint`.
+ *
+ * Separated from {@link CONTENT_ON_PANEL} because they are the group with a *standard* attached
+ * rather than a no-regression bound: every one of them is drawn as body text at 9–13 px on at
+ * least one surface, so WCAG 2.2 AA's 4.5:1 applies to all four with no large-text carve-out
+ * available. The hue tokens below them — the four bands, `--over`, `--transfer`, `--entrance`,
+ * `--secure`, `--measured` — stay on `FLOOR`, because § 1.1 S7 is canonical for the band ladder
+ * and because none of them is ever the only signal (KB-15).
+ */
+const INK_LADDER = ['--text', '--dim', '--dimmer', '--faint'];
+
+/** WCAG 2.2 AA, 1.4.3 Contrast (Minimum), for text below 18.66 px bold / 24 px. */
+const AA_BODY = 4.5;
 
 describe('contrast — a no-regression bound, never a claim about how it looks', () => {
   it('accounts for every token exactly once, derived from the stylesheet', async () => {
@@ -441,6 +454,60 @@ describe('contrast — a no-regression bound, never a claim about how it looks',
       for (const token of CONTENT_ON_ACCENT) {
         const ratio = contrast(tokens[token] as string, tokens['--accent'] as string);
         expect(ratio, `${name} ${token} on --accent`).toBeGreaterThanOrEqual(FLOOR);
+      }
+    }
+  });
+
+  it(`holds the ink ladder to WCAG 2.2 AA (${String(AA_BODY)}:1) on every surface, in both modes`, () => {
+    /*
+     * § D235. `FLOOR` above is a *no-regression* bound measured against one surface; this is a
+     * standard, measured against all five — because a token is drawn on whichever surface the
+     * rule that names it happens to land on, and the incumbent failure was found on `--panel`
+     * (2.60:1) and was worse on `--raised` (2.31:1), which no one-surface check would have seen.
+     *
+     * Both directions of *worst surface* are covered by iterating rather than by naming one: in
+     * dark the worst ground for pale ink is the lightest surface, `--raised`; in light the worst
+     * ground for dark ink is the darkest, `--bg`. A test that picked a surface would have to know
+     * which mode it was in, and would be wrong the day a sixth surface landed.
+     */
+    for (const name of ['dark', 'light'] as const) {
+      const tokens = tokensOf(name);
+      for (const token of INK_LADDER) {
+        for (const surface of SURFACES) {
+          const ratio = contrast(tokens[token] as string, tokens[surface] as string);
+          expect(ratio, `${name} ${token} on ${surface}`).toBeGreaterThanOrEqual(AA_BODY);
+        }
+      }
+    }
+  });
+
+  it('keeps the ink ladder a ladder: four distinct rungs, in order, in both modes', () => {
+    /*
+     * The other half of § D235, and the one a contrast floor alone would let through: four greys
+     * that all cleared 4.5:1 and were indistinguishable from each other would satisfy the test
+     * above and would delete the hierarchy the handoff's § 1.1 S8 is built on. So the rungs are
+     * required to be strictly ordered against a *fixed* ground, and to differ by a real step.
+     *
+     * `--bg` is the ground for both modes here, not because it is the worst — it is the worst in
+     * light and the best in dark — but because ordering is a property of the ink, and measuring
+     * every rung against one surface is what makes the comparison mean anything.
+     */
+    for (const name of ['dark', 'light'] as const) {
+      const tokens = tokensOf(name);
+      const rungs = INK_LADDER.map((token) => contrast(tokens[token] as string, tokens['--bg'] as string));
+      expect(new Set(INK_LADDER.map((token) => tokens[token])).size, `${name} rungs are distinct`).toBe(
+        INK_LADDER.length,
+      );
+      for (let index = 1; index < rungs.length; index += 1) {
+        const above = rungs[index - 1] as number;
+        const here = rungs[index] as number;
+        expect(here, `${name} ${INK_LADDER[index] ?? ''} is quieter than the rung above it`).toBeLessThan(
+          above,
+        );
+        expect(
+          above / here,
+          `${name} ${INK_LADDER[index] ?? ''} is a visible step below the rung above it`,
+        ).toBeGreaterThan(1.05);
       }
     }
   });
