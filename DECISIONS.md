@@ -14895,3 +14895,223 @@ something to scroll. That is `index.html`, reported rather than edited, with the
 lane's report. It also means the grid has **two sources of truth for one set of column widths** — the
 static head and the JS-built rows — which is the underlying defect and wants the head built from the
 same constants.
+
+## D239 — the mood card was reading the one instant whose answer is always calm
+
+### The report, and what it turned out to be
+
+Issue #35: at the end of a Midtown Office shift that the Day report called **"It did not cope"** —
+average wait withheld, worst wait 2 057 s, 771 riders on the stairs, deepest queue 354 — the left
+rail's largest type read
+
+> ◡ **Everyone is getting on with their day.** · *nobody has waited a minute*
+
+with all four band counters at zero, three lines above *served under 60 s **18 %*** in the same
+panel.
+
+Two hypotheses were on the table and they call for different fixes. Either the mood was computed at
+a **stale playhead** — the shape Area B found in the Day report, where a sheet described a day the
+transport had not reached — or it was computed correctly at a playhead whose answer is structurally
+zero. It is the second, and the evidence separates them cleanly:
+
+- `vertical-city` at the shipped rates ends `timed-out` with **84 people still standing**, and
+  `waitBandsAt(recording, endedAt)` correctly reports `[0, 0, 0, 84]`, worst band 3, face `×`. The
+  reading tracks the playhead.
+- `midtown-office` under `collective` over an hour of demand ends `status: 'completed'`,
+  `saturated: true`, `awtIsValid: false`, 1 392 of 1 392 carried, **781 past the 900 s horizon**,
+  **18.0 %** served inside a minute, peak queue **392** at the ground floor — and
+  `waitBandsAt(recording, endedAt)` is `[0, 0, 0, 0]`, worst band 0, face `◡`, headline *"Everyone
+  is getting on with their day."*
+
+So the defect is not a stale anything. **A run that completes runs on until the last passenger is
+delivered, so its final frame has an empty lobby by construction**, and a card keyed on the queue
+there reports the calmest band about the worst possible day. It inverts at the end of every
+completed run and it inverts hardest when the run was worst — because the worse the collapse, the
+larger the crowd that has to drain before the clock stops.
+
+The same instant, in the same rail, does it a second time. `live/honesty.ts`'s **casual** card is
+keyed on `fallingBehindAt`, which needs somebody standing in the fourth band; at `endedAt` nobody
+is, so the casual honesty card read `✓ Comfortably keeping up` over that run too. That one is not
+only a lie, it is § 4's line crossed — *"Basic mode may hide complexity. It may never hide a
+failure"* — because a refused statistic is on § 4's own never-hide list, which `mode/types.ts`'s
+`disclosureClassOf` states as `suppression → must-show`. The casual card was the one **mounted**
+surface where that clause was not kept.
+
+### The decision: a second basis, not a corrected one
+
+`waitBandsAt` gains a third parameter, `WaitBandBasis`, defaulting to the reading it already had:
+
+- `'now'` — everybody **standing** at `t`, from `queueAt`. Unchanged, still the design's card, and
+  `bands.test.ts`'s by-construction agreement with `frameAt(recording, t).totalWaiting` is untouched
+  at both ends of every shipped building. Moving that boundary to fix the terminal instant would
+  have broken the one assertion that catches a banding which drops or double-counts somebody.
+- `'whole-run'` — everybody whose call was **registered** by `t`, banded by the worst wait each of
+  them realised. Non-decreasing in `t`, so a band cannot un-happen as the playhead advances — the
+  same property `observations.ts` gets by deriving `abandoned` from a crossing time rather than from
+  `t - arrivedAt > horizonS`, and for the same reason.
+
+Both walk `recording.legs`, so the two bases count one population and a rider cannot be in the
+retrospective banding and absent from the live one. Asserted on every shipped building: the
+whole-run total equals `observationsAt(…).arrived`, and its worst band dominates the live worst band
+at all eleven sampled instants.
+
+`moodOf` reads `bands.basis` and writes a different sentence for each. That is the load-bearing half
+— two bandings that read identically are one banding with a bug — and the distinction is carried in
+**tense**, which survives a greyscale screenshot and a screen reader where the face's tint does not
+(KB-15). *"The stairwell door is getting a workout"* against *"The stairwell door got a workout"*;
+*"nobody has waited a minute"* against *"across the whole shift, nobody stood half a minute"*. The
+bar's `aria-label` says it in full words: *"Across the whole shift, 1 392 people called a lift, by
+the longest each of them stood: …"*.
+
+The first retrospective headline is the one that needed most care. It replaces the sentence that
+caused the report, and it is a claim about **wait ages over the shift** and nothing else — *"Nobody
+stood for long today"*, not *"the day went well"*. Nobody having waited thirty seconds is genuinely
+all this card measured; the honesty card beside it and the mood drivers under it speak for the rest.
+
+### Where the choice is made, and why it is not in `live/`
+
+`dev/leftRail.ts#shiftIsOver` — `t >= recording.endedAt` — and `basisAt` maps it onto the union.
+`live/` answers whichever question it is asked; *which question a finished shift deserves* is a
+presentation call, which is the split that file's docstring already draws. `shiftIsOver` is exported
+so the test drives the rail's own decision rather than recomputing `t >= endedAt`, which is
+`summaryFigureIds`' argument about itself: a probe that recomputes a decision asserts its own
+arithmetic and would pass with the control disconnected.
+
+`recording.status` is deliberately not consulted. A `timed-out` run is finished too, and it has the
+*more* honest terminal frame — the people it failed are still standing in it — so a rule keyed on
+`status === 'completed'` would hand the retrospective card to the run that needs it least.
+
+The honesty card takes the same basis and the rail draws both on it, because a rail whose face is
+retrospective and whose honesty card is instantaneous is two panels answering two questions with no
+way for a reader to tell which is which. On `'whole-run'` the casual card answers **did it cope**,
+using `meansAreSuppressed` — the run's own gate, not a second opinion about it — and R3 is kept in
+both halves: casual shortens the refusal to one sentence and the verbatim reason is still one
+control away behind *show me the maths*.
+
+### What this did not change
+
+The four stat rows. *standing right now 0* and *longest wait — nobody waiting* are true at the end
+of a completed run and are labelled instantaneous in their own captions and tooltips; they were
+never the sentence being read as a verdict. Left alone rather than relabelled, because a *"run
+over"* badge on a row that already says *right now* is a second answer to a question the caption has
+answered.
+
+`waitBandsAt`'s default is `'now'`, so every caller written before this — `honesty/surfaces.ts`,
+`fallingBehindAt`, `dev/main.ts`'s legend — keeps the reading it had. The defect is still reachable
+and still reproduces: `moodAt(recording, endedAt)` on the Midtown run returns *"Everyone is getting
+on with their day"* today, and `bands.test.ts` asserts that it does, beside the assertion that the
+rail no longer draws it.
+
+### Named limitation
+
+An unfinished shift at a **paused** playhead is still live, correctly. What has no answer here is a
+reader who scrubs backwards after the run ends: the card returns to `'now'` the moment the playhead
+leaves `endedAt`, which is right — they are inspecting an instant — but there is no affordance
+saying *"this is the shift you already finished"*. Stated rather than solved.
+
+---
+
+## D240 — Casual removed the plain-language panel and kept the jargon, and parity could not see it
+
+### What was measured
+
+Issue #71 diffed every rendered text node between the two modes on a completed Chancery House shift
+and found Casual removes **four** strings and adds **two**, identically on the Simulation and Day
+report tabs — all six of them the honesty card. `AWT · WT95`, the seed, the peak-5min window, the
+kilojoule tiles and the 900 s abandonment horizon all stay. Casual is, in the reporter's words,
+*less* informative than Engineer for the audience it names.
+
+Driven here, the finding splits in two, and the second half is the larger.
+
+**One: the disclosure layer's Basic side barely was one.** `itemForFigure` ended
+`basic: BASIC_HIDES.has(figure.id) ? null : advanced` — every figure Basic kept, it kept **verbatim**.
+On a real run: twelve items, two hidden, three differing, **seven byte-identical**, and the seven
+carried the vocabulary the mode exists to remove — *95th-percentile wait*, *door to door*, *rides
+over 60 s*, *the unluckiest rider*, `n = 44 rides`.
+
+**Two: on the Simulation and Day report tabs, nothing mounts those renderings at all.**
+`dev/main.ts`'s only consumer of `disclosureItems` is `drawParity()`, which computes
+`parityRefusal(items)`, writes it to a header element, and then writes `void itemsIn;` — a
+deliberate no-op keeping the import used. So the layer's per-mode work is computed on every
+recording and thrown away. Everything issue #71 lists is drawn by mode-blind code: `AWT · WT95` by
+`dev/main.ts`'s transport status line, the provenance block by `dev/rightRail.ts`, the kilojoule
+tiles by `dev/reportPanel.ts`, the horizon and demand prose by `render/mood.ts`. The mode reaches
+exactly three mounted places — the left rail's honesty card, the settings menu's energy row, and the
+campaign panel's fail states.
+
+That is the standing requirement's own shape (*name the non-test caller*), one level in: the layer
+**has** a non-test caller, and the caller uses it for a check and discards its output. A barrel
+re-export and a `{@link}` tag look exactly like a caller and are not one; so does a call whose
+return value is dropped.
+
+### Why `mode/parity.ts` never said so
+
+Because it structurally cannot. All three of its rules — `hidden-in-basic`, `dropped-text`,
+`de-escalated` — fire when Basic **drops** something Advanced showed. Not one fires when Basic shows
+exactly what Advanced showed. Driven, not reasoned: `mode/disclosure.test.ts` now builds a Basic
+that is a byte-for-byte copy of Advanced and watches `parityViolations` return `[]` and
+`parityRefusal` return `undefined`.
+
+That is the right shape for what parity is for. § 4's clause is *"Basic mode may hide complexity. It
+may never hide a failure"*, and refusing a Basic mode for being **too informative** would be
+refusing the safe direction. It is also, precisely, why the divergence claim needed a home somewhere
+else — and why *"parity.ts exists to prove the two modes differ"* was never what parity.ts proved.
+
+### The decision
+
+**The plain-language layer goes in `mode/disclosure.ts`, where `docs/12` § 2.2 already said it
+lived** — *"`mode/disclosure.ts` already holds the vocabulary that has to move"*. Six figures gain a
+Casual lead sentence; the count changes notation, `n = 44 rides` → `over 44 rides`; nothing else
+moves. Three rules the entries obey:
+
+1. **Never restate a figure.** `Rendering.value` is carried through untouched, the reporting window
+   excepted because § 4 itself replaces that one. A plain retelling of `13.1 s` would be a second
+   copy of a figure, which is a second figure.
+2. **Never simplify a statistical claim into a false one.** *"An interval containing zero means this
+   run cannot tell them apart"* is plain English; *"A is better"* is a different claim. Nothing in
+   the table compares two things at all, and a test sweeps every rendering in both modes for
+   ordering language on both a refused and a quotable run.
+3. **Lead, never replace.** The source sentence follows verbatim and is asserted to — the same rule
+   `SUPPRESSION_LEAD` obeys about a refusal, for the same reason.
+
+The divergence assertion lives in `mode/disclosure.test.ts` and is stated over **every** figure Basic
+keeps rather than over a list of ids, because a list would let a thirteenth figure through
+untranslated in silence — § D152's defect one surface over. `BASIC_HIDES` stays at two members:
+§ 7.2's *"technical only"* column. A third would be Casual hiding a wait figure, and
+`render/runSummary.ts` says why that is worse than showing it — *"a reader who has energy on and the
+waits hidden would be looking at a ranking that puts the worst dispatcher first"*.
+
+### Two rules examined and kept
+
+The brief said the disclosure rule is open to revision. Two were tested against it and neither moved:
+
+- **Should Casual hide WT95?** No. R11's note is explicit that there is no flag which hides AWT or
+  WT95, and the reason is measured: `nearest-car` is on the Pareto front at six of eight matrix
+  cells *because it carries fewer people*. A default mode that shows energy and hides the waits
+  ranks the weakest dispatcher first. Casual gets WT95 with a sentence saying what it is.
+- **Should Casual's rows get their own captions?** It is the right design and it is not shippable
+  from this lane. `honesty/surfaces.ts` seeds `item.label` — one label, both modes — so a
+  per-rendering label would be a new player-facing string the honesty search does not sweep, which
+  is the § D186 hole reopened. Recorded as a gap with its named fix rather than shipped with one.
+
+### What is still open, and it is the majority of the issue
+
+Everything in the second finding. The renderings are better and **nothing draws them**, so a player
+switching to Casual today still sees the four-strings-removed diff the issue measured, plus the
+honesty card's new refusal from § D239. Closing #71 on screen needs, in files this lane does not
+own:
+
+- `dev/main.ts` — mount `itemsIn(items, mode)` instead of dropping it, and route the transport
+  status line's `AWT · WT95` through the same items;
+- `dev/reportPanel.ts` — the Day report's figure tiles and the kJ pair;
+- `dev/rightRail.ts` — the provenance and replay block;
+- `render/mood.ts` — the driver sentences naming the 900 s horizon and the per-5-min demand;
+- `honesty/surfaces.ts` — a `Rendering.label` seed, if Casual is to rename a row rather than only
+  explain it.
+
+Issue #22 (a glossary across Compare, Lab and Parameters) is **not** closed by this and should not
+be folded into it. Its vocabulary — *paired difference*, *Student-t*, *degrees of freedom*,
+*saturated run*, *dead gate*, *authorable* — is produced in `src/batch/`, `src/campaign/`,
+`dev/parameterForm.ts` and `dev/menuPanel.ts`, four lanes wide and none of them here. What this
+change contributes to it is the pattern: a lead sentence that explains the term, carried beside the
+run's own words, never replacing them, and asserted never to become a ranking.

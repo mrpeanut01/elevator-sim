@@ -157,6 +157,96 @@ describe('the casual copy is the design’s, keyed on an observation', () => {
   });
 });
 
+describe('a closed shift is reported by its verdict, not by its empty last second', () => {
+  it('the live casual card really does go calm on a refused run — the defect, reproduced', () => {
+    const recording = recordingOf(SUPPRESSED_ID);
+    // `vertical-city` times out with people still standing, so its *own* terminal frame is honest.
+    // The one that is not is a run that drains, which is what a completed run does; the synthetic
+    // case below holds that shape still, and `dev/leftRail.test.ts` measures it on a real one.
+    expect(meansAreSuppressed(recording)).toBe(true);
+
+    const drained = syntheticRecording({
+      summary: {
+        saturated: true,
+        awtIsValid: false,
+        awtInvalidReason:
+          'the run saturated: the queues did not reach a steady state, so a mean wait describes ' +
+          'nothing.',
+      },
+    });
+    const live = honestyAt(drained, 300, 'casual');
+    expect(live.suppressed).toBe(true);
+    expect(live.fallingBehind).toBe(false);
+    expect(live.title).toBe('Comfortably keeping up');
+    expect(live.glyph).toBe('✓');
+  });
+
+  it('carries the refusal into casual words once the shift is over — § 4’s never-hide list', () => {
+    const drained = syntheticRecording({
+      summary: {
+        saturated: true,
+        awtIsValid: false,
+        awtInvalidReason: 'the run saturated: the queues did not reach a steady state.',
+      },
+    });
+    const closed = honestyAt(drained, 300, 'casual', 'whole-run');
+    expect(closed.basis).toBe('whole-run');
+    expect(closed.warning).toBe(true);
+    expect(closed.glyph).toBe('⚠');
+    expect(closed.title).not.toBe('Comfortably keeping up');
+    expect(closed.plain).toContain('never settled');
+    expect(closed.plain).toContain('average');
+    // R3, both halves: casual shortens the reason and does not remove it — the verbatim rule stays
+    // one control away rather than disappearing.
+    expect(closed.hasMaths).toBe(false);
+    expect(honestyAt(drained, 300, 'engineer', 'whole-run').maths ?? '').toContain(
+      'the run saturated: the queues did not reach a steady state.',
+    );
+  });
+
+  it('does not claim a growing queue for a ground that is not saturation', () => {
+    const closed = honestyAt(
+      syntheticRecording({
+        summary: {
+          saturated: false,
+          awtIsValid: false,
+          awtInvalidReason: 'a leg waited 922.7 s, past the 900 s abandonment horizon.',
+        },
+      }),
+      300,
+      'casual',
+      'whole-run',
+    );
+    expect(closed.plain).not.toContain('never settled');
+    expect(closed.plain).toContain('does not pass every check');
+    // Never a figure: the rail's counts carry the numbers, and a second copy is a second figure.
+    expect(closed.plain).not.toContain('922.7');
+  });
+
+  it('says the lifts kept up only when the run’s own gate says the averages hold', () => {
+    const closed = honestyAt(syntheticRecording(), 300, 'casual', 'whole-run');
+    expect(closed.suppressed).toBe(false);
+    expect(closed.glyph).toBe('✓');
+    expect(closed.title).toBe('The lifts kept up today');
+    expect(closed.warning).toBe(false);
+  });
+
+  it('leaves the engineer card unmoved by the basis — it always read the whole run', () => {
+    for (const overrides of [
+      {},
+      { saturated: true, awtIsValid: false },
+    ]) {
+      const recording = syntheticRecording({ summary: overrides });
+      const live = honestyAt(recording, 300, 'engineer');
+      const closed = honestyAt(recording, 300, 'engineer', 'whole-run');
+      expect(closed.title).toBe(live.title);
+      expect(closed.plain).toBe(live.plain);
+      expect(closed.glyph).toBe(live.glyph);
+      expect(closed.maths).toBe(live.maths);
+    }
+  });
+});
+
 describe('the engineer’s plain sentence does not claim a growing queue it cannot see', () => {
   it('keeps the design’s wording for the saturation ground', () => {
     const card = honestyAt(

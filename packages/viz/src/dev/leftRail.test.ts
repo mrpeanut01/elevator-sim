@@ -21,13 +21,19 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { WAIT_BANDS, moodOf, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
 import { observationsAt } from '../live/observations.js';
-import type { DecisionRow, LiveObservations, WaitBandCount, WaitBands } from '../live/types.js';
+import type {
+  DecisionRow,
+  LiveObservations,
+  WaitBandBasis,
+  WaitBandCount,
+  WaitBands,
+} from '../live/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -45,8 +51,10 @@ import {
   runFiguresOf,
   servedCaptionFor,
   servedTitleFor,
+  shiftIsOver,
   statRowsOf,
   streakLineOf,
+  type MoodView,
 } from './leftRail.js';
 
 /* -------------------------------------------------------------------------- *
@@ -75,7 +83,7 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
 }
 
 /** A synthetic banding, so apportionment can be driven at counts a real run rarely produces. */
-function bandsOf(counts: readonly number[]): WaitBands {
+function bandsOf(counts: readonly number[], basis: WaitBandBasis = 'now'): WaitBands {
   const total = counts.reduce((sum, value) => sum + value, 0);
   const entries: WaitBandCount[] = WAIT_BANDS.map((band, index) => {
     const count = counts[index] ?? 0;
@@ -90,6 +98,7 @@ function bandsOf(counts: readonly number[]): WaitBands {
   }
   return {
     atS: 300,
+    basis,
     total,
     counts: entries,
     worst: WAIT_BANDS[worstIndex] as (typeof WAIT_BANDS)[number],
@@ -602,3 +611,104 @@ describe('a suppressed run yields no mean anywhere in the left rail', () => {
     expect(rows[3]?.label).toBe(servedCaptionFor(live.longWaitThresholdS));
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * Issue #35 — the rail at the terminal playhead
+ * -------------------------------------------------------------------------- */
+
+describe('the rail does not congratulate a shift that collapsed', () => {
+  /**
+   * `midtown-office` under `collective` over an hour of demand — the reporter's own selection, and
+   * the shape the live card cannot see: it **fails and then drains**, so its final frame is an
+   * empty lobby by construction.
+   *
+   * Driven through the rail's own decision (`shiftIsOver`) rather than through a recomputed
+   * `t >= endedAt`, for the reason `summaryFigureIds` states about itself: a probe that recomputes
+   * a decision asserts its own arithmetic, and the control could be disconnected entirely with the
+   * assertion still passing.
+   */
+  let config: LoadedConfig;
+  let recording: VizRecording;
+
+  beforeAll(async () => {
+    config = await loadConfig(DATA_DIR);
+    recording = recordRun(
+      fixtureConfig(config, {
+        buildingId: 'midtown-office',
+        dispatcherId: 'collective',
+        durationS: 3600,
+        onTimeout: 'report',
+      }),
+    ).recording;
+  }, 600_000);
+
+  it('really collapsed and really drained, or the rest of this proves nothing', () => {
+    const live = observationsAt(recording, recording.endedAt);
+    expect(recording.summary.saturated).toBe(true);
+    expect(meansAreSuppressed(recording)).toBe(true);
+    expect(live.waitingNow).toBe(0);
+    expect(live.abandoned).toBeGreaterThan(100);
+    expect(live.servedUnderThresholdPct ?? 100).toBeLessThan(50);
+  }, 600_000);
+
+  it('calls the shift over exactly at the end of it, and not before', () => {
+    expect(shiftIsOver(recording, recording.endedAt)).toBe(true);
+    expect(shiftIsOver(recording, recording.endedAt - 1)).toBe(false);
+    expect(shiftIsOver(recording, recording.startedAt)).toBe(false);
+  });
+
+  it('draws a face and a headline that match the shift, not its last empty second', () => {
+    const view = railMoodAt(recording, recording.endedAt);
+    expect(view.headline).not.toBe('Everyone is getting on with their day.');
+    expect(view.headline).not.toBe('Nobody stood for long today.');
+    expect(view.face).toBe(WAIT_BANDS[3]?.face);
+    expect(view.sub).toContain('across the whole shift');
+    // The stacked bar is a partition of the shift, not four zeroes over an empty lobby.
+    expect(view.legend.reduce((sum, entry) => sum + entry.count, 0)).toBeGreaterThan(0);
+    expect(view.segments.reduce((sum, entry) => sum + entry.widthPct, 0)).toBe(100);
+    // KB-15: the bar's second signal names the basis in words, for a reader who has no face glyph.
+    expect(view.barLabel).toContain('Across the whole shift');
+  }, 600_000);
+
+  it('keeps the live card exactly as it was while the shift is running', () => {
+    // Mid-run the rail must still be the design's instantaneous instrument.
+    const during = railMoodAt(recording, recording.endedAt / 2);
+    expect(during.barLabel).not.toContain('Across the whole shift');
+    expect(during.sub).not.toContain('across the whole shift');
+  }, 600_000);
+
+  it('does not leave the casual honesty card saying the building is fine', () => {
+    // The defect in its second place: at the terminal playhead nobody is behind, so the casual
+    // card read ✓ *Comfortably keeping up* over a shift whose average the run itself refuses.
+    const live = honestyAt(recording, recording.endedAt, 'casual');
+    expect(live.title).toBe('Comfortably keeping up');
+
+    const closed = honestyAt(recording, recording.endedAt, 'casual', 'whole-run');
+    expect(closed.title).not.toBe('Comfortably keeping up');
+    expect(closed.glyph).toBe('⚠');
+    expect(closed.warning).toBe(true);
+    // § 4: Basic may hide complexity, never a failure. The refusal is now in casual words, and the
+    // rule behind it is still one control away rather than gone.
+    expect(closed.suppressed).toBe(true);
+    expect(closed.hasMaths).toBe(false);
+    expect(closed.plain.toLowerCase()).toContain('average');
+  }, 600_000);
+
+  it('draws the mood card and the honesty card on the same basis', () => {
+    for (const t of [recording.startedAt, recording.endedAt / 2, recording.endedAt]) {
+      const over = shiftIsOver(recording, t);
+      const card = honestyAt(recording, t, 'casual', over ? 'whole-run' : 'now');
+      const view = railMoodAt(recording, t);
+      expect(`${String(t)}: ${card.basis}`).toBe(`${String(t)}: ${over ? 'whole-run' : 'now'}`);
+      expect(`${String(t)}: ${String(view.sub.includes('across the whole shift'))}`).toBe(
+        `${String(t)}: ${String(over)}`,
+      );
+    }
+  }, 600_000);
+});
+
+/** The mood card exactly as `drawMood` composes it — the rail's own basis, not a recomputed one. */
+function railMoodAt(recording: VizRecording, t: number): MoodView {
+  const bands = waitBandsAt(recording, t, shiftIsOver(recording, t) ? 'whole-run' : 'now');
+  return moodViewOf(bands, moodOf(bands));
+}

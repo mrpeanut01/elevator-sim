@@ -27,6 +27,22 @@
  *    draws as normal has hidden the failure in the styling while keeping the words — which is the
  *    same defect wearing a stylesheet.
  *
+ * ## The direction this file does not check, stated rather than discovered later
+ *
+ * All three rules fire on Basic **dropping** something. Not one fires on Basic showing exactly what
+ * Advanced showed, so a Basic rendering that is a byte-for-byte copy of Advanced returns an empty
+ * array — `mode/disclosure.test.ts` builds that copy and watches this function pass it, because a
+ * limitation nobody has driven is a limitation somebody will forget.
+ *
+ * That is the right shape for what this file is: § 4's clause is *"Basic mode may hide complexity.
+ * It may never hide a failure"*, and refusing a Basic mode for being **too informative** would be
+ * refusing the safe direction. But it means this check can never notice that the disclosure split
+ * does not exist — which is what had happened, and what issue #71 measured. The other direction is
+ * a claim about the *product* rather than about one item list, and it is asserted where a claim
+ * about the product belongs: `mode/disclosure.test.ts` drives every shipped building and requires
+ * the two modes to differ on every figure Basic keeps. See
+ * [`DECISIONS.md` § D240](../../../../DECISIONS.md).
+ *
  * § 4's *"Advanced is a strict superset"* is **not** a rule here, and that is deliberate.
  * {@link DisclosureItem.advanced} is non-nullable while `basic` is `Rendering | null`, so an item
  * Advanced cannot draw is unexpressible. A runtime check for it would be a guard that cannot fire
