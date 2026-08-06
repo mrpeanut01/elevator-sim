@@ -209,6 +209,36 @@ export interface ResolvedDemandTemplate {
    * (`DECISIONS.md` § D112) with a different key name.
    */
   readonly startOfDayS?: number | undefined;
+  /**
+   * `true` when {@link phases} was **authored as data** rather than computed from a named shape —
+   * `data/traffic-profiles.json → demandTemplates[].phases`. `DECISIONS.md` § D273.
+   *
+   * **Absent, never `false`, on all five templates that shipped before it.** The omitted-not-
+   * `undefined` discipline {@link startOfDayS} keeps, for a sharper reason: this key is inside
+   * every `PassengerTrace` and therefore inside every `SimulationResult`, so a `false` on the
+   * shipped shapes would move `traffic/transportIdentity.test.ts`'s fifteen pinned digests to record
+   * that a template is *not* something.
+   *
+   * ## It is a marker, and two refusals are what read it
+   *
+   * A shape builder's geometry can be refitted, because two numbers generate it. An authored list
+   * cannot, and the two knobs that assume it can are refused by name rather than left to do
+   * something plausible:
+   *
+   * - **`templateOverrides.durationS`** would rescale a sixteen-hour day into a fifteen-minute one
+   *   and leave it with a five-minute lunch. Selecting *which part of a day to run* is a different
+   *   question and needs a different field; reinterpreting `durationS` would change what a stored
+   *   leaderboard score means, since `durationS` travels in every submission.
+   * - **{@link DayVariationConfig.peakShiftS}** moves every interior knot by one amount, and
+   *   {@link maxPeakShiftS} takes its limit from the **outermost** one. On a day the first boundary
+   *   is minutes in, so the limit collapses to those minutes and almost every declared shift is
+   *   refused with a message about a phase boundary the author never thought of as the peak.
+   *
+   * Both refusals are `traffic/demandTemplate.ts`'s, and both are stated in the same shape as the
+   * existing `constant-iso` one: a template that cannot absorb a knob says so by name instead of
+   * absorbing it into something that looks like it worked.
+   */
+  readonly authoredPhaseList?: true | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -727,10 +757,16 @@ export interface TrafficConfig {
    */
   readonly trafficModel?: TrafficModelVersion | undefined;
   /**
-   * Demand shape. A {@link DemandTemplateId} is looked up in `profiles.demandTemplates`; a
+   * Demand shape. An **id** is looked up in `profiles.demandTemplates`; a
    * {@link ResolvedDemandTemplate} is used as given. Defaults to `rise-and-fall`.
+   *
+   * `string` rather than {@link DemandTemplateId} since § D274. The lookup was always against the
+   * loaded catalogue first, so the union has always been the *fallback* list — the shapes this
+   * module can build when no record answers — and since § D273 a record can author its own phases
+   * and answer to an id no union could contain. Validate the string against the records you loaded;
+   * `resolveDemandTemplate` throws by name for one that answers to neither.
    */
-  readonly template?: DemandTemplateId | ResolvedDemandTemplate | undefined;
+  readonly template?: string | ResolvedDemandTemplate | undefined;
   /**
    * Geometry overrides applied on top of the `demandTemplates` record — duration, peak hold,
    * baseline, ISO discards. Rejected when {@link template} is an already-resolved template,
@@ -1108,10 +1144,19 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
   {
     id: 'traffic.template',
     type: 'categorical',
+    // **Narrower than the shipped catalogue since § D274, and named rather than left to be found.**
+    // These are the shapes this module can build with *no record to read*; a record that authors its
+    // own `phases` (§ D273) answers to an id no compiled-in list can contain, and `office-day` is
+    // the first one that does. So a generic optimizer sampling this row will not offer a day
+    // profile. That is the right answer rather than a gap to close: which traffic pattern a building
+    // faces is a **scenario axis**, not a knob to search — CLAUDE.md § Tuning discipline says *tune
+    // per traffic pattern*, which means holding this fixed and searching the weights inside it — and
+    // a `values` list read from `data/` at module load would make this declaration a function of a
+    // file the type system cannot see. A study that wants a day profile names it on the traffic arm.
     values: [...DEMAND_TEMPLATE_IDS],
     default: TRAFFIC_DEFAULTS.templateId,
     description:
-      'Demand shape. rise-and-fall is a 30 min terminating run reported over its peak 5 minutes and is the only one that supports confidence intervals across replications; constant-iso is a single 120 min run for cross-checking.',
+      'Demand shape, as one of the shapes this build can construct without a data record. rise-and-fall is a 30 min terminating run reported over its peak 5 minutes and is the only one that supports confidence intervals across replications; constant-iso is a single 120 min run for cross-checking. A data record may also author its own phase list and be selected by id, which this list cannot enumerate — see DECISIONS.md § D274.',
   },
   {
     id: 'traffic.demandLevel',

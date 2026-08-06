@@ -38,6 +38,23 @@ Three shapes:
 Use the **rise-and-fall template** unless the question is about a changing mix. Rationale in Part 3
 — the constant-demand approach is incompatible with confidence intervals for our purposes.
 
+`data/traffic-profiles.json → demandTemplates` is the authority for what actually ships; the three
+above are the ones this section explains rather than the whole list, and `elevator-sim list` prints
+the current set with each one's horizon and reported window.
+
+**A record may also author its phases outright, and then it is not one of the shapes at all.**
+[`DECISIONS.md`](../DECISIONS.md) § D273: a record carrying `phases: [{ startMin, endMin,
+startIntensity, endIntensity, startSplit?, endSplit? }, …]` is evaluated by the same
+piecewise-linear `intensityAt`/`splitAt` the shapes are — *shape is code and a schedule is data*,
+because a day is a **sequence** of shapes and a builder per day profile is the
+`if (phase === 'evening')` CLAUDE.md invariant 7 forbids. `office-day` is the shipped one: a whole
+working day, 08:00–18:00, whose three peaks are the up-peak's, the lunch's and the down-peak's own
+geometry and hours, separated by derived interpolations. Two things follow and are enforced rather
+than advised — a phase-list template is **reported over the whole of itself** (a five-minute window
+cut out of a day reports one of its periods and calls it the day), and it **refuses**
+`templateOverrides.durationS` and `dayVariation.peakShiftS` by name, because neither means anything
+against an authored schedule (§ D275).
+
 **Only the third varies the mix, and that is measured rather than claimed.**
 [`DECISIONS.md`](../DECISIONS.md) § D156 screened all eight of Phase 6c's operating points with a
 Pearson homogeneity statistic over a time-bin × direction-category table and found the shipped

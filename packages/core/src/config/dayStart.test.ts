@@ -134,9 +134,15 @@ const SHIPPED_HOURS: Readonly<Record<string, string | null>> = {
   // hours that could not both live on one record, which is what forced the split.
   'evening-egress': '22:24',
   'office-down-peak': '17:15',
+  // `office-day` is the phase-list record (§ D273), and 08:00 is the only one of these hours that
+  // is a *consequence* rather than a placement: the day's up-peak ramp begins at `rise-and-fall`'s
+  // own derived 08:30 and the record opens half an hour of trickle before it, so the start is
+  // 08:00 and nothing was chosen. Its evening hold sits at 17:30 — the same instant
+  // `office-down-peak`'s 17:15 places — so the day invents no hour of its own at all.
+  'office-day': '08:00',
 };
 
-describe('the shipped reference data authors five hours and deliberately omits one', () => {
+describe('the shipped reference data authors six hours and deliberately omits one', () => {
   it('every template declares the hour its comment argues for, or none', async () => {
     const config = await load();
     const measured: Record<string, string | null> = {};

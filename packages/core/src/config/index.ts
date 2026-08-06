@@ -49,6 +49,13 @@ export {
   transportModeSchema,
 } from './schema.js';
 
+export { demandPhaseIssues } from './demandPhases.js';
+export type {
+  DemandPhaseIssue,
+  DemandPhaseSegment,
+  DemandPhaseUnit,
+} from './demandPhases.js';
+
 export {
   DEFAULT_ID_PATTERN,
   MAX_FLOORS_PER_RANGE,
@@ -116,6 +123,7 @@ export type {
   ConfigIssue,
   ConfigWarning,
   CostTerm,
+  DemandPhaseRecord,
   DemandTemplate,
   DirectionalSplit,
   DispatchStageConfig,

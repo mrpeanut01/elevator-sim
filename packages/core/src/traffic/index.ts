@@ -113,6 +113,7 @@ export {
   intensityAt,
   lunchTwoWayTemplate,
   maxPeakShiftS,
+  phaseListTemplate,
   requirePeakShiftFits,
   resolveDemandTemplate,
   riseAndFallTemplate,
@@ -124,6 +125,7 @@ export type {
   ConstantDemandOptions,
   DemandTemplateSpec,
   LunchTwoWayOptions,
+  PhaseListOptions,
   RiseAndFallOptions,
 } from './demandTemplate.js';
 

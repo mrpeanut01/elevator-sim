@@ -17,7 +17,6 @@
  */
 
 import {
-  DEMAND_TEMPLATE_IDS,
   Simulation,
   SimulationError,
   type PassengerModel,
@@ -121,11 +120,11 @@ export const WATCH_FLAGS: readonly FlagSpec[] = [
     min: 0,
   },
   {
+    // See `run.ts`'s note: the catalogue is the authority, not a compiled-in list (§ D274).
     name: 'template',
     kind: 'string',
     placeholder: '<id>',
-    summary: 'demand template',
-    choices: [...DEMAND_TEMPLATE_IDS],
+    summary: 'demand template; `elevator-sim list` names the ones this data directory ships',
   },
   { name: 'plain', kind: 'boolean', summary: 'force line output instead of a live frame' },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },

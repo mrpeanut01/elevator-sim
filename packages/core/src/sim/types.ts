@@ -443,8 +443,16 @@ export interface SimulationConfig {
    * comparison of anything. See {@link SimulationResult.trafficModel} for how a run reports it.
    */
   readonly trafficModel?: TrafficModelVersion | undefined;
-  /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
-  readonly demandTemplate?: DemandTemplateId | ResolvedDemandTemplate | undefined;
+  /**
+   * The id of a record in `trafficProfiles.demandTemplates`, or an already-resolved template.
+   * Defaults to `rise-and-fall`.
+   *
+   * `string` rather than `DemandTemplateId` since § D274: a record may author its own phases and
+   * therefore answer to an id the closed union cannot contain. The catalogue is the authority, so
+   * a caller taking this from user input validates it against `trafficProfiles.demandTemplates`
+   * before building the config — `cli/src/commands/run.ts` is the worked example.
+   */
+  readonly demandTemplate?: string | ResolvedDemandTemplate | undefined;
   /**
    * Length of the demand horizon, seconds. Defaults to the template's own duration.
    *

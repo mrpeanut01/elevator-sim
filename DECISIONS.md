@@ -18877,3 +18877,394 @@ between `'traffic.batchSize.weight'` and `'traffic.dayVariation.maxDemandFactor'
 outside this lane's file ownership, so the line is **named here rather than added** — the guard is
 doing exactly what it was written to do, and what it is asking for is a decision that a new
 unsearchable row was intended.
+
+---
+
+## D273 — a ramp is a shape and a day is a sequence, so the phases became data
+
+**Date: 2026-08-06 · Written after the code, before the viewer half.** The core half of *make the
+day the unit of play*.
+
+`traffic/demandTemplate.ts` opened with a defence: *"Shape is code, numbers are data. A ramp is a
+ramp."* Every number a template used came from `data/traffic-profiles.json`, and the **shape** —
+ramp, hold, trough, step — was a builder in the module, selected by a five-way `if (record.id ===
+…)` at the bottom of `fromRecord`. That defence is right for a ramp and wrong for a schedule.
+
+A day's phase list is not a shape. It is a *sequence* of them — an up-peak, a lull, a lunch, a lull,
+a down-peak — and a sixth `if (record.id === 'office-day')` per day profile is exactly the
+`if (phase === 'evening')` CLAUDE.md invariant 7 forbids. A second day profile would be a seventh
+arm, a third a eighth, and none of them would be a new *cost term* or a new mechanism: they would be
+a list of numbers wearing a function's clothes.
+
+### The structural fact that made this small, verified rather than assumed
+
+**The traffic model was already multi-phase.** `DemandPhase` carries per-phase intensity endpoints
+*and* optional per-phase directional-split endpoints; `intensityAt` and `splitAt` are **one**
+piecewise-linear evaluator over **one** knot list; and `shift-change` already ships six phases with
+two interior peaks. Nothing about "a day has parts" was missing.
+
+So a day profile needs **no new evaluator — it is a longer phase list**, and that claim is not left
+as an argument. `traffic/phaseListIdentity.test.ts` § *a phase list reproducing rise-and-fall is
+rise-and-fall* authors `rise-and-fall`'s own knots as a record, resolves it, and requires:
+
+- the resolved `durationS`, **every phase**, `peakIntensity`, `intensityIntegralS` and
+  `meanDirectionalSplit` to be equal — everything the evaluator reads;
+- `intensityAt` and `integratedIntensityS` to agree at 441 sampled instants including overhang;
+- the **trace** to be byte-identical at all five buildings, on `passengers`, `arrivals`, `sources`
+  and then the whole object.
+
+That is composition identity, and it is what proves the new path is the same evaluator being *fed*
+rather than a second one beside it.
+
+### The change
+
+`DemandTemplate.phases?: readonly DemandPhaseRecord[]` — `{ startMin, endMin, startIntensity,
+endIntensity, startSplit?, endSplit?, $comment? }`, minutes beside `durationMin` and
+`startOfDayMin`. `fromRecord` takes a record that declares it **before the id switch**, and that
+ordering is the feature: a record selects the phase-list path by *having* phases, so nothing
+compares its id and a day profile is a record rather than a branch. The five shape builders'
+branches are untouched, and `phaseListIdentity.test.ts` § *adding office-day moves nothing that
+shipped before it* holds all six shipped ids to that at three layers — resolution, trace and whole
+run.
+
+`phaseListTemplate` is the new builder and it adds no geometry of its own: it validates, freezes,
+and hands the list to the same `finish` the five shapes use, which derives `peakIntensity`,
+`intensityIntegralS` and `meanDirectionalSplit` exactly as before.
+
+**The report window is the whole period, and that is a modelling answer rather than a gap.**
+`lunch-two-way` and `shift-change` already report over the whole run, for the reason
+`benchmark/arms.ts` gives about a mixed pattern: *"this is a pattern rather than a peak, and a 300 s
+window of it is a sample of the pattern rather than the thing itself."* A day is that argument at
+its strongest — five minutes cut out of a day reports one of its periods and calls it the day. So a
+phase-list record authors no window and no discards, and the schema refuses `discardFirstMin` /
+`discardLastMin` on one by name. `SimulationConfig.reportWindow` still narrows the *run's* window,
+which is where "show me the morning" belongs.
+
+### One bug this found, and it was in the oldest line in the resolver
+
+`isResolved` tested `'phases' in value`, which was a correct discriminator for exactly as long as a
+record could not have phases. The moment one could, **every day profile handed in as a record would
+have been waved through as already-resolved** — returned untouched, its minutes read as seconds, its
+`peakIntensity` and `intensityIntegralS` never derived, and its phase list never validated. It is
+now `'durationS' in value`, the one field the two shapes cannot share: a `DemandTemplate` is a
+`strictObject` carrying `durationMin`, and a `ResolvedDemandTemplate` is built in seconds. Found by
+`phaseListIdentity.test.ts` refusing to see a malformed list refused — which is the test working
+before the feature it guards had a caller.
+
+---
+
+## D274 — the closed union was already the fallback list, so the call sites widened instead
+
+**Date: 2026-08-06 · Written after the code.** The type-level consequence of
+[§ D273](DECISIONS.md), decided rather than discovered.
+
+`DEMAND_TEMPLATE_IDS` looks like *the templates this project ships*. It has not been that for some
+time: `resolveDemandTemplate` looks an id up in the loaded `demandTemplates` **first** and falls
+back to the union only when no record answers. So the union's runtime role was already the narrower
+one — **the shapes this module can build with no record to read** — and the equality between it and
+the catalogue was a coincidence of the data rather than a property of the code.
+
+§ D273 ends the coincidence. A record can author its own phases and answer to an id no compiled-in
+union can contain, and `office-day` is the first one that does.
+
+**Decision: the union stays exactly what it is, the fallback list, and every call site widens to
+`string` validated against the records it actually loaded.** The alternative — adding `'office-day'`
+to `DEMAND_TEMPLATE_IDS` — is the move that had to be refused, because it would put a *record's* id
+in the *shape* list and make the next day profile a code change again, which is the whole thing
+§ D273 removed.
+
+Widened: `DemandTemplateSpec`, `TrafficConfig.template`, `SimulationConfig.demandTemplate`,
+`experiments`' `TrafficArmSpec.demandTemplate` and its parser, and the stored
+`StoredRunConfig.demandTemplate` and its parser. `DemandTemplateId` itself is unchanged and still
+exported; every widening is a widening, so nothing that assigned one stopped compiling.
+
+### Three places where the check got *better*, not weaker
+
+1. **The CLI.** `--template` was checked at *parse* time against a `choices` list derived from
+   `DEMAND_TEMPLATE_IDS`, and the authority is the `demandTemplates` records the run loads — which
+   `--data <dir>` can change. The static list was already wrong for a custom data directory. It is
+   now `requireDemandTemplate`, the same `pick` every other data-derived flag uses: *available,
+   nearest match, run `elevator-sim list`*.
+2. **The CLI again, and this one was a live defect.** `planRun` spread
+   `...(isDemandTemplateId(template) ? { demandTemplate: template } : {})` — so a `--template` value
+   the predicate rejected was **silently dropped**, the run went ahead on `rise-and-fall`, and the
+   reproduce line printed the flag back. A mistyped template was a different experiment reported as
+   the one you asked for. It now throws a usage error.
+3. **The stored-record parser.** `expectEnum(value, path, DEMAND_TEMPLATE_IDS)` asks *"is this one
+   of the shapes this build compiles?"* of a file that may have been measured against a `data/`
+   directory not on this disk. The id is echoed as written and the check that it *resolves* happens
+   at replay, where a catalogue exists and `resolveDemandTemplate` throws by name.
+
+### Four keys the stored-template parser was dropping, and one it rejected outright
+
+`parseDemandTemplate`'s key list was written when a resolved template had nine fields. It has since
+grown `startOfDayS` ([§ D244](DECISIONS.md)), `meanDirectionalSplit` ([§ D169](DECISIONS.md)) and
+now `authoredPhaseList`, and its phases grew `startSplit`/`endSplit`. So a stored **resolved**
+`lunch-two-way` round-tripped with its mix arc silently deleted — which replays a *different crowd*,
+the invariant-5 failure the comments beside `demandOptionsOf` are about — and a stored resolved
+`rise-and-fall` was rejected outright, because `rejectUnknownKeys` had never heard of the hour. All
+five are carried now. That is a pre-existing defect fixed in passing rather than a consequence of
+this change, and it is recorded here because the next reader will otherwise assume it arrived with
+the widening.
+
+### Two tests that asserted the coincidence, and what they assert now
+
+`traffic/mixIdentity.test.ts` and `traffic/templateAdditionIdentity.test.ts` both held
+`shipped.sort() === [...DEMAND_TEMPLATE_IDS].sort()` — the equality that has just stopped being a
+property. Both now assert **containment** plus the *named* remainder: every id the module can build
+without a record has one, and the records that no shape backs are listed by name and required to
+carry `phases`. That is strictly more than the equality said, because it also says *which* records
+are which.
+
+`mixIdentity`'s partition needed a second fix that is easy to miss: it computed *which templates vary
+the mix* by filtering on `directionalSplitAtStart`, which is the **period-endpoint** form. A phase
+list declares its mix knot by knot, so the filter would have called `office-day` flat while it swings
+from 85/5/10 to 5/85/10 — the partition going stale in exactly the way that test exists to catch. It
+now looks in both places, and the answer is two.
+
+### One declared surface stays narrow on purpose
+
+`TRAFFIC_PARAMETERS`' `traffic.template` row declares `values: [...DEMAND_TEMPLATE_IDS]`, so it is
+now **narrower than the shipped catalogue** and a generic optimizer sampling it will never offer
+`office-day`. That is the right answer rather than a gap, and it is written into the row so the next
+reader does not close it: which traffic pattern a building faces is a **scenario axis**, not a knob
+to search — CLAUDE.md § Tuning discipline says *tune per traffic pattern*, which means holding this
+fixed and searching the weights inside it. Reading the values from `data/` at module load would also
+make an invariant-8 declaration a function of a file the type system cannot see, which is a worse
+trade than the one it buys. A study that wants a day profile names it on the traffic arm, where the
+catalogue is loaded.
+
+---
+
+## D275 — two knobs a schedule cannot absorb, refused by name rather than applied to something plausible
+
+**Date: 2026-08-06 · Written after the code.** Both refusals are shaped on the existing
+`constant-iso` one, which is the precedent this repository already keeps: *a template that cannot
+take a knob says so by name instead of doing something that looks like it worked.*
+
+### 1. `templateOverrides.durationS` — and this **is** issue #81
+
+On a shape builder `durationS` *refits the geometry*: a 900 s `rise-and-fall` is a 900 s run with a
+proportionally shorter ramp and the same 300 s hold, which is a shorter version of the same thing. On
+an authored phase list there is no geometry to refit. Applying it would rescale a ten-hour schedule
+into whatever was asked for — **a fifteen-minute day with a five-minute lunch, reported as a day**.
+
+Refused, with `durationS` getting its own sentence because it is the one that looks like it should
+work; the other nine overrides are refused as a group, because a phase list has no ramp to hold, no
+trough to raise, no step to lengthen and no discard to take.
+
+**Selecting which *part* of a day to run is a different question and must become a different
+field** — `windowStartS` / `windowEndS` — and never a reinterpretation of `durationS`. The reason is
+not aesthetic: `durationS` travels in **every leaderboard submission** and in every stored
+`RunConfig`, so giving it a second meaning would silently change what a stored score was measured
+over. Every board would still verify, and every old row would now be a claim about a different run.
+
+**That field is named here and deliberately not built.** Nothing in the viewer can select a part of
+a day yet — that half belongs to another lane — and a `windowStartS` with no shipped writer is
+precisely `patternSwitching` ([§ D219](DECISIONS.md)) again: authored, loaded, resolved, and writable
+by nothing. The refusal is what ships; the field ships with the surface that needs it. Recorded as an
+unbuilt thing rather than as a built dead one.
+
+**One consequence, stated because it is a real cost.** `mixAmplitude` is refused too, so the flat-mix
+negative control [§ D162](DECISIONS.md) condition 5 requires cannot be run against `office-day` as an
+override. Damping an authored arc towards its own period mean is well defined and was not built,
+because building it now would add a mechanism with no study asking for it. A study that wants the
+control authors a second record with the flat knots — which is what "the shape is data" makes cheap,
+and is the honest form of that control anyway, since it puts the comparison in the file rather than in
+a flag.
+
+### 2. `dayVariation.peakShiftS` — and the collapsed limit is the *smaller* half of the reason
+
+`maxPeakShiftS` computes its bound from the **outermost** interior knot, on the reasoning that the
+run's two endpoints are pinned and a shift is *when the busy part happens*. On a day the first
+boundary is minutes from the start — the trickle before the doors open — so the limit collapses to
+those minutes and almost every declared shift is refused with a message naming a phase boundary the
+author never thought of as the peak.
+
+That alone would be an argument for a better limit. The reason it is a refusal instead is what a
+shift *inside* the collapsed limit would do: it moves **every** interior knot by one amount, so the
+lunch and the evening peak slide together with the morning one. That is not a late peak, it is a late
+clock — and [§ D244](DECISIONS.md) rule 4 already settled that a period's hour is not what a peak
+shift moves. A day with three busy parts has no single peak to shift, in the same way `constant-iso`
+has none.
+
+Refused in the same shape as `constant-iso`'s, and **before** the limit is consulted, so the message
+is about the template's structure rather than about a number.
+
+### What reads the marker, and why it is `true`-or-absent
+
+`ResolvedDemandTemplate.authoredPhaseList?: true`. Omitted — never `false` — on all six shape
+templates, following the `startOfDayS` discipline for a sharper reason: this key sits inside every
+`PassengerTrace` and therefore inside every `SimulationResult`, so a `false` on the shipped shapes
+would move `traffic/transportIdentity.test.ts`'s fifteen pinned digests to record that a template is
+*not* something. They did not move.
+
+---
+
+## D276 — the day is a sequence of cited peaks separated by derived interpolations, and it says so phase by phase
+
+**Date: 2026-08-06 · Written after the code.** `office-day` — one record proving
+[§ D273](DECISIONS.md)'s path, and the only construction defensible against Guide D.
+
+CIBSE Guide D and this project's reference set tabulate **design peaks, not days**. There is no page
+anywhere in it that gives an office's demand as a function of the hour. So a day profile that claimed
+to be cited would be inventing a source, and the honest construction is the one the record's own
+`$comment` states in the CITED / DERIVED / NOT CITED / LIMITATION idiom § D263 used: **a sequence of
+cited peaks separated by derived interpolations**, with each of the seventeen phases saying in its
+own `$comment` which of the two it is.
+
+### The record
+
+`office-day`, 08:00–18:00, `durationMin: 600`, `startOfDayMin: 480`, `recommended: false`,
+seventeen phases, reported over the whole of itself.
+
+| what | intensity | mix | status |
+|---|---|---|---|
+| 08:00–08:30 opening trickle | 0.05 | 85/5/10 | level NOT CITED, inherited from `evening-egress`'s baseline |
+| 08:30–09:00 **morning up-peak** | ramp → 1 → ramp | 85/5/10 | period CITED, geometry and hour `rise-and-fall`'s |
+| 09:00–11:45 mid-morning | 0.25 | relaxes to 45/45/10 | DERIVED interpolation |
+| 11:45–12:15 lunch lead-in | 0.25 | 45/45/10 → 0/90/10 | DERIVED interpolation |
+| 12:15–12:45 **lunch two-way** | ramp → 1 → ramp | the cited arc, exactly | mix CITED, hour `lunch-two-way`'s |
+| 12:45–16:15 afternoon | 0.25 | back to 45/45/10 | DERIVED interpolation |
+| 16:15–17:15 evening lead-in | 0.25 | 45/45/10 → 5/85/10 | DERIVED interpolation |
+| 17:15–17:45 **evening down-peak** | ramp → 1 → ramp | 5/85/10 | period CITED, geometry and hour `office-down-peak`'s |
+| 17:45–18:00 closing trickle | 0.05 | 5/85/10 | as the opening |
+
+### Citation accounting
+
+**CITED.** That the three periods are office design cases in their own right — Guide D names the
+morning up-peak, the lunchtime two-way peak and the evening down-peak, and `docs/03` tabulates the
+standard-office up-peak at 11–15 %pop/5 min as the governing one. And the lunch **mix**, 45/45/10
+(Guide D 2010 carried into 2020; the BCO *Guide to Specification 2014* pairs the same split with a
+13 %/5 min lunchtime two-way demand).
+
+**DERIVED, and inherited rather than invented.** The three peaks' geometry is `rise-and-fall`'s own —
+12.5-minute ramp, 5-minute hold, 12.5-minute ramp — so the record adds no uncited peak duration, the
+discipline `lunch-two-way`, `shift-change` and `office-down-peak` were all authored under. And **all
+three placements are the shipped records' own**, so the day invents no hour: the morning hold lands
+at 08:42:30–08:47:30 and the lunch runs 12:15–12:45, exactly where § D244 put `rise-and-fall`'s 08:30
+and `lunch-two-way`'s 12:15; the evening ramp begins at 17:15 and holds at 17:27:30–17:32:30, exactly
+where § D263 put `office-down-peak`. 08:00 is then a *consequence* — half an hour of trickle before an
+up-peak that begins at 08:30 — rather than a chosen round number.
+
+**DERIVED, and reproduced rather than asserted.** The lunch mix knots. Over 12:15–12:45 the arc is
+`lunch-two-way`'s, linear from 0/90/10 to 90/0/10, and the two interior knots — 0.375/0.525/0.1 and
+0.525/0.375/0.1 — are that same line evaluated at +12.5 and +17.5 minutes. So the day **contains** the
+cited period rather than approximating it, and `phaseListIdentity.test.ts` asserts it against
+`lunch-two-way` itself on a 301-point grid, plus the crossover at 12:30. § D263's rule applies: if
+that identity ever breaks, the `$comment` is what changes, not the test.
+
+**DERIVED, from a conservation argument rather than a table.** The balanced 45/45/10 between the
+peaks. An office at steady occupancy neither fills nor empties, so incoming must equal outgoing; the
+interfloor share is held at the cited 10 % throughout, which is the assumption `lunch-two-way` already
+makes about its own arc. The morning mix is `office-standard`'s own 85/5/10 taken from the same file,
+and the evening mix is its reverse — a statement of the mechanism, in the words § D263 used for
+exactly this, and not a quoted table.
+
+**NOT CITED, and no figure was invented.** The inter-peak intensity of 0.25: no page in this
+reference set gives a %pop/5 min band for office inter-peak or interfloor traffic, and 0.25 is chosen
+to sit clearly below the peaks and clearly above the trickle, the way `shift-change`'s
+`troughFraction` of 0.35 is chosen. The 0.05 trickle, inherited from `evening-egress`'s
+`baselineFraction`. And the evening peak's **height**, taken equal to the morning's: the literature
+says the evening flow is the more concentrated of the two, and § D263 refused to quote an unsourced
+multiple of the up-peak for exactly that reason. It could not have been authored as a rate in any
+case — a `demandTemplates` record has **no rate field**; the level comes from the building's
+`arrivalRatePctPop5min` and the declared `traffic.demandLevel`.
+
+**LIMITATION, four, all structural.**
+
+1. `recommended` is **false** and must stay false. One day is one long run whose waiting times are
+   serially correlated exactly as `constant-iso`'s are, so *"reported over the whole day"* is a
+   description and not a licence to build a confidence interval across days. See `docs/03`
+   § The independence condition.
+2. The peaks are **symmetric ramps and a real office day is not** — departures synchronise at the
+   front and trail long into the evening. § D263 named the same limitation for `office-down-peak`; the
+   day inherits it three times over, and expressing it needs a skewed shape this module does not have
+   and a skew figure no source here publishes.
+3. The day is **unsliced** — see § D275.
+4. `dayVariation.peakShiftS` is refused — see § D275.
+
+### What it does when it is run, and the two things that says
+
+`elevator-sim run --building midtown-office --dispatcher collective --template office-day --seed 42`
+generates **7 283 legs over 600 minutes** and delivers every one of them, in under two seconds. Its
+**AWT is SUPPRESSED**, on the abandonment-horizon ground: 897 of 7 283 arrivals waited past 900 s.
+
+**And it is a day rather than a longer replication, which is the thing § D156 said the shipped
+templates could not be.** Measured on the trace of **that same run** — `midtown-office`, seed 42, the
+7 283 legs above — as the share of legs beginning at a lobby floor in each ten-minute window:
+
+| window | legs | from the lobby |
+|---|---|---|
+| 08:40–08:50, the up-peak | 367 | **86.4 %** |
+| 10:25–10:35, mid-morning | 109 | 58.7 % |
+| 12:15–12:25, lunch outbound | 200 | **12.5 %** |
+| 12:35–12:45, lunch returning | 215 | 74.0 % |
+| 17:25–17:35, the down-peak | 430 | **7.2 %** |
+
+One template, one run, one seed: the building fills, settles, empties to lunch, refills, and empties
+again. § D156 found the shipped templates flat in the mix at *+1.83 σ* and called it structural
+because `DemandPhase` carried a scalar; this is what the phase list is *for*, and the lunch pair
+straddling the cited 45/45/10 crossover is that arc arriving in the legs.
+
+**The mid-morning row is the one to read carefully, and it is quoted rather than explained.** It is
+the flat 45/45/10 stretch, and it measures 58.7 % here and **43.5 %** on the disjoint seed
+20 260 805 — either side of the authored balance on ~110 legs, which is a ten-minute window of a
+quiet period and about what its own scatter allows. Whether the residual is sampling noise or a
+systematic lift from the building's own geometry is **unmeasured**, and no mechanism is claimed for
+it: the four peak rows are the ones this table is evidence for, and each of them is far outside any
+reading of that scatter.
+
+Both halves of the suppression above are the apparatus working. The record is a statement about
+**demand**, and `midtown-office` under `collective` at typical demand does not have the capacity for
+its own peaks —
+which is not something this record introduced, because `rise-and-fall` on the same pair is already
+suppressed for saturation over its own 300 s window. The day makes it *visible over ten hours* rather
+than over five minutes. At `--rate 3` the same day reports **AWT 17.97 s, WT95 48.43 s**, all 1 824
+legs delivered; on `garden-apartments` at typical it reports **AWT 12.98 s**. So the record produces
+reportable runs where the bank can serve it and suppresses honestly where it cannot, which is exactly
+what every other template does.
+
+### Two consequences named rather than discovered
+
+**All leaderboard config boards fork.** `server/leaderboard/submission.ts#configHashOf` digests the
+fully resolved inputs a run depended on, and the demand template catalogue is one of them — *as
+loaded*, not as a curated subset. Adding a record changes that file, so every board keyed on a
+template from it forks, exactly as it did for § D245's one field and § D264's one record. The
+avoidance is the same wrong move refused for the same reason: keeping the record outside the digested
+file would create a second place a template is defined. `submission.ts` already states the intended
+reading — *"A `data/` change does not corrupt an old board — it starts a new one."*
+
+**The non-test caller.** `cli/src/commands/run.ts#planRun` resolves `--template` against the loaded
+catalogue and hands the id to `SimulationConfig.demandTemplate`, so `elevator-sim run --template
+office-day` builds the phase list and runs it; `elevator-sim watch` reaches the same `planRun`; and
+`elevator-sim list` prints the record beside the other six from the same file. `packages/experiments`'
+`TrafficArmSpec.demandTemplate` accepts it as an axis. That is the § D273 path exercised from a
+shipped entry point rather than from a test, which is the check `patternSwitching`
+([§ D219](DECISIONS.md)) failed.
+
+### The viewer cannot start it, and a test says so — which is the finding, not a defect in this change
+
+`packages/viz/src/menu/menu.test.ts` § *every shipped template can be run at some offered length* is
+**red on `office-day`**, and it is right to be: `FREE_PLAY_DURATIONS_S` offers 5, 15, 30, 60 and 120
+minutes, and a ten-hour day fits inside none of them. Its own comment states the rule it is
+enforcing — *"a template that ships and fits inside none of the offered run lengths would be listed
+in the menu and unstartable at every one of them."*
+
+This is the same thing § D264 point 4 records happening to `menu/howToPlay.test.ts` when
+`office-down-peak` landed: a catalogue-derived guard turning red is that guard working. It is left
+red **and named here** rather than fixed, because both fixes are outside this change's file
+ownership and one of them is a design decision rather than a constant:
+
+- **A longer offered length** (`packages/viz/src/menu/types.ts`) makes the day startable and makes
+  Free Play offer a ten-hour run, which is a product decision about what a session is.
+- **A part-of-day window** — § D275's unbuilt `windowStartS`/`windowEndS`, plus the control that
+  writes it — makes the day startable at any offered length by running a *slice* of it, which is
+  what "make the day the unit of play" actually asks for.
+
+The second is the one this work was built towards, and the red test is the strongest available
+argument for sequencing it: the day exists, it runs from the CLI, and the only thing between it and a
+player is a way to say *which part*. `menu/howToPlay.test.ts` § *names every demand template the
+configuration ships* is **green** — the guide's prose already contains both words of `office-day` —
+so the guide will need a sentence distinguishing it when the viewer half lands, and does not fail
+today.

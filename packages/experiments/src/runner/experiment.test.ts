@@ -185,8 +185,22 @@ describe('parseExperimentSpec', () => {
     );
     expect(() => parseExperimentSpec({ ...VALID_JSON, seed: {} })).toThrow(/spec\.seed/);
     expect(() =>
-      parseExperimentSpec({ ...VALID_JSON, traffic: [{ id: 't', demandTemplate: 'rise-and-crash' }] }),
+      parseExperimentSpec({ ...VALID_JSON, traffic: [{ id: 't', demandTemplate: 42 }] }),
     ).toThrow(/spec\.traffic\[0\]\.demandTemplate/);
+    /*
+     * And an unknown *id* is deliberately **not** a parse error any more (`DECISIONS.md` § D274).
+     * It used to be checked against `DEMAND_TEMPLATE_IDS`, which asks "is this one of the shapes
+     * this build compiles?" — the wrong question since § D273 let a `demandTemplates` record author
+     * its own phases and answer to an id no compiled-in union can contain. The authority is the
+     * catalogue the run loads, which this parser does not have, so the id is carried through and
+     * `resolveDemandTemplate` refuses it by name against the data actually in use.
+     */
+    expect(
+      parseExperimentSpec({
+        ...VALID_JSON,
+        traffic: [{ id: 't', demandTemplate: 'rise-and-crash' }],
+      }).traffic?.[0]?.demandTemplate,
+    ).toBe('rise-and-crash');
     expect(() =>
       parseExperimentSpec({ ...VALID_JSON, replication: { stoppingMetric: 'awt' } }),
     ).toThrow(/not a known replication metric/);
