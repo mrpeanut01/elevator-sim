@@ -87,6 +87,7 @@
 
 import type { AwtInvalidGround, PassengerModel } from '@elevator-sim/core/browser';
 
+import { glossaryPlain } from './glossary.js';
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import type { FailStateReport } from '../campaign/failStates.js';
 import type { VizRecording } from '../contract/types.js';
@@ -572,12 +573,29 @@ const CASUAL_LEAD_BY_FIGURE: Readonly<Record<string, string>> = Object.freeze({
   [AWT_ID]:
     'How long a wait came to on average — from the moment somebody pressed the button to the ' +
     'moment they stepped into a car.',
-  [WT95_ID]:
-    'The wait that all but the unluckiest one ride in twenty came in under. It is here because ' +
-    'an average hides the bad end, and the bad end is what people complain about.',
-  [TTD_ID]:
-    'The whole journey, front door to floor — including any change of lifts. Longer than the ' +
-    'waits above, and counting something different, so the two are not comparable.',
+  /*
+   * **These two are read from `mode/glossary.ts`, not written here** — issue #22's lane, and it
+   * found the duplication rather than predicting it.
+   *
+   * `95th-percentile wait` and `door-to-door time` are words the Compare and Lab tabs print too,
+   * so the glossary owns them; this table's own entries for them were a byte-for-byte second copy
+   * of the same explanation, caught by `mode/glossary.test.ts`'s anti-duplication sweep on the
+   * first run of it. Two copies is the defect that lane exists to remove — the band palette in
+   * four `live/` modules, `TERM_PHRASES` against `data/dispatcher-profiles.json` — and finding a
+   * third inside the module § D240 built is the argument for the sweep rather than against it.
+   *
+   * The four entries around them stay written here, and the line between the two groups is not
+   * arbitrary: a glossary entry explains a **word**, and these four explain a **figure**. Nothing
+   * on the Compare tab says *"the single worst wait anybody had"* or draws a paired demand bar, so
+   * there is no second surface for those to drift against, and moving them into a vocabulary
+   * keyed on words would have put figure-shaped prose in a word-shaped table to make a count
+   * look tidier. `long-waits` is the instructive one: the glossary owns *long-wait threshold*,
+   * which is the **line**, and this entry is about the **share of rides that crossed it**. Two
+   * related sentences about two different quantities are not a duplication, and collapsing them
+   * would have lost the figure's own meaning.
+   */
+  [WT95_ID]: glossaryPlain('wt95'),
+  [TTD_ID]: glossaryPlain('door-to-door'),
   [LONG_WAITS_ID]:
     'The share of rides that took longer than this building calls acceptable. A minute is the ' +
     'usual line between a wait people accept and one they notice.',

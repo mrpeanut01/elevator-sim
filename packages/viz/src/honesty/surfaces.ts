@@ -55,6 +55,7 @@ import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../c
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
 import { disclosureItems } from '../mode/disclosure.js';
+import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
@@ -4107,6 +4108,103 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
   },
 };
 
+/**
+ * The statistics vocabulary — issue #22, driven rather than excluded.
+ *
+ * ## Why this is an adapter and not an entry in `NOT_PLAYER_FACING`
+ *
+ * Because it is player-facing copy about **what a number means**, which is the closest thing to
+ * the honesty search's own subject that this package contains. An exclusion would have had to
+ * argue that prose written to explain a confidence interval is not the kind of prose R1, R2, R10,
+ * R11 and R13 are about, and there is no version of that argument that survives being written
+ * down. `mode/glossary.ts` was authored knowing it would be swept.
+ *
+ * The sweep is not decorative. Every rule it applies is one this table could plausibly break:
+ * **R10** because a natural way to explain an interval is *"there is a 95 % chance"*, which is
+ * exactly the misreading Budescu measured; **R11** because a natural way to explain kilojoules is
+ * to call a small number good; **R2** because the whole risk of a plain-language layer is that
+ * *"this run cannot tell them apart"* drifts into *"A is better"*.
+ *
+ * ## Two renderings, and the second is what makes this more than a string dump
+ *
+ * 1. **The whole table.** Every term and every explanation, on every case — so no entry can hide
+ *    behind never having been selected by a run.
+ * 2. **What the batch actually selected.** `glossaryFor` run over the shipped batch report's own
+ *    sentences, which is the call the Compare tab makes. This is the liveness half: a selector
+ *    that matched nothing would leave `honesty.test.ts`'s per-surface assertion looking at a
+ *    corpus with no evidence the vocabulary is ever attached to anything.
+ *
+ * ## Provenance is `authored`, deliberately
+ *
+ * Not `schema`. `schema` is the one provenance R10 does not scope to — it exists for `core`'s own
+ * description of its own dial, re-printed unaltered, which has no run behind it. This text is
+ * this package's own writing about results, so it is result-bearing and the probability-word rule
+ * applies to it in full. Picking `schema` would have been an exemption dressed as a category.
+ *
+ * ## What the roles say, and why `term` is not `prose`
+ *
+ * `GlossaryTerm.term` is seeded `label` — *"a name, a unit, a heading"* — because it is exactly
+ * that: the product's own word, quoted back. `GlossaryTerm.plain` is `prose`. The split matters
+ * for R13's frequency clause, which skips labels: `95th-percentile wait` is a name and not a
+ * restatement of anything.
+ *
+ * The batch report, goal report, stage verdict and stage briefing each now carry a `glossary`
+ * field holding **these same objects by reference**, so the strings seeded here are the strings
+ * those surfaces draw. That is why `BATCH_REPORT` and `CAMPAIGN` do not seed their `glossary`
+ * fields a second time: it would put one sentence into the corpus under two surface ids and make
+ * the search look broader than it is.
+ */
+const GLOSSARY: SurfaceAdapter = {
+  id: 'mode/glossary.ts#glossaryFor',
+  covers: [
+    'mode/glossary.ts#glossaryFor',
+    'mode/glossary.ts#GLOSSARY_TERMS',
+    // The keyed lookup `mode/disclosure.ts` uses for the two Casual leads the glossary owns. It
+    // returns a `plain` this adapter already seeds, so driving it separately would put one
+    // sentence in the corpus twice; listing it here is the claim that seeding the table drives it.
+    'mode/glossary.ts#glossaryPlain',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    for (const entry of GLOSSARY_TERMS) {
+      seeds.push({
+        field: `${entry.id}.term`,
+        text: entry.term,
+        role: 'label',
+        provenance: 'authored',
+      });
+      seeds.push({
+        field: `${entry.id}.plain`,
+        text: entry.plain,
+        role: 'prose',
+        provenance: 'authored',
+      });
+    }
+    /*
+     * The selector, on the batch the case actually ran — the Compare tab's own call. Seeded by the
+     * *selected* term's id rather than by its text, so this half of the corpus is a claim about
+     * which words were attached and the text itself is not duplicated under a second field.
+     */
+    const selected = glossaryFor([
+      context.report.demandClause,
+      context.report.crnSentence,
+      ...context.report.arms.map((arm) => arm.sentence),
+      ...context.report.comparisons.flatMap((comparison) =>
+        comparison.rows.flatMap((row) => [row.label, row.sentence, row.note]),
+      ),
+    ]);
+    for (const entry of selected) {
+      seeds.push({
+        field: `selected.${entry.id}`,
+        text: entry.term,
+        role: 'label',
+        provenance: 'authored',
+      });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -4142,6 +4240,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   SELECTOR,
   CHALLENGE,
   CALENDAR_AND_FABRIC,
+  // Appended, for the reason stated at `SHIFT_REPORT` above: `faults.ts` corrupts the first string
+  // matching a shape, so an adapter inserted earlier would move every fault onto a different
+  // surface and silently change what the shrink assertions are about.
+  GLOSSARY,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
