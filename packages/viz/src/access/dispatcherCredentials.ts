@@ -32,10 +32,20 @@
  *
  * A `destination-entry` profile *without* a panel discloses the destination and carries no
  * credential, and on an access-controlled building that is measurably **worse** than a
- * conventional dispatcher rather than better — 100 % unserved against conventional's 33.5 %
- * (`benchmark/accessControl.ts` H-ACCESS-1, seed 20 260 726, n = 30; `DECISIONS.md` § D137,
- * § D149). It gets its own sentence for that reason. No shipped profile raises it; the branch
- * exists because a profile authored in the parameter form can.
+ * conventional dispatcher rather than better — **61.2 % unserved against conventional's 0.0 %**
+ * (`benchmark/accessControl.ts` H-ACCESS-1, seed 20 260 726, n = 30, re-measured by
+ * `DECISIONS.md` § D280). It gets its own sentence for that reason. No shipped profile raises it;
+ * the branch exists because a profile authored in the parameter form can.
+ *
+ * **The figures this paragraph used to quote — *"100 % unserved against conventional's 33.5 %"* —
+ * are withdrawn, and they were describing a defect.** Both were measured on the tree that applied
+ * access zoning to a hall call's **pickup** floor (`DECISIONS.md` § D254), which stranded every
+ * conventional landing call raised inside a zone and swept collateral into the kiosk's count too.
+ * Re-run on the fixed simulator, conventional dispatch serves the building completely, so the
+ * comparison is now against **zero** rather than against a third — the contrast is *larger*, not
+ * smaller, and the reason for this branch is stronger than the withdrawn numbers made it look. The
+ * kiosk row also got cleaner: 34.1 undelivered against 34.1 kiosk refusals, so every stranded leg
+ * is a credential refusal and none is collateral (§ D256, § D279, § D280).
  */
 
 import {
@@ -165,11 +175,41 @@ export interface AccessCompatibility {
  * warning rather than a block.
  *
  * **No percentage.** § 10.3's example sentence reads *"33 % of riders will not be served"*, and
- * that figure is `benchmark/accessControl.ts` H-ACCESS-1's measurement of **one** arm on **one**
+ * that figure was `benchmark/accessControl.ts` H-ACCESS-1's measurement of **one** arm on **one**
  * building at one seed and one traffic profile. Reproducing it inside a message that fires on
  * any building under any conventional profile would be publishing a number nothing here
  * re-derives, which `CLAUDE.md` forbids in exactly those words. The message names the floors
- * instead — which is derived, exact, and the thing the reader can act on.
+ * instead — which is derived, exact, and the thing the reader can act on. **That decision was
+ * right for a stronger reason than it knew:** the 33.5 % it declined to quote is now **withdrawn**
+ * — it measured `DECISIONS.md` § D254's pickup-access defect, and the same configuration re-run on
+ * the fixed simulator delivers everybody (§ D256). A message that had hard-coded it would have
+ * shipped a defect's signature to the player.
+ *
+ * ## ⚠️ The warning's own middle clause is stale, and it is named here rather than quietly rewritten
+ *
+ * The sentence below still tells the player that *"a call from any of those floors reaches every
+ * car as an unbadged request, every car refuses it on access grounds, and the call is permanently
+ * unassignable."* **That is § D254's deleted defect described as live behaviour.** A credential
+ * governs where you may *go*, not where you may be *collected*; the pickup check and the
+ * `accessDenied` reason are both gone, and conventional dispatch now serves every access-zoned
+ * building this project ships at 100 % delivery — `eta` and `destination-eta-unpriced` are
+ * bit-identical on 150 of 150 `secure-tower` replications (§ D256, § D279).
+ *
+ * **It is not corrected here, and the reason is that the honest correction is a product decision
+ * rather than a wording one.** What survives is enforced by the *runner* per passenger against the
+ * **destination** (`Simulation.#bankCanCarry`, `#carCanCarry`), which no choice of dispatcher
+ * changes, plus § D265's credential gap, which is a property of the traffic model. The one
+ * genuinely dispatcher-dependent refusal left is the **bare kiosk**, and it already has its own
+ * sentence above. So the truthful message for a conventional profile may be *no message at all* —
+ * which would empty this check of the purpose `docs/10` § 10.3 gives it, and § D256's rule is that
+ * a re-design of that kind needs a criterion written before the numbers are read.
+ *
+ * **What may not happen is a second plausible sentence put in the gap.** `CLAUDE.md`'s rule for a
+ * claim about *why* is measure it or say it is unmeasured, and this is the saying. The standing
+ * requirement it sits under is the one for a stale *refusal* (§ D227): a control that writes
+ * something may not claim it writes nothing, and — as here — a message may not claim a refusal the
+ * engine no longer performs. `lockedOut.ts` names the same gap in the same directory for the same
+ * reason.
  */
 export function checkAccessCompatibility(input: AccessCompatibilityInput): AccessCompatibility {
   const capability = credentialCapabilityOf(input.profile);

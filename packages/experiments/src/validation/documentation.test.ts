@@ -241,14 +241,33 @@ describe('the phase-status vocabulary', () => {
  * `DECISIONS.md` § D60 grepped seven places asserting, as fact, that destination dispatch does
  * better under access control **because** authorization and optimization happen in the same step.
  * Measured at n = 150 per building under common random numbers, the difference-of-differences
- * `Δ_secure − Δ_midtown` is `+0.982 s [+0.584, +1.380]` — excluding zero on the **positive** side.
- * It buys *less* where access is controlled, and the saving is entirely in the credential
- * (`benchmark/accessControl.ts` § H-ACCESS-1).
+ * `Δ_secure − Δ_midtown` is `+1.020 s [+0.625, +1.414]` — excluding zero on the **positive** side.
+ * It buys *less* where access is controlled, so the same-step mechanism is not what produces the
+ * saving. The run is `runAccessControlStudy({})` at seed 20 260 726, held in
+ * `benchmark/published.ts` under `difference-of-differences/absolute`; the figure this docstring
+ * carried until 2026-08-06, `+0.982 s [+0.584, +1.380]`, was measured before § D254 fixed the
+ * pickup-access defect and is superseded by § D280.
  *
  * All seven are corrected. **Nothing went red while they were wrong, and nothing would go red if
  * they came back** — which is the same defect class as a published number nothing re-derives, one
  * level up. `published.ts` closed that hole for figures; this closes it for the one *mechanism*
  * sentence this project has measured and refuted.
+ *
+ * ## The correction had a second half, and it went stale exactly as the first one did
+ *
+ * This docstring used to end the paragraph above with *"and the saving is entirely in the credential
+ * (`benchmark/accessControl.ts` § H-ACCESS-1)"*, and six of the sites it guards said the same.
+ * **H-ACCESS-1 is REFUTED** (§ D256, § D279): under conventional dispatch `eta` and
+ * `destination-eta-unpriced` are bit-identical on 150 of 150 `secure-tower` replications across all
+ * seven identity metrics, so the credential buys nothing there and the saving is not in it either.
+ * **Where the saving comes from is unmeasured.**
+ *
+ * That is why {@link WITHDRAWN_DESTINATION_SITES} exists below. § D280 recorded that this guard was
+ * *"unaffected and green, because it asserts a refutation marker rather than a destination for the
+ * saving"* — which is precisely the hole: every site carried the word *refuted* about H-ACCESS-2
+ * while stating a destination H-ACCESS-1 had already lost, and three assertions watched it happen.
+ * A guard that cannot tell a refuted claim from a refuted *answer* is one vocabulary short, which is
+ * the shape § D281 found one entry earlier.
  *
  * ## What is a claim and what is a description
  *
@@ -305,14 +324,76 @@ const REFUTATION_MARKERS =
 /** Characters either side of a claim in which a refutation marker must appear. */
 const MARKER_WINDOW = 400;
 
+/**
+ * The **destination for the saving**, in both wordings the six sites used — § D280.
+ *
+ * Two shapes, because the correction was written twice by different tasks: *"the saving is entirely
+ * in the credential"* and *"the saving … is a claim about **authorization**"*. Both name a place the
+ * saving was said to come from, and both are withdrawn with H-ACCESS-1.
+ *
+ * The bounded `[^.]{0,70}` keeps each alternative inside one sentence, so a paragraph that happens
+ * to mention a saving and, three sentences later, a credential is not a match. Emphasis is already
+ * stripped by {@link plain}, which is why the patterns carry no `*`.
+ */
+const WITHDRAWN_DESTINATION_PATTERNS = new RegExp(
+  ['sav(?:ing|ings)[^.]{0,70}in the credential', 'sav(?:ing|ings)[^.]{0,70}claim about authoriz'].join(
+    '|',
+  ),
+  'gi',
+);
+
+/**
+ * A sentence that marks the *destination* as withdrawn rather than asserting it.
+ *
+ * **Deliberately narrower than {@link REFUTATION_MARKERS}, and that is the entire point.** Every one
+ * of the six sites already carried *refuted* — about H-ACCESS-2 — while stating a destination
+ * H-ACCESS-1 had lost, and § D280 recorded the guard as green throughout. Accepting `refut\w*` here
+ * would reproduce that exact blindness, so the marker has to say the thing that is actually true
+ * now: the answer is **withdrawn**, and where the saving comes from is **unmeasured**.
+ */
+const WITHDRAWAL_MARKERS = /withdraw\w*|unmeasured/gi;
+
+/**
+ * Every prose file this project publishes: `CLAUDE.md` and `docs/*.md`.
+ *
+ * Derived from disk rather than listed, for `deadCode.test.ts`'s reason (§ D192) — a hand list
+ * cannot see a document nobody thought to add to it, and this claim has been hand-counted three
+ * times (§ D60's seven, § D280's eight, § D280's six) without ever being executable.
+ */
+const proseFiles = (): readonly string[] =>
+  Object.freeze([
+    'CLAUDE.md',
+    ...readdirSync(DOCS)
+      .filter((name) => name.endsWith('.md'))
+      .sort()
+      .map((name) => `docs/${name}`),
+  ]);
+
+/**
+ * The documents that state or quote the withdrawn destination, as of § D283.
+ *
+ * `DECISIONS.md` and the repository-root working files are **out of scope by construction**: this
+ * scan covers what the project publishes as its documentation, and § D281's rule is that a decision
+ * record preserves superseded text as history. The root files that also quote it are named in
+ * § D284 and are not this lane's to edit.
+ */
+const WITHDRAWN_DESTINATION_SITES: readonly string[] = Object.freeze([
+  'CLAUDE.md',
+  'docs/01-architecture.md',
+  'docs/05-roadmap.md',
+  'docs/07-handoff.md',
+  'docs/08-review-findings.md',
+  'docs/09-destination-dispatch-contract.md',
+]);
+
 describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D60)', () => {
   /** Emphasis stripped and whitespace collapsed, so a line wrap cannot hide a match. */
   const sourceOf = (file: string): string => plain(read(...file.split('/')));
 
-  /** Distance from a claim occurrence to the nearest refutation marker, or `Infinity`. */
-  function nearestMarker(text: string, start: number, end: number): number {
+  /** Distance from an occurrence to the nearest match of `markers`, or `Infinity`. */
+  function nearest(text: string, markers: RegExp, start: number, end: number): number {
     let best = Number.POSITIVE_INFINITY;
-    for (const marker of text.matchAll(REFUTATION_MARKERS)) {
+    for (const marker of text.matchAll(markers)) {
       const from = marker.index;
       const to = from + marker[0].length;
       const distance = from >= end ? from - end : to <= start ? start - to : 0;
@@ -320,6 +401,10 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
     }
     return best;
   }
+
+  /** Distance from a claim occurrence to the nearest refutation marker, or `Infinity`. */
+  const nearestMarker = (text: string, start: number, end: number): number =>
+    nearest(text, REFUTATION_MARKERS, start, end);
 
   it('never states the performance claim without a refutation beside it', () => {
     const unmarked: string[] = [];
@@ -332,8 +417,8 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
           unmarked.push(
             `${file}: "${claim[0]}" with no refutation within ${String(MARKER_WINDOW)} characters ` +
               `(nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
-              'Measured, that claim is false: Δ_secure − Δ_midtown = +0.982 s [+0.584, +1.380], ' +
-              'excluding zero on the positive side (DECISIONS.md § D60).',
+              'Measured, that claim is false: Δ_secure − Δ_midtown = +1.020 s [+0.625, +1.414], ' +
+              'excluding zero on the positive side (DECISIONS.md § D60, re-pinned by § D280).',
           );
         }
       }
@@ -358,6 +443,49 @@ describe('the refuted access-control mechanism stays refuted (DECISIONS.md § D6
         'carrying the correction. Seven places said it and no test pinned any of them; this is ' +
         'that test.',
     ).toEqual([]);
+  });
+
+  it('never states the withdrawn destination for the saving without a withdrawal beside it', () => {
+    const unmarked: string[] = [];
+    for (const file of proseFiles()) {
+      const text = sourceOf(file);
+      for (const stated of text.matchAll(WITHDRAWN_DESTINATION_PATTERNS)) {
+        const start = stated.index;
+        const distance = nearest(text, WITHDRAWAL_MARKERS, start, start + stated[0].length);
+        if (distance > MARKER_WINDOW) {
+          unmarked.push(
+            `${file}: "${stated[0]}" with no withdrawal within ${String(MARKER_WINDOW)} characters ` +
+              `(nearest ${Number.isFinite(distance) ? String(distance) : 'none in the file'}). ` +
+              'H-ACCESS-1 is REFUTED (DECISIONS.md § D256, § D279): eta and ' +
+              'destination-eta-unpriced are bit-identical on 150 of 150 secure-tower replications, ' +
+              'so the credential buys nothing and the saving is not in it. Where it comes from is ' +
+              'UNMEASURED — say that, and do not substitute another mechanism (§ D280).',
+          );
+        }
+      }
+    }
+    expect(unmarked.join('\n'), unmarked.join('\n')).toBe('');
+  });
+
+  it('mechanises the count — the carrier set is derived from disk, not transcribed', () => {
+    // The other direction, and the one nobody had. § D280 named eight places quoting the figure and
+    // six quoting the destination, both by hand; DECISIONS.md § D60 named seven for the mechanism.
+    // Three hand counts, none of them executable. This derives the set instead, so a NEW site fails
+    // as loudly as a deleted one — the check above cannot see a site that quietly drops the whole
+    // paragraph, and a hand list cannot see a site nobody thought to add.
+    // `matchAll` rather than `test`, because `test` on a /g/ regex advances `lastIndex` and would
+    // make this filter depend on the order the files were read in.
+    const carriers = proseFiles().filter(
+      (file) => [...sourceOf(file).matchAll(WITHDRAWN_DESTINATION_PATTERNS)].length > 0,
+    );
+    expect(
+      carriers,
+      'the set of documents stating the withdrawn destination for the saving has changed. A file ' +
+        'that appeared here states, or quotes, "the saving is in the credential" / "a claim about ' +
+        'authorization" and must carry a withdrawal beside it. A file that disappeared deleted the ' +
+        'record of a refuted answer instead of marking it, which is what DECISIONS.md § D281 ' +
+        'refuses: a withdrawn figure is preserved under its marker, never dropped.',
+    ).toEqual(WITHDRAWN_DESTINATION_SITES);
   });
 
   it('excludes estimateCost.ts, and the exclusion is asserted in both directions', () => {

@@ -86,7 +86,14 @@ get wrong:
 **A finding of the same class that this register never had.** Seven places asserted, as fact, that
 destination dispatch does better under access control *because* authorization and optimization
 happen in the same step. Measured at n = 150 per building under CRN, the difference-of-differences is
-`+0.982 s [+0.584, +1.380]` — the mechanism is **refuted**. Four of the seven were `core`
+`+1.020 s [+0.625, +1.414]` — the mechanism is **refuted**. The run is `runAccessControlStudy({})` at
+seed 20 260 726, pinned in `benchmark/published.ts` as `difference-of-differences/absolute`; the
+figure this register published until 2026-08-06, `+0.982 s [+0.584, +1.380]`, was measured before
+[§ D254](../DECISIONS.md) fixed the pickup-access defect and is superseded by
+[§ D280](../DECISIONS.md). **The correction that used to follow this sentence — *"and the saving is
+entirely in the credential"* — is itself withdrawn**: that was H-ACCESS-1, it is refuted
+([§ D256](../DECISIONS.md), [§ D279](../DECISIONS.md)), and **where the saving comes from is now
+unmeasured**. Four of the seven were `core`
 docstrings; three were documents. **No test pinned any of them**, so nothing went red while they were
 wrong and nothing would go red if they returned. That is the same shape as findings #4 and #14 — a
 claim nothing re-derives — one level up, in prose about a mechanism rather than in a number. Tracked
@@ -97,7 +104,8 @@ true) is asserted in **both** directions. All three were watched failing, and th
 window is four times the measured worst case of 95.
 
 **The same class again, and this time it was caught before it published.** The refuted mechanism's
-number, `Δ_secure − Δ_midtown = +0.982 [+0.584, +1.380]`, was measured by an arm resolved from the
+number as it then stood, `Δ_secure − Δ_midtown = +0.982 [+0.584, +1.380]` (now
+`+1.020 [+0.625, +1.414]`, [§ D280](../DECISIONS.md)), was measured by an arm resolved from the
 **shipped `destination-eta` id** — which was correct only while that profile happened to weight
 `rideTime` at zero. Authoring the weight would have silently redefined `Δ` as the marginal effect of
 0.5 → 1.0 rather than the effect of pricing the destination at all: mean **+0.208**, same sign, same
