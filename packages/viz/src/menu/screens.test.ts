@@ -418,6 +418,55 @@ describe('the root menu says which rows need a server', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * The root is not a one-way door — GitHub issue #40
+ * -------------------------------------------------------------------------- */
+
+describe('the root offers a way out that is not a mode being entered', () => {
+  const rootRunning = (hasRun: boolean): readonly MenuAffordance[] =>
+    screenOf({ ...ARM, hasRun, state: stateAt('main') }).rows;
+
+  it('carries a Resume that asks the shell to close the menu', () => {
+    /*
+     * Issue #40. The root is the one screen with no `back`, so before this it offered six
+     * navigations and no exit: a player who pressed **Menu** over a running shift to check a setting
+     * had to *start something* to get back to the shift they were already watching.
+     */
+    const resume = rootRunning(true).find((row) => row.id === 'main.resume');
+    expect(resume, 'the root menu still has no way out').toBeDefined();
+    expect(resume?.enabled).toBe(true);
+    expect(resume?.intent).toEqual({ kind: 'close' });
+  });
+
+  it('refuses in words when there is no shift behind the menu — S7', () => {
+    // A *Resume* that closed the overlay onto an empty shell would take the screen away and give
+    // nothing back. `MenuAffordance.disabledWhy` is the rule that a refusal is always explained.
+    const resume = rootRunning(false).find((row) => row.id === 'main.resume');
+    expect(resume?.enabled).toBe(false);
+    expect(resume?.disabledWhy ?? '', 'the root’s way out refuses in silence').not.toBe('');
+  });
+
+  it('is the only row on the root that leaves without choosing anything', () => {
+    /*
+     * The non-vacuity guard. Every other root row is a `navigate`, and the three commits that close
+     * the overlay — Start, Open the doors, Keep going — are each a mode being entered on a screen
+     * further in. A second `close` up here would be two answers to *what does leaving mean*.
+     */
+    const closers = rootRunning(true).filter((row) => row.intent.kind === 'close');
+    expect(closers.map((row) => row.id)).toEqual(['main.resume']);
+  });
+
+  it('changes nothing about the menu itself — leaving is the shell’s, not the reducer’s', () => {
+    /*
+     * `applyIntent` returns the state unchanged, and that is the decision rather than an omission: a
+     * reducer that also navigated would be deciding *which screen the menu re-opens on*, which is
+     * `reopen`'s answer (the root) and not this one's to give a second time.
+     */
+    const before = stateAt('settings');
+    expect(applyIntent(before, { kind: 'close' })).toBe(before);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * One door, and one question at a time — issues #30 and #31
  * -------------------------------------------------------------------------- */
 

@@ -91,23 +91,34 @@ export interface MenuPanelHost {
   /** Which calendar period is over the week, or `''`. */
   calendarPeriodId(): string;
   /**
+   * The page **behind** the overlay, so it can be taken out of the page while the overlay is up.
+   *
+   * Handed over rather than found, and the distinction is § D249 § 3's. The shell's elements are not
+   * this file's to disable — but they are the shell's to *name*, and once named the writing belongs
+   * beside the focus trap, because *is the overlay covering the page?* has exactly one answer and it
+   * is `root.hidden`. A `document.body` traversal here would make this file decide what the shell
+   * **is**, which is a second answer that can drift from `dev/main.ts`'s.
+   *
+   * Required, not optional. A modal whose page behind it stays live is issue #68 — a seed typed into
+   * a field the player could not see — and a host that forgot to say would be that, silently. The
+   * one legitimate answer for *nothing behind me* is an empty array, which says it.
+   */
+  shell(): readonly HTMLElement[];
+  /**
    * Whether this deployment has a server behind it — GitHub issue #28's signal on the root menu.
    *
-   * **Optional, and that is a sequencing compromise stated rather than hidden.** Only the shell can
-   * answer it: the origin comes from a `<meta>` tag read at run time (§ D215 § 4, § D243), so the
-   * same bytes are a connected build behind a server and an unconnected one behind a CDN. This lane
-   * does not own `dev/main.ts`, and a **required** member would stop that file compiling in a branch
-   * merging beside this one.
+   * Only the shell can answer it: the origin comes from a `<meta>` tag read at run time (§ D215 § 4,
+   * § D243), so the same bytes are a connected build behind a server and an unconnected one behind a
+   * CDN. **`dev/main.ts` now answers it** — `hasServer: () => client !== undefined`, the same fact
+   * the `open-board` and `account-submit` arms already branch on, so there is no second answer to
+   * *is there a server*.
    *
-   * So the field is optional and its absence **says nothing** — see `MenuViewInput.hasServer` for
-   * why silence beats a guess. The shell's part is one line:
-   *
-   * ```ts
-   * hasServer: () => client !== undefined,
-   * ```
-   *
-   * Until it lands, the three social rows read exactly as they did. `menu/screens.test.ts` drives
-   * both answers, so the decision and its copy are asserted rather than waiting on the wiring.
+   * It stays **optional**, and the reason changed rather than went away. It was optional because the
+   * shell was another lane's; it is optional now because *absence has a meaning of its own* —
+   * `MenuViewInput.hasServer`'s `undefined` is **nobody has said**, which is what a caller with no
+   * `<meta>` lookup (a test, a future embedder) honestly is. A required member would force such a
+   * caller to guess, and a menu that asserted *needs a server* on a build that has one is a worse
+   * claim than the silence it replaced.
    */
   hasServer?: (() => boolean) | undefined;
 }
@@ -146,12 +157,16 @@ type KeepControl = <T extends HTMLElement>(control: T, key: string) => T;
  * of the *Settings* screen — the one that promises *"nothing here changes a run"* — into the seed
  * field, typed `424242`, and re-seeded the simulation with no visible feedback until they left.
  *
- * The panel owns this because the panel is the only thing that knows what is *in* the overlay. It
- * does not own the other half and does not pretend to: `inert` on the shell behind, and Escape
- * closing the menu, both need `dev/main.ts` — the first because the shell's own elements are not
- * this file's to disable, the second because there is no {@link MenuIntent} that closes the overlay
- * and adding one whose arm nothing performs is the dead control this package has shipped eleven
- * times. Both are filed rather than half-built.
+ * The panel owns this because the panel is the only thing that knows what is *in* the overlay.
+ *
+ * **The two halves § D249 § 3 left open are now closed, and neither moved here by itself.**
+ * `inert` and `aria-hidden` on the shell behind are written by {@link coverShell} over the elements
+ * {@link MenuPanelHost.shell} hands over — the shell still names its own, this file only writes
+ * what `root.hidden` says. And **Escape** dispatches {@link MenuIntent} `close`, a member added
+ * together with the arm in `dev/main.ts` that performs it, because a member nothing handles compiles
+ * and ships a dead control: `dispatchMenu` returns `void` and has no `never` arm. Binding Escape to
+ * `back` instead is still refused, for § D249's reason — it would work on five screens and do
+ * nothing on the root.
  */
 export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const doc = host.doc;
@@ -245,8 +260,55 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   if (view.screen === 'leaderboard') children.push(boardTable(doc, board));
 
   fill(root, ...children);
-  asModal(doc, root, view.title, controls);
+  asModal(doc, root, view.title, controls, host.dispatch);
+  // `HTMLElement.hidden` is `boolean | string` since `hidden="until-found"` — and every string it
+  // can hold is a *hidden* state, so truthiness is the whole of the question rather than a coercion
+  // papering over one.
+  coverShell(host.shell(), Boolean(root.hidden));
   restoreFocus(doc, root, controls, wasOn);
+}
+
+/**
+ * Take the shell behind the overlay out of the page while the overlay is up — issues #33 and #68.
+ *
+ * ## Why this is the belt to the trap's braces
+ *
+ * {@link asModal} holds the **keyboard**, and only over the controls this file built. It does not
+ * hold a pointer, and it does not hold something focusable inside the overlay that came from
+ * somewhere else — a link inside a notice, say. Measured before either half existed: 7 focusable
+ * controls inside the overlay and **624 in the document**, and issue #68's reporter reached the seed
+ * field behind the menu from the one screen whose own note promises *"nothing here changes a run"*,
+ * typed `424242`, and re-seeded the run.
+ *
+ * `inert` is what removes a subtree from focus, from hit-testing and from the accessibility tree in
+ * one attribute. `aria-hidden` goes with it because `inert` is the newer of the two and a reader on
+ * an assistive technology that has not implemented it would otherwise still be walked through the
+ * shell — belt and braces, and the pair is cheap.
+ *
+ * ## Why the shell is handed over rather than found
+ *
+ * § D249 § 3 filed this as *needs `dev/main.ts`*, on the ground that the shell's own elements are
+ * not this file's to disable. They still are not: {@link MenuPanelHost.shell} is the shell naming
+ * them, and this function only writes what the overlay's own `hidden` says. A `document.body`
+ * traversal here would be this file deciding what the shell **is**, which is the same class of
+ * second answer the trap refuses a `querySelectorAll` for.
+ *
+ * ## Why it is keyed on `root.hidden` rather than on a flag
+ *
+ * One source. `dev/main.ts#closeMenu` and the `reopen` arm both write `hidden` and then draw, so
+ * the covering and the overlay can never disagree — which a second boolean threaded through the
+ * host could, in exactly the direction that leaves the page permanently inert.
+ */
+function coverShell(shell: readonly HTMLElement[], menuHidden: boolean): void {
+  for (const element of shell) {
+    if (menuHidden) {
+      element.removeAttribute('inert');
+      element.removeAttribute('aria-hidden');
+      continue;
+    }
+    element.setAttribute('inert', '');
+    element.setAttribute('aria-hidden', 'true');
+  }
 }
 
 /* -------------------------------------------------------------------------- *
@@ -268,6 +330,15 @@ const WIRED = new WeakSet<HTMLElement>();
 
 /** The controls of the **current** draw, so the handler reads the live list rather than a stale one. */
 const CONTROLS = new WeakMap<HTMLElement, readonly HTMLElement[]>();
+
+/**
+ * Where Escape sends its intent, refreshed on every draw for {@link CONTROLS}' own reason.
+ *
+ * The listener is attached once per root, ever, so capturing a `dispatch` in its closure would pin
+ * the first draw's host forever — the same staleness the control list is a `WeakMap` to avoid, on a
+ * value whose being stale would be silent rather than visible.
+ */
+const DISPATCH = new WeakMap<HTMLElement, (intent: MenuIntent) => void>();
 
 /**
  * Make the overlay a dialog, and keep Tab inside it.
@@ -297,15 +368,31 @@ function asModal(
   root: HTMLElement,
   label: string,
   controls: readonly HTMLElement[],
+  dispatch: (intent: MenuIntent) => void,
 ): void {
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-label', label);
 
   CONTROLS.set(root, controls);
+  DISPATCH.set(root, dispatch);
   if (WIRED.has(root)) return;
   WIRED.add(root);
   root.addEventListener('keydown', (event: KeyboardEvent) => {
+    /*
+     * **Escape closes, on every screen** — issues #33 and #68, and § D249 § 3's refused
+     * alternative. Binding it to `back` was considered and rejected there: it would work on the
+     * five screens with a history and do nothing on the root, *"which is exactly where #40's
+     * reporter is standing"*. So the key means the same thing everywhere, and what it means is the
+     * `close` intent — which is a member of {@link MenuIntent} rather than a `root.hidden = true`
+     * here, because hiding the overlay is one of two things `dev/main.ts#closeMenu` does and a
+     * second writer of the first would leave the second undone.
+     */
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      DISPATCH.get(root)?.({ kind: 'close' });
+      return;
+    }
     if (event.key !== 'Tab') return;
     const list = CONTROLS.get(root) ?? [];
     if (list.length === 0) return;

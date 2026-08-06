@@ -86,6 +86,30 @@ export type MenuIntent =
   | { readonly kind: 'back' }
   /** Re-open the menu over a running game. `docs/16` § 5 clause 5: nothing could, before. */
   | { readonly kind: 'reopen' }
+  /**
+   * Leave the menu without choosing anything — GitHub issues #40, #33 and #68.
+   *
+   * ## Why this is not `back`
+   *
+   * `back` pops a screen and the root has nothing to pop, so a player who pressed **Menu** over a
+   * running shift and then changed their mind had no way out that was not *start something*: the
+   * root offered six navigations and no exit. That is the one-way door #40 reports, and it is also
+   * the whole of Escape's problem. § D249 § 3 considered binding Escape to `back` and refused it —
+   * *"it would work on five screens and do nothing on the root, which is exactly where #40's
+   * reporter is standing"* — so the key means **close**, on every screen, and that needs a member
+   * of its own.
+   *
+   * ## And it is a member rather than a call, for this union's founding reason
+   *
+   * `dispatchMenu` returns `void` and has no `never` arm, so a member nothing handles compiles and
+   * ships a dead control — the defect this package has shipped eleven times. Adding the intent and
+   * its arm is one change for exactly that reason: the shell does not compile until something
+   * performs it, and `menu/screens.test.ts` requires the row to be reachable.
+   *
+   * It carries nothing. *What was running* is the shell's and stays the shell's: this says only
+   * that the player is done with the menu, and `dev/main.ts#closeMenu` is what that means.
+   */
+  | { readonly kind: 'close' }
   /*
    * A **field and a value**, never a prepared patch and never a closure.
    *
@@ -228,6 +252,7 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'navigate':
     case 'back':
     case 'reopen':
+    case 'close':
     case 'start':
     case 'open-campaign':
     case 'start-endless':
@@ -497,7 +522,7 @@ const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
 function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
   switch (screen) {
     case 'main':
-      return { ...empty, rows: mainRows(input.hasServer) };
+      return { ...empty, rows: mainRows(input.hasServer, input.hasRun) };
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
@@ -537,7 +562,47 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
  */
 const NEEDS_A_SERVER = ' · needs a server, and this one has none';
 
-function mainRows(hasServer: boolean | undefined): readonly MenuAffordance[] {
+/**
+ * The way out — GitHub issue #40, and the row Escape presses.
+ *
+ * The root is the one screen with no `back`, so before this it offered six navigations and no exit:
+ * a player who pressed **Menu** over a running shift to check a setting had to *start something* to
+ * get back to the shift they were already watching. Every existing way out of the overlay is a mode
+ * being entered — Start, Open the doors, Keep going — which is a complete set of *choices* and an
+ * empty set of *changes of mind*.
+ *
+ * **Disabled and explained when there is nothing behind the menu**, which is `docs/16` S7's rule and
+ * not a courtesy: a *Resume* that closed the overlay onto an empty shell would be a button that
+ * takes the screen away and gives nothing back. The shell runs a shift on boot, so this is the cold
+ * state a `hasRun: false` caller describes rather than a state a player normally reaches — and
+ * saying so is cheaper than the one time they do.
+ *
+ * It is first because it is the only row that does not commit the player to anything, and last is
+ * where a reader looks for *cancel*. This overlay has no cancel: leaving it changes nothing, which
+ * is what the detail says.
+ */
+function resumeRow(hasRun: boolean): MenuAffordance {
+  return {
+    id: 'main.resume',
+    label: 'Resume',
+    detail: 'Back to the shift on screen — nothing here is changed by leaving',
+    kind: 'commit',
+    // Closing an overlay moves no leg. `presentation` is the honest scope and it is what lets this
+    // row appear under every play mode, which a way out has to.
+    scope: 'presentation',
+    enabled: hasRun,
+    ...(hasRun
+      ? {}
+      : {
+          disabledWhy:
+            'There is no shift on screen to go back to yet. Pick a scenario or a free-play ' +
+            'selection below and the menu closes onto it.',
+        }),
+    intent: { kind: 'close' },
+  };
+}
+
+function mainRows(hasServer: boolean | undefined, hasRun: boolean): readonly MenuAffordance[] {
   // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
   // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
   const note = hasServer === false ? NEEDS_A_SERVER : '';
@@ -584,6 +649,7 @@ function mainRows(hasServer: boolean | undefined): readonly MenuAffordance[] {
     // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
     social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
+    resumeRow(hasRun),
   ]);
 }
 
@@ -1605,6 +1671,7 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
       // calendar are facts about the run, not about which screen is showing.
       return state;
     case 'reopen':
+    case 'close':
     case 'start':
     case 'open-campaign':
     case 'start-endless':
@@ -1617,6 +1684,10 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'post-challenge':
       // Not the menu's to answer. Returned unchanged rather than thrown: a render path that threw
       // on an intent it did not own would turn a mis-wired button into a blank screen.
+      //
+      // `close` is here rather than beside `back` on purpose. Hiding the overlay is the shell's,
+      // and a reducer that also navigated would decide *which screen the menu re-opens on* — which
+      // is `reopen`'s answer (the root) and not this one's to give twice.
       return state;
   }
 }

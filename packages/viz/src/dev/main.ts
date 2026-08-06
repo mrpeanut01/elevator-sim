@@ -1120,12 +1120,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
         if (entered === undefined) return;
+        // `enterFreePlay` selects the simulation tab — issue #23, and it is in the decision rather
+        // than here for the reason that module exists at all.
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu();
         runShift();
         return;
       }
+
+      case 'close':
+        /*
+         * The way out that is not a mode being entered — issues #40, #33 and #68. `renderAll`
+         * rather than `runShift`: leaving the menu is not asking for a different day, and re-running
+         * here would throw away the shift the player pressed **Resume** to get back to.
+         */
+        closeMenu();
+        renderAll();
+        return;
 
       case 'open-campaign':
         /*
@@ -1569,6 +1581,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * unanswerable only because the screen had nowhere to put the answer.
      */
     challenge: () => challengeView,
+    /*
+     * GitHub issue #28's one line, and the shell is the only thing that can write it.
+     *
+     * The origin comes from a `<meta>` tag read at run time (§ D215 § 4, § D243), so the same bytes
+     * are a connected build behind a server and an unconnected one behind a CDN — `menu/screens.ts`
+     * cannot tell and correctly says nothing when nobody has. `client` is `undefined` exactly when
+     * that lookup found no origin, which is the same fact `open-board` and `account-submit` already
+     * branch on, so this introduces no second answer to *is there a server*.
+     */
+    hasServer: () => client !== undefined,
+    shell: shellBehindMenu,
     calendarPeriodId: () => state.calendar?.id ?? '',
     commissioning: () => commissioningInput(),
     runState: () => {
@@ -1623,6 +1646,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     };
   }
 
+  /**
+   * Everything the overlay covers — issues #33 and #68, and the shell naming its own.
+   *
+   * Derived from `document.body` rather than listed, minus the two things this file appended to it,
+   * so an element added to `index.html` is covered on the day it lands. A hand-written list of the
+   * page's top-level elements would be the shape this repository keeps finding stale, on a guard
+   * whose going stale is silent: the shell would look right and one more thing behind the menu would
+   * be reachable.
+   *
+   * The two exemptions are both this file's own. The overlay cannot cover itself. And
+   * {@link waitLiveRegion} is a `role="status"` that announces **the menu's** own waits — a sign-in
+   * link taking half a minute (§ D243 § 4) — so hiding it from assistive technology while the menu
+   * is up would silence the one region the menu speaks through.
+   *
+   * Read fresh on every draw rather than captured once: `boot` appends both exemptions before the
+   * first `drawMenu`, and a list taken at mount would be a snapshot of a page that is still being
+   * assembled.
+   */
+  function shellBehindMenu(): readonly HTMLElement[] {
+    return [...document.body.children].filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child !== menuRoot && child !== waitLiveRegion,
+    );
+  }
+
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
   }
@@ -1630,13 +1678,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /**
    * Leave the menu — and the one place {@link playerHasChosen} is latched.
    *
-   * Every arm that closes the overlay is a mode being entered: **Start** (free play), **Open the
-   * doors** (the campaign) and **Keep going** (endless). There is no fourth way out, so this is the
-   * complete set of moments at which a run stops being scenery and starts being somebody's day.
+   * Three of the four ways out are a mode being entered: **Start** (free play), **Open the doors**
+   * (the campaign) and **Keep going** (endless). **Resume** is the fourth, and it is a change of
+   * mind rather than a choice — GitHub issue #40, and the intent Escape presses.
+   *
+   * It latches `playerHasChosen` all the same, and that is deliberate rather than an oversight in
+   * the new arm. The flag gates autoplay on the next `adopt`, and a player who pressed **Resume** to
+   * get back to the shift they were watching has left the menu on purpose; a run they then re-roll
+   * should play, exactly as it would have had they never opened the menu. Resume itself starts
+   * nothing — there is no `adopt` on this path — so the shift on screen stays where the playhead
+   * left it.
+   *
+   * **It redraws**, because the overlay's `hidden` is what `menuPanel.ts#coverShell` reads to decide
+   * whether the shell behind is `inert`. Setting `hidden` without drawing would hide the menu and
+   * leave the page underneath it out of the accessibility tree and unclickable — issue #68 with the
+   * sign flipped, and the reason the covering is keyed on one value with one writer.
    */
   function closeMenu(): void {
     menuRoot.hidden = true;
     playerHasChosen = true;
+    drawMenu();
   }
 
   drawMenu();
