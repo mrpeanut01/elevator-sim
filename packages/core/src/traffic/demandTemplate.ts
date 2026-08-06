@@ -46,9 +46,16 @@
  * ## The hour, and why it moves nothing (`DECISIONS.md` § D244)
  *
  * A template may also declare **when it is**: `ResolvedDemandTemplate.startOfDayS`, resolved from
- * `data/traffic-profiles.json → demandTemplates[].startOfDayMin`. Four of the five shipped
+ * `data/traffic-profiles.json → demandTemplates[].startOfDayMin`. Five of the six shipped
  * templates declare one; `constant-iso` declares none, because ISO's constant demand is a rate held
  * to cross-check an analytical baseline and not a time of day.
+ *
+ * **A record gets exactly one hour, and that is what forced the sixth record** (`DECISIONS.md`
+ * § D263). `evening-egress` was a ballroom emptying *and* the calendar's office end-of-day, so its
+ * one hour could only be true of one of them. It is now the venue case at 22:24, and
+ * `office-down-peak` is the office case at 17:15. Two records, one meaning each — rather than an
+ * hour on the record that any caller could override, which would be a second place a template's
+ * clock is defined.
  *
  * **{@link intensityAt}, {@link splitAt} and {@link integratedIntensityS} do not read it, and that
  * is the property the whole feature rests on.** Every arrival instant is drawn against `intensityAt`
@@ -927,6 +934,8 @@ export function resolveDemandTemplate(
   if (spec === 'lunch-two-way') return lunchTwoWay(overrides);
   if (spec === 'shift-change') return shiftChange(overrides);
   if (spec === 'evening-egress') return eveningEgress(overrides);
+  // Same shape as `rise-and-fall`, and the id is what differs. See {@link officeDownPeak}.
+  if (spec === 'office-down-peak') return officeDownPeak(overrides);
   throw new TrafficError(
     `Unknown demand template "${spec}". Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Declare it in data/traffic-profiles.json and add its shape in traffic/demandTemplate.ts.`,
   );
@@ -1039,6 +1048,47 @@ function shiftChange(
   });
 }
 
+/**
+ * **The office end-of-day down-peak — the rise-and-fall shape under its own id and its own hour.**
+ *
+ * Delegates to {@link riseAndFall} rather than authoring a ramp of its own, and that is the honest
+ * arrangement rather than a shortcut: an office empties on the same ramp-hold-ramp profile it fills
+ * on, and the record's own `$comment` inherits `rise-and-fall`'s geometry precisely so that it adds
+ * no duration no source supports — the discipline `lunch-two-way` and `shift-change` were authored
+ * under.
+ *
+ * **So a run of this template draws the same passengers as a run of `rise-and-fall` at the same
+ * seed, and that is declared rather than latent.** `traffic/templateAdditionIdentity.test.ts`
+ * asserts it on the legs. What the record adds is the **hour** (17:15, placing the reported peak at
+ * 17:30) and the period's identity; § D244 rule 1 is that the hour moves nothing, so there is no
+ * mechanism here being claimed and not delivered. A record that claimed a shape it did not have
+ * would be the § D112 defect — this one names the shape it shares.
+ *
+ * **Why it is a separate id at all**, when the geometry is identical: `DECISIONS.md` § D263. A
+ * template gets exactly one `startOfDayMin`, `evening-egress` was serving both a ballroom and an
+ * office end-of-day, and 17:24 and 22:24 are not the same number. Two records, one meaning each.
+ *
+ * Note that the `traffic.riseAndFall.*` overrides reach this shape too, since they are the
+ * parameters of the shape rather than of the id — the same sharing `shift-change` makes of
+ * `peakWindowS`, and for the same reason: a second name for one quantity is how a search space grows
+ * a dimension nobody meant to add.
+ */
+function officeDownPeak(
+  overrides: DemandTemplateOverrides | undefined,
+  recordDurationS?: number,
+  id?: string,
+  name?: string,
+  recordStartOfDayS?: number,
+): ResolvedDemandTemplate {
+  return riseAndFall(
+    overrides,
+    recordDurationS,
+    id ?? 'office-down-peak',
+    name ?? 'Office down-peak template',
+    recordStartOfDayS,
+  );
+}
+
 /** The event-egress shape, with `overrides` beating the record value and then the default. */
 function eveningEgress(
   overrides: DemandTemplateOverrides | undefined,
@@ -1104,6 +1154,9 @@ function fromRecord(
   }
   if (record.id === 'evening-egress') {
     return eveningEgress(overrides, durationS, record.id, record.name, startOfDayS);
+  }
+  if (record.id === 'office-down-peak') {
+    return officeDownPeak(overrides, durationS, record.id, record.name, startOfDayS);
   }
   throw new TrafficError(
     `Demand template "${record.id}" has no shape in this module. Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Adding one is a new shape in traffic/demandTemplate.ts, not a new branch at a call site.`,

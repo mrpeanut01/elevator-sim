@@ -93,7 +93,8 @@ import {
  *
  * ## And re-pinned again for `startOfDayS`, with the delta proved for all fifteen rather than two
  *
- * `DECISIONS.md` § D244 gave four of the five shipped demand templates a time of day. The hour is
+ * `DECISIONS.md` § D244 gave four of the five demand templates shipping at the time a time of day —
+ * five of six since § D263 split `evening-egress` into a venue record and an office one. The hour is
  * invisible to `intensityAt`, `splitAt` and `integratedIntensityS`, so **no arrival, leg, stop or
  * statistic moved** — but `PassengerTrace` is part of a `SimulationResult` and
  * `structuralDigestOfResult` hashes every key, so all fifteen digests below moved on the key alone,

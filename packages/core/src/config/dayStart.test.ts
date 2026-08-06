@@ -14,7 +14,7 @@
  *    let two records that mean the same thing compare unequal;
  * 2. a record with **no** hour is valid, which is what makes omission a declaration rather than an
  *    incomplete row — `constant-iso` ships that way on purpose;
- * 3. the shipped file's four authored hours are inside the bound and land where their `$comment`
+ * 3. the shipped file's five authored hours are inside the bound and land where their `$comment`
  *    says they land, which is the half a range check cannot make.
  *
  * What is deliberately *not* here: whether the hour changes a run. It does not, and that is proved
@@ -127,10 +127,15 @@ const SHIPPED_HOURS: Readonly<Record<string, string | null>> = {
   'constant-iso': null,
   'lunch-two-way': '12:15',
   'shift-change': '14:45',
-  'evening-egress': '17:24',
+  // `evening-egress` is the **venue** case and nothing else since `DECISIONS.md` § D263: 22:24
+  // places its reported five minutes at 22:30–22:35, a function turning out. The office end of day
+  // it used to double as is `office-down-peak`, whose 17:15 places its hold at 17:30 — the pair of
+  // hours that could not both live on one record, which is what forced the split.
+  'evening-egress': '22:24',
+  'office-down-peak': '17:15',
 };
 
-describe('the shipped reference data authors four hours and deliberately omits one', () => {
+describe('the shipped reference data authors five hours and deliberately omits one', () => {
   it('every template declares the hour its comment argues for, or none', async () => {
     const config = await load();
     const measured: Record<string, string | null> = {};

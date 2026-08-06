@@ -18275,3 +18275,210 @@ gained a goal a player can actually chase, which is worth more to the product th
 shipped JSON, so regenerating the data turned that guard red until the prose followed. That guard
 exists because this exact table had gone stale once before, on a change to `vertical-city`'s
 escalator, with nothing noticing.
+
+---
+
+## D263 — one record was two periods, so it is two records
+
+**Date: 2026-08-05 · Written after the code.** GitHub issue #84, split out of
+[§ D244](DECISIONS.md) and recorded there because the obvious fix is the wrong one.
+
+`evening-egress` is named *Event egress*, and its `$comment` argued a venue — *a ballroom emptying, a
+cinema turning out, a floor of a conference breaking at once*. `shift/calendar.ts`'s `quarter-end`
+period selected it as an **office end of day**: *"the whole building leaves at once when the numbers
+are filed."* Both readings were live, both had callers, and nothing was wrong with either of them
+until § D244 gave every template a `startOfDayMin` — because a record gets **one** hour, and a
+building closing at 17:30 and a function turning out at 22:30 are not the same number. It got 17:24,
+derived for the office reading, and said so in a record whose every other sentence argued the venue.
+
+### The fix that was rejected, and it is the smaller one
+
+Moving the hour onto the calendar **period**, so `quarter-end` says 17:30 and a venue period says
+22:30. One field, no new record, no data change. It is wrong because it creates a **second place a
+template's clock is defined**, and the record would then carry an hour any caller may override. This
+repository has paid for that shape repeatedly — the band palette held in four modules, `TERM_PHRASES`
+duplicating `data/dispatcher-profiles.json`, two declarations of `DAY_START_S` — and it goes stale
+the same way every time: the two definitions disagree, and the one nobody is reading is the one that
+is right. § D245 refused the same move for the same reason when it declined to keep the hour outside
+the digested record.
+
+### The fix taken: two records, one meaning each
+
+A template is data (invariant 7) and records are cheap.
+
+| record | what it now means | hour | status of the hour |
+|---|---|---|---|
+| `evening-egress` | **the venue only** — a ballroom, a cinema, a conference floor | 1344 = **22:24** | NOT CITED end to end |
+| `office-down-peak` | **the office end of day** — the building emptying | 1035 = **17:15** | period CITED, hour DERIVED |
+
+`evening-egress` keeps its id, its name, its `$comment`'s venue argument and **its geometry, to the
+byte** — 20 minutes, the 60 s step, the 300 s hold, the 0.05 baseline. Only its hour moved, and
+§ D244 rule 1 is that the hour moves nothing. Its callers were already the venue ones and are
+untouched: `data/buildings/crown-hotel.json`'s 120-person ballroom, and
+`packages/server/src/challenge/schedule.ts`'s `crown-hotel` rotation.
+
+`office-down-peak` is new, and `quarter-end` selects it — the one-line change the issue costed.
+
+### The hours, each derived by placing its template's hold
+
+- **22:24** places `evening-egress`'s reported five minutes at **22:30–22:35**: full flow arrives at
+  `durationMin/4 + 60 s` = +6 min. It is § D244's own worked example — *"a ballroom turning out at
+  22:30 is the same shape on a different clock"* — promoted from a limitation to an authored hour now
+  that the office reading has somewhere else to live.
+- **17:15** places `office-down-peak`'s reported five minutes at **17:27:30–17:32:30**, centred on
+  17:30, by the identical derivation `rise-and-fall`'s 08:30 is: the hold sits at +12.5 to +17.5 min
+  of a 30-minute run. The pair reads as one building's day — **opens at 08:30 for a peak at 08:45,
+  closes at 17:15 for a peak at 17:30**.
+
+### What is cited, and the two things that are not
+
+**CITED — that an office evening down-peak is a design case in its own right.** It is one of the four
+office traffic types this project's reference set names beside the morning up-peak, the lunch mixed
+peak and random interfloor traffic (Elevator World, *Fundamentals of Traffic Analysis*, in
+`docs/02-elevator-reference.md`'s source list; CIBSE Guide D treats the same four). That is the whole
+point of not copying the event shape across: a down-peak is not an egress under another name.
+
+**NOT CITED — the down-peak's arrival rate, and no figure was invented for it.** `docs/03` tabulates
+the office **up**-peak at 11–15 %pop/5 min (standard) and 15–17 % (prestige) and names it the
+governing peak; no page in this project's reference set gives a %pop/5 min band for the office
+down-peak. The literature does say the evening flow is the more concentrated of the two, which is
+exactly why quoting an unsourced multiple of the up-peak here would have been the plausible-looking
+reference CLAUDE.md forbids. **And it could not have been authored anyway**, which is stated on the
+record so a reader does not go hunting: a `demandTemplates` record has **no rate field**. The level a
+run is drawn at comes from the building's `arrivalRatePctPop5min` and the declared
+`traffic.demandLevel`; a template carries the *shape* of demand over a period, never how much of it
+there is.
+
+**NOT CITED — the mix, and the record authors none.** The office down-peak's split is the morning
+up-peak's reversed — roughly 5/85/10 against the shipped `office-standard` profile's 85/5/10 — and
+that is a statement of the mechanism (in the morning everyone rides up from the lobby, in the evening
+everyone rides down to it), not a quoted table. It is **not** written as
+`directionalSplitAtStart`/`AtEnd`, for two reasons that are both load-bearing rather than
+convenient. Those fields mean *the mix moves within the run*, which is `lunch-two-way`'s arc and is
+false of a down-peak — a down-peak's mix is a level; and `shift/calendar.ts` **withholds a period's
+own `splitBias` under a mix-declaring template**, so authoring a constant pair would have silently
+disabled `quarter-end`'s outgoing pull and its Friday override while the screen still looked right.
+That is the § D219 shape — a control that binds nothing — reached by adding data rather than by
+adding a panel.
+
+### The geometry is `rise-and-fall`'s, and the price of that is declared rather than latent
+
+30 minutes, a 5-minute hold, a zero baseline, `peak-5min` — inherited unchanged, so the record adds
+**no uncited geometry**, the discipline `lunch-two-way` and `shift-change` were authored under. The
+price is that `office-down-peak` and `rise-and-fall` **draw the same passengers at the same seed**,
+and `traffic/templateAdditionIdentity.test.ts` § *the same passengers* asserts it on the legs at all
+five buildings rather than leaving it to be discovered.
+
+A record that claimed a shape it did not have would be the § D112 defect — `destination-eta`,
+bit-identical to `eta` at 8 of 8 cells while its name promised a mechanism. This one names the shape
+it shares, in its own `$comment` and in a run, and what it adds is the hour and the period's
+identity. **If that identity ever breaks, the `$comment` is what changes, not the test.**
+
+**LIMITATION, and it is the cost of inheriting:** the shape is symmetric and a real office down-peak
+is not. Departures synchronise at the front — the working day ends at one time for most of the
+building — and then trail long into the evening. Expressing that needs a skewed shape this module
+does not have and a skew figure no source here publishes, so it is neither cited nor modelled, and it
+is named on the record rather than implied by a symmetric ramp.
+
+### The smaller dishonesty this also closes
+
+`evening-egress`'s clock note read *"CITED: that an end-of-day down-peak is a design case, and its
+demand level."* That citation was for the **office** reading, on a record arguing the venue. It has
+gone with the office reading to `office-down-peak`, and **nothing was put in its place**:
+`evening-egress`'s clock is now uncited end to end, and says so. That is a record losing a citation
+it was never entitled to, which reads as a regression and is the opposite of one.
+
+---
+
+## D264 — four consequences of splitting one record, all handled rather than discovered
+
+**Date: 2026-08-05 · Written after the code.** [§ D263](DECISIONS.md) adds a record to
+`data/traffic-profiles.json` and repoints one calendar period. Four things follow that are neither
+optional nor bugs, in the shape § D245 used for § D244's field.
+
+### 1. All five leaderboard config boards fork, and that is the mechanism working
+
+`server/leaderboard/submission.ts#configHashOf` digests the **fully resolved inputs a run depended
+on**, and the demand template catalogue is one of them — *as loaded*, not as a curated subset. Adding
+a record changes that file, so every board keyed on a template from it forks. All five fork, exactly
+as they did for § D245's one field.
+
+The avoidance is the same wrong move, refused for the same reason: keeping the new record outside the
+digested file — a viewer-only constant, a lookup by id — would avoid the fork and create a second
+place a template is defined. `submission.ts` already states the intended reading: *"A `data/` change
+does not corrupt an old board — it starts a new one."* Stored rows stay readable, no honest
+submission is rejected, and the fork costs a board reset rather than a correctness problem. **Said
+here rather than left to be discovered when a board looks empty.**
+
+### 2. `quarter-end` runs a 30-minute period where it ran a 20-minute one
+
+`office-down-peak` inherits `rise-and-fall`'s duration, so the period `quarter-end` imposes is 1 800 s
+rather than 1 200 s, and `calendarPatch` refuses a template the shift is too short for. A quarter-end
+shift between 20 and 30 minutes therefore keeps the run's own template now where it took the period's
+before, with the refusal printed in the words it was already printed in.
+
+**That is no more demanding than the shipped default.** 1 800 s is both `DEFAULT_SHIFT_LENGTH_S` and
+`rise-and-fall`'s own period, so a shift too short for `office-down-peak` was already too short to
+measure the template it would fall back to. The one contract that names a length names 3 600 s.
+`calendar.test.ts` drives the refusal at 300 s and 900 s and asserts the period still moves the legs
+through its population.
+
+**The stronger half of that refusal's original argument moved with the record.** At 300 s
+`evening-egress` makes `core` **throw** — a quarter of the run is the quiet before the doors open,
+and the step and the hold do not fit in what is left. `office-down-peak` at 300 s does not throw; it
+merely measures a slice of a ramp. Both are refused, because the rule is a template's *declared
+period* rather than a rule about one shape, and the throwing case is still live for the venue pairing.
+
+### 3. Byte-identity is proved by a run, at three layers
+
+`traffic/templateAdditionIdentity.test.ts`, whose shape is `dayStartIdentity.test.ts`'s: build the
+shipped `data/` and a copy with the new record filtered out, run the same seed against both **in the
+same process**, require equality byte for byte. No pin, no digest, no tolerance — a guard with no
+pinned constant cannot go stale.
+
+- **resolution** — each of the five templates that shipped before resolves to the same object;
+- **the trace** — 5 buildings × 5 templates, compared on `passengers`, `arrivals`, `sources` and then
+  the whole object;
+- **the whole run** — 5 buildings under `collective`, because a trace is an *input* to a run and
+  something downstream could read the catalogue a trace comparison would never see.
+
+**The third layer is the one that is not obvious, and § D245 is why it is there.** *"A sixth element
+in an array `resolveDemandTemplate` never reaches cannot matter"* is exactly the reasoning that was
+false one layer up, where `configHashOf` digests the whole record set. A hash, an index, an ordering
+or a `[0]` is all it takes for the **count** of records in a file to reach a result, and none of them
+announce themselves. All green, at 44 cases. `sim/oracle.test.ts` is green, and by construction: the
+closed-form Barney/CIBSE comparison is a statement about elapsed seconds within a run, and no arrival
+moved. `traffic/transportIdentity.test.ts`'s fifteen pinned digests did not move, and
+`traffic/mixIdentity.test.ts`'s partition still names `lunch-two-way` as the only mix-varying
+template — the new record declares no mix, which is § D263's point 3.
+
+### 4. The how-to-play guide had to learn the sixth shape, because a test made it
+
+`menu/howToPlay.test.ts` § *names every demand template the configuration ships* derives the
+shipped set from the **catalogue** and requires every id's own words to appear in the guide's prose.
+Adding a record therefore turned it red — *"a shipped traffic shape the guide does not name:
+['office-down-peak']"* — which is that test working exactly as intended: a template offered in Free
+Play that the guide has never heard of is one a new player picks blind.
+
+`menu/screens.ts` now names it, and says the **one thing a player needs to tell the pair apart**,
+because two end-of-day shapes in one list is a choice nobody can make from names alone: *an office
+empties on a ramp; a venue steps — the doors open and the whole room is waiting at once.* That is the
+same distinction `evening-egress`'s record has always argued in its own `$comment`, said once in a
+player's words. It is the only edit here outside this change's stated file ownership, and it was
+forced by a failing test rather than chosen.
+
+### Three sentences elsewhere are now stale, and are named rather than edited
+
+All three sit outside this change's file ownership, so they are recorded here for whoever owns them —
+the stale-sentence defect § D227 is about is worse than a dead seam, and the way it survives is by
+nobody writing it down:
+
+- **`docs/17-play-experience-audit.md` § 4.2** — *"Quarter-end — demand up and a sustained evening
+  egress, which is what `evening-egress` was authored for."* The clause after the dash is the exact
+  claim § D263 refutes; the period runs `office-down-peak` now.
+- **`packages/viz/src/scope/probes.test-helper.ts`** — the `viewer.calendar` probe's comment says
+  quarter-end *"names `evening-egress`"*. The probe itself is unaffected (it requires the two arms to
+  differ on the legs, and they do); only the sentence is wrong.
+- **`packages/viz/UX.md` row CL-03** — *"`evening-egress` at 300 s makes `core` throw outright"* is
+  still a true sentence about `evening-egress`, and is no longer what the calendar test drives. See
+  point 2 above.
