@@ -98,11 +98,17 @@ export interface LeftRailElements {
 /* -------------------------------------------------------------------------- *
  * Tokens
  *
- * Band colours come from `live/bands.ts`, which is the single source of the
- * palette requirement S7 names. Everything else is a CSS custom property by
- * name rather than by value: the stylesheet already declares the token set and
- * a hex literal here would be the second copy of it. `style.setProperty` takes
- * `var(--x)` happily, so there is no cost to spelling it this way.
+ * Every colour this file writes is a CSS custom property **by name rather than
+ * by value**: the stylesheet already declares the token set and a hex literal
+ * here would be the second copy of it. `style.setProperty` takes `var(--x)`
+ * happily, so there is no cost to spelling it this way.
+ *
+ * That was true of the four below and, until § D251, false of the band colours
+ * beside them — `live/bands.ts` held its own hexes, this file put them into
+ * inline styles, and an inline style is not reached by a `:root[data-theme]`
+ * block. The rule and the practice agree now: `live/` names tokens too, so
+ * `BAND_COLORS[0]` *is* `var(--band-0)` and the rail draws the page's green
+ * rather than a copy of the dark one.
  * -------------------------------------------------------------------------- */
 
 const INK = 'var(--text)';
@@ -112,7 +118,7 @@ const FAINT = 'var(--faint)';
 const TRACK = 'var(--edge-strong)';
 const BANKED = 'var(--accent-soft)';
 
-/** `WAIT_BANDS[0].color`, so the *good* green is the band palette's and not a fourth copy. */
+/** `WAIT_BANDS[0].color` — `var(--band-0)`, so the *good* green is the page's and not a copy. */
 const GOOD = BAND_COLORS[0] ?? INK;
 const CAUTION = BAND_COLORS[1] ?? INK;
 const HOT = BAND_COLORS[3] ?? INK;

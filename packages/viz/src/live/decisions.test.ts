@@ -160,7 +160,7 @@ describe('the empty state is the design’s', () => {
         head: 'standing by',
         why: 'no calls registered yet — the building is still waking up',
         title: 'no calls registered yet — the building is still waking up',
-        color: '#4d5a6b',
+        color: 'var(--faint)',
         outcome: 'empty',
       },
     ]);
@@ -178,7 +178,7 @@ describe('the three outcomes each say something honest', () => {
     expect(row?.head).toBe('A → Level 2');
     expect(row?.why).toBe('waitTime 12.4 s carried it · 0.42 clear of the next car');
     expect(row?.t).toBe('06:02');
-    expect(row?.color).toBe('#3fb27f');
+    expect(row?.color).toBe('var(--band-0)');
   });
 
   it('does not call a reassignment an assignment', () => {
@@ -187,7 +187,7 @@ describe('the three outcomes each say something honest', () => {
       300,
     )[0];
     expect(row?.head).toBe('A ⇄ Level 2');
-    expect(row?.color).toBe('#e0b040');
+    expect(row?.color).toBe('var(--band-1)');
   });
 
   it('says nobody may answer when nobody bid', () => {
@@ -219,7 +219,7 @@ describe('the three outcomes each say something honest', () => {
      */
     expect(row?.why).toBe('no car may answer this call · 4 standing there');
     expect(row?.why.match(/no car/g)).toHaveLength(1);
-    expect(row?.color).toBe('#e0473a');
+    expect(row?.color).toBe('var(--band-3)');
   });
 
   it('distinguishes that from cars bidding and none being able to take it', () => {

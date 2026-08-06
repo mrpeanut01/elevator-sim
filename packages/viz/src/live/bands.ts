@@ -74,6 +74,23 @@ import type {
  * Frozen, and the single source of all four: the palette (requirement S7), the boundaries, both
  * label sets and the face glyphs. Three copies of a palette is the defect class this repository
  * has closed ten times.
+ *
+ * ## `color` is a token name, not a value — § D251
+ *
+ * It used to be `#3fb27f`, `#e0b040`, `#e0773a`, `#e0473a` — the four dark-mode band hexes, in a
+ * module `dev/leftRail.ts` and `dev/main.ts` write into inline `style="color:…"` attributes. The
+ * page also declares those four values, twice, as `--band-0…3` with a light twin for each; so this
+ * file was the **second** copy, and the one nothing could theme, because
+ * `:root[data-theme='light']` cannot reach an inline style. The measured cost was **19 of the 26
+ * remaining light-mode AA failures**: the mood legend at 1.77–3.61:1, the served figure and the
+ * goal rows at 1.87–2.48, the stage legend's four discs at 1.68–3.42.
+ *
+ * Naming the token instead of restating its value is the whole fix, and it costs nothing: every
+ * consumer of this field writes it into CSS, and CSS resolves `var(--band-0)` against whichever
+ * block is live. This is the same move `dev/leftRail.ts` had already made for every colour that
+ * was *not* a band — its `INK`/`DIM`/`FAINT` are `var(--text)`/`var(--dimmer)`/`var(--faint)` and
+ * always were. **Nothing here may be handed to a canvas**: `render/tokens.ts` is what the stage
+ * reads, and it holds the same four values as literals for that reason.
  */
 export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
   Object.freeze({
@@ -82,7 +99,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 30,
     label: 'breezy',
     legendLabel: 'under 30 s',
-    color: '#3fb27f',
+    color: 'var(--band-0)',
     face: '◡',
   }),
   Object.freeze({
@@ -91,7 +108,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 60,
     label: 'tapping foot',
     legendLabel: 'a minute',
-    color: '#e0b040',
+    color: 'var(--band-1)',
     face: '◠',
   }),
   Object.freeze({
@@ -100,7 +117,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 120,
     label: 'checking watch',
     legendLabel: 'two minutes',
-    color: '#e0773a',
+    color: 'var(--band-2)',
     face: '⌄',
   }),
   Object.freeze({
@@ -109,7 +126,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: undefined,
     label: 'taking the stairs',
     legendLabel: 'gave up',
-    color: '#e0473a',
+    color: 'var(--band-3)',
     face: '×',
   }),
 ]);
@@ -120,15 +137,20 @@ export const BAND_COLORS: readonly string[] = Object.freeze(WAIT_BANDS.map((band
 /**
  * The face's tinted disc, one per band — design `:2302`.
  *
- * Written out rather than computed from {@link WAIT_BANDS}: the design's fourth tint is `.16`
- * alpha where the other three are `.14`, and deriving them would quietly correct a value the
- * designer chose.
+ * Written out rather than computed from {@link WAIT_BANDS}: the design's fourth tint is 16 %
+ * where the other three are 14 %, and deriving them would quietly correct a value the designer
+ * chose.
+ *
+ * `color-mix` rather than the `rgba(63,178,127,.14)` these were, for {@link WAIT_BANDS}' reason
+ * and by the route `index.html`'s own token test names — *declare a token, or use `color-mix`*.
+ * The mix is against `transparent`, which is exactly what an alpha was: the disc sits on the mood
+ * card and takes 14 % of the band over whatever is under it.
  */
 const MOOD_BG: readonly string[] = Object.freeze([
-  'rgba(63,178,127,.14)',
-  'rgba(224,176,64,.14)',
-  'rgba(224,119,58,.14)',
-  'rgba(224,71,58,.16)',
+  'color-mix(in srgb, var(--band-0) 14%, transparent)',
+  'color-mix(in srgb, var(--band-1) 14%, transparent)',
+  'color-mix(in srgb, var(--band-2) 14%, transparent)',
+  'color-mix(in srgb, var(--band-3) 16%, transparent)',
 ]);
 
 /** The headline for each band — design `:2288–2293`, verbatim. Present tense, and it is live. */

@@ -143,8 +143,10 @@ describe('the casual copy is the design’s, keyed on an observation', () => {
       'People are arriving faster than your cars can clear them. Add a shaft, zone the tower, ' +
         'or ride out a rough morning and read the post-mortem.',
     );
-    expect(card.bg).toBe('rgba(224,176,64,.07)');
-    expect(card.edge).toBe('rgba(224,176,64,.35)');
+    // Token names, not the dark band's value — § D251. A wash is not a word, so this copy of the
+    // palette never showed up in a contrast walk and would have outlived the three that did.
+    expect(card.bg).toBe('color-mix(in srgb, var(--band-1) 7%, transparent)');
+    expect(card.edge).toBe('color-mix(in srgb, var(--band-1) 35%, transparent)');
 
     const calm = honestyAt(syntheticRecording(), 200, 'casual');
     expect(calm.title).toBe('Comfortably keeping up');
@@ -152,8 +154,8 @@ describe('the casual copy is the design’s, keyed on an observation', () => {
       'Cars are clearing calls faster than people turn up. Push the traffic pattern harder, or ' +
         'bank the shift and take tomorrow.',
     );
-    expect(calm.bg).toBe('rgba(63,178,127,.06)');
-    expect(calm.edge).toBe('rgba(63,178,127,.28)');
+    expect(calm.bg).toBe('color-mix(in srgb, var(--band-0) 6%, transparent)');
+    expect(calm.edge).toBe('color-mix(in srgb, var(--band-0) 28%, transparent)');
   });
 });
 

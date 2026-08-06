@@ -200,8 +200,58 @@ function lockBadge(control: Control): ControlNode | undefined {
 }
 
 /**
- * The wrapper every kind shares: name, the lock badge, unit, the input, the reset, the reason, and
- * the prose.
+ * The badge on the label line for a control that **gates** others — issue #79, § D252.
+ *
+ * ## The direction the form could not state
+ *
+ * § D222 shipped the gated end: an inactive control says `needs dispatch.callType`, so a reader
+ * looking at a dead knob can see which switch to move. The mirror was missing. A reader looking at
+ * `selection.policy` — which governs six other controls — was told nothing, so moving it produced a
+ * cascade with no warning and no account of itself. This is that account.
+ *
+ * ## Why a count and not a graph, and why not the ids
+ *
+ * The tab **already orders a gated control below its gate** (`controlsFor`'s gate order), so the
+ * layout encodes which controls a switch governs; what it cannot say is *how many* to look for. A
+ * dependency graph would be a second navigation model over information the page already carries,
+ * and the two would then have to be kept in step — so the badge answers the question the layout
+ * leaves open and adds no second model. The ids go on `data-unlocks` / `data-holds-open`, which is
+ * where a test and the mount read them; a badge naming six of them would be longer than the label
+ * it sits beside.
+ *
+ * ## Why the words move and the badge does not
+ *
+ * Presence is **structural** — the badge is emitted for a control that gates something and for no
+ * control that gates nothing, whatever the current point, because {@link ControlCommon.unlocks} and
+ * {@link ControlCommon.holdsOpen} partition the dependants exactly. A badge that read `unlocks 6`
+ * and then disappeared when the reader threw the switch would vanish at the one moment they are
+ * watching to see what they just did, which is the complaint the issue opens with.
+ *
+ * So the words say which side of the gate the dependants are on: `unlocks 6` while it is holding
+ * them shut, `holds 6 open` once it is not. When it is doing both — a categorical gate with six
+ * dependants under different conditions — the badge names the actionable half, and the two data
+ * attributes carry the whole partition.
+ *
+ * KB-15, by construction and not by a legend: the content is **words and a number**. `.control-gate`
+ * has a tint, and the tint is the second signal.
+ */
+function gateBadge(control: Control): ControlNode | undefined {
+  const shut = control.unlocks;
+  const open = control.holdsOpen;
+  if (shut.length === 0 && open.length === 0) return undefined;
+  const attrs: Record<string, string> = { class: 'control-gate' };
+  if (shut.length > 0) attrs['data-unlocks'] = shut.join(' ');
+  if (open.length > 0) attrs['data-holds-open'] = open.join(' ');
+  const text =
+    shut.length > 0
+      ? `unlocks ${String(shut.length)}`
+      : `holds ${String(open.length)} open`;
+  return node('span', attrs, [], text);
+}
+
+/**
+ * The wrapper every kind shares: name, the lock badge, the gate badge, unit, the input, the reset,
+ * the reason, and the prose.
  *
  * The reason element is emitted **only** when there is one, and when there is one it is emitted as
  * **text in the flow** — not as a tooltip, not as a colour. docs/10 R3's shape: the thing that is
@@ -247,6 +297,11 @@ function frame(control: Control, input: ControlNode): ControlNode {
   ];
   const badge = lockBadge(control);
   if (badge !== undefined) children.push(badge);
+  // After the lock badge, because a control can carry both — `auction.rounds` is gated by
+  // `auction.aggregation` and gates `auction.reserveMarginalDelayS` — and what a reader needs
+  // first from a dead control is why it is dead.
+  const gate = gateBadge(control);
+  if (gate !== undefined) children.push(gate);
   if (control.unit !== undefined) {
     children.push(node('span', { class: 'control-unit' }, [], control.unit));
   }

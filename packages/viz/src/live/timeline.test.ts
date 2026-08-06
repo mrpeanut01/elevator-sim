@@ -220,11 +220,20 @@ describe('the segment palette', () => {
       pairs.set(`${kind}-${String(startIntensity)}`, `${segment?.bg ?? ''}/${segment?.fg ?? ''}`);
     }
     expect(new Set(pairs.values()).size).toBe(5);
-    expect(pairs.get('hold-1')).toBe('#2a2033/#c69ad8');
-    expect(pairs.get('ramp-up-0')).toBe('#2c2418/#dbb075');
-    expect(pairs.get('ramp-down-1')).toBe('#20291f/#9fc48a');
-    expect(pairs.get('flat-0.5')).toBe('#161e2a/#6d7b8d');
-    expect(pairs.get('flat-0')).toBe('#131a24/#5d6b7d');
+    /*
+     * Token names, not the handoff's hexes — § D251. `dev/main.ts` writes these into an inline
+     * `style`, which `:root[data-theme='light']` cannot reach, so the strip was the one part of
+     * the transport that stayed dark on a light page and its label measured **3.15:1 in both
+     * modes** on a grey (`#6d7b8d`) that § D235 had already retired from the ink ladder.
+     *
+     * The **five distinct pairs** assertion above is the one that survives unchanged and is the
+     * one carrying the design's claim: the strip still tells a peak from a ramp from a lull.
+     */
+    expect(pairs.get('hold-1')).toBe('var(--phase-peak)/var(--phase-peak-ink)');
+    expect(pairs.get('ramp-up-0')).toBe('var(--phase-rising)/var(--phase-rising-ink)');
+    expect(pairs.get('ramp-down-1')).toBe('var(--phase-clearing)/var(--phase-clearing-ink)');
+    expect(pairs.get('flat-0.5')).toBe('var(--phase-steady)/var(--phase-ink)');
+    expect(pairs.get('flat-0')).toBe('var(--phase-quiet)/var(--phase-ink-quiet)');
   });
 
   it('formats the title as the design writes it', () => {
