@@ -882,8 +882,21 @@ function optimizationOf(
   const reasons: Readonly<Record<typeof verdict, string>> = {
     CONFIRMED:
       'both the absolute and the baseline-relative difference-of-differences exclude zero on the negative side: pricing the destination really does buy more where access is controlled',
+    /*
+     * The measurement stands; the attribution does not, and it used to be printed here.
+     *
+     * This sentence ended *"the saving … is entirely in the credential (H-ACCESS-1)"* — the claim
+     * § D256 withdrew and § D279 refuted, emitted **with the study's own verdict**, so a reader met
+     * the correction in the docstring twenty lines above and the thing it corrects at the end of
+     * their run. § D283 corrected six documents and could not reach this one, because it is code.
+     *
+     * What is measured is unchanged and is the whole of the first clause. Where the saving comes
+     * from is now **unmeasured**, and says so rather than naming a second plausible mechanism —
+     * CLAUDE.md's rule is *either measure it or say it is unmeasured*, and a replacement guess is
+     * the same defect with a new sentence.
+     */
     REFUTED:
-      'both the absolute and the baseline-relative difference-of-differences exclude zero on the POSITIVE side: given the credential, pricing the destination buys LESS on the access-controlled building, not more — the saving the roadmap attributes to the same-step mechanism is entirely in the credential (H-ACCESS-1)',
+      'both the absolute and the baseline-relative difference-of-differences exclude zero on the POSITIVE side: given the credential, pricing the destination buys LESS on the access-controlled building, not more. Where that saving does come from is UNMEASURED — the credential explanation this study used to print was H-ACCESS-1, which is refuted and withdrawn (DECISIONS.md § D256, § D279)',
     INDISTINGUISHABLE:
       'at least one form of the difference-of-differences contains zero, so the interaction is below the resolution limit of this budget on this building set — which is itself a result about the roadmap’s mechanism claim rather than a failure to measure',
     DISAGREEMENT:
