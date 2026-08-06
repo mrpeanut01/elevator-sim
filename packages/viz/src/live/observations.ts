@@ -164,6 +164,27 @@ function sweepQueues(recording: VizRecording, t: SimTime): QueueSweep {
         passengerId: leg.passengerId,
       });
     }
+    /*
+     * A rider refused at the landing leaves it, exactly as a boarding one does — § D265.
+     *
+     * Written as the mirror of the branch above rather than as a `continue` over the whole leg,
+     * because the two are the same event to this sweep: somebody stops standing there. Without it
+     * a refused rider is a `+1` with no matching `-1` and the depth here grows forever, disagreeing
+     * with `queueAt` — which is the shape the honesty tests exist to catch, arriving in the counter
+     * rather than on the screen.
+     *
+     * They are still counted in `unservedCount`, which is literally true and is what keeps the
+     * censoring gate able to see a refused share big enough to bias anything.
+     */
+    const { refusedAt } = leg;
+    if (refusedAt !== undefined && refusedAt <= t) {
+      events.push({
+        at: refusedAt,
+        delta: -1,
+        floorId: leg.originFloorId,
+        passengerId: leg.passengerId,
+      });
+    }
   }
   events.sort(
     (a, b) => a.at - b.at || a.delta - b.delta || a.passengerId.localeCompare(b.passengerId),

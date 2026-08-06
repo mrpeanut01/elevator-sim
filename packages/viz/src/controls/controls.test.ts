@@ -410,6 +410,10 @@ describe('coverage of the shipped schema — the one claim that needs the real o
       'traffic.batchSize.distribution',
       'traffic.batchSize.mean',
       'traffic.batchSize.weight',
+      // § D265. Declared and not searchable for the same reason as its neighbours — but worth its
+      // own line, because what it declares is a share of riders who may not go where they are
+      // going, and an optimizer free to move it could improve a wait by refusing more people.
+      'traffic.credentialGap.wrongZoneShare',
       // docs/14 § 2.3. Three more rows that are declared and not searchable, for the reason every
       // other entry here is: `default: null`, and a search needs a point it can start from.
       'traffic.dayVariation.maxDemandFactor',
