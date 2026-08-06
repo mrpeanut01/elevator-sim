@@ -578,6 +578,27 @@ describe('the surface set is derived from the source tree', () => {
     }
   });
 
+  it('excludes only producers that still exist — a ghost exclusion is red', async () => {
+    /*
+     * The mirror of *every adapter is attached to something real*, which sits a few lines below and
+     * has always been asserted. Exclusions had no such check, so an id whose producer was later
+     * deleted stayed in {@link NOT_PLAYER_FACING} forever — carrying a reason for a decision about
+     * a symbol that no longer exists, and quietly widening the exemption list against a future
+     * producer that happens to take the same name.
+     *
+     * Not hypothetical: three ghosts accumulated behind `mode` and had to be removed by hand when
+     * § D241 deleted the sign-in/register split. Nothing was red while they sat there.
+     */
+    const ids = new Set((await deriveTextProducers()).map((producer) => producer.id));
+    const ghosts = [...excludedIds].filter((id) => !ids.has(id)).sort();
+    expect(
+      ghosts,
+      'NOT_PLAYER_FACING names a producer that no longer exists. Delete the id — an exclusion ' +
+        'outliving the thing it excused is the stale-assertion defect this repository counts, ' +
+        'and it silently pre-approves whatever takes that name next.',
+    ).toEqual([]);
+  });
+
   it('negative control: an invented producer would be unclassified', async () => {
     // The classification test above passes trivially if `deriveTextProducers` returns things that
     // are always in one of the two sets. This asserts the partition can actually refuse.
