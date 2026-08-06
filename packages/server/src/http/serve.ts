@@ -26,10 +26,18 @@ export interface ServeOptions {
   readonly api: Api;
   readonly port: number;
   /**
-   * Origins allowed to call this API from a browser, or `'*'`.
+   * The one origin allowed to call this API from a browser, or `'null'` for none.
    *
    * Explicit and required. A default of `'*'` is how a CORS policy becomes "no policy" without
-   * anybody deciding it should be.
+   * anybody deciding it should be — and since § D257 `'*'` is not merely undefaulted but
+   * unreachable: `main.ts`'s `allowOriginFrom` refuses it at boot, so no environment can produce
+   * it. This field is still a plain string and this function still writes whatever it is handed
+   * into the header, because the decision belongs at the place that reads the environment and the
+   * tests hand it values directly.
+   *
+   * Singular on purpose. A list would need `Vary: Origin` and a per-request match against the
+   * request's own `Origin` header, which is a second place deciding who may call — and the only
+   * deployment this product has is one viewer, at one origin.
    */
   readonly allowOrigin: string;
   /**

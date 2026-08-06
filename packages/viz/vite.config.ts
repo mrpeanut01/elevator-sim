@@ -31,6 +31,29 @@
  * asset at build time. Both halves call the same {@link readBuildings}, because a manifest that was
  * built one way for the developer and another way for the deployment is two implementations of one
  * contract, and the one nobody looks at is the one that rots.
+ *
+ * ## Since § D257 the build can also be told where the API is
+ *
+ * Nothing here decides that; `apiOrigin.mjs` does, and this file registers it. Two things follow
+ * from `ELEVATOR_SIM_API_ORIGIN` being set, and they are deliberately one decision rather than two:
+ * `index.html` gains `<meta name="elevator-sim-api">`, and `staticwebapp.config.json`'s
+ * `connect-src` is widened to permit that origin. A page told where its API is, by a CSP that
+ * forbids reaching it, is a site that loads perfectly and cannot do anything — so the two may not
+ * be settable apart.
+ *
+ * **Unset is the shipped state**, and it is what `vite dev` and the `Dockerfile` both build with:
+ * no tag is emitted, and the server's own § D243 injection of `"/"` still applies to the bundle it
+ * serves. See `apiOrigin.mjs` for the table of which producer fires when.
+ *
+ * ## The hosting rules travel with the artifact
+ *
+ * `staticwebapp.config.json` is emitted into the build output so routing, caching and the CSP are
+ * versioned beside the code that needs them rather than typed into a portal where no reviewer ever
+ * sees them. It declares **no `navigationFallback`**, which is a deviation from the usual
+ * single-page-app template and matches `packages/server/src/http/static.ts`'s `assetFor` exactly:
+ * the viewer has no client-side router, every real request names a file, and a catch-all rewrite
+ * turns a mistyped asset URL into a 200 carrying HTML — a failure that surfaces as a syntax error
+ * inside what the browser was told was JavaScript. Two hosts, one 404 policy.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -39,7 +62,12 @@ import { join } from 'node:path';
 
 import { defineConfig } from 'vite';
 
+import { apiOriginFrom, apiOriginPlugin, hostConfigWithApiOrigin } from './apiOrigin.mjs';
+
 const DATA_DIR = fileURLToPath(new URL('../../data', import.meta.url));
+
+/** The hosting rules that travel with the artifact — see the header. */
+const HOST_CONFIG = fileURLToPath(new URL('./staticwebapp.config.json', import.meta.url));
 
 /**
  * Every file from `data/` that the built viewer serves — derived from the `fetchJson` calls in
@@ -107,6 +135,15 @@ function buildingsManifest() {
           source: await readFile(join(DATA_DIR, name), 'utf8'),
         });
       }
+      // The hosting rules, with `connect-src` widened to whatever origin the document was told
+      // about — one decision, so a page that knows where its API is is never served by a policy
+      // that forbids reaching it. `hostConfigWithApiOrigin` throws rather than silently returning
+      // the input when there is no `connect-src 'self'` to widen.
+      this.emitFile({
+        type: 'asset',
+        fileName: 'staticwebapp.config.json',
+        source: hostConfigWithApiOrigin(await readFile(HOST_CONFIG, 'utf8'), apiOriginFrom(process.env)),
+      });
     },
   };
 }
@@ -148,5 +185,5 @@ export default defineConfig({
   // nothing said. Failing to start is the honest outcome — it names the conflict instead of
   // hiding it.
   server: { port: 5174, strictPort: true },
-  plugins: [buildingsManifest()],
+  plugins: [buildingsManifest(), apiOriginPlugin(process.env)],
 });

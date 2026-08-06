@@ -32,6 +32,16 @@
     "senderAddress": {
       "value": ""
     },
+    "_comment_viewerOrigin": [
+      "Empty is the shipped state: one Container App serving the viewer and the API from one",
+      "origin. Fill it in ONLY when the viewer is hosted separately (infra/azure/swa/), and then",
+      "with the static site's origin and no trailing slash. It moves ELEVATOR_SIM_ORIGIN and",
+      "ELEVATOR_SIM_ALLOW_ORIGIN together; the server refuses to boot if they disagree.",
+      "Order and the third value: docs/16-static-site-deployment.md § 3."
+    ],
+    "viewerOrigin": {
+      "value": ""
+    },
     "minReplicas": {
       "value": 0
     },

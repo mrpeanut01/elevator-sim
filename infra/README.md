@@ -3,6 +3,13 @@
 One Container App serving the viewer and the API from a single origin, a PostgreSQL flexible server
 behind it, and Communication Services for the one mail this product sends.
 
+> **There is now a second, optional lane.** The page can be served from a CDN instead of from this
+> container, which removes a **32.2 s** cold first load — see
+> [`docs/16-static-site-deployment.md`](../docs/16-static-site-deployment.md) and
+> `infra/azure/swa/`. **It is not switched on**, nothing in it has ever been deployed, and this
+> document describes the deployment that exists. The one thing it adds here is the `viewerOrigin`
+> parameter in § 3.5, which is empty by default and changes nothing when it is.
+
 ---
 
 ## 0. Read this first: what has and has not been verified
@@ -37,6 +44,13 @@ a send that fails at run time. Registering an account is the test; § 4 has it.
 
 Also unverified: **scaling past one replica**. The store is PostgreSQL so concurrent replicas are
 sound in principle, but nothing has run two.
+
+**And the whole of the static-hosting lane.** `viewerOrigin` (§ 3.5) has never been set on a real
+deployment, no Static Web App has been created, and **no page has ever been served cross-origin** —
+so the CORS round trip, the preflight and a real sign-in against two origins are unit-tested and
+have never met a browser. `docs/16-static-site-deployment.md` § 9 itemises that lane's verified and
+unverified halves separately; it is longer than this paragraph because the lane is entirely
+unrun.
 
 **Verified, by running it:**
 
@@ -138,6 +152,30 @@ az deployment group create \
 makes it assign `AcrPull` on that registry to the app's identity, and the Container App explicitly
 depends on the assignment — so the app is never created before it can pull. The registry has to be
 in this resource group for that to resolve.
+
+### 3.5 `viewerOrigin`, and what it moves
+
+Empty is the default and the shipped state: the container serves the page and the API from one
+origin, sign-in links point at this app, and `ELEVATOR_SIM_ALLOW_ORIGIN` is empty, meaning **no page
+may call this API cross-origin**. That is what has been deployed and what § 0 describes.
+
+Set it — to a static host's origin, no trailing slash — and two environment variables move together:
+
+| | Becomes | Because |
+|---|---|---|
+| `ELEVATOR_SIM_ORIGIN` | the site's origin | A sign-in link resolves to a *page* (§ D241 § 4), and the page is now over there |
+| `ELEVATOR_SIM_ALLOW_ORIGIN` | the site's origin | The page's `fetch` is now cross-origin |
+
+One parameter for both, so they cannot drift — and `main.ts` refuses to start if they somehow do.
+**`*` is refused outright**: the API answers session-bearing requests and a verification is a whole
+simulation, so a wildcard publishes both to every page on the web.
+
+A **third** value has to agree and does not live here: the static site must be *built* with
+`ELEVATOR_SIM_API_ORIGIN` set to this app's `apiOrigin` output. It is a GitHub variable rather than
+an ARM parameter, and `docs/16-static-site-deployment.md` § 3 is the order all three are set in — an
+order, because the site's hostname does not exist until its own template has run.
+
+**None of this has been deployed.** See § 0.2.
 
 ---
 
@@ -261,4 +299,13 @@ is not repeated here.
    stored credential in this repository because there is no automation to hold one. When that
    changes, the right credential is a federated one on a Microsoft Entra app
    (`subject: repo:OWNER/elevator-sim:ref:refs/heads/main`) rather than a stored secret — add it
-   when you automate the deployment, not before.
+   when you automate the deployment, not before. *(The **viewer's** deployment is automated:
+   `.github/workflows/deploy-viz.yml` federates into a user-assigned managed identity and stores no
+   secret. It is inert until armed, and it deploys the page only — never this app or this
+   database.)*
+8. **A cold first page load takes 32.2 seconds**, measured on the live deployment against 0.13 s
+   warm. `minReplicas: 0` is what makes this deployment cheap and it is also what makes the first
+   visitor wait, because `serve.ts` serves the page out of the container that is asleep.
+   `GET /api/wake` does not help: the page is the thing being waited on. Two fixes, and neither is
+   free of a trade — `minReplicas: 1` costs roughly $34/month, and moving the page to a CDN costs
+   nothing and splits the origin (`docs/16-static-site-deployment.md` § 2).

@@ -56,7 +56,13 @@ export interface BootstrapOptions {
   readonly sql: Sql;
   /** `process.env`, or whatever a test wants it to be. */
   readonly env: Readonly<Record<string, string | undefined>>;
-  /** The public origin sign-in links point at, e.g. `https://elevator.example`. */
+  /**
+   * The public origin sign-in links point at, e.g. `https://elevator.example`.
+   *
+   * **The viewer's origin, which since § D257 need not be this server's.** A sign-in link resolves
+   * to a page, and the page can be on a CDN while this process is not; `main.ts`'s
+   * `viewerOriginFrom` is what reads it and the only caller that supplies it.
+   */
   readonly publicOrigin: string;
   /** Injected so a test is not at the mercy of the clock, and a server is. */
   readonly now?: () => number;
@@ -158,6 +164,12 @@ export const SIGN_IN_FRAGMENT_KEY = 'sign-in';
  *
  * The viewer reads {@link SIGN_IN_FRAGMENT_KEY} out of `location.hash`, posts it to
  * `/api/auth/redeem`, and clears the hash.
+ *
+ * **`publicOrigin` is the viewer's, not this server's, and § D257 is where that stops being the
+ * same sentence.** Once the bundle is served from a static host, a link built from this process's
+ * own origin opens a page that has no fragment reader on it — the API answers, the browser is shown
+ * JSON, and the account is never signed in. Nothing in this function changes; what changed is that
+ * the value it is given is now a deploy parameter with a wrong answer that used to be unreachable.
  */
 export function signInUrlFor(publicOrigin: string): (token: string) => string {
   const origin = publicOrigin.replace(/\/$/u, '');
