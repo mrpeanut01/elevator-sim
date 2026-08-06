@@ -92,7 +92,7 @@ import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPane
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizFloor, VizRecording } from '../contract/types.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
@@ -125,7 +125,7 @@ import {
   type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
-import { buildLayout } from '../render/layout.js';
+import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
 import { AWT_ID, WT95_ID } from '../render/runSummary.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
@@ -217,6 +217,43 @@ const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
+
+/**
+ * What the stage asks for around the plot, widest request first — GitHub issue #41.
+ *
+ * ## The defect: two numbers that were the same at every width and every building
+ *
+ * {@link QUEUE_GUTTER_PX} and {@link OVERLAY_WIDTH_PX} were passed to `buildLayout` unchanged
+ * whatever was being drawn, so 530 px of a canvas went to scenery whether the building had two
+ * shafts or thirty-five. Measured: **Vertical City draws 27 of 35 at a 1920 px viewport** —
+ * `RS-05`'s *"showing 27 of 35"* notice is doing its job and saying so, and eight shafts of a
+ * building whose whole subject is its shafts are off the picture on the largest screen anybody has.
+ *
+ * ## Why this is a ladder rather than arithmetic
+ *
+ * The obvious fix computes the plot width a shaft count needs and subtracts. It would need
+ * `MIN_SHAFT_WIDTH_PX` and the shaft gap, both private to `render/layout.ts`, and a copy of either
+ * is a second answer to *how wide is a legible shaft* that drifts the day that file is tuned — the
+ * failure this repository counts. So nothing here computes a fit: the shell **asks the layout** by
+ * building one and reading `Layout.hiddenShaftCount`, which is the layout's own measurement of
+ * exactly this question, already carried for the `RS-05` notice.
+ *
+ * The rungs yield in `fitGutters`' own order and for its stated reason — *the overlay panel is a
+ * whole surface and goes first, then the right gutter*. The last rung asks for **nothing**, which
+ * hands the layout its own documented default rather than a floor copied from it: this file never
+ * names a minimum, and `layout.ts` still clamps whatever it is handed.
+ *
+ * A building that fits on rung one stays on rung one, so no picture that was right moves.
+ */
+const STAGE_GUTTER_LADDER: readonly { readonly gutter: number; readonly overlay: boolean }[] =
+  Object.freeze([
+    { gutter: QUEUE_GUTTER_PX, overlay: true },
+    { gutter: QUEUE_GUTTER_PX, overlay: false },
+    { gutter: Math.round(QUEUE_GUTTER_PX / 2), overlay: false },
+    // `gutter: 0` is *ask for nothing*, which `buildLayout` reads as its own `DEFAULTS.gutterRightPx`
+    // — see the note above about never copying that number here.
+    { gutter: 0, overlay: false },
+  ]);
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
 /** How often the live region is re-announced. Every frame would be unusable. */
@@ -279,6 +316,47 @@ export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitL
     count: bands?.counts[index]?.count,
     rangeLabel: rangeLabelOf(band),
   }));
+}
+
+/**
+ * The stage's layout: the widest scenery this canvas can afford **and still draw the building**.
+ *
+ * GitHub issue #41. Walks {@link STAGE_GUTTER_LADDER} and takes the first rung on which no shaft is
+ * hidden; falls through to the last rung when even that cannot hold them all, which is the honest
+ * answer on a phone and is where `RS-05`'s *"showing 6 of 12"* notice takes over. Nothing here
+ * decides how wide a shaft has to be — `Layout.hiddenShaftCount` is the layout's own measurement of
+ * whether they fit, and asking it is what keeps this file free of a copy of `render/layout.ts`'s
+ * private minimums.
+ *
+ * `wantsOverlay` stays the caller's, because it answers a different question — `RS-03` drops the
+ * live-metrics panel below 900 px of canvas whether or not the shafts fit — and a rung that
+ * re-enabled it would be this function overruling that rule.
+ */
+export function stageLayoutFor(options: {
+  readonly width: number;
+  readonly height: number;
+  readonly floors: readonly VizFloor[];
+  readonly shafts: readonly ShaftGeometry[];
+  readonly wantsOverlay: boolean;
+}): Layout {
+  const { wantsOverlay, ...rest } = options;
+  let last: Layout | undefined;
+  for (const rung of STAGE_GUTTER_LADDER) {
+    const layout = buildLayout({
+      ...rest,
+      ...(rung.gutter === 0 ? {} : { gutterRightPx: rung.gutter }),
+      overlayWidthPx: rung.overlay && wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+    });
+    if (layout.hiddenShaftCount === 0) return layout;
+    last = layout;
+  }
+  /*
+   * The ladder is a frozen non-empty tuple, so `last` is always assigned by the time this is
+   * reached. The fallback is a `buildLayout` at the narrowest rung rather than a throw: a stage
+   * that refused to draw would turn *some shafts do not fit* into *no picture at all*, which is
+   * § D234's own defect.
+   */
+  return last ?? buildLayout({ ...rest, overlayWidthPx: 0 });
 }
 
 /* ========================================================================== *
@@ -2900,13 +2978,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
     // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
     const bank = shaftsForBank(recording.shafts, bankFilter);
-    const layout = buildLayout({
+    /*
+     * The scenery yields to the building — issue #41. `stageLayoutFor` walks a ladder of gutter and
+     * overlay requests and takes the first on which no shaft is hidden, instead of handing over the
+     * same two numbers at every width and every building.
+     */
+    const layout = stageLayoutFor({
       width,
       height,
       floors: recording.floors,
       shafts: bank.shafts,
-      gutterRightPx: QUEUE_GUTTER_PX,
-      overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+      wantsOverlay,
     });
     const overlay = overlayAt(recording, frame.simTimeS);
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);

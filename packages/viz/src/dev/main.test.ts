@@ -61,6 +61,7 @@ import {
   seedEntryOf,
   seekActionForKey,
   shaftsForBank,
+  stageLayoutFor,
   transportStatusOf,
   waitLegendEntries,
 } from './main.js';
@@ -247,6 +248,98 @@ describe('the status strip is worded by the reader’s mode', () => {
       'the same refusal is printed once per figure — twice, for one gate',
     ).toBe(1);
   }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The scenery yields to the building — GitHub issue #41
+ * -------------------------------------------------------------------------- */
+
+describe('the stage asks for less gutter when the shafts do not fit', () => {
+  /**
+   * Vertical City's thirty-five shafts, on a canvas the size the stage gets at a 1920 px viewport.
+   *
+   * The width is the **canvas box**, not the window: the shell puts two rails beside the stage, so
+   * 1920 of screen is about 1200 of plot. 1232 is the figure `MIN_PLOT_SHARE`'s own note measures
+   * against, so it is the one used here rather than a new one invented for this case.
+   */
+  const CANVAS = { width: 1232, height: 720 };
+
+  const FLOOR_IDS = Array.from({ length: 10 }, (_ignored, index) => `L${String(index)}`);
+
+  const shaftsOf = (count: number): readonly ShaftGeometry[] =>
+    Array.from({ length: count }, (_ignored, index) => ({
+      carId: `car-${String(index)}`,
+      bankId: 'main',
+      label: `C${String(index)}`,
+      servedFloorIds: FLOOR_IDS,
+    }));
+
+  const floors: readonly VizFloor[] = FLOOR_IDS.map((id, index) => ({
+    id,
+    name: id,
+    index,
+    heightM: index * 3.5,
+    population: 40,
+    isEntrance: index === 0,
+    isTransferFloor: false,
+  }));
+
+  it('draws every shaft of the tallest shipped building at a desktop canvas — issue #41', () => {
+    /*
+     * Measured before the change: **Vertical City shows 27 of 35 at 1920**. `RS-05`'s *"showing 27
+     * of 35"* notice was doing its job and saying so, and eight shafts of a building whose whole
+     * subject is its shafts were off the picture on the largest screen anybody has — because
+     * `QUEUE_GUTTER_PX` and `OVERLAY_WIDTH_PX` were handed over unchanged whatever was being drawn.
+     */
+    const layout = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(35), wantsOverlay: true });
+    expect(layout.hiddenShaftCount, 'shafts are still being dropped at a desktop canvas').toBe(0);
+    expect(layout.columns).toHaveLength(35);
+  });
+
+  it('is inert for a building that already fitted', () => {
+    /*
+     * The other direction, and the one that would be expensive to get wrong: a ladder that yielded
+     * scenery it did not need to would take the live-metrics panel off a six-shaft building for no
+     * reason. The first rung is the request that shipped, so a picture that was right does not move.
+     */
+    const roomy = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(6), wantsOverlay: true });
+    const asShipped = buildLayout({
+      ...CANVAS,
+      floors,
+      shafts: shaftsOf(6),
+      gutterRightPx: 280,
+      overlayWidthPx: 250,
+    });
+    expect(roomy.overlay, 'a building that fits lost its metrics panel').toBeDefined();
+    expect(roomy.plot).toEqual(asShipped.plot);
+  });
+
+  it('never re-enables an overlay RS-03 has dropped', () => {
+    // `wantsOverlay` answers a different question — the canvas is too narrow for the panel at all —
+    // and a rung that turned it back on would be this function overruling that rule.
+    const narrow = stageLayoutFor({
+      width: 600,
+      height: 720,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(narrow.overlay).toBeUndefined();
+  });
+
+  it('still draws a picture when nothing on the ladder fits them all', () => {
+    // A stage that refused to draw would turn *some shafts do not fit* into *no picture at all*,
+    // which is § D234's own defect. `RS-05`'s notice is what covers this case, and it needs columns.
+    const phone = stageLayoutFor({
+      width: 360,
+      height: 640,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(phone.columns.length).toBeGreaterThan(0);
+    expect(phone.hiddenShaftCount).toBeGreaterThan(0);
+  });
 });
 
 describe('keyboard seeking — KX-10', () => {
