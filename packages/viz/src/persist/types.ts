@@ -93,6 +93,7 @@ export const SESSION_KEY = 'elevator-sim.session';
  * |---|---|
  * | 1 | The first shape: the week, the menu `Settings` and the `FreePlaySelection`. |
  * | 2 | The same `session` object, **byte for byte**, plus a sibling {@link SavedLibrary}. |
+ * | 3 | `session.freePlay` gains `windowStartS` — the first version to change the week's own shape. |
  *
  * **A newer payload is still refused**, because this build cannot know what a field it has never
  * seen means — and silently dropping it would hand back a *partially* applied week, which is the
@@ -115,9 +116,43 @@ export const SESSION_KEY = 'elevator-sim.session';
  *
  * Refusing anyway would take a player's week away to punish them for a feature they never used,
  * which is the outcome this whole module exists to avoid. So {@link SESSION_SCHEMA_VERSIONS_READ}
- * is the set that is accepted, {@link SESSION_SCHEMA_VERSION} is the one that is written, and the
- * day the two sections stop being independent — a version 3 that *changes* the week's shape — the
- * older direction goes back to being a refusal, because then it really would be inventing.
+ * is the set that is accepted and {@link SESSION_SCHEMA_VERSION} is the one that is written.
+ *
+ * ## Version 3 is the case the paragraph above predicted, and it is read anyway — on the evidence
+ *
+ * That paragraph ended by saying that *"the day the two sections stop being independent — a version
+ * 3 that **changes** the week's shape — the older direction goes back to being a refusal, because
+ * then it really would be inventing."* Version 3 is that day: `session.freePlay` gains
+ * `windowStartS`, which is inside the week's own object rather than a sibling beside it. The
+ * prediction was right about the shape and wrong about the conclusion, and the reason is worth
+ * keeping rather than quietly deleting.
+ *
+ * **`windowStartS: null` for a version 1 or 2 session is not a default and not a guess.** `null`
+ * means *"no window — run the whole period"* (§ D286), and a build with no window concept ran the
+ * whole period every time. So it is the same argument the empty library already makes one section
+ * up: it is not a stand-in for an unknown value, it is the **measured** state of a session written
+ * before the field existed. Nothing is invented, so nothing is refused.
+ *
+ * The test of that claim is not this paragraph. `session.test.ts` restores a real version-2
+ * envelope and asserts the week, the settings and every other selection field come back *identical*
+ * — so the reading is byte-for-byte except for the one key whose value is derived from the absence
+ * itself.
+ *
+ * The rule the older paragraph was reaching for still stands, restated: **a shape change refuses
+ * the older direction when the new field's absence does not determine its value.** A version 4 that
+ * added, say, a per-day dispatcher choice would have no honest reading of a session that never made
+ * one, and would refuse. That is the question to ask, not whether the field sits in `session` or
+ * beside it.
+ *
+ * ## Bumping is not optional, and version 3 exists because it was skipped once
+ *
+ * `windowStartS` shipped **without** this constant moving. The envelope still said 2, so a
+ * version-2 session missing the key was not read as *older*, it was read as **malformed** — the
+ * player was told their saved week was *damaged*, which was false, and it was told to every player
+ * who had one. `validate.ts`'s extra-key branch already says the rule outright — *"the envelope
+ * version should have changed when that field landed"* — and it only ever said it in the direction
+ * that adds keys. Both directions are the same rule. If a field enters or leaves
+ * {@link SessionSnapshot}, this number moves in the same commit.
  *
  * **A field that cannot survive `JSON.parse(JSON.stringify(x))` is a test failure, not a surprise
  * later.** `jsonSafety.ts` is that test made into a run, and it exists because the trap is already
@@ -125,7 +160,7 @@ export const SESSION_KEY = 'elevator-sim.session';
  * {@link SessionSnapshot} is a `bigint` today; the guard is what makes that a checked property of
  * the value rather than a claim about the types, which are erased by the time this code runs.
  */
-export const SESSION_SCHEMA_VERSION = 2;
+export const SESSION_SCHEMA_VERSION = 3;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -135,7 +170,7 @@ export const SESSION_SCHEMA_VERSION = 2;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

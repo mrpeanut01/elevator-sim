@@ -20703,3 +20703,77 @@ correct, the schema is correct, the parser accepts it, `curl` returns the right 
 the product was broken for everyone who had been there before. **The only instrument that saw it was
 a browser with history.** A deployment is not verified by fetching from it; it is verified by loading
 it the way a returning player does.
+
+---
+
+## D290 — the saved session goes to version 3, and an older one is read rather than called damaged
+
+**Status: shipped.** The envelope version moves 2 → 3, `SESSION_SCHEMA_VERSIONS_READ` becomes
+`[1, 2, 3]`, and a version 1 or 2 session restores with `freePlay.windowStartS: null`.
+
+### What was wrong
+
+`windowStartS` was added to `SessionSnapshot.freePlay` in `9c8f667` (§ D285/§ D286) and
+`SESSION_SCHEMA_VERSION` did not move. It has changed exactly once in its life, in `f3fd2b4`, long
+before.
+
+So a real saved week — well-formed JSON, correct envelope version, one key short — did not read as
+*older*. It read as **malformed**, because the version gate passed it through to the shape check,
+and the player was told:
+
+> Your saved week was **damaged** and could not be read, so it has been cleared.
+
+That sentence is false. Nothing was damaged; the game changed shape. And `windowStartS` shipped for
+the first time in the deploy that carried it, so it was told to **every player who had a week**, not
+to a subset.
+
+### The rule already existed, in one direction only
+
+`validate.ts`'s extra-key branch says it outright — a session carrying a key this build does not
+know is refused with *"the envelope version should have changed when that field landed"*. The same
+rule in the missing-key direction was unenforced, so adding a field was silently cheaper than
+removing one. Both directions are the same rule, and `types.ts` now says so where the constant is
+declared: **if a field enters or leaves `SessionSnapshot`, the version moves in the same commit.**
+
+### Why version 3 is *read* and not refused
+
+`types.ts` predicted this case and got the conclusion wrong, and the prediction is kept rather than
+deleted. It said *"the day the two sections stop being independent — a version 3 that changes the
+week's shape — the older direction goes back to being a refusal, because then it really would be
+inventing."* Version 3 does change the week's own shape. It still does not invent.
+
+`null` means *no window — run the whole period* (§ D286). A build with no window concept ran the
+whole period on every run it ever performed. So `null` is not a default filling a hole, it is the
+**measured** state of a session written before the field existed — the identical argument version 2
+already makes about restoring an empty library, moved one level inward.
+
+The restated rule is the useful part: **a shape change refuses the older direction when the new
+field's absence does not determine its value.** Not whether the field sits inside `session` or
+beside it. A version 4 adding, say, a per-day dispatcher choice would have no honest reading of a
+session that never made one, and would refuse.
+
+### What is asserted, and how it was shown to be worth asserting
+
+`library.test.ts` gains a version-2 block — the version that actually broke — asserting the week
+restores whole, that the restored selection differs from a live one in **exactly one key** whose
+value is `null`, that the next save upgrades to 3, and that a version-2 envelope which is *genuinely*
+malformed is still refused by name. That last one matters: the bump must not have traded a false
+"damaged" for a silent partial restore, which is the outcome `SessionRestore` exists to prevent.
+
+The existing version-1 fixture was **vacuous** and is now not. It built `freePlay` from the live
+`menuState()`, so it already carried `windowStartS` and was a version-3 selection wearing a
+version-1 number; `expect(freePlay).toEqual(menuState().freePlay)` compared a value with itself. It
+now strips the key — by `Omit`, so a rename fails to compile rather than silently stripping nothing
+— and a non-vacuity case asserts the fixture really lacks it while the live build really has it.
+
+Verified by neutering `withWindowStart` and re-running: **4 tests fail**, including the version-1
+case that passed before this change. A green run on both shapes is not evidence, and this session
+had already produced two of those.
+
+### The instrument, again
+
+Every local check passed while this was broken, exactly as in § D289. The failing path needs a
+browser holding a session written by an earlier build — which no test fixture, no `curl` and no
+fresh profile has. It was found by opening the deployed page and reading the notice, and the
+notice was only readable because § D289's cache defect had already been fixed enough for the app
+to boot at all.
