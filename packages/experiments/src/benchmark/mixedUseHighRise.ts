@@ -14,41 +14,55 @@
  *
  * ---
  *
- * # 1. The building's own scenario admits no paired comparison, and that is a measurement
+ * # 1. The building's own scenario **does** admit a paired comparison — the refutation, measured
  *
  * `data/buildings/mixed-use-high-rise.json` says in its own `$comment` that the scenario it encodes
  * is the **morning overlap** — office demand up through the ground lobby while residents ride *down*
- * out of floors 32–60 through the same four shuttles. Run it, and every profile in
- * `data/dispatcher-profiles.json` whose `role` is `baseline` fails outright:
+ * out of floors 32–60 through the same four shuttles. This section used to report that every
+ * profile whose `role` is `baseline` failed outright there — *"0/30 quotable, 39.2 undelivered per
+ * run, 24.4 % unserved"* at 1.5 %, rising to *"36.6 % unserved"* at 0.2 % — and read the rise as the
+ * signature of a **structural refusal**: this building declares `accessZones` over floors 6–30 and
+ * 32–60, an access-restricted *pickup* carried no credential under `up-down-buttons`, every car
+ * answered `accessDenied`, and the call was permanently unassignable.
  *
- * | mixed 40/30/30, 1800 s, n = 30 | conventional (all three baselines) | credential-aware |
- * |---|---|---|
- * | 1.5 % of population per 5 min | 0/30 quotable, 39.2 undelivered per run, **24.4 % unserved** | 30/30 quotable, 0 undelivered |
- * | 0.75 % | 0/30 quotable, 22.7 undelivered, **31.7 % unserved** | 30/30, 0 undelivered |
- * | 0.2 % | 0/30 quotable, 6.4 undelivered, **36.6 % unserved** | 30/30, 0 undelivered |
+ * **That was a defect and not a building.** `DECISIONS.md` § D254 deleted the pickup check — a
+ * credential governs where you may go, not where you may be collected — and § D256 withdrew the
+ * claim. Re-measured at the same three rates, the same seed and the same budget (§ D279):
  *
- * **The unserved fraction rises as the load falls.** That is the signature of a structural refusal
- * rather than an overload: this building declares `accessZones` over floors 6–30 and 32–60, an
- * access-restricted *pickup* carries no credential under `up-down-buttons`, every car answers
- * `accessDenied`, and the call is permanently unassignable. Lowering the rate removes the traffic
- * that *can* be served and leaves the share that cannot, so the fraction goes up. It is the same
- * mechanism `accessControl.ts` § H-ACCESS-1 measures on Secure Tower, on a second building.
+ * | mixed 40/30/30, 1800 s, n = 30 | every arm, conventional and credential-aware alike |
+ * |---|---|
+ * | 1.5 % of population per 5 min | **cell quotable**, 0/30 replications without an AWT, 0.0 undelivered per run, 2.55 % unserved |
+ * | 0.75 % | 1/30 without an AWT, 0.0 undelivered, 2.13 % unserved |
+ * | 0.2 % | 4/30 without an AWT, 0.0 undelivered, 2.32 % unserved |
  *
- * So on this building's designed operating point **there is no baseline with a quotable AWT**, and
- * therefore no paired-t interval, and therefore nothing the criterion as written can be evaluated
- * against. `CLAUDE.md` forbids quoting a mean for a system whose queues grow without bound; a
- * categorical outcome is reported as counts, never as an interval.
+ * **All five arms return identical counts at every rate**, which is the finding rather than a
+ * convenience: whatever is left is not the call type. Nobody is undelivered anywhere. The unserved
+ * share is § D265's credential gap — riders who begin inside the building holding the badge their
+ * own floor implies rather than the one their destination needs — and it is **flat, not rising**:
+ * 2.55 → 2.13 → 2.32 %, which is neither the monotone rise a structural refusal produces nor the
+ * fall an overload produces. `study.coverage.verdict` reads `SERVABLE`.
  *
- * That is *not* the end of the answer, because it is a fact about a **directional regime** and not
- * about the building. Which is why this module keeps going.
+ * The cells at the two thin rates lose their aggregate AWT because a *single* unlucky replication
+ * costs the whole cell (`aggregateCell` is all-or-nothing), and at 0.2 % of population per five
+ * minutes the reporting window holds a handful of people. That is a statement about the operating
+ * point, and it lands on the credentialled arms exactly as hard.
  *
- * # 2. The regime that is comparable, and it is exactly one
+ * # 2. The regime this module measures, and it is no longer the only one available
  *
- * Every pickup must originate somewhere unrestricted, and on this building that means the ground
- * lobby: `G` is the only entrance and the only floor outside both access zones from which a bank
- * runs. So **incoming-only up-peak** is the one regime in which a conventional baseline can be
- * measured here at all. It is not a convenient choice — it is the only one, and § 1 is the
- * measurement that says so.
+ * **This section's own claim has been refuted by § 1 and is left standing as the reason the
+ * measurement is where it is.** It read: *every pickup must originate somewhere unrestricted, and on
+ * this building that means the ground lobby, so incoming-only up-peak is the one regime in which a
+ * conventional baseline can be measured here at all — not a convenient choice, the only one.* § D256
+ * records the irony: that constraint was adopted because the conventional arms were unquotable
+ * everywhere else, which was the defect's own symptom, and it had the accidental effect of confining
+ * every published interval to the regime the defect does not touch. **The published intervals were
+ * protected by the defect's symptom, and that is luck rather than design.**
+ *
+ * The mixed regime is now servable, so it *could* carry an operating point. It does not get one
+ * here: admitting it adds a point, a budget and a pin group, which is a re-design of the experiment
+ * matrix, and § D256 requires the criterion to be written before the numbers are read. § 1 is now
+ * the measurement that says the regime is **open** rather than the one that said it was closed —
+ * and the points below are unchanged, so nothing in § 3 or § 4 rests on the withdrawn claim.
  *
  * It is also a regime in which a destination carries real information, which the shipped up-peak
  * points mostly do not: a passenger entering at `G` may be going to retail (2–5), to an office floor
@@ -375,9 +389,12 @@ function mixedDirectional(rate: number): TrafficArmSpec {
 /**
  * The three rates § 1 is measured at, **descending**.
  *
- * Descending on purpose: the claim is that lowering the load does not rescue the conventional arm,
- * and the evidence is that the unserved *fraction* goes up rather than down. A single rate could not
- * distinguish a structural refusal from an overload.
+ * Descending on purpose, and the sweep is kept now that it has answered in the other direction. The
+ * question it was built for was whether a lower load rescued the conventional arm; a single rate
+ * could not have distinguished a structural refusal from an overload, and it still could not
+ * distinguish either from the third thing the sweep actually found — an unserved share that is
+ * **flat** in the load, because it is a fixed fraction of journeys the traffic model turns away
+ * (§ D265) rather than a queue the fleet cannot clear.
  */
 export const COVERAGE_RATES: readonly number[] = Object.freeze([1.5, 0.75, 0.2]);
 

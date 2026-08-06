@@ -97,13 +97,28 @@ export interface DestinationLiveness {
   /** `rideTime`'s raw values, through `policy.dispatch`/`reconsider` inside the run. */
   readonly ridePricing: LivenessCount;
   /**
-   * What the eligibility filter did, which is where a `callType` change shows up when no term
-   * prices the destination.
+   * What the eligibility filter did — which **used to be** where a `callType` change showed up when
+   * no term priced the destination, and on every shipped configuration this module measures is now
+   * uniformly empty.
+   *
+   * Two changes emptied it and neither is a defect. § T50-D1 moved the credential-less kiosk's
+   * refusal from the landing call to the *passenger*, so it happens at `#kioskAllows` before a call
+   * is raised; § D254 deleted the pickup check, which was the only other producer, along with its
+   * `accessDenied` reason. The census is kept because a zero here is a finding — and because a
+   * filter that started refusing again for any reason is exactly the regression it would catch.
    *
    * `accessRefusals` counts verdicts whose reason is one of the four the credential and the
    * destination can move — `accessDenied`, `destinationAccessDenied`, `serviceZone`,
    * `destinationServiceZone`. `decisionsWhollyRefused` is the count that makes an unservable
    * building unservable: every candidate car refused, so no assignment exists at any cost.
+   *
+   * **`accessDenied` no longer exists in `core` and the set deliberately still names it.** § D254
+   * deleted the reason along with the check that raised it, so on every shipped configuration but
+   * one these counts are zero. Dropping the dead name would make the set look like a description of
+   * the current model and it is not one — it is the set of reasons a `callType` change *could*
+   * move, and a reason that has been deleted is the strongest possible evidence that a count of it
+   * should be zero rather than absent. The one configuration that still fills the set is the bare
+   * kiosk (see {@link livenessCases}), which is why it is measured.
    */
   readonly eligibility: EligibilityCounts;
   /**
@@ -339,6 +354,31 @@ export function livenessCases(
     ) as DispatcherProfile['dispatch'],
   });
 
+  /*
+   * **The one configuration that still produces a structural access refusal, and it is here as a
+   * positive control rather than as a candidate.**
+   *
+   * Until `DECISIONS.md` § D254 the access-refusal counts on this building were the whole point of
+   * the two Secure Tower rows: the conventional arm returned 921 `accessDenied` verdicts and 307 of
+   * 331 wholly-refused decisions, and the credentialled arm returned none. § D254 deleted the check
+   * that produced them — it asked about a hall call's *pickup* floor — and both arms now return
+   * **zero verdicts of any kind**.
+   *
+   * A pair of zeros is exactly the shape § D261 warns about: *"a filter still looking for it would
+   * match nothing and the precondition would pass by being vacuous."* An `accessRefusals === 0`
+   * assertion on two arms is satisfied just as well by a census that stopped counting. So the arm
+   * that *does* still refuse is measured beside them, on the same building, at the same seed: the
+   * bare kiosk, which discloses a destination and carries no credential, so every car answers
+   * `destinationAccessDenied`. `accessControl.ts`'s `BARE_KIOSK_ARM` is the same configuration
+   * measured statistically; this counts it in the filter.
+   */
+  const bareKiosk: DispatcherProfile = Object.freeze({
+    ...destination,
+    id: 'liveness-bare-kiosk',
+    name: 'The shipped destination profile at a kiosk with no credential',
+    dispatch: Object.freeze({ ...destination.dispatch, callType: 'destination-entry' as const }),
+  });
+
   return Object.freeze([
     Object.freeze({
       label: 'shipped destination-eta on the access-controlled building',
@@ -349,6 +389,11 @@ export function livenessCases(
       label: 'the same profile at up-down-buttons — the gate’s off side',
       building: 'secure-tower',
       profile: conventional,
+    }),
+    Object.freeze({
+      label: 'the same profile at a credential-less kiosk — the surviving access refusal',
+      building: 'secure-tower',
+      profile: bareKiosk,
     }),
     Object.freeze({
       label: 'shipped destination-eta at the primary point — the profile data/ actually carries',
