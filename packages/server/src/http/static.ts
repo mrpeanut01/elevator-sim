@@ -104,8 +104,48 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = Object.freeze({
   '.md': 'text/markdown; charset=utf-8',
 });
 
-/** Vite's hashed-asset shape: `name-8charhash.ext`. Conservative — a miss only costs a revalidation. */
+/**
+ * Vite's hashed-asset shape: `name-8charhash.ext`.
+ *
+ * **This pattern cannot tell a content hash from an English word, and must never be asked to.**
+ * `traffic-profiles.json` ends `-profiles.json`, and `profiles` is exactly eight characters of
+ * `[A-Za-z0-9_-]`, so it matches — as does `dispatcher-profiles.json`. That is why {@link isImmutable}
+ * also requires {@link HASHED_DIR}, and why this constant is not exported.
+ */
 const HASHED = /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/u;
+
+/**
+ * Vite's `build.assetsDir`, and the only directory whose names are content-addressed.
+ *
+ * Every hashed output goes here and nothing else does: the data documents the viewer fetches by
+ * fixed name — `traffic-profiles.json`, `dispatcher-profiles.json`, `__buildings.json` — are
+ * emitted at the root by `vite.config.ts`'s copy plugin.
+ */
+const HASHED_DIR = '/assets/';
+
+/**
+ * Whether this asset's *name* changes whenever its bytes do, which is the only thing that licenses
+ * a year-long `immutable`.
+ *
+ * **Both conditions, because the failure is violently asymmetric.** Wrongly answering `false` costs
+ * one conditional request per deploy. Wrongly answering `true` pins every browser that has ever
+ * loaded the file to those bytes for a year, and the page cannot recover on its own — a reload
+ * re-reads the cache, and only a hard refresh or a changed URL escapes.
+ *
+ * That is not hypothetical. `traffic-profiles.json` was served `max-age=31536000, immutable` on the
+ * name test alone, so the deploy carrying `credentialGap` and the `office-day` template reached
+ * every returning player as a **new bundle reading a year-old payload**: the schema demanded a
+ * block the cached file did not have, `parseTrafficProfiles` refused it, and the viewer showed
+ * *"could not load data/"* with no run available at all. Measured on the live origin — the cache
+ * answered with six demand templates and no `credentialGap`, `{cache:'reload'}` answered with seven
+ * and the block present, from one URL in one browser.
+ *
+ * The directory is the load-bearing half. The name pattern is kept because an unhashed file that
+ * somehow reaches `assets/` should still not be frozen, but it is no longer trusted alone.
+ */
+function isImmutable(urlPath: string, name: string): boolean {
+  return urlPath.startsWith(HASHED_DIR) && HASHED.test(name);
+}
 
 /** The tag `viz`'s `dev/main.ts` reads its API origin out of. Named once, on both sides. */
 export const API_ORIGIN_META_NAME = 'elevator-sim-api';
@@ -271,7 +311,7 @@ export async function loadStaticBundle(root: string): Promise<StaticBundle> {
           // Unchanged by the injection, and it must be: `index.html` keeps its name across deploys,
           // so it is `no-cache` whatever is in it, and the rewritten document inherits exactly the
           // caching the original had rather than acquiring its own.
-          immutable: HASHED.test(entry.name),
+          immutable: isImmutable(urlPath, entry.name),
         });
       }
     }

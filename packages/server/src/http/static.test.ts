@@ -31,12 +31,34 @@ let bundle: StaticBundle;
 
 const DOCUMENT = '<!doctype html>\n<html lang="en">\n  <head>\n    <title>viewer</title>\n  </head>\n</html>';
 
+/**
+ * Every document the viewer fetches by a **fixed** name, from `viz/src/dev/data.ts`.
+ *
+ * The list is here rather than imported because `core/` and this package must build with `viz`
+ * absent (CLAUDE.md invariant 6). It is kept honest from the other end instead:
+ * `viz`'s own `data.test.ts` asserts these six are the paths it requests, so a seventh cannot be
+ * added there and quietly go uncached-tested here.
+ */
+const VIEWER_FETCHES = [
+  '/elevator-specs.json',
+  '/traffic-profiles.json',
+  '/dispatcher-profiles.json',
+  '/__buildings.json',
+  '/campaign.json',
+  '/scenario-goals.json',
+] as const;
+
 beforeAll(async () => {
   scratch = await mkdtemp(join(tmpdir(), 'elevator-static-'));
   await mkdir(join(scratch, 'build', 'assets'), { recursive: true });
   await writeFile(join(scratch, 'build', 'index.html'), DOCUMENT);
-  await writeFile(join(scratch, 'build', '__buildings.json'), '{"files":[]}');
+  for (const path of VIEWER_FETCHES) {
+    await writeFile(join(scratch, 'build', path.slice(1)), '{"files":[]}');
+  }
   await writeFile(join(scratch, 'build', 'assets', 'index-D0X0Ej_j.js'), 'export const x = 1;');
+  // Unhashed, and inside `assets/`. The directory is a convention, not a promise, so it alone
+  // must not buy a year of caching.
+  await writeFile(join(scratch, 'build', 'assets', 'unhashed.js'), 'export const y = 2;');
   bundle = await loadStaticBundle(join(scratch, 'build'));
 });
 
@@ -78,14 +100,41 @@ describe('cache-control', () => {
     expect(cacheControlFor(asset!)).toContain('immutable');
   });
 
-  it('refuses to cache the two files whose names survive a deploy', () => {
+  it('refuses to cache any file whose name survives a deploy', () => {
     // `index.html` keeps its name across builds, so a long cache on it pins a browser to a build
     // that no longer exists — and the hashed bundle it references is the part that got deleted.
-    for (const path of ['/index.html', '/__buildings.json']) {
+    //
+    // `VIEWER_FETCHES` rather than two hand-picked names, and that is the whole repair. The
+    // superseded version of this test listed `/index.html` and `/__buildings.json` — which are
+    // exactly the two that the old name-only rule happened to get right — and asserted nothing
+    // about the four beside them. Two of those four were being served `immutable` for a year.
+    for (const path of ['/index.html', ...VIEWER_FETCHES]) {
       const asset = assetFor(bundle, path);
-      expect(asset?.immutable).toBe(false);
-      expect(cacheControlFor(asset!)).toBe('no-cache');
+      expect(asset, path).toBeDefined();
+      expect(asset?.immutable, path).toBe(false);
+      expect(cacheControlFor(asset!), path).toBe('no-cache');
     }
+  });
+
+  it('does not read a hash into an English word — the defect that broke the live deploy', () => {
+    // `traffic-profiles.json` ends `-profiles.json`, and `profiles` is eight characters of
+    // `[A-Za-z0-9_-]`, so Vite's hashed-name pattern matches it. So does
+    // `dispatcher-profiles.json`. Named individually because the failure was theirs alone: the
+    // deploy carrying `credentialGap` and `office-day` reached every returning player as a new
+    // bundle reading a year-old payload, and the viewer refused to boot at all.
+    for (const path of ['/traffic-profiles.json', '/dispatcher-profiles.json']) {
+      expect(assetFor(bundle, path)?.immutable, path).toBe(false);
+    }
+  });
+
+  it('grants immutability on the directory, not on the name alone', () => {
+    // The two halves, each shown to be load-bearing by a case that has only the other. A hashed
+    // name outside `assets/` is refused, because that is the shape every data file that has ever
+    // been misread has; an unhashed name inside it is refused too, because `assets/` is a
+    // convention rather than a promise. Only the conjunction is cached.
+    expect(assetFor(bundle, '/traffic-profiles.json')?.immutable).toBe(false);
+    expect(assetFor(bundle, '/assets/unhashed.js')?.immutable).toBe(false);
+    expect(assetFor(bundle, '/assets/index-D0X0Ej_j.js')?.immutable).toBe(true);
   });
 });
 

@@ -20602,3 +20602,104 @@ comparison exactly as it binds any other: a paired-t interval excluding zero, an
 more than one window from one day is reported. The pairing is available — § D285's ordering is what
 makes two windows of a seed two parts of one day — which means the comparison is *cheap enough to do
 carelessly*. Nothing in this change reports one, and nothing in it should be read as licence to.
+
+---
+
+## D289 — a hashed-name heuristic read `-profiles.json` as a content hash, and froze it for a year
+
+**Status: the defect is closed in two places, and one of them is the request rather than the
+response.** Found by deploying `b6d31c8` and *opening the page*, not by any test.
+
+The live viewer answered `could not load data/` with no run available at all:
+
+```text
+Invalid config in traffic-profiles.json: 1 problem
+  traffic-profiles.json
+    - credentialGap: Invalid input
+```
+
+### What it was
+
+`server/src/http/static.ts` decided `cache-control` per asset from the **file name**:
+
+```ts
+const HASHED = /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/u;   // Vite's `index-Cd4tbeUP.js`
+immutable: HASHED.test(entry.name)
+```
+
+`traffic-profiles.json` ends `-profiles.json`. **`profiles` is exactly eight characters of
+`[A-Za-z0-9_-]`**, so the pattern meant for content hashes matched an ordinary English word, and the
+file shipped `public, max-age=31536000, immutable`. `dispatcher-profiles.json` too. Classified
+against every shipped name, those two are the only ones — `elevator-specs.json` (`specs`, five),
+`scenario-goals.json` (`goals`, five), `campaign.json` and `__buildings.json` (no hyphen) all fall
+the right way, which is exactly why nobody noticed.
+
+The consequence is not a stale file, it is a **broken product for everyone who had visited before**.
+The JS bundle is content-hashed, so it arrives fresh at a new URL every deploy; the data documents
+keep their names, so a poisoned browser keeps them for a year and — this is what `immutable` means —
+**does not revalidate**. A reload re-reads the cache. So the deploy carrying `credentialGap`
+(§ D265/D266) and the `office-day` template (§ D285) landed as a **new bundle reading a year-old
+payload**: the schema required a block the cached file predates, `parseTrafficProfiles` refused it,
+and the viewer had nothing to run.
+
+Measured on the live origin, one URL in one browser, one request each:
+
+| | demand templates | `credentialGap` |
+|---|---|---|
+| default cache mode | **6** | absent |
+| `{cache: 'reload'}` | **7** | present |
+
+### Why the header alone is the wrong half
+
+**A response header only reaches clients that have not been poisoned yet.** The bad entries are
+already in browsers this repository will never see again, with a year to run and an instruction not
+to ask. So the fix is also on the request: `dev/data.ts`'s `fetchJson` now sends
+`{cache: 'no-cache'}` — revalidate always, never serve a stored copy unchecked. Verified against a
+genuinely poisoned cache rather than against the spec: the same tab that answered 6-and-absent on the
+default mode answered **7-and-present** under `no-cache`.
+
+Not `'reload'`, which skips the cache entirely. `no-cache` revalidates, so a server offering `ETag`
+or `Last-Modified` answers 304 with no body. **Ours offers neither**, so this currently costs a full
+re-download of about 210 kB per cold load. That is stated rather than fixed here, and it is worth
+revisiting.
+
+### The rule that replaced the heuristic
+
+Immutability now requires the asset to be **under `/assets/`** — Vite's `build.assetsDir`, where
+every content-addressed output goes and nothing else does — **and** to match the hash shape. Both,
+because the failure is violently asymmetric: answering `false` wrongly costs one conditional request
+per deploy, and answering `true` wrongly costs a year with no way for the page to recover itself.
+
+**The static-hosting lane already had this right.** `packages/viz/staticwebapp.config.json` routes
+`/assets/*` to `immutable` and `/*.json` to `no-cache` — by route, never by name. The two lanes
+disagreed and the deployed one was the wrong one, which is worth more than the fix: the same decision
+was expressed twice, in two idioms, and only the idiom that could not misread a word survived contact
+with a real file name.
+
+### Why the tests did not catch it
+
+`static.test.ts` asserted `no-cache` on `/index.html` and `/__buildings.json` — **the two data files
+the broken rule happened to get right** — and said nothing about the four beside them. The fixture
+directory contained only those two, so the misread names were never in the bundle under test. An
+enumeration of examples, standing in for a property.
+
+Both ends are now pinned. The server test builds its fixture from the **whole** list and asserts
+none of it is cacheable, plus the two misread names individually. The new
+`viz/src/dev/data.test.ts` drives `loadBrowserResources` *and* `loadCampaign` against a stubbed
+`fetch` and asserts the exact set of six paths and that every one revalidates — so a seventh document
+cannot be added without the server's list being told. It also pins the trap itself: `-profiles.json`
+**is** misread by the Vite pattern, asserted in that direction, so a rename cannot quietly make the
+directory rule non-load-bearing while its docstring still explains why it is.
+
+Writing that test found the second bug in the same breath: the six are fetched by **two** loaders,
+deliberately split so a batch worker does not pay for the campaign, and the first draft drove only
+one — leaving `campaign.json` and `scenario-goals.json` unpinned.
+
+### The standing requirement, pointed at a header
+
+CLAUDE.md's rule is *move the control and require the run to change*. A cache header is a control
+whose effect is invisible on the machine that sets it: every check available locally — the file is
+correct, the schema is correct, the parser accepts it, `curl` returns the right bytes — passed while
+the product was broken for everyone who had been there before. **The only instrument that saw it was
+a browser with history.** A deployment is not verified by fetching from it; it is verified by loading
+it the way a returning player does.
