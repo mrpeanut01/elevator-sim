@@ -83,14 +83,14 @@
     },
     {
       "id": "secure-tower-obstructed-doors",
-      "covers": "Access zoning plus a door-obstruction probability, so the run draws from the doors stream as well as the arrivals streams, and four sim knobs are recorded. Its status is timed-out rather than completed, because access-locked-out passengers legitimately keep a run alive to its drain deadline — a stored run that timed out is a real measurement and must replay like any other (reports/replay.ts honours the stored onTimeout for this reason).",
+      "covers": "Access zoning plus a door-obstruction probability, so the run draws from the doors stream as well as the arrivals streams, and four sim knobs are recorded. Its status is timed-out rather than completed, which is what makes it the only always-on golden that can exercise the stored onTimeout policy — a stored run that timed out is a real measurement and must replay like any other (reports/replay.ts honours the stored onTimeout for this reason). WHY IT TIMES OUT CHANGED, and the old reason was a defect: this said 'access-locked-out passengers legitimately keep a run alive to its drain deadline', which was true of the code and false of every lift. DECISIONS.md § D254 deleted the pickup access check — a credential governs where you may go, not where you may be collected — and secure-tower then completed at 100% delivery at 3%, taking the timeout with it and leaving this golden's stated coverage false. The timeout is now DEMAND-DRIVEN, which is the ordinary reason a run does not finish: 40% of population per five minutes over 1500 s cannot be cleared inside the 900 s drain tail. Measured over four seeds before the rate was chosen — timed-out on 4 of 4 with 254 to 269 of about 1200 journeys undelivered (21-22%), against 32% where one seed left only 11 — so the fixture is not perched on the boundary. See DECISIONS.md § D261.",
       "buildingId": "secure-tower",
       "dispatcherProfileId": "eta",
       "seed": "7",
       "demandTemplate": "rise-and-fall",
       "durationS": 1500,
       "demand": {
-        "arrivalRatePctPop5min": 3,
+        "arrivalRatePctPop5min": 40,
         "peakWindowS": 300
       },
       "sim": {

@@ -317,11 +317,28 @@ describe('all demand concentrated on one landing', () => {
  * 4. Access lockout
  * -------------------------------------------------------------------------- */
 
-describe('access lockout — a landing no car will ever take', () => {
+describe('access lockout — a destination no car will ever take', () => {
   /**
    * Additive to `benchmark/accessControl.ts`, which measures the *statistics* of access control.
    * The question here is mechanical and has no interval: when a call is structurally
    * unassignable for the whole run, is every affected passenger still accounted for?
+   *
+   * **The lockout is the bare kiosk now, and it is the only one left** — `DECISIONS.md` § D254,
+   * § D256's withdrawal list, and § D261. This case used to conjure its lockout with conventional
+   * `up-down-buttons`, on the reasoning that *"a landing call carries no credential, so an
+   * access-restricted pickup floor is infeasible for every car in the bank"*. That was true of the
+   * code and false of every lift: a credential governs where you may **go**, not where you may be
+   * **collected**, so the check was deleted and `accessDenied` deleted with it. Conventional
+   * dispatch now serves `secure-tower` at 100 % delivery, and this fixture stopped locking anybody
+   * out — which is § D254 working, not this case failing.
+   *
+   * The surviving lockout is `dispatch.callType: 'destination-entry'` with no panel: the passenger
+   * types a destination into a terminal that has nothing to identify them with, the group is asked
+   * *"may an unbadged passenger reach floor 27?"*, and every car answers `destinationAccessDenied`.
+   * That is `benchmark/accessControl.ts`'s `BARE_KIOSK_ARM`, it refuses 61.2 % of journeys on this
+   * building, and it is **authorization of a destination** — the only access question a lift is
+   * asked. The conservation claim below is unchanged, which is the point of re-pointing rather than
+   * deleting: it was never a claim about *which* refusal, only that nobody vanishes under one.
    */
   it('leaves locked-out passengers undelivered and named, never silently dropped', () => {
     const building = config.buildingsById.get('secure-tower');
@@ -330,16 +347,16 @@ describe('access lockout — a landing no car will ever take', () => {
 
     const outcome = runCorner({
       id: 'adversarial/access-lockout',
-      /* Conventional up/down buttons: a landing call carries no credential, so an
-         access-restricted pickup floor is infeasible for every car in the bank. */
+      /* The bare kiosk: the destination is disclosed and the credential is not, so a zoned
+         destination is infeasible for every car in the bank. */
       building,
-      dispatcherProfile: withCallType(profile('eta'), 'up-down-buttons'),
+      dispatcherProfile: withCallType(profile('eta'), 'destination-entry'),
       seed: 5150,
       durationS: 1800,
       arrivalRatePctPop5min: 2,
       demand: {
         arrivalRatePctPop5min: 2,
-        /* Outgoing and interfloor is what puts calls on restricted landings. */
+        /* Outgoing and interfloor is what sends people to and from restricted floors. */
         directionalSplit: { incoming: 0.2, outgoing: 0.5, interfloor: 0.3 },
       },
       drainGraceS: 600,
@@ -347,9 +364,18 @@ describe('access lockout — a landing no car will ever take', () => {
     console.log(describeOutcome('access lockout', outcome));
 
     /* The lockout really happened, and the run said so in its own words rather than only in
-       its numbers. */
-    const refusals = outcome.result.warnings.filter((warning) => warning.includes('accessDenied'));
+       its numbers.
+
+       The phrase moved with the mechanism. `accessDenied` no longer exists in `core` at all — § D254
+       deleted the reason along with the check — so a filter still looking for it would match nothing
+       and this precondition would pass by being **vacuous**, which is the failure mode the guard is
+       here to prevent. The bare kiosk announces itself at the end of the run instead, and the count
+       is asserted beside the sentence so neither can go quiet on its own. */
+    const refusals = outcome.result.warnings.filter((warning) =>
+      warning.includes('refused by the destination kiosk'),
+    );
     expect(refusals.length).toBeGreaterThan(0);
+    expect(outcome.result.stageActivity.kioskRefusedLegs).toBeGreaterThan(0);
     expect(outcome.result.undelivered.length).toBeGreaterThan(0);
 
     /* Every undelivered journey is a *named* journey, and the audit balances: the count of
