@@ -249,12 +249,8 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "no-divergence",
+          "kind": "answer-the-demand",
           "threshold": null
-        },
-        {
-          "kind": "long-waits-under",
-          "threshold": 10
         },
         {
           "kind": "beat-the-baseline",
@@ -401,14 +397,6 @@
       },
       "replications": 50,
       "goals": [
-        {
-          "kind": "deliver-everyone",
-          "threshold": null
-        },
-        {
-          "kind": "no-divergence",
-          "threshold": null
-        },
         {
           "kind": "answer-the-demand",
           "threshold": null
@@ -574,10 +562,6 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "deliver-everyone",
-          "threshold": null
-        },
-        {
           "kind": "answer-the-demand",
           "threshold": null
         },
@@ -636,20 +620,8 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "deliver-everyone",
-          "threshold": null
-        },
-        {
-          "kind": "no-divergence",
-          "threshold": null
-        },
-        {
           "kind": "answer-the-demand",
           "threshold": null
-        },
-        {
-          "kind": "long-waits-under",
-          "threshold": 10
         },
         {
           "kind": "beat-the-baseline",
