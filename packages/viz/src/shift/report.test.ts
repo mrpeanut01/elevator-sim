@@ -1159,7 +1159,9 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     expect(meta).toContain(clean.buildingName);
     expect(meta).toContain(SELECTION.demandTemplateId);
     expect(meta).toContain('12.0 %pop/5min');
-    expect(meta).toContain('15 min selected');
+    // *"of demand"*, not *"selected"* — issue #80. The clock range on the line above is the run,
+    // drain included; this number is the demand schedule, and nothing used to say which was which.
+    expect(meta).toContain('15 min of demand');
     expect(meta).toContain('not part of a week');
   });
 

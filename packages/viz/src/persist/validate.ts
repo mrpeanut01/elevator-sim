@@ -446,12 +446,23 @@ const FREE_PLAY_CHECKS: Readonly<Record<keyof FreePlaySelection, FieldCheck>> = 
   // which is why it may not be normalised to a number on the way through.
   arrivalRatePctPop5min: nullOr(isFiniteNumber),
   /*
-   * A positive finite number, and deliberately **not** membership of `FREE_PLAY_DURATIONS_S`.
-   * `freePlayIssues` already refuses an unoffered length in a sentence a player can act on, and
-   * `constant-iso`'s cross-field rule lives there too. Duplicating the ladder here would refuse the
-   * whole session — week and settings included — for a field the menu is about to explain.
+   * A positive finite number, and deliberately **not** membership of what the menu offers.
+   * `freePlayIssues` already refuses an unoffered part in a sentence a player can act on. Checking
+   * the offered list here would refuse the whole session — week and settings included — for a field
+   * the menu is about to explain, and it would do it whenever `data/` changed a period's length.
    */
   durationS: isNumberWithin(1, 86_400),
+  /*
+   * Where in the day the run starts, or `null` for the whole period — § D286.
+   *
+   * `null` is a selection rather than a missing value, exactly as `arrivalRatePctPop5min`'s is, so
+   * it is admitted here rather than normalised to `0`: a `0` would be *"a window that starts at the
+   * beginning"*, which is a different stored fact from *"no window"* and would reach `core` as one.
+   *
+   * Bounded by a day rather than by any template's period, for `durationS`'s reason one line up: a
+   * saved session that named a part `data/` has since moved is a menu refusal, not a corrupt file.
+   */
+  windowStartS: nullOr(isNumberWithin(0, 86_400)),
   seed: isSeedString,
 });
 

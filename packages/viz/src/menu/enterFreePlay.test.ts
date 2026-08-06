@@ -37,6 +37,9 @@ const SELECTION: FreePlaySelection = Object.freeze({
   // 1 800 s and not 900: rise-and-fall declares a thirty-minute period, and freePlayIssues
   // refuses the combination in words rather than letting the kernel throw at Start.
   durationS: 1800,
+  // `null` — the whole of `rise-and-fall`'s period, which is the only part a shape template has.
+  // § D286.
+  windowStartS: null,
   seed: '20260804',
 });
 

@@ -48,9 +48,9 @@ import { GOAL_BARS, goalsForDay } from '../shift/goals.js';
 import { WAKE_UP_ARRIVALS } from '../shift/types.js';
 
 import { catalogueOf, type CatalogueSource } from './catalogue.js';
-import { canStart, initialMenuState, navigate } from './menu.js';
+import { canStart, initialMenuState, navigate, partsFor } from './menu.js';
 import { screenOf, type MenuGuide, type MenuViewInput } from './screens.js';
-import { FREE_PLAY_DURATIONS_S, MENU_SCREENS, type MenuCatalogue } from './types.js';
+import { MENU_SCREENS, type MenuCatalogue } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The real configuration, loaded once
@@ -282,12 +282,19 @@ describe('the guide describes the shipped product, in both directions', () => {
       dispatcherProfileId: dispatcher?.id ?? '',
       arrivalRatePctPop5min: null,
     };
-    const shortest = FREE_PLAY_DURATIONS_S.find((seconds) => canStart({ ...base, durationS: seconds }, loaded));
-    expect(shortest, 'no offered run length starts the worked example at all').toBeDefined();
+    // The parts the default traffic shape actually offers, shortest first — § D286 replaced the
+    // ladder with them, so the worked example is pinned to a part rather than to a rung.
+    const offered = [...partsFor(loaded, base.demandTemplateId)].sort(
+      (left, right) => left.durationS - right.durationS,
+    );
+    const shortest = offered.find((part) =>
+      canStart({ ...base, durationS: part.durationS, windowStartS: part.windowStartS }, loaded),
+    );
+    expect(shortest, 'no offered part starts the worked example at all').toBeDefined();
     expect(
       text,
       'the worked example names a run length the menu refuses for the default traffic shape',
-    ).toContain(`${String(Math.round((shortest ?? 0) / 60))} minutes`);
+    ).toContain(`${String(Math.round((shortest?.durationS ?? 0) / 60))} minutes`);
   });
 
   it('is not vacuous — the same checks refuse a name that ships nothing', async () => {
@@ -323,13 +330,30 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     expect(text).toContain('15-minute');
   });
 
-  it('quotes the run lengths Free play offers, in the order it offers them', async () => {
+  it('describes the part-of-day control the menu actually offers, and does not predict the end', async () => {
+    /*
+     * This case guarded the *Run length* sentence against `FREE_PLAY_DURATIONS_S` — a ladder and a
+     * sentence that could drift, which is the § D213 shape the whole file is written against. § D286
+     * removed the ladder, so what is guarded is the two claims that replaced it, both of which a
+     * later edit could quietly undo.
+     */
+    const loaded = await catalogue();
     const text = proseOf(await guide());
-    const minutes = FREE_PLAY_DURATIONS_S.map((seconds) => String(Math.round(seconds / 60)));
-    const expected = `${minutes.slice(0, -1).join(', ')} and ${minutes[minutes.length - 1] ?? ''} minutes`;
-    expect(text, 'the offered run lengths moved and the guide still lists the old ladder').toContain(
-      expected,
+
+    // 1 — the control is named for what it chooses, and by the same name in both modes.
+    expect(text, 'the guide still calls the control a run length').toContain('Part of the day');
+    expect(text).toContain('the same control the campaign uses');
+
+    // 2 — the drain is named and not predicted. Issue #80's fix is that no end time is quoted, so a
+    // guide that started printing one would be making the promise the old labels broke.
+    expect(text).toContain('until the building has cleared');
+    expect(text, 'the guide predicts an end time the run decides').toContain(
+      'outcome rather than a prediction',
     );
+
+    // 3 — and the day really does offer more than one part, or the sentence above describes nothing.
+    const day = loaded.demandTemplates.find((entry) => (entry.parts?.length ?? 0) > 1);
+    expect(day, 'no shipped template offers a part of a day, so the sentence is about nothing').toBeDefined();
   });
 
   it('quotes the seed bound the validator enforces', async () => {
@@ -340,11 +364,10 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     /*
      * Asserted through the validator rather than against its regex, so the sentence is pinned to
      * the behaviour a player meets rather than to a pattern that could be rewritten around it.
-     * The longest offered run is used so that no template's own minimum period can contribute a
-     * second issue and make the seed's own count unreadable.
+     * The opening selection is used so that no part-of-day mismatch can contribute a second issue
+     * and make the seed's own count unreadable.
      */
-    const longest = Math.max(...FREE_PLAY_DURATIONS_S);
-    const base = { ...initialMenuState(loaded).freePlay, durationS: longest };
+    const base = initialMenuState(loaded).freePlay;
     const issuesFor = (seed: string): number => freePlayIssueCount(loaded, { ...base, seed });
     expect(issuesFor('1'), 'a one-digit seed is refused').toBe(0);
     expect(issuesFor('1'.repeat(20)), 'a twenty-digit seed is refused').toBe(0);

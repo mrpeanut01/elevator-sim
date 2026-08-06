@@ -138,10 +138,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'drawer; its one authored string is the drawer toggle — `Controls ▸` / `Close controls` — ' +
         'which names a control rather than a result, and `surfaces.test.ts` asserts it directly ' +
         'alongside the breakpoint it must agree with. `dev/state.ts` is configuration: it answers ' +
-        '*what is the simulator being asked for*, and its one string table, `SHIFT_LENGTHS`, ' +
-        'names a duration (*Standard shift — 30 min*) rather than anything the run produced. Both ' +
-        'are derived only because the two-adjacent-words scanner reads hyphenated ids ' +
-        '(`garden-apartments`, `lunch-two-way`) as prose.',
+        '*what is the simulator being asked for*, and it now authors no string table at all — ' +
+        '`SHIFT_LENGTHS` was its one, and § D286 deleted it in favour of `menu/partsOfDay.ts`, ' +
+        'whose labels are player-facing and are **driven** by the `MENU` adapter rather than ' +
+        'excused here. What is left returns ids. Both modules are derived only because the ' +
+        'two-adjacent-words scanner reads hyphenated ids (`garden-apartments`, `lunch-two-way`) ' +
+        'as prose.',
       ids: [
         /*
          * `shift/incidents.ts` is the same false positive one directory over. It returns
@@ -190,7 +192,13 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // round-trip asserts.
         'dev/main.ts#deepLinkSearchOf',
         'dev/state.ts#initialState',
-        'dev/state.ts#SHIFT_LENGTHS',
+        /*
+         * Returns a demand template **id** — `rise-and-fall`, `office-day` — so the scanner reads
+         * the hyphen as a word break and nothing else. It authors no sentence; what a player reads
+         * about the template it names is the part labels `partsOfDay` produces from it, which the
+         * `MENU` adapter drives.
+         */
+        'dev/state.ts#shiftDemandTemplateId',
         'dev/state.ts#shiftRunConfigOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads

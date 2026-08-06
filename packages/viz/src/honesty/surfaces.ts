@@ -3444,6 +3444,11 @@ const MENU: SurfaceAdapter = {
     'menu/menu.ts#canStart',
     'menu/catalogue.ts#catalogueOf',
     'menu/catalogue.ts#buildingDetail',
+    // § D286. Its prose is the option labels and the sentence under them — *Morning rush —
+    // 08:30–09:00*, *30 min of demand … then however long it takes to clear* — which is exactly the
+    // kind of claim the honesty properties exist for: a label that named a clock the run did not use
+    // would be R1's defect with a friendly face. Driven below rather than excused.
+    'menu/partsOfDay.ts#partsOfDay',
     'menu/account.ts#formIssues',
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
@@ -3475,6 +3480,20 @@ const MENU: SurfaceAdapter = {
     }
     for (const entry of catalogue.demandTemplates) {
       seeds.push({ field: `template.${entry.id}.detail`, text: entry.detail ?? '', role: 'label' });
+      /*
+       * Every part of every shipped template, both strings. The label carries a clock range and the
+       * detail carries a quantity of demand, so both are claims about the run a player is about to
+       * start — and the second is the one issue #80 was filed about, where the number named the
+       * demand schedule and was read as the run.
+       */
+      for (const part of entry.parts ?? []) {
+        seeds.push({ field: `template.${entry.id}.part.${part.id}.label`, text: part.label, role: 'label' });
+        seeds.push({
+          field: `template.${entry.id}.part.${part.id}.detail`,
+          text: part.detail,
+          role: 'observation',
+        });
+      }
     }
 
     const challengeSelection = {
@@ -3482,25 +3501,29 @@ const MENU: SurfaceAdapter = {
       metric: 'awtS',
     };
     const challengeInput = { view: CHALLENGE_VIEW, runsDone: 3 };
+    // The opening template's shortest offered part, taken from the catalogue rather than written
+    // here — the same derivation the menu itself uses, so a sweep cannot drive a selection the menu
+    // would never produce. § D286.
+    const openingTemplateId = catalogue.demandTemplates[0]?.id ?? '';
+    const openingPart = [...(catalogue.demandTemplates[0]?.parts ?? [])].sort(
+      (left, right) => left.durationS - right.durationS,
+    )[0];
     const whole = {
       buildingId: catalogue.buildings[0]?.id ?? '',
       dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
-      demandTemplateId: catalogue.demandTemplates[0]?.id ?? '',
+      demandTemplateId: openingTemplateId,
       arrivalRatePctPop5min: null,
-      durationS: 900,
+      durationS: openingPart?.durationS ?? 1800,
+      windowStartS: openingPart?.windowStartS ?? null,
       seed: '20260804',
     };
     const broken = { ...whole, buildingId: 'demolished', seed: 'not-a-seed', durationS: 7 };
     /*
-     * A third selection, valid in every field and refused on a **cross-field** rule: the longest
-     * template's own period against the shortest offered run. Driven separately because its
-     * sentence carries two numbers a reader will act on, and a wrong one sends them to change the
-     * axis that was already right.
+     * A third selection, valid in every field and refused on a **cross-field** rule: a part that
+     * belongs to a different template. Driven separately because its sentence names what *is*
+     * offered, and a wrong one sends a reader to change the axis that was already right.
      */
-    const longest = [...catalogue.demandTemplates].sort(
-      (left, right) => (right.minimumDurationS ?? 0) - (left.minimumDurationS ?? 0),
-    )[0];
-    const tooShort = { ...whole, demandTemplateId: longest?.id ?? whole.demandTemplateId, durationS: 300 };
+    const tooShort = { ...whole, durationS: 300, windowStartS: null };
 
     for (const [label, selection] of [
       ['whole', whole],

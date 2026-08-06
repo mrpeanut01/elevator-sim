@@ -136,6 +136,35 @@ export interface DemandPhase {
 }
 
 /**
+ * Which part of a template's period a run covers — `DECISIONS.md` § D285, the field
+ * [§ D275](DECISIONS.md) named and deliberately left unbuilt.
+ *
+ * **A new field, never a reinterpretation of {@link ResolvedDemandTemplate.durationS}.** That is the
+ * whole of why it exists: `durationS` travels in every stored `RunConfig` and every leaderboard
+ * submission, so giving it a second meaning would leave every board still verifying and every old
+ * row a claim about a different run. `durationS` keeps meaning *how long the run was*; this says
+ * *where in the day the run was cut from*.
+ *
+ * Both ends are seconds into the template's **own** period, `0` being the instant the record starts
+ * — 08:00 for `office-day`. Half-open `[startS, endS)`, matching {@link inReportWindow} and the
+ * arrival bound in `poissonBatch.ts`.
+ */
+export interface ResolvedDemandWindow {
+  /** Seconds into the template's period at which this run's demand begins. */
+  readonly startS: number;
+  /** Seconds into the template's period at which this run's demand stops. Above {@link startS}. */
+  readonly endS: number;
+  /**
+   * The period the window was cut from, seconds — the record's own `durationMin × 60`.
+   *
+   * Carried rather than left derivable so that a trace is self-describing: a reader holding one
+   * knows it is half an hour *of a ten-hour day* without re-resolving the record it came from. It is
+   * also what a presentation layer needs to draw the window in the day it belongs to.
+   */
+  readonly periodS: number;
+}
+
+/**
  * A demand template resolved to seconds and to a piecewise-linear intensity function.
  *
  * The *shape* is code (a ramp is a ramp); every *number* comes from
@@ -237,8 +266,37 @@ export interface ResolvedDemandTemplate {
    * Both refusals are `traffic/demandTemplate.ts`'s, and both are stated in the same shape as the
    * existing `constant-iso` one: a template that cannot absorb a knob says so by name instead of
    * absorbing it into something that looks like it worked.
+   *
+   * **The first of the two is now answered rather than only refused.** {@link window} is the field
+   * § D275 named, and the refusal message names it back: `durationS` still cannot rescale a
+   * schedule, and `windowStartS`/`windowEndS` selects a part of one instead.
    */
   readonly authoredPhaseList?: true | undefined;
+  /**
+   * Which part of its own period this template was cut to — **absent when the run covers the whole
+   * of it**, which is every run that predates `DECISIONS.md` § D285.
+   *
+   * Omitted rather than `{ startS: 0, endS: durationS }` on an unwindowed template, keeping the
+   * discipline {@link startOfDayS} and {@link authoredPhaseList} set for the same reason each of
+   * them gives: this key sits inside every `PassengerTrace` and therefore inside every
+   * `SimulationResult`, and `traffic/transportIdentity.test.ts` hashes a key's *presence*. A window
+   * spelled out on every unwindowed run would move fifteen pinned digests to record that a run is
+   * not a slice.
+   *
+   * ## What the other fields mean once this is present
+   *
+   * The template is **re-based**: {@link durationS} is the window's own length, {@link phases} are
+   * clipped and shifted so `t = 0` is the window's start, {@link startOfDayS} is the *window's*
+   * hour rather than the record's, and {@link peakIntensity}, {@link intensityIntegralS} and
+   * {@link meanDirectionalSplit} are derived over the window. So every downstream reader — the
+   * kernel's deadline, the report window, the phase strip — sees a period that begins at zero, and
+   * nothing had to learn what a window is. This field is what says which period it was.
+   *
+   * {@link reportWindowStartS} and {@link reportWindowEndS} become the whole of the window, for the
+   * reason § D273 gives about a phase list reporting over the whole of itself: five minutes cut out
+   * of a lunch peak reports one instant of it and calls it the period.
+   */
+  readonly window?: ResolvedDemandWindow | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -773,6 +831,42 @@ export interface TrafficConfig {
    * which carries its geometry with it and would silently ignore them.
    */
   readonly templateOverrides?: DemandTemplateOverrides | undefined;
+  /**
+   * Run only `[windowStartS, windowEndS)` of the selected template's period. `DECISIONS.md` § D285.
+   *
+   * Declared as a pair of plain seconds rather than as a nested object because that is the shape
+   * § D275 named it in, and because the two are validated against each other and against the
+   * template's own length in one place. Both or neither: one alone is refused by name, the way a
+   * phase declaring `startSplit` without `endSplit` is.
+   *
+   * **Not a {@link DemandTemplateOverrides} member, and the distinction is the point.** An override
+   * *refits the template's geometry* — a 900 s `rise-and-fall` is a shorter ramp around the same
+   * hold. A window leaves the geometry exactly as authored and selects part of it, which is why it
+   * is the answer to the question `templateOverrides.durationS` is refused for on a phase list
+   * (§ D275): rescaling a ten-hour day into fifteen minutes gives a fifteen-minute day with a
+   * five-minute lunch, and running 12:15–12:45 of it gives the lunch.
+   *
+   * ## The day is drawn first and then cut, and that is what makes the window a *view*
+   *
+   * The trace is generated over the template's **whole** period exactly as it was before this field
+   * existed — same streams, same draws, same order — and only then filtered to the window and
+   * re-based. So the passengers of a 08:30–09:00 run are *the same records*, with the same ids,
+   * masses, destinations and credentials, as the 08:30–09:00 passengers of the whole day at the
+   * same seed. Two consequences that are the reason for the extra work:
+   *
+   * 1. Common random numbers survive a window change (CLAUDE.md invariant 2). Two windows of one
+   *    seed are two parts of one day rather than two unrelated draws, so a morning-versus-evening
+   *    comparison is paired on the day.
+   * 2. The day a player *runs* today and the day a player would *look at* under a continuously
+   *    simulated schedule contain the same demand, so moving the window from generation to
+   *    presentation does not change which crowd the window names.
+   *
+   * Absent — never `0`/`durationS` — when the run covers the whole period; `traffic/windowIdentity.test.ts`
+   * holds an unwindowed run byte-identical to the run before the field existed.
+   */
+  readonly windowStartS?: number | undefined;
+  /** End of the run's part of the period, seconds, exclusive. See {@link windowStartS}. */
+  readonly windowEndS?: number | undefined;
   /** Which point of each profile's rate range to use. Default `typical`. */
   readonly demandLevel?: DemandLevel | undefined;
   /**

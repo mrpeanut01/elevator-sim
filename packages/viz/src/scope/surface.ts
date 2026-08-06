@@ -130,6 +130,12 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'Which arrival pattern is running — the building’s own, a shipped profile, or one the reader ' +
       'saved. A saved pattern is what makes a run unreproducible from its selection elsewhere.',
   ),
+  'viewer.windowStartS': control(
+    'between-games',
+    'Where in the demand template’s period the shift begins, or null for the whole of it. Reaches ' +
+      'the run as TrafficConfig windowStartS/windowEndS, which select part of the authored ' +
+      'schedule rather than refitting it the way durationS does (§ D275, § D285).',
+  ),
   'viewer.shiftLengthS': control(
     'between-games',
     'The run’s horizon. Comparability depends on it: every published figure in this repository was ' +
@@ -302,8 +308,16 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   ),
   'free-play.durationS': control(
     'between-games',
-    'The menu’s name for viewer.shiftLengthS. Cross-checked against the chosen template’s own ' +
-      'declared minimum in freePlayIssues, because constant-iso needs two hours to leave a window.',
+    'The menu’s name for viewer.shiftLengthS. No longer chosen on its own: since § D286 it is the ' +
+      'length of whichever part of the day was picked, written by the same control as ' +
+      'free-play.windowStartS.',
+  ),
+  'free-play.windowStartS': control(
+    'between-games',
+    'Which part of the day the run covers, with durationS — the menu’s name for ' +
+      'viewer.windowStartS. between-games rather than within-day: picking a different part of the ' +
+      'day mid-week is choosing which exam to sit after seeing the questions. null is the whole ' +
+      'period and is a selection rather than a missing one.',
   ),
   'free-play.seed': control(
     'between-games',

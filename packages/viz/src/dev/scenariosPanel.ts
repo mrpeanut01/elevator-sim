@@ -270,6 +270,10 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
        * select stays live afterwards.
        */
       shiftLengthS: shiftLengthForContract(card.contractId),
+      // Taking an assignment restarts the week, so it restarts the part too: a contract declares a
+      // length and not a part of a day, and inheriting yesterday's lunch under a scenario written
+      // for a morning would be the scenario running something it did not ask for.
+      windowStartS: null,
       /*
        * The mode comes back with the week — § D231.
        *

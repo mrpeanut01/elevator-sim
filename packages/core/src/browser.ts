@@ -501,6 +501,7 @@ export {
   splitAt,
   toPassengerInit,
   transferFloorsOf,
+  windowTemplate,
 } from './traffic/index.js';
 
 export type {
@@ -531,6 +532,7 @@ export type {
   PhaseListOptions,
   ResolvedDayVariation,
   ResolvedDemandTemplate,
+  ResolvedDemandWindow,
   RiseAndFallOptions,
   RoutePlan,
   RouteSegment,

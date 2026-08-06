@@ -235,7 +235,10 @@ function finish(
   // `authoredPhaseList` is destructured for the same reason and one more: it is absent on all five
   // shipped templates, so every one of them serializes exactly as it did before § D273 and not one
   // pinned digest moves. A `false` here would move fifteen of them for a key that means "no".
-  const { startOfDayS, authoredPhaseList, ...rest } = parts;
+  //
+  // `window` joins them since § D285, and for exactly the same reason: it is absent on every run
+  // that covers a whole period, which is every run this repository has ever published.
+  const { startOfDayS, authoredPhaseList, window, ...rest } = parts;
   const hourS = requireTimeOfDay(startOfDayS, 'startOfDayS');
   let peak = 0;
   let integral = 0;
@@ -256,6 +259,7 @@ function finish(
     // The same rule, for the same reason. `constant-iso` has no hour and must carry no key.
     ...(hourS === undefined ? {} : { startOfDayS: hourS }),
     ...(authoredPhaseList === true ? { authoredPhaseList: true as const } : {}),
+    ...(window === undefined ? {} : { window: Object.freeze({ ...window }) }),
   });
 }
 
@@ -403,6 +407,136 @@ export function shiftTemplatePeak(
     // Spread-or-omit rather than `startOfDayS: template.startOfDayS`, so a shifted `constant-iso`
     // — which has no hour — does not acquire an `undefined`-valued key the original lacked.
     ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Cutting a part out of a period (§ D285)
+ * -------------------------------------------------------------------------- */
+
+/** Where a linear segment sits at `timeS`, given its two endpoints. `0` for a degenerate span. */
+function lerp(startS: number, endS: number, startValue: number, endValue: number, timeS: number): number {
+  const span = endS - startS;
+  if (span <= 0) return startValue;
+  return startValue + ((endValue - startValue) * (timeS - startS)) / span;
+}
+
+/** {@link lerp} applied to all three shares. Not normalized here — {@link finish} does that. */
+function splitBetween(phase: DemandPhase, timeS: number): DirectionalSplit | undefined {
+  const { startSplit, endSplit } = phase;
+  if (startSplit === undefined || endSplit === undefined) return undefined;
+  return {
+    incoming: lerp(phase.startS, phase.endS, startSplit.incoming, endSplit.incoming, timeS),
+    outgoing: lerp(phase.startS, phase.endS, startSplit.outgoing, endSplit.outgoing, timeS),
+    interfloor: lerp(phase.startS, phase.endS, startSplit.interfloor, endSplit.interfloor, timeS),
+  };
+}
+
+/**
+ * The same template cut to `[startS, endS)` of its own period, re-based so the cut begins at zero.
+ *
+ * `DECISIONS.md` § D285, and the field [§ D275](DECISIONS.md) named. This is what makes a ten-hour
+ * `office-day` runnable at half an hour **without rescaling it**: the geometry is left exactly as
+ * authored and a part of it is selected, so 12:15–12:45 is the cited lunch peak at its cited length
+ * rather than a lunch squeezed into a proportion of a shorter day.
+ *
+ * ## What moves, and what deliberately does not
+ *
+ * Everything is re-based to the window's own clock — {@link ResolvedDemandTemplate.durationS} is the
+ * window's length, the phases are clipped and shifted, `startOfDayS` becomes the *window's* hour —
+ * so every downstream reader sees an ordinary period that begins at zero. The kernel's deadline, the
+ * report window, the phase strip and the oracle's `[0, durationS]` assumptions all keep working
+ * without learning what a window is. {@link ResolvedDemandTemplate.window} is what records that this
+ * period was cut out of a longer one, and it carries the length of the longer one so a trace can say
+ * *half an hour of a ten-hour day* without re-resolving the record.
+ *
+ * `peakIntensity`, `intensityIntegralS` and `meanDirectionalSplit` are re-derived by {@link finish}
+ * over the window rather than carried across, so the template cannot disagree with itself — the same
+ * rule {@link shiftTemplatePeak} follows. A morning window's mean mix is the morning's, not the
+ * day's, and that is the honest reading: it *is* a different period.
+ *
+ * **The report window becomes the whole of the cut.** § D273's argument about a phase list applies
+ * with more force to a part of one: five minutes taken out of a lunch peak reports one instant of it
+ * and calls it the period. A run that wants a narrower measurement still has
+ * `SimulationConfig.reportWindow`, which is where *"show me the busiest five minutes of it"* belongs.
+ *
+ * **Declaring the whole period is not a window, and returns the template untouched.** A window names
+ * a *part*, and the whole is not one; so *"the full day"* and *"no window"* are the same selection
+ * spelled two ways, and they produce the same run byte for byte rather than two runs differing in
+ * whether a key is present. `traffic/windowIdentity.test.ts` asserts it.
+ *
+ * @throws TrafficError for a window outside the period, an empty or inverted one, or a second window
+ *   on a template that already carries one.
+ */
+export function windowTemplate(
+  template: ResolvedDemandTemplate,
+  startS: number,
+  endS: number,
+): ResolvedDemandTemplate {
+  if (template.window !== undefined) {
+    throw new TrafficError(
+      `Demand template "${template.id}" is already a [${template.window.startS}, ${template.window.endS}) window of a ${template.window.periodS} s period, so it cannot be windowed again: the second window would be measured against the first one's length and "which part of the day" would stop naming a part of the day. Window the period once, from the record.`,
+    );
+  }
+  requireNonNegative(startS, 'windowStartS');
+  requireNonNegative(endS, 'windowEndS');
+  if (endS <= startS) {
+    throw new TrafficError(
+      `windowStartS (${startS} s) must be below windowEndS (${endS} s) on demand template "${template.id}": the window is the part of the period the run covers, and a part with no length is a run with no demand rather than a short one.`,
+    );
+  }
+  if (endS > template.durationS) {
+    throw new TrafficError(
+      `Window [${startS}, ${endS}) s does not fit inside demand template "${template.id}", whose period is ${template.durationS} s. A window selects part of the period the record authors; it cannot extend one. Widen the record, or select a window inside it.`,
+    );
+  }
+  // The whole is not a part. Returning the template untouched is what makes "the full day" and "no
+  // window" the same run rather than two runs that differ in a key.
+  if (startS === 0 && endS === template.durationS) return template;
+
+  const durationS = endS - startS;
+  const phases: DemandPhase[] = [];
+  for (const phase of template.phases) {
+    const from = Math.max(phase.startS, startS);
+    const to = Math.min(phase.endS, endS);
+    // Half-open, so a window landing exactly on a boundary takes the phase that starts there and
+    // not the one that ends there — the same rule `inReportWindow` and `poissonBatch` follow.
+    if (to <= from) continue;
+    const startSplit = splitBetween(phase, from);
+    const endSplit = splitBetween(phase, to);
+    phases.push({
+      startS: from - startS,
+      endS: to - startS,
+      startIntensity: lerp(phase.startS, phase.endS, phase.startIntensity, phase.endIntensity, from),
+      endIntensity: lerp(phase.startS, phase.endS, phase.startIntensity, phase.endIntensity, to),
+      // Spread-or-omit: a window of a template whose phases declare no mix must declare none either,
+      // or the run would acquire a `meanDirectionalSplit` its period never had and change path.
+      ...(startSplit === undefined || endSplit === undefined ? {} : { startSplit, endSplit }),
+    });
+  }
+  if (phases.length === 0) {
+    throw new TrafficError(
+      `Window [${startS}, ${endS}) s of demand template "${template.id}" covers none of its phases, which should be impossible for a window inside its ${template.durationS} s period. The phase list is not contiguous.`,
+    );
+  }
+
+  return finish({
+    id: template.id,
+    name: template.name,
+    recommended: template.recommended,
+    durationS,
+    phases,
+    // The whole of the cut. See the docstring: a part is reported over the whole of itself.
+    reportWindowStartS: 0,
+    reportWindowEndS: durationS,
+    // The window's hour, not the record's — this is the half of § D244 that stops being free. The
+    // hour is now an *input* to a label a player reads, and wrapped modulo a day so a window taken
+    // from a period that runs past midnight cannot print a 25th hour.
+    ...(template.startOfDayS === undefined
+      ? {}
+      : { startOfDayS: (template.startOfDayS + startS) % SECONDS_PER_DAY }),
+    ...(template.authoredPhaseList === true ? { authoredPhaseList: true as const } : {}),
+    window: { startS, endS, periodS: template.durationS },
   });
 }
 
@@ -1172,7 +1306,7 @@ function requireNoPhaseListOverrides(
   if (set.length === 0) return;
   if (set.includes('durationS')) {
     throw new TrafficError(
-      `templateOverrides.durationS cannot be applied to demand template "${id}": its phases are authored, not computed, so there is no geometry to refit and a new duration would rescale a whole day's schedule into whatever length was asked for — a fifteen-minute day with a five-minute lunch, reported as a day. Run the period the record declares, or select a shorter template. Choosing which *part* of a day to run is a separate field and not this one, because durationS travels in every stored result and must keep meaning "how long the run was".`,
+      `templateOverrides.durationS cannot be applied to demand template "${id}": its phases are authored, not computed, so there is no geometry to refit and a new duration would rescale a whole day's schedule into whatever length was asked for — a fifteen-minute day with a five-minute lunch, reported as a day. Choosing which *part* of a day to run is windowStartS/windowEndS and not this one (§ D285), because durationS travels in every stored result and must keep meaning "how long the run was". Run the period the record declares, window it to a part of itself, or select a shorter template.`,
     );
   }
   throw new TrafficError(

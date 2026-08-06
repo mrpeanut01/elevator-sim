@@ -461,11 +461,33 @@ export interface SimulationConfig {
    */
   readonly durationS?: number | undefined;
   /**
+   * Run only `[windowStartS, windowEndS)` of the template's period. `DECISIONS.md` § D285.
+   *
+   * **The other kind of window, and the two are not the same control.** {@link reportWindow} narrows
+   * *what is measured* out of a run that happened in full; this narrows *what is run*. A player who
+   * picks the lunch peak of a ten-hour day is asking for the second — the morning is not simulated
+   * and then hidden, it does not happen.
+   *
+   * Handed to the generator as `TrafficConfig.windowStartS`/`windowEndS` rather than folded into
+   * {@link durationS}, which becomes `templateOverrides.durationS` and refits a shape's geometry.
+   * That distinction is the whole of § D275: `durationS` travels in every stored `RunConfig` and
+   * every leaderboard submission, so a second meaning for it would leave every board still
+   * verifying and every stored row a claim about a run nobody made.
+   *
+   * Both or neither. Absent means the run covers the whole period, which is byte-identical to the
+   * run before this field existed.
+   */
+  readonly windowStartS?: number | undefined;
+  /** End of the run's part of the template's period, seconds, exclusive. See {@link windowStartS}. */
+  readonly windowEndS?: number | undefined;
+  /**
    * Which window the summary is computed over.
    *
    * Defaults to the template's own measurement window — the peak 5 minutes for
    * `rise-and-fall`. `'full-run'` and `'peak-5min'` are the two derived selections; an explicit
    * {@link ReportWindow} overrides both.
+   *
+   * Narrows the *report*, never the run — see {@link windowStartS} for the one that narrows the run.
    */
   readonly reportWindow?: WindowSelection | undefined;
   readonly demand?: SimulationDemandOptions | undefined;

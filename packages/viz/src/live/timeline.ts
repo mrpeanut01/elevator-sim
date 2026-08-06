@@ -40,12 +40,20 @@ import type { VizPhase, VizRecording } from '../contract/types.js';
 import type { TickLabel, TimelineSegment } from './types.js';
 
 /**
- * The hour the shift starts, in seconds since midnight. 06:00, as the design rules its timeline.
+ * The hour a run starts at when it declares none. 06:00, as the design rules its timeline.
  *
  * The **only** number in this module that is not the run's own, and it is a caption rather than a
  * modelling constant: nothing statistical reads it, no simulated quantity changes if it moves,
  * and the demand template underneath is unaffected. It exists so that a reader sees *07:12* over
  * a morning peak instead of *4 320 s*.
+ *
+ * **It is now the fallback rather than the answer** — issue #83. Every shipped template but one
+ * declares its own hour (§ D244), a *part* of a day declares the part's (§ D285), and
+ * `dev/main.ts` reads the run's and passes it in. A `lunch-two-way` drawn at 06:00 was worse than
+ * no clock at all, because a player concluded from it that the traffic pattern did not matter much.
+ * The default survives for the two cases that genuinely have no hour: `constant-iso`, which
+ * declares none on purpose, and a recording restored from a file, whose hour `VizRecording` does
+ * not carry.
  */
 export const DAY_START_S = 6 * 3600;
 
@@ -66,14 +74,21 @@ export function hhmm(todS: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-/** Time of day at a playhead position, seconds since midnight. */
-export function timeOfDayAt(simTimeS: SimTime): number {
-  return DAY_START_S + simTimeS;
+/**
+ * Time of day at a playhead position, seconds since midnight.
+ *
+ * `dayStartS` is the run's own hour and defaults to {@link DAY_START_S} — see that constant for why
+ * the default is a fallback rather than the answer. `undefined` is accepted as well as omission, so
+ * a caller holding `trace.startOfDayS` for a template that declares no hour can pass it straight
+ * through rather than restating the default at the call site.
+ */
+export function timeOfDayAt(simTimeS: SimTime, dayStartS: number | undefined = DAY_START_S): number {
+  return (dayStartS ?? DAY_START_S) + simTimeS;
 }
 
-/** The header's clock, `hh:mm`, at a playhead position. */
-export function clockAt(simTimeS: SimTime): string {
-  return hhmm(timeOfDayAt(simTimeS));
+/** The header's clock, `hh:mm`, at a playhead position. See {@link timeOfDayAt} for `dayStartS`. */
+export function clockAt(simTimeS: SimTime, dayStartS?: number | undefined): string {
+  return hhmm(timeOfDayAt(simTimeS, dayStartS));
 }
 
 /* -------------------------------------------------------------------------- *

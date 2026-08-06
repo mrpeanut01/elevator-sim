@@ -350,6 +350,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   'viewer.pattern':
     'same: a saved pattern is this browser’s alone (runIdentity.ts refuses a run carrying one), so restoring it would restore an unreproducible run',
   'viewer.shiftLengthS': 'the live run’s length; menu.freePlay.durationS is the persisted selection',
+  'viewer.windowStartS':
+    'the live run’s part of the day; menu.freePlay.windowStartS is the persisted selection, and the two travel together because they are one choice — a restored length without its window would run the right amount of demand out of the wrong hour (§ D286)',
   'viewer.freePlay':
     'the two override axes the live run is carrying, derived by enterFreePlay from the selection that is persisted — storing the derivation as well would let it drift from its source',
   'viewer.seed':

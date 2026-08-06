@@ -83,6 +83,24 @@ const PARAMETERS_BY_CONFIG_FIELD = {
    * it changes, which is why it is `null` for a different reason than `idPrefix` is.
    */
   trafficModel: null,
+  /*
+   * Which *part of the day* the run covers (§ D285) — a scenario axis, not a knob, and `null` for a
+   * third reason on top of the two above.
+   *
+   * § D244 rule 3 kept `startOfDayS` out of this surface because an optimizer sampling *what hour it
+   * is* would search a dimension that cannot move a cost. The window is that hour made selectable,
+   * so the argument applies harder: sampling it would search *which experiment to run*, and
+   * CLAUDE.md § Tuning discipline says the opposite — tune per traffic pattern, which means holding
+   * the pattern fixed and searching the weights inside it.
+   *
+   * There is also a declaration this surface could not honestly make. A tunable declares a range,
+   * and the only true range here is `[0, the selected template's own durationS)` — 1 800 s for
+   * `rise-and-fall` and 36 000 s for `office-day`. `activeWhen` selects on a *value*, not on a
+   * length read out of `data/`, so any range written here would be wrong for five of the seven
+   * shipped records. A declared schema that disagrees with the resolver is worse than none.
+   */
+  windowStartS: null,
+  windowEndS: null,
 
   template: ['traffic.template'],
   templateOverrides: [
