@@ -65,6 +65,7 @@ import type {
   WaitBandId,
   WaitBands,
 } from '../live/types.js';
+import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
@@ -803,7 +804,7 @@ export function mountLeftRail(elements: LeftRailElements, context: MountContext)
       const t = view.simTimeS;
       const mode = disclosureOf(state.mode);
 
-      drawMood(doc, elements.mood, surfaces, recording, t);
+      drawMood(doc, elements.mood, surfaces, recording, t, state.mode);
       drawStats(doc, surfaces, recording, t);
       drawShift(doc, elements.shift, surfaces, view);
       drawHonesty(elements.honesty, recording, t, mode, state.showMaths);
@@ -832,6 +833,7 @@ function drawMood(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  viewMode: ViewMode,
 ): void {
   const view =
     recording === undefined
@@ -867,7 +869,7 @@ function drawMood(
     ),
   );
 
-  drawDrivers(doc, surfaces, recording, t);
+  drawDrivers(doc, surfaces, recording, t, viewMode);
 }
 
 /**
@@ -911,12 +913,16 @@ function drawDrivers(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  mode: ViewMode,
 ): void {
   if (recording === undefined) {
     surfaces.drivers('idle', () => []);
     return;
   }
-  const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t));
+  // The reader's own mode — issue #71. The two driver sentences that carry vocabulary (the
+  // abandonment horizon, and the per-5-minute rates) lead with a plain-language sentence in Casual
+  // and are unchanged in Engineer.
+  const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t), mode);
   const rows = moodDriverRowsOf(mood);
   surfaces.drivers(
     `${String(mood.provisional)}|${rows.map((driver) => driver.text).join('|')}`,

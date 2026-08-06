@@ -126,6 +126,7 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
+import { AWT_ID, WT95_ID } from '../render/runSummary.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
@@ -136,7 +137,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
-import { dayReportOf } from '../shift/report.js';
+import { dayReportOf, type DayReportInput } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
@@ -280,6 +281,63 @@ export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitL
   }));
 }
 
+/* ========================================================================== *
+ * The transport's reading of the run — GitHub issue #71
+ * ========================================================================== */
+
+/**
+ * The two figures the status strip carries, **as the reader's own mode words them**.
+ *
+ * ## The defect this closes
+ *
+ * The line was `AWT ${meanWaitS} s · WT95 ${wait95S} s`, built from `recording.summary` directly.
+ * Issue #71 diffed every rendered text node between the two modes on a completed shift and found
+ * that `AWT · WT95` is identical in both — one of six strings that made Casual, in the reporter's
+ * words, *less* informative than Engineer for the audience it names.
+ *
+ * The renderings that would have fixed it already existed and already reached this file:
+ * `disclosureItems` was called on every recording and its output dropped with `void itemsIn;`
+ * (§ D240 § 2). So this is not a new vocabulary — it is the shipped one, mounted.
+ *
+ * ## Why it reads the items rather than the summary
+ *
+ * Because the items are what parity is checked over, and a status line derived independently could
+ * disagree with the check that says the two modes agree. It also gets the **suppression** for free
+ * and in one place: `mode/disclosure.ts` already replaces a refused mean with the run's own reason,
+ * so this function has no `meansAreSuppressed` branch of its own to keep in step with `docs/10` R9.
+ *
+ * ## It carries each figure's `n`, and the honesty search is why
+ *
+ * The line it replaces read `AWT 13.1 s · WT95 27.4 s` and had done since it was written. Seeding it
+ * into the corpus made `honesty/properties.ts` fail on it immediately, at six generated cases in
+ * both modes: **an estimate with no count beside it** — R13 clause one, *"`n = 5` is not a caveat on
+ * `11.3 s`; it is part of what `11.3 s` means"*. The finding is about the shipped strip rather than
+ * about this function, and it had been invisible for the same reason the whole issue is: nothing on
+ * this line went through the layer that classifies a figure as an estimate.
+ *
+ * So the count comes with the value. `Rendering.count` already holds it, in the same visual unit,
+ * which is what makes this a **routing** change rather than a new claim: the figure, its window and
+ * its `n` were all sitting in the item the shell was throwing away.
+ *
+ * `undefined` — never an empty string — when there is no run or the items carry neither figure.
+ * The strip's transient messages live in the same element, and writing `''` over one of them would
+ * blank the screen at the moment a reader is being told something.
+ */
+export function transportStatusOf(
+  items: readonly DisclosureItem[],
+  mode: ViewMode,
+): string | undefined {
+  const drawn = itemsIn(items, mode);
+  const parts = [AWT_ID, WT95_ID]
+    .map((id) => drawn.find((item) => item.id === id))
+    .filter((item) => item !== undefined)
+    .map((item) => {
+      const { value, count } = item.rendering;
+      return count === undefined ? `${item.label} ${value}` : `${item.label} ${value} (${count})`;
+    });
+  return parts.length === 0 ? undefined : parts.join(' · ');
+}
+
 /** A band's boundary, as the two numbers it already publishes and the unit they are in. */
 function rangeLabelOf(band: WaitBandDefinition): string {
   const from = String(band.fromS);
@@ -400,6 +458,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let selectedLandingId = '';
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
+  /**
+   * What the sheet on screen was shaped from, so a presentation setting can re-shape it.
+   *
+   * ## Why the input is held rather than the sheet re-assembled
+   *
+   * `showEnergyAxis` is presentation, and the `set-setting` arm's own rule is that presentation is
+   * *applied now, not at the next `adopt`* — a setting that only took effect on the next run is
+   * indistinguishable from an inert one for as long as a player stays on the screen, which is
+   * exactly how four of them went unnoticed (§ D250). `dayReportOf` is pure, so re-running it is
+   * free and safe; what is **not** safe is re-running `closeShift`, which banks the day, increments
+   * the attempt and can clear a contract. Holding the input separates *shape the sheet* from *file
+   * the day* without splitting `closeShift` into two functions that could drift about which
+   * recording they are describing.
+   *
+   * `undefined` before anything is filed, and it is never cleared: it is the input for whatever
+   * sheet `ViewerState.report` currently holds, and those two are written together and only here.
+   */
+  let filedReportInput: DayReportInput | undefined;
   /**
    * Where the service badges were last drawn, for the click handler.
    *
@@ -1074,9 +1150,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
           applyPlaybackSpeed();
           applyTheme();
           if (menuState.settings.reduceMotion) playback?.pause();
-          // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
-          // nudged — `renderAll` is the chokepoint every state change already goes through.
-          if (intent.field === 'showEnergyAxis') renderAll();
+          /*
+           * The energy axis is a **figure on a sheet**, so the sheet is re-shaped and then the
+           * panel is redrawn — GitHub issue #70.
+           *
+           * `renderAll()` alone was this line, and it was honest about the shell and wrong about
+           * the Day report: the filed `ShapedDayReport` already holds its figure list, so redrawing
+           * the panel drew the same two kJ tiles again. `dayReportOf` is pure and re-running it is
+           * free; `closeShift` is what banks a day and is deliberately not re-entered. See
+           * {@link filedReportInput}.
+           */
+          if (intent.field === 'showEnergyAxis') {
+            if (filedReportInput !== undefined) {
+              filedReportInput = {
+                ...filedReportInput,
+                showEnergyAxis: menuState.settings.showEnergyAxis,
+              };
+              state = { ...state, report: dayReportOf(filedReportInput) };
+            }
+            renderAll();
+          }
           /*
            * The canvas is not part of `renderAll`'s panel sweep, and the playback tick only redraws
            * on a frame change — so without this a theme flip repainted the shell and left the stage
@@ -2175,6 +2268,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (!isViewMode(value)) return;
       window.localStorage.setItem(MODE_KEY, value);
       context.update({ mode: value });
+      /*
+       * The status strip is written here as well as on `adopt` — issue #71, and see
+       * {@link drawTransportStatus} for why it is not in `renderAll`. These are the two moments the
+       * derived text can change: a new recording, and the reader moving this control. A mode change
+       * that left the strip on the previous mode's words would be the disclosure selector doing
+       * three-quarters of something, which is worse to read than doing none of it.
+       */
+      drawTransportStatus();
     });
     /*
      * The remembered mode, **unless the link named one**. A deep link is somebody sending a
@@ -2269,6 +2370,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }, 1400);
   }
 
+  /**
+   * This run's disclosure items, in both modes at once — the layer's one shipped derivation.
+   *
+   * Asked here and handed to both consumers (`docs/16` S5). {@link drawParity} checks them whole and
+   * {@link drawTransportStatus} draws two of them; two calls would be two answers to *what does this
+   * run disclose*, and the parity check would then be checking a list that is not the list on
+   * screen — which is the one thing that check may not do.
+   */
+  function disclosureNow(): readonly DisclosureItem[] {
+    const recording = state.recording;
+    if (recording === undefined) return [];
+    return disclosureItems({
+      recording,
+      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      lockedOut: lockedOutAt(recording, recording.endedAt),
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    });
+  }
+
   function drawParity(): void {
     /*
      * Parity is a property of **what was mounted**, not of the mode toggle: § 4's rule is that
@@ -2276,19 +2396,37 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * items. So the items are derived from the recording and checked whole — a check over an empty
      * list would pass every time and say nothing.
      */
-    const recording = state.recording;
-    if (recording === undefined) {
-      setText(ui.header.modeParity, '');
-      return;
-    }
-    const items: readonly DisclosureItem[] = disclosureItems({
-      recording,
-      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
-      lockedOut: lockedOutAt(recording, recording.endedAt),
-      showEnergyAxis: menuState.settings.showEnergyAxis,
-    });
-    setText(ui.header.modeParity, parityRefusal(items) ?? '');
-    void itemsIn;
+    const items = disclosureNow();
+    setText(ui.header.modeParity, items.length === 0 ? '' : (parityRefusal(items) ?? ''));
+  }
+
+  /**
+   * The transport's own reading of the run — **through the disclosure layer**, GitHub issue #71.
+   *
+   * ## What was here, and why it was the majority of the issue
+   *
+   * This line was built from `recording.summary` directly: `AWT 13.1 s · WT95 27.4 s`, mode-blind,
+   * on a screen whose mode selector claims to simplify things for a reader out of their depth. The
+   * disclosure layer's per-mode renderings *were* computed on every recording — and then dropped
+   * with `void itemsIn;`, a deliberate no-op keeping the import used (§ D240 § 2). So the layer had
+   * a non-test caller that used it for a check and discarded its output, which is the standing
+   * requirement's own shape one level in: **a call whose return value is dropped looks exactly like
+   * a caller and is not one.**
+   *
+   * ## Why this is written on adopt and on a mode change, and not in `renderAll`
+   *
+   * `#status` is also where four transient messages land — the copied provenance line, *copied*,
+   * *the shift did not run*, a batch's progress — each of which restores itself after its own
+   * moment. A writer inside `renderAll` would clobber whichever of those was on screen the next
+   * time any state moved, which is a regression wearing a fix. So the derived text is written at
+   * the two moments it can actually change: a new recording, and the reader moving the mode
+   * selector. One derivation ({@link transportStatusOf}), two call sites, and the transient
+   * messages keep the screen until one of those two happens — which is exactly what they did
+   * before.
+   */
+  function drawTransportStatus(): void {
+    const text = transportStatusOf(disclosureNow(), state.mode);
+    if (text !== undefined) setText(ui.transport.status, text);
   }
 
   /* ---------------------------------------------------------------------- *
@@ -2513,12 +2651,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     selectedLandingId = '';
     fillLandingSelect(recording);
     fillBankSelect(recording);
-    setText(
-      ui.transport.status,
-      meansAreSuppressed(recording)
-        ? `AWT suppressed — ${recording.summary.awtInvalidReason ?? 'the queues never settled'}`
-        : `AWT ${recording.summary.meanWaitS.toFixed(1)} s · WT95 ${recording.summary.wait95S.toFixed(1)} s`,
-    );
+    /*
+     * Through the disclosure layer — issue #71, and the suppression comes with it.
+     *
+     * This was a two-arm ternary over `meansAreSuppressed(recording)` reading `summary.meanWaitS`
+     * and `summary.wait95S` directly: mode-blind, and a **second** copy of the R9 refusal that
+     * `mode/disclosure.ts` already owns. Both problems go together, because the renderings this now
+     * reads are the ones `drawParity` checks — so the line on screen and the parity claim about it
+     * can no longer be about two different lists.
+     */
+    drawTransportStatus();
   }
 
   /**
@@ -2604,7 +2746,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * reach — which is why this one went four modes without a test.
      */
     const week = closedWeekOf(state, outcome);
-    const report = dayReportOf({
+    filedReportInput = {
       recording,
       observations,
       goals,
@@ -2633,7 +2775,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       dayStartS: DAY_START_S,
-    });
+      /*
+       * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
+       * one-field-and-one-caller fix.
+       *
+       * Every other caller of `dayReportOf` is describing a run rather than serving a preference —
+       * the honesty sweep, the acceptance suites — and gets the axis shown, which is what
+       * `DayReportInput.showEnergyAxis`'s `undefined` means. This is the shell, so it passes the
+       * player's own value, and the Day report's kJ pair is the first pixel `Settings.showEnergyAxis`
+       * has ever reached.
+       */
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    };
+    const report = dayReportOf(filedReportInput);
     /*
      * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
      * end, and the reader opening the sheet — and the second one has already set the tab. Setting

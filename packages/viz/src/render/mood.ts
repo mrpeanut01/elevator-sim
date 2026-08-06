@@ -50,6 +50,7 @@
 
 import type { FloorQueue, WaitBand } from '../frame/overlay.js';
 import type { VizSummary } from '../contract/types.js';
+import type { ViewMode } from '../mode/types.js';
 import { BAND_WORDS } from './riderQueue.js';
 
 /* -------------------------------------------------------------------------- *
@@ -265,8 +266,13 @@ const BAND_LEVEL: Readonly<Record<WaitBand, MoodLevel>> = Object.freeze({
  * it names no dispatcher, ranks no alternative, and does not move when a different arm is chosen
  * except by moving the observation underneath it.
  */
-export function buildingMood(observations: MoodObservations): BuildingMood {
+export function buildingMood(
+  observations: MoodObservations,
+  mode: ViewMode = 'advanced',
+): BuildingMood {
   const { summary, queues, atS, endedAt } = observations;
+  const lead = (casual: string, sentence: string): string =>
+    mode === 'basic' ? `${casual} ${sentence}` : sentence;
   const drivers: MoodDriver[] = [];
 
   drivers.push({
@@ -284,12 +290,28 @@ export function buildingMood(observations: MoodObservations): BuildingMood {
     id: DRIVER_IDS.abandoned,
     label: 'the unluckiest rider',
     level: level.verdict === 'starved' || overHorizon > 0 ? 'distressed' : 'calm',
-    text:
+    /*
+     * The **abandonment horizon** is the phrase issue #71 measured surviving into Casual unchanged,
+     * on a card whose whole job is to explain a run to somebody who does not have the vocabulary.
+     * `mode/disclosure.ts` holds the vocabulary for the *figures*; this driver is prose and holds
+     * its own, under that module's three rules: the lead **restates no figure**, it **makes no
+     * claim the source does not**, and the source sentence follows **verbatim**.
+     */
+    /*
+     * *"After a **certain** wait"* was the first draft, and R10's static sweep refused it: `certain`
+     * is a probability word, and this repository does not let one stand in a player-facing sentence
+     * even where it plainly means *particular*. The rule is right to be blunt here — the sentence
+     * sits beside a count of people who gave up.
+     */
+    text: lead(
+      'Past a fixed wait, this run stops counting somebody as waiting at all and treats them as ' +
+        'having given up.',
       overHorizon > 0
         ? `${String(overHorizon)} of ${String(level.arrivalCount)} people waited past the ` +
           `${level.horizonS.toFixed(0)} s point at which this run stops counting a wait at all.`
         : `Nobody waited past the ${level.horizonS.toFixed(0)} s abandonment horizon; the longest ` +
           `wait was ${level.longestWaitS === null ? 'not measured — nobody arrived in the reporting window' : `${level.longestWaitS.toFixed(0)} s${level.longestWaitIsCensored ? ' and counting, because that person never boarded' : ''}`}.`,
+    ),
   });
 
   drivers.push({
@@ -326,12 +348,21 @@ export function buildingMood(observations: MoodObservations): BuildingMood {
     id: DRIVER_IDS.demand,
     label: 'demand answered',
     level: personsPer5Min < offeredPer5Min ? 'frustrated' : 'calm',
-    text:
+    /*
+     * The other half of #71's measured diff on this card: *per 5 minutes* is a rate, and a rate
+     * given as two bare decimals is the shape a reader out of their depth reads as two scores. The
+     * lead says **what is being compared**, and stops — naming a winner would be the ranking rule 2
+     * forbids, and it would be a ranking of a building against itself.
+     */
+    text: lead(
+      'Two rates, over the same five minutes: how fast people turned up, against how fast the lifts ' +
+        'moved them.',
       `${offeredPer5Min.toFixed(1)} people arrived every 5 minutes and the lifts carried ` +
-      `${personsPer5Min.toFixed(1)}.` +
-      (personsPer5Min < offeredPer5Min
-        ? ' More were arriving than leaving, which is what a queue is.'
-        : ' The lifts kept up with the door.'),
+        `${personsPer5Min.toFixed(1)}.` +
+        (personsPer5Min < offeredPer5Min
+          ? ' More were arriving than leaving, which is what a queue is.'
+          : ' The lifts kept up with the door.'),
+    ),
   });
 
   const ordered = DRIVER_ORDER.map((id) => {
