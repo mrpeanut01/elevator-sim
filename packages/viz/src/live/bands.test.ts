@@ -69,7 +69,18 @@ describe('the band definitions are the design’s, and the prose is pinned to th
       'two minutes',
       'gave up',
     ]);
-    expect(BAND_COLORS).toEqual(['#3fb27f', '#e0b040', '#e0773a', '#e0473a']);
+    /*
+     * Token names, not hexes — § D251. The four values live in `index.html`'s two `:root` blocks,
+     * where a theme can reach them; a hex here is the copy that could not be repainted, and it is
+     * what left the mood legend at 1.77:1 on a light page. `live/palette.test.ts` asserts the
+     * general rule and that each of these is a property the page declares.
+     */
+    expect(BAND_COLORS).toEqual([
+      'var(--band-0)',
+      'var(--band-1)',
+      'var(--band-2)',
+      'var(--band-3)',
+    ]);
     expect(WAIT_BANDS.map((band) => band.face)).toEqual(['◡', '◠', '⌄', '×']);
   });
 

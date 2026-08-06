@@ -123,6 +123,58 @@
         --secure: #c9a56a;
         --measured: #9fc48a;
 
+        /* The transport's phase strip — one plate and one ink per demand phase, § D251.
+           `src/live/timeline.ts` names these; it holds no colour of its own.
+
+           **Derived, and that is the point.** Every value here is a mix of tokens declared above,
+           so the strip follows `data-theme` with the rest of the page and there is nothing here
+           for the light block to restate — which is why it does not, and why `tokens.test.ts`'s
+           hex filter walks past this group rather than demanding a light twin of it. These were
+           six background/foreground hex pairs inside `live/timeline.ts`, written into inline
+           styles, and an inline style is not reached by `:root[data-theme='light']` however
+           complete the palette is: the `DRAIN` label measured 3.15:1 in **both** modes.
+
+           No brace in this comment, and that is load-bearing rather than style: three test files
+           find this block with a non-greedy regex that stops at the first closing brace, so one
+           written in a comment silently truncates the block they think they are reading and every
+           token below it stops existing as far as they are concerned. Twice while writing this
+           group. `src/live/palette.test.ts` asserts the block reaches its own last declaration,
+           so the next one to try gets a red test rather than a shortened palette.
+
+           The three hues are the handoff's own (`design.html` `:988–994`), and two of them are
+           already tokens at the same value: `AM PEAK`'s `#c69ad8` is `--transfer` and `LUNCH`'s
+           `#9fc48a` is `--measured`, so naming them creates no shared colour that the page did not
+           already have. `PM PEAK`'s `#dbb075` is nobody's token; `--secure` is the nearest hue the
+           palette owns and its own meaning — a floor behind a credential — lives on the canvas
+           gutter, which no reader is comparing a 26 px transport strip against. The word in the
+           segment (`FILLING` / `PEAK` / `EASING` / `DRAIN`) is the signal; the hue reinforces it
+           (KB-15).
+
+           15 % over `--raised` and 70 % toward `--text` are the two numbers, chosen so the ink
+           clears AA on its own plate in **both** modes with room: 6.60–7.15 dark, 6.37–7.72 light.
+           The three quiet plates are surfaces rather than tints, which is what the handoff's own
+           values already were — its `STEADY` `#161e2a` is `--raised` and its `QUIET` `#131a24` is
+           `--card`, to within a rounding step. */
+        --phase-ink: var(--dim);
+        /* The handoff draws `QUIET` and `TRICKLE` a rung quieter than `STEADY` (`#5d6b7d` against
+           `#6d7b8d`), which is the ink ladder doing what it is for: a segment asking for nothing
+           says less loudly than one holding below peak. Both rungs clear AA on their own plate —
+           6.01 dark, 6.53 light — so this is a hierarchy and not the contrast-as-signal § D235
+           refused for `.tab-secondary`. */
+        --phase-ink-quiet: var(--dimmer);
+        --phase-peak: color-mix(in srgb, var(--transfer) 15%, var(--raised));
+        --phase-peak-ink: color-mix(in srgb, var(--transfer) 70%, var(--text));
+        --phase-rising: color-mix(in srgb, var(--secure) 15%, var(--raised));
+        --phase-rising-ink: color-mix(in srgb, var(--secure) 70%, var(--text));
+        --phase-clearing: color-mix(in srgb, var(--measured) 15%, var(--raised));
+        --phase-clearing-ink: color-mix(in srgb, var(--measured) 70%, var(--text));
+        --phase-steady: var(--raised);
+        /* Between `--phase-quiet` and `--phase-steady`, keeping the handoff's ordering: a band the
+           schedule says nothing about is quieter than one holding below peak and louder than one
+           asking for nothing. */
+        --phase-unknown: color-mix(in srgb, var(--raised) 35%, var(--card));
+        --phase-quiet: var(--card);
+
         /* Type. Two families: prose and figures. § 1.1 S8. */
         --sans: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
         --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -134,6 +186,29 @@
         --r-chip: 6px;
         --rail-left: 296px;
         --rail-right: 364px;
+
+        /* The elevation's column widths — § D253, and the reason they are here rather than in the
+           rules is that they were in **three** places: the `.elev-*` rules below, the
+           `.elevation-head`'s own inline widths, and `dev/buildingEditor.ts`'s `SHAFT_LEFT_PX`,
+           which is their sum plus the padding and the gaps. The header and the JS-built rows were
+           two sources of truth for one set of columns, and the only thing keeping them in step was
+           that nobody had touched either.
+
+           Two of the three are one now: the rules and the header both name these. The third is
+           `buildingEditor.ts`'s arithmetic, which this lane does not own — so
+           `src/dev/elevationGeometry.test.ts` derives its constants from this block and fails if
+           either side moves alone. That is `dev/tokens.test.ts`'s arrangement applied to widths
+           instead of to colours, and it is what a duplication that cannot be deleted gets. */
+        --elev-floor-w: 40px;
+        --elev-sky-w: 26px;
+        --elev-occ-w: 104px;
+        --elev-people-w: 74px;
+        --elev-col-gap: 8px;
+        --elev-row-pad: 8px;
+        --elev-shaft-gap: 6px;
+        /* The narrowest the fixed columns and one shaft will sit in. Below it the grid scrolls
+           rather than shrinking, which is what `.elevation`'s `overflow-x` is for. */
+        --elev-stage-min: 400px;
       }
 
       /* ======================================================================
@@ -888,25 +963,59 @@
       .summary-line { font: 500 11px var(--mono); color: var(--accent-soft); margin-top: 13px; line-height: 1.6; }
       .advice { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 0; }
 
-      /* The elevation, § 1.3 M11. */
-      .elevation { border: 1px solid var(--edge); border-radius: var(--r-panel); background: var(--bg); padding: 12px 12px 10px; }
-      .elevation-head {
-        display: flex; align-items: baseline; gap: 8px; padding: 0 8px 7px;
-        font: 600 9px var(--mono); letter-spacing: 0.09em; color: var(--faint);
-        border-bottom: 1px solid var(--hairline); min-width: 400px;
+      /* The elevation, § 1.3 M11.
+
+         § D253 — **the head and the body scroll as one grid, and the outer box is what scrolls.**
+         `.elevation-head` is a static sibling of the scroller, so with `min-width: 400px` inside a
+         container that had no `overflow-x` it simply overflowed the panel: at a 1440 px viewport
+         `#elevation-body` measured `clientWidth 302` against `scrollWidth 400`, and the ~98 px that
+         was unreachable was the whole SHAFTS column — the one the instruction line directly above
+         it tells the player to drag. The header, meanwhile, did not move with it, because it was
+         not in the scroller.
+
+         Two boxes, each with one job. `.elevation-grid` holds the header and the body and is sized
+         to the wider of them (`max-content`); `.elevation-scroll` is the one that scrolls. So a
+         single horizontal gesture carries the header and the rows together and the columns cannot
+         slide out of register, and the body keeps its own **vertical** scroll for the 420 px row
+         cap.
+
+         The scroll is on the inner box rather than on `.elevation` itself — which is what the issue
+         proposed — because `.elevation` also holds the legend, the two notes, the add/remove
+         buttons and the paragraph about saving. Scrolling to reach shaft H would have carried all
+         of those off the left-hand edge with it, which trades one thing a reader cannot reach for
+         six. */
+      .elevation {
+        border: 1px solid var(--edge); border-radius: var(--r-panel); background: var(--bg);
+        padding: 12px 12px 10px;
       }
-      .elevation-body { position: relative; overflow: auto; border-radius: 8px; margin-top: 6px; }
-      .elev-row { flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px; box-sizing: border-box; }
-      .elev-floor { width: 40px; flex: none; font: 600 10px var(--mono); background: none; border: 0; text-align: left; padding: 0; }
-      .elev-sky { width: 26px; flex: none; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; }
+      .elevation-scroll { overflow-x: auto; }
+      .elevation-grid { min-width: max-content; }
+      .elevation-head {
+        display: flex; align-items: baseline; gap: var(--elev-col-gap);
+        padding: 0 var(--elev-row-pad) 7px;
+        font: 600 9px var(--mono); letter-spacing: 0.09em; color: var(--faint);
+        border-bottom: 1px solid var(--hairline); min-width: var(--elev-stage-min);
+      }
+      /* `overflow-x` is deliberately not declared. A box with `overflow-y: auto` and
+         `overflow-x: visible` computes the visible one to `auto` — the spec's own rule — so
+         writing `overflow-x: visible` here would read as *do not scroll sideways* and mean the
+         opposite, giving the body a second horizontal scrollbar the header does not follow. The
+         wrapper above is what stops it ever having anything to scroll. */
+      .elevation-body { position: relative; overflow-y: auto; border-radius: 8px; margin-top: 6px; }
+      .elev-row {
+        flex: none; display: flex; align-items: center; gap: var(--elev-col-gap);
+        padding: 0 var(--elev-row-pad); box-sizing: border-box;
+      }
+      .elev-floor { width: var(--elev-floor-w); flex: none; font: 600 10px var(--mono); background: none; border: 0; text-align: left; padding: 0; }
+      .elev-sky { width: var(--elev-sky-w); flex: none; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; }
       .elev-sky span {
         width: 13px; height: 13px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
         border: 1px solid var(--edge); font: 600 8px var(--mono);
       }
-      .elev-occ { width: 104px; flex: none; height: 100%; display: flex; align-items: center; touch-action: none; background: none; border: 0; padding: 0; }
+      .elev-occ { width: var(--elev-occ-w); flex: none; height: 100%; display: flex; align-items: center; touch-action: none; background: none; border: 0; padding: 0; }
       .elev-occ-track { position: relative; width: 100%; height: 6px; border-radius: 3px; background: var(--bg); display: block; overflow: hidden; }
-      .elev-people { width: 74px; flex: none; text-align: right; font: 500 10px var(--mono); white-space: nowrap; }
-      .elev-shafts { position: absolute; top: 0; bottom: 0; right: 8px; display: flex; gap: 6px; }
+      .elev-people { width: var(--elev-people-w); flex: none; text-align: right; font: 500 10px var(--mono); white-space: nowrap; }
+      .elev-shafts { position: absolute; top: 0; bottom: 0; right: var(--elev-row-pad); display: flex; gap: var(--elev-shaft-gap); }
       /* A 4 % wash of the ink rather than of white: on a light elevation a white wash is nothing,
          and this is the only mark that says where a shaft is before a band is dragged onto it. */
       .elev-shaft { flex: 1; min-width: 0; position: relative; background: color-mix(in srgb, var(--text) 4%, transparent); border-radius: 5px; }
@@ -1153,6 +1262,31 @@
         display: inline-block; margin-right: 8px; padding: 0 6px;
         border: 1px solid var(--warn); border-radius: 9px;
         font: 500 10.5px var(--mono); line-height: 16px; color: var(--warn);
+        vertical-align: 1px; white-space: nowrap;
+      }
+      /* § D252 — the other end of the same edge. `controls/render.ts` emits `.control-gate` for
+         every control that gates another and for no control that gates none, so this rule is
+         keyed on the structure and never on a parameter id, exactly as `.control-lock` is.
+
+         The accent family rather than `--warn`: a control that governs others is not in trouble,
+         and `.control-lock`'s amber means *this one is waiting on something*. Two states, two
+         hues — and, KB-15, two different sets of **words**, so a reader who separates neither
+         still reads `needs dispatch.callType` on one and `unlocks 6` on the other. The badge is
+         never dimmed by `.control-disabled` below, for the reason the lock badge is not: a
+         control can be inactive and still gate others, and the sentence explaining a dead row is
+         the thing a reader of a dead row is here for.
+
+         `--accent-soft` and **not** `--accent`, measured rather than chosen: `--accent` is
+         4.26:1 on `--bg` in light — § D235 measured that and left it, because its group carries a
+         no-regression floor of 4 rather than the standard — and this badge is 10.5 px text, which
+         AA asks 4.5:1 of. Drawn in `--accent` it was the one sub-AA element on the tab that was
+         not an inactive control. `--accent-soft` is 7.62 dark and 6.66 light against the worst of
+         the five surfaces, and it is the token whose declared job is to sit away from the page in
+         both modes. */
+      .control-gate {
+        display: inline-block; margin-right: 8px; padding: 0 6px;
+        border: 1px solid var(--accent-soft); border-radius: 9px;
+        font: 500 10.5px var(--mono); line-height: 16px; color: var(--accent-soft);
         vertical-align: 1px; white-space: nowrap;
       }
       /* The dimming moves off the row and onto the parts of it that are actually dead.
@@ -1625,20 +1759,24 @@
           <section role="tabpanel" id="panel-scenarios" aria-labelledby="tab-scenarios" hidden>
             <div class="sheet">
               <div style="max-width: 1040px">
+                <!-- § D253 — the three counts here said *five* over eight scenario cards, and the
+                     footnote handed a player a repository path. Static markup cannot count, so the
+                     numbers are pinned instead: `src/dev/scenarioCopy.test.ts` derives them from
+                     `shift/contracts.ts`'s `CONTRACTS` and fails on the day a ninth lands, which is
+                     the check that was missing rather than the number that was wrong. -->
                 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
                   <div>
-                    <div class="eyebrow">Scenarios — five buildings, any order</div>
+                    <div class="eyebrow">Scenarios — eight buildings, any order</div>
                     <p style="font-size: 13px; color: var(--dim); line-height: 1.5; margin: 6px 0 0; max-width: 640px">
                       Every scenario is open from the start. Bank the clean shifts one asks for, or just run
-                      it and watch what breaks — each building teaches something the other four cannot.
+                      it and watch what breaks — each building teaches something the other seven cannot.
                     </p>
                   </div>
                 </div>
                 <div style="display: grid; gap: 10px" id="scenario-list"></div>
                 <p style="font-size: 12px; color: var(--dimmer); margin: 16px 0 0; max-width: 660px; line-height: 1.55">
-                  All five ship with the simulator in <code style="font-family: var(--mono)">data/buildings/</code> —
-                  same floor heights, same car specs, same populations. Taking an assignment restarts the week
-                  on that building.
+                  All eight ship with the simulator — same floor heights, same car specs, same
+                  populations. Taking an assignment restarts the week on that building.
                 </p>
               </div>
             </div>
@@ -1794,7 +1932,7 @@
                          title="Capacity is what the building was designed to hold; occupancy is how much of it is let today. Population — the number the lifts must move — is the product of the two."></div>
                     <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline)">
                       <div class="eyebrow helpful"
-                           title="The machine class from data/elevator-specs.json. It sets the speed band, the rise the class can serve and the loads it is built in — choosing one is choosing the physics, not a label.">
+                           title="The machine class, from the specification tables this simulator ships. It sets the speed band, the rise the class can serve and the loads it is built in — choosing one is choosing the physics, not a label.">
                         Machine class
                       </div>
                       <button type="button" id="building-open-machines"
@@ -1808,7 +1946,7 @@
                     </div>
                     <div class="chip-row" style="margin-top: 12px">
                       <span class="helpful" style="font-size: 11.5px; color: var(--dim); margin-right: 4px"
-                            title="Rated load in pounds, at 150 lb per person — the capacities table in data/elevator-specs.json. Each class is only built in part of the range.">rated load</span>
+                            title="Rated load in pounds, at 150 lb per person — the shipped capacities table. Each class is only built in part of the range.">rated load</span>
                       <span class="chip-row" id="building-load-chips"></span>
                     </div>
                     <div class="chip-row" style="margin-top: 8px">
@@ -1840,15 +1978,24 @@
                     of floors
                   </div>
                   <div class="elevation">
-                    <div class="elevation-head">
-                      <span style="width: 40px; flex: none">FLOOR</span>
-                      <span style="width: 26px; flex: none; text-align: center"
-                            title="Click a floor's dot to make it a sky lobby — a transfer level where riders change between an express shaft and the locals above.">SKY</span>
-                      <span style="width: 104px; flex: none">OCCUPIED</span>
-                      <span style="width: 74px; flex: none; text-align: right">PEOPLE</span>
-                      <span style="flex: 1; text-align: center">SHAFTS</span>
+                    <!-- § D253 — head and body inside one box, so one horizontal scroll moves both
+                         and the header cannot come out of register with the rows under it. Every
+                         width below is the token the `.elev-*` rule for that column uses, so the
+                         header and the JS-built row are no longer two answers to *how wide is
+                         OCCUPIED*. -->
+                    <div class="elevation-scroll">
+                      <div class="elevation-grid">
+                        <div class="elevation-head">
+                          <span style="width: var(--elev-floor-w); flex: none">FLOOR</span>
+                          <span style="width: var(--elev-sky-w); flex: none; text-align: center"
+                                title="Click a floor's dot to make it a sky lobby — a transfer level where riders change between an express shaft and the locals above.">SKY</span>
+                          <span style="width: var(--elev-occ-w); flex: none">OCCUPIED</span>
+                          <span style="width: var(--elev-people-w); flex: none; text-align: right">PEOPLE</span>
+                          <span style="flex: 1; text-align: center">SHAFTS</span>
+                        </div>
+                        <div class="elevation-body" id="elevation-body"></div>
+                      </div>
                     </div>
-                    <div class="elevation-body" id="elevation-body"></div>
                     <div style="display: flex; padding: 7px 8px 0; gap: 10px">
                       <span id="elevation-occ-note" class="eyebrow-note"></span>
                       <span style="flex: 1; min-width: 0; display: flex; justify-content: flex-end; gap: 6px">
@@ -2086,7 +2233,7 @@
               <label>candidate <select id="batch-candidate"></select></label>
               <label>duration <input id="batch-duration" type="number" min="60" max="7200" step="60" value="900" size="5" /></label>
               <label>seed <input id="batch-seed" size="18" inputmode="numeric" value="20260729" /></label>
-              <label title="CLAUDE.md budgets 50–200 per configuration">
+              <label title="50–200 replications per configuration is this project’s budget; ten produced a 12 % error against the converged mean in the reference study">
                 replications <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
               </label>
               <label title="blank runs the building's own traffic profile">

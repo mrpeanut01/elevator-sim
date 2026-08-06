@@ -17461,3 +17461,412 @@ issue reporter ran it in one line — set `accessZones: []`, change nothing else
 dispatcher — and `mixed-use-high-rise` went from `timed-out` with 642 of 725 delivered to `completed`
 with 725 of 725. A structural refusal that a *configuration* change makes disappear is not a
 property of the fabric.
+---
+
+## D251 — four modules held their own copy of the palette, and an inline style is unreachable
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #76's residue. § D235
+raised the ink ladder and § D236 fixed the layout, and between them the Simulation tab's WCAG AA
+failures went 88 → 9 in dark and 48 → 28 in light. § D236 named what was left and whose it was:
+*"`src/live/bands.ts` and `src/live/decisions.ts` hold hex copies of the dark band palette, which
+`dev/leftRail.ts` writes into inline `style="color:…"` … **This is the whole of the 28**."* This is
+that lane.
+
+### What reproduced, measured rather than inherited
+
+The report and § D236 are both second-hand here, so the walk was re-run rather than trusted: a real
+`vite` serving the shipped `index.html`, a real Chromium at 1280 × 720, the menu left the way a
+player leaves it, a shift run and the playhead dragged to the end, then every element with its own
+visible text — effective background composited up the tree through every translucent layer,
+`font-size` and `font-weight` deciding whether AA asks 4.5:1 or 3:1. Both modes, both disclosure
+modes, driven through the shipped `themeFor('system', matchMedia)` rather than by stamping an
+attribute.
+
+| | dark | light |
+|---|---|---|
+| before | **1** | **26** |
+| after | **0** | **1** |
+
+**Two of the three inherited figures did not reproduce, and the difference matters in opposite
+directions.** Dark is **1**, not 9 — and the one is the timeline label, which § D236 lists
+separately as failing *in both* modes, so the two accounts agree about the cause and disagree about
+the count. Light is **26**, not 28. Both gaps are the walk's reach rather than a disagreement about
+a colour: this one sweeps the Simulation tab at one viewport with the drawer shut, and § D236's
+swept more of the product. Nothing in either list is outside the four files below, which is the
+claim that decides the lane.
+
+The 26 partition exactly by which module held the copy:
+
+| copy | what it painted | ratios |
+|---|---|---|
+| `live/bands.ts` (19) | the mood legend's four labels and four counts, the *served under 60 s* figure, six goal glyphs and values, the stage legend's four discs | 1.68–3.61 |
+| `live/decisions.ts` (6) | `.decision-title` — `A → Lobby`, six rows | 2.48 |
+| `live/timeline.ts` (1) | the phase strip's `DRAIN` label — **and this one fails in dark too** | 3.15 |
+
+### The fourth copy, which no walk could have found
+
+`live/honesty.ts` held `rgba(224,176,64,.07)` and `rgba(63,178,127,.06)` — the **dark** values of
+`--band-1` and `--band-0` — as the honesty card's wash and rule. A wash carries no word, so it never
+appears in a contrast walk, and it would have survived a fix that chased the reported ratios and
+stopped. It is the same defect and it is fixed the same way. **That is the argument for fixing the
+class rather than the twenty-six instances**, and it is why the deliverable is a rule.
+
+### Why the values move to the page rather than the page moving to the values
+
+The candidate fixes were: give each module a light-mode branch; hand the modules a resolved palette
+at mount; or have the modules **name** the tokens the page already declares.
+
+The first two lose to one fact about the medium. `dev/leftRail.ts` and `dev/main.ts` put these
+strings into an *inline* `style` attribute, and an inline style is not reached by
+`:root[data-theme='light']` — no stylesheet block can repaint it, however complete the palette is.
+So any fix that keeps a value in TypeScript needs the modules to learn which mode is live, which
+means a second theme resolver beside `render/theme.ts`, in the directory whose own docstring says it
+holds *no arithmetic over a recording anywhere in it* because a decision made inside a DOM write is
+a decision no test can reach.
+
+Naming the token costs nothing and needs nobody to know the mode: `style.setProperty` takes
+`var(--band-0)` happily, and CSS resolves it against whichever block is live. `dev/leftRail.ts` had
+**already made this move** for every colour that was not a band — its `INK`, `DIM`, `FAINT` and
+`TRACK` are `var(--text)`, `var(--dimmer)`, `var(--faint)`, `var(--edge-strong)`, and its own token
+comment said so. The bands were the exception, and the exception was the bug.
+
+`render/tokens.ts` keeps its literals and is untouched. The canvas cannot take a `var()` — a 2D
+context wants a colour — so the stage reads values and the DOM reads names, which is the split
+`dev/tokens.test.ts` already pins in both directions. **Nothing in `live/` may be handed to a
+canvas**, and nothing is.
+
+### The phase strip needed tokens that did not exist, and they are derived
+
+`live/timeline.ts`'s six pairs had no counterpart in the stylesheet at all, so this half is a
+declaration and not a rename. Two constraints shaped it:
+
+1. **A new *hex* token is not available to this lane.** `dev/tokens.test.ts` requires every hex in
+   `:root` to be answered in the light block, requires the light block to declare nothing
+   `themeFor` does not resolve, and `render/theme.test.ts` requires every hex token to sit in
+   exactly one of its four contrast groups. All three roads run through `render/`, which this lane
+   does not own. A **derived** token — one whose value is `var()` or `color-mix()` over tokens
+   already declared — is invisible to all three, because each derives its set with a hex filter.
+   That is not a loophole found; it is the same reason the filters exist: a derived value has no
+   independent value to check, and the tokens under it are checked already.
+2. **The handoff is canonical for the interface.** So the mapping answers to `design.html`
+   `:988–994` rather than to convenience.
+
+Two of the three hues turn out to be tokens already, at the same value: `AM PEAK`'s `#c69ad8` is
+`--transfer` and `LUNCH`'s `#9fc48a` is `--measured`. Naming them creates no shared colour the page
+did not already have — the handoff itself drew the transport strip and the floor gutter the same
+violet. `PM PEAK`'s `#dbb075` is nobody's token; `--secure` is the nearest hue the palette owns, and
+the meaning it carries — a floor behind a credential — lives on the canvas gutter, which nobody is
+comparing a 26 px transport strip against. **The word in the segment is the signal** — `FILLING`,
+`PEAK`, `EASING`, `DRAIN`, and `recordRun`'s `labelOfPhase` reserves `PEAK` for the segment holding
+the template's peak — so the hue reinforces and never carries (KB-15).
+
+The three quiet plates are surfaces rather than tints, which is what the handoff's own values
+already were: its `STEADY` `#161e2a` is `--raised` and its `QUIET` `#131a24` is `--card`, to within a
+rounding step. `--phase-unknown` sits between them, keeping the handoff's ordering — a band the
+schedule says nothing about is quieter than one holding below peak and louder than one asking for
+nothing.
+
+Two numbers, and they were chosen by measurement rather than by eye: **15 %** of the hue over
+`--raised` for the plate, **70 %** of the hue toward `--text` for the ink. The ink then clears AA on
+its own plate in both modes with room — 6.60–7.15 dark, 6.37–7.72 light — where 20 % put `--dim` at
+4.34–4.44 in dark, under the standard. The neutral segments take `--phase-ink` (`--dim`) and the two
+quiet ones `--phase-ink-quiet` (`--dimmer`), which is the handoff's own rung difference (`#6d7b8d`
+against `#5d6b7d`); **both rungs clear AA on their own plate**, 6.01 and 6.53, so this is a hierarchy
+and not the contrast-as-signal § D235 refused for `.tab-secondary`.
+
+**One value in the old strip was a fossil, and it is the reason the label failed in dark as well.**
+`flat`'s `#6d7b8d` was `--dimmer`'s value *before* § D235 raised it — copied out at some point, and
+therefore not moved when the ladder moved. A copied literal does not follow the token it was copied
+from. `live/decisions.ts` had the same fossil: its `empty` row was `#4d5a6b`, which is `--faint`'s
+pre-§ D235 value, so the *standing by* row was still being drawn in a grey the ladder had abandoned
+for failing 2.31:1.
+
+### What is asserted, so this cannot rot
+
+The four edits fix today's page. `live/palette.test.ts` is what stops the fifth copy, and it is why
+the fix is described as *one source reachable by the theme* rather than as four edits:
+`dev/tokens.test.ts` already guards the stylesheet's half — *no rule below the two blocks paints a
+literal* — and **nothing guarded this half**, which is exactly how a palette can be perfect,
+asserted in both directions, and applied to a tenth of the page.
+
+1. **No colour literal anywhere in `live/`, nor in `dev/leftRail.ts`.** The file set is read off
+   disk rather than listed (§ D213: a hand-written list stops tracking the directory it was built
+   from, and the file somebody adds next week is the one that carries the copy). Comments are
+   stripped, because `live/timeline.ts`'s docstring still tabulates the handoff's six hex pairs
+   while explaining what replaced them, and a check satisfiable by rewording a docstring is not
+   checking the code.
+2. **No dangling token.** Every `var(--x)` named is a property `index.html`'s `:root` declares.
+   This is § D222's `aria-describedby` argument in another medium: an unset custom property makes
+   `color` fall back to `inherit`, so a typo produces a plausible-looking rail rather than an error,
+   and an assertion rebuilt from the same constant would not see it.
+3. **No orphan.** Every `--phase-*` the page declares is one `live/timeline.ts` names — § D213's
+   rule in the direction that rots quietly, and the same shape as `dev/tokens.test.ts`'s orphan
+   check on the light block.
+4. **The `:root` block is read to its end.** See below.
+
+### A brace in a comment silently shortens the palette — found twice, in one sitting
+
+`dev/tokens.test.ts`, `render/theme.test.ts` and the new file all find the block with a **non-greedy**
+`:root { … }` match, which stops at the first closing brace. The comment introducing `--phase-*`
+first read *"six `{ bg, fg }` hex pairs"*; the block those three files thought they were reading then
+ended **inside a comment**, and every token below it stopped existing as far as they were concerned.
+Nothing went red — both incumbent files only ever *look names up*, and a name that is silently absent
+is a check that silently passes. The second occurrence was the comment written to warn about the
+first, which quoted the regex.
+
+Fixed by rewording, and pinned so the next one is loud: the block must contain `--rail-right`, its
+own last declaration, and must contain no brace at all. Recorded here rather than only in the file
+because the two incumbent tests are outside this lane and are the ones with something to lose.
+
+### What is left, and whose it is
+
+**One element still fails, and the fix is a token value in a file this lane does not own.** The stage
+legend's four discs are drawn on `--bg` — the *darkest* light surface — and light `--band-0`
+`#1c7a55` measures **4.43:1** there. § D235 measured that token at 4.94 and deliberately left it,
+but it measured it on `--panel`; `render/theme.test.ts`'s `CONTENT_ON_PANEL` does the same. § D236
+already found and fixed this exact shape once — `waitingUp` at 4.34:1 on `--bg`, moved to `#0d7069`,
+with the note that the key's marks are measured *"against `--bg`, the ground the key is actually
+drawn on"* — and `--band-0` was not swept with it. The other three bands clear it: 4.58, 4.58, 4.93.
+
+Recommended, and **not applied here**: `LIGHT_PALETTE.bandSettling` `#1c7a55` → `#1a7451`, which is
+4.80 on `--bg`, 5.34 on `--panel`, 5.74 on `--raised`, and leaves the ladder's order untouched. The
+mirror is that the four bands belong in a group measured against `--bg` rather than `--panel`, since
+`#legend` is the surface they are actually drawn on. Both are `render/`'s, and § D235's own rule —
+*do not weaken a criterion, raise it* — says the group moves rather than the bound.
+
+---
+
+## D252 — the dependency had one end drawn, and the badge is the other end rather than a graph
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #79, split out of #17.
+§ D222 shipped the *gated* end — an inactive control's label line reads `needs dispatch.callType`,
+so a reader looking at a dead knob can see which switch to move. The mirror was missing: a control
+that **gates** others said nothing, so `selection.policy`, which governs six other rows, looked
+exactly like a control that governs none, and moving it produced a cascade with no warning and no
+account of itself.
+
+### The graph is refused on design grounds, and § D222 already wrote the reason
+
+#17 asked for *an expandable section showing which settings unlock which others*, and § D222 left
+it open as *"a product call and not this lane's"*. The call is: **no.** `controlsFor` emits the
+space's own gate order, so **the tab already places a gated control below its gate** — the layout
+*is* the dependency structure, drawn. A graph would be a second navigation model over information
+the page already carries, and the two would then have to be kept in step. This repository has a
+long record of what happens to two sources of one truth, and § D251 landed four hours earlier for
+exactly that reason.
+
+What the layout cannot say is **how many** controls are waiting below a switch. That is what the
+badge adds, and it is the whole of what it adds: the ids go on `data-unlocks` / `data-holds-open`,
+where a test and a mount read them, and *which* remains the layout's answer. A badge naming six
+dotted ids would be longer than the control it sits beside.
+
+### Derived from the declarations, in one pass, and never listed
+
+`dependantsByGate` inverts the `activeWhen` graph from `space.parameters` — the same declarations
+`unmetGatesOf` reads for the other end. A list of *"controls that gate others"* maintained beside
+the schema would be the § D213 defect with an aggravating factor: the two ends of one edge, in two
+places, with nothing comparing them. `controls.test.ts` builds its expectation the same way, off
+`ORCHARD_PARAMETERS`, so a sixth fictional row with a gate on it moves the test rather than passing
+under it.
+
+A gate id that is not itself a dimension is skipped rather than invented. All ten in the shipped
+dispatcher space *are* dimensions — which is what makes the badge actionable, since the thing it
+counts is always a control on the same tab — but `activeWhen` is a plain record and a schema may
+gate on something the form does not draw.
+
+### Two fields, because one would vanish at the moment it is being read
+
+The obvious model is a single `unlocks: string[]` — the dependants this control is currently
+holding shut. It has a defect the issue names in its first sentence: *a player moving a switch
+cannot see what they just unlocked.* A badge derived from that list alone reads `unlocks 6` before
+the switch is thrown and **disappears** after, at exactly the instant the reader is looking for
+confirmation.
+
+So the model carries both halves and they **partition** the dependants: a declared condition on
+this control is either satisfied at the current point or it is not, so every dependant is in
+`unlocks` or in `holdsOpen`, exactly once. Their total is the dependant count, which does not move
+as the reader edits. Presence of the badge is therefore **structural** — emitted for a control that
+gates something and for no control that gates nothing, whatever the point — while its words follow
+the state:
+
+| state | badge |
+|---|---|
+| holding dependants shut | `unlocks 6` |
+| keeping them all live | `holds 6 open` |
+| both, under different conditions | `unlocks N` — the actionable half; both data attributes carry the whole partition |
+
+The split is per **gate**, not per dependant, and the fictional schema has the case that proves it:
+`orchard.lanternCount` is a conjunction of two gates, and at the defaults the crew of six satisfies
+`{ min: 4 }` while `nightHarvest: false` does not satisfy `['true']`. So `pickersOnShift` reads
+`holds 1 open` and `nightHarvest` reads `unlocks 1`, about the same row. A reverse edge computed
+from *"is the dependant live"* rather than from *"is my own condition satisfied"* would put both in
+the same half and tell a reader that hiring people unlocks lanterns.
+
+### § D222's two constraints, and one measurement that moved a colour
+
+The reason text is untouched — it is still an element in the flow, above the help, referenced first
+by `aria-describedby`. Nothing became a tooltip and nothing became a disclosure. The badge's content
+is **words and a number**, so KB-15 holds by construction: a reader who separates neither hue still
+reads `needs dispatch.callType` on one badge and `unlocks 6` on the other.
+
+`.control-gate` was drawn in `--accent` and is drawn in `--accent-soft`, because the first was
+measured rather than assumed. `--accent` is **4.26:1 on `--bg` in light** — § D235 measured that and
+left it deliberately, since its group carries a no-regression floor of 4 rather than the standard —
+and this badge is 10.5 px text, which AA asks 4.5:1 of. In `--accent` it would have been the only
+sub-AA element on the Parameters tab that is not an inactive control. `--accent-soft` is 7.62 dark
+and 6.66 light against the worst of the five surfaces.
+
+### Measured on the shipped page, in a browser, both themes
+
+Ten gating controls, ten badges, in both modes: `unlocks 6` on `selection.policy`, `3` on
+`dispatch.reassignmentPolicy`, `2` on four more, `1` on four. `auction.rounds` carries **both**
+badges — it is gated by `auction.aggregation` and gates `auction.reserveMarginalDelayS` — which is
+why the two are independent elements rather than a three-state one, and why the lock badge is
+emitted first: what a reader needs first from a dead control is why it is dead.
+
+The standing requirement, pointed at a badge rather than at a slider: **move the control and require
+the screen to change.** Driving `#param-dispatch-callType` from `up-down-buttons` to
+`destination-entry` in a real browser turns `unlocks 2` into `holds 2 open`, with
+`data-holds-open="weights.rideTime dispatch.passengerAssignment"` — the two rows that became live.
+
+Measured after, on the Parameters tab: **the badge adds no contrast failure in either mode** (9.06
+dark, 6.66 light), and the tab's 44 remaining failures in each mode are unchanged and are all text
+inside `.control-disabled` rows, which WCAG 2.2 1.4.3 exempts as inactive user-interface components.
+
+---
+
+## D253 — two counts nothing was checking, and a header that could not travel with its own rows
+
+**Date: 2026-08-05 · Written after the code, and says so.** Two play-tester issues about
+`packages/viz/index.html`, filed separately and closed together because they are the same shape:
+**a fact declared in two places, with nothing comparing them.** #37 is the campaign's size, written
+into prose beside a list generated from the campaign. #52 is a column width, written into a header
+beside rows generated from the same columns.
+
+## 1 — The Scenarios tab said *five* over eight cards, and pointed at a directory
+
+The heading read *"Scenarios — five buildings, any order"*, the intro *"the other four"*, and the
+footnote *"All five ship with the simulator in `data/buildings/`"*. `CONTRACTS` has **eight** — the
+handoff fixed the campaign at the five buildings shipped when it was drawn and three landed
+afterwards (`docs/12` § 4.7) — and `dev/scenariosPanel.ts` draws a card from each, so a player
+counted eight cards under a heading that said five. The cards themselves were corrected at source
+by another lane; these three sentences are static markup, and static markup cannot count.
+
+### Three routes, and why the count is pinned rather than derived or deleted
+
+- **Derive it at runtime**, by giving the three sentences ids and having the mount write the number
+  in. It is the honest shape and it needs `dev/elementMap.ts` and `dev/scenariosPanel.ts`, both
+  outside this lane. **Recorded as the better fix rather than taken** — see the end of this entry.
+- **Delete the count** — *"every building, any order"* — which cannot go stale because it says
+  nothing. Refused: *how many scenarios are there* is the first thing a player wants from the tab,
+  and this is the only sentence that answers it before the cards render.
+- **Type it and pin it.** `dev/scenarioCopy.test.ts` reads the three sentences out of the markup
+  with the number **captured**, and compares each against `CONTRACTS.length` — which is the list the
+  cards under them come from. The day a ninth contract lands, the suite goes red naming the
+  sentence to change.
+
+The defect was never the number. It was that a hand-typed count had nothing checking it, which is
+what `dev/tokens.test.ts` closes for colours and `elementMap.test.ts` closes for ids, on this same
+file, by this same technique. Reading the word out rather than searching for the right one matters
+in both directions: a page that said *five* fails with the word it said, and a page that lost a
+sentence fails because the pattern does not match at all — where a `toContain` on the correct string
+is satisfied by a page containing the wrong one too. The negative control plants #37's own defect
+back and requires the patterns to find it.
+
+Matching the *shape* rather than the bare word is also what lets *"the clean shifts **one** asks
+for"* stand. A blanket ban on number words in the panel would have to be answered by rewording
+ordinary English, which is how a check ends up being edited instead of the thing it checks.
+
+### The path, and the two more found beside it
+
+*"…in `data/buildings/`"* handed a repository directory to somebody playing a game. Sweeping the
+whole markup rather than the panel found **two more**: `data/elevator-specs.json` in two
+machine-class tooltips, and `CLAUDE.md` — this repository's agent instructions — in the batch
+panel's *replications* label. All four are gone, and the sweep is over the page rather than over the
+Scenarios tab, because scoping it to what was reported would have left the two it found. What is
+banned is a path a reader could try to open and the names of this repository's own documents; a bare
+`.json` is not, because the Lab and Parameters tabs legitimately name a *schema* and a *profile*,
+and a rule that banned the characters would be answered by rewording rather than by removing a leak.
+
+## 2 — The elevation's header was a static sibling of the scroller
+
+`.elevation-head` sat **outside** `#elevation-body`, with `min-width: 400px`, inside a container
+with no `overflow-x`. Measured at 1440 × 1100 with eight shafts, before:
+
+| box | client / scroll | `overflow-x` |
+|---|---|---|
+| `.elevation` | 339 / 412 | `visible` |
+| `.editor-grid` | 702 / 774 | `visible` |
+| `.sheet` | **750 / 798** | `auto` |
+| `#elevation-body` | 315 / 446 | `auto` |
+
+Three things follow from that table, and only the first was reported as the headline.
+
+**The SHAFTS column was unreachable.** The body scrolled and the header did not, because the header
+was not in the scroller — so a player who found the gesture watched the rows slide under a header
+that stayed put. Of eight authored shafts, **A and B were on screen and C through H were past the
+right-hand edge**, while the legend directly below listed all eight. The instruction line above it
+reads *"drag a shaft's top or bottom edge to restrict it to a band of floors"*, pointed at the part
+that was not there.
+
+**The reporter's second measurement reproduces exactly, and it is a consequence rather than a
+second bug.** They measured `.sheet` at `741 / 794` and described slider labels degrading to
+*"CUPANCY"* and *"esign capacity per floor"* once anything scrolled it. `.sheet` is the only
+ancestor with `overflow-x: auto`, so the elevation's 73 px of overflow travelled up through
+`.editor-grid` and landed there: **the form's left edge was cut off because the elevation's right
+edge was.** Measured after the fix, `.sheet` is `750 / 750` and `.editor-grid` is `702 / 702`. One
+cause, and closing it closes both.
+
+**And the fix has to be one grid, not two scrollers.** `.elevation-scroll` is the box that scrolls
+and `.elevation-grid` inside it is `min-width: max-content`, so the header and the body are sized
+together and one gesture moves both. Measured after, at 1440 with eight shafts: the scroller is
+`315 / 446`, **`#elevation-body` is `446 / 446`** — it never has anything to scroll sideways, so it
+cannot get its own scrollbar and drift out of register — and at full scroll the header's left edge
+and the first row's left edge are the same number (578), with the eighth bar's right edge at 1016
+inside a viewport edge at 1024.
+
+Two details that are decisions rather than detail:
+
+- **The scroll is on an inner box, not on `.elevation`** — which is what #52 proposed. `.elevation`
+  also holds the legend, the two notes, the add/remove buttons and the paragraph about saving.
+  Scrolling to reach shaft H would have carried all six off the left-hand edge, trading one thing a
+  reader cannot reach for six.
+- **`.elevation-body` declares no `overflow-x` at all.** The proposal was `overflow-x: visible;
+  overflow-y: auto`, and that pair does not mean what it reads as: a box with one axis `visible` and
+  the other not computes the visible one to `auto`. Written out it would have said *do not scroll
+  sideways* and given the body a second horizontal scrollbar the header does not follow — the exact
+  defect being fixed, restored by the fix for it. Confirmed by measurement: the computed
+  `overflow-x` on that element is `auto` either way.
+
+### The defect under the defect: one set of columns, three declarations
+
+Fixing the scroll and stopping would leave the next drift waiting. The four column widths were
+written **three times**: in the `.elev-*` rules, again inline on `.elevation-head`'s five spans, and
+a third time as `dev/buildingEditor.ts`'s `SHAFT_LEFT_PX = 284` — their sum plus the row padding and
+the four gaps, under a docstring that says *"if either moves, both move"* and nothing that makes it
+so. The shaft overlay is absolutely positioned at that offset; a column that widened in the
+stylesheet would have drawn bars over the PEOPLE figures.
+
+Two of the three are one now: the rules and the header both name `--elev-floor-w`, `--elev-sky-w`,
+`--elev-occ-w`, `--elev-people-w`, `--elev-col-gap`, `--elev-row-pad`, `--elev-shaft-gap` and
+`--elev-stage-min`. The third cannot be, from this lane — `elevationStageWidthPx` has to stay pure,
+because it is what § D236's half of #52 is asserted on, and `buildingEditor.ts` is not ours. So the
+duplication that remains is **pinned rather than promised**: `dev/elevationGeometry.test.ts` derives
+`SHAFT_LEFT_PX` from the page's own tokens as `pad + FLOOR + gap + SKY + gap + OCCUPIED + gap +
+PEOPLE + gap`, recovers the inter-bar gap and the right-hand inset from `elevationStageWidthPx` by
+differencing rather than by importing constants that would then be asserted against themselves, and
+requires the header to carry no bare pixel width at all. That is `dev/tokens.test.ts`'s arrangement
+applied to widths instead of to colours, and it is what a duplication that cannot be deleted gets.
+
+### What is left, and whose it is
+
+Both remainders are the same request, in two files this lane does not own:
+
+1. **`dev/buildingEditor.ts` should read the tokens rather than restate them.** `SHAFT_LEFT_PX`,
+   `SHAFT_GAP_PX`, `SHAFT_RIGHT_PX` and `STAGE_MIN_PX` are `index.html`'s numbers copied into
+   TypeScript. A mount can read a custom property off the computed style once and hand the pure
+   function its geometry, which would make the test above unnecessary rather than necessary.
+2. **The Scenarios tab's three counts should be written by the mount.** `dev/elementMap.ts` gains
+   three ids and `dev/scenariosPanel.ts` writes `CONTRACTS.length` into them, at which point the
+   count is derived and `scenarioCopy.test.ts`'s first case becomes a statement about the mount
+   rather than about the markup.

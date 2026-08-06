@@ -88,6 +88,30 @@ export interface ControlCommon {
   readonly inactiveReason?: string | undefined;
   /** The `activeWhen` gate ids that are unmet, in declaration order. Empty when `enabled`. */
   readonly unmetGates: readonly string[];
+  /**
+   * The other controls this one is **currently holding shut** — § D252.
+   *
+   * The mirror of {@link unmetGates}, and the direction the form could not previously state.
+   * `unmetGates` looks *up* a dependency and names what this control is waiting on; these two look
+   * *down* it and name what is waiting on this control. Ids of parameters whose own `activeWhen`
+   * declares this one as a gate, and whose condition on it the current point does **not** satisfy.
+   *
+   * Derived from the same declarations `unmetGates` is derived from, so the two ends of every edge
+   * are computed from one source and cannot come to disagree about which edges exist.
+   */
+  readonly unlocks: readonly string[];
+  /**
+   * The other controls this one is **currently keeping live** — the other half of the partition.
+   *
+   * Ids of parameters that declare this one as a gate and whose condition on it the current point
+   * **does** satisfy. Together with {@link unlocks} this is every dependant, exactly once: a
+   * declared condition is either satisfied at a point or it is not.
+   *
+   * Both are needed rather than one, because a badge derived from {@link unlocks} alone would
+   * vanish the moment the reader threw the switch — at exactly the point they are watching to see
+   * what they just did.
+   */
+  readonly holdsOpen: readonly string[];
 }
 
 /** A continuous dimension: a range input beside a number input, honouring `scale`. */

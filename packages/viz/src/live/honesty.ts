@@ -87,10 +87,20 @@ import type { DisclosureMode, HonestyCard, WaitBandBasis } from './types.js';
 const SATURATION_SENTENCE =
   'the run saturated: the queues did not reach a steady state, so a mean wait describes nothing.';
 
-const WARNING_BG = 'rgba(224,176,64,.07)';
-const WARNING_EDGE = 'rgba(224,176,64,.35)';
-const CALM_BG = 'rgba(63,178,127,.06)';
-const CALM_EDGE = 'rgba(63,178,127,.28)';
+/*
+ * The card's wash and rule, one pair per verdict — § D251.
+ *
+ * These were `rgba(224,176,64,…)` and `rgba(63,178,127,…)`: the **dark** values of `--band-1` and
+ * `--band-0`, written out, and put on the card by `dev/leftRail.ts` as an inline `background` and
+ * `border-color`. Neither shows up in a contrast walk — a wash is not a word — so this copy was
+ * the quiet one, and it would have stayed after the three that were measured were fixed. It is
+ * the same defect and it is fixed the same way: name the token, and let `color-mix` do what an
+ * alpha did.
+ */
+const WARNING_BG = 'color-mix(in srgb, var(--band-1) 7%, transparent)';
+const WARNING_EDGE = 'color-mix(in srgb, var(--band-1) 35%, transparent)';
+const CALM_BG = 'color-mix(in srgb, var(--band-0) 6%, transparent)';
+const CALM_EDGE = 'color-mix(in srgb, var(--band-0) 28%, transparent)';
 
 /**
  * Is the building falling behind at the playhead? An observation, and only an observation.

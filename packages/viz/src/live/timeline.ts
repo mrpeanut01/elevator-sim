@@ -102,19 +102,40 @@ interface SegmentPalette {
  * | `#161e2a/#6d7b8d` | `STEADY` | `flat`, above zero | Neutral mid for a template that simply holds below its peak. `constant-iso` is two hours of this and is `STEADY`, not a two-hour rush. |
  * | `#131a24/#5d6b7d` | `QUIET` | `flat`, at zero | The dimmest pair for a segment asking for nothing at all. |
  * | `#151c27/#5d6b7d` | `TRICKLE` | the unlabelled fallback | Dim and mute, for the band drawn when the recording carries no schedule. It has to *look* like it is not claiming anything, because it is not. |
+ *
+ * ## The values are token names now, and the hexes above are history — § D251
+ *
+ * Every pair in that table used to be *written here*, and `dev/main.ts` puts a segment's `bg` and
+ * `fg` into an inline `style`. **An inline style is not reached by `:root[data-theme='light']`**,
+ * so the strip stayed dark on a light page however complete the palette was, and the label — a
+ * pre-§ D235 `#6d7b8d`, a value the ink ladder had already left behind — measured **3.15:1 in
+ * both modes**. That is this repository's signature defect, wearing a transport bar's hat: a
+ * palette held in a second place, where nothing that themes the page can see it.
+ *
+ * So the six pairs are `--phase-*` in `index.html`, derived from tokens the palette already
+ * declares, and this module names them. The hexes stay in the table above because they are what
+ * the handoff drew and the derivation is answerable to them; they are no longer what the page
+ * paints. `live/palette.test.ts` asserts that no colour literal survives anywhere in this
+ * directory, and that every custom property named here is one `index.html` declares.
  */
 export const PHASE_PALETTE: Readonly<Record<VizPhase['kind'], SegmentPalette>> = Object.freeze({
-  'ramp-up': Object.freeze({ bg: '#2c2418', fg: '#dbb075' }),
-  hold: Object.freeze({ bg: '#2a2033', fg: '#c69ad8' }),
-  'ramp-down': Object.freeze({ bg: '#20291f', fg: '#9fc48a' }),
-  flat: Object.freeze({ bg: '#161e2a', fg: '#6d7b8d' }),
+  'ramp-up': Object.freeze({ bg: 'var(--phase-rising)', fg: 'var(--phase-rising-ink)' }),
+  hold: Object.freeze({ bg: 'var(--phase-peak)', fg: 'var(--phase-peak-ink)' }),
+  'ramp-down': Object.freeze({ bg: 'var(--phase-clearing)', fg: 'var(--phase-clearing-ink)' }),
+  flat: Object.freeze({ bg: 'var(--phase-steady)', fg: 'var(--phase-ink)' }),
 });
 
 /** `flat` at zero intensity is not the same segment as `flat` below peak. See {@link PHASE_PALETTE}. */
-export const QUIET_PALETTE: SegmentPalette = Object.freeze({ bg: '#131a24', fg: '#5d6b7d' });
+export const QUIET_PALETTE: SegmentPalette = Object.freeze({
+  bg: 'var(--phase-quiet)',
+  fg: 'var(--phase-ink-quiet)',
+});
 
 /** The band drawn when nothing is known. See {@link PHASE_PALETTE}. */
-export const UNKNOWN_PALETTE: SegmentPalette = Object.freeze({ bg: '#151c27', fg: '#5d6b7d' });
+export const UNKNOWN_PALETTE: SegmentPalette = Object.freeze({
+  bg: 'var(--phase-unknown)',
+  fg: 'var(--phase-ink-quiet)',
+});
 
 export interface TimelineOptions {
   /**

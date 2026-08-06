@@ -118,7 +118,7 @@ function decisionRow(overrides: Partial<DecisionRow> = {}): DecisionRow {
     head: 'A → Level 12',
     why: 'waitTime 12.4 s carried it · 0.42 clear of the next car',
     title: 'waitTime — estimated wait for the new passenger (serves AWT): 12.4 s.',
-    color: '#3fb27f',
+    color: 'var(--band-0)',
     outcome: 'assigned',
     ...overrides,
   };
