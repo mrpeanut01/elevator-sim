@@ -2099,24 +2099,49 @@ on both is a **batch goal**; a cell with any unjudgeable run is neither.
 | **1 first call** | `garden-apartments`, shipped | 49/50, 48/50 † | 50/50, 50/50 | 50/50, 50/50 | **38/50, 48/50** | 49/50, 48/50 † |
 | **2 morning rush** | `midtown-office`, 2.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **24/50, 20/50** | **41/50, 45/50** |
 | **3 overwhelmed** | `midtown-office`, shipped | 50/50, 50/50 | 0/50, 0/50 | **28/50, 29/50** | 0/50, 0/50 | 0/50, 0/50 |
-| **4 two banks** | `mixed-use-high-rise`, 1.5 % | 0/50, 0/50 | **13/50, 14/50** | 50/50, 50/50 | 0/50, 0/50 | **43/50, 42/50** |
-| **5 credentials** | `secure-tower`, shipped | 0/50, 0/50 | **35/50, 32/50** | 50/50, 50/50 | **3/50, 1/50** | **32/50, 30/50** |
-| **6 the tall one** | `vertical-city`, 0.5 % | **4/50, 9/50** | **41/50, 43/50** | 50/50, 50/50 | **4/50, 6/50** | 49/50, 50/50 ‡ |
+| **4 two banks** | `mixed-use-high-rise`, 1.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **21/50, 22/50** | 50/50, 50/50 |
+| **5 credentials** | `secure-tower`, shipped | 50/50, 50/50 | **46/50, 48/50** | 50/50, 50/50 | **6/50, 8/50** | **12/50, 15/50** |
+| **6 the tall one** | `vertical-city`, 0.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **31/50, 25/50** | 50/50, 50/50 |
 | **7 prove it** | `midtown-office`, 1.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **26/50, 31/50** | 50/50, 50/50 |
 | **8 the headline address** | `chancery-house`, 3 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
-| **9 both ways at once** | `crown-hotel`, 2.5 % | **43/50, 43/50** | 50/50, 49/50 ‡ | 50/50, 50/50 | **36/50, 37/50** | 50/50, 48/50 ‡ |
-| **10 the bed and the visitor** | `st-jude-hospital`, 2 % | **19/50, 19/50** | **49/50, 48/50** | 50/50, 50/50 | **19/50, 19/50** | **42/50, 36/50** |
+| **9 both ways at once** | `crown-hotel`, 2.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **40/50, 42/50** | 50/50, 49/50 ‡ |
+| **10 the bed and the visitor** | `st-jude-hospital`, 2 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **38/50, 37/50** | 50/50, 50/50 |
 
-Bold is a shipping batch goal. ‡ on stage 9 is the same withholding as row 6's: `50/50, 49/50` and
-`50/50, 48/50` are a constant-pass on one seed set and a variable on the other, and a classification
-that does not survive a disjoint seed set is not one to ship a level on — the hotel's two-way demand
-sits exactly on that boundary. † is **unjudgeable**: 1 of 50 tuning seeds and 2 of 50 holdout seeds
+Bold is a shipping batch goal. † is **unjudgeable**: 1 of 50 tuning seeds and 2 of 50 holdout seeds
 serve nobody in the reporting window, so those runs have no verdict and the judgeable ones are not
 counted on their own — see R12's box. ‡ is **withheld because the two seed sets disagree about the
 kind of answer**: 49/50 is a variable and 50/50 is a constant-pass, and a classification that does
-not survive a disjoint seed set is not one to ship a level on. `everyone-can-get-there` and
-`beat-the-baseline` are withheld on every stage, the first blocked on W7 and the second because it
-compares two arms.
+not survive a disjoint seed set is not one to ship a level on — the hotel's two-way demand sits
+exactly on that boundary. `everyone-can-get-there` and `beat-the-baseline` are withheld on every
+stage, the first blocked on W7 and the second because it compares two arms.
+
+> **Five of these ten rows moved on 2026-08-05, and the five that did not are the evidence.**
+> [`DECISIONS.md`](../DECISIONS.md) § D254 deleted an access check that asked about the **pickup**
+> floor — a credential governs where you may go, not where you may be collected — and this table was
+> regenerated from the runs that produced it rather than adjusted to suit. The rows that moved are
+> stages **4, 5, 6, 9 and 10**, which are `mixed-use-high-rise`, `secure-tower`, `vertical-city`,
+> `crown-hotel` and `st-jude-hospital`: **exactly the five shipped buildings that declare
+> `accessZones`**, and no others. Stages 1, 2, 3, 7 and 8 are byte-identical, and they are the
+> control — `garden-apartments` and `midtown-office` declare `accessZones: []`, and `chancery-house`
+> declares none.
+>
+> `deliver-everyone` is now **50/50 on both seed sets on every stage**, from 0/50 on stages 4 and 5,
+> 4/50 and 9/50 on stage 6 and 19/50 on stage 10. That is the headline: conventional dispatch serves
+> every access-zoned building this project ships, at 100 % delivery, and the stranding those rows
+> recorded was a defect in the simulator rather than a property of the buildings.
+>
+> **One rate moved the other way, and it is the interesting one.** Stage 5's `long-waits-under` fell
+> from 32/50, 30/50 to **12/50, 15/50**. Nothing got worse: the riders who used to be stranded on a
+> restricted landing were never served, so they were never counted among the waits, and the goal was
+> being measured over the survivors. Serving them puts their long waits back into the sample. It is
+> the same arithmetic `CLAUDE.md` gives for abandonment — *a configuration that improves its wait by
+> serving fewer people has not improved anything* — seen from the other side.
+>
+> Nine cells also changed **bucket**, all in the same direction bar one: a rate that is now 50/50 on
+> both seed sets is a *fact about this configuration* rather than a goal, so stages 4, 6, 9 and 10
+> hand `deliver-everyone`, `no-divergence` and `long-waits-under` back to the briefing. Stage 4's
+> `answer-the-demand` goes the other way — 0/50 was a configuration fact and 21/50, 22/50 is a real
+> batch goal — so that stage gained a goal the player can actually chase.
 
 > **This table had gone stale, and now it cannot again.** Three of row 6's five cells did not match
 > `data/scenario-goals.json`: `no-divergence` was written 38/50, 42/50 against a shipped 41/50,

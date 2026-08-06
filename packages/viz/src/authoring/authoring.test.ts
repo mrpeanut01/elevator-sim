@@ -1125,6 +1125,53 @@ describe('the building editor is not decoration', () => {
 
   /* ---- access zoning: the credential half, and only that ------------------ */
 
+  /**
+   * **The next two cases FAIL ON PURPOSE. Do not "fix" them, and above all do not weaken them.**
+   *
+   * Tracked as **issue #87**; the mechanism is written up in [`DECISIONS.md`](../../../../DECISIONS.md)
+   * § D256 (*"Two are a real question, and it is worth stating precisely"*), and the change that
+   * caused it is § D254. The resolution is a **modelling decision** that has gone to the product
+   * owner, and it is not a repair a test lane may make on its own.
+   *
+   * ## Why they fail, which is not the usual reason
+   *
+   * They are **not stale fixtures**, and that distinction is the whole point of this note. Every
+   * other suppression fixture in this package broke because it reached for a building that used to
+   * saturate and no longer does; those were re-pointed at a stated demand rate (§ D260). This is a
+   * different animal: **the control is not unwired, and the run genuinely does not change.**
+   *
+   * § D254 deleted the access check on the *pickup* floor — a credential governs where you may go,
+   * not where you may be collected. While that check existed, adding a zone changed the run by
+   * stranding every landing call raised inside it, regardless of anybody's credential. So these two
+   * cases were observing the control **through the defect**.
+   *
+   * With the defect gone, `traffic/generator.ts` decides the outcome: `credentialGroupFor` issues
+   * each rider a credential drawn from the zones the building declares, and `planDemand` has
+   * already dropped every pair for which no credential works. The traffic model therefore only ever
+   * generates journeys somebody is entitled to make, and a well-formed zone over a single group
+   * changes nothing on the legs, because everybody bound for a restricted floor holds a badge for
+   * it. Measured directly in § D256: `midtown-office`, seed 424 242, a synthetic zone over floors
+   * 8–13 permitting a group named `nobody-has-this` — 205 of 699 legs are bound for those floors,
+   * **all 205 alight there**, and the run is byte-identical to the unzoned one under both
+   * `collective` and `destination-eta`.
+   *
+   * ## What is *not* wrong, so nobody re-derives it
+   *
+   * The third case below — *the credential control changes the run* — **passes**, and it is the
+   * proof that the editor's access-zone controls are wired. It uses **two** zones under
+   * **different** groups, so `credentialForRoute` finds no credential for the interfloor pairs
+   * between them and `planDemand` drops them. The seam is live; what is inert is the narrower
+   * single-zone case these two assert on.
+   *
+   * ## What would fix them, when the decision lands
+   *
+   * A configuration the generator cannot silently satisfy: `credentialAssignment: 'none'`, which
+   * the generator already supports, or a destination call type that must be *told* the credential.
+   * Whoever owns that decision picks one. The standing requirement is explicit that they may not
+   * simply be deleted, and asserting something weaker — that the *fingerprint* moved, or that the
+   * zone merely parses — would convert a real question into a green tick.
+   */
+
   const ZONED: BuildingSpec = {
     ...spec,
     accessZones: [{ id: 'zone-1', floors: [6, 7, 8, 9, 10], credentialGroups: ['tenant'] }],
@@ -1132,6 +1179,7 @@ describe('the building editor is not decoration', () => {
   const partsOf = (of: BuildingSpec): readonly [readonly string[], unknown] =>
     JSON.parse(runWith(of)) as [readonly string[], unknown];
 
+  // FAILS ON PURPOSE — issue #87, DECISIONS.md § D256. See the note above.
   it('an access zone changes the run, and leaves every shaft serving exactly what it did', () => {
     /*
      * The whole of why access zoning is a *second* kind of zoning. The two arms are the same three
@@ -1148,6 +1196,7 @@ describe('the building editor is not decoration', () => {
     expect(JSON.stringify(partsOf(ZONED)[1])).not.toBe(JSON.stringify(partsOf(spec)[1]));
   });
 
+  // FAILS ON PURPOSE — issue #87, DECISIONS.md § D256. See the note above.
   it('the floor multi-select changes the run — one more floor inside the zone', () => {
     const wider: BuildingSpec = { ...ZONED, accessZones: withZoneFloor(ZONED, 'zone-1', 5) };
     expect(zoneFloorsOf(wider, wider.accessZones[0] as never)).toStrictEqual([5, 6, 7, 8, 9, 10]);

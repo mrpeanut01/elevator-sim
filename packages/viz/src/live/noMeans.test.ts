@@ -28,7 +28,7 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import { DATA_DIR, SUPPRESSED_BUILDING_ID, suppressedConfig } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
@@ -40,15 +40,24 @@ import { phaseAt, tickLabelsOf, timelineOf } from './timeline.js';
 
 const LIVE_DIR = fileURLToPath(new URL('.', import.meta.url));
 
-/** The one that saturates hardest at the shipped rates. */
-const SUPPRESSED_ID = 'vertical-city';
+/**
+ * The run whose mean is refused — `suppressedConfig`, and the rate is the point.
+ *
+ * This said *"the one that saturates hardest at the shipped rates"* and named the building alone.
+ * It was true, and it was true because of `DECISIONS.md` § D254's defect: the pickup access check
+ * stranded every landing call raised inside a zone, and the queue that produced was read as
+ * saturation. Served properly `vertical-city` completes at 100 % delivery and quotes its mean, so
+ * the guard below started failing — correctly. The fixture now states a **demand rate**, which is
+ * a property of the traffic rather than of a bug. See {@link SUPPRESSED_BUILDING_ID}.
+ */
+const SUPPRESSED_ID = SUPPRESSED_BUILDING_ID;
 
 let config: LoadedConfig;
 let recording: VizRecording;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  recording = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+  recording = recordRun(suppressedConfig(config)).recording;
 }, 600_000);
 
 /** Comments removed, so the rule is about code rather than about prose. */

@@ -18068,3 +18068,210 @@ container path is verified still working by a run — the real `dist-web`, the r
 parts were run and which were only reasoned about, and `infra/README.md` § 0.2 now carries the same
 admission beside *"No mail has ever been sent"* — which this lane makes more load-bearing rather
 than less, since it moves the origin that mail's link is built from.
+
+---
+
+## D260 — eight guards fired because a defect was the fixture, and the replacement is a rate
+
+**Date: 2026-08-05 · Written after the measurement, and the measurement is the reason it is written
+at all.** [§ D254](DECISIONS.md) fixed a real defect in `estimateCost` and turned the `viz` suite red
+at 27 points in 13 files. [§ D256](DECISIONS.md) triaged them and named the shape: *"All but two are
+a stale **fixture** … each of them reaches for an access-zoned building because those reliably
+were."* This is that repair, and the only interesting thing about it is what the guards were doing
+while it was needed.
+
+### The guards were right, and they are the reason this was cheap
+
+Eight of the failures are a case literally titled **"really is suppressed, or the rest of this
+proves nothing"** or **"really is refused, …"**. They are precondition checks, written by somebody
+who understood that a test asserting *"a suppressed run shows no mean"* passes trivially against a
+run that is not suppressed. When the fixture stopped being refused, they said so **first**, in one
+line, before the assertions that depend on them could go quietly green.
+
+That is worth recording because the alternative was available and would have looked like a smaller
+diff: relax the guard, or assert the weaker property. Neither was done, and the guards were
+re-verified rather than assumed — with the fixture pointed at a rate that does **not** saturate, all
+**13** suppression-dependent assertions across seven files go red, including all four preconditions.
+A repair that leaves the guard unable to fail has not repaired anything.
+
+### What the fixture was, and why it was never a good one
+
+`vertical-city` at its **shipped** rate, named in five files as *"the one that saturates hardest at
+the shipped rates"*. It did saturate. It saturated because § D254's pickup check refused every
+landing call raised inside an access zone, so the queue grew because nobody collected it and the
+trend test read that as demand outrunning supply. Served properly the building completes at 100 %
+delivery and quotes its mean.
+
+The rate was also **seed-fragile**, which nobody had measured. Over five seeds at the shipped rate,
+the run refuses its mean on **2 of 5** — the suites had pinned one of the seeds where it did.
+
+### The replacement, measured up to rather than guessed
+
+`fixtures.test-helper.ts` gains two named fixtures. Both state a **demand rate**, which is a
+property of the traffic rather than of a bug, and both were measured before they were chosen.
+
+**`suppressedConfig` — `vertical-city` at 16 %**, over five seeds:
+
+| rate | runs refusing their mean |
+|---|---|
+| 8 %, 9 %, 10 % | **0 of 5** |
+| shipped, 11 %, 12 % | 2 of 5 |
+| 13 %–20 % | **5 of 5** |
+
+**16 rather than 13, and the ragged band is why.** Saturation is a trend test over the reporting
+window, so near its threshold it is a coin toss on the seed — the regime `docs/03` warns about and
+the last place a fixture should sit. 16 % is three points clear of the last rate that ever came back
+quotable. The ground is `saturated` on every seed, which `mode/disclosure.test.ts` depends on more
+than the count: it asserts the ground travels beside the prose, and a fixture that wandered between
+grounds would make that assertion about a different sentence each run.
+
+**`timedOutConfig` — `mixed-use-high-rise` at 80 %.** A different claim, and a much stronger demand:
+the horizon is 900 s of traffic plus 3 600 s of drain, so `vertical-city` at **50 %** still reports
+`completed`. At 80 % this building is `timed-out` on 3 of 3 seeds with 606–732 journeys undelivered.
+It is `chancery-house`'s 30 % on the same footing — a fixture rate, with no figure published from
+the run, and saying so is the difference between a fixture and a claim.
+
+### The one that got better rather than merely fixed
+
+`live/honesty.test.ts`'s *"the live casual card really does go calm on a refused run — the defect,
+reproduced"* carried a comment saying `vertical-city` *"times out with people still standing, so its
+own terminal frame is honest"*, and made the case synthetically for want of a real run of the right
+shape. That sentence described the defect, not the building. `suppressedConfig` is a run that
+**drains** — `completed`, nobody undelivered — and is refused all the same, which is exactly the
+shape the defect needs and which no shipped fixture used to produce. The claim is now made on a run
+the viewer can actually produce **and** on the synthetic recording, which stays because it pins the
+shape without depending on a rate.
+
+### Two that are not `vertical-city`, and one is a third instance of the same lesson
+
+`frame/overlay.test.ts`'s two-bands-at-one-landing identity failed on **`crown-hotel`**, which was
+not on § D256's list and is the one building nobody expected. It declares one access zone —
+`back-of-house` over `B1` — so `B1` held a queue nothing would collect, and the identity was
+satisfied by a backlog rather than by traffic. Its breadth rate goes 10 → 16, which is the fixture
+helper following its own already-written instruction (*"Raising the rate for these three is the
+honest fix"*): at 10 % the witness fails on 3 of 3 seeds, at 16 % it holds on 3 of 3 and the run
+stays quotable on 3 of 3, and at 18 % it saturates on two. `midtown-office` keeps its **shipped**
+rate as the other arm of the saturation pair — an un-manipulated configuration is worth keeping
+where one still works.
+
+---
+
+## D261 — three rationales that cited a deleted mechanism, and a number that survived its own reason
+
+**Date: 2026-08-05 · Written after the measurement.** [§ D256](DECISIONS.md) withdrew four things
+rather than quietly replacing them, and named two of them as prose that *"cite the defect as their
+mechanism"*. A rationale that is false is a stale assertion, which this repository treats as a defect
+in its own right ([§ D30](DECISIONS.md), [§ D60](DECISIONS.md), [§ D227](DECISIONS.md)) — so they are
+corrected here, each against a re-measurement rather than against an argument.
+
+### `arms.ts` § `secure-interfloor-mix` — the instructive one
+
+Its stated ground was *"there is no budget at which a conventional arm has a quotable AWT here …
+every car returns `accessDenied` and the call is permanently unassignable"*. Re-censused over **300
+replications** at `BENCHMARK_SEED`: `nearest-car`, `eta`, `collective` and every credentialled arm
+are **clean across the whole census**. The arms that used to fail from index 0 no longer fail at all.
+
+**And `admissibleReplications` stays `0`.** The field means *the largest budget at which **every** arm
+including the baseline still has a valid AWT*, and one arm still loses it at index 0:
+`destination-entry-bare`, the bare kiosk, which discloses a destination and carries no credential so
+an access-restricted **destination** is refused by every car. That is authorization of a destination,
+which is the only access question a lift is asked, and § D254 left it untouched.
+
+So **the number survives and its reason does not**, and that is the most dangerous shape this
+repository knows: a value that still reproduces, resting on an explanation that has been false since
+the commit before. Nothing would have caught it, because nothing re-derives a *rationale*.
+
+### The two `EXCLUDED_CELLS` — the ground moves from *structural* to *deferred*
+
+`ExcludedCell.mechanism` is documented as *"the measurement that excludes it. Never a tolerance,
+never a preference."* Both of these cited measurements of the defect:
+
+- **`secure-interfloor-mix`** — *"An access-restricted pickup carries no credential under up-down
+  buttons, so the call is permanently unassignable."* Refuted, above.
+- **`mixed-use-mixed-40-30-30`** — *"every `role: "baseline"` profile is 0/30 quotable and the
+  unserved fraction **RISES** as the load falls, which is a structural refusal rather than
+  overload."* Re-measured at n = 30 on the three rates § 1 sweeps — 1.5 %, 0.75 %, 0.2 % — **every**
+  arm including `nearest-car` now has a quotable AWT at every rate, undelivered is 0.0 per run and
+  the unserved fraction is **0.00 % at all three**. There is no rise left to be structural about.
+
+Neither cell is admitted, and that restraint is the decision rather than an omission. Admitting one
+adds a matrix row and a published pin group, which is a re-design of the experiment matrix, and
+§ D256 requires the criterion to be written before the numbers are read. So both are relabelled
+**excluded pending a criterion** — which is honest in a way *"excluded by a measured mechanism"* no
+longer is, and which a reader cannot mistake for a measured refusal.
+
+### The golden that stopped timing out, and the manifest rule it tests
+
+`validation/golden/manifest.json` says in its own header that *"the only edit this file should ever
+need is an added or removed key name"*. `secure-tower-obstructed-doors` needed another kind, and the
+rule is the reason it needed it rather than an exception to it: the golden's `covers` **asserted**
+*"its status is timed-out … because access-locked-out passengers legitimately keep a run alive to its
+drain deadline"*, and that assertion was the defect. The building now completes at 3 %, the always-on
+tier lost its only timed-out golden, and `goldenRuns.test.ts`'s *"honours the stored timeout policy"*
+had nothing to bite on — reporting itself as *"no golden in this tier timed out"*, which is a
+precondition check doing its job.
+
+The timeout is now **demand-driven**, which is the ordinary reason a run does not finish: 40 % of
+population per five minutes over 1 500 s cannot be cleared inside the 900 s drain tail. Measured over
+four seeds before the rate was chosen — `timed-out` on 4 of 4 with **254–269 of ~1 200** journeys
+undelivered, against 32 % where one seed left only 11. `drainGraceS` is untouched at 900, because it
+is one of the four sim knobs this golden exists to record and shortening it would have bought the
+timeout by cutting the tail rather than by loading the building.
+
+### The adversarial lockout, re-pointed at the surviving lockout
+
+`validation/adversarial.test.ts`'s conservation claim — *locked-out passengers are undelivered and
+**named**, never silently dropped* — is unchanged and was never about **which** refusal. Its fixture
+becomes the bare kiosk, which § D256 named as the one lockout § D254 leaves standing. Its
+precondition needed care rather than a search-and-replace: it filtered warnings for the string
+`accessDenied`, and that reason **no longer exists in `core` at all**, so a filter still looking for
+it would match nothing and the precondition would pass by being **vacuous**. It now matches the
+kiosk's own end-of-run sentence and asserts `stageActivity.kioskRefusedLegs > 0` beside it, so
+neither the words nor the count can go quiet alone.
+
+---
+
+## D262 — a published pass-rate table moved on five rows, and the five that held are the evidence
+
+**Date: 2026-08-05 · Written after the regeneration, and the regeneration is published rather than
+performed.** `data/scenario-goals.json` is generated from measured runs, and [§ D254](DECISIONS.md)
+moved what those runs do. `CLAUDE.md`'s rule is that a published number is pinned to the run that
+produced it; the thing that rule forbids is a **silent** regeneration, so what moved is stated here
+and in `docs/10` § M30 rather than left in a diff.
+
+Regenerated with `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`, both seed sets, 50 replications each.
+**48 entries changed across 5 of the 10 scenarios**, and the split is not approximate:
+
+| | scenarios | buildings |
+|---|---|---|
+| moved | 4, 5, 6, 9, 10 | `mixed-use-high-rise`, `secure-tower`, `vertical-city`, `crown-hotel`, `st-jude-hospital` |
+| byte-identical | 1, 2, 3, 7, 8 | `garden-apartments`, `midtown-office` ×3, `chancery-house` |
+
+The five that moved are **exactly the five shipped buildings that declare `accessZones`**, and no
+others. The five that held declare none, and they are the control — the same 5/5 split § D254 found
+on its 60-cell matrix and § D255 found on the fifteen pinned identity cells, arriving independently
+on a third apparatus.
+
+**`deliver-everyone` is now 50/50 on both seed sets on every stage**, from `0/50` on stages 4 and 5,
+`4/50, 9/50` on stage 6 and `19/50, 19/50` on stage 10. That is § D254's headline restated in the
+game's own units: conventional dispatch serves every access-zoned building this project ships.
+
+**One rate moved the other way, and it is the one to read.** Stage 5's `long-waits-under` fell from
+`32/50, 30/50` to **`12/50, 15/50`**. Nothing got worse. The riders stranded on a restricted landing
+were never served, so their waits were never in the sample, and the goal was being measured over the
+survivors; serving them puts the long waits back. It is `CLAUDE.md`'s own arithmetic for abandonment
+— *a configuration that improves its wait by serving fewer people has not improved anything* — seen
+from the other side, and it is the reason a table like this must be regenerated whole rather than
+patched where it looks wrong.
+
+Nine cells changed **bucket**. Eight go the same way: a rate that is now 50/50 on both seed sets is a
+*fact about this configuration* rather than a goal, so stages 4, 6, 9 and 10 hand `deliver-everyone`,
+`no-divergence` and `long-waits-under` back to the briefing. Stage 4's `answer-the-demand` goes the
+other way — `0/50` was a configuration fact and `21/50, 22/50` is a real batch goal — so that stage
+gained a goal a player can actually chase, which is worth more to the product than the four it lost.
+
+**The doc-side copy moved with it, and only because a test made it.** `goalRates.test.ts` parses
+§ M30's markdown table out of `docs/10` and compares every cell and every bold mark against the
+shipped JSON, so regenerating the data turned that guard red until the prose followed. That guard
+exists because this exact table had gone stale once before, on a change to `vertical-city`'s
+escalator, with nothing noticing.

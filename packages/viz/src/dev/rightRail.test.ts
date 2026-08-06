@@ -31,7 +31,7 @@ import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js
 import { DEFAULT_PATTERN, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { probabilityWordIn } from '../campaign/words.js';
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig, requireBuilding } from '../fixtures.test-helper.js';
+import { DATA_DIR, requireBuilding, suppressedConfig } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
@@ -494,10 +494,16 @@ describe('machineWarningOf', () => {
  * -------------------------------------------------------------------------- */
 
 describe('a suppressed run yields no mean anywhere in the right rail', () => {
+  /*
+   * `suppressedConfig` is `vertical-city` at a **stated** 16 % of population per five minutes rather
+   * than at its shipped rate — `DECISIONS.md` § D260. At the shipped rate this run used to be
+   * refused, and it was refused by § D254's pickup access check rather than by its traffic. The
+   * plates below are still read off `vertical-city`, so nothing about the building moved.
+   */
   let recording: VizRecording;
 
   beforeAll(() => {
-    recording = recordRun(breadthConfig(config, 'vertical-city')).recording;
+    recording = recordRun(suppressedConfig(config)).recording;
   }, 600_000);
 
   it('really is suppressed, or the rest of this proves nothing', () => {

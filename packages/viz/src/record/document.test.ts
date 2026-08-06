@@ -10,7 +10,7 @@
 import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
+import { DATA_DIR, fixtureConfig, timedOutConfig } from '../fixtures.test-helper.js';
 import { VIZ_SCHEMA_VERSION, type VizRecording } from '../contract/types.js';
 import { recordRun } from './recordRun.js';
 import {
@@ -179,9 +179,19 @@ describe('verifyReplay — PB-16', () => {
   }, 120_000);
 
   it('round-trips through a file for a building that times out', () => {
-    // The buildings a viewer most needs to load are the ones a run cannot complete.
-    const timedOut = recordRun(breadthConfig(config, 'vertical-city')).recording;
+    /*
+     * The documents a viewer most needs to load are the ones a run cannot complete.
+     *
+     * `timedOutConfig` rather than `breadthConfig(config, 'vertical-city')` — `DECISIONS.md` § D260.
+     * The old fixture timed out because § D254's pickup access check refused every landing call
+     * raised inside an access zone, so the queue was never collected; `vertical-city` now completes
+     * at 100 % delivery on every seed tried, and so does `mixed-use-high-rise`. The timeout has to
+     * come from demand instead, and it does: 80 % of population per five minutes leaves 606–732
+     * journeys in the system when the drain deadline fires, on all three seeds measured.
+     */
+    const timedOut = recordRun(timedOutConfig(config)).recording;
     expect(timedOut.status).toBe('timed-out');
+    expect(timedOut.summary.undelivered).toBeGreaterThan(0);
     const result = readRecordingDocument(JSON.stringify(timedOut));
     expect(result.ok).toBe(true);
     if (!result.ok) return;

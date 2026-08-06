@@ -40,7 +40,12 @@ import { AWT_INVALID_GROUNDS } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
+import {
+  DATA_DIR,
+  SUPPRESSED_BUILDING_ID,
+  fixtureConfig,
+  suppressedConfig,
+} from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { readRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
@@ -219,12 +224,19 @@ describe('shortening is not removing — parity still guards core’s sentence',
  * from *"the mechanism is wired"* — which is the roadmap's standing requirement (**name the non-test
  * caller**) pointed at a contract field rather than at a function.
  *
- * So this suite records **real runs** and asserts on what came out of them: `vertical-city` at the
- * shipped rates, which is the building `live/noMeans.test.ts` uses for the same reason (it saturates
- * hardest), and `garden-apartments`, which does not saturate and is therefore the control that keeps
- * the first assertion from being true of everything.
+ * So this suite records **real runs** and asserts on what came out of them: `suppressedConfig`,
+ * which is the fixture `live/noMeans.test.ts` uses for the same reason, and `garden-apartments`,
+ * which does not saturate and is therefore the control that keeps the first assertion from being
+ * true of everything.
+ *
+ * **The refused run is a rate, not a building** — `DECISIONS.md` § D260. This named `vertical-city`
+ * *"at the shipped rates"*, and § D254's pickup access check was what refused it; the building now
+ * completes at 100 % delivery on every seed tried. `suppressedConfig` states 16 % of population per
+ * five minutes, and its ground is `saturated` on all three seeds measured — which this file depends
+ * on more than the others do, because a fixture that wandered between grounds would make the
+ * per-ground lead assertion below about a different sentence each run.
  */
-const SUPPRESSED_ID = 'vertical-city';
+const SUPPRESSED_ID = SUPPRESSED_BUILDING_ID;
 
 let config: LoadedConfig;
 let suppressed: VizRecording;
@@ -232,7 +244,7 @@ let quotable: VizRecording;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  suppressed = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+  suppressed = recordRun(suppressedConfig(config)).recording;
   quotable = recordRun(fixtureConfig(config)).recording;
 }, 600_000);
 
