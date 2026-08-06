@@ -92,7 +92,7 @@ import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPane
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizFloor, VizRecording } from '../contract/types.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
@@ -125,7 +125,8 @@ import {
   type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
-import { buildLayout } from '../render/layout.js';
+import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
+import { AWT_ID, WT95_ID } from '../render/runSummary.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
@@ -136,7 +137,7 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
-import { dayReportOf } from '../shift/report.js';
+import { dayReportOf, type DayReportInput } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
@@ -216,6 +217,43 @@ const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
+
+/**
+ * What the stage asks for around the plot, widest request first — GitHub issue #41.
+ *
+ * ## The defect: two numbers that were the same at every width and every building
+ *
+ * {@link QUEUE_GUTTER_PX} and {@link OVERLAY_WIDTH_PX} were passed to `buildLayout` unchanged
+ * whatever was being drawn, so 530 px of a canvas went to scenery whether the building had two
+ * shafts or thirty-five. Measured: **Vertical City draws 27 of 35 at a 1920 px viewport** —
+ * `RS-05`'s *"showing 27 of 35"* notice is doing its job and saying so, and eight shafts of a
+ * building whose whole subject is its shafts are off the picture on the largest screen anybody has.
+ *
+ * ## Why this is a ladder rather than arithmetic
+ *
+ * The obvious fix computes the plot width a shaft count needs and subtracts. It would need
+ * `MIN_SHAFT_WIDTH_PX` and the shaft gap, both private to `render/layout.ts`, and a copy of either
+ * is a second answer to *how wide is a legible shaft* that drifts the day that file is tuned — the
+ * failure this repository counts. So nothing here computes a fit: the shell **asks the layout** by
+ * building one and reading `Layout.hiddenShaftCount`, which is the layout's own measurement of
+ * exactly this question, already carried for the `RS-05` notice.
+ *
+ * The rungs yield in `fitGutters`' own order and for its stated reason — *the overlay panel is a
+ * whole surface and goes first, then the right gutter*. The last rung asks for **nothing**, which
+ * hands the layout its own documented default rather than a floor copied from it: this file never
+ * names a minimum, and `layout.ts` still clamps whatever it is handed.
+ *
+ * A building that fits on rung one stays on rung one, so no picture that was right moves.
+ */
+const STAGE_GUTTER_LADDER: readonly { readonly gutter: number; readonly overlay: boolean }[] =
+  Object.freeze([
+    { gutter: QUEUE_GUTTER_PX, overlay: true },
+    { gutter: QUEUE_GUTTER_PX, overlay: false },
+    { gutter: Math.round(QUEUE_GUTTER_PX / 2), overlay: false },
+    // `gutter: 0` is *ask for nothing*, which `buildLayout` reads as its own `DEFAULTS.gutterRightPx`
+    // — see the note above about never copying that number here.
+    { gutter: 0, overlay: false },
+  ]);
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
 /** How often the live region is re-announced. Every frame would be unusable. */
@@ -278,6 +316,136 @@ export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitL
     count: bands?.counts[index]?.count,
     rangeLabel: rangeLabelOf(band),
   }));
+}
+
+/**
+ * The stage's layout: the widest scenery this canvas can afford **and still draw the building**.
+ *
+ * GitHub issue #41. Walks {@link STAGE_GUTTER_LADDER} and takes the first rung on which no shaft is
+ * hidden; falls through to the last rung when even that cannot hold them all, which is the honest
+ * answer on a phone and is where `RS-05`'s *"showing 6 of 12"* notice takes over. Nothing here
+ * decides how wide a shaft has to be — `Layout.hiddenShaftCount` is the layout's own measurement of
+ * whether they fit, and asking it is what keeps this file free of a copy of `render/layout.ts`'s
+ * private minimums.
+ *
+ * `wantsOverlay` stays the caller's, because it answers a different question — `RS-03` drops the
+ * live-metrics panel below 900 px of canvas whether or not the shafts fit — and a rung that
+ * re-enabled it would be this function overruling that rule.
+ */
+export function stageLayoutFor(options: {
+  readonly width: number;
+  readonly height: number;
+  readonly floors: readonly VizFloor[];
+  readonly shafts: readonly ShaftGeometry[];
+  readonly wantsOverlay: boolean;
+}): Layout {
+  const { wantsOverlay, ...rest } = options;
+  let last: Layout | undefined;
+  for (const rung of STAGE_GUTTER_LADDER) {
+    const layout = buildLayout({
+      ...rest,
+      ...(rung.gutter === 0 ? {} : { gutterRightPx: rung.gutter }),
+      overlayWidthPx: rung.overlay && wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+    });
+    if (layout.hiddenShaftCount === 0) return layout;
+    last = layout;
+  }
+  /*
+   * The ladder is a frozen non-empty tuple, so `last` is always assigned by the time this is
+   * reached. The fallback is a `buildLayout` at the narrowest rung rather than a throw: a stage
+   * that refused to draw would turn *some shafts do not fit* into *no picture at all*, which is
+   * § D234's own defect.
+   */
+  return last ?? buildLayout({ ...rest, overlayWidthPx: 0 });
+}
+
+/* ========================================================================== *
+ * The transport's reading of the run — GitHub issue #71
+ * ========================================================================== */
+
+/**
+ * The two figures the status strip carries, **as the reader's own mode words them**.
+ *
+ * ## The defect this closes
+ *
+ * The line was `AWT ${meanWaitS} s · WT95 ${wait95S} s`, built from `recording.summary` directly.
+ * Issue #71 diffed every rendered text node between the two modes on a completed shift and found
+ * that `AWT · WT95` is identical in both — one of six strings that made Casual, in the reporter's
+ * words, *less* informative than Engineer for the audience it names.
+ *
+ * The renderings that would have fixed it already existed and already reached this file:
+ * `disclosureItems` was called on every recording and its output dropped with `void itemsIn;`
+ * (§ D240 § 2). So this is not a new vocabulary — it is the shipped one, mounted.
+ *
+ * ## Why it reads the items rather than the summary
+ *
+ * Because the items are what parity is checked over, and a status line derived independently could
+ * disagree with the check that says the two modes agree. It also gets the **suppression** for free
+ * and in one place: `mode/disclosure.ts` already replaces a refused mean with the run's own reason,
+ * so this function has no `meansAreSuppressed` branch of its own to keep in step with `docs/10` R9.
+ *
+ * ## It carries each figure's `n`, and the honesty search is why
+ *
+ * The line it replaces read `AWT 13.1 s · WT95 27.4 s` and had done since it was written. Seeding it
+ * into the corpus made `honesty/properties.ts` fail on it immediately, at six generated cases in
+ * both modes: **an estimate with no count beside it** — R13 clause one, *"`n = 5` is not a caveat on
+ * `11.3 s`; it is part of what `11.3 s` means"*. The finding is about the shipped strip rather than
+ * about this function, and it had been invisible for the same reason the whole issue is: nothing on
+ * this line went through the layer that classifies a figure as an estimate.
+ *
+ * So the count comes with the value. `Rendering.count` already holds it, in the same visual unit,
+ * which is what makes this a **routing** change rather than a new claim: the figure, its window and
+ * its `n` were all sitting in the item the shell was throwing away.
+ *
+ * `undefined` — never an empty string — when there is no run or the items carry neither figure.
+ * The strip's transient messages live in the same element, and writing `''` over one of them would
+ * blank the screen at the moment a reader is being told something.
+ */
+export function transportStatusOf(
+  items: readonly DisclosureItem[],
+  mode: ViewMode,
+): string | undefined {
+  const drawn = itemsIn(items, mode);
+  const shown = [AWT_ID, WT95_ID]
+    .map((id) => drawn.find((item) => item.id === id))
+    .filter((item) => item !== undefined);
+  if (shown.length === 0) return undefined;
+
+  const figures = shown.map((item) => {
+    const { value, count } = item.rendering;
+    return count === undefined ? `${item.label} ${value}` : `${item.label} ${value} (${count})`;
+  });
+
+  /*
+   * **A refusal carries its reason, once.**
+   *
+   * Two things this had to be driven to get right, and printing what the function returns is what
+   * found both.
+   *
+   * The line it replaces read `AWT suppressed — <the run's own awtInvalidReason>`, and the first
+   * draft of this routing dropped the second half: on `midtown-office` at the viewer's defaults —
+   * a run whose mean *is* refused — it produced `average wait suppressed (n = 201 rides)` and
+   * nothing about why. That is R3 with the reason deleted, on the surface a reader glances at
+   * without opening a panel: a **worse** line than the one it replaced.
+   *
+   * Appending it per figure was the second draft, and it printed a 300-character refusal **twice**,
+   * because both figures are refused by the same `awtIsValid` call and carry the same sentence. So
+   * the reasons are deduplicated and said after the figures. Two figures refused for two different
+   * reasons — which no shipped ground produces today, since the gate is one call — would print
+   * both, in order, rather than silently choosing one.
+   *
+   * Only a `suppression` origin contributes: on a quotable figure the note is the window and the
+   * sample, and `figures` above already carries the sample.
+   */
+  const reasons = [
+    ...new Set(
+      shown
+        .filter((item) => item.origin.kind === 'suppression')
+        .map((item) => item.rendering.note)
+        .filter((note) => note !== undefined),
+    ),
+  ];
+  return [figures.join(' · '), ...reasons].join(' — ');
 }
 
 /** A band's boundary, as the two numbers it already publishes and the unit they are in. */
@@ -400,6 +568,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let selectedLandingId = '';
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
+  /**
+   * What the sheet on screen was shaped from, so a presentation setting can re-shape it.
+   *
+   * ## Why the input is held rather than the sheet re-assembled
+   *
+   * `showEnergyAxis` is presentation, and the `set-setting` arm's own rule is that presentation is
+   * *applied now, not at the next `adopt`* — a setting that only took effect on the next run is
+   * indistinguishable from an inert one for as long as a player stays on the screen, which is
+   * exactly how four of them went unnoticed (§ D250). `dayReportOf` is pure, so re-running it is
+   * free and safe; what is **not** safe is re-running `closeShift`, which banks the day, increments
+   * the attempt and can clear a contract. Holding the input separates *shape the sheet* from *file
+   * the day* without splitting `closeShift` into two functions that could drift about which
+   * recording they are describing.
+   *
+   * `undefined` before anything is filed, and it is never cleared: it is the input for whatever
+   * sheet `ViewerState.report` currently holds, and those two are written together and only here.
+   */
+  let filedReportInput: DayReportInput | undefined;
   /**
    * Where the service badges were last drawn, for the click handler.
    *
@@ -1074,9 +1260,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
           applyPlaybackSpeed();
           applyTheme();
           if (menuState.settings.reduceMotion) playback?.pause();
-          // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
-          // nudged — `renderAll` is the chokepoint every state change already goes through.
-          if (intent.field === 'showEnergyAxis') renderAll();
+          /*
+           * The energy axis is a **figure on a sheet**, so the sheet is re-shaped and then the
+           * panel is redrawn — GitHub issue #70.
+           *
+           * `renderAll()` alone was this line, and it was honest about the shell and wrong about
+           * the Day report: the filed `ShapedDayReport` already holds its figure list, so redrawing
+           * the panel drew the same two kJ tiles again. `dayReportOf` is pure and re-running it is
+           * free; `closeShift` is what banks a day and is deliberately not re-entered. See
+           * {@link filedReportInput}.
+           */
+          if (intent.field === 'showEnergyAxis') {
+            if (filedReportInput !== undefined) {
+              filedReportInput = {
+                ...filedReportInput,
+                showEnergyAxis: menuState.settings.showEnergyAxis,
+              };
+              state = { ...state, report: dayReportOf(filedReportInput) };
+            }
+            renderAll();
+          }
           /*
            * The canvas is not part of `renderAll`'s panel sweep, and the playback tick only redraws
            * on a frame change — so without this a theme flip repainted the shell and left the stage
@@ -1120,12 +1323,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
         if (entered === undefined) return;
+        // `enterFreePlay` selects the simulation tab — issue #23, and it is in the decision rather
+        // than here for the reason that module exists at all.
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu();
         runShift();
         return;
       }
+
+      case 'close':
+        /*
+         * The way out that is not a mode being entered — issues #40, #33 and #68. `renderAll`
+         * rather than `runShift`: leaving the menu is not asking for a different day, and re-running
+         * here would throw away the shift the player pressed **Resume** to get back to.
+         */
+        closeMenu();
+        renderAll();
+        return;
 
       case 'open-campaign':
         /*
@@ -1249,6 +1464,41 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         return;
       }
+
+      case 'commit-commissioning':
+        /*
+         * **The fabric stops being a draft** — GitHub issue #48.
+         *
+         * `state.commissioning` is already written, pick by pick, so this arm changes no choice.
+         * What it does is what the screen had no way to say: leave the design phase and open the
+         * week on it. `runShift` because the fabric is `between-games` and this is the moment
+         * between games — the player has finished choosing, and the run they see next is the one
+         * they chose. Every other commit in this switch does exactly this pair.
+         *
+         * No guard here on `review.admissible`: `menu/screens.ts` disables the row and says why,
+         * which is `docs/16` S7's rule that a control which cannot be honoured is not offered. A
+         * second check would be a second answer to *may this open a week*, and the two would
+         * disagree the day the review gains a gate.
+         */
+        state = { ...state, tab: 'run' };
+        closeMenu();
+        runShift();
+        return;
+
+      case 'reset-commissioning':
+        /*
+         * Back to as built — the screen's other verb. `[]` is `ViewerState.commissioning`'s *as
+         * built* and is byte-identical to the authored building, so this is one step rather than an
+         * undo stack: a per-pick history would be a second model of the choices beside the one the
+         * reducer holds.
+         *
+         * `drawMenu` and **not** `runShift`. The player is still on the commissioning screen and
+         * has not said they are finished; re-running here would spend a simulation on a fabric they
+         * are in the middle of deciding, and would move the shift under the menu they are reading.
+         */
+        state = { ...state, commissioning: [] };
+        drawMenu();
+        return;
 
       case 'run-challenge':
         runChallenge();
@@ -1569,6 +1819,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * unanswerable only because the screen had nowhere to put the answer.
      */
     challenge: () => challengeView,
+    /*
+     * GitHub issue #28's one line, and the shell is the only thing that can write it.
+     *
+     * The origin comes from a `<meta>` tag read at run time (§ D215 § 4, § D243), so the same bytes
+     * are a connected build behind a server and an unconnected one behind a CDN — `menu/screens.ts`
+     * cannot tell and correctly says nothing when nobody has. `client` is `undefined` exactly when
+     * that lookup found no origin, which is the same fact `open-board` and `account-submit` already
+     * branch on, so this introduces no second answer to *is there a server*.
+     */
+    hasServer: () => client !== undefined,
+    shell: shellBehindMenu,
     calendarPeriodId: () => state.calendar?.id ?? '',
     commissioning: () => commissioningInput(),
     runState: () => {
@@ -1623,6 +1884,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     };
   }
 
+  /**
+   * Everything the overlay covers — issues #33 and #68, and the shell naming its own.
+   *
+   * Derived from `document.body` rather than listed, minus the two things this file appended to it,
+   * so an element added to `index.html` is covered on the day it lands. A hand-written list of the
+   * page's top-level elements would be the shape this repository keeps finding stale, on a guard
+   * whose going stale is silent: the shell would look right and one more thing behind the menu would
+   * be reachable.
+   *
+   * The two exemptions are both this file's own. The overlay cannot cover itself. And
+   * {@link waitLiveRegion} is a `role="status"` that announces **the menu's** own waits — a sign-in
+   * link taking half a minute (§ D243 § 4) — so hiding it from assistive technology while the menu
+   * is up would silence the one region the menu speaks through.
+   *
+   * Read fresh on every draw rather than captured once: `boot` appends both exemptions before the
+   * first `drawMenu`, and a list taken at mount would be a snapshot of a page that is still being
+   * assembled.
+   */
+  function shellBehindMenu(): readonly HTMLElement[] {
+    return [...document.body.children].filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child !== menuRoot && child !== waitLiveRegion,
+    );
+  }
+
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
   }
@@ -1630,13 +1916,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /**
    * Leave the menu — and the one place {@link playerHasChosen} is latched.
    *
-   * Every arm that closes the overlay is a mode being entered: **Start** (free play), **Open the
-   * doors** (the campaign) and **Keep going** (endless). There is no fourth way out, so this is the
-   * complete set of moments at which a run stops being scenery and starts being somebody's day.
+   * Three of the four ways out are a mode being entered: **Start** (free play), **Open the doors**
+   * (the campaign) and **Keep going** (endless). **Resume** is the fourth, and it is a change of
+   * mind rather than a choice — GitHub issue #40, and the intent Escape presses.
+   *
+   * It latches `playerHasChosen` all the same, and that is deliberate rather than an oversight in
+   * the new arm. The flag gates autoplay on the next `adopt`, and a player who pressed **Resume** to
+   * get back to the shift they were watching has left the menu on purpose; a run they then re-roll
+   * should play, exactly as it would have had they never opened the menu. Resume itself starts
+   * nothing — there is no `adopt` on this path — so the shift on screen stays where the playhead
+   * left it.
+   *
+   * **It redraws**, because the overlay's `hidden` is what `menuPanel.ts#coverShell` reads to decide
+   * whether the shell behind is `inert`. Setting `hidden` without drawing would hide the menu and
+   * leave the page underneath it out of the accessibility tree and unclickable — issue #68 with the
+   * sign flipped, and the reason the covering is keyed on one value with one writer.
    */
   function closeMenu(): void {
     menuRoot.hidden = true;
     playerHasChosen = true;
+    drawMenu();
   }
 
   drawMenu();
@@ -2114,6 +2413,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (!isViewMode(value)) return;
       window.localStorage.setItem(MODE_KEY, value);
       context.update({ mode: value });
+      /*
+       * The status strip is written here as well as on `adopt` — issue #71, and see
+       * {@link drawTransportStatus} for why it is not in `renderAll`. These are the two moments the
+       * derived text can change: a new recording, and the reader moving this control. A mode change
+       * that left the strip on the previous mode's words would be the disclosure selector doing
+       * three-quarters of something, which is worse to read than doing none of it.
+       */
+      drawTransportStatus();
     });
     /*
      * The remembered mode, **unless the link named one**. A deep link is somebody sending a
@@ -2208,6 +2515,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }, 1400);
   }
 
+  /**
+   * This run's disclosure items, in both modes at once — the layer's one shipped derivation.
+   *
+   * Asked here and handed to both consumers (`docs/16` S5). {@link drawParity} checks them whole and
+   * {@link drawTransportStatus} draws two of them; two calls would be two answers to *what does this
+   * run disclose*, and the parity check would then be checking a list that is not the list on
+   * screen — which is the one thing that check may not do.
+   */
+  function disclosureNow(): readonly DisclosureItem[] {
+    const recording = state.recording;
+    if (recording === undefined) return [];
+    return disclosureItems({
+      recording,
+      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      lockedOut: lockedOutAt(recording, recording.endedAt),
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    });
+  }
+
   function drawParity(): void {
     /*
      * Parity is a property of **what was mounted**, not of the mode toggle: § 4's rule is that
@@ -2215,19 +2541,37 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * items. So the items are derived from the recording and checked whole — a check over an empty
      * list would pass every time and say nothing.
      */
-    const recording = state.recording;
-    if (recording === undefined) {
-      setText(ui.header.modeParity, '');
-      return;
-    }
-    const items: readonly DisclosureItem[] = disclosureItems({
-      recording,
-      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
-      lockedOut: lockedOutAt(recording, recording.endedAt),
-      showEnergyAxis: menuState.settings.showEnergyAxis,
-    });
-    setText(ui.header.modeParity, parityRefusal(items) ?? '');
-    void itemsIn;
+    const items = disclosureNow();
+    setText(ui.header.modeParity, items.length === 0 ? '' : (parityRefusal(items) ?? ''));
+  }
+
+  /**
+   * The transport's own reading of the run — **through the disclosure layer**, GitHub issue #71.
+   *
+   * ## What was here, and why it was the majority of the issue
+   *
+   * This line was built from `recording.summary` directly: `AWT 13.1 s · WT95 27.4 s`, mode-blind,
+   * on a screen whose mode selector claims to simplify things for a reader out of their depth. The
+   * disclosure layer's per-mode renderings *were* computed on every recording — and then dropped
+   * with `void itemsIn;`, a deliberate no-op keeping the import used (§ D240 § 2). So the layer had
+   * a non-test caller that used it for a check and discarded its output, which is the standing
+   * requirement's own shape one level in: **a call whose return value is dropped looks exactly like
+   * a caller and is not one.**
+   *
+   * ## Why this is written on adopt and on a mode change, and not in `renderAll`
+   *
+   * `#status` is also where four transient messages land — the copied provenance line, *copied*,
+   * *the shift did not run*, a batch's progress — each of which restores itself after its own
+   * moment. A writer inside `renderAll` would clobber whichever of those was on screen the next
+   * time any state moved, which is a regression wearing a fix. So the derived text is written at
+   * the two moments it can actually change: a new recording, and the reader moving the mode
+   * selector. One derivation ({@link transportStatusOf}), two call sites, and the transient
+   * messages keep the screen until one of those two happens — which is exactly what they did
+   * before.
+   */
+  function drawTransportStatus(): void {
+    const text = transportStatusOf(disclosureNow(), state.mode);
+    if (text !== undefined) setText(ui.transport.status, text);
   }
 
   /* ---------------------------------------------------------------------- *
@@ -2452,12 +2796,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     selectedLandingId = '';
     fillLandingSelect(recording);
     fillBankSelect(recording);
-    setText(
-      ui.transport.status,
-      meansAreSuppressed(recording)
-        ? `AWT suppressed — ${recording.summary.awtInvalidReason ?? 'the queues never settled'}`
-        : `AWT ${recording.summary.meanWaitS.toFixed(1)} s · WT95 ${recording.summary.wait95S.toFixed(1)} s`,
-    );
+    /*
+     * Through the disclosure layer — issue #71, and the suppression comes with it.
+     *
+     * This was a two-arm ternary over `meansAreSuppressed(recording)` reading `summary.meanWaitS`
+     * and `summary.wait95S` directly: mode-blind, and a **second** copy of the R9 refusal that
+     * `mode/disclosure.ts` already owns. Both problems go together, because the renderings this now
+     * reads are the ones `drawParity` checks — so the line on screen and the parity claim about it
+     * can no longer be about two different lists.
+     */
+    drawTransportStatus();
   }
 
   /**
@@ -2543,7 +2891,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * reach — which is why this one went four modes without a test.
      */
     const week = closedWeekOf(state, outcome);
-    const report = dayReportOf({
+    filedReportInput = {
       recording,
       observations,
       goals,
@@ -2572,7 +2920,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       dayStartS: DAY_START_S,
-    });
+      /*
+       * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
+       * one-field-and-one-caller fix.
+       *
+       * Every other caller of `dayReportOf` is describing a run rather than serving a preference —
+       * the honesty sweep, the acceptance suites — and gets the axis shown, which is what
+       * `DayReportInput.showEnergyAxis`'s `undefined` means. This is the shell, so it passes the
+       * player's own value, and the Day report's kJ pair is the first pixel `Settings.showEnergyAxis`
+       * has ever reached.
+       */
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    };
+    const report = dayReportOf(filedReportInput);
     /*
      * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
      * end, and the reader opening the sheet — and the second one has already set the tab. Setting
@@ -2653,13 +3013,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
     // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
     const bank = shaftsForBank(recording.shafts, bankFilter);
-    const layout = buildLayout({
+    /*
+     * The scenery yields to the building — issue #41. `stageLayoutFor` walks a ladder of gutter and
+     * overlay requests and takes the first on which no shaft is hidden, instead of handing over the
+     * same two numbers at every width and every building.
+     */
+    const layout = stageLayoutFor({
       width,
       height,
       floors: recording.floors,
       shafts: bank.shafts,
-      gutterRightPx: QUEUE_GUTTER_PX,
-      overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+      wantsOverlay,
     });
     const overlay = overlayAt(recording, frame.simTimeS);
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);

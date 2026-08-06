@@ -50,6 +50,9 @@ import type { VizFloor } from '../contract/types.js';
 import type { BrowserResources } from './data.js';
 import { recordRun } from '../record/recordRun.js';
 
+import { disclosureItems } from '../mode/disclosure.js';
+import type { DisclosureItem } from '../mode/types.js';
+
 import {
   deepLinkDefaultsOf,
   deepLinkSearchOf,
@@ -58,6 +61,8 @@ import {
   seedEntryOf,
   seekActionForKey,
   shaftsForBank,
+  stageLayoutFor,
+  transportStatusOf,
   waitLegendEntries,
 } from './main.js';
 import { initialState, profileById, shiftRunConfigOf, type ViewerState } from './state.js';
@@ -145,6 +150,195 @@ describe('index.html holds no second copy of the legend', () => {
     // needs a handle to keep it, and `elementMap.ts` is where a handle is declared.
     const markup = await legendMarkup();
     expect(markup).toContain('id="legend-title"');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The transport strip reads the disclosure layer — GitHub issue #71
+ * -------------------------------------------------------------------------- */
+
+describe('the status strip is worded by the reader’s mode', () => {
+  /**
+   * A real run's disclosure items, built the way `dev/main.ts` builds them.
+   *
+   * `midtown-office` for `recordingOf`'s measured reason a few hundred lines down: Garden
+   * Apartments at the viewer's defaults is six floors of almost nobody, and a run with no queue in
+   * it is a run whose figures cannot tell two modes apart.
+   */
+  function itemsOf(): readonly DisclosureItem[] {
+    const state: ViewerState = { ...initialState(resources, 424242n), buildingId: 'midtown-office' };
+    const recording = recordRun(shiftRunConfigOf(resources, state).config, {
+      recordDecisions: false,
+    }).recording;
+    return disclosureItems({
+      recording,
+      dispatcherName: recording.dispatcherProfileId,
+      /*
+       * Empty, and it is the honest value here rather than a shortcut. `dev/main.ts`'s own
+       * `lockedOutAt` is a shell closure that needs the loaded building document and the running
+       * profile; what it feeds is the `locked-out` item, which neither figure below reads. An empty
+       * set means *this caller does not know*, which `lockedOut.ts` is explicit is a different
+       * claim from *this building restricts nothing* — and neither claim touches `awt` or `wt95`.
+       */
+      lockedOut: [],
+    });
+  }
+
+  it('says something different in each mode — § D230', () => {
+    /*
+     * **Move the control and require the rendering to change** — the standing requirement's form
+     * for a disclosure control. § D240 § 2 measured the old state: `AWT · WT95` was byte-identical
+     * in both modes, one of six strings that made Casual *less* informative than Engineer for the
+     * audience it names — because this line was built from `recording.summary` directly while the
+     * per-mode renderings were computed on every recording and dropped with `void itemsIn;`.
+     */
+    const items = itemsOf();
+    const advanced = transportStatusOf(items, 'advanced');
+    const basic = transportStatusOf(items, 'basic');
+    expect(advanced, 'the strip says nothing at all about a run that happened').toBeDefined();
+    expect(basic, 'Casual is drawing no status line').toBeDefined();
+    expect(basic, 'the disclosure selector was moved and the strip did not change').not.toBe(
+      advanced,
+    );
+  }, 300_000);
+
+  it('carries each figure’s n, which is R13 clause one', () => {
+    /*
+     * The honesty search found this on the **shipped** strip, the moment the line entered the
+     * corpus: `AWT 13.1 s · WT95 27.4 s` is an estimate with no count beside it, and *"`n = 5` is
+     * not a caveat on `11.3 s`; it is part of what `11.3 s` means"*. Six generated cases failed in
+     * both modes. The count was on the `Rendering` all along and the strip was not reading it.
+     */
+    const line = transportStatusOf(itemsOf(), 'advanced') ?? '';
+    expect(line, `the strip publishes a figure with no sample: ${line}`).toContain('n =');
+  }, 300_000);
+
+  it('says nothing at all when there is no run', () => {
+    // `undefined`, never `''`. The strip's transient messages share this element — the copied
+    // provenance line, the batch progress — and blanking one of them would take a sentence off
+    // the screen at the moment a reader is being told something.
+    expect(transportStatusOf([], 'advanced')).toBeUndefined();
+  });
+
+  it('carries a refused mean’s reason, and carries it once', () => {
+    /*
+     * Two regressions this routing had on the way, both found by printing what the function
+     * returns rather than by reasoning about it, and both worse than the line being replaced.
+     *
+     * The first draft dropped the reason entirely — `average wait suppressed (n = 201 rides)` and
+     * nothing about why, where the old strip read `AWT suppressed — <the run's own reason>`. That
+     * is R3 with the refusal deleted, on the surface a reader glances at without opening a panel.
+     *
+     * The second appended it per figure and printed a 300-character sentence **twice**, because
+     * `awt` and `wt95` are refused by one `awtIsValid` call and carry the same words.
+     *
+     * `midtown-office` at the viewer's defaults is a run whose mean really is refused, which is
+     * what makes this case reachable at all — asserted below rather than assumed.
+     */
+    const items = itemsOf();
+    const line = transportStatusOf(items, 'advanced') ?? '';
+    expect(line, 'this fixture no longer refuses its mean, so the case is vacuous').toContain(
+      'suppressed',
+    );
+    const reason = items.find((item) => item.id === 'awt')?.advanced.note ?? '';
+    expect(reason, 'the refused figure carries no reason to route').not.toBe('');
+    expect(line, 'the strip refuses a figure and does not say why').toContain(reason);
+    expect(
+      line.split(reason).length - 1,
+      'the same refusal is printed once per figure — twice, for one gate',
+    ).toBe(1);
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The scenery yields to the building — GitHub issue #41
+ * -------------------------------------------------------------------------- */
+
+describe('the stage asks for less gutter when the shafts do not fit', () => {
+  /**
+   * Vertical City's thirty-five shafts, on a canvas the size the stage gets at a 1920 px viewport.
+   *
+   * The width is the **canvas box**, not the window: the shell puts two rails beside the stage, so
+   * 1920 of screen is about 1200 of plot. 1232 is the figure `MIN_PLOT_SHARE`'s own note measures
+   * against, so it is the one used here rather than a new one invented for this case.
+   */
+  const CANVAS = { width: 1232, height: 720 };
+
+  const FLOOR_IDS = Array.from({ length: 10 }, (_ignored, index) => `L${String(index)}`);
+
+  const shaftsOf = (count: number): readonly ShaftGeometry[] =>
+    Array.from({ length: count }, (_ignored, index) => ({
+      carId: `car-${String(index)}`,
+      bankId: 'main',
+      label: `C${String(index)}`,
+      servedFloorIds: FLOOR_IDS,
+    }));
+
+  const floors: readonly VizFloor[] = FLOOR_IDS.map((id, index) => ({
+    id,
+    name: id,
+    index,
+    heightM: index * 3.5,
+    population: 40,
+    isEntrance: index === 0,
+    isTransferFloor: false,
+  }));
+
+  it('draws every shaft of the tallest shipped building at a desktop canvas — issue #41', () => {
+    /*
+     * Measured before the change: **Vertical City shows 27 of 35 at 1920**. `RS-05`'s *"showing 27
+     * of 35"* notice was doing its job and saying so, and eight shafts of a building whose whole
+     * subject is its shafts were off the picture on the largest screen anybody has — because
+     * `QUEUE_GUTTER_PX` and `OVERLAY_WIDTH_PX` were handed over unchanged whatever was being drawn.
+     */
+    const layout = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(35), wantsOverlay: true });
+    expect(layout.hiddenShaftCount, 'shafts are still being dropped at a desktop canvas').toBe(0);
+    expect(layout.columns).toHaveLength(35);
+  });
+
+  it('is inert for a building that already fitted', () => {
+    /*
+     * The other direction, and the one that would be expensive to get wrong: a ladder that yielded
+     * scenery it did not need to would take the live-metrics panel off a six-shaft building for no
+     * reason. The first rung is the request that shipped, so a picture that was right does not move.
+     */
+    const roomy = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(6), wantsOverlay: true });
+    const asShipped = buildLayout({
+      ...CANVAS,
+      floors,
+      shafts: shaftsOf(6),
+      gutterRightPx: 280,
+      overlayWidthPx: 250,
+    });
+    expect(roomy.overlay, 'a building that fits lost its metrics panel').toBeDefined();
+    expect(roomy.plot).toEqual(asShipped.plot);
+  });
+
+  it('never re-enables an overlay RS-03 has dropped', () => {
+    // `wantsOverlay` answers a different question — the canvas is too narrow for the panel at all —
+    // and a rung that turned it back on would be this function overruling that rule.
+    const narrow = stageLayoutFor({
+      width: 600,
+      height: 720,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(narrow.overlay).toBeUndefined();
+  });
+
+  it('still draws a picture when nothing on the ladder fits them all', () => {
+    // A stage that refused to draw would turn *some shafts do not fit* into *no picture at all*,
+    // which is § D234's own defect. `RS-05`'s notice is what covers this case, and it needs columns.
+    const phone = stageLayoutFor({
+      width: 360,
+      height: 640,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(phone.columns.length).toBeGreaterThan(0);
+    expect(phone.hiddenShaftCount).toBeGreaterThan(0);
   });
 });
 

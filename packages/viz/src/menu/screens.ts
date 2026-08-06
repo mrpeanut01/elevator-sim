@@ -54,6 +54,7 @@ import {
   type CommissioningChoices,
 } from '../commissioning/types.js';
 import { refusalsBeside, type CommissioningReview } from '../commissioning/refusals.js';
+import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
@@ -86,6 +87,30 @@ export type MenuIntent =
   | { readonly kind: 'back' }
   /** Re-open the menu over a running game. `docs/16` § 5 clause 5: nothing could, before. */
   | { readonly kind: 'reopen' }
+  /**
+   * Leave the menu without choosing anything — GitHub issues #40, #33 and #68.
+   *
+   * ## Why this is not `back`
+   *
+   * `back` pops a screen and the root has nothing to pop, so a player who pressed **Menu** over a
+   * running shift and then changed their mind had no way out that was not *start something*: the
+   * root offered six navigations and no exit. That is the one-way door #40 reports, and it is also
+   * the whole of Escape's problem. § D249 § 3 considered binding Escape to `back` and refused it —
+   * *"it would work on five screens and do nothing on the root, which is exactly where #40's
+   * reporter is standing"* — so the key means **close**, on every screen, and that needs a member
+   * of its own.
+   *
+   * ## And it is a member rather than a call, for this union's founding reason
+   *
+   * `dispatchMenu` returns `void` and has no `never` arm, so a member nothing handles compiles and
+   * ships a dead control — the defect this package has shipped eleven times. Adding the intent and
+   * its arm is one change for exactly that reason: the shell does not compile until something
+   * performs it, and `menu/screens.test.ts` requires the row to be reachable.
+   *
+   * It carries nothing. *What was running* is the shell's and stays the shell's: this says only
+   * that the player is done with the menu, and `dev/main.ts#closeMenu` is what that means.
+   */
+  | { readonly kind: 'close' }
   /*
    * A **field and a value**, never a prepared patch and never a closure.
    *
@@ -147,6 +172,39 @@ export type MenuIntent =
     }
   /** Choose which capital constraint the week is commissioned under. */
   | { readonly kind: 'set-constraint'; readonly constraintId: string }
+  /**
+   * Take the fabric on screen into the week — GitHub issue #48.
+   *
+   * ## Why a screen whose controls already worked still needed this
+   *
+   * `set-commissioning` writes `ViewerState.commissioning` on every pick, so the choices were
+   * *already* live. What the screen had no way to say was **I am done**: no commit, no cancel, and
+   * nothing that took the player anywhere afterwards. A design phase you cannot leave deliberately
+   * is a design phase whose result arrives by accident, on whichever run happens next.
+   *
+   * So this is the moment the fabric stops being a draft, and it is also the only moment the screen
+   * has to refuse: `CommissioningReview.admissible` is false whenever anything is over budget or out
+   * of the constraint's scope, and a commit is where that refusal belongs — beside the verb, not
+   * scattered over three selects that are each individually fine.
+   *
+   * It carries nothing. *Which choices* is `ViewerState.commissioning`, which the shell already
+   * holds; putting them on the intent would be a second copy that could disagree with the screen
+   * the player is looking at.
+   */
+  | { readonly kind: 'commit-commissioning' }
+  /**
+   * Put the fabric back to what the building already has — issue #48's other half.
+   *
+   * **Not an undo stack.** It resets to *as built*, which is `ViewerState.commissioning`'s empty
+   * value and is byte-identical to the authored building: one step, no history, and the same value
+   * `withBuilding` writes when the building changes (§ D269). A per-pick undo would be a second
+   * model of the choices beside the one the reducer holds.
+   *
+   * It is offered **only when something has moved**, because a cancel that is always available on a
+   * screen where nothing has changed is a control whose press changes nothing — `docs/16` S7, and
+   * the defect this repository counts.
+   */
+  | { readonly kind: 'reset-commissioning' }
   /** Post the whole seed set. Never a partial one — see `challengeSubmissionOf`. */
   | { readonly kind: 'post-challenge' };
 
@@ -228,6 +286,7 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'navigate':
     case 'back':
     case 'reopen':
+    case 'close':
     case 'start':
     case 'open-campaign':
     case 'start-endless':
@@ -238,6 +297,8 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'submit-score':
     case 'run-challenge':
     case 'post-challenge':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
       return intent;
   }
 }
@@ -497,7 +558,7 @@ const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
 function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
   switch (screen) {
     case 'main':
-      return { ...empty, rows: mainRows(input.hasServer) };
+      return { ...empty, rows: mainRows(input.hasServer, input.hasRun) };
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
@@ -537,7 +598,47 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
  */
 const NEEDS_A_SERVER = ' · needs a server, and this one has none';
 
-function mainRows(hasServer: boolean | undefined): readonly MenuAffordance[] {
+/**
+ * The way out — GitHub issue #40, and the row Escape presses.
+ *
+ * The root is the one screen with no `back`, so before this it offered six navigations and no exit:
+ * a player who pressed **Menu** over a running shift to check a setting had to *start something* to
+ * get back to the shift they were already watching. Every existing way out of the overlay is a mode
+ * being entered — Start, Open the doors, Keep going — which is a complete set of *choices* and an
+ * empty set of *changes of mind*.
+ *
+ * **Disabled and explained when there is nothing behind the menu**, which is `docs/16` S7's rule and
+ * not a courtesy: a *Resume* that closed the overlay onto an empty shell would be a button that
+ * takes the screen away and gives nothing back. The shell runs a shift on boot, so this is the cold
+ * state a `hasRun: false` caller describes rather than a state a player normally reaches — and
+ * saying so is cheaper than the one time they do.
+ *
+ * It is first because it is the only row that does not commit the player to anything, and last is
+ * where a reader looks for *cancel*. This overlay has no cancel: leaving it changes nothing, which
+ * is what the detail says.
+ */
+function resumeRow(hasRun: boolean): MenuAffordance {
+  return {
+    id: 'main.resume',
+    label: 'Resume',
+    detail: 'Back to the shift on screen — nothing here is changed by leaving',
+    kind: 'commit',
+    // Closing an overlay moves no leg. `presentation` is the honest scope and it is what lets this
+    // row appear under every play mode, which a way out has to.
+    scope: 'presentation',
+    enabled: hasRun,
+    ...(hasRun
+      ? {}
+      : {
+          disabledWhy:
+            'There is no shift on screen to go back to yet. Pick a scenario or a free-play ' +
+            'selection below and the menu closes onto it.',
+        }),
+    intent: { kind: 'close' },
+  };
+}
+
+function mainRows(hasServer: boolean | undefined, hasRun: boolean): readonly MenuAffordance[] {
   // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
   // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
   const note = hasServer === false ? NEEDS_A_SERVER : '';
@@ -584,6 +685,7 @@ function mainRows(hasServer: boolean | undefined): readonly MenuAffordance[] {
     // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
     social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
+    resumeRow(hasRun),
   ]);
 }
 
@@ -714,9 +816,10 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
           'is comfortable in one building will swamp another — and a run whose queue never ' +
           'settles has its average wait withheld rather than reported.',
-        'Run length — how long the day runs. Five are offered: 5, 15, 30, 60 and 120 minutes. It ' +
-          'has to be at least the traffic shape’s own period, and the menu refuses the ' +
-          'combination here rather than letting the run fail afterwards.',
+        'Run length — how long the day runs. Six are offered: 5, 15, 30, 60, 120 and 600 minutes. ' +
+          'It has to be at least the traffic shape’s own period, and the menu refuses the ' +
+          'combination here rather than letting the run fail afterwards. The longest is there ' +
+          'because one shipped shape is a whole working day and fits inside none of the others.',
         'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
           'still, the same seed produces the same arrivals, the same decisions and the same ' +
           'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +
@@ -1400,11 +1503,103 @@ function commissioningBody(input: MenuViewInput): Body {
     .filter((refusal) => refusal.bankId === null)
     .map((refusal) => refusal.message);
 
+  /*
+   * **The two verbs the screen did not have** — issue #48.
+   *
+   * Every dropdown above already wrote `ViewerState.commissioning` on the pick (§ D248), so the
+   * fabric was live and the screen still had no way to say *I am done* or *put it back*. Commit
+   * last, cancel above it: the order is *the thing you came to do, then the way out of it*, which
+   * is the order every other screen in this file puts its commit in.
+   */
+  const moved = state.review.moved.length > 0;
+  rows.push({
+    id: 'commissioning.reset',
+    label: 'Put it back as built',
+    detail: moved
+      ? `Undo all ${String(state.review.moved.length)} ${
+          state.review.moved.length === 1 ? 'change' : 'changes'
+        } and return to the building as it stands.`
+      : 'The fabric is what the building already has.',
+    kind: 'commit',
+    scope: 'between-games',
+    // Offered only when something has moved. A cancel that is always available on a screen where
+    // nothing has changed is a control whose press changes nothing — `docs/16` S7.
+    enabled: moved,
+    ...(moved
+      ? {}
+      : { disabledWhy: 'Nothing has been changed yet, so there is nothing to put back.' }),
+    intent: { kind: 'reset-commissioning' },
+  });
+  rows.push({
+    id: 'commissioning.commit',
+    label: 'Commission it',
+    detail: 'Take this fabric into the week. Nothing here moves again once the doors do.',
+    kind: 'commit',
+    scope: 'between-games',
+    enabled: state.review.admissible,
+    /*
+     * The refusal beside the **verb**, and it is a different sentence from the ones beside the
+     * controls. Each select's own `disabledWhy` says what is wrong with that dimension; this says
+     * why the configuration as a whole may not open a week, which is a claim no single select can
+     * make. `refusals` is the review's, joined and not rewritten — a refusal is pinned by the run
+     * that produced it, never by a second sentence about it.
+     */
+    ...(state.review.admissible
+      ? {}
+      : {
+          disabledWhy: state.review.refusals.map((refusal) => refusal.message).join(' '),
+        }),
+    intent: { kind: 'commit-commissioning' },
+  });
+
   return {
     rows: Object.freeze(rows),
-    notices: Object.freeze([COMMISSIONING_NOTE, state.buildingName, state.review.sentence]),
+    notices: Object.freeze([
+      // The brief first: *what am I choosing* before *what the number is not*. A player who does
+      // not yet know what a machine class is cannot act on a sentence about capital units.
+      COMMISSIONING_BRIEF,
+      COMMISSIONING_NOTE,
+      state.buildingName,
+      state.review.sentence,
+      ...previewLines(state.review),
+    ]),
     issues: Object.freeze(whole),
   };
+}
+
+/**
+ * What this configuration would be, before it is committed — issue #48's preview.
+ *
+ * ## Every word of it is `commissioning/`'s own
+ *
+ * `CommissioningReview.moved` is the diff `movedChoices` computed, and `movedChoiceText` is the
+ * sentence that module already writes for one moved dimension. Nothing is re-derived here: a
+ * preview that recomputed *what changed* would be a second answer to a question `refusals.ts` has
+ * already answered, and the two would disagree on the day a fourth dimension lands.
+ *
+ * ## What it may not say, and does not
+ *
+ * **What the change will buy.** Every line is a statement of *what the hardware would be* — `2 → 4`
+ * shafts, `hydraulic → gearless-traction` — and not one of them says faster, better or worth it.
+ * That is `docs/10` R2 and CLAUDE.md's paired-t rule at the same time: this screen has run nothing,
+ * so it has measured nothing, and a preview that ranked two fabrics off no replications would be
+ * the confident nonsense this project exists to avoid. The capital figure is not restated either —
+ * it appears in `review.sentence` above, in exactly one place, because a limit shown twice starts
+ * reading like a score.
+ *
+ * Empty when nothing has moved, which is the honest answer rather than *"no changes"*: the notice
+ * slot is not a place to say that a section has nothing in it.
+ */
+function previewLines(review: CommissioningReview): readonly string[] {
+  if (review.moved.length === 0) return [];
+  const changes = review.moved
+    .map((moved) => `${moved.bankId} ${DIMENSION_LABELS[moved.dimension]} ${movedChoiceText(moved)}`)
+    .join('; ');
+  return [
+    `What you would be commissioning, against what the building has now: ${changes}. This says ` +
+      'what the hardware would be, and nothing about what it would buy — nothing has been ' +
+      'simulated yet.',
+  ];
 }
 
 /**
@@ -1418,6 +1613,36 @@ const COMMISSIONING_NOTE =
   'Choose the fabric before the week opens, then live with it — nothing here moves once the doors ' +
   'do. The capital figure is a limit on what you may build, not a score: it is never compared ' +
   'between players, never shown beside a wait, and never enters a verdict.';
+
+/**
+ * What this screen is *for* — GitHub issue #48's design brief.
+ *
+ * ## Why one more paragraph on a screen that already had a note
+ *
+ * {@link COMMISSIONING_NOTE} says what the capital figure is **not**, which is the sentence this
+ * module could not do without. What no sentence said is what a player is being asked to *decide*:
+ * #24 reported three questions this screen knew the answers to and printed none of, and this is the
+ * fourth — *what am I choosing between, and when does it stop being changeable?*
+ *
+ * ## The three things it may not say, and does not
+ *
+ * 1. **No ranking, and no recommendation.** It names the three dimensions and the constraint; it
+ *    does not say which choice is better, because nothing has been simulated and one replication
+ *    could not settle it anyway (CLAUDE.md's paired-t rule, and `docs/10` R2).
+ * 2. **No unmeasured mechanism.** Every clause is a fact about **what the code does** — the fabric
+ *    is fixed for the week, the constraint decides what may move — never about what a choice buys.
+ *    The one sentence that would need a measurement is the one about geometry beating dispatch, and
+ *    it is absent for exactly that reason.
+ * 3. **No second copy of the capital rule.** The limit is stated once, in the note above. Said
+ *    twice it starts reading like the thing being optimised, which is `commissioning/types.ts`'s
+ *    whole argument about a currency that quietly becomes a score.
+ */
+const COMMISSIONING_BRIEF =
+  'Three things per bank: how many shafts it has, which machine class goes in them, and what ' +
+  'speed those are rated for. What you may move is the constraint’s to decide — retrofit freezes ' +
+  'the fabric entirely, refurbishment keeps the shafts you have, and a new build opens all three. ' +
+  'Change what you want, then commission it: from that point the week runs on this building, and ' +
+  'the only thing left to move is how the cars are dispatched.';
 
 /* ------------------------------------------------------------- leaderboard */
 
@@ -1601,10 +1826,13 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'set-calendar':
     case 'set-commissioning':
     case 'set-constraint':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
       // The shell's, because each writes `ViewerState` rather than `MenuState` — the fabric and the
       // calendar are facts about the run, not about which screen is showing.
       return state;
     case 'reopen':
+    case 'close':
     case 'start':
     case 'open-campaign':
     case 'start-endless':
@@ -1617,6 +1845,10 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'post-challenge':
       // Not the menu's to answer. Returned unchanged rather than thrown: a render path that threw
       // on an intent it did not own would turn a mis-wired button into a blank screen.
+      //
+      // `close` is here rather than beside `back` on purpose. Hiding the overlay is the shell's,
+      // and a reducer that also navigated would decide *which screen the menu re-opens on* — which
+      // is `reopen`'s answer (the root) and not this one's to give twice.
       return state;
   }
 }

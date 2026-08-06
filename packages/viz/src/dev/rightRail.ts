@@ -67,6 +67,7 @@ import {
   type PatternSpec,
 } from '../authoring/patternSpec.js';
 import type { VizRecording } from '../contract/types.js';
+import type { ViewMode } from '../mode/types.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { statLineOf } from '../shift/contracts.js';
 
@@ -82,6 +83,8 @@ import {
   buildingConfigOf,
   disclosureOf,
   profileById,
+  withBuilding,
+  withDispatcher,
   type SavedPattern,
   type ViewerState,
 } from './state.js';
@@ -424,7 +427,17 @@ export function trafficPlateOf(
 export function buildingPlateOf(
   building: ResolvedBuilding,
   recording: VizRecording | undefined,
+  mode: ViewMode = 'advanced',
 ): readonly PlateEntry[] {
+  /*
+   * The plain-language lead — issue #71, and `mode/disclosure.ts`'s three rules applied to a plate
+   * rather than to a figure: it **restates no number**, it **makes no claim the source does not**,
+   * and the measured sentence follows **verbatim**. Only the two rows below the line take one,
+   * because they are the two that carry a vocabulary — *handling capacity* and *achieved interval*
+   * are lift-engineering terms, and the five above the line are floors, metres and people.
+   */
+  const lead = (casual: string, sentence: string): string =>
+    mode === 'basic' ? `${casual} ${sentence}` : sentence;
   const heights = building.floors.map((floor) => floor.heightM);
   const rise = heights.length > 1 ? Math.max(...heights) - Math.min(...heights) : 0;
   const cars = building.banks.flatMap((bank) => bank.cars);
@@ -476,9 +489,12 @@ export function buildingPlateOf(
       capacity.pctPopulationPer5Min === null
         ? `${capacity.personsPer5Min.toFixed(1)} persons / 5 min`
         : `${capacity.pctPopulationPer5Min.toFixed(1)}% of population / 5 min`,
-    help:
+    help: lead(
+      'Handling capacity is how many people the lifts actually moved in five minutes, set against ' +
+        'how many turned up in the same five.',
       `Carried ${capacity.personsPer5Min.toFixed(1)} people every five minutes against ` +
-      `${capacity.offeredPer5Min.toFixed(1)} arriving. A count, not an estimate.`,
+        `${capacity.offeredPer5Min.toFixed(1)} arriving. A count, not an estimate.`,
+    ),
   });
 
   const interval = summary.achievedInterval;
@@ -486,17 +502,22 @@ export function buildingPlateOf(
     rows.push({
       k: 'achieved interval',
       v: 'withheld',
-      help:
+      help: lead(
+        'The interval is the average wait between one car leaving the lobby and the next, and this ' +
+          'run has not earned an average.',
         'A mean gap between departures is still a mean. This run does not clear the checks an ' +
-        `average has to clear: ${summary.awtInvalidReason ?? 'the queues did not reach a steady state.'}`,
+          `average has to clear: ${summary.awtInvalidReason ?? 'the queues did not reach a steady state.'}`,
+      ),
     });
   } else if (interval.meanS !== null) {
     rows.push({
       k: 'achieved interval',
       v: `${interval.meanS.toFixed(1)} s over ${String(interval.count)} gaps`,
-      help:
+      help: lead(
+        'The interval is the average wait between one car leaving the lobby and the next.',
         'Mean spacing of car departures from the terminal. The gap count is carried because a ' +
-        'mean over two gaps is a different claim from one over sixty.',
+          'mean over two gaps is a different claim from one over sixty.',
+      ),
     });
   } else {
     rows.push({
@@ -833,7 +854,18 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
               selected: entry.id === state.dispatcherId,
               help: `Profile id \`${entry.id}\`.`,
               onPick: () => {
-                context.update({ dispatcherId: entry.id });
+                /*
+                 * The whole transition, not the id — issue #65. `withDispatcher` takes the editor's
+                 * working copy along while it is untouched, on `withBuilding`'s rule and for its
+                 * reason: writing `dispatcherId` alone left the editor describing a profile nobody
+                 * is running, under a card marked *selected*.
+                 *
+                 * A whole `ViewerState` **is** a `Partial<ViewerState>`, so this merges to exactly
+                 * the state the transition returned. No new member on {@link MountContext}: a
+                 * `replace` would be the one thing that seam's docstring forbids a panel — writing a
+                 * state directly rather than asking for a change.
+                 */
+                context.update(withDispatcher(state, resources, entry.id));
                 context.runShift();
               },
             }),
@@ -890,7 +922,15 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
               selected: id === state.buildingId,
               help: `Building id \`${id}\`.`,
               onPick: () => {
-                context.update({ buildingId: id });
+                /*
+                 * `withBuilding`, not a `buildingId` patch — the same hole as the dispatcher card
+                 * beside it, on the control where it costs the most. Writing the id alone skipped
+                 * the week's move into (and out of) the building's scenario, left the fabric keyed
+                 * by the previous building's bank ids (issue #46), and left both working copies on
+                 * the building that is no longer running. `dev/main.ts`'s coach select has always
+                 * called this function; this card is the other writer and did not.
+                 */
+                context.update(withBuilding(state, resources, id));
                 context.runShift();
               },
             });
@@ -905,7 +945,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
           },
         ]);
       } else {
-        buildingPlate(buildingPlateOf(building, recording));
+        buildingPlate(buildingPlateOf(building, recording, state.mode));
       }
 
       /* ---- Machines ---- */

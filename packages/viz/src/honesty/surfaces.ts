@@ -140,6 +140,7 @@ import {
   zoneChoicesOf,
 } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
+import { transportStatusOf } from '../dev/main.js';
 import {
   dwellHintOf,
   flagLineOf,
@@ -1345,6 +1346,17 @@ const MODE: SurfaceAdapter = {
     'mode/disclosure.ts#BASIC_WINDOW_VALUE',
     'mode/parity.ts#parityViolations',
     'mode/parity.ts#parityRefusal',
+    /*
+     * The transport's status strip — GitHub issue #71, and it belongs to **this** adapter rather
+     * than to one of its own.
+     *
+     * `dev/main.ts#transportStatusOf` composes two of the renderings above into one line. An
+     * adapter of its own would have to build the same items from the same recording to drive it,
+     * which is a second answer to *what does this run disclose* — and the parity check a few lines
+     * down would then be checking a list that is not the list on screen. So it is seeded here, off
+     * the items that were already derived.
+     */
+    'dev/main.ts#transportStatusOf',
   ],
   render(context) {
     const { recording } = context;
@@ -1402,6 +1414,34 @@ const MODE: SurfaceAdapter = {
     for (const [index, broken] of parityViolations(items).entries()) {
       seeds.push({ field: `parityViolations[${String(index)}]`, text: broken.message, role: 'reason' });
     }
+    /*
+     * The line the transport actually prints, in both modes — issue #71.
+     *
+     * `estimate`, because that is what it is: `AWT` and `WT95` are the two figures `awtIsValid`
+     * speaks for, and on a run whose mean is refused this line carries the refusal instead. Seeding
+     * it as anything softer would exempt the one string on the shell that a reader glances at
+     * without opening a panel.
+     */
+    for (const mode of VIEW_MODES) {
+      const status = transportStatusOf(items, mode);
+      if (status === undefined) continue;
+      const awt = itemsIn(items, mode).find((item) => item.id === 'awt');
+      seeds.push({
+        field: `${mode}.transportStatus`,
+        text: status,
+        role: 'estimate',
+        /*
+         * The `n` is **on the line**, which is what makes seeding it as an estimate legal — and it
+         * is there because this seed put it there. Driven into the corpus reading `AWT 13.1 s ·
+         * WT95 27.4 s`, the search failed six cases on R13 clause one at once; the count comes off
+         * the same `Rendering` the value does, so `declaredCount` reads it from the item rather
+         * than re-parsing the line this adapter just built.
+         */
+        declaredCount: awt?.rendering.count === undefined ? undefined : countOf(awt.rendering.count),
+        countShown: awt?.rendering.count !== undefined,
+      });
+    }
+
     const refusal = parityRefusal(items);
     if (refusal !== undefined) seeds.push({ field: 'parityRefusal', text: refusal, role: 'reason' });
 
@@ -2523,6 +2563,18 @@ const REPORT_PANEL: SurfaceAdapter = {
     'dev/reportPanel.ts#diagnosisRowsOf',
     'dev/reportPanel.ts#emptyReportView',
     'dev/reportPanel.ts#runProgressOf',
+    /*
+     * The lever cards, and the table that decides which of them navigate — issue #38.
+     *
+     * They reach this adapter through `reportViewOf`, which is `leverRowsOf(shaped.levers)`, and the
+     * loop below already seeds every card's title and body. `LEVER_SURFACES` is named here rather
+     * than excluded because it is not separable from them: the derived scanner reads its hyphenated
+     * ids as prose, and the honest answer is that the words a player sees on those cards **are**
+     * driven — what the table adds is a `TabName`, which is an element id and reaches no sentence.
+     * An exclusion would have had to claim the cards are unchecked, which is false.
+     */
+    'dev/reportPanel.ts#leverRowsOf',
+    'dev/reportPanel.ts#LEVER_SURFACES',
   ],
   render(context) {
     const seeds: TextSeed[] = [];

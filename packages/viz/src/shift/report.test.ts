@@ -401,6 +401,69 @@ describe('energy is an axis, never a score — § D106', () => {
       String(clean.summary.energy.deliveredLegCount),
     );
   });
+
+  /* ---------------------------------------------------------------------- *
+   * The axis a player may put away — GitHub issue #70
+   * ---------------------------------------------------------------------- */
+
+  /** The sheet, with the energy preference answered either way. */
+  const sheetWith = (showEnergyAxis: boolean | undefined): ShapedDayReport =>
+    dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
+      ...(showEnergyAxis === undefined ? {} : { showEnergyAxis }),
+    });
+
+  it('takes the pair off the sheet when the reader has put the axis away', () => {
+    /*
+     * **Move the control and require the rendering to change** — § D230's form of the standing
+     * requirement, for a control that configures a *disclosure* rather than a run. § D250 measured
+     * the old state: with a run on screen the whole shell's text was **byte-identical** with this
+     * switch on and off, because its only consumer chain ended at `parityRefusal`, a string that is
+     * empty whenever parity holds. This is the first surface it moves.
+     */
+    const shown = sheetWith(true).figures.map((cell) => cell.id);
+    const hidden = sheetWith(false).figures.map((cell) => cell.id);
+    expect(shown, 'the sheet no longer publishes the energy pair at all').toContain('energy-work');
+    expect(hidden, 'the switch was moved and the sheet did not change').not.toEqual(shown);
+  });
+
+  it('takes both or neither, never one of the two — § D106', () => {
+    /*
+     * The pair is the axis. `workPerServedLegKJ` without `workKJ` is a per-leg efficiency with
+     * nothing to read it against, which is exactly the score this project refuses — a configuration
+     * that spends less by serving fewer people has not saved anything.
+     */
+    const hidden = sheetWith(false).figures;
+    expect(hidden.filter((cell) => cell.id.startsWith('energy-'))).toEqual([]);
+    expect(hidden.filter((cell) => cell.axisOnly)).toEqual([]);
+  });
+
+  it('takes nothing else off the sheet with it', () => {
+    // The other direction. A preference about one axis that quietly dropped a wait figure would be
+    // the suppression `docs/10` R3 forbids, wearing a settings row.
+    const shown = sheetWith(true).figures.map((cell) => cell.id);
+    const hidden = sheetWith(false).figures.map((cell) => cell.id);
+    expect(hidden).toEqual(shown.filter((id) => !id.startsWith('energy-')));
+  });
+
+  it('shows the axis to a caller that has no player to ask', () => {
+    /*
+     * `DEFAULT_SETTINGS.showEnergyAxis` is `false` and this default is **show**, which is
+     * `DEFAULT_RUN_SUMMARY_OPTIONS`' rule and its argument verbatim: the honesty sweep and the
+     * acceptance suites are describing a run rather than serving a preference, and a run description
+     * that dropped an axis because a menu somewhere defaults it off would be the honesty search
+     * measuring a surface the product does not show.
+     */
+    expect(sheetWith(undefined).figures.map((cell) => cell.id)).toEqual(
+      sheetWith(true).figures.map((cell) => cell.id),
+    );
+  });
 });
 
 describe('where it went wrong is derived from the run', () => {

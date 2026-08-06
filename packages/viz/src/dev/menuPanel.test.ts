@@ -142,6 +142,12 @@ function recorder(): Recorder {
       getAttribute(key: string) {
         return node.attrs.get(key) ?? null;
       },
+      // Grown because `coverShell` started calling it, which is the only rule this recorder has
+      // ever been grown by — `inert` has to come **off** the shell when the overlay closes, and a
+      // recorder that could only ever add attributes would report the covering as permanent.
+      removeAttribute(key: string) {
+        node.attrs.delete(key);
+      },
       append(...kids: Recorded[]) {
         node.children.push(...kids);
       },
@@ -231,10 +237,16 @@ function render(
   state: MenuState,
   loaded: MenuCatalogue,
   overrides: Partial<MenuPanelHost> = {},
-): Recorder & { readonly asked: MenuIntent[]; readonly draw: () => void } {
+): Recorder & {
+  readonly asked: MenuIntent[];
+  readonly draw: () => void;
+  /** The one stand-in for the page behind the overlay — see the `inert` cases. */
+  readonly shell: Recorded;
+} {
   const made = recorder();
   const { doc, root } = made;
   const asked: MenuIntent[] = [];
+  const shell = doc.createElement('div') as unknown as Recorded;
   const host: MenuPanelHost = {
     doc,
     catalogue: loaded,
@@ -247,13 +259,14 @@ function render(
     challenge: () => undefined,
     commissioning: () => undefined,
     calendarPeriodId: () => '',
+    shell: () => [shell as unknown as HTMLElement],
     ...overrides,
   };
   const draw = (): void => {
     renderMenu(root as unknown as HTMLElement, host);
   };
   draw();
-  return { ...made, asked, draw };
+  return { ...made, asked, draw, shell };
 }
 
 /** The Free play screen, with the seed deliberately broken so `canStart` refuses. */
@@ -552,8 +565,8 @@ describe('the overlay behaves like the dialog it looks like', () => {
      * Measured on the shipped page before the change, with the Leaderboard overlay covering the
      * screen: `role: null`, `aria-modal: null`, `body[inert]: false`, and the shell's own tabs and
      * comboboxes still exposed. Issue #33's own words: *"There is no `dialog` role, no `aria-modal`,
-     * and no `inert`/`aria-hidden` on the background."* Two of those three are this file's; the
-     * third is `dev/main.ts`'s and is filed rather than faked here.
+     * and no `inert`/`aria-hidden` on the background."* All three are now asserted — the third by
+     * the `inert` cases below, over the elements `MenuPanelHost.shell` hands across.
      */
     const loaded = await catalogue();
     const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded);
@@ -602,7 +615,60 @@ describe('the overlay behaves like the dialog it looks like', () => {
     const controls = walk(root).filter((node) => node.attrs.has('data-menu-control'));
     focus(controls[0] ?? null);
     expect(press('Tab').prevented, 'the first control refused an ordinary forward Tab').toBe(false);
-    expect(press('Escape').prevented, 'the trap is reacting to keys that are not Tab').toBe(false);
+    /*
+     * The probe key was `Escape` and is now an ordinary letter, because Escape acquired a meaning:
+     * it closes the menu (below). The guard is unchanged and still says *the handler owns two keys
+     * and no others* — a trap that swallowed every keystroke would make the overlay unusable, and
+     * `a` is a key nothing here has any business claiming.
+     */
+    expect(press('a').prevented, 'the handler is reacting to keys it does not own').toBe(false);
+  });
+
+  it('closes the menu on Escape, on every screen including the root — issues #33, #68, #40', async () => {
+    /*
+     * § D249 § 3 refused binding Escape to `back`: *"it would work on five screens and do nothing on
+     * the root, which is exactly where #40's reporter is standing."* So the key is wired to `close`,
+     * which is a member of `MenuIntent` and therefore has an arm in the shell's exhaustive switch.
+     *
+     * Driven on the root **and** on a screen with a history, because the whole point of the refused
+     * alternative is that it behaves differently on the two.
+     */
+    const loaded = await catalogue();
+    for (const screen of ['main', 'settings'] as const) {
+      const { asked, press } = render({ ...initialMenuState(loaded), screen }, loaded);
+      expect(press('Escape').prevented, `${screen}: Escape was left to the browser`).toBe(true);
+      expect(asked, `${screen}: Escape asked for something other than a close`).toEqual([
+        { kind: 'close' },
+      ]);
+    }
+  });
+
+  it('takes the page behind it out of the document while it is up — issue #33', async () => {
+    /*
+     * The half § D249 § 3 filed as *needs `dev/main.ts`*. The trap holds the **keyboard**, and only
+     * over the controls this file built; it holds no pointer, and nothing focusable inside the
+     * overlay that came from elsewhere. Measured before either half existed: 7 focusable controls
+     * inside the overlay and **624 in the document**.
+     */
+    const loaded = await catalogue();
+    const { shell } = render(initialMenuState(loaded), loaded);
+    expect(shell.attrs.get('inert'), 'the page behind the overlay is still focusable').toBe('');
+    expect(shell.attrs.get('aria-hidden'), 'a screen reader can still walk the shell').toBe('true');
+  });
+
+  it('gives it back the moment the overlay is hidden', async () => {
+    /*
+     * The direction that would be catastrophic to get wrong, and the reason the covering is keyed on
+     * `root.hidden` with one writer rather than on a flag: a shell left `inert` after the menu
+     * closed is a page nobody can click, and it would look completely normal.
+     */
+    const loaded = await catalogue();
+    const { root, shell, draw } = render(initialMenuState(loaded), loaded);
+    expect(shell.attrs.has('inert')).toBe(true);
+    root.hidden = true;
+    draw();
+    expect(shell.attrs.has('inert'), 'the shell stayed inert behind a closed menu').toBe(false);
+    expect(shell.attrs.has('aria-hidden'), 'the shell stayed hidden behind a closed menu').toBe(false);
   });
 
   it('brings focus into the overlay, and puts it back on the same control after a redraw', async () => {

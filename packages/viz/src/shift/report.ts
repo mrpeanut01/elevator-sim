@@ -258,6 +258,38 @@ export interface DayReportInput {
   readonly dispatcherName?: string | undefined;
   /** The simulated second the shift clock calls 06:00. See {@link DAY_START_S}. */
   readonly dayStartS?: SimTime | undefined;
+  /**
+   * Whether to draw the energy pair — `Settings.showEnergyAxis`, arriving where it can be seen.
+   *
+   * ## The defect this closes, which was a control with no pixel
+   *
+   * GitHub issue #70, and § D250 is the measurement. `render/runSummary.ts#summaryFigureIds`
+   * honoured the setting; its only shipped caller was `mode/disclosure.ts#disclosureItems`, whose
+   * only shipped caller was `dev/main.ts#drawParity`, which turned the item list into
+   * `parityRefusal` — **empty whenever parity holds**, which is the shipped state. Measured with a
+   * run on screen: the whole shell's rendered text was **byte-identical** with the switch on and
+   * off. The two energy cells a player actually reads are {@link energyFigures}', and this input had
+   * no field for the preference, so the Day report *could not* honour it. § D250's own words: *"the
+   * fix is one required field and one caller"*. This is the field.
+   *
+   * ## Why it is optional here and required nowhere
+   *
+   * `undefined` is **show it**, which is what every caller that has no player gets — the acceptance
+   * suites, the honesty sweep, `scenario/`. That is `DEFAULT_RUN_SUMMARY_OPTIONS`' rule and its
+   * argument transfers verbatim: `DEFAULT_SETTINGS.showEnergyAxis` is `false` and this default is
+   * *show*, because a run description that silently dropped an axis because a menu somewhere
+   * defaults it off would be the honesty search measuring a surface the product does not show.
+   *
+   * ## What it may not become
+   *
+   * A **suppression**. § D106: energy is an axis, never a score, and it is drawn *beside* AWT and
+   * WT95 rather than folded into a grade. Withholding it takes the whole pair or neither — never
+   * one of the two, and never the ratio without the raw figure — because `workPerServedLegKJ`
+   * without `workKJ` is a per-leg efficiency with nothing to read it against, which is precisely
+   * the score this project refuses. {@link energyFigures} emits the pair; this decides whether the
+   * pair is emitted.
+   */
+  readonly showEnergyAxis?: boolean | undefined;
 }
 
 /**
@@ -408,7 +440,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         : `One run — ${recording.buildingName}`,
     metaLines: metaLinesFor(input, dispatcherName, dayStartS),
     lede: judgement.lede,
-    figures: figuresFor(summary, observations, dayStartS),
+    figures: figuresFor(summary, observations, dayStartS, input.showEnergyAxis ?? true),
     verdict: judgement.verdict,
     verdictLine: judgement.verdictLine,
     diagnosisHeading: judgement.diagnosisHeading,
@@ -708,6 +740,7 @@ function figuresFor(
   summary: VizSummary,
   observations: Observations,
   dayStartS: SimTime,
+  showEnergyAxis: boolean,
 ): readonly ReportFigure[] {
   return [
     {
@@ -745,7 +778,13 @@ function figuresFor(
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
-    ...energyFigures(summary),
+    /*
+     * The pair, or neither — issue #70, and § D106 is why it cannot be one of the two. A reader who
+     * has `workPerServedLegKJ` and not `workKJ` has a per-leg efficiency with nothing to read it
+     * against, which is the score this project refuses; a reader who has neither has one fewer axis
+     * and no false claim.
+     */
+    ...(showEnergyAxis ? energyFigures(summary) : []),
   ];
 }
 

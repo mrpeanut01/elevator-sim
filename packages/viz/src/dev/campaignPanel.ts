@@ -68,6 +68,7 @@ import {
 import { renderControls, valueAtSliderPosition } from '../controls/render.js';
 import type { Control, ControlValues } from '../controls/types.js';
 import { disclosureItems, rowClassesOf } from '../mode/disclosure.js';
+import type { GlossaryTerm } from '../mode/glossary.js';
 import { parityRefusal } from '../mode/parity.js';
 import { itemsIn, type ViewMode } from '../mode/types.js';
 import { recordRun } from '../record/recordRun.js';
@@ -466,12 +467,30 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         'figure-observation',
       ),
     );
-    nodes.push(admissionNode(stage));
+    const admission = admissionNode(stage);
+    nodes.push(admission.node);
+    /*
+     * Last, under the sentences that used the words — issue #22, and `dev/batchPanel.ts`'s reason.
+     * Both sources are `glossaryFor` over their **own** emitted text, so nothing here lists a term
+     * and nothing here can drift from what the briefing actually says.
+     */
+    nodes.push(...glossaryNodes([...briefing.glossary, ...admission.glossary]));
     return nodes;
   }
 
   /** What the chosen profile moves, and whether this stage opened it. */
-  function admissionNode(stage: CampaignStage): HTMLElement {
+  /**
+   * The *your setting* row, **and the words it used** — issue #22.
+   *
+   * A pair rather than two functions, because the second would have to call `admitProfile` again to
+   * find out what the first said: `ProfileAdmission.glossary` is `glossaryFor` over *that*
+   * admission's own sentence, so recomputing it means recomputing the sentence, and two calls are
+   * two answers to *is this profile admissible* that could disagree on the day the space moves.
+   */
+  function admissionNode(stage: CampaignStage): {
+    readonly node: HTMLElement;
+    readonly glossary: readonly GlossaryTerm[];
+  } {
     const baseline = profileById(stage.dispatcher.startingProfileId);
     /*
      * The **resolved** dispatcher, so the briefing describes what the candidate arm will actually
@@ -481,12 +500,17 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
      */
     const outcome = candidateProfileFor(stage);
     if (baseline === undefined || !outcome.ok) {
-      return row(
-        'your setting',
-        outcome.ok ? 'no profile selected' : outcome.reason,
-        undefined,
-        'figure-absent',
-      );
+      return {
+        node: row(
+          'your setting',
+          outcome.ok ? 'no profile selected' : outcome.reason,
+          undefined,
+          'figure-absent',
+        ),
+        // No admission was computed, so there is no admission text to have used a word. An empty
+        // list is the honest answer rather than a `glossaryFor` over a refusal this module wrote.
+        glossary: [],
+      };
     }
     const candidate = outcome.profile;
     const admission = admitProfile(
@@ -495,14 +519,55 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       candidate,
       editableIdsOf(stage.dispatcher.editable, loaded.space.ids),
     );
-    return row(
-      'your setting',
-      admission.sentence,
-      admission.admissible
-        ? undefined
-        : 'A stage names the dimensions it opens so that what it judges is what it offered. Pick a profile that stays inside them, or move to a stage that opens these.',
-      admission.admissible ? 'figure-observation' : 'figure-warning',
-    );
+    return {
+      node: row(
+        'your setting',
+        admission.sentence,
+        admission.admissible
+          ? undefined
+          : 'A stage names the dimensions it opens so that what it judges is what it offered. Pick a profile that stays inside them, or move to a stage that opens these.',
+        admission.admissible ? 'figure-observation' : 'figure-warning',
+      ),
+      glossary: admission.glossary,
+    };
+  }
+
+  /**
+   * The words a surface used, defined once each — issue #22.
+   *
+   * ## Three properties, each one a rule this repository already had
+   *
+   * **The plain language leads; it never replaces.** No row above is touched: every verdict,
+   * sentence and refusal is byte-identical to what it was before this block existed, which
+   * `campaignPanel.test.ts` asserts by rendering with and without terms and comparing the rest.
+   * § D240's rule 3.
+   *
+   * **The terms are derived, never listed.** `StageBriefing.glossary`, `StageReport.glossary` and
+   * `ProfileAdmission.glossary` are each `glossaryFor` over their own emitted text, so a sentence
+   * that stops using a word loses its definition on the same commit. This panel adds no list for
+   * that to drift from.
+   *
+   * **It may not become a ranking.** `mode/glossary.ts` sweeps every `plain` for comparative and
+   * ordering language; nothing here composes copy, so that sweep is the only way one could arrive.
+   *
+   * Deduplicated by `id` rather than by object identity: the producers return entries **from**
+   * `GLOSSARY_TERMS` by reference, so identity would work today and would fail silently the day one
+   * of them maps over them.
+   */
+  function glossaryNodes(terms: readonly GlossaryTerm[]): readonly HTMLElement[] {
+    const seen = new Set<string>();
+    const shown = terms.filter((entry) => !seen.has(entry.id) && seen.add(entry.id));
+    if (shown.length === 0) return [];
+    return [
+      row(
+        'the words above',
+        'What each term on this screen means. Definitions only — nothing here is a result, and ' +
+          'nothing here compares two settings.',
+        undefined,
+        'figure-observation',
+      ),
+      ...shown.map((entry) => row(entry.term, entry.plain, undefined, 'figure-observation')),
+    ];
   }
 
   /* ------------------------------------------------------------------ *
@@ -824,6 +889,9 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
         );
       }
     }
+    // The stage's own verdict words and the batch report's, in one block — issue #22. One screen,
+    // one vocabulary; `judge.ts` already notes that the two lists overlap and both are derived.
+    ui.output.append(...glossaryNodes([...verdict.glossary, ...report.glossary]));
   }
 
   /**

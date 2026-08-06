@@ -36,6 +36,7 @@
 
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import type { GlossaryTerm } from '../mode/glossary.js';
 import { goalReport, type GoalReport, type GoalReportRow } from '../scenario/goalReport.js';
 import type { BrowserResources } from './data.js';
 import {
@@ -388,6 +389,56 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
       drawComparisonRows(comparison.rows);
     }
     drawGoals(goals);
+    /*
+     * **Last, and after everything it explains** — GitHub issue #22.
+     *
+     * A vocabulary belongs under the sentences that used it rather than above them: a reader who
+     * already knows what a paired difference is should not have to scroll past the definition to
+     * reach the result, and a reader who does not knows exactly where to look the moment they meet
+     * the word. Both reports' terms go in one block because they are one screen.
+     */
+    drawGlossary([...report.glossary, ...goals.glossary]);
+  }
+
+  /**
+   * The words this screen used, defined once each — issue #22.
+   *
+   * ## Three properties, and each one is a rule this repository already had
+   *
+   * **The plain language leads; it never replaces.** Not one row above is touched: every figure,
+   * every sentence and every refusal is byte-identical to what it was before this block existed,
+   * which `batchPanel.test.ts` asserts by rendering with and without it and comparing the rest of
+   * the tree. § D240's rule 3, one surface over.
+   *
+   * **The terms are derived, never listed.** `BatchReport.glossary` and `GoalReport.glossary` are
+   * `glossaryFor(…)` over the reports' **own emitted text**, so a sentence that stops using a word
+   * loses its definition on the same commit — this panel adds no list of its own for that to drift
+   * from.
+   *
+   * **It may not become a ranking.** `mode/glossary.ts` sweeps every `plain` for comparative and
+   * ordering language and reworded one entry when it did; nothing here composes new copy, so the
+   * only way a ranking could reach this block is through that sweep.
+   *
+   * Deduplicated by `id` rather than by object identity: both reports return entries **from**
+   * `GLOSSARY_TERMS` by reference, so identity would work today and would stop working silently the
+   * day a producer maps over them. `figure-observation` because a definition is not a result.
+   */
+  function drawGlossary(terms: readonly GlossaryTerm[]): void {
+    const seen = new Set<string>();
+    const shown = terms.filter((entry) => !seen.has(entry.id) && seen.add(entry.id));
+    if (shown.length === 0) return;
+    ui.output.append(
+      row(
+        'the words above',
+        'What each term on this screen means. Definitions only — nothing here is a result, and ' +
+          'nothing here compares two settings.',
+        undefined,
+        'figure-observation',
+      ),
+    );
+    for (const entry of shown) {
+      ui.output.append(row(entry.term, entry.plain, undefined, 'figure-observation'));
+    }
   }
 
   /**

@@ -38,6 +38,7 @@ import {
   doorTimingFor,
   profileFromSpec,
   specFromProfile,
+  specIsDirty as dispatcherSpecIsDirty,
   type DispatcherSpec,
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
@@ -58,6 +59,7 @@ import {
 import {
   DEFAULT_PATTERN,
   demandFromSpec,
+  patternIsDirty,
   specFromTrafficProfile,
   trafficProfilesWithPattern,
   type PatternSpec,
@@ -403,17 +405,49 @@ export function weekForSession(state: ViewerState, stored: WeekState | undefined
 }
 
 /**
- * Change which building is running, taking the editor's working copy with it **when it is
+ * Change which building is running, taking the editors' working copies with it **when they are
  * untouched**.
  *
- * The two halves are both needed and they pull against each other. Leaving the copy alone means
+ * The two halves are both needed and they pull against each other. Leaving a copy alone means
  * opening the building editor after picking Vertical City shows Garden Apartments, which is a panel
  * describing a building nobody is looking at. Re-seeding it unconditionally means a reader who has
  * spent five minutes dragging an elevation loses it by touching the building select.
  *
- * So: re-seed only when the copy still equals the building it was read from. That is the ordinary
+ * So: re-seed only when the copy still equals the thing it was read from. That is the ordinary
  * rule for a working copy, and it is checkable here because `buildingSpec.ts` already has to answer
  * *is this dirty?* for the editor's own **edited — not saved** flag. One question, one answer.
+ *
+ * ## Two working copies, not one — GitHub issue #65
+ *
+ * The rule above was applied to `buildingSpec` and to nothing else, and the traffic editor is read
+ * from the building too: `sourcePatternOf` resolves `editingPatternId: 'building'` through
+ * `state.buildingId`, so the moment the building changed, the editor's untouched copy of Garden
+ * Apartments' profile was being compared against Vertical City's — and the panel said
+ * **edited — not saved** about a document nobody had edited. That is a *stale refusal*'s mirror
+ * image: a claim that work is at risk when none is, which trains a reader to ignore the one flag
+ * that means something. `patternSpec` now follows `buildingSpec`, under the same pristine guard and
+ * for the same reason.
+ *
+ * ## And the fabric does not follow — it is cleared
+ *
+ * {@link ViewerState.commissioning} is a `BankChoice` per **bank id**, and bank ids are a fact about
+ * one building. Carrying Garden Apartments' `main` over to Vertical City makes a choice set that
+ * `commissionedBuilding` will apply by name to whatever bank happens to share the id and drop on
+ * the floor otherwise — so the commissioning screen drew the previous scenario's shafts under the
+ * new building's name, and the review's capital figure was summed over hardware that is not there
+ * (issue #46).
+ *
+ * Empty is *as built*, and byte-identical to it, so clearing is the one value that means **nothing
+ * has been decided about this building** — which is exactly true the instant a different building
+ * arrives. It is not a re-seed for the same reason `asBuiltChoices` is not stored: a screen that
+ * has not been opened has decided nothing, and `commissioningInput` builds the as-built set when it
+ * needs one.
+ *
+ * There is no pristine guard on this half, and that is the difference rather than an omission. A
+ * working copy can be dirty *against its source* because it is a document being edited; a choice
+ * set cannot, because the bank ids it is keyed by stop existing. Nothing is preserved by keeping
+ * it — see `state.test.ts`, which moves the fabric, changes building, and requires the fabric to be
+ * gone.
  */
 export function withBuilding(
   state: ViewerState,
@@ -451,15 +485,98 @@ export function withBuilding(
       : contract.id === state.week.contractId
         ? state.week
         : takeContract(state.week, contract.id);
-  const next: ViewerState = { ...state, buildingId, week };
+  /*
+   * The fabric is dropped whenever the building actually moves, and left alone when it does not —
+   * `withBuilding` is called from the coach select on every `change`, including one that re-picks
+   * the building already running, and a re-pick that silently discarded a fabric would be the
+   * control moving back on its own.
+   */
+  const moved = buildingId !== state.buildingId;
+  const next: ViewerState = {
+    ...state,
+    buildingId,
+    week,
+    ...(moved ? { commissioning: [] } : {}),
+  };
+  const withPattern = moved ? withReseededPattern(next, resources, state) : next;
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
   const pristine =
     source !== undefined &&
     !buildingSpecIsDirty(state.buildingSpec, specFromBuilding(source, state.editingBuildingId));
-  if (!pristine) return next;
+  if (!pristine) return withPattern;
   const wanted = buildingConfigOf(resources, state.savedBuildings, buildingId);
+  if (wanted === undefined) return withPattern;
+  return {
+    ...withPattern,
+    buildingSpec: specFromBuilding(wanted, buildingId),
+    editingBuildingId: buildingId,
+  };
+}
+
+/**
+ * Take the traffic editor's working copy to the new building, when it is still the old one's.
+ *
+ * Only ever called for `editingPatternId: 'building'`, and that is the whole of the condition: a
+ * reader editing a *named* profile or one they saved is editing a document that has nothing to do
+ * with which building is running, and re-seeding there would throw their work away on a control
+ * that was not about it. `'building'` is the one selection whose source `sourcePatternOf` resolves
+ * through `state.buildingId`, so it is the one that goes stale when the building changes.
+ *
+ * `before` is the state as it was, because the dirty question is *"is this copy still the old
+ * building's profile?"* and the new building's is the wrong thing to ask it against.
+ */
+function withReseededPattern(
+  next: ViewerState,
+  resources: BrowserResources,
+  before: ViewerState,
+): ViewerState {
+  if (before.editingPatternId !== 'building') return next;
+  const was = buildingConfigOf(resources, before.savedBuildings, before.buildingId);
+  const source = specFromTrafficProfile(resources.trafficProfiles, was?.trafficProfile);
+  if (patternIsDirty(before.patternSpec, source)) return next;
+  const wanted = buildingConfigOf(resources, next.savedBuildings, next.buildingId);
   if (wanted === undefined) return next;
-  return { ...next, buildingSpec: specFromBuilding(wanted, buildingId), editingBuildingId: buildingId };
+  return {
+    ...next,
+    patternSpec: specFromTrafficProfile(resources.trafficProfiles, wanted.trafficProfile),
+  };
+}
+
+/**
+ * Change which dispatcher is driving, taking the editor's working copy with it — GitHub issue #65.
+ *
+ * `withBuilding`'s rule, on the other rail card, and it was missing for exactly as long: the rail
+ * wrote `dispatcherId` alone, so picking **collective** from the list left `editingDispatcherId` and
+ * `dispatcherSpec` on whatever profile had been opened before — a cost-function line, an advice
+ * sentence and a weight grid describing a dispatcher nobody is running, under a card marked
+ * *selected*. `runThisDispatcherStateOf` then offered *use this one* about the profile already
+ * driving, because it compares the two ids.
+ *
+ * The pristine guard is the same and it is load-bearing for the same reason: a reader who has spent
+ * five minutes moving weights and then wants to see what `collective` does keeps their copy, and the
+ * editor's **edited — not saved** flag goes on saying so. `specIsDirty` is the one question, asked
+ * once, exactly as `buildingSpecIsDirty` is above.
+ */
+export function withDispatcher(
+  state: ViewerState,
+  resources: BrowserResources,
+  dispatcherId: string,
+): ViewerState {
+  const next: ViewerState = { ...state, dispatcherId };
+  if (dispatcherId === state.dispatcherId) return next;
+  const source = allDispatchers(resources, state.savedDispatchers).find(
+    (profile) => profile.id === state.editingDispatcherId,
+  );
+  if (dispatcherSpecIsDirty(state.dispatcherSpec, source)) return next;
+  const wanted = allDispatchers(resources, state.savedDispatchers).find(
+    (profile) => profile.id === dispatcherId,
+  );
+  if (wanted === undefined) return next;
+  return {
+    ...next,
+    dispatcherSpec: specFromProfile(wanted, wanted.name),
+    editingDispatcherId: dispatcherId,
+  };
 }
 
 /** The disclosure mode in the handoff's own words. `mode/` calls the two levels basic/advanced. */

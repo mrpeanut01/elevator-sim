@@ -64,6 +64,7 @@ import {
 import { renderControls, renderUnsearchable, valueAtSliderPosition } from '../controls/render.js';
 import type { ControlNode } from '../controls/render.js';
 import type { Control, ControlEdit, ControlValues } from '../controls/types.js';
+import { glossaryFor } from '../mode/glossary.js';
 
 /** The id the picker uses for the profile-authorable space, which is not one declared schema. */
 const SEARCH_SPACE_SOURCE = '<dispatcher search space>';
@@ -227,7 +228,38 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
     const unsearchable = renderUnsearchable(space.unsearchable);
     if (unsearchable !== undefined) container.append(instantiateControlNode(doc, unsearchable));
 
-    status.textContent = formStatusLine(space, controls, values);
+    const line = formStatusLine(space, controls, values);
+    status.textContent = line;
+    /*
+     * **The two terms nothing else defines** — GitHub issue #22, and this is the wiring that
+     * matters most of the three.
+     *
+     * `formStatusLine` above and `controls/editedProfile.ts` are the *only* producers in the tree
+     * of **dead gate** and **authorable**. `mode/glossary.ts` defines both and holds them to its
+     * *attached to something real* clause, so neither can rot silently — but until this call they
+     * were definitions no player could reach, which is the shape this repository counts.
+     *
+     * `glossaryFor` is called on the line this function just built rather than on a field, because
+     * unlike the batch and campaign reports there is no report object here to carry one. It is pure
+     * and it reads nothing but the string it is handed, so what comes back is exactly what this
+     * sentence says — which is the same *derived, never listed* property the other two surfaces get
+     * from their `glossary` fields, reached one step more directly.
+     *
+     * The status line itself is **untouched**: the definitions go in a block beneath it, and
+     * `parameterForm.test.ts` asserts the sentence is byte-identical to what `formStatusLine`
+     * returned. The plain language leads; it never replaces.
+     */
+    const terms = glossaryFor([line]);
+    if (terms.length === 0) return;
+    const list = doc.createElement('div');
+    list.className = 'control-glossary';
+    for (const entry of terms) {
+      const item = doc.createElement('p');
+      item.className = 'control-inactive';
+      item.textContent = `${entry.term} — ${entry.plain}`;
+      list.append(item);
+    }
+    container.append(list);
   }
 
   function apply(edit: ControlEdit): void {

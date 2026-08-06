@@ -19045,16 +19045,23 @@ Wired this pass, all of them pure functions whose reports now carry a derived `g
 `campaign/brief.ts#briefingFor`, `campaign/dimensions.ts#admitProfile`, and
 `mode/disclosure.ts`'s two Casual leads.
 
-**The DOM mounts are not**, and they are stated here rather than left to be discovered. The
-vocabulary reaches a screen only when a panel draws the field, and three panels do not yet:
+**The DOM mounts were not**, and they were stated here rather than left to be discovered. The
+vocabulary reaches a screen only when a panel draws the field, and three panels did not:
 `dev/batchPanel.ts`, `dev/campaignPanel.ts` and `dev/parameterForm.ts`. That is § D240's own second
-finding repeating one lane over — *the renderings are better and nothing draws them* — and it is
+finding repeating one lane over — *the renderings are better and nothing draws them* — and it was
 recorded as an open gap with its named fix, not as coverage. Two of the six terms in issue #22's
-own list, *dead gate* and *authorable*, are produced **only** in files this lane does not own
-(`dev/parameterForm.ts`, `controls/editedProfile.ts`), so they are defined here and drawn nowhere
-until that routing lands. They are held to clause 4 of § D277 like every other entry: both are
-asserted to be phrases the shipped source really prints, so the definitions cannot quietly become
-ghosts while they wait.
+own list, *dead gate* and *authorable*, are produced **only** in files this lane did not own
+(`dev/parameterForm.ts`, `controls/editedProfile.ts`), so they were defined here and drawn nowhere
+until that routing landed. They were held to clause 4 of § D277 like every other entry: both are
+asserted to be phrases the shipped source really prints, so the definitions could not quietly become
+ghosts while they waited.
+
+**That routing has now landed and this paragraph is past tense because of it — [§ D272](DECISIONS.md).**
+All three panels draw the vocabulary, and `dev/parameterForm.ts` calls `glossaryFor` on the status
+line it builds, which is what makes *dead gate* and *authorable* readable by a player for the first
+time. The paragraph is corrected rather than deleted: a stated gap goes stale exactly the way a
+stated refusal does, and leaving this one standing would have told the next reader that two
+definitions are unreachable when they are not.
 
 ## D273 — a ramp is a shape and a day is a sequence, so the phases became data
 
@@ -19444,3 +19451,432 @@ player is a way to say *which part*. `menu/howToPlay.test.ts` § *names every de
 configuration ships* is **green** — the guide's prose already contains both words of `office-day` —
 so the guide will need a sentence distinguishing it when the viewer half lands, and does not fail
 today.
+
+---
+
+## D269 — a working copy follows the thing it was read from, and a choice set keyed by bank id does not follow at all
+
+**Date: 2026-08-06 · Written after the code.** Play-tester issues **#46** and **#65**, which are two
+reports of one missing rule: `withBuilding` re-seeded exactly one of the three things that are *about
+the building*, and nothing said why the other two were different.
+
+### What was reported
+
+**#46:** the commissioning screen showed the previous scenario's shafts under the new building's
+name. **#65:** the traffic editor said **edited — not saved** about a document nobody had edited, and
+the dispatcher card in the right rail left the dispatcher editor describing a profile nobody was
+running.
+
+### Three fields, three answers, and only one of them had been given
+
+`withBuilding` took `buildingSpec` across under a **pristine guard** — re-seed only while the copy
+still equals the building it was read from — with the argument written out: leaving it alone shows a
+panel describing a building nobody is looking at, and re-seeding unconditionally throws away five
+minutes of dragging an elevation. That argument is right, and it was applied to one field.
+
+`patternSpec` is the same kind of thing and needed the same answer. `trafficEditor.ts#sourcePatternOf`
+resolves `editingPatternId: 'building'` through `state.buildingId`, so an untouched copy of Garden
+Apartments' profile was compared against Vertical City's the instant the building moved, and the
+editor's dirty flag fired on a document nobody had touched. **That is a stale refusal's mirror
+image** — CLAUDE.md's rule that a control which writes nothing must say so, run backwards: a claim
+that work is at risk when none is, which trains a reader to ignore the one flag that means
+something. The condition is `editingPatternId === 'building'` and nothing else: a reader editing a
+*named* profile is editing a document that has nothing to do with which building is running, and
+re-seeding there would throw their work away on a control that was not about it.
+
+`commissioning` is **not** the same kind of thing, and that is the decision rather than an
+inconsistency. `CommissioningChoices` is a `BankChoice` per **bank id**, and a bank id is a fact
+about one building. Carried over, `commissionedBuilding` applies the choices by name to whatever bank
+happens to share an id and drops the rest, and `reviewCommissioning` sums capital over hardware that
+is not there. So there is no pristine guard on this half: a working copy can be dirty *against its
+source* because it is a document being edited; a choice set cannot, because the ids it is keyed by
+stop existing. It is **cleared**, and empty is *as built* and byte-identical to the authored
+building — the one value that means *nothing has been decided about this building*, which is exactly
+true the instant a different one arrives.
+
+Cleared only when the building actually **moves**. The coach select fires `change` for a re-pick of
+the building already running, and discarding a fabric there would be the inert-control failure with
+the sign flipped: the control moves, and then it moves back on its own.
+
+### The interlock, which is why this had to land with § D248 rather than after it
+
+With the transport fixed, the `set-commissioning` arm seeds `state.commissioning` from
+`asBuiltChoices` before writing back — so **touching** a dropdown latches a choice set onto the
+state. Before § D248 the field was usually empty and the staleness was invisible; after it, one pick
+on Garden Apartments follows the player to every building they visit. The clearing is what makes the
+repaired dropdowns safe, and shipping the two apart would have made #42's fix the cause of #46's
+worst case.
+
+### The rail wrote three fields directly, and one of them was the building
+
+`dev/rightRail.ts`'s dispatcher card was `context.update({ dispatcherId: entry.id })` — the id and
+nothing else — so picking **collective** from the list left `editingDispatcherId` and
+`dispatcherSpec` on whatever profile had been opened before: a cost-function line, an advice
+sentence and a weight grid describing a dispatcher nobody is running, under a card marked
+*selected*, and `runThisDispatcherStateOf` offering *use this one* about the profile already
+driving. `withDispatcher` is `withBuilding`'s rule on that card, pristine guard included.
+
+The **building** card beside it was worse and is the more instructive of the two: it wrote
+`{ buildingId: id }` and bypassed `withBuilding` entirely, so the week never followed the building
+into or out of its scenario, neither working copy moved, and — once the paragraph above landed — the
+fabric was not cleared either. `dev/main.ts`'s coach select has called `withBuilding` since it was
+written; this card is the other writer of the same field and did not. **One field, two writers, one
+of which knew about a rule the other had never heard of.**
+
+Both now go through the transition function, passed as a whole state to `MountContext.update` — a
+`ViewerState` **is** a `Partial<ViewerState>`, so it merges to exactly what the transition returned.
+No `replace` member was added: writing a state directly is the one thing that seam's docstring
+forbids a panel.
+
+### What is asserted, and why the state assertions are not enough on their own
+
+Both clearing assertions were watched failing against the old reducer before being trusted. But a
+test that only checks `commissioning` is `[]` is a test about a field, and this repository has
+shipped eleven behaviours that were configured, unit-tested and read by nothing. So the fabric and
+the dispatcher pick are each **compared on the legs** — `midtown-office` at 1 800 s, for
+`probes.test-helper.ts`'s measured reason that Garden Apartments produces 20 legs and two hydraulic
+cars answer every one, so a third car is never assigned and a live control reads dead.
+
+---
+
+## D270 — the menu had three ways out and all three were a choice, so Escape had nothing to press
+
+**Date: 2026-08-06 · Written after the code.** GitHub issues **#40**, **#33**, **#68**, **#28** and
+**#23** — five reports that turn out to be one missing intent and three lines of wiring.
+
+### The root was a one-way door, and that is why § D249 could not finish
+
+Every way out of the overlay was a mode being entered: **Start**, **Open the doors**, **Keep going**.
+That is a complete set of *choices* and an empty set of *changes of mind*. A player who pressed
+**Menu** over a running shift to check a setting had to start something to get back to the shift they
+were already watching.
+
+§ D249 § 3 hit the same wall from the other side and said so: Escape could not be bound to `back`,
+because *"it would work on five screens and do nothing on the root, which is exactly where #40's
+reporter is standing"*. So both issues need the same thing — a `close` intent — and it lands **with
+its arm**, because `dispatchMenu` returns `void` and has no `never` arm: a member nothing handles
+compiles and ships a dead control, which is the defect this package has shipped eleven times.
+
+The row is **Resume**, disabled and explained when there is no shift behind the menu. The reducer
+returns the state unchanged: hiding the overlay is the shell's, and a reducer that also navigated
+would be deciding *which screen the menu re-opens on*, which is `reopen`'s answer and not this one's
+to give twice.
+
+`closeMenu` latches `playerHasChosen` on this path too, and that is deliberate rather than an
+oversight in the new arm. The flag gates autoplay on the next `adopt`; a player who pressed
+**Resume** has left the menu on purpose, and a run they then re-roll should play. Resume itself
+starts nothing, so the shift on screen stays where the playhead left it.
+
+### `inert` on the shell: the shell names its own elements and the panel writes them
+
+The trap § D249 built holds the **keyboard**, and only over the controls the panel itself built. It
+holds no pointer, and nothing focusable inside the overlay that came from elsewhere. Measured before
+either half: **7 focusable controls inside the overlay and 624 in the document.**
+
+§ D249 § 3 filed the rest as *needs `dev/main.ts`*, on the ground that the shell's own elements are
+not the panel's to disable. They still are not — but they are the shell's to **name**, and
+`MenuPanelHost.shell` is that naming. `menuPanel.ts` then writes `inert` and `aria-hidden` from one
+value with one writer: the overlay's own `hidden`. A `document.body` traversal inside the panel would
+have been the panel deciding what the shell **is**, which is a second answer that can drift; a
+boolean threaded through the host would have been a second source that can disagree — in the
+direction that leaves the page permanently unclickable, which looks completely normal.
+
+The shell's own list is derived from `document.body.children` minus the two things it appended
+there, so an element added to `index.html` is covered on the day it lands. Both exemptions are the
+shell's own: the overlay cannot cover itself, and the wait live region announces **the menu's** own
+requests — a sign-in link taking half a minute (§ D243 § 4) — so hiding it while the menu is up would
+silence the one region the menu speaks through.
+
+`closeMenu` now redraws, which is what takes the covering back off. Setting `hidden` without drawing
+would hide the menu and leave the page underneath it out of the accessibility tree and unclickable.
+
+### Two one-liners that were waiting on this file rather than on a decision
+
+**#28:** `hasServer: () => client !== undefined`. `menu/screens.ts` cannot tell — the origin comes
+from a `<meta>` tag read at run time, so the same bytes are a connected build behind a server and an
+unconnected one behind a CDN — and it correctly says nothing when nobody has answered. The field
+stays optional, and the reason **changed rather than went away**: it was optional because the shell
+was another lane's; it is optional now because *absence has a meaning of its own*, and a required
+member would force a caller with no `<meta>` lookup to guess.
+
+**#23:** Start selected no tab, so reaching Free Play from the Day report hid the menu and left
+`panel-run` hidden — the reporter pressed *Start*, the screen went back to a sheet about the
+**previous** run, and the shift they had just configured played on a canvas nobody could see. The
+fix is `tab: 'run'`, and it is in `menu/enterFreePlay.ts` rather than in the shell's arm for that
+module's founding reason: a decision written inside a click handler needs a document and a click to
+reach, so it cannot be tested and it drifts. Asserted from a state on `report`, because asserting it
+from one already on `run` would pass against a function that writes nothing.
+
+### One test moved, and it is not a weakening
+
+The trap's *"the handler is reacting to keys that are not Tab"* guard probed with `Escape`, which
+now has a meaning. The probe moved to an ordinary letter; the guard is unchanged and still says *the
+handler owns two keys and no others*. The document recorder grew `removeAttribute`, which is the only
+rule it has ever been grown by — `inert` has to come **off**, and a recorder that could only add
+attributes would report the covering as permanent.
+
+---
+
+## D271 — a walk that reproduces the transport cannot measure it, and this one contained a copy of the defect
+
+**Date: 2026-08-06 · Written after the code.** `playthrough/walk.test.ts`, and nothing was red before
+or after.
+
+### The defect, which is the most instructive thing in this wave
+
+§ D248 § 4 diagnosed why three tiers of evidence were all green while every Commissioning dropdown
+and the Calendar were inert on the shipped page. The model walk *presses every option of every select
+on every screen*, and it said nothing about any of them, because it built the intent it pressed with
+**the same expression the panel used**:
+
+```ts
+row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+  ? { ...row.intent, value: option.id }
+  : row.intent
+```
+
+and then `continue`d past every row that fell into the fallback. Two copies of one condition can only
+ever agree. **The four broken transports were exactly the four this walk asserted nothing about**,
+and its own reach was the shape of the defect.
+
+§ D248 fixed the panel and added `menu/screens.test.ts`. The copy in the walk survived, because
+nothing was failing.
+
+### What replaced it, and why the skip condition is now a different question
+
+The case presses `menu/screens.ts#withChosenValue` — the shipped transport, exhaustive over
+`MenuIntent` with no `default`. What it skips is `REDUCER_OWNS`, which is a fact about
+**`applyIntent`** (*which intents does the reducer answer?*) rather than a restatement of the panel's
+condition. The three it omits write `ViewerState` rather than `MenuState`, and `applyIntent` returns
+the state unchanged for them by design, in an arm that says so.
+
+`set-challenge` is in the owned set and was not in the old expression: the reducer has always
+answered it, and the old ternary dropped it for no reason anybody had stated.
+
+A second case covers the half the first structurally cannot reach — for the three intents the shell
+owns, *the screen reflects it* is not a question this tier can ask, so what is asked is whether the
+**dispatched intent names the option that was picked**. A third requires the graph to reach selects
+on both sides of the split, without which either could pass vacuously.
+
+The rewrite was watched failing against a re-introduced fallback arm.
+
+### The rule, stated generally
+
+**A test may not build its subject the way its subject builds itself.** § D183's disclosure suite paid
+for this once with a fixture; this is the same failure in a walk, and the tell is the same: the test
+and the code contain the same expression, so the test can only confirm the code, never contradict
+it. Where a decision is exported — and in this package they nearly all are, for § D214 § 2's reason —
+the test presses the export.
+
+---
+
+## D272 — the layer was computed on every recording and dropped, and mounting it found an R13 violation on a line that had shipped for months
+
+**Date: 2026-08-06 · Written after the code, and two of the three findings came from printing what a
+function returns rather than from reasoning about it.** GitHub issues **#71**, **#70**, **#41**,
+**#38**, **#48** and **#59**.
+
+### #71 — `void itemsIn;`
+
+§ D240 § 2 measured it: `dev/main.ts`'s only consumer of `disclosureItems` was `drawParity`, which
+computed `parityRefusal(items)` and then wrote `void itemsIn;`, a deliberate no-op keeping the import
+used. The layer had a non-test caller that used it for a check and discarded its output — **the
+standing requirement's own shape one level in: a call whose return value is dropped looks exactly
+like a caller and is not one.**
+
+`transportStatusOf` mounts them. The transport's `AWT · WT95` was built from `recording.summary`
+directly, which made it mode-blind *and* made it a second copy of the R9 suppression that
+`mode/disclosure.ts` already owns; both go together, because the renderings this now reads are the
+ones `drawParity` checks — so the line on screen and the parity claim about it can no longer be about
+two different lists.
+
+Written on `adopt` and on a mode change rather than in `renderAll`. `#status` is also where four
+transient messages land, each of which restores itself after its own moment, and a writer inside
+`renderAll` would clobber whichever was on screen the next time any state moved. Those are the two
+moments the derived text can change.
+
+**Seeding it into the honesty corpus failed six generated cases immediately**, in both modes:
+`AWT 13.1 s · WT95 27.4 s` is an estimate with no count beside it — R13 clause one, *"`n = 5` is not a
+caveat on `11.3 s`; it is part of what `11.3 s` means"*. The finding is about the **shipped strip**,
+not about the new function, and it had been invisible for exactly the reason the whole issue is:
+nothing on that line went through the layer that classifies a figure as an estimate. The count was on
+the `Rendering` all along.
+
+**Two more, found by printing the output.** The first routing dropped the refusal: on a run whose
+mean is refused it produced `average wait suppressed (n = 201 rides)` and nothing about why, where
+the old strip read `AWT suppressed — <reason>`. That is R3 with the refusal deleted, on the surface a
+reader glances at without opening a panel — a **worse** line than the one being replaced. Appending
+the reason per figure was the second draft, and it printed a 300-character sentence twice, because
+`awt` and `wt95` are refused by one `awtIsValid` call and carry the same words. The reasons are
+deduplicated and said after the figures.
+
+`render/mood.ts`'s two jargon-carrying drivers and `rightRail.ts`'s measured plate rows take a Casual
+lead under § D240's three rules — restate no figure, make no claim the source does not, let the
+source sentence follow verbatim. R10's static sweep refused the first draft's *"after a **certain**
+wait"*: `certain` is a probability word, and the rule is right to be blunt about it in a sentence
+sitting beside a count of people who gave up.
+
+### #70 — a setting with a sink and no screen
+
+§ D250 measured the whole chain: `summaryFigureIds` honoured `showEnergyAxis`, its only caller was
+`disclosureItems`, whose only caller was `drawParity`, which turned the items into `parityRefusal` —
+**empty whenever parity holds**, which is the shipped state. With a run on screen the shell's text
+was byte-identical with the switch on and off. Its own words: *"the fix is one required field and one
+caller"*.
+
+`DayReportInput.showEnergyAxis` is the field. It takes the **pair or neither** — § D106:
+`workPerServedLegKJ` without `workKJ` is a per-leg efficiency with nothing to read it against, which
+is the score this project refuses. `undefined` is *show it*, which is `DEFAULT_RUN_SUMMARY_OPTIONS`'
+rule verbatim: a caller with no player is describing a run, and one that silently dropped an axis
+because a menu defaults it off would be the honesty search measuring a surface the product does not
+show.
+
+The shell re-**shapes** the filed sheet rather than only redrawing it, because a `ShapedDayReport`
+already holds its figure list. `dayReportOf` is pure and re-running it is free; `closeShift` is what
+banks a day and is deliberately not re-entered, so the input it was shaped from is held beside it.
+
+### #41 — two numbers that were the same at every width and every building
+
+`QUEUE_GUTTER_PX` (280) and `OVERLAY_WIDTH_PX` (250) went to `buildLayout` unchanged whatever was
+drawn, so 530 px of canvas was scenery whether the building had two shafts or thirty-five. Measured:
+**Vertical City drew 27 of 35 at 1920** — `RS-05`'s notice doing its job, and eight shafts of a
+building whose whole subject is its shafts off the picture on the largest screen anybody has.
+
+The obvious fix computes the plot width a shaft count needs. It would need `MIN_SHAFT_WIDTH_PX` and
+the shaft gap, both private to `render/layout.ts`, and a copy of either is a second answer to *how
+wide is a legible shaft*. So nothing computes a fit: `stageLayoutFor` walks a ladder of requests and
+**asks the layout** — `hiddenShaftCount` is that file's own measurement of this question, already
+carried for the notice. The rungs yield in `fitGutters`' own order and for its stated reason, and the
+last rung asks for **nothing**, which hands the layout its documented default rather than a floor
+copied from it.
+
+### #38 — a card that named a tab and did not go there
+
+*"…and the Building tab will let you feel how much it buys."* The lever cards are the one place on
+the sheet that tell a reader to do something, and they were the one place with nothing to press,
+while the Compare block under the small print has been a navigation since it landed.
+
+`LEVER_SURFACES` maps the two cards that are a **fabric** change onto the Building tab. The other two
+are deliberately absent: *Weight fairness up* and *Ask where they're going* are both a different
+dispatcher, and a card that navigated to the dispatcher editor with a lever named would be this sheet
+recommending a dispatch strategy off one replication — R2, and CLAUDE.md's paired-t rule. Asserted in
+both directions on one run, so the restraint cannot pass by there being no navigable card at all.
+
+A navigable card is a `<button type="button">`; a card with no surface stays the `<div>` it was,
+because an element that looks pressable and does nothing is the inert control this repository counts.
+
+The derived scanner flagged `LEVER_SURFACES` as an unclassified prose producer — its ids are
+hyphenated. It is named in the `REPORT_PANEL` adapter's `covers` rather than excluded: the cards'
+words are genuinely driven there already, and an exclusion would have claimed otherwise.
+
+### #48 — a design phase that could not be finished
+
+Every dropdown on the commissioning screen already wrote `ViewerState.commissioning` on the pick, so
+the fabric was live and the screen still had no way to say *I am done*. A design phase you cannot
+leave deliberately is one whose result arrives by accident, on whichever run happens next.
+
+`commit-commissioning` and `reset-commissioning` land with their arms, for § D270's reason. Commit
+closes the menu, selects the simulation and runs; reset writes `[]` and only redraws, because a
+player still on the screen has not said they are finished and re-running would spend a simulation on
+a fabric they are mid-decision on. Reset is offered only once something has moved — a cancel that is
+always available where nothing has changed is a control whose press changes nothing.
+
+The preview is `CommissioningReview.moved` through `movedChoiceText`, the diff that module already
+computes. It says what the hardware **would be** and nothing about what it would buy: the screen has
+simulated nothing, so a ranking there would be the confident nonsense the statistical discipline
+exists to prevent. The capital figure is not restated — a limit shown twice starts reading like the
+thing being optimised, which is `commissioning/types.ts`'s own argument.
+
+**The R2 sweep is scoped to the preview line, and that is a finding rather than a concession.** Over
+the whole screen it went red on the capital legend's *"more shafts, **faster** cars and a
+taller-rated class each commit more"* (§ D230). That sentence interpolates `CAPITAL_UNITS_PER_MPS`
+and says what a choice **costs**, which is the one comparison this screen is allowed to make. A check
+that can only pass by deleting a true sentence is the wrong check.
+
+### #59's remainder — one slug is left, and it stays
+
+Swept the Compare surface: after § D236 renamed the goal rows' arms, the only slug left is the rows'
+own labels, which are `goalLabel(spec)` and therefore `GoalKind` — kebab-case, seven of them.
+
+**It stays, because it is a key rather than a sentence.** `data/scenario-goals.json` names goals by
+these ids and `docs/10` § 10.4 quotes them; renaming it on the surface would break the one link a
+reader has between a row and its definition — the same argument `goalReport.ts` already makes for
+keeping `armId` and `dispatcherProfileId` on the row. So the honest requirement is not *no slugs*, it
+is **no unexplained slug**, and `batchPanel.test.ts` requires all seven to reach a `mode/glossary.ts`
+definition in both of `goalLabel`'s forms, derived from `GOAL_KINDS` so an eighth cannot arrive
+unexplained.
+
+### The three panels § D278 filed as an open gap now draw the vocabulary
+
+§ D278's closing section named the gap precisely — *"the vocabulary reaches a screen only when a
+panel draws the field, and three panels do not yet"* — and it is closed here. `dev/batchPanel.ts`
+draws `BatchReport.glossary` and `GoalReport.glossary`; `dev/campaignPanel.ts` draws
+`StageBriefing`'s, `StageReport`'s and `ProfileAdmission`'s. Both put the block **last**, under the
+sentences that used the words: a reader who already knows what a paired difference is should not
+scroll past the definition to reach the result.
+
+`dev/parameterForm.ts` is the one that mattered. It has no report object, so `draw` calls
+`glossaryFor` on the status line it has just built — pure, and reading nothing but the string it is
+handed. `formStatusLine` and `controls/editedProfile.ts` are the **only** producers of *dead gate*
+and *authorable* in the tree, so both terms were defined, both were held to § D277's *attached to
+something real* clause, and neither could be read by anybody. § D278 said as much and expected the
+routing; this is it.
+
+Two properties are asserted rather than promised. **The plain language leads and never replaces** —
+no existing row is touched, and the definitions go beneath the sentence that used the word. And the
+terms are **deduplicated by `id` rather than by object identity**: the producers return
+`GLOSSARY_TERMS` entries by reference, so identity holds today and would fail silently the day one of
+them maps over the table.
+
+`admissionNode` now returns its terms beside its node rather than gaining a sibling that would call
+`admitProfile` again — two calls are two answers to *is this profile admissible*, and they would
+disagree the day the space moves.
+
+---
+
+## D279 — the ten-hour day is offered because it ships, and this is the smaller of the two fixes § D276 named
+
+**Date: 2026-08-06 · Written after the code.** The red test § D276 left named, closed.
+
+### What was red, and why leaving it red was right until now
+
+`packages/viz/src/menu/menu.test.ts` § *every shipped template can be run at some offered length*
+failed on `office-day`. That guard is derived from `data/` rather than written about a template, and
+its own comment states what it enforces: *"a template that ships and fits inside none of the offered
+run lengths would be listed in the menu and unstartable at every one of them."* `office-day` declares
+`durationMin: 600`; `FREE_PLAY_DURATIONS_S` offered 5, 15, 30, 60 and 120 minutes.
+
+A catalogue-derived guard turning red is that guard working — the same thing § D264 point 4 records
+happening to `menu/howToPlay.test.ts` when `office-down-peak` landed. § D276 left it red and named
+because both fixes were outside that change's ownership.
+
+### Which of the two fixes this is, and which it is not
+
+§ D276 names two and prefers the second:
+
+- **a longer offered length**, which makes Free Play offer a ten-hour run;
+- **a part-of-day window** — § D275's unbuilt `windowStartS`/`windowEndS` plus the control that
+  writes it — which makes the day startable at *any* length by running a slice of it, and which is
+  what *make the day the unit of play* actually asks for.
+
+This is the first. The second is the right feature and it is **unbuilt**: § D275 refused the two
+knobs it needs by name, and building it reaches `core` and `data/`. Choosing the smaller fix is not
+a judgement that it is the better one — it is the observation that a record which ships and cannot be
+started from any surface is a worse state than a long session, and that the precedent for exactly
+this problem already exists. § D213 § 8, when `constant-iso` landed: *"`FREE_PLAY_DURATIONS_S` and
+`ACCEPTED_DURATIONS_S` gain 7 200 s so the template is playable at all."* Same problem, same move,
+one record later.
+
+**It does not close the window question**, and the constant says so in its own docstring: when the
+slice control lands, this entry stops being the only way to reach `office-day` and may well be
+dropped.
+
+### The second guard that fired, and it fired correctly
+
+`menu/howToPlay.test.ts` then went red: the guide's *Run length* sentence lists the offered lengths
+and is checked against `FREE_PLAY_DURATIONS_S` itself, so a constant that moves and a sentence that
+does not is caught rather than shipped. That is the § D213 shape the whole file is written against —
+a hand-maintained list that stopped tracking the data it was built from — and it worked. The sentence
+now reads *six* and names 600, with a clause saying **why** the longest is there, because a run
+length an order of magnitude past the others is the kind of number a reader assumes is a mistake
+unless something says otherwise.
