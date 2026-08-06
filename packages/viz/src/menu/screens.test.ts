@@ -45,7 +45,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
+import { asBuiltChoices, movedChoiceText, withBankChoice } from '../commissioning/choices.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
 import {
   CONSTRAINTS,
@@ -69,6 +69,7 @@ import {
   type CommissioningScreenInput,
   type MenuAffordance,
   type MenuIntent,
+  type MenuScreenView,
   type MenuViewInput,
 } from './screens.js';
 import { MENU_SCREENS, type MenuScreen, type MenuState } from './types.js';
@@ -414,6 +415,156 @@ describe('the root menu says which rows need a server', () => {
     // teach their subject with the server off, so disabling them would hide the only thing they can
     // still do — and a player who cannot open the challenge screen cannot read what a challenge is.
     for (const row of rootWith(false)) expect(row.enabled, row.id).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The design phase can be finished — GitHub issue #48
+ * -------------------------------------------------------------------------- */
+
+describe('the commissioning screen can be committed, cancelled and read', () => {
+  const fabricScreen = (over: CommissioningScreenInput): MenuScreenView =>
+    screenOf({ ...ARM, commissioning: over, state: stateAt('commissioning') });
+
+  /** The shipped arm, with one bank's shafts moved — a fabric that is definitely not as built. */
+  function movedArm(): CommissioningScreenInput {
+    const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+    if (building === undefined) throw new Error('midtown-office is not loaded');
+    const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+    const built = asBuiltChoices(building, classes);
+    const first = built[0];
+    if (first === undefined) throw new Error('midtown-office has no bank');
+    const choices = withBankChoice(built, { ...first, shafts: first.shafts + 1 });
+    const constraint = constraintById('new-build') ?? CONSTRAINTS[0];
+    if (constraint === undefined) throw new Error('no constraints ship');
+    return {
+      ...commissioningArm(),
+      choices,
+      review: reviewCommissioning({
+        base: building,
+        choices,
+        classes,
+        specs: RESOURCES.elevatorSpecs,
+        constraint,
+      }),
+    };
+  }
+
+  it('offers a commit, and it is what takes the fabric into the week', () => {
+    /*
+     * Issue #48. Every dropdown on this screen already wrote `ViewerState.commissioning` on the
+     * pick (§ D248), so the fabric was live — and the screen still had no way to say *I am done*.
+     * A design phase you cannot leave deliberately is one whose result arrives by accident, on
+     * whichever run happens next.
+     */
+    const commit = fabricScreen(commissioningArm()).rows.find((row) => row.id === 'commissioning.commit');
+    expect(commit, 'the fabric screen still has no way to finish').toBeDefined();
+    expect(commit?.intent).toEqual({ kind: 'commit-commissioning' });
+  });
+
+  it('refuses the commit in words when the review refuses the configuration', () => {
+    /*
+     * The refusal belongs beside the **verb**, and it is a different sentence from the ones beside
+     * the controls: each select's own `disabledWhy` says what is wrong with that dimension, and
+     * this says why the configuration as a whole may not open a week — a claim no single select can
+     * make. `retrofit` opens nothing, so every move is out of scope and the review refuses.
+     */
+    const arm = movedArm();
+    const building = RESOURCES.buildings.find((entry) => entry.id === 'midtown-office')?.config;
+    if (building === undefined) throw new Error('midtown-office is not loaded');
+    const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+    const retrofit = constraintById('retrofit');
+    if (retrofit === undefined) throw new Error('retrofit does not ship');
+    const refused: CommissioningScreenInput = {
+      ...arm,
+      constraintId: retrofit.id,
+      review: reviewCommissioning({
+        base: building,
+        choices: arm.choices,
+        classes,
+        specs: RESOURCES.elevatorSpecs,
+        constraint: retrofit,
+      }),
+    };
+    const commit = fabricScreen(refused).rows.find((row) => row.id === 'commissioning.commit');
+    expect(commit?.enabled, 'a refused configuration can still open a week').toBe(false);
+    expect(commit?.disabledWhy ?? '', 'the commit refuses in silence').not.toBe('');
+  });
+
+  it('offers a cancel only once something has moved — S7', () => {
+    // A cancel that is always available on a screen where nothing has changed is a control whose
+    // press changes nothing, which is the defect this repository counts.
+    const untouched = fabricScreen(commissioningArm()).rows.find((row) => row.id === 'commissioning.reset');
+    expect(untouched?.enabled, 'a fabric nobody moved offers something to put back').toBe(false);
+    expect(untouched?.disabledWhy ?? '').not.toBe('');
+
+    const moved = fabricScreen(movedArm()).rows.find((row) => row.id === 'commissioning.reset');
+    expect(moved?.enabled, 'a moved fabric cannot be put back').toBe(true);
+    expect(moved?.intent).toEqual({ kind: 'reset-commissioning' });
+  });
+
+  it('previews what would be built, in the diff commissioning/ already computed', () => {
+    /*
+     * The preview is `CommissioningReview.moved` through `movedChoiceText` — the sentence that
+     * module already writes for one moved dimension. Nothing is re-derived: a preview that
+     * recomputed *what changed* would be a second answer to a question `refusals.ts` has answered,
+     * and the two would disagree the day a fourth dimension lands.
+     */
+    const arm = movedArm();
+    const said = fabricScreen(arm).notices.join(' ');
+    expect(arm.review.moved.length, 'this arm moves nothing, so the preview has nothing to say').toBeGreaterThan(0);
+    for (const moved of arm.review.moved) {
+      expect(said, `the preview omits ${moved.id}`).toContain(movedChoiceText(moved));
+    }
+  });
+
+  it('says nothing at all about what a change would buy — R2', () => {
+    /*
+     * The line the preview may not cross. This screen has simulated nothing, so it has measured
+     * nothing, and a preview that ranked two fabrics off no replications would be exactly the
+     * confident nonsense CLAUDE.md's statistical discipline is written against. Every clause is a
+     * statement of what the hardware **would be**.
+     *
+     * ## Scoped to the preview line, and the reason is a real sentence it would otherwise flag
+     *
+     * The first draft swept every notice on the screen and went red on the capital legend's *"more
+     * shafts, **faster** cars and a taller-rated class each commit more"* (§ D230 § #24). That
+     * sentence is about **price** — it interpolates `CAPITAL_UNITS_PER_MPS` and says what a choice
+     * costs, which is the one comparison this screen is allowed to make. Sweeping it would have
+     * been a check that could only pass by deleting a true statement, so the sweep is narrowed to
+     * the line this change authored rather than the rule being loosened.
+     */
+    const preview = fabricScreen(movedArm())
+      .notices.filter((line) => line.includes('would be commissioning'))
+      .join(' ')
+      .toLowerCase();
+    expect(preview, 'there is no preview line to sweep').not.toBe('');
+    for (const word of ['faster', 'better', 'improve', 'worse', 'recommend', 'should choose']) {
+      expect(preview, `the preview says "${word}" about a fabric nothing has run`).not.toContain(word);
+    }
+  });
+
+  it('explains what the screen is for before it explains what the number is not', () => {
+    // Issue #48's design brief. #24 reported three questions this screen knew the answers to and
+    // printed none of; this is the fourth — *what am I choosing between?* A player who does not
+    // know what a machine class is cannot act on a sentence about capital units.
+    const notices = fabricScreen(commissioningArm()).notices;
+    expect(notices[0] ?? '', 'the screen still opens on the capital caveat').toContain('shafts');
+    expect(notices.join(' ')).toContain('machine class');
+  });
+
+  it('carries no capital figure into the preview — the limit is stated once', () => {
+    /*
+     * `commissioning/types.ts`'s whole argument: a currency shown twice starts reading like the
+     * thing being optimised. The figure lives in `review.sentence`, in one place, and the preview
+     * repeats neither number.
+     */
+    const arm = movedArm();
+    const preview = fabricScreen(arm).notices.filter((line) => line.includes('would be commissioning'));
+    expect(preview.length, 'there is no preview line to check').toBe(1);
+    for (const figure of [String(arm.review.capitalUnits), String(arm.review.budgetUnits)]) {
+      expect(preview[0] ?? '', `the preview restates ${figure}`).not.toContain(figure);
+    }
   });
 });
 

@@ -54,6 +54,7 @@ import {
   type CommissioningChoices,
 } from '../commissioning/types.js';
 import { refusalsBeside, type CommissioningReview } from '../commissioning/refusals.js';
+import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
@@ -171,6 +172,39 @@ export type MenuIntent =
     }
   /** Choose which capital constraint the week is commissioned under. */
   | { readonly kind: 'set-constraint'; readonly constraintId: string }
+  /**
+   * Take the fabric on screen into the week — GitHub issue #48.
+   *
+   * ## Why a screen whose controls already worked still needed this
+   *
+   * `set-commissioning` writes `ViewerState.commissioning` on every pick, so the choices were
+   * *already* live. What the screen had no way to say was **I am done**: no commit, no cancel, and
+   * nothing that took the player anywhere afterwards. A design phase you cannot leave deliberately
+   * is a design phase whose result arrives by accident, on whichever run happens next.
+   *
+   * So this is the moment the fabric stops being a draft, and it is also the only moment the screen
+   * has to refuse: `CommissioningReview.admissible` is false whenever anything is over budget or out
+   * of the constraint's scope, and a commit is where that refusal belongs — beside the verb, not
+   * scattered over three selects that are each individually fine.
+   *
+   * It carries nothing. *Which choices* is `ViewerState.commissioning`, which the shell already
+   * holds; putting them on the intent would be a second copy that could disagree with the screen
+   * the player is looking at.
+   */
+  | { readonly kind: 'commit-commissioning' }
+  /**
+   * Put the fabric back to what the building already has — issue #48's other half.
+   *
+   * **Not an undo stack.** It resets to *as built*, which is `ViewerState.commissioning`'s empty
+   * value and is byte-identical to the authored building: one step, no history, and the same value
+   * `withBuilding` writes when the building changes (§ D269). A per-pick undo would be a second
+   * model of the choices beside the one the reducer holds.
+   *
+   * It is offered **only when something has moved**, because a cancel that is always available on a
+   * screen where nothing has changed is a control whose press changes nothing — `docs/16` S7, and
+   * the defect this repository counts.
+   */
+  | { readonly kind: 'reset-commissioning' }
   /** Post the whole seed set. Never a partial one — see `challengeSubmissionOf`. */
   | { readonly kind: 'post-challenge' };
 
@@ -263,6 +297,8 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'submit-score':
     case 'run-challenge':
     case 'post-challenge':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
       return intent;
   }
 }
@@ -1466,11 +1502,103 @@ function commissioningBody(input: MenuViewInput): Body {
     .filter((refusal) => refusal.bankId === null)
     .map((refusal) => refusal.message);
 
+  /*
+   * **The two verbs the screen did not have** — issue #48.
+   *
+   * Every dropdown above already wrote `ViewerState.commissioning` on the pick (§ D248), so the
+   * fabric was live and the screen still had no way to say *I am done* or *put it back*. Commit
+   * last, cancel above it: the order is *the thing you came to do, then the way out of it*, which
+   * is the order every other screen in this file puts its commit in.
+   */
+  const moved = state.review.moved.length > 0;
+  rows.push({
+    id: 'commissioning.reset',
+    label: 'Put it back as built',
+    detail: moved
+      ? `Undo all ${String(state.review.moved.length)} ${
+          state.review.moved.length === 1 ? 'change' : 'changes'
+        } and return to the building as it stands.`
+      : 'The fabric is what the building already has.',
+    kind: 'commit',
+    scope: 'between-games',
+    // Offered only when something has moved. A cancel that is always available on a screen where
+    // nothing has changed is a control whose press changes nothing — `docs/16` S7.
+    enabled: moved,
+    ...(moved
+      ? {}
+      : { disabledWhy: 'Nothing has been changed yet, so there is nothing to put back.' }),
+    intent: { kind: 'reset-commissioning' },
+  });
+  rows.push({
+    id: 'commissioning.commit',
+    label: 'Commission it',
+    detail: 'Take this fabric into the week. Nothing here moves again once the doors do.',
+    kind: 'commit',
+    scope: 'between-games',
+    enabled: state.review.admissible,
+    /*
+     * The refusal beside the **verb**, and it is a different sentence from the ones beside the
+     * controls. Each select's own `disabledWhy` says what is wrong with that dimension; this says
+     * why the configuration as a whole may not open a week, which is a claim no single select can
+     * make. `refusals` is the review's, joined and not rewritten — a refusal is pinned by the run
+     * that produced it, never by a second sentence about it.
+     */
+    ...(state.review.admissible
+      ? {}
+      : {
+          disabledWhy: state.review.refusals.map((refusal) => refusal.message).join(' '),
+        }),
+    intent: { kind: 'commit-commissioning' },
+  });
+
   return {
     rows: Object.freeze(rows),
-    notices: Object.freeze([COMMISSIONING_NOTE, state.buildingName, state.review.sentence]),
+    notices: Object.freeze([
+      // The brief first: *what am I choosing* before *what the number is not*. A player who does
+      // not yet know what a machine class is cannot act on a sentence about capital units.
+      COMMISSIONING_BRIEF,
+      COMMISSIONING_NOTE,
+      state.buildingName,
+      state.review.sentence,
+      ...previewLines(state.review),
+    ]),
     issues: Object.freeze(whole),
   };
+}
+
+/**
+ * What this configuration would be, before it is committed — issue #48's preview.
+ *
+ * ## Every word of it is `commissioning/`'s own
+ *
+ * `CommissioningReview.moved` is the diff `movedChoices` computed, and `movedChoiceText` is the
+ * sentence that module already writes for one moved dimension. Nothing is re-derived here: a
+ * preview that recomputed *what changed* would be a second answer to a question `refusals.ts` has
+ * already answered, and the two would disagree on the day a fourth dimension lands.
+ *
+ * ## What it may not say, and does not
+ *
+ * **What the change will buy.** Every line is a statement of *what the hardware would be* — `2 → 4`
+ * shafts, `hydraulic → gearless-traction` — and not one of them says faster, better or worth it.
+ * That is `docs/10` R2 and CLAUDE.md's paired-t rule at the same time: this screen has run nothing,
+ * so it has measured nothing, and a preview that ranked two fabrics off no replications would be
+ * the confident nonsense this project exists to avoid. The capital figure is not restated either —
+ * it appears in `review.sentence` above, in exactly one place, because a limit shown twice starts
+ * reading like a score.
+ *
+ * Empty when nothing has moved, which is the honest answer rather than *"no changes"*: the notice
+ * slot is not a place to say that a section has nothing in it.
+ */
+function previewLines(review: CommissioningReview): readonly string[] {
+  if (review.moved.length === 0) return [];
+  const changes = review.moved
+    .map((moved) => `${moved.bankId} ${DIMENSION_LABELS[moved.dimension]} ${movedChoiceText(moved)}`)
+    .join('; ');
+  return [
+    `What you would be commissioning, against what the building has now: ${changes}. This says ` +
+      'what the hardware would be, and nothing about what it would buy — nothing has been ' +
+      'simulated yet.',
+  ];
 }
 
 /**
@@ -1484,6 +1612,36 @@ const COMMISSIONING_NOTE =
   'Choose the fabric before the week opens, then live with it — nothing here moves once the doors ' +
   'do. The capital figure is a limit on what you may build, not a score: it is never compared ' +
   'between players, never shown beside a wait, and never enters a verdict.';
+
+/**
+ * What this screen is *for* — GitHub issue #48's design brief.
+ *
+ * ## Why one more paragraph on a screen that already had a note
+ *
+ * {@link COMMISSIONING_NOTE} says what the capital figure is **not**, which is the sentence this
+ * module could not do without. What no sentence said is what a player is being asked to *decide*:
+ * #24 reported three questions this screen knew the answers to and printed none of, and this is the
+ * fourth — *what am I choosing between, and when does it stop being changeable?*
+ *
+ * ## The three things it may not say, and does not
+ *
+ * 1. **No ranking, and no recommendation.** It names the three dimensions and the constraint; it
+ *    does not say which choice is better, because nothing has been simulated and one replication
+ *    could not settle it anyway (CLAUDE.md's paired-t rule, and `docs/10` R2).
+ * 2. **No unmeasured mechanism.** Every clause is a fact about **what the code does** — the fabric
+ *    is fixed for the week, the constraint decides what may move — never about what a choice buys.
+ *    The one sentence that would need a measurement is the one about geometry beating dispatch, and
+ *    it is absent for exactly that reason.
+ * 3. **No second copy of the capital rule.** The limit is stated once, in the note above. Said
+ *    twice it starts reading like the thing being optimised, which is `commissioning/types.ts`'s
+ *    whole argument about a currency that quietly becomes a score.
+ */
+const COMMISSIONING_BRIEF =
+  'Three things per bank: how many shafts it has, which machine class goes in them, and what ' +
+  'speed those are rated for. What you may move is the constraint’s to decide — retrofit freezes ' +
+  'the fabric entirely, refurbishment keeps the shafts you have, and a new build opens all three. ' +
+  'Change what you want, then commission it: from that point the week runs on this building, and ' +
+  'the only thing left to move is how the cars are dispatched.';
 
 /* ------------------------------------------------------------- leaderboard */
 
@@ -1667,6 +1825,8 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'set-calendar':
     case 'set-commissioning':
     case 'set-constraint':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
       // The shell's, because each writes `ViewerState` rather than `MenuState` — the fabric and the
       // calendar are facts about the run, not about which screen is showing.
       return state;

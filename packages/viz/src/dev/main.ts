@@ -1465,6 +1465,41 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
 
+      case 'commit-commissioning':
+        /*
+         * **The fabric stops being a draft** — GitHub issue #48.
+         *
+         * `state.commissioning` is already written, pick by pick, so this arm changes no choice.
+         * What it does is what the screen had no way to say: leave the design phase and open the
+         * week on it. `runShift` because the fabric is `between-games` and this is the moment
+         * between games — the player has finished choosing, and the run they see next is the one
+         * they chose. Every other commit in this switch does exactly this pair.
+         *
+         * No guard here on `review.admissible`: `menu/screens.ts` disables the row and says why,
+         * which is `docs/16` S7's rule that a control which cannot be honoured is not offered. A
+         * second check would be a second answer to *may this open a week*, and the two would
+         * disagree the day the review gains a gate.
+         */
+        state = { ...state, tab: 'run' };
+        closeMenu();
+        runShift();
+        return;
+
+      case 'reset-commissioning':
+        /*
+         * Back to as built — the screen's other verb. `[]` is `ViewerState.commissioning`'s *as
+         * built* and is byte-identical to the authored building, so this is one step rather than an
+         * undo stack: a per-pick history would be a second model of the choices beside the one the
+         * reducer holds.
+         *
+         * `drawMenu` and **not** `runShift`. The player is still on the commissioning screen and
+         * has not said they are finished; re-running here would spend a simulation on a fabric they
+         * are in the middle of deciding, and would move the shift under the menu they are reading.
+         */
+        state = { ...state, commissioning: [] };
+        drawMenu();
+        return;
+
       case 'run-challenge':
         runChallenge();
         return;
