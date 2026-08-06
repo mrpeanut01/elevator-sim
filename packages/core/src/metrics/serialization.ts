@@ -77,6 +77,14 @@ export const passengerRecordSchema = z.strictObject({
   // unchanged. Required here rather than tolerated: without it a run on an access-zoned building
   // cannot be stored and replayed, which is invariant 5 (`DECISIONS.md` § D266).
   refusedAt: simTime.optional(),
+  // Absent on every run that declares no `patience`, so a record written before patience existed
+  // parses unchanged. Required here for `refusedAt`'s reason and found the same way: the recorder
+  // has emitted it since patience shipped, and this schema is a `strictObject`, so **any** run
+  // declaring patience threw `Unrecognized key: "abandonedAt"` and could not be stored or replayed
+  // — invariant 5. It went unnoticed because no shipped configuration declares patience, so no
+  // golden run and no persistence case ever wrote one. Reproduced at `midtown-office`, 6 %/5 min,
+  // 120 s mean patience: 322 of 657 legs carried the key and the parse refused all of them.
+  abandonedAt: simTime.optional(),
   carId: z.string().min(1).optional(),
   bankId: z.string().min(1).optional(),
   // Destination dispatch only, and optional in both directions: a record written before the

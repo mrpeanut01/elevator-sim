@@ -209,6 +209,21 @@ export function replaySimulationConfig(
       ? {}
       : { doorObstructionProbability: sim.doorObstructionProbability }),
     ...(sim.maxEvents === undefined ? {} : { maxEvents: sim.maxEvents }),
+    /*
+     * Patience, and it is the one field here that changes **who is served** rather than how fast.
+     *
+     * Every other line in this block tunes the machinery. This one decides whether a rider is still
+     * standing there, so a replay that dropped it would carry the people who gave up — a different
+     * run, reported as a failure to reproduce. That is exactly what it was: `endedAt` 1 800 s
+     * stored against 1 884 s replayed, with a second occupant in the first car on the same seed.
+     *
+     * It had to be added in **three** places, and the order they were found in is the point: the
+     * record schema refused `abandonedAt` outright, so nothing ever reached this far; fixing that
+     * made the parse succeed and the *replay* disagree; and fixing the stored config made the
+     * disagreement smaller rather than gone, because this rebuild never read the field. Invariant 5
+     * is only satisfied at the last of the three.
+     */
+    ...(sim.patience === undefined ? {} : { patience: sim.patience }),
     // A stored run that timed out is a legitimate measurement of a saturated configuration, and
     // it was stored, so it was not thrown at the time. Replaying it under the default `throw`
     // would turn reading the archive into an error — so the stored policy is honoured, and

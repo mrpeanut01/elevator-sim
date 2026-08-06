@@ -59,6 +59,7 @@
  *   estimate ({@link ConvergenceReport}), because 10 replications and 200 are different claims.
  */
 
+import type { PatienceConfig } from '@elevator-sim/core';
 import type {
   BatchSizeCurve,
   CredentialAssignment,
@@ -213,6 +214,15 @@ export interface StoredSimOptions {
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
   readonly onTimeout?: TimeoutPolicy | undefined;
+  /**
+   * How long riders will stand before giving up, when the run declared it.
+   *
+   * Carried for invariant 5's reason and no other: patience changes *who is served*, so a replay
+   * without it is a different run. It was omitted here while the recorder was already emitting
+   * `abandonedAt`, so a patience run failed to parse — and once that was fixed, failed to
+   * reproduce, which is the same violation one layer down and the more expensive half to find.
+   */
+  readonly patience?: PatienceConfig | undefined;
 }
 
 /**

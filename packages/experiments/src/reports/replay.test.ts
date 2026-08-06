@@ -168,6 +168,46 @@ describe('a stored run replays to an identical result', () => {
     expect(replayed.runId).toBe('sweep-0007');
     expect(replayed.record.metadata).toEqual({ candidate: 'w-0.25', round: 3 });
   }, 60_000);
+
+  it('stores and replays a run whose riders gave up', () => {
+    /*
+     * Invariant 5 for the one feature that had never been round-tripped.
+     *
+     * `passengerRecordSchema` is a `strictObject` and did not declare `abandonedAt`, while the
+     * recorder has emitted it for every abandoning leg since patience shipped. So **any** run
+     * declaring `patience` threw `Unrecognized key: "abandonedAt"` on parse and could not be stored
+     * or replayed. Nothing caught it because no shipped configuration declares patience, so no
+     * golden run and no case in this file had ever written one — the gap was in the fixtures, not
+     * in the assertions.
+     *
+     * The configuration is chosen to make riders actually leave rather than to be quick: at the
+     * fast fixture building nobody waits long enough, and a case that abandons nobody would pass
+     * against the very schema that refuses this key. `abandoned > 0` is asserted first for exactly
+     * that reason — it is the non-vacuity guard, not decoration.
+     */
+    const stored = parseStoredRun(
+      serializeStoredRun(
+        storedRun(config, {
+          seed: 20260726,
+          buildingId: 'midtown-office',
+          overrides: {
+            durationS: 1800,
+            demand: { arrivalRatePctPop5min: 6 },
+            patience: { meanS: 120, distribution: 'exponential' as const },
+          },
+        }),
+      ),
+    );
+
+    const abandoned = stored.record.passengers.filter((leg) => leg.abandonedAt !== undefined);
+    expect(abandoned.length).toBeGreaterThan(0);
+    // The value survives, not merely the key: a schema that stripped it would still parse.
+    for (const leg of abandoned) expect(leg.abandonedAt).toBeGreaterThan(0);
+
+    expect(assertIdenticalReplay(stored, sources).record.passengers).toEqual(
+      stored.record.passengers,
+    );
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

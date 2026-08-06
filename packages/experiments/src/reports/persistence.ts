@@ -56,6 +56,7 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import { PATIENCE_DISTRIBUTIONS, type PatienceConfig } from '@elevator-sim/core';
 import {
   CREDENTIAL_ASSIGNMENTS,
   DEMAND_LEVELS,
@@ -969,6 +970,7 @@ function parseSimOptions(value: unknown, path: Path): StoredSimOptions {
     'doorObstructionProbability',
     'maxEvents',
     'onTimeout',
+    'patience',
   ]);
   return Object.freeze({
     ...spread('transferWalkS', readOptional(object, 'transferWalkS', path, expectNumber)),
@@ -986,6 +988,31 @@ function parseSimOptions(value: unknown, path: Path): StoredSimOptions {
         expectEnum(entry, entryPath, TIMEOUT_POLICIES),
       ),
     ),
+    ...spread('patience', readOptional(object, 'patience', path, parsePatience)),
+  });
+}
+
+/**
+ * The patience block, when the run declared one.
+ *
+ * Carried because it changes **who is served**: riders who gave up in the stored run would be
+ * carried in a replay that did not know about them, so the replay is a different run. That is not
+ * hypothetical — it is what this omission did, and it surfaced only after `abandonedAt` was added
+ * to `passengerRecordSchema`: the parse stopped throwing and the *replay* started disagreeing,
+ * `endedAt` 1 820 s against 2 948 s on the same seed.
+ *
+ * `distribution` and `meanS` are required because {@link PatienceConfig} requires them and there is
+ * deliberately no default patience — a defaulted one would put an unstated behaviour into a run
+ * that never asked for it. `spreadS` and `minS` are optional in both directions.
+ */
+function parsePatience(value: unknown, path: Path): PatienceConfig {
+  const object = expectObject(value, path);
+  rejectUnknownKeys(object, path, ['distribution', 'meanS', 'spreadS', 'minS']);
+  return Object.freeze({
+    distribution: expectEnum(object['distribution'], [...path, 'distribution'], PATIENCE_DISTRIBUTIONS),
+    meanS: expectNumber(object['meanS'], [...path, 'meanS']),
+    ...spread('spreadS', readOptional(object, 'spreadS', path, expectNumber)),
+    ...spread('minS', readOptional(object, 'minS', path, expectNumber)),
   });
 }
 
@@ -1159,6 +1186,7 @@ function simOptionsOf(config: SimulationConfig): StoredSimOptions | undefined {
     ...spread('doorObstructionProbability', config.doorObstructionProbability),
     ...spread('maxEvents', config.maxEvents),
     ...spread('onTimeout', config.onTimeout),
+    ...spread('patience', config.patience),
   });
   return Object.keys(sim).length === 0 ? undefined : sim;
 }
