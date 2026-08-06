@@ -163,7 +163,13 @@ describe('a run that declares no window is untouched by the field existing', () 
         ...(named ? { windowStartS: 0, windowEndS: 600 * 60 } : {}),
       });
     expect(JSON.stringify(runOf(true))).toBe(JSON.stringify(runOf(false)));
-  });
+    // Two ten-hour days of `midtown-office`, and the only case in this file that runs the kernel
+    // rather than the generator. It costs 2.5 s alone and **timed out against the 5 s default under
+    // a full-suite run**, where 340 files share the pool — passing in isolation and failing in
+    // `npm test` is the worst way for a test to be wrong, because the failure looks like the code.
+    // The three identity suites this one mirrors carry 60–180 s for the same reason; it was the
+    // one that did not.
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
