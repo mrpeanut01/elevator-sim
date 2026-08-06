@@ -21,7 +21,7 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
+import { DATA_DIR, fixtureConfig, suppressedConfig } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { WAIT_BANDS, moodOf, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
@@ -533,14 +533,19 @@ describe('decisionRowViewOf', () => {
  * -------------------------------------------------------------------------- */
 
 describe('a suppressed run yields no mean anywhere in the left rail', () => {
-  /** The one that saturates hardest at the shipped rates — `live/noMeans.test.ts`'s choice. */
-  const SUPPRESSED_ID = 'vertical-city';
+  /**
+   * The refused run — `live/noMeans.test.ts`'s choice, and `DECISIONS.md` § D260's rate.
+   *
+   * This read *"the one that saturates hardest at the shipped rates"*. It did, and it did because of
+   * § D254's pickup access check rather than because of its traffic; served properly the building
+   * completes at 100 % delivery and quotes its mean. `suppressedConfig` states the rate instead.
+   */
   let config: LoadedConfig;
   let recording: VizRecording;
 
   beforeAll(async () => {
     config = await loadConfig(DATA_DIR);
-    recording = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+    recording = recordRun(suppressedConfig(config)).recording;
   }, 600_000);
 
   it('really is suppressed, or the rest of this proves nothing', () => {

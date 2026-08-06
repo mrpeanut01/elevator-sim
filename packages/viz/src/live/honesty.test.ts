@@ -1,11 +1,17 @@
 /**
  * The honesty card, on runs whose refusal is real.
  *
- * Not asserted on a stub with `awtIsValid: false` bolted on: `midtown-office` and `vertical-city`
- * saturate at the shipped traffic rates and `garden-apartments` does not, which gives both the
- * refusal and its negative control from runs the viewer can actually produce. Suppression that
- * fires everywhere is indistinguishable from a module that never computes anything, and this
- * repository has shipped that shape before.
+ * Not asserted on a stub with `awtIsValid: false` bolted on: `suppressedConfig` saturates and
+ * `garden-apartments` does not, which gives both the refusal and its negative control from runs the
+ * viewer can actually produce. Suppression that fires everywhere is indistinguishable from a module
+ * that never computes anything, and this repository has shipped that shape before.
+ *
+ * **The refused run is now a rate rather than a building** — `DECISIONS.md` § D260. It read
+ * *"`midtown-office` and `vertical-city` saturate at the shipped traffic rates"*, which was true
+ * and was true for the wrong reason on the second of them: § D254's pickup access check stranded
+ * `vertical-city`'s landing calls and the backlog read as saturation. Served properly the building
+ * completes at 100 % delivery, so the fixture states 16 % of population per five minutes and the
+ * refusal is the traffic's.
  *
  * The sharpest assertion is the one about the prototype: the design's disclosure computes *"queue
  * length rose by N persons"* from `waiting - 8`, a number off the screen rather than out of the
@@ -17,15 +23,20 @@ import { loadConfig, type LoadedConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig } from '../fixtures.test-helper.js';
+import {
+  DATA_DIR,
+  SUPPRESSED_BUILDING_ID,
+  breadthConfig,
+  suppressedConfig,
+} from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
 import { fallingBehindAt, honestyAt } from './honesty.js';
 import { syntheticRecording, waitingLeg } from './synthetic.test-helper.js';
 
-/** One that saturates at the shipped rates, and one that does not. */
-const SUPPRESSED_ID = 'vertical-city';
+/** One whose mean the run refuses, and one it stands behind. */
+const SUPPRESSED_ID = SUPPRESSED_BUILDING_ID;
 const QUOTABLE_ID = 'garden-apartments';
 
 let config: LoadedConfig;
@@ -33,9 +44,8 @@ const recordings = new Map<string, VizRecording>();
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  for (const id of [SUPPRESSED_ID, QUOTABLE_ID]) {
-    recordings.set(id, recordRun(breadthConfig(config, id)).recording);
-  }
+  recordings.set(SUPPRESSED_ID, recordRun(suppressedConfig(config)).recording);
+  recordings.set(QUOTABLE_ID, recordRun(breadthConfig(config, QUOTABLE_ID)).recording);
 }, 600_000);
 
 function recordingOf(id: string): VizRecording {
@@ -162,10 +172,27 @@ describe('the casual copy is the design’s, keyed on an observation', () => {
 describe('a closed shift is reported by its verdict, not by its empty last second', () => {
   it('the live casual card really does go calm on a refused run — the defect, reproduced', () => {
     const recording = recordingOf(SUPPRESSED_ID);
-    // `vertical-city` times out with people still standing, so its *own* terminal frame is honest.
-    // The one that is not is a run that drains, which is what a completed run does; the synthetic
-    // case below holds that shape still, and `dev/leftRail.test.ts` measures it on a real one.
     expect(meansAreSuppressed(recording)).toBe(true);
+
+    /*
+     * **Reproduced on the real run, which it could not be before § D260.**
+     *
+     * This said *"`vertical-city` times out with people still standing, so its own terminal frame is
+     * honest"*, and the defect therefore had to be shown against the synthetic recording below. That
+     * sentence described § D254's defect rather than the building: the pickup access check stranded
+     * the landing calls, so the run never cleared. Served properly, `suppressedConfig` is a run that
+     * **drains** — `completed`, nobody undelivered — and whose mean is refused all the same, which is
+     * exactly the shape this defect needs and the shape no shipped fixture used to produce.
+     *
+     * So the claim is now made twice: once on a run the viewer can actually produce, and once on the
+     * synthetic recording, which stays because it pins the same shape without depending on a rate.
+     */
+    const live = honestyAt(recording, recording.endedAt, 'casual');
+    expect(recording.status).toBe('completed');
+    expect(live.suppressed).toBe(true);
+    expect(live.fallingBehind).toBe(false);
+    expect(live.title).toBe('Comfortably keeping up');
+    expect(live.glyph).toBe('✓');
 
     const drained = syntheticRecording({
       summary: {
@@ -176,11 +203,11 @@ describe('a closed shift is reported by its verdict, not by its empty last secon
           'nothing.',
       },
     });
-    const live = honestyAt(drained, 300, 'casual');
-    expect(live.suppressed).toBe(true);
-    expect(live.fallingBehind).toBe(false);
-    expect(live.title).toBe('Comfortably keeping up');
-    expect(live.glyph).toBe('✓');
+    const synthetic = honestyAt(drained, 300, 'casual');
+    expect(synthetic.suppressed).toBe(true);
+    expect(synthetic.fallingBehind).toBe(false);
+    expect(synthetic.title).toBe('Comfortably keeping up');
+    expect(synthetic.glyph).toBe('✓');
   });
 
   it('carries the refusal into casual words once the shift is over — § 4’s never-hide list', () => {
