@@ -50,6 +50,7 @@ import {
   emptyReportView,
   figureViewOf,
   goalRowViewOf,
+  LEVER_SURFACES,
   leverRowsOf,
   reportViewOf,
   runProgressOf,
@@ -602,13 +603,58 @@ describe('the rest of the sheet', () => {
      */
     for (const recording of [clean, saturated]) {
       const report = reportOf(recording);
-      expect(leverRowsOf(report.levers)).toEqual(
+      expect(leverRowsOf(report.levers).map((row) => ({ title: row.title, body: row.body }))).toEqual(
         report.levers.map((lever) => ({ title: lever.title, body: lever.body })),
       );
     }
     expect(reportOf(clean).levers.map((lever) => lever.id)).not.toEqual(
       reportOf(saturated).levers.map((lever) => lever.id),
     );
+  });
+
+  it('sends the two fabric cards to the tab they name — issue #38', () => {
+    /*
+     * *"The blunt instrument. Costs a shaft, works immediately, and the **Building tab** will let
+     * you feel how much it buys."* The card is the one place on this sheet that tells a reader to
+     * do something, and it was the one place with nothing to press: it named a tab in prose and did
+     * not go there. Every other pointer on the surface — the Compare block under the small print —
+     * has been a navigation since it landed.
+     */
+    const rows = leverRowsOf(reportOf(clean).levers);
+    const addACar = rows.find((row) => row.title === 'Add a car');
+    expect(addACar, 'this run no longer offers the card the issue names').toBeDefined();
+    expect(addACar?.surface, 'the card names the Building tab and goes nowhere').toBe('building');
+  });
+
+  it('leaves the two dispatcher cards unclickable, and that is the restraint — R2', () => {
+    /*
+     * *Weight fairness up* and *Ask where they're going* are both **a different dispatcher**, and a
+     * card that navigated to the dispatcher editor with a lever named would be this sheet
+     * recommending a dispatch strategy off one replication — `docs/10` R2, and CLAUDE.md's *never
+     * declare one dispatcher better than another without a paired-t interval that excludes zero*.
+     *
+     * Asserted in both directions on the same run, so the case cannot pass by there being no
+     * navigable card at all.
+     */
+    const rows = leverRowsOf(reportOf(clean).levers);
+    const navigable = rows.filter((row) => row.surface !== undefined).map((row) => row.title);
+    const inert = rows.filter((row) => row.surface === undefined).map((row) => row.title);
+    expect(navigable.length, 'no card navigates anywhere, so the pair below proves nothing').toBeGreaterThan(0);
+    expect(inert, 'a dispatcher card acquired a destination').toContain('Weight fairness up');
+  });
+
+  it('names only cards the shift layer can actually emit', () => {
+    /*
+     * The table is keyed on `ReportLever.id`, and a hand-written key set is the shape this
+     * repository keeps finding stale. So it is checked against the ids `shift/report.ts` produces,
+     * over both fixture runs, rather than against a list transcribed beside it.
+     */
+    const emitted = new Set(
+      [clean, saturated].flatMap((recording) => reportOf(recording).levers.map((lever) => lever.id)),
+    );
+    for (const id of Object.keys(LEVER_SURFACES)) {
+      expect(emitted.has(id), `LEVER_SURFACES names "${id}", which no run emits`).toBe(true);
+    }
   });
 
   it('heads the diagnosis with the shift layer’s own words, and never with a fixed one — issue #56', () => {

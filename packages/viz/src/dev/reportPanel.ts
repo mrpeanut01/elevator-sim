@@ -118,7 +118,7 @@ import type {
 import { nextDay, takeContract } from '../shift/week.js';
 
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
-import type { ReportElements } from './elementMap.js';
+import type { ReportElements, TabName } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 
 /* -------------------------------------------------------------------------- *
@@ -181,7 +181,48 @@ export interface DiagnosisRowView {
 export interface LeverRowView {
   readonly title: string;
   readonly body: string;
+  /**
+   * The tab this card's advice is carried out on, or `undefined` for one that names no surface.
+   *
+   * GitHub issue #38. *"The Building tab will let you feel how much it buys"* names a tab and does
+   * not go there: the card is the one place on this sheet that tells a reader to do something, and
+   * it was the one place with nothing to press. Every other pointer on the surface — the Compare
+   * block under the small print — is already a navigation, so this is the existing seam applied to
+   * the four cards rather than a new idea.
+   *
+   * `undefined` rather than a default. A card whose advice is a *dispatcher* choice is carried out
+   * on a surface this sheet cannot name without picking one for the reader, which is the one thing
+   * `docs/10` R2 forbids it; see {@link LEVER_SURFACES}.
+   */
+  readonly surface?: TabName | undefined;
 }
+
+/**
+ * Which tab carries out each lever's advice — **the two that are a fabric change, and no others.**
+ *
+ * Issue #38, and the restraint is the decision rather than an omission.
+ *
+ * *Add a car* and *Zone the tower* are both edits to the building document: a car is a `CarConfig`
+ * and zoning is a bank's `servesFloors`, and the Building tab is where both are authored. Naming it
+ * is a statement about **where a control lives**, which is checkable and cannot go stale silently —
+ * `reportPanel.test.ts` asserts every id here is a card `shift/report.ts` can actually emit.
+ *
+ * The other two are deliberately absent. *Weight fairness up* and *Ask where they're going* are
+ * both **a different dispatcher**, and a card that navigated to the dispatcher editor with a lever
+ * named would be this sheet recommending a dispatch strategy off one replication — `docs/10` R2,
+ * and CLAUDE.md's *never declare one dispatcher better than another without a paired-t interval
+ * that excludes zero*. The sheet may say what today showed; it may not point at the control that
+ * would make one profile beat another. Their cards keep their words and stay unclickable, which is
+ * the honest difference and is asserted in both directions.
+ *
+ * Keyed on `ReportLever.id`, which is stable and is the same id the shift layer matches
+ * observations against — so a fifth lever arrives here as a missing entry (no navigation) rather
+ * than as a wrong one.
+ */
+export const LEVER_SURFACES: Readonly<Record<string, TabName>> = Object.freeze({
+  'add-a-car': 'building',
+  'zone-the-tower': 'building',
+});
 
 /**
  * One `before → after` pair — **both of them strings the sheets themselves published**.
@@ -467,7 +508,14 @@ export function diagnosisRowsOf(rows: readonly ReportDiagnosis[]): readonly Diag
 }
 
 export function leverRowsOf(levers: readonly ReportLever[]): readonly LeverRowView[] {
-  return levers.map((lever) => ({ title: lever.title, body: lever.body }));
+  return levers.map((lever) => {
+    const surface = LEVER_SURFACES[lever.id];
+    return {
+      title: lever.title,
+      body: lever.body,
+      ...(surface === undefined ? {} : { surface }),
+    };
+  });
 }
 
 /**
@@ -1003,18 +1051,40 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   function drawLevers(view: ReportView): void {
     fill(
       ui.levers,
-      ...view.levers.map((lever) =>
-        el(doc, 'div', {
-          className: 'report-lever',
-          children: [
-            el(doc, 'div', {
-              text: lever.title,
-              style: { 'font-size': '13px', 'font-weight': '600' },
-            }),
-            el(doc, 'div', { className: 'figure-note', text: lever.body }),
-          ],
-        }),
-      ),
+      ...view.levers.map((lever) => {
+        const words = [
+          el(doc, 'div', {
+            text: lever.title,
+            style: { 'font-size': '13px', 'font-weight': '600' },
+          }),
+          el(doc, 'div', { className: 'figure-note', text: lever.body }),
+        ];
+        /*
+         * **A card that names a tab goes there** — issue #38.
+         *
+         * A `<button>` rather than a click handler on the `<div>` that was here: the card is
+         * reached by Tab, announced as a control, and pressed with Space or Enter, none of which a
+         * clickable div is. `type="button"` because this sheet sits inside no form and a default
+         * submit would reload the page.
+         *
+         * A card with no surface stays the `<div>` it was, and that is the § D177 rule kept rather
+         * than bent: an element that looks pressable and does nothing is the inert control this
+         * repository counts, so the two cards that may not navigate do not look as though they can.
+         */
+        if (lever.surface === undefined) {
+          return el(doc, 'div', { className: 'report-lever', children: words });
+        }
+        const surface = lever.surface;
+        const card = el(doc, 'button', {
+          className: 'report-lever report-lever-goes',
+          attrs: { type: 'button' },
+          children: words,
+        });
+        card.addEventListener('click', () => {
+          context.openTab(surface);
+        });
+        return card;
+      }),
     );
   }
 

@@ -2563,6 +2563,18 @@ const REPORT_PANEL: SurfaceAdapter = {
     'dev/reportPanel.ts#diagnosisRowsOf',
     'dev/reportPanel.ts#emptyReportView',
     'dev/reportPanel.ts#runProgressOf',
+    /*
+     * The lever cards, and the table that decides which of them navigate — issue #38.
+     *
+     * They reach this adapter through `reportViewOf`, which is `leverRowsOf(shaped.levers)`, and the
+     * loop below already seeds every card's title and body. `LEVER_SURFACES` is named here rather
+     * than excluded because it is not separable from them: the derived scanner reads its hyphenated
+     * ids as prose, and the honest answer is that the words a player sees on those cards **are**
+     * driven — what the table adds is a `TabName`, which is an element id and reaches no sentence.
+     * An exclusion would have had to claim the cards are unchecked, which is false.
+     */
+    'dev/reportPanel.ts#leverRowsOf',
+    'dev/reportPanel.ts#LEVER_SURFACES',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
