@@ -747,8 +747,28 @@ describe('docs/05-roadmap.md § Phase 5 — which entry point regenerates which 
  * `PINNED_COVERAGE` now holds the counts and `derivedCoverageForms()` renders every precision the
  * documents print at. This asserts the document against that vocabulary, so the roadmap copy cannot
  * drift from the study again without going red.
+ *
+ * ## The table is **withdrawn**, and § D279 pointed this guard at that rather than around it
+ *
+ * `DECISIONS.md` § D256 withdrew H-ACCESS-1's verdict and *"the coverage table in
+ * `docs/05-roadmap.md` § H-ACCESS-1 … with them"*, and the document says so: its heading is struck
+ * through and marked `WITHDRAWN`. The rows underneath it are preserved as the record of what the
+ * study said while it was measuring the § D254 defect — which is what this repository does with a
+ * superseded figure, rather than deleting it.
+ *
+ * That left this guard comparing a **withdrawn** table against **live** pins, and § D279's re-pin
+ * is what made the mismatch visible. The two available repairs were to relax the guard, or to
+ * point it at the record the document is actually carrying. It is pointed: the rows must come from
+ * `withdrawnCoverageForms()`, **and** the heading must still carry the withdrawal marker, so a
+ * document cannot quietly promote the old numbers back to current by deleting one word. A third
+ * assertion keeps it from becoming an allowlist — the live vocabulary must be non-empty and must
+ * *not* contain the rows this table prints, which is what says the study has moved on from them.
+ *
+ * The guard therefore still fails on drift (a fourth set of numbers is in neither vocabulary), on
+ * silent un-withdrawal (the marker), and on a re-pin that did not take (the disjointness). What it
+ * no longer does is demand that a struck-through historical table track a live run.
  */
-describe('docs/05-roadmap.md § H-ACCESS-1 — the coverage table is derived, not transcribed', () => {
+describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is the withdrawn pins', () => {
   /** `| **0 of 30** | 18.2 | 33.5 % |` → `0 of 30 | 18.2 | 33.5 %`. */
   const normalizeRow = (row: string): string =>
     row
@@ -759,17 +779,39 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the coverage table is derived, no
       .slice(1) // drop the arm label; the numbers are what is pinned
       .join(' | ');
 
-  it('renders every published coverage row from the study’s own pins', async () => {
-    const { derivedCoverageForms } = await import('../benchmark/accessControl.js');
-    const legal = derivedCoverageForms();
+  it('renders every published coverage row from the study’s own withdrawn record', async () => {
+    const { derivedCoverageForms, withdrawnCoverageForms } = await import(
+      '../benchmark/accessControl.js'
+    );
+    const live = derivedCoverageForms();
+    const withdrawn = withdrawnCoverageForms();
 
-    expect(legal.size, 'the coverage vocabulary is empty — the pins are gone').toBeGreaterThan(3);
+    expect(live.size, 'the live coverage vocabulary is empty — the pins are gone').toBeGreaterThan(
+      3,
+    );
+    expect(
+      withdrawn.size,
+      'WITHDRAWN_COVERAGE is empty, so this guard would accept anything the live pins happen to ' +
+        'render and nothing else — see DECISIONS.md § D256, which withdrew these rows rather than ' +
+        'deleting them',
+    ).toBeGreaterThan(3);
 
     const roadmap = read('docs', '05-roadmap.md');
     const heading = roadmap.indexOf('**H-ACCESS-1 — coverage.');
     expect(heading, 'docs/05-roadmap.md no longer states H-ACCESS-1').toBeGreaterThan(0);
 
     const table = roadmap.slice(heading, roadmap.indexOf('\n\n', roadmap.indexOf('|', heading)));
+
+    // The marker, asserted before the numbers: these rows are legal *because* the table is
+    // withdrawn, so a table that stopped saying so would be quoting a defect as a measurement.
+    expect(
+      table.slice(0, table.indexOf('\n')),
+      'docs/05-roadmap.md § H-ACCESS-1 no longer marks its coverage table as withdrawn, but the ' +
+        'rows under it are the ones DECISIONS.md § D256 withdrew. Either the table was refreshed ' +
+        'from a current run — in which case check it against derivedCoverageForms() instead — or ' +
+        'the withdrawal was dropped and the document now asserts a defect as a measurement.',
+    ).toMatch(/WITHDRAWN/u);
+
     const rows = table
       .split('\n')
       .filter((line) => line.startsWith('| `'))
@@ -779,12 +821,31 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the coverage table is derived, no
       3,
     );
 
-    const undeclared = rows.filter((row) => !legal.has(row));
+    const undeclared = rows.filter((row) => !withdrawn.has(row));
     expect(
       undeclared,
-      'a coverage row in docs/05-roadmap.md that benchmark/accessControl.ts’s PINNED_COVERAGE ' +
-        'cannot render. Re-run runAccessControlStudy and re-pin both places, or the document is ' +
-        'quoting a run the code no longer produces — which is exactly how 51.7 % survived the C35 fix.',
+      'a coverage row in docs/05-roadmap.md that benchmark/accessControl.ts’s WITHDRAWN_COVERAGE ' +
+        'cannot render. The table is a historical record of what H-ACCESS-1 reported before ' +
+        'DECISIONS.md § D254; a row that is in neither vocabulary is a transcription nobody can ' +
+        'reproduce — which is exactly how 51.7 % survived the C35 fix.',
     ).toEqual([]);
+
+    /*
+     * And the disjointness, which is what keeps the two vocabularies from collapsing into one
+     * permissive set. The conventional and bare-kiosk rows moved under § D254; if the live pins
+     * could still render them, the re-pin did not take and this guard would be unable to tell a
+     * withdrawn figure from a current one. (The credential row withdrew as all-zeros, which is
+     * still how Midtown's live row renders, so it is deliberately not required to be disjoint.)
+     */
+    const moved = rows.filter((row) => row.startsWith('0 of 30'));
+    expect(moved.length, 'neither withdrawn row parsed, so the check below is checking nothing').toBe(
+      2,
+    );
+    for (const row of moved) {
+      expect(
+        live.has(row),
+        `the roadmap's withdrawn row "${row}" is still derivable from the live PINNED_COVERAGE`,
+      ).toBe(false);
+    }
   });
 });

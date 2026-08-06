@@ -33,7 +33,9 @@
  *
  * ## Cost
  *
- * The five run four full `Simulation`s (destination liveness runs seven cases plus references),
+ * The five run four full `Simulation`s (destination liveness runs **ten** cases plus references —
+ * the count is stated here and derived nowhere, so it is checked against `livenessCases` whenever
+ * that list changes; DECISIONS.md § D279 added the tenth),
  * two 24-replication experiments and a 1200-state ensemble. That is minutes, not seconds, which is
  * why this is a command rather than something the always-on tier calls.
  */
@@ -104,7 +106,7 @@ export interface LivenessSuiteResult {
 
 export interface LivenessSuiteOptions {
   /**
-   * Narrow the two that dominate the wall clock — destination liveness (seven instrumented runs
+   * Narrow the two that dominate the wall clock — destination liveness (**ten** instrumented runs
    * plus two reference runs) and energy liveness (2 × 24 replications).
    *
    * **Off by default, and the default is the point.** A driver whose default skipped the expensive

@@ -268,11 +268,32 @@ describe('Phase 5 — the operating points are the highest at which an interval 
  *   full-run window at 1.5 % of population per 5 minutes is a *pattern* rather than a peak, and the
  *   lobby plateau that breaks `nearest-car` at up-peak never forms. So `n` is a choice and the study
  *   derives it from its own measured spread instead of from a ceiling.
- * - **Secure Tower interfloor-mix: both conventional arms are invalid from replication index 0**,
- *   and no budget changes it. That is H-ACCESS-1 in the census rather than in the study, and it is
- *   the reason `DESTINATION_CASES` records `admissibleReplications: 0` for that row: there is no
- *   budget at which every arm has a quotable AWT, so the case has no interval table and its result
- *   is reported as counts.
+ * - **Secure Tower interfloor-mix: the bare kiosk is invalid from replication index 0 and every
+ *   other arm from index 3**, and no budget changes either. `admissibleReplications: 0` therefore
+ *   survives, and its *reason* has been rewritten twice.
+ *
+ * ## What this row used to say, and why it is worth two paragraphs
+ *
+ * It said *"both conventional arms are invalid from replication index 0 … that is H-ACCESS-1 in the
+ * census rather than in the study"*. Both clauses were the § D254 defect: `estimateCost` asked the
+ * access question about a hall call's **pickup** floor, so every landing call raised inside an
+ * access zone went unassignable and the conventional arms had no AWT from the first draw.
+ *
+ * `DECISIONS.md` § D261 corrected it to *"nearest-car, eta, collective and every credentialled arm
+ * are clean across the whole census"* — measured, at the time, and **now false as well**. § D265
+ * gave a declared share of journeys the badge their own floor implies rather than the one their
+ * destination needs, and on this building that turns away 4.1 % of arrivals. Re-censused over 300
+ * replications on 2026-08-06 (§ D279), the first invalid replication is **3 on every arm**:
+ * `nearest-car`, `eta`, `destination-eta` and all five `rideTime` arms and `eta-deferred` alike.
+ *
+ * **Failing at the same index on every arm is the finding, and it is why the assertion below is
+ * written as an equality across arms rather than as a bound per arm.** Under common random numbers
+ * the riders § D265 turns away are the same people in every cell, so a ground that lands on all
+ * eight arms at the identical draw is a property of the traffic and not of any dispatcher. The
+ * ground is **censoring** — a handful of unserved riders in a 50-to-75-person reporting window,
+ * over the 5 % limit — where the kiosk's is **saturation**. The kiosk still binds
+ * `admissibleReplications`, and still for § D261's reason: it discloses a destination and carries
+ * no credential, so an access-restricted destination is refused by every car.
  */
 describe('Phase 6a — the interfloor-mix operating points, censused rather than inherited', () => {
   async function destinationResources() {
@@ -349,7 +370,7 @@ describe('Phase 6a — the interfloor-mix operating points, censused rather than
     expect(worst.longestS).toBeLessThan(DEFAULT_MAX_WAIT_HORIZON_S / 2);
   }, TIMEOUT_MS);
 
-  it('finds the conventional arms invalid from replication zero on Secure Tower interfloor-mix', async () => {
+  it('finds the bare kiosk invalid from replication zero, and every other arm together at three', async () => {
     const spec = destinationCase('secure-interfloor-mix');
     const result = await runGateExperiment({
       id: `census/destination/${spec.id}`,
@@ -371,21 +392,51 @@ describe('Phase 6a — the interfloor-mix operating points, censused rather than
         [...firstInvalidByArm].map(([arm, index]) => `${arm}@${index}`).join(', '),
     );
 
-    // The three arms with no credential fail immediately and structurally: an access-restricted
-    // pickup carries no credential under `up-down-buttons`, and `destination-entry` forwards the
-    // destination while dropping the credential, so both are refused by every car.
-    for (const armId of [BASELINE_PROFILE, DISCLOSURE_BASELINE, BARE_KIOSK_ARM]) {
-      expect(firstInvalidByArm.get(armId), `${armId} should be invalid from the first replication`).toBe(
-        0,
-      );
+    // The bare kiosk alone fails from the first replication, and it fails structurally:
+    // `destination-entry` forwards the destination while dropping the credential, so an
+    // access-restricted destination is refused by every car and the queue diverges.
+    expect(
+      firstInvalidByArm.get(BARE_KIOSK_ARM),
+      `${BARE_KIOSK_ARM} should be invalid from the first replication`,
+    ).toBe(0);
+
+    /*
+     * **Every other arm loses its AWT at the same index, and the equality is the assertion.**
+     *
+     * A per-arm bound (`each is invalid somewhere before 300`) would be satisfied by eight arms
+     * failing at eight different draws, which is what a dispatch effect looks like. What is
+     * measured is one draw for all of them — the § D265 credential gap crossing the censoring
+     * limit on the same replication in every cell, because common random numbers give every arm
+     * the same turned-away riders. So the arms are compared against **each other** rather than
+     * against a constant, and the shared index is printed rather than hard-coded, so a change that
+     * moved it stays green while a change that split the arms apart goes red.
+     */
+    const censoredArms = [
+      BASELINE_PROFILE,
+      DISCLOSURE_BASELINE,
+      DISCLOSURE_PROFILE,
+      ...RIDE_TIME_WEIGHTS.map((weight) => rideArmId(weight)),
+      DEFERRED_ARM,
+    ];
+    const shared = firstInvalidByArm.get(DISCLOSURE_BASELINE);
+    expect(shared, `${DISCLOSURE_BASELINE} no longer loses its AWT anywhere in 300`).toBeGreaterThan(
+      0,
+    );
+    for (const armId of censoredArms) {
+      expect(firstInvalidByArm.get(armId), `${armId} diverged from the shared ceiling`).toBe(shared);
     }
-    // Every credentialled arm is clean over the whole census.
-    for (const armId of [DISCLOSURE_PROFILE, ...RIDE_TIME_WEIGHTS.map((w) => rideArmId(w))]) {
-      expect(firstInvalidByArm.get(armId), `${armId} lost its AWT`).toBeUndefined();
-    }
-    // Which is exactly what `admissibleReplications: 0` records: no budget makes this case's arm
-    // list uniformly quotable, so it has counts rather than an interval table.
+    // …and it is the kiosk that binds, strictly earlier than the rest. Without this the block above
+    // would still pass if the kiosk had drifted up to join them.
+    expect(firstInvalidByArm.get(BARE_KIOSK_ARM) ?? Number.NaN).toBeLessThan(shared as number);
+
+    // Which is what `admissibleReplications: 0` records: no budget makes this case's arm list
+    // uniformly quotable, so it has counts rather than an interval table. The number survives both
+    // rewrites of its reason — DECISIONS.md § D261, then § D279.
     expect(spec.admissibleReplications).toBe(0);
+    console.log(
+      `  ${BARE_KIOSK_ARM} binds at 0; the other ${String(censoredArms.length)} arms share ` +
+        `index ${String(shared)}`,
+    );
   }, TIMEOUT_MS);
 
   it('covers every case Phase 6a declares', async () => {

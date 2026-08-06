@@ -1337,12 +1337,12 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-interfloor-mix/wt95S": { n: 150, mean: -0.22138544826820217, standardError: 0.11615664791656582, lower: -0.45091251522753817, upper: 0.008141618691133806 },
   }),
   "access-control": Object.freeze({
-    "difference-of-differences/absolute": { n: 150, mean: 0.9817163614447753, standardError: 0.20187949687645595, lower: 0.5838889567775986, upper: 1.379543766111952 },
-    "difference-of-differences/relative": { n: 150, mean: 0.017478124066803227, standardError: 0.0035523232655978545, lower: 0.010479881172083476, upper: 0.02447636696152298 },
+    "difference-of-differences/absolute": { n: 150, mean: 1.0198874336002008, standardError: 0.20019156511627376, lower: 0.625335677340711, upper: 1.4144391898596906 },
+    "difference-of-differences/relative": { n: 150, mean: 0.01773961364007575, standardError: 0.0035577341279079693, lower: 0.010730844452832154, upper: 0.024748382827319348 },
     "midtown-office/absolute": { n: 150, mean: -1.561910714197996, standardError: 0.17918132736647488, lower: -1.9159753782699884, upper: -1.2078460501260035 },
     "midtown-office/relative": { n: 150, mean: -0.028525773527358408, standardError: 0.003086751585385648, lower: -0.0346252353363334, upper: -0.022426311718383413 },
-    "secure-tower/absolute": { n: 150, mean: -0.5801943527532207, standardError: 0.09300206009696317, lower: -0.7639676490570606, upper: -0.39642105644938086 },
-    "secure-tower/relative": { n: 150, mean: -0.011047649460555179, standardError: 0.0017581141127432525, lower: -0.014521706115217158, upper: -0.007573592805893199 },
+    "secure-tower/absolute": { n: 150, mean: -0.542023280597795, standardError: 0.08927885901427864, lower: -0.7184394824990636, upper: -0.3656070786965264 },
+    "secure-tower/relative": { n: 150, mean: -0.010786159887282657, standardError: 0.001769021417337921, lower: -0.01428176951955677, upper: -0.007290550255008544 },
   }),
   "mixed-use-high-rise": Object.freeze({
     "up-peak-1pct/destination-eta+ride1−collective/awtS": { n: 150, mean: 0.5722989475015055, standardError: 0.076666560359278, lower: 0.4208048139434696, upper: 0.7237930810595413 },

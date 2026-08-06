@@ -226,11 +226,51 @@ describe('the two arms share a passenger population and do not share a leg decom
  * -------------------------------------------------------------------------- */
 
 describe('where an interval may be quoted at all, censused on this cell and not inherited', () => {
-  it('finds the building’s own mixed scenario structurally closed to a paired comparison', async () => {
+  /**
+   * **The third building on which this claim was the § D254 defect, and the third refutation.**
+   *
+   * This case asserted `vertical-city`'s own mixed scenario *structurally closed* — no cell of
+   * either arm quotable at any of three rates, with the unserved fraction rising as the load fell.
+   * `accessControl.ts` § H-ACCESS-1 made the same claim on Secure Tower and `mixedUseHighRise.ts`
+   * § 1 on Mixed-Use High-Rise; all three were measuring one modelling error, that `estimateCost`
+   * asked the access question about a hall call's **pickup** floor (§ D254, § D256).
+   *
+   * Re-measured at the same rates, seed and budget (§ D279): every rate quotable on both decks and
+   * both dispatchers at 1.5 % and 0.75 %, nobody undelivered anywhere, and the unserved share
+   * 0.92 → 0.99 → 0.73 % — § D265's credential gap, flat in the load rather than climbing.
+   *
+   * **The census is kept and re-pointed rather than deleted**, because what it exists to decide is
+   * still live: whether this building's own scenario can carry an operating point. It now can, and
+   * whether it *should* is a re-design of the point list, which § D256 requires a criterion for
+   * before any number is read. The double-deck verdict below is unaffected — it is measured at the
+   * up-peak points, which never ran this scenario.
+   */
+  it('finds the building’s own mixed scenario open to a paired comparison after all', async () => {
     const result = await study();
-    expect(result.coverage.noneQuotable).toBe(true);
-    expect(result.coverage.unservedRisesAsLoadFalls).toBe(true);
-    expect(result.coverage.verdict).toBe('STRUCTURAL');
+    expect(result.coverage.noneQuotable).toBe(false);
+    expect(result.coverage.unservedRisesAsLoadFalls).toBe(false);
+    expect(result.coverage.verdict).toBe('SERVABLE');
+
+    // Nobody stranded on any arm at any rate — the clause the structural reading had inverted.
+    for (const row of result.coverage.rows) {
+      expect(
+        row.meanUndelivered,
+        `${row.buildingId}/${row.armId} at ${String(row.rate)} % leaves journeys undelivered`,
+      ).toBe(0);
+    }
+
+    // And the double-deck and single-deck arms agree, which is what says the remaining unserved
+    // share is a property of the traffic rather than of the pairing this study is about.
+    for (const rate of [...new Set(result.coverage.rows.map((row) => row.rate))]) {
+      const at = result.coverage.rows.filter((row) => row.rate === rate);
+      expect(at.length, `no coverage rows at ${String(rate)} %`).toBeGreaterThan(1);
+      for (const row of at) {
+        expect(row.withoutQuotableAwt, `${row.buildingId}/${row.armId} at ${String(rate)} %`).toBe(
+          at[0]?.withoutQuotableAwt,
+        );
+        expect(row.meanUnservedFraction).toBeCloseTo(at[0]?.meanUnservedFraction ?? -1, 12);
+      }
+    }
     console.log(`[double-deck] coverage: ${result.coverage.verdictReason}`);
   }, TIMEOUT_MS);
 

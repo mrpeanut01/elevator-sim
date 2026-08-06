@@ -4,10 +4,14 @@
  * `mixedUseHighRise.ts` carries the argument and the result. This suite asserts the four things the
  * result would be worthless without, and one it would be dishonest without:
  *
- * 1. **§ 1 is categorical and structural.** No `role: 'baseline'` profile has a quotable AWT under
- *    the building's own mixed-directional scenario at *any* of three rates, and the unserved
- *    fraction rises as the load falls. That is what makes "the building admits no paired comparison
- *    there" a measurement rather than a preference.
+ * 1. **§ 1 is categorical, and since `DECISIONS.md` § D254 it answers the other way.** It used to
+ *    assert that no `role: 'baseline'` profile had a quotable AWT under the building's own
+ *    mixed-directional scenario at *any* of three rates, with the unserved fraction rising as the
+ *    load fell — a structural refusal. That was the pickup access check, not the building. Every
+ *    arm is now quotable at the thickest rate with nobody undelivered, the baselines and the
+ *    credential-aware arms return identical counts at all three, and the unserved share is flat at
+ *    2.1–2.6 %. The sweep is kept because it is what makes either answer a measurement rather than
+ *    a preference; § D279 is the re-measurement.
  * 2. **Every point is quotable at its budget, and CRN-aligned.** A cell whose arms are not both
  *    quotable renders `UNQUOTABLE`, and an interval read off unpaired runs is not an interval.
  * 3. **The gate is TTD and the two costs are always present.** § D27: *"A WORSE verdict on AWT does
@@ -82,21 +86,69 @@ describe('the naive baselines are read out of data/, not named in code', () => {
  * § 1 — the building's own scenario
  * -------------------------------------------------------------------------- */
 
-describe('§ 1 — the building’s own scenario admits no paired comparison, and the reason is structural', () => {
-  it('leaves every baseline without a quotable AWT at every rate', () => {
+describe('§ 1 — the building’s own scenario admits a paired comparison after all (§ D254, § D279)', () => {
+  /**
+   * **The inversion, and it is asserted as an identity rather than as a negation.**
+   *
+   * This case required *"every baseline without a quotable AWT at every rate"* and a positive
+   * undelivered count on each. Both were `estimateCost`'s pickup check: an access-restricted
+   * landing call carried no credential under `up-down-buttons`, every car refused it, and the
+   * unserved traffic was the refusal rather than the load. § D254 deleted the check.
+   *
+   * The bare negation — *"some baseline is quotable somewhere"* — would be a much weaker claim than
+   * the one it replaces. What is asserted instead is what the census actually shows: at every rate
+   * the three `role: "baseline"` profiles and the two credential-aware arms return **identical**
+   * counts, and at the thickest rate all five are quotable with nobody undelivered. An arm list
+   * that agrees to the last field is the strongest available statement that the call type is not
+   * what decides quotability here, and it is the statement § 1 got backwards.
+   */
+  it('finds every baseline quotable at the thickest rate, and identical to the credential arms at all three', () => {
     for (const rate of COVERAGE_RATES) {
+      const at = (armId: string) =>
+        study.coverage.rows.find((entry) => entry.rate === rate && entry.armId === armId);
+      const reference = at(DECOMPOSITION_ARM);
+      expect(reference, `no coverage row for ${DECOMPOSITION_ARM} at ${String(rate)} %`).toBeDefined();
+
       for (const baseline of study.baselines) {
-        const row = study.coverage.rows.find(
-          (entry) => entry.rate === rate && entry.armId === baseline,
-        );
+        const row = at(baseline);
         expect(row, `no coverage row for ${baseline} at ${String(rate)} %`).toBeDefined();
+        // Nobody is stranded on any arm at any rate. This is the clause § 1 had inverted.
         expect(
-          row?.quotable,
-          `${baseline} has a quotable AWT at ${String(rate)} % on the mixed-directional scenario, ` +
-            'so a paired-t interval IS available there and § 1 of the module docstring is wrong.',
-        ).toBe(false);
-        expect(row?.meanUndelivered ?? 0).toBeGreaterThan(0);
+          row?.meanUndelivered,
+          `${baseline} leaves journeys undelivered at ${String(rate)} % on the mixed-directional ` +
+            'scenario. § 1 reported exactly that before DECISIONS.md § D254, and it was the ' +
+            'pickup access check rather than the building.',
+        ).toBe(0);
+        expect(row?.notCompleted).toBe(0);
+        // …and the credential-aware arm does no better, field for field, so whatever costs the
+        // thin rates their aggregate AWT is not the call type.
+        for (const field of [
+          'quotable',
+          'withoutQuotableAwt',
+          'notCompleted',
+          'meanUndelivered',
+          'meanUnservedFraction',
+        ] as const) {
+          expect(
+            row?.[field],
+            `${baseline} differs from ${DECOMPOSITION_ARM} on ${field} at ${String(rate)} %`,
+          ).toBe(reference?.[field]);
+        }
       }
+    }
+
+    // The thickest rate, where 30 replications are enough for every arm to quote a mean — the
+    // clause that makes the identity above a statement about a *servable* regime rather than about
+    // two arms failing in the same way.
+    for (const baseline of study.baselines) {
+      const row = study.coverage.rows.find(
+        (entry) => entry.rate === COVERAGE_RATES[0] && entry.armId === baseline,
+      );
+      expect(
+        row?.quotable,
+        `${baseline} has no quotable AWT at the thickest rate, so § 1's regime is closed again`,
+      ).toBe(true);
+      expect(row?.withoutQuotableAwt).toBe(0);
     }
   });
 
@@ -146,13 +198,38 @@ describe('§ 1 — the building’s own scenario admits no paired comparison, an
     }
   });
 
-  it('finds the unserved fraction RISING as the load falls — structural, not load-driven', () => {
-    // The whole discrimination. An overloaded building serves a larger *fraction* as demand drops;
-    // a building that structurally refuses a share of its demand serves a smaller one, because the
-    // servable traffic is what went away.
-    expect(study.coverage.unservedRisesAsLoadFalls).toBe(true);
-    expect(study.coverage.verdict).toBe('STRUCTURAL');
-    expect(study.coverage.verdictReason).toMatch(/RISES as the load falls/);
+  it('finds the unserved fraction FLAT in the load — neither structural nor an overload', () => {
+    /*
+     * **The discrimination survives; its answer changed.** An overloaded building serves a larger
+     * fraction as demand drops; a building that structurally refuses a share of its demand serves a
+     * smaller one, because the servable traffic is what went away. This case asserted the second,
+     * and the rise it was reading was `estimateCost`'s pickup check (§ D254).
+     *
+     * Measured now, the sweep answers *neither*: 2.55 → 2.13 → 2.32 %, which is a fixed share of
+     * journeys the traffic model turns away (§ D265) and not a queue at all. So the assertion is
+     * the sweep's own conclusion — `SERVABLE` — plus the flatness that says why, because
+     * `SERVABLE` alone would also be returned by a building whose unserved share was falling
+     * steeply, which would be a different result and should not read as this one.
+     */
+    expect(study.coverage.unservedRisesAsLoadFalls).toBe(false);
+    expect(study.coverage.noBaselineIsQuotable).toBe(false);
+    expect(study.coverage.verdict).toBe('SERVABLE');
+    expect(study.coverage.verdictReason).toMatch(/admits a paired comparison after all/u);
+
+    // Flat rather than merely non-rising: every rate's unserved share sits inside a band far
+    // narrower than the three-fold spread in demand that produced it. A structural refusal would
+    // climb across this sweep and an overload would fall across it; neither fits inside 1 point.
+    const shares = COVERAGE_RATES.map((rate) => {
+      const at = study.coverage.rows.filter((row) => row.rate === rate);
+      return at.reduce((total, row) => total + row.meanUnservedFraction, 0) / at.length;
+    });
+    expect(Math.min(...shares)).toBeGreaterThan(0);
+    expect(Math.max(...shares) - Math.min(...shares)).toBeLessThan(0.01);
+    console.log(
+      `§ 1 unserved share by rate: ${COVERAGE_RATES.map(
+        (rate, index) => `${String(rate)} % → ${((shares[index] as number) * 100).toFixed(2)} %`,
+      ).join(', ')} — flat, and nobody undelivered at any of them`,
+    );
   });
 });
 

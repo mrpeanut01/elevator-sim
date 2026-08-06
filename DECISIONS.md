@@ -19880,3 +19880,259 @@ a hand-maintained list that stopped tracking the data it was built from — and 
 now reads *six* and names 600, with a clause saying **why** the longest is there, because a run
 length an order of magnitude past the others is the kind of number a reader assumes is a mistake
 unless something says otherwise.
+## D279 — ten permanently-red tests, classified by measurement, and not one of them needed deleting
+
+**Date: 2026-08-06 · Written after the measurement, and every classification below is a run rather
+than a reading.** [§ D256](DECISIONS.md) left twelve tests red on purpose, on the argument that
+*"a suite made green by re-pinning a refuted hypothesis would have destroyed the only evidence that
+it was refuted."* [§ D260](DECISIONS.md)–[§ D262](DECISIONS.md) repaired the two it called fixtures.
+This is the other ten.
+
+**The argument does not hold, and the reason is what a red suite costs rather than what it
+preserves.** The evidence of refutation belongs in § D256 and in the study's own report, and it is
+in both. What a permanently red suite destroys is the ability to tell a new failure from an expected
+one — at which point the next real regression is waved through by a reader who has learned that
+these ten are always red. A test suite that cannot go green has stopped being an instrument.
+
+**And several of the ten had stopped being merely stale and become false.** They asserted, as
+passing criteria for a *future* tree, that the unserved fraction RISES as the load falls, that every
+baseline is unquotable at every rate, that the conventional arms are invalid from replication zero.
+Each of those is now a measured falsehood sitting in a file that describes itself as a measurement.
+
+### The classification, and what each one cost
+
+Every row was decided by re-running the study at its own budget, its own seed and its own operating
+point. Nothing was decided by argument, and no assertion was weakened to make a test pass.
+
+| # | file · case | class | what was done |
+|---|---|---|---|
+| 1 | `accessControl` · *conventional dispatch cannot serve it at all* | **refuted** | inverted to an **equality**: the two arms are bit-identical on **150 of 150** secure-tower replications |
+| 2 | `accessControl` · *the two identical where there are no access zones* | **still true**, one line refuted | null half kept and strengthened; `verdict` `CONFIRMED` → `REFUTED`, asserted with its reason |
+| 3 | `accessControl` · *prints the kiosk column at the value pinned* | **measured under the defect** | `29.0` → **`34.1`**, and derived from the pin rather than transcribed a fourth time |
+| 4 | `accessControl` · *reproduces every pinned estimate* | **measured under the defect** | 4 of 6 figures re-pinned, 2 reproduce bit-identically — [§ D280](DECISIONS.md) |
+| 5 | `accessControl` · *reproduces every pinned coverage row* | **measured under the defect** | 3 of 6 rows re-pinned, 3 hold — [§ D280](DECISIONS.md), [§ D281](DECISIONS.md) |
+| 6 | `destinationLiveness` · *removes every access refusal on the zoned building* | **refuted** | inverted to an **empty filter on every arm**, with a leg-count control that is not empty |
+| 7 | `doubleDeck` · *the mixed scenario is structurally closed* | **refuted** | inverted to `SERVABLE`; nobody undelivered on any arm at any rate |
+| 8 | `mixedUseHighRise` · *every baseline unquotable at every rate* | **refuted** | inverted to quotable at the thickest rate, and identical to the credential arms at all three |
+| 9 | `mixedUseHighRise` · *the unserved fraction RISES as the load falls* | **refuted** | inverted to **flat** — 2.55 → 2.13 → 2.32 %, neither rising nor falling |
+| 10 | `saturationCensus` · *conventional arms invalid from replication zero* | **half refuted, half re-measured** | the kiosk still binds at 0; every other arm now fails **together at 3**, and § D261's own correction was itself stale |
+
+**Six refuted, three re-pinned, one that was two claims wearing one title — and nothing deleted.**
+That is worth stating because deletion was authorised and would have been easier. Every one of the
+ten had a true, non-vacuous statement available *at the same operating point, on the same seed, at
+the same budget*, so in every case the honest repair was to turn the assertion round rather than to
+remove it. A study that has to move to a new operating point to say something true is a study whose
+result has been chosen; none of these had to.
+
+### The three inversions worth reading, because a bare negation would have been weaker
+
+**H-ACCESS-1's is an equality.** *"The conventional arm no longer fails"* is a weaker claim than
+the one it replaced and is satisfied by a great many broken simulators. What is asserted instead is
+that `eta` and `destination-eta-unpriced` are **the same run** on the building whose five access
+zones were supposed to separate them — 0 of 150 replications differing on any of seven identity
+metrics, the same equality that holds on Midtown Office, which declares no access zones at all.
+`CoverageResult` gained `secureDifferingReplications` to carry it, and the report prints the two
+identity counts side by side: **one zero is a null on an unzoned building; two zeros are the
+statement that the credential moves nothing anywhere under conventional dispatch.**
+
+**Mixed-Use High-Rise's is an identity across arms.** At all three rates the three
+`role: "baseline"` profiles and the two credential-aware arms return identical counts, field for
+field. That is stronger than *"some baseline is quotable somewhere"* and it says the thing § 1 had
+backwards: what costs the two thin rates their aggregate AWT is the reporting window, and it lands
+on the credentialled arms exactly as hard.
+
+**The census's is an equality across arms too, and it replaces a bound.** Over 300 replications at
+`BENCHMARK_SEED` every arm but the kiosk — `nearest-car`, `eta`, `destination-eta`, all five
+`rideTime` arms, `eta-deferred` — loses its AWT at **replication index 3**, the same draw in every
+cell. A per-arm bound would be satisfied by eight arms failing at eight different draws, which is
+what a dispatch effect looks like; one shared index under common random numbers is what says it is
+the **traffic**. So the arms are asserted against each other and the index is printed rather than
+hard-coded.
+
+### The ground is now two different grounds, and that is a better finding than the one it replaced
+
+`accessControl.test.ts` has always argued that *"the two failing arms fail for different reasons and
+the unserved fraction cannot tell them apart."* It was right about the shape and wrong about the
+reasons, which were the § D254 defect. Measured on the same 30 replications, the grounds are
+different **in kind**:
+
+| arm | replications without a quotable AWT | ground |
+|---|---|---|
+| `eta`, `destination-eta-unpriced` | 11 of 30 | **censored** — 3 to 5 of a 50-to-75-person window unserved, over the 5 % limit |
+| `destination-entry-bare` | 30 of 30 | **saturated** — the queue rises 0.8 to 1.8 persons/min, 12 to 25× its own scatter |
+
+The censoring is [§ D265](DECISIONS.md)'s credential gap: riders who begin inside the building
+holding the badge their own floor implies rather than the one their destination needs. No `callType`
+reaches them, which is why both arms carry it identically.
+
+**`11 of 30` is a knife-edge and is recorded as one.** The per-replication unserved fraction
+straddles the limit — 0.036, 0.046, 0.033, 0.096, 0.067, 0.065, 0.064, 0.054, 0.054, 0.031 over the
+first ten draws — so the *count* belongs to this seed while the *equality of the two arms* belongs
+to the model. Only the second is asserted as a property; the first is asserted as a pin. That is
+§ D260's ragged-band warning applied to a fixture this lane did not choose and cannot move.
+
+### What is now open, and is deliberately left open
+
+Three studies asserted that a building's own mixed-directional scenario was structurally closed to a
+paired comparison — Secure Tower, Mixed-Use High-Rise, Vertical City. All three were one defect, and
+all three regimes are now **servable**. That means each could carry an operating point it does not
+have, which would add points, budgets and pin groups. § D256's rule is that such a re-design needs a
+criterion written before the numbers are read, and the numbers have now been read. **So none is
+admitted here**, and each census is re-pointed to say the regime is *open* rather than deleted — the
+same restraint [§ D261](DECISIONS.md) showed with the two `EXCLUDED_CELLS`.
+
+`mixedUseHighRise.ts` § 2 is left standing with its own refutation attached rather than rewritten
+away, because the irony is the lesson: *"incoming-only up-peak is the one regime in which a
+conventional baseline can be measured here at all — not a convenient choice, the only one"* was
+adopted **because** of the defect's symptom, and it had the accidental effect of confining every
+published interval to the regime the defect does not touch. § D256 called that luck. It is why the
+matrix survived, and it should stay legible as luck.
+
+### One measurement did not survive the lane that made it, and it is the same lesson one turn later
+
+§ D261 corrected `arms.ts`'s `secure-interfloor-mix` rationale to *"nearest-car, eta, collective and
+every credentialled arm are clean across the whole census"*. That was measured, and it was measured
+**before § D265 landed**. It is now false: every arm fails at index 3. The correction has been
+corrected, against a re-run rather than against a citation.
+
+**This is § D30's stale-mechanism shape arriving inside a document written to fix a stale
+mechanism.** Nothing re-derives a rationale, so nothing caught it — exactly as § D261 said of the
+number whose reason had gone. The only defence is the one this repository already states: a claim
+about *why* is either measured or labelled unmeasured, and *"re-censused on «date»"* is now written
+into the rationale itself so the next reader knows what the sentence is a snapshot of.
+
+---
+
+## D280 — seven published figures re-pinned, and the four that held are the evidence
+
+**Date: 2026-08-06 · Written after the regeneration, and the regeneration is published rather than
+performed.** `CLAUDE.md`'s rule is that a published number is pinned to the run that produced it, and
+what that rule forbids is a **silent** regeneration. So the movement is stated here rather than left
+in a diff, in the form [§ D262](DECISIONS.md) used for `data/scenario-goals.json`.
+
+All figures from `runAccessControlStudy({})` at its own declared budget: seed 20 260 726, n = 150
+per building for the intervals, `coverageReplications = 30` for the counts, Secure Tower and Midtown
+Office at the `arms.ts` interfloor-mix operating points. No operating point was invented; it is the
+published one, re-run.
+
+### The intervals — H-ACCESS-2
+
+| key | pinned | measured now |
+|---|---|---|
+| `secure-tower/absolute` | `−0.580 [−0.764, −0.396]` | **`−0.542 [−0.718, −0.366]`** |
+| `secure-tower/relative` | `−0.011 [−0.015, −0.008]` | **`−0.011 [−0.014, −0.007]`** |
+| `difference-of-differences/absolute` | `+0.982 [+0.584, +1.380]` | **`+1.020 [+0.625, +1.414]`** |
+| `difference-of-differences/relative` | `+0.017 [+0.010, +0.024]` | **`+0.018 [+0.011, +0.025]`** |
+| `midtown-office/absolute` | `−1.562 [−1.916, −1.208]` | **unchanged, to the last digit** |
+| `midtown-office/relative` | `−0.029 [−0.035, −0.022]` | **unchanged, to the last digit** |
+
+**The two that held are the control, and they are the reason this is a building effect rather than a
+perturbation.** Midtown Office declares no `accessZones`; Secure Tower declares five. That is the
+same split § D254 found on its 60-cell matrix, § D255 on the fifteen identity cells and § D262 on
+the goal table, arriving independently on a fourth apparatus.
+
+**H-ACCESS-2's verdict does not move.** `REFUTED`, in both forms, on the positive side, at the same
+n. The difference-of-differences got very slightly *larger*, so nothing about the refutation is
+closer to its boundary than it was.
+
+### The counts — H-ACCESS-1
+
+| key | pinned | measured now |
+|---|---|---|
+| `secure-tower/eta` | 0 of 30 quotable · 30/30 not completed · 18.167 undelivered · 33.53 % unserved | **19 of 30 quotable · 0/30 not completed · 0.0 undelivered · 4.13 % unserved** |
+| `secure-tower/destination-entry-bare` | 0 of 30 · 52.233 undelivered · 100 % unserved · 28.967 kiosk-refused | **0 of 30 · 34.067 undelivered · 61.21 % unserved · 34.067 kiosk-refused** |
+| `secure-tower/destination-eta-unpriced` | 30 of 30 · 0 · 0.00 % | **19 of 30 · 0.0 · 4.13 %** — *equal to `secure-tower/eta` in every field* |
+| the three `midtown-office` rows | all zeros, quotable | **unchanged** |
+
+The kiosk row **got cleaner again**: 34.067 undelivered against 34.067 kiosk refusals, so every
+undelivered leg is a credential refusal and nothing else. § D256 recorded the same identity at
+36.50/36.50; the level moved with § D265's traffic and the identity held through both.
+
+### The one thing this lane could not finish, and it is named rather than worked around
+
+**`+0.982 [+0.584, +1.380]` is quoted in eight places outside `packages/experiments/`** —
+`CLAUDE.md`, `docs/01-architecture.md`, `docs/05-roadmap.md`, `docs/07-handoff.md`,
+`docs/08-review-findings.md`, `docs/09-destination-dispatch-contract.md`, and twice in this file's
+own history. Every one of them is now quoting a run the code no longer produces, which is the exact
+defect `published.ts` exists to prevent, one layer out from where it can see.
+
+They are **not corrected here**, because this lane does not own those files. The two sites inside
+`benchmark/` are corrected, `published.test.ts`'s partition is green, and this entry is the handover.
+A reader who finds `+0.982` in a document should read it as superseded by the table above.
+
+**The sentence beside the figure needs more care than the figure does.** Six of those eight say some
+form of *"it buys less where access is controlled, and the saving is entirely in the credential
+(H-ACCESS-1)"*. The first clause is the measurement and it stands. **The second clause is now false**
+— H-ACCESS-1 is refuted and the credential buys nothing at all under conventional dispatch, so the
+saving is not in the credential either. Where it *is* is unmeasured. `accessControl.test.ts` now says
+so in its own docstring; `documentation.test.ts`'s three-way guard on the *mechanism* claim is
+unaffected and green, because it asserts a refutation marker rather than a destination for the
+saving. **A lane that owns `docs/` should either measure where the saving comes from or write that it
+is unmeasured** — this repository's own rule for a sentence about *why*.
+
+---
+
+## D281 — a withdrawn table is not a drifted table, and the guard could not tell them apart
+
+**Date: 2026-08-06 · Written after the code, and the code is four lines of vocabulary and one
+assertion.** [§ D280](DECISIONS.md)'s re-pin turned `validation/documentation.test.ts` red at a place
+nothing in [§ D256](DECISIONS.md)'s list predicted, and the failure is more interesting than the fix.
+
+`documentation.test.ts` § *docs/05-roadmap.md § H-ACCESS-1* exists because a categorical figure went
+stale while three guards watched — the `C35` fix moved a coverage row from `27.6 | 51.7 %` to
+`52.2 | 100.0 %` and no layer could see it. It asserts that every row of the roadmap's H-ACCESS-1
+table is renderable from `accessControl.ts`'s `PINNED_COVERAGE`.
+
+**But § D256 withdrew that table.** The roadmap says so in its own heading — *"~~CONFIRMED,
+categorically, with no interval.~~ WITHDRAWN"* — and keeps the rows underneath as the record of what
+the study reported while it was measuring the § D254 defect, which is what this repository does with
+a superseded figure rather than deleting it. So the guard was holding a **withdrawn** table to
+**live** pins, and it was green only because the pins had not moved since the withdrawal.
+
+### Why that is a defect in the guard rather than in either document
+
+The guard cannot distinguish two situations it must treat differently:
+
+- a document **preserving** a withdrawn figure under a withdrawal marker, which is required; and
+- a document that has silently **drifted** off the live pins, which is the thing it was built to
+  catch.
+
+Both look like *"a row the live pins cannot render."* Given only one vocabulary, the guard has to be
+pointed at whichever of the two it is unable to fail — and pointing it at the permissive one is how
+`51.7 %` survived the `C35` fix in the first place.
+
+### The fix, and why it is not a weakening
+
+`accessControl.ts` gains `WITHDRAWN_COVERAGE` — the three Secure Tower rows as they stood when
+§ D256 withdrew them — and `withdrawnCoverageForms()` beside `derivedCoverageForms()`. **Two sets,
+deliberately not one.** A single merged set would let any stale row pass anywhere, which is the
+allowlist this layer exists not to be; two sets let a caller declare *which* it accepts and be held
+to that.
+
+The roadmap guard now asserts three things where it asserted one:
+
+1. every row renders from the **withdrawn** vocabulary;
+2. the heading still carries `WITHDRAWN` — checked **before** the numbers, because the rows are
+   legal only *because* the table is withdrawn, and a document that dropped the marker would be
+   asserting a defect as a measurement;
+3. the two rows that moved are **not** renderable from the live pins — which is what says the re-pin
+   took, and what stops the two vocabularies from collapsing into one permissive set.
+
+So the guard still fails on drift (a fourth set of numbers is in neither vocabulary), on silent
+un-withdrawal, and on a re-pin that did not happen. What it no longer does is require a struck-
+through historical table to track a live run — which no edit inside this lane's ownership could have
+delivered, and which is not what the document is for.
+
+**`WITHDRAWN_COVERAGE` is a record and not a pin, and its docstring says so.** Nothing re-derives it
+from a run, because no run produces it any more, so it may never be quoted as a measurement. The one
+place a value's provenance is *"a defect used to produce this"* is a place that has to be labelled,
+or the next reader will treat it as a second opinion.
+
+### The clause that is deliberately not asserted
+
+`secure-tower/destination-eta-unpriced` withdrew as `30 of 30 | 0.0 | 0.00 %`, which is also how
+Midtown Office's **live** credential row renders. Exact disjointness between the two vocabularies
+would therefore fail, and it would fail for no reason: two different rows that happen to be all
+zeros are not a drift. So disjointness is asserted only over the two rows this study **reports** as
+moved, and the exception is written down rather than absorbed into a looser rule.
+
