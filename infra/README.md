@@ -17,6 +17,8 @@ behind it, and Communication Services for the one mail this product sends.
 **Deployed 2026-08-05** to `Rene Family` / `elevator-sim` / **eastus2**, serving at
 `https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io`.
 
+Redeployed the same day at `cb50cee-amd64`, which is the first deploy carrying the play-test wave — and the first from a workstation rather than CI, which is how the `linux/arm64` trap in § 0.1 was found.
+
 That sentence replaces an earlier one saying this had never been deployed. It is worth keeping the
 distinction sharp, because the last `infra/` in this repository published a figure that did not
 reproduce from its own template, and what let that survive review was that its untested parts read
@@ -33,6 +35,7 @@ recorded because each one is a class, not an incident:
 | `RoleDefinitionDoesNotExist` | The Communication and Email Service Owner role id was wrong in its last segment. A built-in role id is a fact to look up — both are now confirmed with `az role definition list`, and the command sits in the comment beside each |
 | `ParameterOutOfRange` on `Version`, allowed list `[]` | **PostgreSQL flexible server is restricted in East US on this subscription.** An empty list of allowed versions is what a blocked region looks like; the capability API says so outright. Hence `eastus2` |
 | `did not issue a challenge` from `az acr login` | The registry name was derived from the subscription id, so tearing the group down and redeploying recreated the *same* name. ARM said `Succeeded`, DNS resolved, and the data plane answered `GET /v2/` with a bare 404 instead of a 401 challenge. Registry names are now discovered, or created fresh and random |
+| `ActivationFailed` with **no logs and no replica** | The image was built on an Apple Silicon Mac, so it was `linux/arm64`; Container Apps runs `linux/amd64`. The revision takes 100 % of traffic, fails to activate, and there is no replica to log — `az containerapp logs show` answers *"Could not find a replica for this app"* and `runningStateDetails` is `null`, so the platform never says why. Diagnosed by comparing `docker image inspect --format '{{.Os}}/{{.Architecture}}'` against the image already deployed. **Always `docker build --platform linux/amd64`.** The previous images came from CI, which is x86, which is why this had never been seen |
 | `ResourceNotFound` on resources the template creates | ARM racing its own creates on a first pass. The resources existed on completion and a re-run converged — which is why the script is safe to re-run and says so |
 
 ### 0.2 Still not verified
