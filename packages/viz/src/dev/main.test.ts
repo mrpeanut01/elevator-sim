@@ -50,6 +50,9 @@ import type { VizFloor } from '../contract/types.js';
 import type { BrowserResources } from './data.js';
 import { recordRun } from '../record/recordRun.js';
 
+import { disclosureItems } from '../mode/disclosure.js';
+import type { DisclosureItem } from '../mode/types.js';
+
 import {
   deepLinkDefaultsOf,
   deepLinkSearchOf,
@@ -58,6 +61,7 @@ import {
   seedEntryOf,
   seekActionForKey,
   shaftsForBank,
+  transportStatusOf,
   waitLegendEntries,
 } from './main.js';
 import { initialState, profileById, shiftRunConfigOf, type ViewerState } from './state.js';
@@ -146,6 +150,103 @@ describe('index.html holds no second copy of the legend', () => {
     const markup = await legendMarkup();
     expect(markup).toContain('id="legend-title"');
   });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The transport strip reads the disclosure layer — GitHub issue #71
+ * -------------------------------------------------------------------------- */
+
+describe('the status strip is worded by the reader’s mode', () => {
+  /**
+   * A real run's disclosure items, built the way `dev/main.ts` builds them.
+   *
+   * `midtown-office` for `recordingOf`'s measured reason a few hundred lines down: Garden
+   * Apartments at the viewer's defaults is six floors of almost nobody, and a run with no queue in
+   * it is a run whose figures cannot tell two modes apart.
+   */
+  function itemsOf(): readonly DisclosureItem[] {
+    const state: ViewerState = { ...initialState(resources, 424242n), buildingId: 'midtown-office' };
+    const recording = recordRun(shiftRunConfigOf(resources, state).config, {
+      recordDecisions: false,
+    }).recording;
+    return disclosureItems({
+      recording,
+      dispatcherName: recording.dispatcherProfileId,
+      /*
+       * Empty, and it is the honest value here rather than a shortcut. `dev/main.ts`'s own
+       * `lockedOutAt` is a shell closure that needs the loaded building document and the running
+       * profile; what it feeds is the `locked-out` item, which neither figure below reads. An empty
+       * set means *this caller does not know*, which `lockedOut.ts` is explicit is a different
+       * claim from *this building restricts nothing* — and neither claim touches `awt` or `wt95`.
+       */
+      lockedOut: [],
+    });
+  }
+
+  it('says something different in each mode — § D230', () => {
+    /*
+     * **Move the control and require the rendering to change** — the standing requirement's form
+     * for a disclosure control. § D240 § 2 measured the old state: `AWT · WT95` was byte-identical
+     * in both modes, one of six strings that made Casual *less* informative than Engineer for the
+     * audience it names — because this line was built from `recording.summary` directly while the
+     * per-mode renderings were computed on every recording and dropped with `void itemsIn;`.
+     */
+    const items = itemsOf();
+    const advanced = transportStatusOf(items, 'advanced');
+    const basic = transportStatusOf(items, 'basic');
+    expect(advanced, 'the strip says nothing at all about a run that happened').toBeDefined();
+    expect(basic, 'Casual is drawing no status line').toBeDefined();
+    expect(basic, 'the disclosure selector was moved and the strip did not change').not.toBe(
+      advanced,
+    );
+  }, 300_000);
+
+  it('carries each figure’s n, which is R13 clause one', () => {
+    /*
+     * The honesty search found this on the **shipped** strip, the moment the line entered the
+     * corpus: `AWT 13.1 s · WT95 27.4 s` is an estimate with no count beside it, and *"`n = 5` is
+     * not a caveat on `11.3 s`; it is part of what `11.3 s` means"*. Six generated cases failed in
+     * both modes. The count was on the `Rendering` all along and the strip was not reading it.
+     */
+    const line = transportStatusOf(itemsOf(), 'advanced') ?? '';
+    expect(line, `the strip publishes a figure with no sample: ${line}`).toContain('n =');
+  }, 300_000);
+
+  it('says nothing at all when there is no run', () => {
+    // `undefined`, never `''`. The strip's transient messages share this element — the copied
+    // provenance line, the batch progress — and blanking one of them would take a sentence off
+    // the screen at the moment a reader is being told something.
+    expect(transportStatusOf([], 'advanced')).toBeUndefined();
+  });
+
+  it('carries a refused mean’s reason, and carries it once', () => {
+    /*
+     * Two regressions this routing had on the way, both found by printing what the function
+     * returns rather than by reasoning about it, and both worse than the line being replaced.
+     *
+     * The first draft dropped the reason entirely — `average wait suppressed (n = 201 rides)` and
+     * nothing about why, where the old strip read `AWT suppressed — <the run's own reason>`. That
+     * is R3 with the refusal deleted, on the surface a reader glances at without opening a panel.
+     *
+     * The second appended it per figure and printed a 300-character sentence **twice**, because
+     * `awt` and `wt95` are refused by one `awtIsValid` call and carry the same words.
+     *
+     * `midtown-office` at the viewer's defaults is a run whose mean really is refused, which is
+     * what makes this case reachable at all — asserted below rather than assumed.
+     */
+    const items = itemsOf();
+    const line = transportStatusOf(items, 'advanced') ?? '';
+    expect(line, 'this fixture no longer refuses its mean, so the case is vacuous').toContain(
+      'suppressed',
+    );
+    const reason = items.find((item) => item.id === 'awt')?.advanced.note ?? '';
+    expect(reason, 'the refused figure carries no reason to route').not.toBe('');
+    expect(line, 'the strip refuses a figure and does not say why').toContain(reason);
+    expect(
+      line.split(reason).length - 1,
+      'the same refusal is printed once per figure — twice, for one gate',
+    ).toBe(1);
+  }, 300_000);
 });
 
 describe('keyboard seeking — KX-10', () => {

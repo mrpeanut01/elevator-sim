@@ -328,14 +328,46 @@ export function transportStatusOf(
   mode: ViewMode,
 ): string | undefined {
   const drawn = itemsIn(items, mode);
-  const parts = [AWT_ID, WT95_ID]
+  const shown = [AWT_ID, WT95_ID]
     .map((id) => drawn.find((item) => item.id === id))
-    .filter((item) => item !== undefined)
-    .map((item) => {
-      const { value, count } = item.rendering;
-      return count === undefined ? `${item.label} ${value}` : `${item.label} ${value} (${count})`;
-    });
-  return parts.length === 0 ? undefined : parts.join(' · ');
+    .filter((item) => item !== undefined);
+  if (shown.length === 0) return undefined;
+
+  const figures = shown.map((item) => {
+    const { value, count } = item.rendering;
+    return count === undefined ? `${item.label} ${value}` : `${item.label} ${value} (${count})`;
+  });
+
+  /*
+   * **A refusal carries its reason, once.**
+   *
+   * Two things this had to be driven to get right, and printing what the function returns is what
+   * found both.
+   *
+   * The line it replaces read `AWT suppressed — <the run's own awtInvalidReason>`, and the first
+   * draft of this routing dropped the second half: on `midtown-office` at the viewer's defaults —
+   * a run whose mean *is* refused — it produced `average wait suppressed (n = 201 rides)` and
+   * nothing about why. That is R3 with the reason deleted, on the surface a reader glances at
+   * without opening a panel: a **worse** line than the one it replaced.
+   *
+   * Appending it per figure was the second draft, and it printed a 300-character refusal **twice**,
+   * because both figures are refused by the same `awtIsValid` call and carry the same sentence. So
+   * the reasons are deduplicated and said after the figures. Two figures refused for two different
+   * reasons — which no shipped ground produces today, since the gate is one call — would print
+   * both, in order, rather than silently choosing one.
+   *
+   * Only a `suppression` origin contributes: on a quotable figure the note is the window and the
+   * sample, and `figures` above already carries the sample.
+   */
+  const reasons = [
+    ...new Set(
+      shown
+        .filter((item) => item.origin.kind === 'suppression')
+        .map((item) => item.rendering.note)
+        .filter((note) => note !== undefined),
+    ),
+  ];
+  return [figures.join(' · '), ...reasons].join(' — ');
 }
 
 /** A band's boundary, as the two numbers it already publishes and the unit they are in. */
