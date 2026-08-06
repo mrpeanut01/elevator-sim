@@ -816,9 +816,10 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
           'is comfortable in one building will swamp another — and a run whose queue never ' +
           'settles has its average wait withheld rather than reported.',
-        'Run length — how long the day runs. Five are offered: 5, 15, 30, 60 and 120 minutes. It ' +
-          'has to be at least the traffic shape’s own period, and the menu refuses the ' +
-          'combination here rather than letting the run fail afterwards.',
+        'Run length — how long the day runs. Six are offered: 5, 15, 30, 60, 120 and 600 minutes. ' +
+          'It has to be at least the traffic shape’s own period, and the menu refuses the ' +
+          'combination here rather than letting the run fail afterwards. The longest is there ' +
+          'because one shipped shape is a whole working day and fits inside none of the others.',
         'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
           'still, the same seed produces the same arrivals, the same decisions and the same ' +
           'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +

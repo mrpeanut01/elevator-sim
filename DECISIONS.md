@@ -19831,3 +19831,52 @@ them maps over the table.
 `admissionNode` now returns its terms beside its node rather than gaining a sibling that would call
 `admitProfile` again — two calls are two answers to *is this profile admissible*, and they would
 disagree the day the space moves.
+
+---
+
+## D279 — the ten-hour day is offered because it ships, and this is the smaller of the two fixes § D276 named
+
+**Date: 2026-08-06 · Written after the code.** The red test § D276 left named, closed.
+
+### What was red, and why leaving it red was right until now
+
+`packages/viz/src/menu/menu.test.ts` § *every shipped template can be run at some offered length*
+failed on `office-day`. That guard is derived from `data/` rather than written about a template, and
+its own comment states what it enforces: *"a template that ships and fits inside none of the offered
+run lengths would be listed in the menu and unstartable at every one of them."* `office-day` declares
+`durationMin: 600`; `FREE_PLAY_DURATIONS_S` offered 5, 15, 30, 60 and 120 minutes.
+
+A catalogue-derived guard turning red is that guard working — the same thing § D264 point 4 records
+happening to `menu/howToPlay.test.ts` when `office-down-peak` landed. § D276 left it red and named
+because both fixes were outside that change's ownership.
+
+### Which of the two fixes this is, and which it is not
+
+§ D276 names two and prefers the second:
+
+- **a longer offered length**, which makes Free Play offer a ten-hour run;
+- **a part-of-day window** — § D275's unbuilt `windowStartS`/`windowEndS` plus the control that
+  writes it — which makes the day startable at *any* length by running a slice of it, and which is
+  what *make the day the unit of play* actually asks for.
+
+This is the first. The second is the right feature and it is **unbuilt**: § D275 refused the two
+knobs it needs by name, and building it reaches `core` and `data/`. Choosing the smaller fix is not
+a judgement that it is the better one — it is the observation that a record which ships and cannot be
+started from any surface is a worse state than a long session, and that the precedent for exactly
+this problem already exists. § D213 § 8, when `constant-iso` landed: *"`FREE_PLAY_DURATIONS_S` and
+`ACCEPTED_DURATIONS_S` gain 7 200 s so the template is playable at all."* Same problem, same move,
+one record later.
+
+**It does not close the window question**, and the constant says so in its own docstring: when the
+slice control lands, this entry stops being the only way to reach `office-day` and may well be
+dropped.
+
+### The second guard that fired, and it fired correctly
+
+`menu/howToPlay.test.ts` then went red: the guide's *Run length* sentence lists the offered lengths
+and is checked against `FREE_PLAY_DURATIONS_S` itself, so a constant that moves and a sentence that
+does not is caught rather than shipped. That is the § D213 shape the whole file is written against —
+a hand-maintained list that stopped tracking the data it was built from — and it worked. The sentence
+now reads *six* and names 600, with a clause saying **why** the longest is there, because a run
+length an order of magnitude past the others is the kind of number a reader assumes is a mistake
+unless something says otherwise.

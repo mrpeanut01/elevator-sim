@@ -131,11 +131,36 @@ export interface FreePlaySelection {
 /**
  * Run lengths Free Play offers, seconds. 15 minutes is the shipped studies' own horizon.
  *
- * Two hours is here for one reason and it is a `data/` fact rather than a taste: `constant-iso`
- * declares `durationMin: 120`, and without a length that reaches it the template would be listed
- * in the menu and unusable at every length beside it.
+ * ## The last two are `data/` facts rather than tastes
+ *
+ * Two hours is here for one reason: `constant-iso` declares `durationMin: 120`, and without a
+ * length that reaches it the template would be listed in the menu and unusable at every length
+ * beside it (§ D213 § 8).
+ *
+ * **Ten hours is the same fact, one record later.** `office-day` declares `durationMin: 600` — a
+ * whole working day, 08:00 to 18:00, seventeen phases ([§ D276](../../../../DECISIONS.md)) — and
+ * `menu.test.ts` § *every shipped template can be run at some offered length* went **red** on it the
+ * day it landed. That guard is derived from `data/` and turning red is it working: a template that
+ * ships and fits inside none of the offered lengths is listed in the menu and unstartable at every
+ * one of them.
+ *
+ * ## Why this rather than the part-of-day window
+ *
+ * § D276 names two fixes and prefers the other one: `windowStartS`/`windowEndS`, so a player runs a
+ * *slice* of the day at any length, which is what *make the day the unit of play* actually asks
+ * for. That is the right feature and it is **unbuilt** — § D275 refused the two knobs it needs, and
+ * building it reaches `core` and `data/`.
+ *
+ * So this is the smaller of the two and it is the one § D213 § 8 already set the precedent for, on
+ * exactly this problem, with exactly this reasoning: *"`FREE_PLAY_DURATIONS_S` and
+ * `ACCEPTED_DURATIONS_S` gain 7 200 s so the template is playable at all"*. A ten-hour run is a long
+ * session, and offering it is a smaller claim than shipping a record no surface can start. **It does
+ * not close the window question** — when the slice control lands, this entry stops being the only
+ * way to reach `office-day` and may well be dropped.
  */
-export const FREE_PLAY_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
+export const FREE_PLAY_DURATIONS_S: readonly number[] = Object.freeze([
+  300, 900, 1800, 3600, 7200, 36_000,
+]);
 
 /* -------------------------------------------------------------------------- *
  * The catalogue — what there is to choose from
