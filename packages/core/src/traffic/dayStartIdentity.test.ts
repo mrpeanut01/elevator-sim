@@ -142,7 +142,10 @@ const EXPECTED_HOURS: Readonly<Record<DemandTemplateId, number | null>> = {
   'constant-iso': null,
   'lunch-two-way': 12 * 3600 + 15 * 60,
   'shift-change': 14 * 3600 + 45 * 60,
-  'evening-egress': 17 * 3600 + 24 * 60,
+  // The venue hour. 22:24 places the reported five minutes at 22:30–22:35; the office end-of-day
+  // that used to share this record is `office-down-peak` below. `DECISIONS.md` § D263.
+  'evening-egress': 22 * 3600 + 24 * 60,
+  'office-down-peak': 17 * 3600 + 15 * 60,
 };
 
 describe('the hour lands on the resolved template and on the trace, and is absent when unauthored', () => {

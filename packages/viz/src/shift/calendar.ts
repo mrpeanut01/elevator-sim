@@ -70,11 +70,12 @@
  * - **A template over the player's own choice.** Free Play's template select is the reader's most
  *   explicit statement about what to run (§ D215), and a period quietly replacing it would be a
  *   control that stopped working when a calendar was open.
- * - **A template the shift is too short for.** A template declares a period of its own — 20 minutes
- *   for `evening-egress`, 30 for `shift-change` — and `menu.ts` already refuses a free-play run
- *   shorter than that as leaving nothing to measure. Shorter still and `core` throws outright: at
- *   the 300 s free-play duration the egress's step and hold do not fit inside the run. The period
- *   defers to the shift and reports it.
+ * - **A template the shift is too short for.** A template declares a period of its own — 30 minutes
+ *   for both of the templates a shipped period names, `office-down-peak` and `shift-change`, and 20
+ *   for `evening-egress` — and `menu.ts` already refuses a free-play run shorter than that as
+ *   leaving nothing to measure. Shorter still and `core` throws outright: at the 300 s free-play
+ *   duration the egress's step and hold do not fit inside the run. The period defers to the shift
+ *   and reports it.
  *
  * ## The one coarsening, named
  *
@@ -385,7 +386,21 @@ export const CALENDAR_PERIODS: Readonly<Record<CalendarPeriodId, CalendarPeriod>
   }),
 
   /*
-   * "Demand up and a sustained evening egress, which is what `evening-egress` was authored for."
+   * "Demand up and a sustained evening egress."
+   *
+   * **It runs `office-down-peak`, not `evening-egress`, and the swap is the whole of
+   * `DECISIONS.md` § D263.** `docs/17` § 4.2's sentence — *"which is what `evening-egress` was
+   * authored for"* — was wrong about that record and this period was the evidence: `evening-egress`
+   * is named *Event egress*, its `$comment` argues a ballroom emptying, and this period is an office
+   * end of day. § D244 then gave every template exactly one `startOfDayMin`, and one record cannot
+   * be both 17:30 and 22:30. So the office reading has its own record, with its own hour and its own
+   * citation status, and this period selects it; `evening-egress` keeps the ballroom, which
+   * `crown-hotel` and the challenge rotation are the callers of.
+   *
+   * **The period is 30 minutes now rather than 20**, because `office-down-peak` inherits
+   * `rise-and-fall`'s duration. That is no more demanding than the shipped default: 1 800 s is both
+   * `DEFAULT_SHIFT_LENGTH_S` and the default template's own period, so a shift too short for this
+   * one was already too short to measure the template it replaced.
    *
    * The business week only: a quarter does not end on a Saturday, and `appliesOn` is what says so.
    * That is also the clause that makes the *inverse* assertion available — a Saturday inside this
@@ -393,6 +408,12 @@ export const CALENDAR_PERIODS: Readonly<Record<CalendarPeriodId, CalendarPeriod>
    *
    * NOT CITED: 1.15. An assumption about how many people are in the office when the numbers are
    * being filed.
+   *
+   * **The bias is still this period's job and not the template's**, and the reason is on the record:
+   * `office-down-peak` authors no `directionalSplitAtStart`, so the mix stays the caller's to set
+   * and {@link calendarPatch} applies it here rather than withholding it. What that costs is
+   * measured and named rather than implied — an 0.5 blend toward `EGRESS` off an 85/5/10 office
+   * profile leaves *incoming* the larger share, which `calendar.test.ts` asserts in those words.
    */
   'quarter-end': Object.freeze({
     id: 'quarter-end',
@@ -404,7 +425,7 @@ export const CALENDAR_PERIODS: Readonly<Record<CalendarPeriodId, CalendarPeriod>
     shift: Object.freeze({
       populationFactor: 1.15,
       splitBias: Object.freeze({ label: 'toward the lobby', toward: EGRESS, amount: 0.5 }),
-      demandTemplateId: 'evening-egress' as DemandTemplateId,
+      demandTemplateId: 'office-down-peak' as DemandTemplateId,
       eventId: null,
       goodsCars: 0,
       note: 'A fuller building than usual, and it empties in one go.',

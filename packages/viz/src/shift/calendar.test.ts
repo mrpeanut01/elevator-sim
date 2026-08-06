@@ -70,8 +70,8 @@ import { withIncidents } from './incidents.js';
  * **standard 30-minute shift**.
  *
  * 1 800 s rather than the 900 s the cheaper probes use, and the reason is a period rather than a
- * preference: `quarter-end` and `rota-week` impose a demand template, `evening-egress` and
- * `shift-change` declare 20- and 30-minute periods of their own, and `calendarPatch` refuses a
+ * preference: `quarter-end` and `rota-week` impose a demand template, `office-down-peak` and
+ * `shift-change` each declare a 30-minute period of their own, and `calendarPatch` refuses a
  * template the shift is too short for — in the same words `menu.ts` refuses one to a free-play run.
  * Measured at 900 s those two periods would still move the legs, and would move them **without the
  * template**, so the test would be quietly measuring half of what it claims. 1 800 s is
@@ -369,7 +369,12 @@ describe('§ D177 — the period reaches the simulation', () => {
     const plan = planWith(state, CALENDAR_PERIODS['quarter-end']);
     expect(legsOfRun(runOf(plan))).not.toBe(controlLegs(state));
 
-    expect(plan.config.demandTemplate).toBe('evening-egress');
+    /*
+     * `office-down-peak`, not `evening-egress`, since `DECISIONS.md` § D263. This period is an
+     * office end of day and `evening-egress` is a ballroom emptying — one record was doing both
+     * jobs, and § D244's one-hour-per-template made that impossible to keep honest.
+     */
+    expect(plan.config.demandTemplate).toBe('office-down-peak');
     expect(plan.calendar.population?.after ?? 0).toBeGreaterThan(plan.calendar.population?.before ?? 0);
     // The mix is pulled toward the lobby, not replaced by it: an 0.5 blend off an 85/5/10 office
     // profile leaves incoming the larger share, and the period says so rather than claiming a
@@ -475,13 +480,15 @@ describe('what a period will not do', () => {
 
   it('will not run a template the shift is too short for', () => {
     /*
-     * Not a nicety. `evening-egress` declares a 20-minute period; at the 300 s free-play duration
-     * `core` **throws** — a quarter of the run is the quiet before the doors open, and the step and
-     * the hold do not fit in what is left — so a period that imposed its template regardless would
-     * end the shift with an exception instead of a building.
+     * Not a nicety, and the bar is `menu.ts`'s own: a template's declared period, refused in the
+     * same words it refuses a free-play run with. `office-down-peak` declares a 30-minute period, so
+     * a 300 s or 900 s shift measures a slice of a ramp and reports it as a down-peak.
      *
-     * The bar is `menu.ts`'s own: a template's declared period, refused in the same words it refuses
-     * a free-play run with.
+     * **The stronger half of the argument belongs to the record this period no longer names.**
+     * `evening-egress` declares 20 minutes, and at 300 s `core` **throws** — a quarter of the run is
+     * the quiet before the doors open, and the step and the hold do not fit in what is left. That
+     * case is still live for the venue pairing (`crown-hotel`, and the challenge rotation), which is
+     * why the refusal is a declared-period rule rather than a rule about one shape.
      */
     const day = calendarDayFor(CALENDAR_PERIODS['quarter-end'], 1, 0);
     for (const runLengthS of [300, 900]) {
@@ -494,7 +501,7 @@ describe('what a period will not do', () => {
         runLengthS,
       });
       expect(patch.demandTemplateId, `${String(runLengthS)} s`).toBeNull();
-      expect(patch.withheld[0] ?? '').toContain('evening-egress');
+      expect(patch.withheld[0] ?? '').toContain('office-down-peak');
       // The rest of the period still applies. A refusal on one half is not a refusal of the period.
       expect(patch.population?.after ?? 0).toBeGreaterThan(patch.population?.before ?? 0);
       expect(patch.demand.directionalSplit).toBeDefined();

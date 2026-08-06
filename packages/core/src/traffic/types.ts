@@ -77,6 +77,17 @@ export class TrafficError extends Error {
  * the lunch mixed peak, outgoing-dominant as occupants leave the building and incoming-dominant
  * as they return. Its intensity geometry is `rise-and-fall`'s, unchanged, so the only thing it
  * adds is the mix arc — see {@link DemandPhase.startSplit}.
+ *
+ * **`evening-egress` and `office-down-peak` are two records for what was once one** (`DECISIONS.md`
+ * § D263). `evening-egress` is the **venue** case — a ballroom emptying, a cinema turning out — and
+ * its step is the point of it. `office-down-peak` is the **office end of day**, a design case in its
+ * own right rather than an egress under another name, and its intensity geometry is
+ * `rise-and-fall`'s. Splitting them is what let each one carry the hour that is true of it: a
+ * building empties at 17:30 and a function turns out at 22:30, and § D244 gives a record exactly one
+ * hour. Since the geometry is shared, an `office-down-peak` run draws the **same passengers** as a
+ * `rise-and-fall` run at the same seed — declared in the record's own `$comment` and asserted by
+ * `traffic/templateAdditionIdentity.test.ts`, because what that record adds is the hour and the
+ * period's identity, not a shape.
  */
 export const DEMAND_TEMPLATE_IDS = [
   'rise-and-fall',
@@ -84,6 +95,7 @@ export const DEMAND_TEMPLATE_IDS = [
   'lunch-two-way',
   'shift-change',
   'evening-egress',
+  'office-down-peak',
 ] as const;
 
 export type DemandTemplateId = (typeof DEMAND_TEMPLATE_IDS)[number];

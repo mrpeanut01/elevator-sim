@@ -698,10 +698,16 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'study. Every one of them is a set of weights rather than a program; the next section ' +
           'takes them one at a time.',
         'Traffic shape — which demand template the run is drawn from. The shipped set is a rise ' +
-          'and fall, a lunch two-way peak, a shift change, an evening egress, and a constant ISO ' +
-          'load. Each template declares its own period, and each is marked either recommended — ' +
-          'its shape supports a confidence interval across replications — or cross-checking, ' +
-          'which is there to test a result against a differently shaped day.',
+          'and fall, a lunch two-way peak, an office down peak, a shift change, an evening ' +
+          'egress, and a constant ISO load. Each template declares its own period, and each is ' +
+          'marked either recommended — its shape supports a confidence interval across ' +
+          'replications — or cross-checking, which is there to test a result against a ' +
+          'differently shaped day.',
+        'The office down peak and the evening egress are the end of a day twice over, and the ' +
+          'difference is the leading edge. An office empties on a ramp: the working day ends, the ' +
+          'landings fill over a few minutes, and the flow tails off. A venue steps — the doors ' +
+          'open and the whole room is waiting at once, which is the case a ballroom or a cinema ' +
+          'poses and no other shape here produces.',
         'Arrival rate — how much demand, as a share of the building’s population arriving every ' +
           'five minutes. Left at this building’s own profile it uses whatever the building ' +
           'declares, which is the choice that does not pin a number the reference data is free ' +
