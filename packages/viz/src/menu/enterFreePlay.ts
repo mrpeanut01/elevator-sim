@@ -90,6 +90,15 @@ export function enterFreePlay(
     dispatcherId: selection.dispatcherProfileId,
     seed: BigInt(selection.seed),
     shiftLengthS: selection.durationS,
+    /*
+     * The other half of the one selection, and the only place a start and a length become two ends
+     * of a window. § D286.
+     *
+     * `null` — the whole period — is carried as `null` rather than resolved to `0`: `core` reads the
+     * absence as *no window*, and a `[0, durationS)` window would be the same run carrying a key it
+     * did not need, which is the byte-identity § D285 is built on.
+     */
+    windowStartS: selection.windowStartS,
     freePlay: {
       demandTemplateId: selection.demandTemplateId,
       arrivalRatePctPop5min: selection.arrivalRatePctPop5min,

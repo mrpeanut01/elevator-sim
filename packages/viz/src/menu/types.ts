@@ -124,47 +124,105 @@ export interface FreePlaySelection {
   readonly demandTemplateId: string;
   readonly arrivalRatePctPop5min: number | null;
   readonly durationS: number;
+  /**
+   * Where in the template's period the run begins, seconds — or `null` for *the whole of it*.
+   *
+   * `DECISIONS.md` § D286, and the second half of one selection. {@link durationS} keeps meaning
+   * exactly what it always meant — **how long the run's demand is** — and this says *where in the
+   * day that length is cut from*, so the two together name a part of the day and neither has been
+   * given a second meaning. That distinction is § D275's and it is not cosmetic: `durationS`
+   * travels in every leaderboard submission, and a `durationS` that meant *which slice* would leave
+   * every stored score a claim about a run nobody made.
+   *
+   * `null` rather than absent, following `arrivalRatePctPop5min`'s precedent in this same interface:
+   * *the whole period* is a real selection rather than a missing one, and it has to survive as one
+   * through persistence and through the board hash.
+   *
+   * The window's far end is `windowStartS + durationS`. Carried as a start and a length rather than
+   * as two absolute times because that is what the two facts are — `core` takes both ends, and
+   * `enterFreePlay` is where one becomes the other.
+   *
+   * ## The board cannot see this yet, and that is a named gap rather than a silence
+   *
+   * `SubmittedRun` and `configHashOf` live in `packages/server` and digest `durationS` without this,
+   * so a morning and an evening of equal length would share a board — two different exams scored on
+   * one table. Until the submission carries the window, {@link canStart} still starts a windowed run
+   * and `freePlayIssues` declines to *post* one, with the reason said on the screen. See § D288.
+   */
+  readonly windowStartS: number | null;
   /** Decimal digits. A string because a seed is an identity, not a quantity to do arithmetic on. */
   readonly seed: string;
 }
 
 /**
- * Run lengths Free Play offers, seconds. 15 minutes is the shipped studies' own horizon.
+ * The longest single run the menu will offer, seconds — a **bound**, no longer a ladder.
  *
- * ## The last two are `data/` facts rather than tastes
+ * `FREE_PLAY_DURATIONS_S` stood here: five lengths, later six, that a player chose between and that
+ * `templateOverrides.durationS` then refitted the demand curve to. § D286 removed it, because that
+ * control was three defects wearing one name (issues #80, #81, #82) and none of them was fixable by
+ * relabelling it — a length that rescales the day is a scenario control presented as a time budget.
+ * *Which part of the day you run* replaced it, and a part's length comes from the period it names.
  *
- * Two hours is here for one reason: `constant-iso` declares `durationMin: 120`, and without a
- * length that reaches it the template would be listed in the menu and unusable at every length
- * beside it (§ D213 § 8).
+ * ## Why a bound survives the ladder
  *
- * **Ten hours is the same fact, one record later.** `office-day` declares `durationMin: 600` — a
- * whole working day, 08:00 to 18:00, seventeen phases ([§ D276](../../../../DECISIONS.md)) — and
- * `menu.test.ts` § *every shipped template can be run at some offered length* went **red** on it the
- * day it landed. That guard is derived from `data/` and turning red is it working: a template that
- * ships and fits inside none of the offered lengths is listed in the menu and unstartable at every
- * one of them.
+ * `menu.test.ts` § *every shipped template can be run at some offered part* is the guard § D282 left
+ * standing, and a guard with no bound cannot fail: every template can be run over the whole of
+ * itself, so *"at some offered part"* would be a tautology. Two hours is what makes it a real claim
+ * again — `office-day` declares 600 minutes and clears it **only through a window**, which is
+ * exactly the fix § D276 named and § D282 could not build.
  *
- * ## Why this rather than the part-of-day window
- *
- * § D276 names two fixes and prefers the other one: `windowStartS`/`windowEndS`, so a player runs a
- * *slice* of the day at any length, which is what *make the day the unit of play* actually asks
- * for. That is the right feature and it is **unbuilt** — § D275 refused the two knobs it needs, and
- * building it reaches `core` and `data/`.
- *
- * So this is the smaller of the two and it is the one § D213 § 8 already set the precedent for, on
- * exactly this problem, with exactly this reasoning: *"`FREE_PLAY_DURATIONS_S` and
- * `ACCEPTED_DURATIONS_S` gain 7 200 s so the template is playable at all"*. A ten-hour run is a long
- * session, and offering it is a smaller claim than shipping a record no surface can start. **It does
- * not close the window question** — when the slice control lands, this entry stops being the only
- * way to reach `office-day` and may well be dropped.
+ * Two hours rather than any other number, and it is a `data/` fact rather than a taste: it is
+ * `constant-iso`'s own `durationMin`, the longest period any shipped template asks to be run over in
+ * one piece (§ D213 § 8). The 36 000 s § D282 added is **dropped**, as that entry said it would be —
+ * *"when the slice control lands, this entry stops being the only way to reach `office-day` and may
+ * well be dropped"* — which also closes the half-applied state it left behind, where the client
+ * offered a ten-hour run the server's own `ACCEPTED_DURATIONS_S` would have refused on post.
  */
-export const FREE_PLAY_DURATIONS_S: readonly number[] = Object.freeze([
-  300, 900, 1800, 3600, 7200, 36_000,
-]);
+export const LONGEST_OFFERED_RUN_S = 7200;
 
 /* -------------------------------------------------------------------------- *
  * The catalogue — what there is to choose from
  * -------------------------------------------------------------------------- */
+
+/**
+ * One selectable part of one template's period.
+ *
+ * Both of the run's identity fields are on it — {@link windowStartS} and {@link durationS} — because
+ * they are one selection and a control that wrote one without the other would leave a run covering
+ * a period nobody named.
+ */
+export interface DayPart {
+  /**
+   * Stable identity, and what a select hands back: `1800:1800`, or `null:36000` for a whole period.
+   *
+   * A compound id rather than a name, because `applyIntent` is a pure reducer with no catalogue to
+   * look one up in — the string a select returns has to carry the whole selection. Start first, so
+   * the two halves read in the order the sentence does.
+   */
+  readonly id: string;
+  /** `Morning rush`, or the template's own name for a whole period. */
+  readonly name: string;
+  /** `Morning rush — 08:30–09:00`. The clock is omitted for a template that declares no hour. */
+  readonly label: string;
+  /**
+   * `30 min of demand — 08:30 to 09:00, then however long it takes to clear`.
+   *
+   * **No end time is printed, and that is issue #80's actual fix rather than a shorter version of
+   * it.** The tail is the drain, and the drain is an *outcome*: how long the building takes to clear
+   * is what the run is measuring, and it depends on the dispatcher, the building and the seed. The
+   * old labels were wrong by up to 1.9× precisely because they printed a number for it — implicitly,
+   * by printing only the demand schedule and letting a player read it as the run. Naming the tail
+   * without predicting it is the only honest thing this line can say. `sim.drainGraceS` bounds it at
+   * an hour, which is a deadline rather than an estimate.
+   */
+  readonly detail: string;
+  /** Seconds into the template's period at which this part begins, or `null` for the whole of it. */
+  readonly windowStartS: number | null;
+  /** Length of the run's demand, seconds. The part's own, never a rescale of the period. */
+  readonly durationS: number;
+  /** Seconds after local midnight at which the part begins, or `null` for a template with no hour. */
+  readonly startOfDayS: number | null;
+}
 
 /**
  * One selectable thing, with enough to draw a row for it.
@@ -187,6 +245,15 @@ export interface CatalogueEntry {
    * combination at Start would move an explainable error to the one place with no words for it.
    */
   readonly minimumDurationS?: number | undefined;
+  /**
+   * Which parts of this template's period a player may run. Templates only. § D286.
+   *
+   * Derived by `partsOfDay` from the loaded records and carried here so that the panel, the
+   * validator and the opening state all read **one** answer to *what is offered*. A template entry
+   * with no parts is one nothing can start, which `freePlayIssues` says in words rather than
+   * leaving to a disabled button.
+   */
+  readonly parts?: readonly DayPart[] | undefined;
 }
 
 /**

@@ -20,6 +20,7 @@
 import {
   SimulationError,
   Simulation,
+  TRAFFIC_DEFAULTS,
   WARNING_CODES,
   type LoadedConfig,
   type SimulationConfig,
@@ -45,7 +46,7 @@ import {
   resolveDataDir,
   withTrafficProfile,
 } from '../data.js';
-import { EXIT_INTERNAL } from '../errors.js';
+import { EXIT_INTERNAL, UsageError } from '../errors.js';
 import {
   ABSENT,
   clock,
@@ -113,6 +114,16 @@ export const RUN_FLAGS: readonly FlagSpec[] = [
     placeholder: '<id>',
     summary: 'demand template; `elevator-sim list` names the ones this data directory ships',
     defaultText: 'rise-and-fall',
+  },
+  {
+    // Deliberately not `--window`, which is one flag over and means the *report* window — which
+    // part of a run is summarised. This one selects which part of the day is **run**; the two are
+    // separate questions and § D285 keeps them separate fields. Named for what a player calls it.
+    name: 'part',
+    kind: 'string',
+    placeholder: '<HH:MM-HH:MM>',
+    summary: 'run only this part of the template’s day, by clock time',
+    defaultText: 'the whole period',
   },
   {
     name: 'rate',
@@ -254,6 +265,59 @@ function demandTemplateIdOf(config: LoadedConfig, value: string | undefined): st
   return requireDemandTemplate(config, value).id;
 }
 
+/** `08:30` as minutes after local midnight, or `undefined` for anything that is not a clock time. */
+function clockMinutesOf(text: string): number | undefined {
+  const match = /^(\d{1,2}):(\d{2})$/u.exec(text);
+  if (match === null) return undefined;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return undefined;
+  return hours * 60 + minutes;
+}
+
+/**
+ * `--part 08:30-09:00` as the window `core` takes — § D285.
+ *
+ * **Clock times rather than offsets, and resolved against the record's own hour.** `office-day`
+ * declares `startOfDayMin: 480`, so `08:30-09:00` is `[1800, 3600)` of its period; nothing here
+ * knows that a working day starts at eight, and a record that moved its hour would move what this
+ * flag means without this function changing. Offsets into a period would have been simpler to parse
+ * and would have made the player do the arithmetic the record already did.
+ *
+ * Refused rather than defaulted for a template that declares no hour: `constant-iso` is a rate held
+ * long enough to cross-check an analytical baseline, not a time of day (§ D244), so *"the part of it
+ * between half eight and nine"* has no answer and inventing midnight would give a plausible wrong
+ * one.
+ */
+function dayWindowOf(
+  config: LoadedConfig,
+  templateId: string | undefined,
+  part: string | undefined,
+): { readonly windowStartS: number; readonly windowEndS: number } | undefined {
+  if (part === undefined) return undefined;
+  const record = requireDemandTemplate(config, templateId ?? TRAFFIC_DEFAULTS.templateId);
+  const [fromText, toText] = part.split('-');
+  const fromMin = fromText === undefined ? undefined : clockMinutesOf(fromText);
+  const toMin = toText === undefined ? undefined : clockMinutesOf(toText);
+  if (fromMin === undefined || toMin === undefined) {
+    throw new UsageError(
+      `--part must be two clock times, as in --part 08:30-09:00; received "${part}".`,
+    );
+  }
+  if (record.startOfDayMin === undefined) {
+    throw new UsageError(
+      `--part names clock times and demand template "${record.id}" declares no hour of day, so there is no clock to name a part of. Run the whole period, or select a template that declares one.`,
+    );
+  }
+  if (toMin <= fromMin) {
+    throw new UsageError(`--part must end after it starts; received "${part}".`);
+  }
+  return {
+    windowStartS: (fromMin - record.startOfDayMin) * 60,
+    windowEndS: (toMin - record.startOfDayMin) * 60,
+  };
+}
+
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const buildingId = requiredStringFlag(parsed, 'building');
   const dispatcherId = requiredStringFlag(parsed, 'dispatcher');
@@ -269,6 +333,8 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const templateId = demandTemplateIdOf(config, template);
   const rate = numberFlag(parsed, 'rate');
   const window = stringFlag(parsed, 'window');
+  const part = stringFlag(parsed, 'part');
+  const dayWindow = dayWindowOf(config, templateId, part);
 
   const simulation: SimulationConfig = {
     building,
@@ -291,6 +357,7 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     // and let the summary's own saturation test decide what may be quoted.
     onTimeout: 'report',
     ...(durationS === undefined ? {} : { durationS }),
+    ...(dayWindow === undefined ? {} : dayWindow),
     ...(templateId === undefined ? {} : { demandTemplate: templateId }),
     ...(rate === undefined ? {} : { demand: { arrivalRatePctPop5min: rate } }),
     ...(window === 'full-run' || window === 'peak-5min' ? { reportWindow: window } : {}),
@@ -305,6 +372,7 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     ...(durationS === undefined ? [] : [`--duration ${durationS}`]),
     ...(template === undefined ? [] : [`--template ${template}`]),
     ...(rate === undefined ? [] : [`--rate ${rate}`]),
+    ...(part === undefined ? [] : [`--part ${part}`]),
     ...(window === undefined ? [] : [`--window ${window}`]),
   ];
 

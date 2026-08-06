@@ -42,10 +42,12 @@ import {
   canStart,
   freePlayIssues,
   navigate,
+  partsFor,
   updateChallenge,
   updateFreePlay,
   updateSettings,
 } from './menu.js';
+import { partIdOf } from './partsOfDay.js';
 import { CALENDAR_PERIODS, CALENDAR_PERIOD_IDS } from '../shift/calendar.js';
 import {
   CONSTRAINTS,
@@ -58,7 +60,6 @@ import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
-  FREE_PLAY_DURATIONS_S,
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
   type CatalogueEntry,
@@ -816,10 +817,15 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
           'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
           'is comfortable in one building will swamp another — and a run whose queue never ' +
           'settles has its average wait withheld rather than reported.',
-        'Run length — how long the day runs. Six are offered: 5, 15, 30, 60, 120 and 600 minutes. ' +
-          'It has to be at least the traffic shape’s own period, and the menu refuses the ' +
-          'combination here rather than letting the run fail afterwards. The longest is there ' +
-          'because one shipped shape is a whole working day and fits inside none of the others.',
+        'Part of the day — which stretch of the traffic shape you run, and the same control the ' +
+          'campaign uses. A shape that is one period offers that period; the working day offers ' +
+          'each of its busy parts and the whole of itself, so the morning rush, the lunch two-way ' +
+          'and the evening down-peak are three different problems rather than three lengths of ' +
+          'one. Every option says how much demand it schedules and between which clock times.',
+        'What no option says is when the run ends. The demand schedule stops at the time on the ' +
+          'label and the run keeps going until the building has cleared, which is the part worth ' +
+          'watching and is an outcome rather than a prediction — how long a backlog takes to drain ' +
+          'is what the dispatcher is being judged on.',
         'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
           'still, the same seed produces the same arrivals, the same decisions and the same ' +
           'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +
@@ -927,12 +933,25 @@ const RATE_OPTIONS: readonly CatalogueEntry[] = Object.freeze(
   })),
 );
 
-const DURATION_OPTIONS: readonly CatalogueEntry[] = Object.freeze(
-  FREE_PLAY_DURATIONS_S.map((seconds) => ({
-    id: String(seconds),
-    name: `${String(Math.round(seconds / 60))} minutes`,
-  })),
-);
+/**
+ * The parts of the selected template's period, as menu rows. § D286.
+ *
+ * Derived per render from the catalogue rather than held in a module constant, because the option
+ * list depends on *which template is selected* — a `lunch-two-way` has no morning in it — and a
+ * constant could not. That dependency is the whole reason this replaced a fixed ladder: a length
+ * was offered identically under every template and meant something different under each.
+ */
+function partOptions(catalogue: MenuCatalogue, demandTemplateId: string): readonly CatalogueEntry[] {
+  return Object.freeze(
+    partsFor(catalogue, demandTemplateId).map((part) => ({
+      id: part.id,
+      name: part.label,
+      // The sentence issue #80 asked for: what is simulated, and that the tail is a tail. No end
+      // time — the drain is an outcome of the run, not a prediction the menu may make.
+      detail: part.detail,
+    })),
+  );
+}
 
 function freePlayBody(input: MenuViewInput): Body {
   const selection = input.state.freePlay;
@@ -981,7 +1000,16 @@ function freePlayBody(input: MenuViewInput): Body {
       String(selection.arrivalRatePctPop5min),
       RATE_OPTIONS,
     ),
-    select('free-play.duration', 'Run length', 'durationS', String(selection.durationS), DURATION_OPTIONS),
+    select(
+      'free-play.part',
+      // One name, in both modes. The campaign called this *shift length* and offered four narrative
+      // options; Free play called it *Run length* and offered five numeric ones; they wrote the same
+      // field (issue #82). This is that control, named for what it actually chooses.
+      'Part of the day',
+      'windowStartS',
+      partIdOf(selection.windowStartS, selection.durationS),
+      partOptions(input.catalogue, selection.demandTemplateId),
+    ),
     {
       id: 'free-play.seed',
       label: 'Seed',
@@ -1865,7 +1893,21 @@ function freePlayPatch(field: keyof FreePlaySelection, value: string): Partial<F
       // `"null"` is *this building's own profile*, which is a distinct selection and has to survive
       // as one — resolving it to a number here would pin a rate `data/` is free to change.
       return { arrivalRatePctPop5min: value === 'null' ? null : Number(value) };
+    case 'windowStartS': {
+      // One control writing two fields, because it is one selection: *which part of the day* is a
+      // start and a length, and a patch that set one without the other would leave a run covering a
+      // period nobody named. The option's id carries both, because `applyIntent` is a pure reducer
+      // with no catalogue to look a part up in — see `DayPart.id`.
+      const [startText, durationText] = value.split(':');
+      return {
+        windowStartS: startText === 'null' || startText === undefined ? null : Number(startText),
+        durationS: Number(durationText ?? '0'),
+      };
+    }
     case 'durationS':
+      // Not written by any control. `windowStartS` above writes both halves of the selection, and
+      // this arm exists so the exhaustive switch still covers the key rather than being narrowed to
+      // the fields that happen to have a row today.
       return { durationS: Number(value) };
     case 'seed':
       // Not parsed. A seed is an identity rather than a quantity, and `freePlayIssues` is what says

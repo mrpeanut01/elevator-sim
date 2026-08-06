@@ -126,6 +126,7 @@ import {
   resolveDemandTemplate,
   shiftTemplatePeak,
   splitAt,
+  windowTemplate,
 } from './demandTemplate.js';
 import {
   batchesPerSecond,
@@ -1239,8 +1240,19 @@ interface RawBatch {
  * `StreamSet` on the same seed reproduces it exactly. That is what lets Phase 3 hand the
  * identical trace to every dispatcher under comparison.
  *
+ * ## A window is cut *after* the day is drawn, and that ordering is the feature (§ D285)
+ *
+ * `windowStartS`/`windowEndS` do not reach the sampler. The whole period is generated first — same
+ * streams, same draws, same order as a run that declares no window — and {@link sliceToWindow} then
+ * keeps the batches inside the window and re-bases them. So the crowd at 08:30–09:00 is *the same
+ * records*, ids included, whether the run covers half an hour or the whole day, which is what keeps
+ * common random numbers intact across a window change (CLAUDE.md invariant 2) and what would let
+ * the window move from *which run to make* to *what to look at* without renaming the crowd it
+ * selects. Bounding the sampler instead would have been cheaper and would have drawn a different
+ * day for every window.
+ *
  * @throws TrafficError for an unsupported arrival process or batch distribution, an unknown
- *   traffic profile, or a journey no chain of banks can route.
+ *   traffic profile, a journey no chain of banks can route, or a window outside the period.
  */
 export function generateTrace(config: TrafficConfig): PassengerTrace {
   const { building, streams } = config;
@@ -1501,7 +1513,7 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     );
   }
 
-  return Object.freeze({
+  const whole: PassengerTrace = Object.freeze({
     seed: streams.masterSeed.toString(),
     buildingId: building.id,
     template,
@@ -1527,6 +1539,83 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     // Every diagnostic worth raising is raised while planning: sampling adds no new ones,
     // because a trace that samples something the plan did not allow for is a bug, not a warning.
     warnings: plan.warnings,
+  });
+
+  return sliceToWindow(whole, config.windowStartS, config.windowEndS);
+}
+
+/**
+ * The part of a trace inside `[windowStartS, windowEndS)`, re-based so the window starts at zero.
+ *
+ * `DECISIONS.md` § D285. **Returns the trace itself when no window is declared**, which is the
+ * byte-identity guarantee stated as one line of code: a run that asks for no part of a day is the
+ * run this function did not exist for, and `traffic/windowIdentity.test.ts` holds the whole object
+ * to `toBe` rather than to a digest.
+ *
+ * ## The passengers are the day's passengers
+ *
+ * Nothing is re-drawn and nothing is renumbered. A kept passenger arrives with the id, journey,
+ * batch, mass, destination, credential and category it had in the whole day; only its
+ * `arrivalTimeS` moves, by exactly `windowStartS`. **The ids are therefore not contiguous** — a
+ * 08:30 window of `office-day` starts somewhere around `p400` — and that is the property rather
+ * than an oversight: it is what makes *"the morning of this day"* one crowd whichever length of run
+ * asked for it, so two windows of a seed are paired on the same day and a comparison between them
+ * keeps the power common random numbers buy.
+ *
+ * ## Two fields that keep describing the whole period, said rather than discovered
+ *
+ * `sources` and `peakPassengersPerSecond` are the **day's plan**, unchanged, because the trace was
+ * genuinely drawn from it — they are attribution, and rewriting them would claim the window had its
+ * own plan. `expectedPassengers` *is* re-derived, over the window's own integral, because it is the
+ * analytic figure `generator.test.ts` checks the realised count against and a day's expectation
+ * beside half an hour of arrivals would be a mismatch reported as a defect.
+ */
+function sliceToWindow(
+  trace: PassengerTrace,
+  windowStartS: number | undefined,
+  windowEndS: number | undefined,
+): PassengerTrace {
+  if (windowStartS === undefined && windowEndS === undefined) return trace;
+  if (windowStartS === undefined || windowEndS === undefined) {
+    throw new TrafficError(
+      `A demand window needs both ends: windowStartS is ${String(windowStartS)} and windowEndS is ${String(windowEndS)}. One alone would leave the other end of the run to a default nobody declared, which is how a run comes to cover a period its record never named.`,
+    );
+  }
+  const template = windowTemplate(trace.template, windowStartS, windowEndS);
+  // Reference equality, not a value comparison: `windowTemplate` returns its argument when the
+  // window is the whole period, because the whole is not a part. So "the full day" and "no window"
+  // land on the same early return and produce the same object.
+  if (template === trace.template) return trace;
+
+  const arrivals: ArrivalEvent[] = [];
+  const passengers: GeneratedPassenger[] = [];
+  for (const batch of trace.arrivals) {
+    if (batch.timeS < windowStartS || batch.timeS >= windowEndS) continue;
+    const timeS = batch.timeS - windowStartS;
+    const members = batch.passengers.map((passenger) =>
+      // Spread rather than rebuilt, so every key keeps its position and its presence — a passenger
+      // that used no transport hop still carries no `transportHops` key. Overwriting an existing
+      // key leaves it where it was, which is what keeps a windowed record comparable field for
+      // field with the day's own.
+      Object.freeze({ ...passenger, arrivalTimeS: timeS, inReportWindow: true }),
+    );
+    passengers.push(...members);
+    arrivals.push(Object.freeze({ ...batch, timeS, passengers: Object.freeze(members) }));
+  }
+
+  return Object.freeze({
+    ...trace,
+    template,
+    durationS: template.durationS,
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
+    reportWindowStartS: template.reportWindowStartS,
+    reportWindowEndS: template.reportWindowEndS,
+    arrivals: Object.freeze(arrivals),
+    passengers: Object.freeze(passengers),
+    passengerCount: passengers.length,
+    // Every kept arrival is inside the window, and the window is the whole of what is reported.
+    passengersInReportWindow: passengers.length,
+    expectedPassengers: expectedPassengersOver(template, trace.peakPassengersPerSecond),
   });
 }
 

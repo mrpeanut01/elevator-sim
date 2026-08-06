@@ -378,7 +378,10 @@ function selectionLines(selection: SingleRunSelection): readonly string[] {
       ? 'the building’s own rate'
       : `${selection.arrivalRatePctPop5min.toFixed(1)} %pop/5min`;
   return [
-    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min selected`,
+    // *"min of demand"* rather than *"min selected"* — issue #80. The number is the demand
+    // schedule and never the run: the clock range on the line above is the run, drain included, and
+    // the two used to be read as one because nothing said which was which.
+    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min of demand`,
     'one run, not part of a week — nothing is banked',
   ];
 }

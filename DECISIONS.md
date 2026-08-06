@@ -20268,3 +20268,337 @@ audits of this claim produced three different totals, all by hand, none reproduc
 sites they missed are the two that are not prose: a printed verdict string and a player-facing
 warning. § D283's derived scan closes that for `CLAUDE.md` and `docs/`. **It does not reach `.ts`,
 and the four sites above are the measure of what that leaves open.**
+---
+
+## D285 — a part of a day is a new field, and the day is drawn before it is cut
+
+**Date: 2026-08-06 · Written after the code.** `windowStartS`/`windowEndS` — the field
+[§ D275](DECISIONS.md) named, argued for, and deliberately did not build.
+
+§ D275 refused `templateOverrides.durationS` on an authored phase list and said why in one sentence:
+rescaling a ten-hour schedule into fifteen minutes gives *a fifteen-minute day with a five-minute
+lunch, reported as a day*. It then named the field that would answer the question properly and left
+it unbuilt on an explicit ground — *"a `windowStartS` with no shipped writer is precisely
+`patternSwitching` ([§ D219](DECISIONS.md)) again: authored, loaded, resolved, and writable by
+nothing."* [§ D286](DECISIONS.md) is the writer. This is the field.
+
+### It is a new field and never a second meaning for `durationS`, and the reason is arithmetic
+
+`durationS` travels in `StoredRunConfig`, in `SubmittedRun`, and into
+`server/leaderboard/submission.ts#configHashOf`. Giving it a second meaning would leave **every
+board still verifying and every stored row a claim about a different run** — the worst available
+failure, because nothing would go red. So `durationS` keeps meaning *how long the run's demand was*,
+which is true of a windowed run exactly as it is of any other, and the window says *where in the
+period that length was cut from*.
+
+### The ordering that is the whole design: draw the day, then cut it
+
+`generateTrace` does not pass the window to the sampler. It generates the template's **whole**
+period — same streams, same draws, same order as a run declaring no window — and `sliceToWindow`
+then keeps the batches inside the window and re-bases them by exactly `windowStartS`. Bounding the
+sampler instead would have been shorter and would have drawn a **different day for every window**.
+
+Two things follow, and they are why the extra work was done:
+
+1. **Common random numbers survive a window change** (CLAUDE.md invariant 2). Two windows of one
+   seed are two parts of one day, so a morning-versus-evening comparison is *paired on the day*
+   rather than being two unrelated experiments. Under a bounded sampler that pairing does not exist
+   and the 5–20× the CRN design buys is spent on nothing.
+2. **The passengers of a window are the day's passengers** — the same records, with the same ids,
+   masses, destinations, credentials and planned legs. Measured: `office-day` at `midtown-office`
+   seed 42 draws 7 283 legs, and the 08:30–09:00 window is 714 of them, beginning at `p61`. Nothing
+   is renumbered, and `traffic/windowIdentity.test.ts` asserts the ids and every field of every kept
+   record against the day's own.
+
+The ids being **non-contiguous** is the property rather than an oversight. A window that renumbered
+would look identical on every other check and would have stopped being a view of the day.
+
+### What a windowed template becomes, and the one thing that does not move
+
+`windowTemplate` re-bases: `durationS` is the window's length, the phases are clipped and shifted so
+`t = 0` is the window's start, `startOfDayS` becomes the *window's* hour, and `peakIntensity`,
+`intensityIntegralS` and `meanDirectionalSplit` are re-derived over the window by `finish` — the
+same rule `shiftTemplatePeak` follows, so a template cannot disagree with itself. The lunch window's
+mean mix comes back as the cited 45/45/10 rather than the day's, which is the honest reading: it
+**is** a different period.
+
+So every downstream reader — the kernel's deadline, `traceReportWindow`, the phase strip, the
+oracle's `[0, durationS]` assumptions — sees an ordinary period that begins at zero, and **nothing
+had to learn what a window is.** `ResolvedDemandTemplate.window` is what records that this period
+was cut out of a longer one, and it carries `periodS` so a trace can say *half an hour of a ten-hour
+day* without re-resolving the record.
+
+**The report window becomes the whole of the cut**, on § D273's argument at one more step: a phase
+list is reported over the whole of itself because five minutes cut out of a day reports one of its
+periods and calls it the day — and five minutes cut out of a *lunch peak* reports one instant of it
+and calls it the period. A run wanting a narrower measurement still has
+`SimulationConfig.reportWindow`, which narrows the report and never the run.
+
+### The whole is not a part
+
+Declaring `[0, durationS)` returns the template **by reference**, so *"the full day"* and *"no
+window"* are one selection spelled two ways and produce the same object rather than two that differ
+in whether a key is present. That matters because `structuralDigestOfResult` hashes a key's
+*presence*: a full-period window carrying a `window` key would fork every board it touched to record
+that a run is not a slice.
+
+### Byte-identity, confirmed by a run rather than by an argument
+
+The `core` suite is **2 410 green, the baseline exactly** — every pinned digest in
+`transportIdentity.test.ts`, every case in `dayStartIdentity.test.ts`, and `sim/oracle.test.ts`'s
+closed-form Barney/CIBSE comparison, all unmoved. `sliceToWindow` returns its argument when no
+window is declared, so that is the guarantee stated as one line of code rather than hoped for.
+`traffic/windowIdentity.test.ts` adds the three layers `dayStartIdentity` established: the key is
+absent on all six shipped templates, the whole period is the same object at all five buildings, and
+a whole run is byte-identical end to end.
+
+### Two refusals kept and one message corrected
+
+`templateOverrides.durationS` is **still refused** on a phase list, and `dayVariation.peakShiftS`
+still is too. This field does not relax either — it *answers* the first, and the message now names
+it: *"Choosing which part of a day to run is windowStartS/windowEndS and not this one."* A window
+that would nest is refused as well, because a second window measured against the first one's length
+stops naming a part of the day.
+
+### It is not a tunable, and could not honestly be declared as one
+
+Absent from `TRAFFIC_PARAMETERS`, joining `startOfDayS` there for § D244 rule 3's reason and one
+more. A tunable declares a **range**, and the only true range is `[0, the selected template's own
+durationS)` — 1 800 s for `rise-and-fall` and 36 000 s for `office-day`. `activeWhen` selects on a
+value, not on a length read out of `data/`, so any range written there would be wrong for five of
+the seven shipped records, and a declared schema that disagrees with the resolver is worse than none.
+
+---
+
+## D286 — one control, replacing two, with its options derived from the records' own hours
+
+**Date: 2026-08-06 · Written after the code.** Play-tester issues #78, #80, #81, #82 and #83, and
+the writer § D275 said the field could not ship without.
+
+Five issues, one cause: **the product's unit is a day and its only run-shape control was a length.**
+The campaign called it *shift length* and offered four narrative options; Free play called it *Run
+length* and offered five numeric ones; they wrote the same field (#82). The labels understated the
+run by up to 1.9×, because a length names the demand schedule and says nothing about the drain
+(#80). And a longer length **rescaled** the demand curve rather than showing more of the day, so the
+peak was five minutes at every setting and the rush hour moved (#81) — a scenario control presented
+as a time budget, which is § D177's inert control with the sign flipped: the control moves, the run
+changes, and it changes something other than what the label says.
+
+None of that was fixable by relabelling. So the control is now **which part of the day you run**, in
+both modes, with one option set:
+
+```text
+Morning rush — 08:30–09:00
+Lunch — 12:15–12:45
+Evening — 17:15–17:45
+Office working day — 08:00–18:00
+```
+
+### Nothing in that list is written down, and the three things that could have been are each derived
+
+**The intervals** come from the loaded templates' own hours. `rise-and-fall` declares 08:30 and a
+thirty-minute period and `office-day` declares 08:00, so the morning is `[30 min, 60 min)` of the
+day; likewise `lunch-two-way`'s 12:15 and `office-down-peak`'s 17:15. § D276's claim that the day
+**contains** those three cited periods is what makes that a derivation rather than a coincidence,
+and `traffic/windowIdentity.test.ts` asserts each part's clock **and length** against the record it
+comes from, so a record that moved either turns it red.
+
+**Which candidates survive** is decided by the day's own phase list. A template's hour offers a part
+when it lands on the day's phase **boundaries** and the day reaches full intensity inside it. That is
+what excludes `shift-change`: its 14:45 is 405 minutes into this day, inside the flat 315–495
+stretch, and an office day has no shift change — a derivation that admitted it would print a
+two-peak label over a level. `evening-egress`'s 22:24 is outside the day altogether. **Both
+exclusions are structural facts about the record rather than two ids the code knows to skip**, which
+is the difference between this and the hand-written list § D213 paid for five times.
+
+**The names** come from the hour, and *"rush"* is warranted rather than decorative: a part exists
+only where the day reaches its own peak intensity, so every named part is the busiest the building
+gets. The one option that is not a peak — the whole period — is named by the template instead.
+
+### The ladder is gone, and a bound replaced it
+
+`FREE_PLAY_DURATIONS_S` is deleted; `LONGEST_OFFERED_RUN_S = 7200` stands in its place. The 36 000 s
+§ D282 added is **dropped**, exactly as that entry said it would be — *"when the slice control lands,
+this entry stops being the only way to reach `office-day` and may well be dropped"* — which also
+closes the half-applied state it left: the client offered a ten-hour run that the server's own
+`ACCEPTED_DURATIONS_S` would have refused on post.
+
+The bound survives because without it the guard § D282 left standing becomes a tautology. Every
+template can be run over the whole of itself, so *"can be run at some offered part"* would pass for
+anything. Two hours is `constant-iso`'s own `durationMin`, the longest period any shipped record asks
+to be run over in one piece, and `office-day`'s 600 minutes clears the guard **only through a
+window** — which is the fix § D276 named and § D282 could not build. `menu.test.ts` now asserts both
+halves: every shipped template has a part inside the bound *and* the reducer accepts it, and the day
+offers its three cited periods and a whole self that does not fit.
+
+### Two fields, one control, and why the option id carries both
+
+`FreePlaySelection` gains `windowStartS: number | null` beside the `durationS` it already had, and
+`ViewerState` gains the same pair. `null` is *the whole period* — a real selection rather than a
+missing one, following `arrivalRatePctPop5min`'s precedent in the same interface.
+
+`applyIntent` is a pure reducer with no catalogue, so the option's id carries the whole selection:
+`1800:1800`, or `null:36000`. One control writing two fields is unusual and is the honest shape here,
+because they are one choice — a patch that set a length without its window would leave a run covering
+a period nobody named.
+
+`shiftRunConfigOf` then branches: `durationS` **or** a window, never both. That is not tidiness. On a
+phase-list template `core` refuses the override outright (§ D275), so passing both would throw on the
+one template that has parts to select.
+
+### The standing requirement, applied before the panel was written
+
+`scope/probes.test-helper.ts` gains `viewer.windowStartS` and `free-play.windowStartS`, each driving
+**two parts of one day at the same length and the same seed** — the morning against the lunch, and
+the morning against the evening. Holding the length still is what makes the probe about the window:
+a pair that also differed in length would pass on the length and prove nothing about the part.
+
+It is also the probe that would have caught the mistake this feature could most easily have made. Had
+the window been folded into `durationS`, the two arms would have been *identical* and the control
+inert — `patternSwitching` again, one wave later.
+
+### The scope is `between-days`, and the reason is not administrative
+
+Picking a different part of the day mid-week is choosing which exam to sit after seeing the
+questions. So both keys are declared `between-games` in `scope/surface.ts` beside the fields they
+name, and taking a scenario assignment resets the part along with the week.
+
+---
+
+## D287 — the clock the run is actually at, and a label that names the tail without predicting it
+
+**Date: 2026-08-06 · Written after the code.** Issues #80 and #83, which are one defect seen from
+two ends.
+
+### The clock: 06:00 in four places, and none of them the run's
+
+`DAY_START_S = 6 * 3600` was the answer everywhere a time appeared — the header clock, its empty
+state, the transport strip and the Day report's own header. So `lunch-two-way` was drawn at
+breakfast and *Event egress* at dawn, and issue #83 makes the sharp point about what that costs: a
+player who picks *"CIBSE Guide D lunch two-way"* and sees a morning concludes **that the traffic
+pattern does not matter much**, which is the opposite of what the product is trying to teach. A
+template named for a time of day that runs at a different time of day is worse than no template.
+
+§ D244 gave every shipped template but one its own hour and closed with *"the viewer. The clock is
+pinned at 06:00 in `packages/viz` and this change does not touch it."* § D285 gives a *part* of a day
+its own. This is where the viewer finally reads them: `dev/main.ts` captures `trace.startOfDayS` from
+the run and passes it to all four surfaces, and `DAY_START_S` survives as the **fallback** for the
+two cases that genuinely have no hour — `constant-iso`, which declares none on purpose, and a
+recording restored from a file, whose hour `VizRecording` does not carry.
+
+**Captured from the run, not re-derived from `state`**, and that is § D234's lesson at the one seam
+it would have recurred on: `state` is what the player has *selected* and the recording is what they
+are *watching*, and the two differ the moment a control moves before the next run. Reading the
+selection would have put the next run's clock on the last run's sheet.
+
+**One consequence of § D244 stops being free here, and it is worth naming.** That entry recorded
+that nothing statistical read the hour, so a wrong hour cost a label and nothing else — and that it
+would stop being free *"the moment a phase boundary becomes a measurement boundary, or a report
+slices a day at a wall-clock time."* Both have now happened. The hour is an input to the part list,
+to every option label, and to four surfaces a player reads. `shift-change`'s 15:00 — the one hour
+§ D244 marked NOT CITED — is still the first a site-specific configuration should override, and it
+is now visible rather than latent.
+
+### The label: state the demand window, name the tail, predict nothing
+
+Issue #80 measured *"Short shift — 15 min"* simulating 28 minutes, and every option overrunning its
+label by 1.5–1.9×. The obvious fix — print the end time — is the wrong one, and it is wrong for the
+reason the issue itself supplies: the tail is where the backlog clears and where `TOOK THE STAIRS`
+accumulates. **How long a building takes to clear is a run *outcome*, not a prediction**; it depends
+on the dispatcher, the building and the seed, and it is the thing being judged. `sim.drainGraceS`
+bounds it at an hour, which is a deadline rather than an estimate.
+
+So every option says:
+
+```text
+30 min of demand — 08:30 to 09:00, then however long it takes to clear
+```
+
+and the guide says the same thing once, in the sentence that used to list the ladder: *the demand
+schedule stops at the time on the label and the run keeps going until the building has cleared, which
+is the part worth watching and is an outcome rather than a prediction.* The Day report's own
+selection line moves from *"15 min selected"* to *"15 min of demand"*, one line under a clock range
+that now shows the real span of the run, drain included — so the two numbers a reader used to
+conflate are labelled.
+
+### Both strings are swept rather than excused
+
+`menu/partsOfDay.ts#partsOfDay` is added to the `MENU` adapter's `covers` and its labels and details
+are seeded into the honesty sweep — a label naming a clock the run did not use is R1's defect with a
+friendly face, and it is exactly what these two issues report. `derive.test.ts`'s exclusion of
+`dev/state.ts#SHIFT_LENGTHS` is deleted rather than re-pointed, because the table is gone; what
+replaced it is player-facing and is **driven**, not excused.
+
+---
+
+## D288 — the board cannot see which part of the day a run was, and that is said rather than left
+
+**Date: 2026-08-06 · Written after the code.** The named gap in [§ D286](DECISIONS.md), and the
+answer to whether the `between-days` control can become a `presentation` one without re-pinning what
+a stored score means.
+
+### The gap, and it is sharper than a mislabelled row
+
+`RunSubmission` is six fields — building, dispatcher, template, rate, `durationS` and seed — and the
+window is in none of them. The obvious reading is that a morning and an evening are both thirty
+minutes and would share a board. True, and **not the worst of it**, because the board does not store
+a number the client sends: it **re-simulates the seed for itself** (§ D214 § 3). A client-side figure
+is only ever a *claim*.
+
+So what a posted window actually produces is this. The server replays `office-day` at
+`durationS: 1800`, which reaches `core` as `templateOverrides.durationS` on an authored phase list
+and is **refused by name** (§ D275) — the submission comes back a 422, and `menu/client.ts`'s own
+docstring says what that reads as: *"a 422 that means 'your score did not replay' and must not read
+as an accusation."* A player who did nothing wrong is told their score did not reproduce.
+
+On a shape template it is quieter and no better. The replay rescales the geometry instead of cutting
+it and returns a different, entirely legitimate answer. **Neither number is wrong.** They are answers
+about two different runs, and nothing in the exchange could say so — which is the failure that leaves
+nothing red, and the one this repository counts.
+
+The fix is one field on `RunSubmission`, one line in `configHashOf`, and the replay honouring it.
+All three are in `packages/server`, outside this lane's ownership, so what ships is the refusal
+rather than the field, in the shape this repository already keeps for a knob a surface cannot honour:
+`constant-iso`'s refusal, and § D275's two. A windowed run **starts**; it is **not postable**, and
+the reason on screen names the replay rather than the row — *"the board would replay this seed over
+the whole period and get a different, equally correct answer."*
+
+### The transition, and how far it is actually achieved
+
+The owner's instinct is that once a day is simulated *continuously*, *which part of the day* stops
+being a run parameter and becomes a **view onto one run** — `presentation`, at which point the scope
+question dissolves. The requirement set for this work was that the transition must not re-pin what a
+stored score means.
+
+**Achieved, on the axis that matters, and approximated on one that cannot be:**
+
+- **The selection survives verbatim.** `(templateId, windowStartS, windowEndS)` names the same
+  interval of the same schedule whether the engine runs the slice or runs the day and shows the
+  slice. Nothing about the field's units, shape or storage would change. `durationS`, the seed and
+  the config hash are untouched by the transition, because the window never entered any of them.
+- **The demand is identical.** This is what § D285's draw-then-cut ordering buys, and it is the whole
+  reason the sampler was not bounded. The riders in an 08:30–09:00 window *are* the day's 08:30–09:00
+  riders, record for record and id for id, so the window names the same crowd on both sides of the
+  change. Had the sampler been bounded, moving the window from generation to presentation would have
+  silently changed **who turns up**, and every stored score would have become a claim about a
+  different crowd.
+- **The results cannot be identical, and no arrangement of this field makes them so.** A continuously
+  simulated day carries queued riders and moving cars across 08:30; a windowed run starts with an
+  empty building and parked cars. That is a real modelling difference and it belongs to the
+  transition rather than to the window. It is stated in `windowIdentity.test.ts`'s preamble as
+  something deliberately **not** asserted, so a later reader does not mistake the demand identity for
+  a stronger claim than it is.
+
+So: **clean on the record, clean on the demand, and honestly approximate on the numbers.** A board
+measured today under a window would have to be re-opened after the transition — not because the field
+was designed wrong, but because the run genuinely starts from a different state. That is a smaller
+and more explicable cost than the one § D275 was protecting against, where every old row would have
+kept verifying while meaning something else.
+
+### One consequence worth naming before it is discovered
+
+A window makes it easy to compare morning against evening, and CLAUDE.md's ranking rule binds that
+comparison exactly as it binds any other: a paired-t interval excluding zero, and Holm–Bonferroni if
+more than one window from one day is reported. The pairing is available — § D285's ordering is what
+makes two windows of a seed two parts of one day — which means the comparison is *cheap enough to do
+carelessly*. Nothing in this change reports one, and nothing in it should be read as licence to.

@@ -4433,6 +4433,11 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     // `generateTrace` rejects overrides against an already-resolved template, which carries its
     // own geometry; passing an empty record would trip that check for no benefit.
     ...(Object.keys(templateOverrides).length === 0 ? {} : { templateOverrides }),
+    // § D285, and carried straight through rather than folded into `templateOverrides`: an override
+    // refits the template's geometry and a window leaves it exactly as authored. That is what makes
+    // this the answer to the refusal `durationS` gets on a phase list rather than a way round it.
+    ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+    ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
     ...(demand.demandLevel === undefined ? {} : { demandLevel: demand.demandLevel }),
     ...(demand.arrivalRatePctPop5min === undefined
       ? {}

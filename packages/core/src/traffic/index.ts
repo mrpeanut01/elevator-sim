@@ -73,6 +73,7 @@ export type {
   PassengerTrace,
   ResolvedDayVariation,
   ResolvedDemandTemplate,
+  ResolvedDemandWindow,
   TraceLeg,
   TrafficConfig,
   TrafficModelVersion,
@@ -119,6 +120,7 @@ export {
   riseAndFallTemplate,
   shiftTemplatePeak,
   splitAt,
+  windowTemplate,
 } from './demandTemplate.js';
 
 export type {

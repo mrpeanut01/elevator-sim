@@ -126,6 +126,14 @@ export const WATCH_FLAGS: readonly FlagSpec[] = [
     placeholder: '<id>',
     summary: 'demand template; `elevator-sim list` names the ones this data directory ships',
   },
+  {
+    // The same flag `run` takes, because `watch` reaches the same `planRun` — a command that could
+    // run a template's ten-hour day and not a part of it would be the two paths drifting. § D285.
+    name: 'part',
+    kind: 'string',
+    placeholder: '<HH:MM-HH:MM>',
+    summary: 'watch only this part of the template’s day, by clock time',
+  },
   { name: 'plain', kind: 'boolean', summary: 'force line output instead of a live frame' },
   { name: 'data', kind: 'string', placeholder: '<dir>', summary: 'data directory to read' },
   { name: 'no-color', kind: 'boolean', summary: 'never emit ANSI colour' },

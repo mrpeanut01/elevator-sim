@@ -12,6 +12,7 @@
  * building that lands and a building that leaves are each a failure rather than a quiet omission.
  */
 
+import { partsOfDay } from './partsOfDay.js';
 import type { CatalogueEntry, MenuCatalogue } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -58,6 +59,34 @@ export interface CatalogueTemplate {
   readonly recommended?: boolean | undefined;
   /** The template record's own minimum period, minutes. Surfaced, because the kernel enforces it. */
   readonly durationMin?: number | undefined;
+  /**
+   * The record's own hour, minutes after local midnight — **absent when it declares none**
+   * (`constant-iso`). § D244.
+   *
+   * Surfaced because `partsOfDay` derives *which part of the day you run* from it, and because the
+   * clock a run is drawn at is this number rather than the 06:00 the viewer used to assume for every
+   * template alike (issue #83). Kept `undefined`-able rather than defaulted: omission means *this
+   * template has no hour*, never *its hour is midnight*, and a `0` here would draw a two-hour ISO
+   * cross-check at 00:00.
+   */
+  readonly startOfDayMin?: number | undefined;
+  /**
+   * The record's authored phase list, when it has one — § D273. Absent on every shape template.
+   *
+   * Only three numbers per phase reach the menu, and that narrowness is the point: `partsOfDay`
+   * needs the day's **knots** and its **maximum** to decide which of the loaded hours name a period
+   * the day actually contains, and nothing else. Handing the menu the resolved template instead
+   * would let a panel start rendering demand geometry no test covers, which is what this whole
+   * interface exists to prevent.
+   */
+  readonly phases?:
+    | readonly {
+        readonly startMin: number;
+        readonly endMin: number;
+        readonly startIntensity: number;
+        readonly endIntensity: number;
+      }[]
+    | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -110,6 +139,11 @@ export function catalogueOf(source: CatalogueSource): MenuCatalogue {
     // Carried through rather than dropped: the kernel throws for a run shorter than the template's
     // own period, so a menu that did not know this number could only find out at Start.
     ...(template.durationMin === undefined ? {} : { minimumDurationS: template.durationMin * 60 }),
+    // Which parts of this template's period a player may run — the one control that replaced the
+    // campaign's *shift length* and Free play's *Run length* (§ D286). Derived here rather than in
+    // the panel because it is a fact about the loaded records, and because a panel that computed it
+    // would be a second answer to *what is offered* beside the one `freePlayIssues` validates.
+    parts: partsOfDay(source.trafficProfiles.demandTemplates, template.id),
   }));
 
   return Object.freeze({

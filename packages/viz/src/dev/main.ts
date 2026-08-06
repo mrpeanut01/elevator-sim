@@ -70,6 +70,7 @@ import {
   type LeaderboardClient,
 } from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
+import { partById, partIdOf, partsOfDay } from '../menu/partsOfDay.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
 import {
@@ -87,7 +88,7 @@ import {
 import { asBuiltChoices, shaftChoices, speedChoices, withBankChoice } from '../commissioning/choices.js';
 import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
-import type { MenuState } from '../menu/types.js';
+import type { DayPart, MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
@@ -175,9 +176,9 @@ import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
-  SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  shiftDemandTemplateId,
   closedWeekOf,
   specsWithSaved,
   buildingNameOf,
@@ -608,6 +609,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * fired.
    */
   let calendarCaption = '';
+  /**
+   * The hour the run on screen actually begins at, seconds after local midnight — issue #83.
+   *
+   * `DAY_START_S`, a flat 06:00, stood in every one of the four places this now reaches: the header
+   * clock, its empty state, the transport strip and the Day report. So `lunch-two-way` was drawn at
+   * breakfast and *Event egress* at dawn, and a player who picked *"CIBSE Guide D lunch two-way"*
+   * got a morning with a different mix. § D244 gave every template its own hour and § D285 gave a
+   * *part* of one its own; this is where the viewer finally reads them.
+   *
+   * **Captured from the run rather than re-derived from `state`**, and that is § D234's lesson at
+   * the one seam it would recur on: `state` is what the player has *selected* and the recording is
+   * what they are *watching*, and the two differ the moment a control moves before the next run.
+   * Reading the selection here would put the next run's clock on the last run's sheet.
+   *
+   * `undefined` before the first run and for a recording restored from a file, where the clock falls
+   * back to the shipped `DAY_START_S` — a recording's own hour is not in `VizRecording`, and
+   * inventing one from whatever is selected now would be exactly the defect above.
+   */
+  let runStartOfDayS: number | undefined;
   /**
    * Whether the player has entered a play mode — § D232, and the guard on every progression write.
    *
@@ -2459,7 +2479,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ui.header.buildingSub,
       view.building === undefined ? '' : statLineOf(view.building),
     );
-    setText(ui.header.clock, view.recording === undefined ? '06:00' : clockAt(view.simTimeS));
+    setText(
+      ui.header.clock,
+      view.recording === undefined
+        ? clockAt(0, runStartOfDayS)
+        : clockAt(view.simTimeS, runStartOfDayS),
+    );
     const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
     setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
     setText(
@@ -2589,9 +2614,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
       runShift();
     });
     ui.coach.shiftLength.addEventListener('change', () => {
-      context.update({ shiftLengthS: Number(ui.coach.shiftLength.value) });
+      // One control, two fields — § D286. The option's id carries both halves of the selection, so
+      // this handler does not have to know what a part is; `freePlayPatch` is the same decision in
+      // the menu, and both go through the one parser.
+      const part = partById(coachParts(), ui.coach.shiftLength.value);
+      if (part === undefined) return;
+      context.update({ shiftLengthS: part.durationS, windowStartS: part.windowStartS });
       runShift();
     });
+  }
+
+  /**
+   * The parts of the day the campaign's select offers, for whatever template is about to run.
+   *
+   * Read through `shiftDemandTemplateId` rather than from `state.pattern` directly, so the options
+   * are parts of the period the run will actually use — a select offering a lunch peak of a template
+   * the run is not on is § D177's inert control with a plausible label.
+   */
+  function coachParts(): readonly DayPart[] {
+    return partsOfDay(
+      resources.trafficProfiles.demandTemplates,
+      shiftDemandTemplateId(resources, state, buildingConfigOf(resources, state.savedBuildings, state.buildingId)),
+    );
   }
 
   function drawCoach(view: ViewAt): void {
@@ -2618,10 +2662,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ],
       state.pattern,
     );
+    /*
+     * *Part of the day*, derived from the loaded records and **the same list Free play offers** —
+     * issue #82, which reported one setting wearing two names, four narrative options here and five
+     * numeric ones there. `partsOfDay` is the single derivation; this select and `menu/screens.ts`
+     * both read it, so the two cannot drift into two answers again.
+     */
     fillSelect(
       ui.coach.shiftLength,
-      SHIFT_LENGTHS.map((entry) => ({ value: String(entry.seconds), label: entry.label })),
-      String(state.shiftLengthS),
+      coachParts().map((part) => ({ value: part.id, label: part.label })),
+      partIdOf(state.windowStartS, state.shiftLengthS),
     );
 
     /*
@@ -2701,6 +2751,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const recorded = recordRun(plan.config, {
         outOfServiceCarIds: plan.outOfServiceCarIds,
       });
+      // The template's own hour, moved on by the window when the run is a part of a day. Absent for
+      // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
+      runStartOfDayS = recorded.result.trace.startOfDayS;
       state = { ...state, recording: recorded.recording, report: undefined, withheld: plan.withheld };
       adopt(recorded.recording);
       renderAll();
@@ -2919,7 +2972,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
           : { kind: 'week-day' as const },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
-      dayStartS: DAY_START_S,
+      /*
+       * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
+       * a template that declares none (`constant-iso`) and for a recording restored from a file.
+       * See {@link runStartOfDayS} for why this is captured from the run rather than from `state`.
+       */
+      dayStartS: runStartOfDayS ?? DAY_START_S,
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.
@@ -3041,7 +3099,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
         .map((entry) => entry.floorId),
       lockedOutLandings: lockedOut,
       queues: queueAt(recording, frame.simTimeS),
-      dayStartS: DAY_START_S,
+      /*
+       * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
+       * a template that declares none (`constant-iso`) and for a recording restored from a file.
+       * See {@link runStartOfDayS} for why this is captured from the run rather than from `state`.
+       */
+      dayStartS: runStartOfDayS ?? DAY_START_S,
       filteredBankId: bank.filtered ? bankFilter : undefined,
     });
     carBadgeHits = hits.carBadges;
@@ -3268,7 +3331,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       fill(ui.transport.ticks);
       return;
     }
-    const segments = timelineOf(recording);
+    // Same hour as the header and the sheet. Three surfaces reading three different clocks for one
+    // instant is the disagreement `clockOf`'s own docstring warns about.
+    const segments = timelineOf(recording, { dayStartS: runStartOfDayS ?? DAY_START_S });
     /*
      * The playhead is a child of the timeline and must survive the segments being replaced, so it
      * is re-appended rather than recreated: recreating it would drop the element `#playhead` names

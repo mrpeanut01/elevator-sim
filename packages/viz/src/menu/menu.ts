@@ -14,15 +14,17 @@
  * the client and the server disagreeing about what a selection meant.
  */
 
+import { partIdOf } from './partsOfDay.js';
 import {
   DEFAULT_SETTINGS,
-  FREE_PLAY_DURATIONS_S,
+  LONGEST_OFFERED_RUN_S,
   PLAYBACK_SPEEDS,
   ROOT_SCREEN,
   type ChallengeSelection,
   type FreePlaySelection,
   type MenuCatalogue,
   type MenuScreen,
+  type DayPart,
   type MenuState,
   type SelectionIssue,
   type Settings,
@@ -46,6 +48,7 @@ import {
  */
 export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): MenuState {
   const demandTemplateId = catalogue.demandTemplates[0]?.id ?? '';
+  const opening = openingPart(catalogue, demandTemplateId);
   return Object.freeze({
     screen: ROOT_SCREEN,
     history: Object.freeze([]),
@@ -57,7 +60,8 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
       // `null` is "this building's own profile", which is the honest default: the player has not
       // yet expressed a rate, and picking one for them would pin a number `data/` may change.
       arrivalRatePctPop5min: null,
-      durationS: openingDurationS(catalogue, demandTemplateId),
+      durationS: opening.durationS,
+      windowStartS: opening.windowStartS,
       seed,
     }),
     challenge: Object.freeze({
@@ -75,27 +79,48 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
 }
 
 /**
- * The shortest offered length the opening template can actually be measured over.
+ * Which parts of `demandTemplateId` this catalogue offers, or `[]` for an id it does not carry.
  *
- * **Derived, not indexed** — § D213's rule, applied to a number rather than a list. The opening
- * length was `FREE_PLAY_DURATIONS_S[1]`, 15 minutes, while the first shipped template
- * (`rise-and-fall`) declares a 30-minute period; so {@link freePlayIssues} refused the state
- * {@link initialMenuState} had just built, and the first thing a new player met on the Free play
- * screen was a disabled *Start* under a refusal. An index cannot know that. This can, and stays
- * correct when a template's period changes or the ladder moves.
- *
- * The ladder is sorted rather than assumed ascending, so *shortest that fits* keeps meaning that
- * if the offered lengths are ever reordered.
- *
- * When no offered length is long enough the longest is returned and {@link freePlayIssues} still
- * refuses it — which is the honest answer, because that selection genuinely cannot be measured and
- * quietly inventing a length outside the ladder would refuse at Start instead, one screen later.
+ * The single answer to *what is offered*, read by the opening state, the validator and the panel —
+ * § D213's rule applied to the control § D286 replaced two with. A panel that computed its own
+ * option list would be a second answer, and the one nobody validated would be the one on screen.
  */
-function openingDurationS(catalogue: MenuCatalogue, demandTemplateId: string): number {
-  const minimum =
-    catalogue.demandTemplates.find((entry) => entry.id === demandTemplateId)?.minimumDurationS ?? 0;
-  const offered = [...FREE_PLAY_DURATIONS_S].sort((left, right) => left - right);
-  return offered.find((seconds) => seconds >= minimum) ?? offered.at(-1) ?? 900;
+export function partsFor(catalogue: MenuCatalogue, demandTemplateId: string): readonly DayPart[] {
+  return catalogue.demandTemplates.find((entry) => entry.id === demandTemplateId)?.parts ?? [];
+}
+
+/**
+ * The part a fresh player opens on: the shortest one that fits inside {@link LONGEST_OFFERED_RUN_S}.
+ *
+ * **Derived, not indexed** — § D213's rule, and the reason the function it replaced existed. The
+ * opening length used to be `FREE_PLAY_DURATIONS_S[1]`, fifteen minutes, while the first shipped
+ * template declares a thirty-minute period; so {@link freePlayIssues} refused the state
+ * {@link initialMenuState} had just built, and a new player's first sight of Free play was a
+ * disabled *Start* under a refusal (GitHub issue #13). An index cannot know a period's length. This
+ * can, and it stays correct when a record's hours move or a day profile lands.
+ *
+ * **Shortest rather than first** because the shortest is the smallest commitment, and on a day
+ * profile it is a *peak* rather than the whole ten hours — which is the answer issue #78 asked for:
+ * the first thing a player meets is a rush hour they can watch, not a working day they must sit
+ * through. The whole period is last in the list and is still one press away.
+ *
+ * When nothing fits, the whole period is returned and {@link freePlayIssues} refuses it in words.
+ * That is the honest answer: inventing a length outside what is offered would move the refusal to
+ * Start, one screen later and with nothing to act on.
+ */
+function openingPart(
+  catalogue: MenuCatalogue,
+  demandTemplateId: string,
+): { readonly durationS: number; readonly windowStartS: number | null } {
+  const parts = partsFor(catalogue, demandTemplateId);
+  const fits = [...parts]
+    .sort((left, right) => left.durationS - right.durationS)
+    .find((part) => part.durationS <= LONGEST_OFFERED_RUN_S);
+  const chosen = fits ?? parts.at(-1);
+  // A catalogue with no templates at all is a broken install, and `freePlayIssues` says so. The
+  // fallback is the shipped recommended period rather than a round number, so the refusal a player
+  // reads names a real length.
+  return chosen ?? { durationS: 1800, windowStartS: null };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -234,29 +259,41 @@ export function freePlayIssues(
       message: `No demand template "${selection.demandTemplateId}" is loaded.`,
     });
   }
-  if (!FREE_PLAY_DURATIONS_S.includes(selection.durationS)) {
-    issues.push({
-      field: 'durationS',
-      message: `A ${String(selection.durationS)} s run is not one of the offered lengths.`,
-    });
-  }
   /*
    * The one cross-field rule, and the reason it is here rather than discovered at Start.
    *
-   * A demand template declares its own period. `constant-iso` is 120 minutes and discards 15 of
-   * warm-up and 5 of cool-down; run it for 15 and the kernel throws *"leaves no measurement
-   * window"* — correct, and said in a place a player cannot act on. Refused here, in words, with
-   * both numbers in them.
+   * A part belongs to a template. Change the template and the parts change with it — a `lunch-two-way`
+   * has no morning in it — so a selection that named a part of the template it used to have is
+   * refused here, in words, rather than reaching `windowTemplate` and throwing *"does not fit inside
+   * demand template"* in a place a player cannot act on.
+   *
+   * This replaced the `constant-iso` minimum-length rule, and it subsumes it: that template's only
+   * offered part is its own 120 minutes, so the run that used to be refused for leaving no
+   * measurement window is now one a player cannot select in the first place.
    */
   const template = catalogue.demandTemplates.find((entry) => entry.id === selection.demandTemplateId);
-  const minimum = template?.minimumDurationS;
-  if (minimum !== undefined && selection.durationS < minimum) {
+  const parts = partsFor(catalogue, selection.demandTemplateId);
+  const selected = parts.find(
+    (part) => part.id === partIdOf(selection.windowStartS, selection.durationS),
+  );
+  if (template !== undefined && selected === undefined) {
     issues.push({
-      field: 'durationS',
+      field: 'windowStartS',
       message:
-        `${template?.name ?? selection.demandTemplateId} needs at least ` +
-        `${String(Math.round(minimum / 60))} minutes — it discards a warm-up and a cool-down, and a ` +
-        `${String(Math.round(selection.durationS / 60))}-minute run leaves nothing to measure.`,
+        parts.length === 0
+          ? `${template.name} declares no period this menu can run.`
+          : `${template.name} does not have that part of the day. It offers ${parts
+              .map((part) => part.label)
+              .join(', ')}.`,
+    });
+  }
+  if (selected !== undefined && selected.durationS > LONGEST_OFFERED_RUN_S) {
+    issues.push({
+      field: 'windowStartS',
+      message:
+        `${selected.label} is ${String(Math.round(selected.durationS / 60))} minutes of demand, ` +
+        `longer than the ${String(Math.round(LONGEST_OFFERED_RUN_S / 60))} minutes a single run ` +
+        'offers. Pick one of its busy parts instead.',
     });
   }
 

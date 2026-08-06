@@ -96,27 +96,25 @@ import type { BrowserResources } from './data.js';
 import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import type { RailSegment, TabName } from './elementMap.js';
 
-/**
- * How long a shift is, in simulated seconds of demand.
- *
- * The handoff's day is sixteen hours and this simulator does not have one — `docs/12` § 4.1 is the
- * argument and this select is the consequence. The four lengths are the two shipped demand
- * templates' own horizons and two multiples of the recommended one: `rise-and-fall` is 30 minutes
- * and `constant-iso` is two hours, so a reader can run a shift that matches a published figure's
- * horizon exactly rather than one this UI invented.
- *
- * The default is **30 minutes**, the template's own, for the same reason: it is the horizon every
- * number in `docs/05-roadmap.md` was measured over, so the first thing a reader sees is comparable
- * with the project's own results.
+/*
+ * `SHIFT_LENGTHS` stood here: four narrative options, *Short shift — 15 min* to *Full period — 2 h*,
+ * writing the same `shiftLengthS` field that Free play's five numeric *Run length* options wrote
+ * (issue #82). Both are gone — § D286. The options now come from `partsOfDay`, derived from the
+ * loaded records' own hours, and they are the same options in both modes: one name, one list, one
+ * meaning. Nothing is authored here because there is nothing left to author — a part's length is the
+ * period it names and its label is its clock. See `menu/partsOfDay.ts` for the derivation, and for
+ * why a length control could not be relabelled into an honest one.
  */
-export const SHIFT_LENGTHS: readonly { readonly seconds: number; readonly label: string }[] =
-  Object.freeze([
-    { seconds: 900, label: 'Short shift — 15 min' },
-    { seconds: 1800, label: 'Standard shift — 30 min' },
-    { seconds: 3600, label: 'Long shift — 1 h' },
-    { seconds: 7200, label: 'Full period — 2 h' },
-  ]);
 
+/**
+ * The shift a page with no scenario opens on, seconds — `rise-and-fall`'s own thirty minutes.
+ *
+ * Unchanged by § D286 and for its original reason: it is the horizon every number in
+ * `docs/05-roadmap.md` was measured over, so the first thing a reader sees is comparable with the
+ * project's own results. It is a *length* rather than a part because a contract declares a length
+ * (`ScenarioContract.shiftLengthS`) and the scenarios were authored against the templates' periods;
+ * {@link ViewerState.windowStartS} opens at `null`, the whole of whatever period that is.
+ */
 export const DEFAULT_SHIFT_LENGTH_S = 1800;
 
 /**
@@ -137,6 +135,25 @@ export const DEFAULT_SHIFT_LENGTH_S = 1800;
  */
 export function shiftLengthForContract(contractId: string): number {
   return contractById(contractId)?.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S;
+}
+
+/**
+ * The demand template a shift will actually run, given a state — the id the parts are derived from.
+ *
+ * Exported because `dev/main.ts` needs the same answer `shiftRunConfigOf` reaches, and two
+ * expressions for *which template is running* is how the select comes to offer parts of a period
+ * the run is not using. The calendar's own override is deliberately **not** consulted: a period may
+ * swap the template for a scheduled day, and offering the player parts of a template the calendar
+ * chose for them would let a control move something the calendar owns.
+ */
+export function shiftDemandTemplateId(
+  resources: BrowserResources,
+  state: ViewerState,
+  building: BuildingConfig | undefined,
+): string {
+  const spec = selectedPatternSpec(resources, state, building);
+  const fromPattern = spec === undefined ? 'rise-and-fall' : demandFromSpec(spec).demandTemplate;
+  return state.freePlay?.demandTemplateId ?? fromPattern;
 }
 
 /** A dispatcher the reader saved. */
@@ -247,6 +264,19 @@ export interface ViewerState {
   readonly dispatcherId: string;
   readonly pattern: PatternSelection;
   readonly shiftLengthS: number;
+  /**
+   * Where in the demand template's period this shift begins, seconds — `null` for the whole of it.
+   *
+   * `DECISIONS.md` § D286, and the other half of {@link shiftLengthS}. Together they are *which part
+   * of the day you run*: a length says how much demand, this says which part of the schedule it is
+   * cut from, and neither has taken on the other's meaning. `shiftLengthS` still travels into the
+   * leaderboard's `durationS` meaning exactly what it always meant.
+   *
+   * `null` rather than `0`, and carried into `SimulationConfig` as *no field at all*: a run over the
+   * whole of a period is byte-identical to the run before this existed, which is the property
+   * `traffic/windowIdentity.test.ts` holds to.
+   */
+  readonly windowStartS: number | null;
   /**
    * What Free Play asked for, over and above the pattern select — or `undefined`, which is the
    * campaign's state and every published figure's.
@@ -617,6 +647,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     // The opening scenario's own shift, which for `c1` is an hour — § D234. The page opens on
     // `CONTRACTS[0]`, so the length the tutorial is graded over is the length it opens on.
     shiftLengthS: shiftLengthForContract(contractForBuilding(buildingId)?.id ?? ''),
+    // The whole of whatever period the opening template declares. `null` rather than `0`, so the
+    // first run a reader sees is byte-identical to the run before § D285 existed.
+    windowStartS: null,
     // `undefined`, not a default template. The campaign owns the run until Free Play says
     // otherwise, and every published figure in this repository was measured with no override.
     freePlay: undefined,
@@ -980,7 +1013,25 @@ export function shiftRunConfigOf(
       elevatorSpecs: specs,
       dispatcherProfiles,
       seed: state.seed,
-      durationS: state.shiftLengthS,
+      /*
+       * `durationS` **or** a window, never both — § D286, and the branch is what makes the control
+       * honest rather than what makes it work.
+       *
+       * `durationS` becomes `templateOverrides.durationS` inside `runSimulation`, which *refits the
+       * template's geometry*: a 900 s `rise-and-fall` is a shorter ramp around the same five-minute
+       * hold, which is issue #81's rescale. So a part of the day may not travel as one. It travels
+       * as `windowStartS`/`windowEndS`, which leave the schedule exactly as authored and select
+       * from it, and the run's demand horizon then comes from the window rather than from here.
+       *
+       * On a phase-list template `core` would refuse the override outright (§ D275), so this is not
+       * merely tidier: passing both would throw on the one template that has parts to select.
+       */
+      ...(state.windowStartS === null
+        ? { durationS: state.shiftLengthS }
+        : {
+            windowStartS: state.windowStartS,
+            windowEndS: state.windowStartS + state.shiftLengthS,
+          }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
       demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
@@ -1055,7 +1106,10 @@ function sameArmMap(
 function selectedPatternSpec(
   resources: BrowserResources,
   state: ViewerState,
-  building: BuildingConfig,
+  // Accepted and unused (see `void building` below), and widened to admit `undefined` so that
+  // `shiftDemandTemplateId` — whose caller looks a building up by id and may not find one — can
+  // reach the same answer without inventing a building to satisfy a parameter nobody reads.
+  building: BuildingConfig | undefined,
 ): PatternSpec | undefined {
   // `undefined` is the comparable default: no override at all. See the docstring above.
   if (state.pattern === 'building') return undefined;
