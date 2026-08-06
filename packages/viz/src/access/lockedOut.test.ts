@@ -22,7 +22,35 @@ import { credentialCapabilityOf } from './dispatcherCredentials.js';
 import { LOCKOUT_CAUSES, describeLockedOut, lockedOutLandingsAt } from './lockedOut.js';
 import { restrictedFloorIds } from './zoning.js';
 
-const SEED = 20_260_729n;
+/**
+ * **Re-pointed by § D265, at a seed measured rather than guessed.**
+ *
+ * The old seed was 20 260 729, and the thing it used to produce — a landing inside an access zone
+ * whose calls no car would answer — was § D254's defect. § D265 makes it real again by a different
+ * mechanism: a declared share of in-building journeys carry the badge their own floor implies
+ * rather than the one their destination needs, so the building turns them away where they stand.
+ *
+ * That is a *smaller* population than a broken pickup check produced, so the seed matters. Censused
+ * on `secure-tower` under `nearest-car` at this suite's own 900 s configuration, counting refusals
+ * by where the refused **leg** was standing:
+ *
+ * | seed | refusals | inside a zone | in the lobby |
+ * |---|---|---|---|
+ * | 20 260 729 | 3 | 0 | 3 |
+ * | 20 260 730 | 6 | 2 (13, 14) | 4 |
+ * | 20 260 731 | 4 | 2 (9, 23) | 2 |
+ * | **424 242** | 4 | **3** (12, 20, 23) | 1 |
+ *
+ * 424 242 is taken because three landings inside zones is what makes *"orders the landings by the
+ * building's own floor order"* a real assertion rather than a tautology over one entry.
+ *
+ * **The lobby column is why {@link lockedOutLandingsAt}'s predicate is now *origin or destination*.**
+ * A journey that starts inside a zone and transfers at the lobby is refused on its **second** leg,
+ * standing somewhere unrestricted, and the old landing-only predicate reported nothing about it — at
+ * seed 20 260 729 that was every one of the run's refusals. § D265 widened it; the census is what
+ * says the widening was not cosmetic.
+ */
+const SEED = 424_242n;
 
 let config: LoadedConfig;
 let restricted: readonly string[];
@@ -110,8 +138,31 @@ describe('Secure Tower under `nearest-car`', () => {
       carriesCredential: carries('nearest-car'),
     });
     expect(landings.length).toBeGreaterThan(0);
+    const zoning = restrictedFloorIds(
+      (config.buildingsById.get('secure-tower')?.floors ?? []).map((floor) => floor.id),
+      config.buildingsById.get('secure-tower')?.accessZones ?? [],
+    );
     for (const landing of landings) {
-      expect(restricted).toContain(landing.floorId);
+      /*
+       * **The landing, or where its riders are going** — § D265 widened the predicate and this
+       * follows it. A rider standing in the unrestricted lobby bound for a floor their badge does
+       * not open is locked out at the lobby, and on this building the transfer at the lobby is
+       * where several of them are. So the floor is not required to be restricted; what is required
+       * is that every leg counted at it is bound somewhere that is.
+       */
+      const legs = recording.legs.filter(
+        (leg) =>
+          leg.originFloorId === landing.floorId &&
+          leg.boardedAt === undefined &&
+          leg.carId === undefined,
+      );
+      expect(legs.length).toBeGreaterThan(0);
+      for (const leg of legs) {
+        expect(
+          zoning.includes(landing.floorId) || zoning.includes(leg.destinationFloorId),
+          `${leg.passengerId} at ${landing.floorId} is bound for the unrestricted ${leg.destinationFloorId}`,
+        ).toBe(true);
+      }
       expect(landing.cause).toBe('credential-not-read');
       expect(landing.credentialGroups.length).toBeGreaterThan(0);
       expect(landing.legCount).toBeGreaterThan(0);
@@ -244,10 +295,36 @@ describe('an unbadged rider on a restricted floor', () => {
     ).toEqual([]);
   });
 
-  it('is not reported at an unrestricted origin', () => {
+  /**
+   * **Corrected by § D265, and the old assertion is worth recording.**
+   *
+   * It read *"is not reported at an unrestricted origin"* and passed a leg `G → 2` — the lobby to a
+   * restricted floor — expecting silence. That was right while the access question was asked about
+   * the *pickup*: an unrestricted landing had nothing to refuse. Since § D254 the question is asked
+   * about the **destination**, so this rider is refused by every car in the building and standing
+   * in the lobby is not what saves them. Reporting nothing about them was the defect.
+   *
+   * What is still true — and is what the case now asserts — is that a leg touching **no** restricted
+   * floor at either end is not a lockout of any kind.
+   */
+  it('is reported at an unrestricted origin when the destination is restricted', () => {
+    const landings = lockedOutLandingsAt({
+      recording: withLegs([leg({ originFloorId: 'G', destinationFloorId: '2', direction: 'up' })]),
+      at: 100,
+      restrictedFloorIds: restricted,
+      carriesCredential: false,
+    });
+    expect(landings).toHaveLength(1);
+    expect(landings[0]?.floorId).toBe('G');
+    expect(landings[0]?.cause).toBe('rider-has-no-credential');
+  });
+
+  it('is not reported when neither end of the leg is restricted', () => {
     expect(
       lockedOutLandingsAt({
-        recording: withLegs([leg({ originFloorId: 'G', destinationFloorId: '2', direction: 'up' })]),
+        recording: withLegs([
+          leg({ originFloorId: 'G', destinationFloorId: 'G', direction: 'up', passengerId: 'p9' }),
+        ]),
         at: 100,
         restrictedFloorIds: restricted,
         carriesCredential: false,

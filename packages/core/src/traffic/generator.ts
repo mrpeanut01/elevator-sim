@@ -78,6 +78,7 @@
  * | `origins` | which entrance an incoming batch arrives at |
  * | `destinations` | each passenger's destination floor |
  * | `passengerMass` | one body mass per passenger, in final trace order |
+ * | `credential` | one draw per passenger, in final trace order: are they carrying the badge for where they are going? |
  * | `doorObstruction` | **never** |
  * | `policyNoise` | **never** |
  *
@@ -324,6 +325,8 @@ interface ResolvedOptions {
   readonly demandLevel: DemandLevel;
   readonly interfloorWeighting: InterfloorWeighting;
   readonly credentialAssignment: CredentialAssignment;
+  /** Resolved share for {@link credentialForRouteWithGap}. See {@link resolveCredentialGap}. */
+  readonly credentialGapShare: number;
   readonly batchSharesDestination: boolean;
   readonly maxLegs: number;
   /** `undefined` means every floor keeps its own profile's split. */
@@ -351,6 +354,9 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
     demandLevel: config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
     interfloorWeighting: config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
     credentialAssignment: config.credentialAssignment ?? TRAFFIC_DEFAULTS.credentialAssignment,
+    // No `??` of this module's own, for `passengerMass`'s reason: unset means *the data decides*,
+    // and the only honest resolution is the block `data/traffic-profiles.json` authored.
+    credentialGapShare: resolveCredentialGap(config),
     batchSharesDestination: config.batchSharesDestination ?? TRAFFIC_DEFAULTS.batchSharesDestination,
     maxLegs,
     directionalSplit: normalizeSplit(config.directionalSplit),
@@ -396,6 +402,25 @@ function resolvePassengerMass(config: DemandConfig): PassengerMassConfig {
     );
   }
   return override;
+}
+
+/**
+ * The share of wrong-zone journeys this run draws at: the override, or the reference data.
+ *
+ * `resolvePassengerMass`'s shape and its reason, exactly. Unset means *the data decides* — the
+ * shipped number is a declared assumption with its reasoning attached in
+ * `data/traffic-profiles.json`, and a default invented here would be a second source of truth for
+ * it. Runtime-checked because `TrafficConfig` crosses a package boundary and a JSON round trip can
+ * hand over something the compiler never saw; a share outside `[0, 1]` is not a share.
+ */
+function resolveCredentialGap(config: DemandConfig): number {
+  const share = config.credentialGap?.wrongZoneShare ?? config.profiles.credentialGap?.wrongZoneShare;
+  if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
+    throw new TrafficError(
+      `credentialGap.wrongZoneShare must be a finite share in [0, 1]; received ${String(share)}. data/traffic-profiles.json declares it, and the schema requires it — an absent block reads exactly like zero and would make every accessZones declaration inert (issue #87).`,
+    );
+  }
+  return share;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -950,12 +975,15 @@ function permittedGroupsByFloor(
  * common case and the correct answer for an unbadged visitor. `null` means the journey is
  * impossible for any occupant and must not be generated at all.
  *
- * Deterministic, and consuming no random draw. A *stochastic* credential mix would need a
- * seventh named stream on `StreamSet`; adding one is a deliberate act (see
- * `random/streams.ts`), not something this module should do implicitly. The rule — first
- * group, in declared zone order, that covers the whole route — has a pleasing consequence in
- * Secure Tower: interfloor trips between two tenant zones come out as `facilities` or
- * `security` staff, which is who actually makes them.
+ * Deterministic, and consuming no random draw: this is the **authorised** answer, and the one
+ * stochastic thing about a credential — whether the traveller actually holds it — is
+ * {@link credentialForRouteWithGap}'s, on its own named stream.
+ *
+ * The rule — first group, in declared zone order, that covers the whole route — has a pleasing
+ * consequence in Secure Tower: interfloor trips between two tenant zones come out as `facilities`
+ * or `security` staff, which is who actually makes them. It is also exactly the idealisation the
+ * gap exists to relax: a `tenant-alpha` employee on floor 6 heading for floor 18 is a person, and
+ * this function says they must have been a caretaker.
  */
 function credentialForRoute(
   route: readonly string[],
@@ -970,6 +998,76 @@ function credentialForRoute(
     if (reachesAll) return candidate;
   }
   return null;
+}
+
+/**
+ * **The credential gap** — the credential a traveller actually carries, which is not always the
+ * one their journey needs.
+ *
+ * `credentialForRoute` above answers *what would authorise this trip*, and until this function
+ * existed the generator handed every rider exactly that. The consequence, found only once
+ * [§ D254](../../../../DECISIONS.md) removed the defect that was hiding it, is that **access
+ * zoning could not change a run**: a gate that only ever sees authorised traffic never bites, and
+ * every `accessZones` block in `data/buildings/` was configuration nothing could act on (GitHub
+ * issue #87, § D265).
+ *
+ * ## Who is in the gap, and who deliberately is not
+ *
+ * Only journeys that **begin inside the building**. A journey from an entrance has already passed
+ * whatever the building puts in front of its lobby — a reception desk, a turnstile, a door — and
+ * that control is upstream of the lift and outside this simulator, which is § D254's own reading
+ * of where a credential is checked. A visitor arriving off the street is met and badged, so
+ * modelling them as unbadged would be modelling a reception desk that does not work.
+ *
+ * What the lift really refuses is somebody already inside, on a floor they are entitled to,
+ * heading for one they are not. **Which of the two populations they are is decided by the
+ * building's own zones and by where they start, never by a second number:**
+ *
+ * | the traveller starts | they carry | the viewer's cause |
+ * |---|---|---|
+ * | inside a zone | that zone's own first group — a real badge, for the wrong place | `credential-not-read` |
+ * | on an unrestricted floor | nothing | `rider-has-no-credential` |
+ *
+ * A rider whose own zone's credential *does* reach the destination is not in the gap at all —
+ * they are authorised, and the draw costs them nothing. So a zone that shares a group with its
+ * neighbour produces no lockouts between them, which is the building's data deciding the outcome
+ * rather than this module.
+ *
+ * ## The draw
+ *
+ * One uniform per passenger from the `credential` stream, taken **unconditionally, in final trace
+ * order**, exactly as `passengerMass` is. Taking it only for candidates would make the draw
+ * sequence a function of `accessZones`, so adding one floor to a zone would re-roll every later
+ * rider and two arms differing only in their zoning would stop being the same crowd. See
+ * `random/streams.ts` § `credential`.
+ */
+function credentialForRouteWithGap(
+  route: readonly string[],
+  permitted: ReadonlyMap<string, readonly CredentialGroup[]>,
+  authorised: CredentialGroup | undefined,
+  originIsEntrance: boolean,
+  gapDraw: number,
+  share: number,
+): CredentialGroup | undefined {
+  // Nothing on the route is restricted, or the route starts outside the building: no gap to be in.
+  if (authorised === undefined || originIsEntrance) return authorised;
+  if (gapDraw >= share) return authorised;
+
+  const origin = route[0];
+  const ownGroups = origin === undefined ? [] : (permitted.get(origin) ?? []);
+  // The badge their own floor implies. `undefined` when they start somewhere unrestricted, which
+  // is the second row of the table above and not a special case.
+  const carried = ownGroups[0];
+  // Their own zone already reaches the destination, so the draw changes nothing: this is somebody
+  // moving within what their badge opens, and the building's zoning is what says so.
+  const restricted = route.filter((floorId) => permitted.has(floorId));
+  if (
+    carried !== undefined &&
+    restricted.every((floorId) => (permitted.get(floorId) ?? []).includes(carried))
+  ) {
+    return authorised;
+  }
+  return carried;
 }
 
 /** Why an origin-destination pair was rejected, or `ok`. */
@@ -1283,12 +1381,25 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
 
   const planner = RoutePlanner.forBuilding(building);
   const permitted = permittedGroupsByFloor(building.accessZones);
+  const entranceIds = new Set(building.floors.filter((floor) => floor.isEntrance === true).map((floor) => floor.id));
   // `planDemand` has already dropped every pair for which no credential works, so `null` is
   // unreachable here; treat it as an unbadged visitor rather than crashing a whole trace.
-  const credentialGroupFor = (route: readonly string[]): CredentialGroup | undefined =>
-    options.credentialAssignment === 'none'
-      ? undefined
-      : (credentialForRoute(route, permitted) ?? undefined);
+  const credentialGroupFor = (
+    route: readonly string[],
+    originFloorId: string,
+    gapDraw: number,
+  ): CredentialGroup | undefined => {
+    if (options.credentialAssignment === 'none') return undefined;
+    const authorised = credentialForRoute(route, permitted) ?? undefined;
+    return credentialForRouteWithGap(
+      route,
+      permitted,
+      authorised,
+      entranceIds.has(originFloorId),
+      gapDraw,
+      options.credentialGapShare,
+    );
+  };
 
   const arrivals: ArrivalEvent[] = [];
   const passengers: GeneratedPassenger[] = [];
@@ -1364,7 +1475,11 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
         massKg: drawMass(streams.passengerMass, massConfig),
-        credentialGroup: credentialGroupFor(route),
+        // Drawn here, unconditionally and in final trace order, for the reason the mass above is:
+        // gap membership is then a property of the person rather than of the building's zoning,
+        // so two arms that differ only in an access zone are still the same crowd. See
+        // {@link credentialForRouteWithGap}.
+        credentialGroup: credentialGroupFor(route, batch.originFloor.id, streams.credential.nextFloat()),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
         profileId: pick.profileId,

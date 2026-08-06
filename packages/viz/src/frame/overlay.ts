@@ -101,6 +101,18 @@ export interface OverlayOptions {
  */
 function isWaitingAt(leg: VizLeg, t: SimTime): boolean {
   if (leg.arrivedAt > t) return false;
+  /*
+   * **A rider the building turned away is not waiting** — `DECISIONS.md` § D266. They never board
+   * and never get a car, so on `boardedAt` alone they are indistinguishable from somebody standing
+   * there for the rest of the run; drawing them in the queue would make a credential refusal look
+   * like a service failure on every surface that folds this predicate, which is the one reading
+   * § D266 exists to refuse. `refusedAt` is absent on every leg of every building that declares no
+   * `accessZones`, so this term is inert on three of the eight shipped buildings.
+   *
+   * Right-continuous with the rest: refused at exactly `t` means not waiting at `t`, which is the
+   * convention `boardedAt` follows one line down.
+   */
+  if (leg.refusedAt !== undefined && leg.refusedAt <= t) return false;
   return leg.boardedAt === undefined || leg.boardedAt > t;
 }
 

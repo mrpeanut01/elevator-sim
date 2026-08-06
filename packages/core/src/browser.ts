@@ -506,6 +506,7 @@ export type {
   BatchSizeCurve,
   ConstantDemandOptions,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandConfig,
   DemandLevel,

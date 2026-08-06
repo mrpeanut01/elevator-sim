@@ -127,23 +127,43 @@ import {
  * check and not a perturbation of the dispatcher. `mixed-use-high-rise|nearest-car`'s own
  * `onTimeout: 'report'` allowance above is now unnecessary for the reason it was granted — that
  * arm delivers everybody — and is kept because the flag is what the pins were taken under.
+ *
+ * ## And a fourth time for § D265 — the same nine, and the same six that held
+ *
+ * The credential gap gives a declared share of in-building journeys the badge their own floor
+ * implies rather than the one their destination needs, so the building turns them away and they do
+ * not travel. That is § D254's partition arrived at from the opposite direction: nine cells moved,
+ * and they are exactly the three buildings that declare `accessZones`, under all three conventional
+ * dispatchers.
+ *
+ * Every one of the nine still reports `completed` with **`undelivered: 0`** — the lifts strand
+ * nobody, which is § D254's finding and it is untouched. What moved is that 4 of 396 journeys on
+ * `secure-tower`, 11 of 757 on `mixed-use-high-rise` and 13 of 1 956 on `vertical-city` are counted
+ * in `conservation.accessRefused` rather than in `delivered`, and the run's figures move with the
+ * population that actually rode.
+ *
+ * **The six cells on `garden-apartments` and `midtown-office` did not move by one bit** — same
+ * digest, same eight headline reals to the last place, `midtown-office` still refusing its mean on
+ * the same `saturated` ground. That is the control, and it is the run this lane's byte-identity
+ * claim rests on rather than an argument about which code paths are reachable.
  */
 const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
     'a721ea412cb91990a2cc85f2d4aa48f45b1ce516b771d52b5969f359ed0f4458',
   'garden-apartments|eta': 'ddc08973567c2379f201cfc290986d80d34368cda0289d0c86bd3719e618b94d',
-  'garden-apartments|collective': 'ccfe134d70b873a0fa6a8007a63216402ead003b670026939263d20d8062b3bc',
+  'garden-apartments|collective':
+    'ccfe134d70b873a0fa6a8007a63216402ead003b670026939263d20d8062b3bc',
   'midtown-office|nearest-car': 'b1330d5f6ff9c942a9474bddac18947a83c64db3fb3ec548abb26c09e100aed8',
   'midtown-office|eta': 'eddb3f97da5dbd23457c3b2fe2ee95c9476f354d44c09ef0bfa1fda44c0ec412',
   'midtown-office|collective': '434a08434d9d1c1e2197e9e0efe7926680b5ea9e11614ed5f556b6281d48d6ba',
   'mixed-use-high-rise|nearest-car':
-    '129b89a1c877a09a520b82f9f3452f98bf070137d2585b6fcaf144c9bb332b9e',
-  'mixed-use-high-rise|eta': '4bd639964c8dcc727adef90a94b457042f58506c9cd902f1b260fb7ccbd35da3',
+    'dd497989b07c8a45f8458ca586d27537cd66ad9442e6800f043f5ceca548ad4a',
+  'mixed-use-high-rise|eta': 'c76524aefd38f871c0a1be23c6ca07cb7e27ae9e1b1108e7bf74fcf849442f54',
   'mixed-use-high-rise|collective':
-    '15341e131d854be514d06c5fdb4fa905fe964e29c6b2dffdbf62d13d755155ff',
-  'secure-tower|nearest-car': '140d67af62ffc1e9c85b9e78ea9f82f48f2e57abf602decf55017f26f5e30888',
-  'secure-tower|eta': '96327524c4e5129fce937eb76116e73b86af8f3a671cc041c5dc3810d1b67ebe',
-  'secure-tower|collective': '259356762940596271b96914ccfa0ab705ef1228d342b7c141c3081566a1f9c9',
+    '1bb075b1d5b3d055ee8f1ed4d60f2877e83c9de6dda4efaf1b664b552c2158f0',
+  'secure-tower|nearest-car': 'f591700fd7b205af757ce7d38dce4b5f555d99322488af6879c7348bf9549661',
+  'secure-tower|eta': '75e35ec8db83190c85be04371ed05a3e0e2bb58d32105bcdc9c5ea1037f61d4d',
+  'secure-tower|collective': '6536ff4ffada1dfb8d5d0012241713ae6ade194d27626a2eff084093c9b10bcd',
 };
 
 /**
@@ -160,9 +180,9 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * is unchanged.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '1c2501bd145de12e760ac2308f9750bb6adcdf54c66adb0732cb82c74d8f9127',
-  'vertical-city|eta': '449c4ee9b5ef3370f45cd27e20c6d83c5c6b6b3a61bdd2da753a3b5363de2a93',
-  'vertical-city|collective': 'a0448d161f89e23c343097b2df2f78f11cadd6030c4bb424b8be2cbda1eec1b3',
+  'vertical-city|nearest-car': 'd826af3bd806d84e72b4bf3c934e47c35e3211460a7a8a67218567e8110d0fc8',
+  'vertical-city|eta': 'a6c3d0704c13cdc2e91fc4d3f29b13b333d2ae05088cb2d6f3d7c854f3eb4edf',
+  'vertical-city|collective': '7603c8b397ccd88b141748625640d847985f0134b2c1c2ae604448b7dd498756',
 };
 
 /**
@@ -208,15 +228,15 @@ const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>
   'midtown-office|nearest-car': { waitMeanS: 1625.3073142849905, waitP95S: 2778.5301723158727, rideMeanS: 101.4917970264325, ttdMeanS: 1726.7991113114228, workKJ: 1485.6773233378524, workPerLegKJ: 7.541509255522094, handlingPct: 4.035087719298246, longestWaitS: 2906.760720955624 },
   'midtown-office|eta': { waitMeanS: 803.5837920145476, waitP95S: 1451.3328596031365, rideMeanS: 103.1891892481786, ttdMeanS: 906.772981262727, workKJ: 2143.0568396923136, workPerLegKJ: 10.87846111518941, handlingPct: 4.7953216374269, longestWaitS: 1482.5906698639715 },
   'midtown-office|collective': { waitMeanS: 791.9363372638369, waitP95S: 1415.12165477437, rideMeanS: 100.09924603990174, ttdMeanS: 892.0355833037382, workKJ: 2285.0767835145743, workPerLegKJ: 11.599374535606977, handlingPct: 4.619883040935672, longestWaitS: 1436.744534680982 },
-  'mixed-use-high-rise|nearest-car': { waitMeanS: 142.10544033145624, waitP95S: 387.1291283536797, rideMeanS: 85.83881085871421, ttdMeanS: 299.71599213814886, workKJ: 18554.753508457314, workPerLegKJ: 67.22736778426562, handlingPct: 8.787346221441124, longestWaitS: 411.2582877419493 },
-  'mixed-use-high-rise|eta': { waitMeanS: 17.327972060875723, waitP95S: 45.84432718605183, rideMeanS: 83.81718832889898, ttdMeanS: 127.62874763554764, workKJ: 28689.576776790745, workPerLegKJ: 108.67263930602554, handlingPct: 9.622144112478031, longestWaitS: 97.87760181883891 },
-  'mixed-use-high-rise|collective': { waitMeanS: 23.84993103248671, waitP95S: 67.51164623159896, rideMeanS: 80.36325778673698, ttdMeanS: 131.01089136245614, workKJ: 31561.450258943398, workPerLegKJ: 119.09981229789962, handlingPct: 9.666080843585236, longestWaitS: 123.61383347847595 },
-  'secure-tower|nearest-car': { waitMeanS: 117.50578060891134, waitP95S: 236.49202767237338, rideMeanS: 99.05396066082899, ttdMeanS: 230.9134610017266, workKJ: 3692.412283657347, workPerLegKJ: 27.351202101165534, handlingPct: 6.754032258064516, longestWaitS: 261.24994780096097 },
-  'secure-tower|eta': { waitMeanS: 33.834449274537576, waitP95S: 86.58687220630071, rideMeanS: 99.94210694401706, ttdMeanS: 141.43631161356444, workKJ: 6256.948630612125, workPerLegKJ: 46.00697522508916, handlingPct: 10.483870967741936, longestWaitS: 92.86280434382616 },
-  'secure-tower|collective': { waitMeanS: 27.69737216856337, waitP95S: 103.06062675292485, rideMeanS: 93.31256304889672, ttdMeanS: 128.22673467578974, workKJ: 7141.873618804888, workPerLegKJ: 52.902767546702876, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
-  'vertical-city|nearest-car': { waitMeanS: 132.3612250003804, waitP95S: 450.8375837775556, rideMeanS: 87.32429712411934, ttdMeanS: 365.30942858725524, workKJ: 51285.39244586513, workPerLegKJ: 62.39098837696488, handlingPct: 11.847759361571516, longestWaitS: 614.7212331603102 },
-  'vertical-city|eta': { waitMeanS: 27.93732451789864, waitP95S: 81.04027255941901, rideMeanS: 82.1993051894896, ttdMeanS: 190.43948716341964, workKJ: 64693.002379474885, workPerLegKJ: 73.2650083572762, handlingPct: 12.072846326989973, longestWaitS: 130.57283536186333 },
-  'vertical-city|collective': { waitMeanS: 33.004990520236795, waitP95S: 90.01929999607432, rideMeanS: 78.64133260719593, ttdMeanS: 186.5091247249759, workKJ: 77951.89587917822, workPerLegKJ: 86.22997331767502, handlingPct: 12.318395743810107, longestWaitS: 426.01312542571054 },
+  'mixed-use-high-rise|nearest-car': { waitMeanS: 145.55932170547212, waitP95S: 382.66480657762986, rideMeanS: 87.71659701524483, ttdMeanS: 306.6194441822547, workKJ: 20187.25418119246, workPerLegKJ: 75.32557530295693, handlingPct: 8.743409490333919, longestWaitS: 403.9571933061047 },
+  'mixed-use-high-rise|eta': { waitMeanS: 18.677243897186987, waitP95S: 47.866201988667136, rideMeanS: 88.45922413158152, ttdMeanS: 133.67971334875568, workKJ: 27869.788231567258, workPerLegKJ: 108.02243500607464, handlingPct: 9.182776801405975, longestWaitS: 64.81390615945668 },
+  'mixed-use-high-rise|collective': { waitMeanS: 22.263212841048855, waitP95S: 64.98740058634255, rideMeanS: 80.88911937790147, ttdMeanS: 128.49625251724177, workKJ: 33817.25292375409, workPerLegKJ: 132.61667813236897, handlingPct: 9.358523725834798, longestWaitS: 97.59904714023628 },
+  'secure-tower|nearest-car': { waitMeanS: 117.50578060891134, waitP95S: 236.49202767237338, rideMeanS: 99.05396066082899, ttdMeanS: 224.9833335727993, workKJ: 3692.412283657347, workPerLegKJ: 27.351202101165534, handlingPct: 6.754032258064516, longestWaitS: 261.24994780096097 },
+  'secure-tower|eta': { waitMeanS: 33.18829302490414, waitP95S: 86.37592396911488, rideMeanS: 100.83803786988547, ttdMeanS: 139.19270979268728, workKJ: 6256.948630612125, workPerLegKJ: 46.347767634163894, handlingPct: 10.483870967741936, longestWaitS: 91.88634249324991 },
+  'secure-tower|collective': { waitMeanS: 28.077489232750207, waitP95S: 103.06062675292485, rideMeanS: 95.86154920637641, ttdMeanS: 127.06784142193546, workKJ: 6714.034768258036, workPerLegKJ: 49.73359087598545, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
+  'vertical-city|nearest-car': { waitMeanS: 130.27227643894926, waitP95S: 471.71911859523584, rideMeanS: 88.91265803083918, ttdMeanS: 363.86439856015835, workKJ: 50275.4997554894, workPerLegKJ: 59.287145938077124, handlingPct: 11.561285041948025, longestWaitS: 633.3074402713851 },
+  'vertical-city|eta': { waitMeanS: 24.230893718009746, waitP95S: 79.35783649899052, rideMeanS: 83.20450610244768, ttdMeanS: 183.33988863148602, workKJ: 70222.50025428712, workPerLegKJ: 80.90149798881005, handlingPct: 12.70718232044199, longestWaitS: 120.89955123787024 },
+  'vertical-city|collective': { waitMeanS: 30.197768922726834, waitP95S: 80.35426825330633, rideMeanS: 78.80324849119535, ttdMeanS: 181.76770543213865, workKJ: 81058.35428299439, workPerLegKJ: 91.38484135625072, handlingPct: 12.216083486801718, longestWaitS: 408.60979568160394 },
 };
 
 /** The eight reported figures, and where each lives in a summary. */

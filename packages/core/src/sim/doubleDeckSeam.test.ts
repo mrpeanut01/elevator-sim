@@ -216,12 +216,19 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
      * being applied to a hall call's *pickup* floor, so every conventional arm was refusing
      * landings raised inside those zones. All three arms now deliver 1 976 of 1 976 where they
      * previously delivered 1 759–1 855, so the shuttle is carrying more people and driving more
-     * moves on both sides of the comparison. The counts below are that run.
+     * moves on both sides of the comparison.
+     *
+     * **And re-measured again for § D265.** The credential gap turns 13 of this building's 1 956
+     * journeys away for want of a badge, so both arms now carry 1 943 rather than 1 976 and every
+     * count moves a little. The **finding is unchanged and was re-read rather than assumed**: all
+     * three shipped dispatchers still save shuttle moves when the decks are paired — 256 against
+     * 262, 271 against 299, 296 against 309 — so the `saved === 3` claim below is still a
+     * measurement of this run and not an inheritance from the last one.
      */
     const CENSUS: Readonly<Record<string, readonly [number, number]>> = {
-      'nearest-car': [251, 261],
-      eta: [273, 296],
-      collective: [301, 303],
+      'nearest-car': [256, 262],
+      eta: [271, 299],
+      collective: [296, 309],
     };
 
     let saved = 0;

@@ -202,6 +202,13 @@ describe('traceKeyOf', () => {
       entranceWeights: { entranceWeights: { G: 1 } },
       interfloorWeighting: { interfloorWeighting: 'uniform' },
       credentialAssignment: { credentialAssignment: 'none' },
+      /*
+       * § D265, and **in** the key for `dayVariation`'s reason rather than by analogy to it: two
+       * cells differing in the share are two different crowds — the same people, different
+       * badges, and therefore a different set of them able to travel at all. Pairing them would
+       * be arithmetic across two populations.
+       */
+      credentialGap: { credentialGap: { wrongZoneShare: 0 } },
       maxLegs: { maxLegs: 4 },
       peakWindowS: { peakWindowS: 420 },
       baselineFraction: { baselineFraction: 0.25 },

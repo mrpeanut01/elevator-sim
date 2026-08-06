@@ -32,8 +32,18 @@
  * | operating point | ΔTTD | ΔAWT | ΔWT95 | Δride | bit-identical |
  * |---|---|---|---|---|---|
  * | **Midtown interfloor-mix 1.5 %** (the contract's primary point) | `+0.11 [−0.04, +0.25]` INDIST. | `−0.01 [−0.10, +0.08]` INDIST. | `+0.15 [−0.33, +0.64]` INDIST. | `+0.12 [−0.01, +0.25]` INDIST. | 27 / 150 |
- * | Secure Tower interfloor-mix 1.5 % | `−0.03 [−0.13, +0.08]` INDIST. | `−0.04 [−0.10, +0.01]` INDIST. | `−0.22 [−0.45, +0.02]` INDIST. | `+0.02 [−0.05, +0.09]` INDIST. | 41 / 150 |
+ * | Secure Tower interfloor-mix 1.5 % | `−0.04 [−0.14, +0.06]` INDIST. | `−0.06 [−0.11, −0.00]` **see below** | `−0.22 [−0.45, +0.01]` INDIST. | `+0.02 [−0.05, +0.08]` INDIST. | 41 / 150 |
  * | **Midtown interfloor-mix 4.5 %** — where the promise binds | `+5.94 [+4.42, +7.46]` **WORSE** | `+6.96 [+5.55, +8.38]` **WORSE** | `+37.34 [+29.37, +45.32]` **WORSE** | `−1.02 [−1.63, −0.41]` **BETTER** | 0 / 150 |
+ *
+ * **Secure Tower's ΔAWT is marked *see below* rather than given a verdict, and § D268 is why.**
+ * [§ D265](../../../../DECISIONS.md)'s credential gap changed this building's population, and the
+ * interval moved: it used to contain zero comfortably and now excludes it, by **six ten-thousandths
+ * of a second**. (The superseded pair is in § D268, and is deliberately not reprinted here — an
+ * interval literal in this directory is a claim needing a pin, and a *withdrawn* number has none.) That is not a result and it is not reported as one: the cell
+ * carries `admissibleReplications: 0` ([§ D261](../../../../DECISIONS.md)), the effect is a
+ * twentieth of a second on a building whose AWT is tens of seconds, and an interval that clears zero
+ * at the fourth decimal after a population change is exactly the shape `CLAUDE.md`'s opening warning
+ * is about. It is re-pinned because the code produces it, and it is a number rather than a finding.
  *
  * Three things worth reading off it that a headline cannot say.
  *

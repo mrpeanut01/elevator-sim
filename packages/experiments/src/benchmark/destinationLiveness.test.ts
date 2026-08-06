@@ -268,7 +268,15 @@ describe('Phase 6b liveness — the shipped landing-panel profile', () => {
   it('keeps its promises on the access-controlled building too', async () => {
     const secure = at(await liveness(), 'destination-panel', 'secure-tower');
     expect(secure.panel.passengerModel).toBe('destination-dispatch');
-    expect(secure.panel.promisedLegs).toBe(secure.panel.legs);
+    /*
+     * **Every leg the panel could see** — § D266's term, added rather than the equality relaxed.
+     * The building turns a handful of riders away for want of a credential before any car is
+     * dispatched, so they never reach a landing queue and no panel is ever asked about them. The
+     * count is asserted to be real and non-zero below, so this cannot be satisfied by a run in
+     * which the panel quietly stopped promising anybody.
+     */
+    expect(secure.panel.refusedLegs).toBeGreaterThan(0);
+    expect(secure.panel.promisedLegs).toBe(secure.panel.legs - secure.panel.refusedLegs);
     expect(secure.panel.wrongCarBoardings).toBe(0);
     // D30/T16-D2: the panel is what authorizes, so the credentialled building is served.
     expect(secure.eligibility.decisionsWhollyRefused).toBe(0);

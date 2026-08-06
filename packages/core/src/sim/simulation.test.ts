@@ -921,6 +921,19 @@ describe('a call the car it was given to will not answer', () => {
  * What replaces it is the opposite claim, asserted on the legs rather than on a window
  * statistic: an access-zoned building under bare up/down buttons delivers everybody.
  */
+/** Floor id to the credential groups permitted there — the building's own zones, indexed. */
+function permittedGroupsByFloorOf(building: {
+  readonly accessZones?: readonly { readonly floors: readonly string[]; readonly credentialGroups: readonly string[] }[];
+}): ReadonlyMap<string, readonly string[]> {
+  const byFloor = new Map<string, string[]>();
+  for (const zone of building.accessZones ?? []) {
+    for (const floorId of zone.floors) {
+      byFloor.set(floorId, [...(byFloor.get(floorId) ?? []), ...zone.credentialGroups]);
+    }
+  }
+  return byFloor;
+}
+
 describe('an access-zoned building is serviceable by a conventional dispatcher', () => {
   /** Every shipped building that declares a non-empty `accessZones`, with its conventional arms. */
   const ZONED: readonly (readonly [string, string, number, number])[] = [
@@ -931,9 +944,22 @@ describe('an access-zoned building is serviceable by a conventional dispatcher',
     ['vertical-city', 'eta', 424242, 1976],
   ];
 
+  /*
+   * **Re-pointed by § D265, and not weakened.** The credential gap gives a declared share of
+   * in-building journeys the badge their own floor implies rather than the one their destination
+   * needs, so a handful of riders on each of these buildings are genuinely turned away. § D254's
+   * finding is about the *lifts*, and it is asserted here exactly as before: `undelivered` is
+   * still empty, the status is still `completed`, and nothing is refused as structurally
+   * unservable. What is added is that the shortfall is **named** — every one of the missing legs
+   * carries `refusedAt`, and every one of them really is carrying a credential the floor they
+   * were going to does not permit. A version of this that simply relaxed the equality would let a
+   * lost passenger hide in the difference.
+   */
   it.each(ZONED)(
-    '%s under %s at seed %d delivers all %d legs on bare up/down buttons',
+    '%s under %s at seed %d carries all %d legs the credentials allow, on bare up/down buttons',
     (buildingId, profileId, seed, expected) => {
+      const building = config.buildingsById.get(buildingId);
+      if (building === undefined) throw new Error(`no building "${buildingId}"`);
       const result = runSimulation(
         baseConfig(buildingId, profileId, { seed, onTimeout: 'report' }),
       );
@@ -941,10 +967,27 @@ describe('an access-zoned building is serviceable by a conventional dispatcher',
       // The legs, not the wait. A window statistic can be flattered by the passengers a
       // dispatcher never collected; `undelivered` cannot.
       expect(result.undelivered).toEqual([]);
-      expect(result.conservation.delivered).toBe(expected);
-      expect(result.conservation.delivered).toBe(result.conservation.generated);
+      expect(result.conservation.generated).toBe(expected);
+      const refused = result.conservation.accessRefused ?? 0;
+      expect(result.conservation.delivered + refused).toBe(expected);
       expect(result.conservation.balanced).toBe(true);
       expect(result.status).toBe('completed');
+
+      // The shortfall is a credential and nothing else, checked per person rather than as a
+      // total: each refused leg is one whose own credential cannot reach the floor it was going
+      // to, which is the only reason this model ever refuses anybody at a landing.
+      const permitted = permittedGroupsByFloorOf(building);
+      const refusedLegs = result.record.passengers.filter((leg) => leg.refusedAt !== undefined);
+      expect(refusedLegs.length).toBe(refused);
+      expect(refused).toBeGreaterThan(0);
+      for (const leg of refusedLegs) {
+        const groups = permitted.get(leg.destinationFloorId);
+        expect(groups, `${leg.passengerId} was refused for an unrestricted floor`).toBeDefined();
+        expect(
+          leg.credentialGroup === undefined || !(groups ?? []).includes(leg.credentialGroup),
+          `${leg.passengerId} holds ${String(leg.credentialGroup)}, which reaches ${leg.destinationFloorId}`,
+        ).toBe(true);
+      }
 
       // And nothing was refused as structurally unservable, which is the mechanism rather than
       // the symptom.

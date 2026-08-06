@@ -268,6 +268,28 @@ export interface PassengerRecord {
    * beside the mean and why `awtIsValid` refuses the mean outright once the rate is high enough.
    */
   readonly abandonedAt?: SimTime | undefined;
+  /**
+   * When the building **turned this leg away for want of a credential** (`DECISIONS.md` § D266).
+   *
+   * **Absent on every leg that was not refused**, which is every leg of every building that
+   * declares no `accessZones` and every leg whose rider is correctly badged — so such a record is
+   * the object it was before this field existed. Never present beside {@link boardedAt}: a
+   * passenger the readers refused did not ride, and the recorder refuses the combination rather
+   * than storing it.
+   *
+   * Equal to {@link arrivedAt} on every leg that carries it today, because the model asks the
+   * credential question when the rider reaches the landing rather than when a car does. It is a
+   * time rather than a flag so that a later model which reads badges further down the journey
+   * writes a record this one can still be compared against.
+   *
+   * A leg carrying this is **not served and not censored** — a third outcome, the same shape
+   * {@link abandonedAt} is. The difference from abandonment is the direction of the bias and it is
+   * the reason the two are not one field: an abandoned leg deletes a *long* wait from the average,
+   * and a refused leg deletes a wait that never started. Both leave the mean describing fewer
+   * people than arrived, which is why the counts are published beside it
+   * (`ConservationAudit.accessRefused`).
+   */
+  readonly refusedAt?: SimTime | undefined;
   /** The car that served this leg, when known. */
   readonly carId?: string | undefined;
   /** The bank that served this leg, when known. */

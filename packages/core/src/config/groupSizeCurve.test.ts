@@ -55,6 +55,7 @@ const documentWith = (batchSize: unknown): unknown => ({
     { id: 'rise-and-fall', name: 'Rise and fall', recommended: true, durationMin: 30 },
   ],
   passengerMass: { distribution: 'normal', meanKg: 75, stdDevKg: 15, minKg: 20 },
+  credentialGap: { wrongZoneShare: 0 },
 });
 
 const parse = (batchSize: unknown): TrafficProfiles =>

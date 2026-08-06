@@ -18482,3 +18482,398 @@ nobody writing it down:
 - **`packages/viz/UX.md` row CL-03** — *"`evening-egress` at 300 s makes `core` throw outright"* is
   still a true sentence about `evening-egress`, and is no longer what the calendar test drives. See
   point 2 above.
+
+---
+
+## D265 — access zoning was a gate nobody ever failed, and the share is a number rather than a mechanism
+
+**Date: 2026-08-05 · Written after the code, and the measurement is the reason it is written at
+all.** GitHub issue **#87**, option (a), decided by the product owner.
+
+[§ D254](DECISIONS.md) fixed a real defect — a credential gates where you may **go**, not where you
+may be **collected** — and in fixing it revealed that the gate had nothing to bite on.
+`traffic/generator.ts`'s `credentialGroupFor` issued each rider the credential their own route
+needs, and `planDemand` had already dropped every pair for which no credential works, so **every
+generated trip was authorised by construction**. Measured in § D256: `midtown-office`, seed 424 242,
+a synthetic zone over floors 8–13 permitting a group named `nobody-has-this` — 205 legs bound there,
+all 205 alight, all 205 carrying it.
+
+So `accessZones` was a block of configuration that was loaded, schema-checked, cross-validated with
+four dedicated warning codes, indexed correctly by `Bank`, consulted by `Simulation` in three
+places, and **could not change a result**. That is this repository's signature defect with the
+polarity reversed: not a behaviour with no caller, but a caller with no behaviour to reach.
+
+### What the share is a share *of*, which is the whole modelling decision
+
+`data/traffic-profiles.json` gains one number, `credentialGap.wrongZoneShare` — the share of
+journeys that begin **inside** the building and end inside an access zone the traveller's own floor
+does not already reach, made by somebody who does not hold a credential for it.
+
+**Journeys that begin at an entrance are deliberately excluded**, and that is half the claim. A
+visitor arriving off the street has passed whatever the building puts in front of its lobby — a
+reception desk, a turnstile, a door — and that control is upstream of the lift and outside this
+simulator. § D254 makes the same point about pickup floors, citing CIBSE Guide D § 10: *"where entry
+to a lift lobby really is restricted, the control is a locked door or a turnstile — building fabric,
+upstream of the lift."* Modelling the visitor as unbadged would be modelling a reception desk that
+does not work.
+
+What the **lift** refuses is somebody already inside, on a floor they are entitled to, heading for
+one they are not — a `tenant-alpha` employee on floor 6 going to floor 18 to see a colleague.
+`credentialForRoute` says every such trip is made by `facilities` or `security` staff, because those
+are the only groups permitted in both zones. That is the idealisation, and it is the one the gap
+relaxes.
+
+**Which of the two populations a gap rider is in comes from the building's own zones, never from a
+second number:**
+
+| the traveller starts | they carry | the viewer's cause |
+|---|---|---|
+| inside a zone | that zone's own first group — a real badge, for the wrong place | `credential-not-read` |
+| on an unrestricted floor | nothing | `rider-has-no-credential` |
+
+A rider whose own zone's credential *does* reach the destination is not in the gap at all. So a zone
+that shares a group with its neighbour produces no lockouts between them, which is the data deciding
+the outcome rather than the code — CLAUDE.md invariant 7, and there is no `if (building === …)`
+anywhere in it. Both causes occur across the shipped set: `secure-tower`'s gap riders are all
+badge-holders (every interfloor origin there is inside a zone), `st-jude-hospital`'s are all unbadged
+(its two zones sit under unrestricted wards).
+
+### The number, and it is NOT CITED
+
+**0.25, and no figure was invented for it.** No page in this project's reference set publishes a rate
+of unauthorised journey attempts. Guide D § 10 describes how lift access control is implemented and
+ISO 8100-32 describes how a destination terminal authorises a destination; neither counts how often
+somebody tries a floor they may not have. The security literature publishes tailgating rates, and
+quoting one here would be the plausible-looking reference CLAUDE.md forbids — tailgating is a
+control that **fails open** at a door somebody else opened, a different event with a different
+consequence from a reader that refuses a car call.
+
+What stands in place of a citation is **three bounds, all measured before the value was chosen**:
+
+1. **It must be an exception.** A building where a large share of internal journeys are unauthorised
+   has not implemented access control badly, it has drawn its zone boundaries in the wrong place.
+2. **It must be observable** at the shipped budgets, or the file is asserting a mechanism no run can
+   show — the § D112 defect.
+3. **It must not, on its own, push a shipped building past `DEFAULT_MAX_UNSERVED_FRACTION`** (5 % of
+   window arrivals), because a refused rider is counted unserved and a gap large enough to suppress
+   a building's mean would be reporting a credential as congestion.
+
+The census the value was chosen against — candidates at `wrongZoneShare: 1`, which is every rider
+the gap could ever touch, and refusals at the shipped 0.25 over five seeds, each building at its
+shipped rate:
+
+| building | candidates | refused at 0.25, five seeds |
+|---|---|---|
+| `secure-tower` | 33 of 473 (7.0 %) | 4, 9, 8, 7, 9 — **0.8–2.3 %** of legs, all badge-holders |
+| `mixed-use-high-rise` | 31 of 725 (4.3 %) | 12, 7, 13, 12, 10 — **0.8–1.7 %** |
+| `st-jude-hospital` | 14 of 276 (5.1 %) | 3, 7, 1, 2, 7 — **0.4–2.6 %**, all unbadged |
+| `vertical-city` | 50 of 1 976 (2.5 %) | 8, 15, 15, 11, 3 — **0.2–0.8 %** |
+| `crown-hotel` | 1 of 350 (0.3 %) | 0, 0, 0, 1, 1 |
+| the three that declare no zones | **0** | **0** |
+
+So a quarter of a small population is between two tenths of a percent and two and a half percent of
+a building's whole demand — an exception at the level a reader judges a building by, and half the
+censoring limit at its worst. `crown-hotel` is the honest outlier: one back-of-house floor produces
+nought or one candidate a run, so the gap barely touches it, and
+`traffic/credentialGapIdentity.test.ts` pins it at a seed where it does rather than hiding the zero.
+
+**Two limitations, both named rather than implied.** The refusal is modelled at the **landing**;
+under a conventional up-down-button system the reader is inside the car, so a real wrong-zone rider
+boards, presses a button that does not light, and rides somewhere before walking back — a stop and a
+place in a car this model does not charge the building for, so the cost of the gap is *understated*
+under conventional control. And the share is **constant** across buildings, hours and traffic
+patterns, which a real one is not; varying it needs per-building figures nothing here publishes.
+
+### The draw, and invariant 2
+
+An eleventh named stream, `credential`, appended to `STREAM_NAMES` and to `TRAFFIC_STREAM_NAMES`.
+`traffic/types.ts` had said for two waves that *"a stochastic credential mix would need a named
+stream on `StreamSet`; adding one is a deliberate act"*, and this is that act.
+
+**One draw per passenger, unconditionally, in final trace order** — `passengerMass`'s discipline
+exactly. Drawing only for candidates would make the draw *sequence* a function of `accessZones`, so
+adding one floor to a zone would re-roll every later rider and two arms differing only in their
+zoning would stop being the same crowd. Taken for everybody, gap membership is a property of the
+person and the zones decide whether it costs them anything. On the traffic seed rather than the run
+seed, by the `doorObstruction` test the module already applies to `patience` and `modeChoice`:
+whether somebody is carrying the right badge is a fact about *them*, and seeding it off the machine
+would mean re-rolling a dispatcher silently re-rolled which riders could travel at all.
+
+The compatibility lock in `random/streams.test.ts` gains a row rather than moving one — a new
+*name* gets new parameters and disturbs nothing above it — and the vector was produced by an
+independent BigInt implementation of FNV-1a-64, SplitMix64 and `pcg_setseq_64_xsh_rr_32` that
+reproduces `arrivals`' four pinned draws exactly, which is what makes it evidence rather than a
+transcription of the code under test.
+
+### Byte-identity, proven by a run rather than by an argument
+
+`traffic/credentialGapIdentity.test.ts`, in `dayStartIdentity.test.ts`'s shape. The three shipped
+buildings that declare no `accessZones` — `chancery-house`, `garden-apartments`, `midtown-office`,
+**derived from disk rather than listed** — produce a byte-identical trace *and* a byte-identical
+`runSimulation` result at `wrongZoneShare` 0, at the shipped share, and at 1. The five that do
+declare zones must **differ** at 0 against 1, or the file would pass just as happily against a knob
+nothing reads.
+
+The same 5/3 split arrives independently on three other apparatus, which is what makes it a property
+rather than a coincidence: `transportIdentity.test.ts` moves 9 of its 15 cells and holds 6,
+`dayStartIdentity.test.ts` moves the same 9, and `mixIdentity.test.ts` moves 6 of 10 structural
+digests while **`BASELINE_PASSENGER_COUNTS` and `BASELINE_CONTINUOUS` do not move at all, on any of
+the ten**. That last is the shape of the change stated as a measurement: the gap re-labels people, it
+does not generate different ones. Same passengers, same arrival times, same masses, same routes — a
+different badge in some of their pockets.
+
+The correctness oracle (`sim/oracle.test.ts`) is untouched and green: it runs pure up-peak, where
+every journey begins at an entrance and no journey is in the gap by construction.
+
+---
+
+## D266 — a rider the building will not carry is a fourth outcome, and calling them a third would be the abandonment defect
+
+**Date: 2026-08-05 · Written after the code.** [§ D265](DECISIONS.md) puts riders on landings whom
+no car may legally carry. This is what the runner does with them, and the care is entirely in what
+it refuses to call them.
+
+`Simulation.#admit` asks `isAccessPermitted(credential, destination)` once, at the landing, before
+any car is involved — the same question `#bankCanCarry` and `#carCanCarry` ask, asked early because
+the answer is a fact about the pair `(credential, floor)` that no dispatch decision can change. A
+rider it refuses is **recorded as having arrived**, then turned away, and leaves.
+
+### The three things they are not, and why each would be a lie
+
+- **Delivered** would say somebody got where they were going who did not.
+- **Waiting** would leave them standing for the rest of the run, so their censored wait would run
+  past the 900 s abandonment horizon and `awtIsValid`'s `starved` ground would suppress the mean of
+  **every** access-zoned building. A credential refusal reported as a service failure is precisely
+  the confusion § D254 found the old defect causing, and it is what CLAUDE.md means by *"they must
+  not wait forever pretending to be a dispatcher failure."*
+- **Abandoned** would put them in `RunSummary.abandonment` and into `awtIsValid`'s abandonment
+  ground, so a run declaring no `sim.patience` would report riders giving up, and the rate a reader
+  judges patience by would be measuring access zoning.
+
+So they get their own terminus: `PassengerRecord.refusedAt`, `ConservationAudit.accessRefused`,
+`StageActivity.accessRefusedLegs`, and one end-of-run warning in the run's own words. All three are
+**spread-or-omit at zero**, because `structuralDigestOfResult` hashes every key whatever its value
+and a key present on every run would move every pinned identity digest in the repository to say
+nothing.
+
+### Why this is not the abandonment defect it is shaped like
+
+CLAUDE.md's rule is that abandonment is published **beside** AWT and never folded into it, because
+removing the longest waits improves the mean by construction. A refusal removes a wait that never
+started, so the direction of the bias differs — but the *other* half of the objection applies in
+full: **a building that refuses more people reports a shorter mean for exactly that reason.**
+
+That is `EnergyStatistics.workPerServedLegKJ` beside raw energy ([§ D106](DECISIONS.md)) and
+`conservation.stairsJourneys` beside the served-leg count, one axis over, and it is handled the same
+way — the count is published, with its denominator, and the run says out loud that every per-leg
+figure it reports is taken over the riders who could travel.
+
+**Two things the accounting deliberately does not do.** It does not exempt refused legs from
+`WaitStatistics.unservedCount`: they arrived and were never served, which is literally true, and it
+means a refusal rate large enough to bias the mean is caught by the existing censoring gate. And it
+does not add a **sixth `awtIsValid` ground**, which is the right long-term fix and is the shape
+`abandoned` already has — placed above `censored` so a reader is not sent hunting a backlog that is
+not there. Adding one widens `AwtInvalidGround` and every total `Record` over it, two of which live
+in `packages/viz/src/mode/` and `packages/viz/src/menu/`, which this lane may not edit. **Named as a
+gap rather than left implicit**, with the measured reason it is not urgent: the unserved fraction on
+the worst shipped building is 2.6 %, against a 5 % limit.
+
+`sim/conservation.test.ts` re-derives the refusals from the **record** — a leg carrying `refusedAt`,
+never boarded, never alighted — and requires them to be the journeys the audit counted, before using
+the number in any arithmetic; an audit that miscounted would otherwise agree with itself.
+`fuzz/properties.ts` does the same, independently. `metrics/serialization.ts` admits `refusedAt` so a
+run on an access-zoned building can still be stored and replayed (invariant 5).
+
+### The same refusal, one layer up, where it would have drawn a lie
+
+A refused rider never boards and never gets a car, so on `VizLeg`'s existing fields they are
+**indistinguishable from somebody standing on a landing for the rest of the run** — the reading this
+section refuses in `core`, arriving in the viewer. Left alone, `frame/overlay.ts`'s `isWaitingAt`
+would have kept them in the queue at every instant, and every surface that folds it — the landing
+queues, `Frame.totalWaiting`, the mood card, the left rail — would have drawn a credential refusal as
+congestion.
+
+So `VizLeg` carries `refusedAt` (absent on every leg of the three unzoned buildings, so a recording
+of one is byte-identical to one written before the field existed), `isWaitingAt` reads it, and
+`recordRun.ts`'s fold emits **no landing event at all** for a refused leg rather than a matched
+`+1`/`−1` pair: `refusedAt` equals `arrivedAt`, the fold's tie-break sorts boardings before arrivals
+at one instant, and a matched pair would therefore net to `+1` and leave them in the queue anyway.
+They are in no wait sample either, which is right — they never waited. `access/lockedOut.ts` is where
+they are named instead.
+
+---
+
+## D267 — the lessons come back through the model, and two of them changed stages
+
+**Date: 2026-08-05 · Written after the measurement.** GitHub issue **#88**, option (1), decided by
+the product owner: the scenario lessons return through § D265 rather than being rewritten.
+
+### `deliver-everyone` is a goal again on four stages, and withheld on a fifth
+
+`data/scenario-goals.json` regenerated with `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`, both seed sets,
+50 replications each. **Ten entries changed across five scenarios — 4, 5, 6, 9 and 10 — and they are
+exactly the five that run on a building declaring `accessZones`.** Stages 1, 2, 3, 7 and 8 are
+byte-identical. It is the same 5/5 split § D254 found on its 60-cell matrix, § D255 on the fifteen
+identity cells and § D262 on this very table, arriving a fourth time on a fourth apparatus.
+
+| stage | `deliver-everyone` before | after | disposition |
+|---|---|---|---|
+| 4 two banks | 50/50, 50/50 | **36/50, 34/50** | configuration fact → **batch goal** |
+| 5 credentials | 50/50, 50/50 | **5/50, 11/50** | configuration fact → **batch goal** |
+| 6 the tall one | 50/50, 50/50 | **40/50, 46/50** | configuration fact → **batch goal** |
+| 9 both ways at once | 50/50, 50/50 | 47/50, **50/50** | configuration fact → **withheld** |
+| 10 the bed and the visitor | 50/50, 50/50 | **41/50, 41/50** | configuration fact → **batch goal** |
+
+Stage 9 is the one to read. `crown-hotel` declares a single back-of-house zone over `B1`, so its gap
+population is nought or one rider a run — variable on the tuning seeds and constant-pass on the
+holdout, which R12 refuses outright: *a classification that does not survive a disjoint seed set is
+not one to ship a level on.* So four stages get the goal back and the fifth does not, and the
+difference is the building's own zoning rather than anybody's judgement.
+
+Three other cells moved with them: stage 4's `answer-the-demand` `21/50, 22/50 → 19/50, 20/50`, and
+stage 5's `no-divergence` `46/50, 48/50 → 45/50, 46/50` and `long-waits-under` `12/50, 15/50 →
+14/50, 12/50`. § M30's census is now **17 batch goals, 29 configuration facts, 4 unjudgeable**, and
+`docs/10`'s printed copy of the table moved with the JSON because `goalRates.test.ts` parses the
+markdown and refuses to let the two drift.
+
+### Stage 5's brief was teaching the defect, and now teaches the model
+
+It read: *"a call from a restricted floor is not slow — it is unanswerable … Change what the call
+carries, and watch the locked-out landings clear."* Every clause of that was § D254's defect. It now
+says what is true: a few riders each run are heading for a floor their badge does not open, they are
+turned away where they stand, and **no dispatcher setting reaches them** — a reader that can see the
+wrong badge still says no. `campaign/failStates.ts`'s player-facing sentence is corrected the same
+way, and its lever text says the fix is a credential or the building's access zoning.
+
+`access/lockedOut.ts`'s § 10.4 table had the same stale row — *"the fix: a dispatcher that reads
+credentials"* — and it is corrected in place. What a credential-carrying call type actually changes
+is **where the refusal is made**: a terminal that reads the badge declines at the panel, a landing
+button does not. `LockedOutInput.carriesCredential` selects on exactly that and is now documented as
+selecting on exactly that, and on nothing stronger. **A named gap goes with it:**
+`describeLockedOut`'s wording for that row — *"this dispatcher does not read `tenant-alpha-staff`"* —
+is literally true under `up-down-buttons` and its implicature is not, and correcting it means editing
+`packages/viz/src/render/lockedOutRender.test.ts`, which pins both branches and which this lane may
+not edit.
+
+The module's **predicate** is widened, and that is not cosmetic. It was *"registered a call at a
+restricted floor"*, which was right while the access question was about the pickup; it is now
+*"standing at a restricted floor, **or bound for one**"*. Censused on `secure-tower` at 900 s, the
+share of a run's refusals the old predicate could not see runs from a quarter to **all of them** — a
+journey that starts inside a zone and transfers at the lobby is refused on its second leg, standing
+somewhere unrestricted, and at seed 20 260 729 that is every one of them. The cost is stated rather
+than discovered: on a run that ends with people still in the system, a leg merely stranded by
+congestion whose destination happens to be restricted now counts too. On a run that completes there
+is no such leg.
+
+### Two stages swapped cases, and the swap is § D254's rather than § D265's
+
+`campaign.test.ts` carried two complementary cases: *a measured clear* (stage 4, so the campaign is
+demonstrably winnable) and *a move along the front* (stage 5, so `beat-the-baseline`'s "and nothing
+resolved against it" clause is falsifiable). Swept over all twelve shipped profiles at each stage's
+own seeds:
+
+| stage | profiles that clear | closest miss |
+|---|---|---|
+| 4 two banks | **none** | `zoned-uppeak`, 2 metrics for and 1 against |
+| 5 credentials | **several** | — |
+| 6 the tall one | **none** | `zoned-uppeak`, 1 for and 4 against |
+
+So the clear moved to stage 5 and the front moved to stage 4, and both are asserted as **searches
+with a stated floor** rather than pinned profile ids: which profile clears is a measurement that will
+move again, and a test naming one gets re-pinned without anybody re-reading the claim. Stage 6's case
+is **inverted rather than deleted** — it now pins the negative and requires that everything which
+resolves ahead also resolves behind, so the day a profile does clear it, the case fails and the
+published *"three stages clear from the dropdown"* count gets re-read.
+
+**This was already true before § D265** — all three cases were among the ten failures issue #88
+handed this lane, and they fail at `wrongZoneShare: 0` too. § D254 is what moved them, by changing
+what every conventional arm on an access-zoned building does. **Stage 6 is still playable** by the
+mechanism § D161 documents for the four stages that never cleared from the dropdown: an edited weight
+vector. That is stage 2's apparatus and it is not re-run here.
+
+---
+
+## D268 — what the share cost in published numbers, and the one figure that moved
+
+**Date: 2026-08-05 · Written after the runs.** [§ D265](DECISIONS.md) changes what five of eight
+shipped buildings do, and CLAUDE.md's rule is that a published number is pinned to the run that
+produced it. This is the accounting.
+
+### What moved, and what did not
+
+| table | moved | held |
+|---|---|---|
+| `traffic/transportIdentity.test.ts` — three tables | 9 of 15 | **6** — `garden-apartments`, `midtown-office` |
+| `traffic/dayStartIdentity.test.ts` `SUPERSEDED_STRUCTURAL` | 9 of 15 | the same 6 |
+| `traffic/mixIdentity.test.ts` structural digests | 6 of 10 | 4, and **every** passenger count and continuous field |
+| `sim/doubleDeckSeam.test.ts` shuttle-move census | 3 of 3 | the finding: all three dispatchers still save moves paired |
+| `data/scenario-goals.json` | 10 entries, 5 scenarios | 5 scenarios, byte-identical |
+| `benchmark/published.ts` `destination-dispatch` | **4 of 12** | the 8 `midtown-*` pins |
+| `benchmark/matrix.test.ts` — 352 pins, 8 Pareto fronts | **none** | all of it |
+| `benchmark/accessControl.ts` — 6 intervals | **none** | all of it |
+
+**The matrix is untouched, and the reason is the one § D256 already found and called luck.** Every
+matrix cell on a zoned building is an *up-peak* cell, and up-peak traffic is incoming: every journey
+starts at the ground lobby. § D265's gap applies only to journeys that begin **inside** the building,
+so it cannot reach a single one of them. That is the second time the same accident has protected the
+same 132 pins, and it is recorded as an accident again rather than as design — a study that added an
+interfloor share to any zoned cell would move them.
+
+**The one interval that moved is `destination-dispatch`'s `secure-interfloor-mix`, and it moved
+across zero**: ΔAWT was `−0.043 [−0.098, +0.013]` and is now `−0.056 [−0.112, −0.0006]`. The interval
+excludes zero by six ten-thousandths of a second. **It is not a result**, and saying so is the point:
+the cell's own `admissibleReplications` is `0` ([§ D261](DECISIONS.md)), the effect is a twentieth of
+a second on a building whose AWT is tens of seconds, and an interval that clears zero at the fourth
+decimal after a population change is exactly the shape CLAUDE.md's opening warning is about. It is
+re-pinned because the code produces it, and it is reported as a number rather than as a finding.
+
+### What is left red, and it is one case in a block § D256 already refuted
+
+`benchmark/mixedUseHighRise.test.ts` § 1 — *"the building's own scenario admits no paired comparison,
+and the reason is structural"* — had two of its three cases failing before this lane, because its
+premise is H-ACCESS-1's and H-ACCESS-1 is REFUTED. The third case bundled two claims and § D265
+separated them: *"serves the same traffic completely"* is still true at every rate
+(`meanUndelivered` 0, `notCompleted` 0, unserved fraction 2.1–2.6 % against a 5 % limit), and *"every
+replication quotes an AWT"* is not, at the two thin rates, on **every** arm including the
+conventional ones. The ground is an **empty reporting window**: at 0.2 % of population per five
+minutes the window holds a handful of people, and removing the ~2 % the gap turns away empties it on
+4 of the 30 draws. That is a statement about the operating point rather than about access control, so
+the case now asserts the completeness claim its title makes at every rate and the quotability claim
+at the one rate a 30-replication batch is thick enough to support.
+
+The block's other two cases are left red exactly as § D256 left them: the verdict they assert is
+`STRUCTURAL` and the study measures `SERVABLE`, and re-pinning a refuted hypothesis would destroy the
+only evidence that it was refuted.
+
+### Four consequences of adding one field, all handled rather than discovered
+
+§ D245's shape, and § D264's, a third time. The compiler found every one of them:
+
+1. **`SimulationDemandOptions`** gains `credentialGap`, so `runner/experiment.ts`'s `DemandParsers`
+   — a mapped type over `Required<SimulationDemandOptions>` — stopped compiling until it had a
+   parser, and `runner/crn.ts`'s trace key stopped compiling until it carried the field. The key
+   matters: two cells differing in the share are two different crowds, so pairing them would compare
+   populations rather than dispatchers.
+2. **`reports/persistence.ts`**'s hand-written projection, which § D264 already records as the shape
+   that drops a reachable override silently. `0` is the control arm, and a stored control that lost
+   the field would replay at the shipped share.
+3. **`metrics/serialization.ts`**'s `passengerRecordSchema` is a `strictObject`, so a stored run on
+   an access-zoned building failed to re-parse until `refusedAt` was admitted. **And it exposed a
+   pre-existing instance of the same defect**: `abandonedAt` is emitted by the recorder and is *not*
+   in that schema, so a run declaring `sim.patience` cannot be stored and replayed today. Filed
+   rather than fixed here — no shipped configuration declares patience, so no published figure is in
+   question, and it wants a round-trip test of its own.
+4. **`tuning/space/collect.test.ts`**'s declared-row count, 129 → 130. `default: null`, so
+   `SPACE.parameters.length` does not move: the number lives in `data/traffic-profiles.json` with its
+   reasoning attached, and a second copy in the parameter table would be the second source of truth
+   this repository has paid for repeatedly.
+
+### One check this lane may not close, and it needs one line
+
+`packages/viz/src/controls/controls.test.ts` § *points at every discovered schema, and names the rows
+inside them that cannot be searched* holds a sorted list of the fifteen `default: null` parameter
+ids. It is sixteen now, and the missing entry is `'traffic.credentialGap.wrongZoneShare'`, sorted
+between `'traffic.batchSize.weight'` and `'traffic.dayVariation.maxDemandFactor'`. `controls/` is
+outside this lane's file ownership, so the line is **named here rather than added** — the guard is
+doing exactly what it was written to do, and what it is asking for is a decision that a new
+unsearchable row was intended.

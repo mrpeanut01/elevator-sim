@@ -310,6 +310,26 @@ export interface PassengerMassConfig extends Commented {
   readonly maxKg?: number | undefined;
 }
 
+/**
+ * How often somebody already inside the building tries to go where their badge does not open.
+ *
+ * A property of the crowd rather than of any one building, which is why it lives beside
+ * {@link PassengerMassConfig} and not in `data/buildings/`: the *value* is a statement about
+ * people, and the building's own `accessZones` decide who it costs anything. See
+ * `traffic/generator.ts` § *The credential gap* and the record's own `$comment` for what is
+ * cited and what is not.
+ */
+export interface CredentialGapConfig extends Commented {
+  /**
+   * Share, `0..1`, of journeys that begin **inside** the building and end inside an access zone
+   * the traveller's own floor does not already reach.
+   *
+   * `0` restores the pre-gap model exactly: every generated rider holds a credential for wherever
+   * they are going.
+   */
+  readonly wrongZoneShare: number;
+}
+
 /** The whole of `data/traffic-profiles.json`. */
 export interface TrafficProfiles extends Commented {
   readonly version: number;
@@ -317,6 +337,7 @@ export interface TrafficProfiles extends Commented {
   readonly profiles: readonly TrafficProfile[];
   readonly demandTemplates: readonly DemandTemplate[];
   readonly passengerMass: PassengerMassConfig;
+  readonly credentialGap: CredentialGapConfig;
 }
 
 // ---------------------------------------------------------------------------

@@ -294,6 +294,10 @@ describe('landing assignments — RV-T3', () => {
           leg.originFloorId === assignment.floorId &&
           leg.direction === assignment.direction &&
           leg.arrivedAt <= t &&
+          // `DECISIONS.md` § D266, as in the acceptance identity below: a rider the building turned
+          // away is not on the landing, and recomputing the predicate here rather than importing it
+          // is what keeps this the independent side of the comparison.
+          (leg.refusedAt === undefined || leg.refusedAt > t) &&
           (leg.boardedAt === undefined || leg.boardedAt > t),
       );
       expect(assignment.waiting).toBe(waitingHere.length);
@@ -492,6 +496,10 @@ describe('queueAt — the acceptance identity', () => {
             (leg) =>
               leg.originFloorId === queue.floorId &&
               leg.arrivedAt <= t &&
+              // `DECISIONS.md` § D266: a rider the building turned away for want of a credential is
+              // not standing there. Recomputed here rather than borrowed from `isWaitingAt`, which
+              // is the module under test — this is the independent side of the comparison.
+              (leg.refusedAt === undefined || leg.refusedAt > t) &&
               (leg.boardedAt === undefined || leg.boardedAt > t),
           );
           expect(queue.total, `${buildingId} ${queue.floorId} @ ${String(t)}`).toBe(here.length);

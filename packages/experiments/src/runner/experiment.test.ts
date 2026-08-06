@@ -62,6 +62,9 @@ const DEMAND_JSON = {
   entranceWeights: { G: 1 },
   interfloorWeighting: 'uniform',
   credentialAssignment: 'none',
+  // § D265. A parser that accepted the block and dropped it would run the arm at the shipped
+  // share while the spec said 0, which is the failure this whole table exists to catch.
+  credentialGap: { wrongZoneShare: 0 },
   maxLegs: 4,
   peakWindowS: 420,
   baselineFraction: 0.25,

@@ -542,6 +542,18 @@ export const trafficProfilesSchema = z
       .refine((mass) => mass.maxKg === undefined || mass.maxKg > mass.meanKg, {
         message: 'expected maxKg > meanKg',
       }),
+    // Required, not optional, and that is the decision rather than an oversight. This is the one
+    // number in the file that says how often access zoning actually costs somebody a journey, and
+    // an absent block would mean "somebody has not decided" while reading exactly like "zero" —
+    // which is the value that makes every `accessZones` declaration in `data/buildings/` inert
+    // (issue #87). Authoring it is cheap; discovering it was missing is not.
+    credentialGap: z.strictObject({
+      $comment: comment,
+      wrongZoneShare: z
+        .number()
+        .min(0, 'wrongZoneShare is a share of journeys and cannot be negative')
+        .max(1, 'wrongZoneShare is a share of journeys and cannot exceed 1'),
+    }),
   })
   .superRefine((profiles, ctx) => {
     checkUniqueIds(profiles.profiles, 'profiles', ctx);

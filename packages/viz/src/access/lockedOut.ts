@@ -14,14 +14,45 @@
  *
  * | the rider | the dispatcher | what the run did | the fix |
  * |---|---|---|---|
- * | holds `tenant-alpha-staff` | reads no credential | permanently unassignable | a dispatcher that reads credentials |
+ * | holds `tenant-alpha-staff` | reads no credential | permanently unassignable | *see the correction below* |
  * | holds **nothing** | anything | permanently unassignable | a credential for the rider — no dispatcher helps |
  * | holds `tenant-alpha-staff` | reads credentials | ordinary congestion | more cars, or a better policy |
  *
  * The second row is the one that is invisible without the field and is not a shade of the first:
- * a trace generated with `credentialAssignment: 'none'` puts unbadged riders on restricted
- * floors, and **no** shipped dispatcher can serve them. Telling that reader to switch to
- * `destination-eta` would be advice that does not work.
+ * an unbadged rider on a restricted floor cannot be served by **any** shipped dispatcher. Telling
+ * that reader to switch to `destination-eta` would be advice that does not work.
+ *
+ * ## The first row's *fix* column is stale, and this is the correction
+ *
+ * It read *"a dispatcher that reads credentials"*, and that was true of the simulator this module
+ * was written against and is not true of the one it now runs on.
+ * [§ D254](../../../../DECISIONS.md) took the credential question off the hall call's pickup floor,
+ * and `Simulation.#bankCanCarry` asks it **per passenger with the passenger's own credential**,
+ * whatever the call type. So a rider whose badge does not open the floor they are going to is
+ * refused under every dispatcher this repository ships — `destination-eta` included — and
+ * § D265's credential gap is what now puts such riders on the landings at all.
+ *
+ * **What a credential-carrying call type actually changes is where the refusal is made**, not
+ * whether it is made: a terminal that reads the badge declines the request at the panel, and a
+ * landing button does not. That is what {@link LockedOutInput.carriesCredential} selects on, and
+ * it is the whole of what it means. It is **not** a claim that the rider travels.
+ *
+ * `describeLockedOut`'s sentence for the first row — *"this dispatcher does not read
+ * `tenant-alpha-staff`"* — is literally true under `up-down-buttons` and its implicature is not:
+ * reading the badge would not carry them. Correcting the wording, and the two causes' names with
+ * it, means editing `packages/viz/src/render/lockedOutRender.test.ts`, which pins both branches of
+ * this function against synthetic landings and which § D265's lane may not edit.
+ * **Named as a gap rather than left implicit**, and the player-facing sentence — which this lane
+ * does own — is corrected instead: see `campaign/failStates.ts` § `PLAIN['locked-out']` and its
+ * lever text, which say the fix is a credential or the building's access zoning and never a dial.
+ *
+ * ## What this function cannot see, measured rather than assumed
+ *
+ * The predicate is *"registered a call **at** a restricted floor"*, so a journey that begins inside
+ * a zone, transfers at an unrestricted sky lobby and is refused on its **second** leg is standing
+ * somewhere unrestricted and is not reported. On `secure-tower` at 900 s that is between none and
+ * all of a run's refusals depending on the seed — the census is in `lockedOut.test.ts`'s `SEED`
+ * docstring. `conservation.accessRefused` is the count that misses nobody.
  *
  * ## Why the restricted-floor list is an input rather than a field
  *
@@ -37,11 +68,15 @@
  * ## Why the origin floor and not the credential alone
  *
  * A leg carries a credential when **any** floor on its route is restricted, so a lobby-to-office
- * trip on Secure Tower carries one too — and that call is answerable, because a conventional
- * `estimateCost` checks access at the pickup floor and (with no destination disclosed) nowhere
- * else. Measured: conventional dispatch leaves 33.5 % of Secure Tower unserved, not 100 %. So
- * *"holds a credential and was never served"* over-claims, and the predicate here is
- * *"registered a call **at** a restricted floor"*.
+ * trip on Secure Tower carries one too — and that rider travels perfectly well. So *"holds a
+ * credential and was never served"* over-claims, and the predicate here is *"registered a call
+ * **at** a restricted floor"*.
+ *
+ * (The measurement that used to be quoted here — *"conventional dispatch leaves 33.5 % of Secure
+ * Tower unserved"* — was H-ACCESS-1's coverage row, and it is **withdrawn**: it measured § D254's
+ * defect, and re-run on the fixed simulator the same configuration delivers everybody
+ * ([§ D256](../../../../DECISIONS.md)). The predicate it argued for is still the right one, for the
+ * reason above rather than for that number.)
  */
 
 import type { VizFloor, VizLeg, VizRecording } from '../contract/types.js';
@@ -72,7 +107,15 @@ export interface LockedOutInput {
   readonly at: number;
   /** Floors inside at least one access zone. Empty means "this caller does not know". */
   readonly restrictedFloorIds: readonly string[];
-  /** Whether the profile that produced this run forwards the credential to the cars. */
+  /**
+   * Whether the profile that produced this run forwards the credential to the cars.
+   *
+   * **Selects where the refusal is made, never whether it is made.** A terminal that reads the
+   * badge declines the request at the panel, so the landing carries no call to diagnose; a landing
+   * button does not read it, so the rider stands there. Either way the rider does not travel —
+   * `Simulation.#bankCanCarry` asks the access question with the passenger's own credential under
+   * every call type. See the module docstring's correction to the first row of § 10.4's table.
+   */
   readonly carriesCredential: boolean;
 }
 
@@ -95,8 +138,31 @@ export function lockedOutLandingsAt(input: LockedOutInput): readonly LockedOutLa
   for (const leg of input.recording.legs) {
     if (leg.arrivedAt > input.at) continue;
     if (leg.boardedAt !== undefined || leg.carId !== undefined) continue;
-    if (!restricted.has(leg.originFloorId)) continue;
-    // A rider whose credential the cars *do* receive is not locked out; they are waiting.
+    /*
+     * **Where they are, or where they are going** — widened by § D265, and the second half is the
+     * one that carries the shipped case now.
+     *
+     * The predicate was the landing alone, and that was right when the thing being reported was a
+     * *pickup* the group would not answer. Since § D254 there is no such thing: the access question
+     * is asked about the **destination**, so a rider standing in an unrestricted lobby bound for a
+     * floor their badge does not open is exactly as locked out as one standing inside a zone, and
+     * the old predicate could not see them. Measured on `secure-tower` at 900 s, between none and
+     * all of a run's refusals are of that shape depending on the seed — a journey that starts
+     * inside a zone and transfers at the lobby is refused on its **second** leg, standing
+     * somewhere unrestricted.
+     *
+     * Widening rather than replacing, and the difference matters: a leg whose *origin* is
+     * restricted and whose destination is not is still reported, so nothing this function used to
+     * say stops being said.
+     *
+     * **What it costs, stated rather than discovered:** on a run that ends with people still in
+     * the system, a leg merely stranded by congestion whose destination happens to be restricted
+     * now counts here too. On a run that completes there is no such leg — everybody else boarded —
+     * which is the case every shipped fixture and every campaign stage is in.
+     */
+    if (!restricted.has(leg.originFloorId) && !restricted.has(leg.destinationFloorId)) continue;
+    // A rider whose credential the terminal reads was told at the panel, so this landing is not
+    // where their problem is. It is not a claim that they travelled — see `carriesCredential`.
     if (input.carriesCredential && leg.credentialGroup !== undefined) continue;
     const bucket = byFloor.get(leg.originFloorId) ?? { legs: [], groups: [] };
     bucket.legs.push(leg);

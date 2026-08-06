@@ -222,10 +222,30 @@ export function checkConservation(context: PropertyContext): Violation[] {
     if (last.alightedAt !== undefined && last.isFinalLeg) delivered += 1;
   }
 
+  /*
+   * **The fourth terminus** (`DECISIONS.md` § D266): a journey the building turned away for want
+   * of a credential. It did not arrive and it is not still in the system, so it belongs to neither
+   * of the two counts above and the books do not balance without it.
+   *
+   * Recounted from the **record** rather than read off `conservation.accessRefused`, for the reason
+   * `delivered` is recounted three lines up: an audit that miscounted would then agree with itself.
+   * A refused leg carries `refusedAt` and never boarded; the count is over journeys, because that
+   * is what `generated` counts.
+   */
+  const refusedJourneys = new Set<string>();
+  for (const leg of result.record.passengers) {
+    if (leg.refusedAt === undefined) continue;
+    if (leg.boardedAt !== undefined) {
+      fail(`leg "${leg.passengerId}" was refused at t=${String(leg.refusedAt)} and boarded anyway`, leg.passengerId);
+    }
+    refusedJourneys.add(leg.journeyId);
+  }
+  const accessRefused = refusedJourneys.size;
+
   const undelivered = result.undelivered.length;
-  if (delivered + undelivered !== generated) {
+  if (delivered + undelivered + accessRefused !== generated) {
     fail(
-      `books do not balance: ${String(generated)} generated, ${String(delivered)} delivered, ${String(undelivered)} named undelivered`,
+      `books do not balance: ${String(generated)} generated, ${String(delivered)} delivered, ${String(undelivered)} named undelivered, ${String(accessRefused)} refused for want of a credential`,
     );
   }
 
@@ -234,6 +254,11 @@ export function checkConservation(context: PropertyContext): Violation[] {
   if (audit.generated !== generated) fail(`audit says ${String(audit.generated)} generated; the trace says ${String(generated)}`);
   if (audit.delivered !== delivered) fail(`audit says ${String(audit.delivered)} delivered; the recount says ${String(delivered)}`);
   if (audit.undelivered !== undelivered) fail(`audit says ${String(audit.undelivered)} undelivered; ${String(undelivered)} are named`);
+  if ((audit.accessRefused ?? 0) !== accessRefused) {
+    fail(
+      `audit says ${String(audit.accessRefused ?? 0)} refused for want of a credential; the record carries ${String(accessRefused)}`,
+    );
+  }
   if (!audit.balanced) fail('audit reports the books do not balance');
   if (audit.legsRecorded !== audit.legsCreated) {
     fail(`${String(audit.legsCreated)} legs created, ${String(audit.legsRecorded)} recorded: a leg is invisible to every statistic`);

@@ -100,6 +100,27 @@ describe('§ 1 — the building’s own scenario admits no paired comparison, an
     }
   });
 
+  /**
+   * **Two claims, and § D265 separated them by making one of them false.**
+   *
+   * This case asserted *"serves the same traffic completely"* and checked three things: nobody
+   * undelivered, no run failing to complete, and **every replication quoting an AWT**. The first
+   * two are what the title says and they still hold at every rate. The third is a different claim
+   * — that the *statistics* of a 30-replication batch are quotable — and it now fails at the two
+   * thin rates, on every arm including the conventional ones.
+   *
+   * Measured rather than assumed, at the shipped budget: `meanUndelivered` is **0** and
+   * `notCompleted` is **0** on all fifteen rows, and the unserved fraction is 2.1–2.6 %, which is
+   * half the 5 % censoring limit. What moved is `withoutQuotableAwt`: **0 of 30** at 1.5 %,
+   * **1 of 30** at 0.75 %, **4 of 30** at 0.2 %. The ground is an **empty reporting window**, not
+   * censoring — at 0.2 % of population per five minutes the window holds a handful of people, and
+   * removing the ~2 % the credential gap turns away empties it on four of the thirty draws.
+   *
+   * That is a statement about the operating point rather than about access control, so it is
+   * asserted as what it is: the completeness claim in the title, at every rate, plus the
+   * quotability claim at the one rate the batch is thick enough to support it. Requiring
+   * quotability at 0.2 % would be requiring a 30-replication batch to have no unlucky draw.
+   */
   it('serves the same traffic completely with a credential-aware arm', () => {
     // The contrast is what makes § 1 a statement about the *call type* rather than about the
     // building being too small. Same building, same trace, same rates.
@@ -108,10 +129,20 @@ describe('§ 1 — the building’s own scenario admits no paired comparison, an
         const row = study.coverage.rows.find(
           (entry) => entry.rate === rate && entry.armId === armId,
         );
-        expect(row?.quotable, `${armId} unquotable at ${String(rate)} %`).toBe(true);
-        expect(row?.meanUndelivered).toBe(0);
-        expect(row?.notCompleted).toBe(0);
+        expect(row?.meanUndelivered, `${armId} left somebody behind at ${String(rate)} %`).toBe(0);
+        expect(row?.notCompleted, `${armId} failed to complete at ${String(rate)} %`).toBe(0);
+        // And the shortfall is not censoring hiding behind a complete run: the unserved fraction
+        // stays under the limit that would suppress a mean for a backlog.
+        expect(row?.meanUnservedFraction ?? 1).toBeLessThan(0.05);
       }
+    }
+    // The thickest rate, where 30 replications are enough for every one of them to quote a mean.
+    for (const armId of [DECOMPOSITION_ARM, LEVEL_1_ARM]) {
+      const row = study.coverage.rows.find(
+        (entry) => entry.rate === COVERAGE_RATES[0] && entry.armId === armId,
+      );
+      expect(row?.quotable, `${armId} unquotable at the thickest rate`).toBe(true);
+      expect(row?.withoutQuotableAwt, `${armId} at the thickest rate`).toBe(0);
     }
   });
 

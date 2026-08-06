@@ -253,6 +253,10 @@ export function traceKeyOf(simulation: CellSimulationConfig): string {
     entranceWeights: demand.entranceWeights,
     interfloorWeighting: demand.interfloorWeighting,
     credentialAssignment: demand.credentialAssignment,
+    // § D265. `canonicalize` drops `undefined`, so an arm that leaves the share to the reference
+    // data produces exactly the trace key it produced before this field existed, and no cohort in
+    // any existing experiment moves — the same argument the three below carry.
+    credentialGap: demand.credentialGap,
     maxLegs: demand.maxLegs,
     peakWindowS: demand.peakWindowS,
     baselineFraction: demand.baselineFraction,

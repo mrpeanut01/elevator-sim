@@ -713,8 +713,20 @@ export function diagnoseServiceLevel(
      * `starved` verdict about somebody who was not there. `abandonedAt` is absent on every leg of
      * every run that declares no patience, so this term is inert on the shipped path.
      */
-    const endedAtS = leg.boardedAt ?? leg.abandonedAt ?? censoredAtS;
-    const censored = leg.boardedAt === undefined && leg.abandonedAt === undefined;
+    /*
+     * **A refused leg's wait is known too, and for a stronger reason** (`DECISIONS.md` § D266).
+     *
+     * An abandoned rider's wait ended when they chose to leave; a refused rider's ended when the
+     * building told them they could not go, which in this model is the instant they reached the
+     * landing. Reading it as censored would put a fifteen-minute wait against somebody who never
+     * pressed a button, and `starved` would then fire on every access-zoned building for a reason
+     * that is not congestion — which is the one thing a credential refusal must never be reported
+     * as. `refusedAt` is absent on every leg of every building that declares no `accessZones`, so
+     * this term is inert on three of the eight shipped buildings.
+     */
+    const endedAtS = leg.boardedAt ?? leg.abandonedAt ?? leg.refusedAt ?? censoredAtS;
+    const censored =
+      leg.boardedAt === undefined && leg.abandonedAt === undefined && leg.refusedAt === undefined;
     // A leg that arrived after the censoring instant (a record whose horizon precedes its last
     // arrival) would otherwise contribute a negative wait and drag the maximum down; clamp at 0
     // rather than let a malformed record understate the tail.

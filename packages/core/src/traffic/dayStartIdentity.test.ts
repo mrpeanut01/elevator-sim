@@ -77,26 +77,33 @@ const DISPATCHER_IDS = ['nearest-car', 'eta', 'collective'] as const;
  * is still a measurement and not an inheritance: deleting `startOfDayS` from a current result still
  * reproduces the entry below exactly, for all fifteen. The six cells on `garden-apartments` and
  * `midtown-office` were re-measured too and came back **identical**, which is the control.
+ *
+ * **And again for § D265**, on the same nine cells and with the same six holding. The credential
+ * gap turns a declared share of in-building journeys away for want of a badge, which only a
+ * building declaring `accessZones` can do; both tables were regenerated together in one run of one
+ * tree, so the one-key claim is still a measurement. The six unzoned cells below are byte-for-byte
+ * what they were before the gap existed, which is what this lane's byte-identity claim is.
  */
 const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
     '63a070bcc4e255ff0034744cb11f633e5c8b4fb55f1bb87efd4f5fce11ef4706',
   'garden-apartments|eta': '515017af532ab0927f67718044c9d1b822c448bc4bb3e53ebeb93301fd05e444',
-  'garden-apartments|collective': '954516d3e35e14e306852fb30a53d1e091f01c7f08c387a11be2d8213c0bfb1d',
+  'garden-apartments|collective':
+    '954516d3e35e14e306852fb30a53d1e091f01c7f08c387a11be2d8213c0bfb1d',
   'midtown-office|nearest-car': '726a75c4127cefaaa755de5be9f76445230d3cb109c60e9d7bc1090d80c16add',
   'midtown-office|eta': '7a26950af349e3f7573bfc0a63ff11efac034fbbfdf617a822dbc4500c9b852c',
   'midtown-office|collective': '1387235946badd1db220427c45e166a6aa4b1c6bc241696fad602e9000f13b71',
   'mixed-use-high-rise|nearest-car':
-    'c99da9cf45e473c66f41afbb78fc7a440e0a2c2135325f775ce151cc067aa9ce',
-  'mixed-use-high-rise|eta': 'b14a02635ad23a4db09c20b408c77846af6b7580d485818e557c69cda44e1437',
+    '7bc9d4aa233495882c1ff3d3d823e40d5e6a1d8a914d755fe53b43e26a802198',
+  'mixed-use-high-rise|eta': '47f15437c29b748d1fb95902104310718ec7dcd9bfbd1ec0b13676d237c6907c',
   'mixed-use-high-rise|collective':
-    '995058e616e2aad10a213e62b145110cce7c30d599dafebf09eb068d3a69aa62',
-  'secure-tower|nearest-car': 'aace27e171c5eef6163e476e1354d5d1d6426a34a9ac1ad843f5d31bf1365e93',
-  'secure-tower|eta': '793a0f7573d11881676c19aa3df5d51647c34d9474a38a37117379b028c5d4ab',
-  'secure-tower|collective': '64592076343f41c10545f3402ac86638e48ddc0ba8b996f7c81d0ac8fe1cd68d',
-  'vertical-city|nearest-car': 'e16858399b0b6fd77957f50ce6b2724fd51fa343207be90d9f186a2e98379142',
-  'vertical-city|eta': 'ca54a212ce9f699487c888b1d748437d151d99ca4df7ff9862e11c22e77b3b3b',
-  'vertical-city|collective': 'f73069c0137c0f0ce0eb328bf3e3f6e72d0bef85c68c6d7ba023293c7cc50a1a',
+    '9ffc6b7fb054017db69afbe030cf6b07e603f13c6091ace426b2024337f420ca',
+  'secure-tower|nearest-car': '3b99ad0366448c26f08047eff7bfb29706e089e52009131bd26eb705a71a750c',
+  'secure-tower|eta': 'a0294d5060875bf3b4143ebf4ebddb1682bdb7f193d36954d7f18e8976736b5b',
+  'secure-tower|collective': '13bce7a771756549df8c2432798fbd064014ed0dfd44b2dfb572fba5d72f1e36',
+  'vertical-city|nearest-car': '3b323308fafc96cf4e40909ad7460e9b440c439b2292ff659dfcc4c40d3f9b3d',
+  'vertical-city|eta': 'efc3de9879571eb5d62bc893fba2a772494d6c4020b300780fa5c2a8cb2809aa',
+  'vertical-city|collective': 'fb50e75156ea5fadabc5cb337ff65ff9583795ee843009af72b752c96bd8cf39',
 };
 
 /**

@@ -134,6 +134,20 @@ control, the run does not change, and the screen looks right. The rule that caug
 below — *move the control and require the run to change, compared on the legs* — applied before the
 panel was written rather than after ([§ D219](DECISIONS.md)).
 
+**And the newest one is the same defect with its polarity reversed, which is why it is not in the
+count.** `accessZones` was loaded, schema-checked, cross-validated with four dedicated warning
+codes, indexed correctly by `Bank` and consulted by `Simulation` in three places — and **could not
+change a result**, because `traffic/generator.ts` issued every rider the credential their own route
+needs, so every generated trip was authorised by construction and the gate never bit. Not a
+behaviour with no caller: a caller with no behaviour to reach. It is closed by giving a declared
+share of journeys that begin *inside* the building the badge their own floor implies rather than the
+one their destination needs ([§ D265](DECISIONS.md)); the share is **an uncited assumption with its
+reasoning attached in `data/traffic-profiles.json`**, not a citation, and the rider it turns away is
+a **fourth outcome** — neither delivered, nor waiting, nor abandoned — published beside AWT on
+exactly the footing `workPerServedLegKJ` sits beside raw energy ([§ D266](DECISIONS.md)). It was
+found only because [§ D254](DECISIONS.md) removed the defect that had been hiding it, which is the
+lesson: a feature can be observable **through a bug** and inert without one.
+
 **The eleventh is the most recent and the most instructive, and it is the one to read first.** The
 whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,
 `servesFloorPair` — had **no non-test caller anywhere in the tree**. Every reference outside its own
