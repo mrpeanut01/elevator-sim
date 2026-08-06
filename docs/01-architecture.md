@@ -101,21 +101,35 @@ Conflating these is the classic modeling mistake. They must remain separate conc
 | **Operational zoning** | Dynamic floor partitioning among cars during up-peak | Dispatcher policy | Tunable strategy |
 
 Because the system learns the destination before boarding, a credential-aware dispatcher can
-authorize and optimize in one step where a conventional one **cannot authorize at all**. That is a
-true statement about the code.
+authorize and optimize in one step. That is a true statement about the code, and about the code
+only — it does **not** follow that a conventional dispatcher cannot authorize, and the clause that
+used to say so is withdrawn two paragraphs down.
 
 > **The performance claim that used to be built on it is refuted, and this paragraph asserted it as
 > fact.** It read *"destination dispatch is better under access control, because … authorize and
 > optimize in the same step."* Measured at n = 150 per building under common random numbers, the
-> difference-of-differences `Δ_secure − Δ_midtown` is **+0.982 s [+0.584, +1.380]**, excluding zero
+> difference-of-differences `Δ_secure − Δ_midtown` is **+1.020 s [+0.625, +1.414]**, excluding zero
 > on the **positive** side: given the credential, pricing the destination buys *less* where access is
-> controlled, not more. What the credential does buy is **coverage** — conventional dispatch cannot
-> serve Secure Tower's interfloor traffic under any budget (0 of 30 replications quotable, 33.5 %
-> unserved), because an access-restricted pickup carries no credential and every car answers
-> `accessDenied`. So the saving is real and it is a claim about **authorization**, not about
-> **optimization**. Full result and the reason a single-building interval cannot settle it:
+> controlled, not more. The run is `runAccessControlStudy({})` at seed 20 260 726, pinned in
+> `benchmark/published.ts` as `difference-of-differences/absolute` and re-measured by
+> [§ D280](../DECISIONS.md); the superseded **+0.982 s [+0.584, +1.380]** was produced on the tree
+> that still carried [§ D254](../DECISIONS.md)'s pickup-access defect. Full result and the reason a
+> single-building interval cannot settle it:
 > [Roadmap § The access-control hypothesis](05-roadmap.md). Seven places asserted the old sentence
 > and no test pinned any of them.
+
+> **⚠️ The second half of that correction is itself withdrawn, and it is the more important half.**
+> This box used to continue *"what the credential does buy is coverage — conventional dispatch
+> cannot serve Secure Tower's interfloor traffic under any budget (0 of 30 replications quotable,
+> 33.5 % unserved) … so the saving is real and it is a claim about **authorization**, not about
+> **optimization**."* That was **H-ACCESS-1**, and it is **REFUTED** ([§ D256](../DECISIONS.md),
+> [§ D279](../DECISIONS.md)): it was measuring the pickup-access defect, not a property of
+> conventional dispatch. Re-measured, `eta` and `destination-eta-unpriced` are **bit-identical on 150
+> of 150** `secure-tower` replications across all seven identity metrics, and every access-zoned
+> building this project ships is served at 100 % delivery under conventional dispatch. The credential
+> buys nothing there, so the saving is not in it. **Where the saving comes from is unmeasured.** What
+> is measured is the negative — the same-step mechanism is not what produces it — and nothing here
+> may be substituted for the missing positive account.
 
 ## Simulation kernel
 

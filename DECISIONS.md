@@ -20136,3 +20136,135 @@ would therefore fail, and it would fail for no reason: two different rows that h
 zeros are not a drift. So disjointness is asserted only over the two rows this study **reports** as
 moved, and the exception is written down rather than absorbed into a looser rule.
 
+
+---
+
+## D283 — the figure moved and the sentence beside it went false, and only one of those was a transcription
+
+**Date: 2026-08-06 · Written after the edits, and every number in it is quoted from a run this lane
+did not perform.** [§ D280](DECISIONS.md) re-pinned H-ACCESS-2 and handed over what it could not
+reach: eight documents quoting `+0.982 [+0.584, +1.380]`, and six of them attaching a destination for
+the saving that H-ACCESS-1 had already lost. This is that handover discharged for the files a `docs/`
+lane owns.
+
+### The two corrections are not the same kind of correction
+
+**The figure is arithmetic.** `+0.982 [+0.584, +1.380]` → **`+1.020 [+0.625, +1.414]`**, and with it
+Secure Tower's own row `−0.580 [−0.764, −0.396]` → **`−0.542 [−0.718, −0.366]`**, because a document
+that moved only the difference-of-differences would publish a table whose three rows no longer
+subtract. Midtown's `−1.562 [−1.916, −1.208]` is unchanged to the last digit and is the control.
+Every site now names the run: `runAccessControlStudy({})`, seed 20 260 726, n = 150 per building,
+held in `benchmark/published.ts` under `difference-of-differences/absolute`.
+
+**The sentence is not.** Six sites ended *"and the saving is entirely in the credential
+(H-ACCESS-1)"*. H-ACCESS-1 is **REFUTED** ([§ D256](DECISIONS.md), [§ D279](DECISIONS.md)) — `eta`
+and `destination-eta-unpriced` are bit-identical on 150 of 150 `secure-tower` replications across all
+seven identity metrics — so the credential buys nothing and the saving is not in it. **Every site now
+says the destination is unmeasured, and not one offers a replacement.** That restraint is the whole
+of the correction: a second plausible mechanism would have satisfied every reader and every test, and
+would have been § D30 again with new wording. What survives is the negative — the same-step mechanism
+is not what produces the saving — which is what the seven corrected sites already rest on.
+
+| site | figure | destination |
+|---|---|---|
+| `CLAUDE.md` | re-pinned, run named | withdrawn, unmeasured, new paragraph |
+| `docs/01-architecture.md` | re-pinned, run named | withdrawn; the coverage clause it rested on withdrawn with it |
+| `docs/05-roadmap.md` | full H-ACCESS-2 table re-pinned | withdrawn in a ⚠️ box beside the table |
+| `docs/07-handoff.md` | re-pinned, run named | withdrawn; coverage bullet struck through |
+| `docs/08-review-findings.md` | both occurrences re-pinned | withdrawn |
+| `docs/09-destination-dispatch-contract.md` | outcome row re-pinned | withdrawn in the row and inline at § 4.3 |
+
+### Three sites moved that were not on § D280's list, and they were found rather than looked for
+
+1. **`docs/05-roadmap.md` § D100 part 1** — the mixed-use table and *"the unserved fraction rises as
+   the load falls … every car answers `accessDenied`"*, asserted as live fact in a document that now
+   says two sections later that `accessDenied` no longer exists. § D279 rows 8 and 9 had already
+   re-measured it: quotable at the thickest rate, and **flat** at 2.55 → 2.13 → 2.32 %. Marked
+   withdrawn rather than regenerated, § D256's rule.
+2. **`docs/05-roadmap.md`'s H-ACCESS-1 prose** — *"it does not perform"* — which sits **outside** the
+   withdrawal blockquote and outside § D281's guarded table, so nothing covered it.
+3. **`docs/07-handoff.md`'s `kiosk-refused` row** — *"both unserved … 0.0 against 29.0 refusals per
+   run"*. The kiosk column moved to **34.1** (§ D279 row 3, § D280) and the conventional arm is not
+   unserved at all, so the sentence was wrong twice. What the column *buys* is unchanged, and is now
+   the only thing separating the two arms.
+
+### What the guard could not see, and the vocabulary it was missing
+
+`validation/documentation.test.ts` was **green throughout**, and § D280 said why: it *"asserts a
+refutation marker rather than a destination for the saving."* Every one of the six sites carried the
+word *refuted* — truthfully, about H-ACCESS-2 — a few characters from a destination H-ACCESS-1 had
+already lost. Three assertions watched that happen and none of them could fail.
+
+**This is § D281's shape one entry later: one vocabulary where two were needed.** That guard could
+not tell a *withdrawn* table from a *drifted* one; this one could not tell a refuted **claim** from a
+refuted **answer**. Both are fixed the same way — by naming the second thing rather than by loosening
+the first.
+
+So a fourth assertion lands, and its marker set is **deliberately narrower** than the existing one:
+`withdraw\w*|unmeasured` and **not** `refut\w*`, because accepting `refut\w*` would reproduce exactly
+the blindness being closed. Watched failing, in both directions:
+
+- a bare re-assertion of the destination in `CLAUDE.md` with the withdrawal vocabulary stripped —
+  *"nearest 11 472 characters"*;
+- the correction deleted from `docs/08-review-findings.md` — the derived carrier set comes back five
+  long against six.
+
+**And the count is now mechanised, which is the part that had never been done.** This claim has been
+hand-counted three times — § D60's seven mechanism sites, § D280's eight figure sites, § D280's six
+destination sites — and not one of those counts was executable, which is why every audit of it found
+a number nobody could check. `proseFiles()` derives `CLAUDE.md` plus every `docs/*.md` from disk and
+the carrier set is asserted by deep equality, so a **new** site fails as loudly as a deleted one. A
+hand list cannot see a document nobody thought to add to it; that is § D192's lesson, applied to
+prose.
+
+**The 400-character window is inherited and is a floor rather than a target.** A withdrawal marker in
+the *preceding paragraph* still satisfies it — measured, not assumed: the first negative attempt in
+this lane passed for that reason and had to be made harder. That tolerance is the existing guard's
+and is left alone rather than tightened on a lane that would be choosing it to fit its own prose.
+
+---
+
+## D284 — the seventh site, and it is a live sentence rather than a stale one
+
+**Date: 2026-08-06 · Written after a grep that was run for one reason and answered a different
+question.** § D280 named eight documents quoting the moved figure and six quoting the withdrawn
+destination. Both counts are short, and what they miss is worse than what they contain.
+
+### Four sites carry the withdrawn destination and are not in any count
+
+| site | what it says | owned by this lane |
+|---|---|---|
+| `packages/experiments/src/benchmark/accessControl.ts` § `reasons.REFUTED` | *"the saving the roadmap attributes to the same-step mechanism is entirely in the credential (H-ACCESS-1)"* | **no** |
+| `packages/core/src/sim/destinationDispatch.test.ts` | *"H-ACCESS-2 is refuted (§ D60) and the saving is in the credential"* | **no** |
+| `TEST_MATRIX.md` | the figure at `+0.982`, and H-ACCESS-1 ticked ✅ *"cannot serve … 33.5 % unserved"* | **no** |
+| `T9-FINDINGS.md`, `MULTI_AGENT_PLAN.md` | the figure as history; *"H-ACCESS-1 confirmed categorically"* | **no** |
+
+**The first is the serious one, because it is not documentation.** `reasons.REFUTED` is the string
+the study *prints* with its own verdict, and the module's docstring twenty lines away already says
+the opposite — § D279 rewrote the docstring and left the emitted reason. So `accessControl.ts` states
+both the correction and the thing it corrects, and the one a reader sees at the end of a run is the
+wrong one. It is `benchmark/`, not `validation/`, and this lane may not edit it.
+
+### And the site that is not a document at all
+
+`packages/viz/src/access/dispatcherCredentials.ts`'s pre-run warning tells the **player**, live:
+
+> *"a call from any of those floors reaches every car as an unbadged request, every car refuses it on
+> access grounds, and the call is permanently unassignable."*
+
+That is § D254's deleted defect, described to a user as current behaviour, in a string
+`dev/editor.ts`, `dev/rightRail.ts` and the honesty search all consume. Its docstring's *withdrawn*
+figures were corrected here; **the sentence itself was not**, and the reason is that the honest fix is
+a product decision rather than a wording one. What still refuses a rider is enforced by the runner
+against the **destination** and by § D265's credential gap — neither of which any choice of
+dispatcher changes — so the truthful message for a conventional profile may be **no message at all**,
+which would empty the check of the purpose `docs/10` § 10.3 gives it. § D256's rule is that a
+re-design of that kind needs a criterion written before the numbers, so the gap is **named in the
+module's own docstring** on the precedent `lockedOut.ts` set in the same directory, and no second
+plausible sentence is put in it.
+
+**The lesson is the one this repository keeps relearning, and the count is the evidence.** Three
+audits of this claim produced three different totals, all by hand, none reproducible — and the
+sites they missed are the two that are not prose: a printed verdict string and a player-facing
+warning. § D283's derived scan closes that for `CLAUDE.md` and `docs/`. **It does not reach `.ts`,
+and the four sites above are the measure of what that leaves open.**

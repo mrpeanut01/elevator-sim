@@ -173,13 +173,27 @@ data; it does not make data exempt. See [§ D112](DECISIONS.md) and [§ D114](DE
 **A stated mechanism goes stale the same way, and the correction is now pinned.** Seven places
 in this repository asserted, as fact, that destination dispatch does better under access control
 *because* authorization and optimization happen in the same step. Measured at n = 150 per building
-under common random numbers, the difference-of-differences is `+0.982 s [+0.584, +1.380]` — it buys
-*less* where access is controlled, and the saving is entirely in the credential. All seven are
-corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it three
+under common random numbers, the difference-of-differences is `+1.020 s [+0.625, +1.414]` — it buys
+*less* where access is controlled. The run is `runAccessControlStudy({})` at seed 20 260 726, held in
+`benchmark/published.ts` under `difference-of-differences/absolute` and re-pinned by
+[§ D280](DECISIONS.md); the superseded `+0.982 [+0.584, +1.380]` was measured on the tree carrying
+[§ D254](DECISIONS.md)'s pickup-access defect. All seven are
+corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it four
 ways: the claim may not appear without a refutation within 400 characters of it, the correction may
-not be silently deleted, and `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
-and true — is asserted in **both** directions. If you write a sentence about *why* something
+not be silently deleted, `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
+and true — is asserted in **both** directions, and no site may re-state the withdrawn destination for
+the saving. If you write a sentence about *why* something
 performs better, either measure it or say it is unmeasured.
+
+**And the second half of that correction was itself a stated mechanism, which is why it is now
+withdrawn rather than replaced.** Six of those sites went on to say *"and the saving is entirely in
+the credential (H-ACCESS-1)"*. H-ACCESS-1 is **REFUTED** ([§ D256](DECISIONS.md),
+[§ D279](DECISIONS.md)): under conventional dispatch `eta` and `destination-eta-unpriced` are
+bit-identical on **150 of 150** `secure-tower` replications across all seven identity metrics, so the
+credential buys nothing there and the saving is not in it either. What stays measured is the
+**negative** — the same-step mechanism is not what produces the saving. **Where the saving does come
+from is unmeasured, and no replacement mechanism may be offered in its place**, because a second
+plausible sentence would be this defect again with new wording.
 
 **A stated *refusal* goes stale the same way, and it is the more dangerous half.** The traffic
 editor drew *mean group size* as a refusal — *"no field of `SimulationDemandOptions` carries it …
