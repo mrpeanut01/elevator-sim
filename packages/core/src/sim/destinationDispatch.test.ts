@@ -147,7 +147,11 @@ describe('the landing panel names a car and boarding honours it', () => {
       // this is the same claim read off the record rather than off the runner's counter — a
       // promise the record does not carry cannot be audited from a stored run.
       expect(result.status, buildingId).toBe('completed');
-      expect(audit.legsAssigned, buildingId).toBe(audit.legsCreated);
+      // Every leg the panel could see. A leg the building turned away for want of a credential
+      // never reached a landing queue, so no panel was ever asked about it and no promise could
+      // have been made — the same term `#reconcile`'s own promise identity nets out (§ D266).
+      const refused = result.record.passengers.filter((leg) => leg.refusedAt !== undefined).length;
+      expect(audit.legsAssigned, buildingId).toBe(audit.legsCreated - refused);
       const recorded = result.record.passengers.filter(
         (leg) => leg.assignedCarId !== undefined,
       ).length;
@@ -155,6 +159,12 @@ describe('the landing panel names a car and boarding honours it', () => {
         audit.legsAssigned,
       );
       for (const leg of result.record.passengers) {
+        // A refused leg holds no promise and never boarded to need one, so it has no time either;
+        // it is excluded here and counted above rather than exempted silently (§ D266).
+        if (leg.refusedAt !== undefined) {
+          expect(leg.assignedCarId, `${leg.passengerId} was refused and still holds a car`).toBeUndefined();
+          continue;
+        }
         expect(leg.assignedAt, `${leg.passengerId} has a car but no time`).toBeDefined();
         expect(leg.assignedAt as number).toBeGreaterThanOrEqual(leg.arrivedAt);
       }

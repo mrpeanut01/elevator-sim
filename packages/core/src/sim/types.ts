@@ -53,6 +53,7 @@ import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -298,6 +299,14 @@ export interface SimulationDemandOptions {
   readonly entranceWeights?: Readonly<Record<string, number>> | undefined;
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * Override `data/traffic-profiles.json`'s `credentialGap` block. `DECISIONS.md` § D265.
+   *
+   * Unset means the reference data decides. `{ wrongZoneShare: 0 }` is the control arm — every
+   * rider correctly badged, which is what the model did before the gap existed and what every
+   * figure this repository published before it was measured under.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   readonly maxLegs?: number | undefined;
   /** How long demand holds at peak, which is also the reported window. `rise-and-fall` only. */
   readonly peakWindowS?: number | undefined;
@@ -734,7 +743,33 @@ export interface ConservationAudit {
   readonly stairsTransitS?: number;
 
   /**
-   * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
+   * Journeys the building **turned away for want of a credential** (`DECISIONS.md` § D266).
+   *
+   * Absent — not `0` — on every building that declares no `accessZones`, and on every run where
+   * everybody happened to be correctly badged, so such a run carries the audit object it always
+   * did.
+   *
+   * **A published figure, for {@link stairsJourneys}' reason and § D106's.** A refused rider
+   * leaves the lift system: they reached a landing, the readers said no, and no car ever carried
+   * them. The served-leg count falls with them, so a comparison across configurations with
+   * different refusal rates **compares different populations** — and a building that refuses more
+   * people will report a shorter mean wait for exactly that reason. Without this count that
+   * shortfall reads as better service.
+   *
+   * Counted in **neither** {@link delivered} nor {@link undelivered}: they did not get there, and
+   * they are not still in the system. They are in `WaitStatistics.unservedCount` — they were never
+   * served, which is literally true — so a refusal rate large enough to bias the mean is caught by
+   * `awtIsValid`'s existing censoring ground. **Named limitation:** that ground's sentence
+   * attributes the censoring to a backlog, which is the wrong cause here; a ground of its own,
+   * placed above `censored` the way `abandoned` is, is the right fix and is a change to
+   * `metrics/awtValidity.ts`'s ground table that widens `AwtInvalidGround` and every total
+   * `Record` over it in `packages/viz`. § D266 records why this lane did not make it.
+   */
+  readonly accessRefused?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) &&
+   * legsCreated === legsRecorded`.
    */
   readonly balanced: boolean;
 }
@@ -908,6 +943,25 @@ export interface StageActivity {
    * See `Simulation.#kioskAllows` and § T50-D1.
    */
   readonly kioskRefusedLegs: number;
+  /**
+   * Distinct legs the building turned away for want of a credential (`DECISIONS.md` § D266): the
+   * rider reached the landing, their badge did not open the floor they were going to, and no car
+   * was ever sent.
+   *
+   * Zero on the three shipped buildings that declare no `accessZones`, and on any run configured
+   * with `traffic.credentialGap.wrongZoneShare: 0`. Distinct from {@link kioskRefusedLegs}, which
+   * is the *interface* refusing a destination it cannot authorize; this is the *credential*
+   * failing to authorize one. Both leave a rider uncarried and they have different fixes, so they
+   * are counted apart.
+   *
+   * **Absent, not `0`, when nobody was refused** — unlike {@link kioskRefusedLegs} beside it, and
+   * the asymmetry is deliberate rather than untidy. `structuralDigestOfResult` hashes every key
+   * whatever its value, so a key present on every run would move every pinned identity digest in
+   * the repository to say nothing. Present and `0` is not available here: it would be exactly the
+   * claim *"this run could have refused somebody and did not"*, which is true of the five zoned
+   * buildings and meaningless on the other three.
+   */
+  readonly accessRefusedLegs?: number;
 }
 
 /**

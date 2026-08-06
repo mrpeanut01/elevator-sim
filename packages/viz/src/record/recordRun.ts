@@ -613,6 +613,8 @@ function describeLegs(passengers: readonly PassengerRecord[]): readonly VizLeg[]
     if (passenger.bankId !== undefined) leg.bankId = passenger.bankId;
     if (passenger.assignedCarId !== undefined) leg.assignedCarId = passenger.assignedCarId;
     if (passenger.credentialGroup !== undefined) leg.credentialGroup = passenger.credentialGroup;
+    // Absent on every leg the building did not turn away, by the same rule the five above keep.
+    if (passenger.refusedAt !== undefined) leg.refusedAt = passenger.refusedAt;
     return leg;
   });
   legs.sort((a, b) => a.arrivedAt - b.arrivedAt || a.passengerId.localeCompare(b.passengerId));
@@ -648,6 +650,22 @@ interface FoldedPassengers {
 function foldPassengers(passengers: readonly PassengerRecord[]): FoldedPassengers {
   const events: QueueEvent[] = [];
   for (const passenger of passengers) {
+    /*
+     * **A rider the building turned away never joins the landing** — `DECISIONS.md` § D266, and it
+     * is the same claim `frame/overlay.ts`'s `isWaitingAt` makes, made here so the two folds agree
+     * (`overlay.test.ts` § *the queues account for exactly the legs the frame says are waiting*).
+     * Without it they would sit in the queue for the rest of the run and every surface reading
+     * `Frame.totalWaiting` would draw a credential refusal as congestion.
+     *
+     * **No event at all rather than a `+1` and a `-1`**, and the reason is the tie-break two dozen
+     * lines down: `refusedAt` equals `arrivedAt` in this model, ties sort boardings (`-1`) before
+     * arrivals (`+1`), and a matched pair at one instant would therefore net to `+1` and leave them
+     * in the queue anyway. They are also in no wait sample, which is right — they never waited.
+     *
+     * `refusedAt` is absent on every leg of every building that declares no `accessZones`, so this
+     * is inert on three of the eight shipped buildings.
+     */
+    if (passenger.refusedAt !== undefined) continue;
     events.push({
       at: passenger.arrivedAt,
       delta: 1,

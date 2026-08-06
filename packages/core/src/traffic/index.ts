@@ -57,6 +57,7 @@ export type {
   ArrivalEvent,
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandPhase,

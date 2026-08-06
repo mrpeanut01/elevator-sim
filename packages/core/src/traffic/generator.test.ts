@@ -1005,25 +1005,83 @@ describe('passenger mass', () => {
 });
 
 describe('access credentials', () => {
-  it('assigns a credential permitted on every restricted floor of the route', () => {
-    const b = building('secure-tower');
-    const permitted = new Map<string, Set<string>>();
+  /** Floor id to the credential groups permitted there, in declared zone order. */
+  const permittedOf = (b: ResolvedBuilding): ReadonlyMap<string, readonly string[]> => {
+    const byFloor = new Map<string, string[]>();
     for (const zone of b.accessZones) {
       for (const floorId of zone.floors) {
-        const groups = permitted.get(floorId) ?? new Set<string>();
-        for (const group of zone.credentialGroups) groups.add(group);
-        permitted.set(floorId, groups);
+        byFloor.set(floorId, [...(byFloor.get(floorId) ?? []), ...zone.credentialGroups]);
       }
     }
-    const trace = generateTrace({ building: b, profiles, streams: new StreamSet(41) });
+    return byFloor;
+  };
+
+  it('assigns a credential permitted on every restricted floor of the route, with no gap', () => {
+    /*
+     * **The pre-§ D265 model, asserted at the value that restores it.** The claim *"every rider
+     * holds a credential for the whole of their route"* was the whole of the generator's
+     * credential model and it is exactly what made access zoning inert on the legs (issue #87):
+     * a gate that only ever sees authorised traffic can never bite. So it is not deleted — it is
+     * the **control arm**, and `wrongZoneShare: 0` is the configuration it is true of.
+     */
+    const b = building('secure-tower');
+    const permitted = permittedOf(b);
+    const trace = generateTrace({
+      building: b,
+      profiles,
+      streams: new StreamSet(41),
+      credentialGap: { wrongZoneShare: 0 },
+    });
     for (const passenger of trace.passengers) {
       for (const floorId of routeOf(passenger)) {
         const groups = permitted.get(floorId);
         if (groups === undefined) continue;
         expect(passenger.credentialGroup, `${passenger.id} on ${floorId}`).toBeDefined();
-        expect(groups.has(passenger.credentialGroup as string)).toBe(true);
+        expect(groups.includes(passenger.credentialGroup as string)).toBe(true);
       }
     }
+  });
+
+  it('gives a gap rider their own floor’s badge, never a stranger’s, and only inside the building', () => {
+    /*
+     * The shipped share, and the two halves of § D265's modelling claim asserted separately.
+     *
+     * **Who is in the gap**: nobody whose journey starts at an entrance. Somebody walking in off
+     * the street has passed a reception desk or a turnstile, which is upstream of the lift and
+     * outside this simulator (§ D254 makes the same point about pickup floors), so modelling them
+     * as unbadged would be modelling a reception desk that does not work.
+     *
+     * **What they carry**: the first group their *origin* floor's zone declares, or nothing at all
+     * when their origin is unrestricted. Never some third zone's credential — a rider carrying a
+     * badge for a floor they have never been to would be a different and much stranger claim, and
+     * it is the shape a careless implementation of this would produce.
+     */
+    const b = building('secure-tower');
+    const permitted = permittedOf(b);
+    const entrances = new Set(b.floors.filter((floor) => floor.isEntrance === true).map((f) => f.id));
+    const trace = generateTrace({ building: b, profiles, streams: new StreamSet(41) });
+
+    let gapRiders = 0;
+    for (const passenger of trace.passengers) {
+      const destinationGroups = permitted.get(passenger.finalDestinationFloorId);
+      if (destinationGroups === undefined) continue;
+      if (
+        passenger.credentialGroup !== undefined &&
+        destinationGroups.includes(passenger.credentialGroup)
+      ) {
+        continue;
+      }
+      gapRiders += 1;
+      expect(entrances.has(passenger.originFloorId), `${passenger.id} started at an entrance`).toBe(
+        false,
+      );
+      const own = permitted.get(passenger.originFloorId);
+      expect(passenger.credentialGroup, `${passenger.id} carries a floor it never stood on`).toBe(
+        own?.[0],
+      );
+    }
+    // Not vacuous: the shipped share really does put somebody in the gap on this building.
+    expect(gapRiders).toBeGreaterThan(0);
   });
 
   it('never generates a journey no credential group could make', () => {

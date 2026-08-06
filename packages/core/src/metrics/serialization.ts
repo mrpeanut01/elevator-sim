@@ -72,6 +72,11 @@ export const passengerRecordSchema = z.strictObject({
   egressTransitSeconds: z.number().nonnegative().finite().optional(),
   boardedAt: simTime.optional(),
   alightedAt: simTime.optional(),
+  // Absent on every leg of every building that declares no `accessZones`, and on every leg whose
+  // rider is correctly badged, so a record written before the credential gap existed parses
+  // unchanged. Required here rather than tolerated: without it a run on an access-zoned building
+  // cannot be stored and replayed, which is invariant 5 (`DECISIONS.md` § D266).
+  refusedAt: simTime.optional(),
   carId: z.string().min(1).optional(),
   bankId: z.string().min(1).optional(),
   // Destination dispatch only, and optional in both directions: a record written before the

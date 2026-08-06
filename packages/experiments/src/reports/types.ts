@@ -62,6 +62,7 @@
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -123,6 +124,15 @@ export interface StoredDemandOptions {
   readonly entranceWeights?: Readonly<Record<string, number>> | undefined;
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * The share of in-building journeys made by somebody whose badge does not open where they are
+   * going. `DECISIONS.md` § D265.
+   *
+   * Stored for the reason `mixAmplitude` below is: `0` is the control arm, and a stored control
+   * that lost this field would rebuild at the shipped share — the control carrying its treatment's
+   * population, which is worse than losing the run.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   readonly maxLegs?: number | undefined;
   readonly peakWindowS?: number | undefined;
   readonly baselineFraction?: number | undefined;

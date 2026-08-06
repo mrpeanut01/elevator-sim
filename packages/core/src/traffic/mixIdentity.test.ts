@@ -89,6 +89,19 @@ import { DEMAND_TEMPLATE_IDS, type DemandTemplateId } from './types.js';
  * different function, so a value carried over from the old table would be meaningless. What makes
  * them trustworthy is not their provenance but that **both CI platforms reproduce them**, which is
  * a stronger guarantee than the old table ever had.
+ *
+ * ## Six of the ten moved for § D265, and the four that held say what moved
+ *
+ * The credential gap changes **which credential a rider carries**, and `credentialGroup` is one of
+ * the identity fields this digest allow-lists — so the six entries on `mixed-use-high-rise`,
+ * `secure-tower` and `vertical-city` moved and the four on `garden-apartments` and
+ * `midtown-office` did not. Those two declare no `accessZones`.
+ *
+ * **`BASELINE_PASSENGER_COUNTS` and `BASELINE_CONTINUOUS` did not move at all, on any of the ten**,
+ * and that is the shape of the change stated as a measurement: the gap re-labels people, it does
+ * not generate different ones. Same passengers, same arrival times, same masses, same routes — a
+ * different badge in some of their pockets. A change that had also moved the counts would have been
+ * a change to the demand model, and this table is where the difference shows.
  */
 const BASELINE_STRUCTURAL_DIGESTS: Readonly<Record<string, string>> = {
   'garden-apartments|rise-and-fall':
@@ -100,13 +113,13 @@ const BASELINE_STRUCTURAL_DIGESTS: Readonly<Record<string, string>> = {
   'midtown-office|constant-iso':
     '9f20f1e305ad3f85b1c8487de4350c496f73d3af6bdb9a6a1b969311b160c953',
   'mixed-use-high-rise|rise-and-fall':
-    'd34eda24a3d1dc6592192e8fcf8b2f56792084833d57d409b1c329deb5f5dee0',
+    '99e13c90b599329d29052aa63b8016b0b8669189a0188c8cd3edb51ea9600394',
   'mixed-use-high-rise|constant-iso':
-    '4c8d601179bf138b08cf902ced56bc9bdff746d6fc085e9c355df9e129d110c4',
+    '1cac61cb0dcbf38552c6b3202c9a986ced7f5c558a701daacb7c78e1679d1131',
   'secure-tower|rise-and-fall':
-    '531556403f4764e1ed8c54f036d3e35ea733e33ad78f3d41bfe778f59585c957',
+    '38e6a45bfa5015e6ebcf96eeab17a7ed8189cf0b2a1f16238ef281ed629bbcde',
   'secure-tower|constant-iso':
-    '1bb96d97f5498072875a4d07f6a380024d6f11b2b2b814562302a463eac9ea80',
+    '5e083ed4687cc1497b8e20aabfa644fb4f937c55a253ff2d18c4b62f13de9e4d',
   /*
    * **`vertical-city` is the pair that moved for a real reason, and the reason is still recorded.**
    *
@@ -122,9 +135,9 @@ const BASELINE_STRUCTURAL_DIGESTS: Readonly<Record<string, string>> = {
    * that declare no transport mode, are untouched by it.
    */
   'vertical-city|rise-and-fall':
-    '09617ebd247d23bbb3094f3f4c214711214fd05d29abacec64e2828217cde601',
+    '3f83f8560c04d6cdfe9dae565500fa784bcb0030759bd949a2a1598a26a9c565',
   'vertical-city|constant-iso':
-    'ce27e7f5b5376bae061668b3b5554e5a2258d53c2e7bb598d72c99e5d1145685',
+    '6d8b13c350c31ffacbfe1ae740ca1f457f0a368e1cfb2311b4d6e8c1184a19bb',
 };
 
 /**

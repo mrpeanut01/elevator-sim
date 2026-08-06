@@ -32,6 +32,7 @@ import {
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -191,6 +192,19 @@ function parsePassengerMass(value: unknown, path: string): PassengerMassOverride
   };
 }
 
+/**
+ * A credential-gap block as a spec author writes it. `DECISIONS.md` § D265.
+ *
+ * One required field, and `rejectUnknown` beside it for `parsePassengerMass`'s reason: a spec is
+ * the one door where a misspelt key could arrive and be silently ignored, which would run the arm
+ * at the shipped share while the author believed they had set it.
+ */
+function parseCredentialGap(value: unknown, path: string): CredentialGapOverride {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['wrongZoneShare'], path);
+  return { wrongZoneShare: asFiniteNumber(record['wrongZoneShare'], `${path}.wrongZoneShare`) };
+}
+
 /** A day-variation block as a spec author writes it. Both bounds required. docs/14 § 2.3. */
 function parseDayVariation(value: unknown, path: string): DayVariationConfig {
   const record = asRecord(value, path);
@@ -247,6 +261,7 @@ const DEMAND_PARSERS: DemandParsers = {
     asMember<InterfloorWeighting>(value, INTERFLOOR_WEIGHTINGS, path),
   credentialAssignment: (value, path) =>
     asMember<CredentialAssignment>(value, CREDENTIAL_ASSIGNMENTS, path),
+  credentialGap: parseCredentialGap,
   maxLegs: asFiniteNumber,
   peakWindowS: asFiniteNumber,
   baselineFraction: asFiniteNumber,

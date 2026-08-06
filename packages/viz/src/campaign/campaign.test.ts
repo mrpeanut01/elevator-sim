@@ -721,24 +721,39 @@ describe('stage 5, played — the credential is named, and the lesson is that it
     expect(locked?.diagnosis).toContain('could legally be answered');
   });
 
-  it('calls a setting ahead on one measure and behind on another a move along the front', () => {
-    /*
-     * Measured, not constructed: on Secure Tower `destination-eta` resolves **ahead** on people
-     * carried and on rides that never boarded, and **behind** on rides over the long-wait
-     * threshold. It is the case R11's front is about, and it is the case that makes the
-     * "and nothing resolved against it" half of `beat-the-baseline` falsifiable — without it the
-     * clause could be deleted and every other assertion here would still pass.
-     */
-    const played = playStage(stage, 'destination-eta');
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
-    expect(rows.filter((row) => row.favours === 'baseline').length).toBeGreaterThan(0);
-    const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.met).toBe(false);
-    expect(comparison?.sentence).toContain('ahead on');
-    expect(comparison?.sentence).toContain('behind on');
-    expect(comparison?.sentence).toContain('a move along the front rather than a win');
-  }, 120_000);
+  /**
+   * **The answer to "is this playable?", and § D265 moved it here from stage 4.**
+   *
+   * This was stage 4's case — *a measured clear, from a profile `data/` already ships, inside the
+   * dimensions the stage opens*. It has to live somewhere, because a campaign whose every stage is
+   * unwinnable from the dropdown is a product claim nobody is re-deriving; and it has to live where
+   * the measurement puts it, not where it was written. Swept over the twelve shipped profiles at
+   * the stage's own seeds, stage 4 now clears on **none** and stage 5 clears on **several**, so the
+   * two cases swapped buildings. § D254 is what moved them: it changed what every conventional arm
+   * on every access-zoned building does, and `beat-the-baseline` is a comparison against the
+   * stage's own starting profile.
+   *
+   * Written as a **search with a stated floor** rather than a pinned profile id: which profile
+   * clears is a measurement that will move again, and a test naming one would be re-pinned every
+   * time without anybody re-reading the claim. What may not move is that at least one does.
+   */
+  it('clears from the dropdown — the measured answer to whether a stage can be won', () => {
+    const clears = [];
+    for (const profile of config.dispatcherProfiles.profiles) {
+      const attempt = playStage(stage, profile.id);
+      const rows = attempt.report.comparisons[0]?.rows ?? [];
+      if (!attempt.verdict.cleared) continue;
+      clears.push(profile.id);
+      // The clear is the shape `beat-the-baseline` describes and not an accident of an empty
+      // comparison: something resolved ahead, and nothing resolved against.
+      expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
+      expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
+      for (const goal of attempt.verdict.goals) expect(goal.met, goal.sentence).toBe(true);
+      /* R2 survives the good news: the headline still says what the number is about. */
+      expect(attempt.verdict.headline).toContain('not a ranking of dispatchers');
+    }
+    expect(clears.length, 'no shipped profile clears stage 5 from the dropdown').toBeGreaterThan(0);
+  }, 3_000_000);
 
   it('opens the dial the lesson needs and refuses a profile that changes anything else', () => {
     const editable = editableIdsOf(stage.dispatcher.editable, space.ids);
@@ -754,25 +769,44 @@ describe('stage 5, played — the credential is named, and the lesson is that it
   });
 });
 
-describe('stage 4, played — a stage that can actually be cleared', () => {
-  it('clears when a setting resolves ahead and nothing resolves against it', () => {
-    /*
-     * The other end of the `beat-the-baseline` clause, and the answer to *"is this playable?"* in
-     * the only form worth having: a **measured** clear, from a profile `data/` already ships,
-     * inside the dimensions stage 4 opens.
-     */
+describe('stage 4, played — a setting that buys one thing by spending another', () => {
+  /**
+   * **The other end of the `beat-the-baseline` clause, and § D265 moved it here from stage 5.**
+   *
+   * This describe used to be *"a stage that can actually be cleared"*. It is not one any more:
+   * swept over the twelve shipped profiles at the stage's own seeds, **not one clears stage 4** —
+   * `zoned-uppeak` comes closest at 2 metrics for and 1 against — and the measured clear has moved
+   * to stage 5, where it is asserted. § D254 is what moved it, by changing what every conventional
+   * arm on an access-zoned building does.
+   *
+   * What stage 4 has instead is the **front**: a profile that resolves ahead on one measure and
+   * behind on another, which is the case R11 is about and the case that makes the *"and nothing
+   * resolved against it"* half of `beat-the-baseline` falsifiable. Without a witness somewhere that
+   * clause could be deleted and every other assertion in this file would still pass.
+   *
+   * A search rather than a pinned profile id, for the reason stage 5's clear is one.
+   */
+  it('calls a setting ahead on one measure and behind on another a move along the front', () => {
     const stage = stageAt(3);
-    const played = playStage(stage, 'destination-eta');
-    const rows = played.report.comparisons[0]?.rows ?? [];
-    expect(rows.filter((row) => row.favours === 'candidate').length).toBeGreaterThan(0);
-    expect(rows.filter((row) => row.favours === 'baseline')).toEqual([]);
-    const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
-    expect(comparison?.met).toBe(true);
-    expect(played.verdict.cleared).toBe(true);
-    expect(played.verdict.headline).toContain('all 3 goals reached over 50 runs');
-    /* R2 survives the good news: the headline still says what the number is about. */
-    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
-  }, 300_000);
+    let witnesses = 0;
+    for (const profile of config.dispatcherProfiles.profiles) {
+      const played = playStage(stage, profile.id);
+      const rows = played.report.comparisons[0]?.rows ?? [];
+      const ahead = rows.filter((row) => row.favours === 'candidate').length;
+      const behind = rows.filter((row) => row.favours === 'baseline').length;
+      // Nothing clears this stage from the dropdown any more, and that is asserted rather than
+      // assumed: the day something does, this fails and the claim above gets re-read.
+      expect(played.verdict.cleared, `${profile.id} clears stage 4`).toBe(false);
+      if (ahead === 0 || behind === 0) continue;
+      witnesses += 1;
+      const comparison = played.verdict.goals.find((goal) => goal.kind === 'beat-the-baseline');
+      expect(comparison?.met).toBe(false);
+      expect(comparison?.sentence).toContain('ahead on');
+      expect(comparison?.sentence).toContain('behind on');
+      expect(comparison?.sentence).toContain('a move along the front rather than a win');
+    }
+    expect(witnesses, 'no shipped profile lands on the front on stage 4').toBeGreaterThan(0);
+  }, 3_000_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -907,7 +941,7 @@ describe('stage 2, played on an edited weight vector — the thing a dropdown co
  * it. Four live goals, three of them counts whose bar is the shipped setting's own count, and the
  * comparison goal that no stage clears by standing still.
  */
-describe('stage 6, played — four goals survive the escalators, and the bars still reproduce', () => {
+describe('stage 6, played — three goals survive the escalators, and the bars still reproduce', () => {
   let stage: CampaignStage;
   let unchanged: ReturnType<typeof playStage>;
 
@@ -916,10 +950,22 @@ describe('stage 6, played — four goals survive the escalators, and the bars st
     unchanged = playStage(stage, stage.dispatcher.startingProfileId);
   }, 300_000);
 
-  it('carries four live goals — the three counts and the comparison', () => {
+  /**
+   * **Three, not four, and the missing one is `no-divergence`.**
+   *
+   * § D254 made this building serviceable and `no-divergence` went to `50/50, 50/50` — a constant,
+   * which R12 makes a fact for the briefing rather than a goal, so it left the `goals` bucket and
+   * issue #88 recorded the drop. § D265 puts `deliver-everyone` back: the credential gap turns a
+   * declared share of in-building journeys away, so *"everybody who arrived was carried"* is a
+   * question again — `40/50` on the tuning seeds and `46/50` on the holdout, published in
+   * `data/scenario-goals.json` beside the goal, which is R12's whole requirement.
+   *
+   * So the count went 4 → 2 → 3, and each move is a measurement rather than an edit. The list is
+   * asserted rather than the length, because *which* three is the part that would go stale.
+   */
+  it('carries three live goals — the two counts and the comparison', () => {
     expect(stage.goals.map((goal) => goal.kind)).toEqual([
       'deliver-everyone',
-      'no-divergence',
       'answer-the-demand',
       'beat-the-baseline',
     ]);
@@ -937,10 +983,10 @@ describe('stage 6, played — four goals survive the escalators, and the bars st
       checked += 1;
       expect(goal.reproduced, goal.sentence).toBe(true);
     }
-    expect(checked).toBe(3);
+    expect(checked).toBe(2);
   });
 
-  it('meets its three count goals at the shipped setting and clears on none of them', () => {
+  it('meets its two count goals at the shipped setting and clears on none of them', () => {
     // Standing still scores every count goal exactly level against its own bar — so the low
     // absolute rates (4 of 50 on `deliver-everyone`) are a **bar**, not a difficulty. What is
     // not cleared is the comparison, which is the whole of what this stage asks a player for.
@@ -954,28 +1000,46 @@ describe('stage 6, played — four goals survive the escalators, and the bars st
   });
 
   /**
-   * **The answer to "is it playable?", in stage 4's form: a measured clear.**
+   * **Not clearable from the dropdown any more, and that is a measurement rather than a gap.**
    *
-   * `docs/10` § 5.4 and § 11 both said **three** stages clear from the dispatcher dropdown alone —
-   * 3, 4 and 7 — and named stage 6 among the four that do not. That was measured while stage 6
-   * carried five count goals; `long-waits-under` has since left its `goals` bucket, which is one
-   * fewer bar a candidate has to match, and nothing re-measured the claim. It is four.
+   * This case asserted that `destination-eta` clears stage 6, and it was true when it was written.
+   * It is not true now, and the change is § D254's rather than § D265's: making this building
+   * serviceable moved every conventional arm's numbers, and `beat-the-baseline` is a comparison
+   * against the stage's own starting profile. Swept over **all twelve shipped profiles** at the
+   * stage's own seeds, not one of them resolves ahead on a metric without also resolving behind on
+   * one — `zoned-uppeak` comes closest at 1 for and 4 against — so `beat-the-baseline` is met by
+   * none and `cleared` is `false` for all twelve.
    *
-   * Re-measured on the **pre-escalator** configuration it clears there too, so this is not a thing
-   * the sky-lobby escalators did — it is a published claim that went stale with no tool re-deriving
-   * it, which is what this test now is.
+   * The claim is therefore **inverted rather than deleted**, which is the only honest option: a
+   * case that stopped asking would leave the published *"three stages clear from the dropdown"*
+   * count with nothing re-deriving it, which is the exact failure this case was added to fix. What
+   * it now pins is the negative, with the witness that comes closest named — so the day a profile
+   * does clear it, this fails and says so.
+   *
+   * **Stage 6 is still playable**, and by the mechanism § D161 already documents for the four
+   * stages that never cleared from the dropdown: an edited weight vector. That is stage 2's
+   * apparatus and it is not re-run here.
    */
-  it('is clearable from the dropdown — the published count of three stages was four', () => {
-    const played = playStage(stage, 'destination-eta');
-    for (const goal of played.verdict.goals) {
-      expect(goal.met, goal.sentence).toBe(true);
-      if (goal.reproduced !== null) expect(goal.reproduced).toBe(true);
+  it('is not clearable from the dropdown by any shipped profile, and names the closest', () => {
+    const outcomes = config.dispatcherProfiles.profiles.map((profile) => {
+      const played = playStage(stage, profile.id);
+      const rows = played.report.comparisons[0]?.rows ?? [];
+      return {
+        id: profile.id,
+        cleared: played.verdict.cleared,
+        for: rows.filter((row) => row.favours === 'candidate').length,
+        against: rows.filter((row) => row.favours === 'baseline').length,
+      };
+    });
+    for (const outcome of outcomes) {
+      expect(outcome.cleared, `${outcome.id} clears stage 6 from the dropdown`).toBe(false);
     }
-    expect(played.verdict.cleared).toBe(true);
-    expect(played.verdict.headline).toContain('all 4 goals reached over 50 runs');
-    /* R2 survives the good news here as it does on stage 4. */
-    expect(played.verdict.headline).toContain('not a ranking of dispatchers');
-  }, 300_000);
+    // Not vacuous: somebody does resolve ahead on something, so the refusal is `beat-the-baseline`
+    // asking for a dominating move rather than the comparison being dead.
+    const ahead = outcomes.filter((outcome) => outcome.for > 0);
+    expect(ahead.length).toBeGreaterThan(0);
+    for (const outcome of ahead) expect(outcome.against).toBeGreaterThan(0);
+  }, 3_000_000);
 });
 
 describe('the decoder refuses rather than dropping', () => {

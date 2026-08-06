@@ -700,6 +700,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     'entranceWeights',
     'interfloorWeighting',
     'credentialAssignment',
+    'credentialGap',
     'maxLegs',
     'peakWindowS',
     'baselineFraction',
@@ -757,6 +758,16 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
     });
   });
 
+  // § D265. One required field, and `rejectUnknownKeys` beside it for `dayVariation`'s reason: a
+  // stored block with a misspelt key would rebuild at the shipped share while the record said 0.
+  const credentialGap = readOptional(object, 'credentialGap', path, (entry, entryPath) => {
+    const inner = expectObject(entry, entryPath);
+    rejectUnknownKeys(inner, entryPath, ['wrongZoneShare']);
+    return Object.freeze({
+      wrongZoneShare: expectNumber(inner['wrongZoneShare'], [...entryPath, 'wrongZoneShare']),
+    });
+  });
+
   const split = readOptional(object, 'directionalSplit', path, (entry, entryPath) => {
     const inner = expectObject(entry, entryPath);
     rejectUnknownKeys(inner, entryPath, ['incoming', 'outgoing', 'interfloor']);
@@ -799,6 +810,7 @@ function parseDemandOptions(value: unknown, path: Path): StoredDemandOptions {
         expectEnum(entry, entryPath, CREDENTIAL_ASSIGNMENTS),
       ),
     ),
+    ...spread('credentialGap', credentialGap),
     ...spread('maxLegs', readOptional(object, 'maxLegs', path, expectNumber)),
     ...spread('peakWindowS', readOptional(object, 'peakWindowS', path, expectNumber)),
     ...spread('baselineFraction', readOptional(object, 'baselineFraction', path, expectNumber)),
@@ -1035,6 +1047,9 @@ function demandOptionsOf(demand: NonNullable<SimulationConfig['demand']>): Store
     ...spread('entranceWeights', demand.entranceWeights),
     ...spread('interfloorWeighting', demand.interfloorWeighting),
     ...spread('credentialAssignment', demand.credentialAssignment),
+    // § D265, for `mixAmplitude`'s reason one line down: 0 is a control arm, and a projection
+    // that dropped it would replay the control at the shipped share.
+    ...spread('credentialGap', demand.credentialGap),
     ...spread('maxLegs', demand.maxLegs),
     ...spread('peakWindowS', demand.peakWindowS),
     ...spread('baselineFraction', demand.baselineFraction),

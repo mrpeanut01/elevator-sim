@@ -1,9 +1,17 @@
 /**
  * The invariant the rest of this package is worthless without: **no passenger is ever lost.**
  *
- * A generated journey ends in exactly one of two states. Either it reached the floor it asked
- * for, or it is named — with its leg, its position and why — in
- * `SimulationResult.undelivered`. There is no third state, and there is no rounding.
+ * A generated journey ends in exactly one **accounted** state. Either it reached the floor it asked
+ * for; or it is named — with its leg, its position and why — in `SimulationResult.undelivered`; or
+ * the building turned it away for want of a credential, in which case it is counted in
+ * `conservation.accessRefused` and its leg carries `refusedAt` (`DECISIONS.md` § D266). There is no
+ * unaccounted state, and there is no rounding.
+ *
+ * **The third is checked as hard as the first two, and it is checked to be a refusal rather than a
+ * shortfall.** A refused journey did not arrive and is not still in the system, so a bug that
+ * quietly dropped people would look exactly like it if the count were the only thing asserted.
+ * So the arithmetic below re-derives the refusals from the record — a leg carrying `refusedAt`,
+ * never boarded, never alighted — and requires them to be the same journeys the audit counted.
  *
  * This is checked across every building the project ships, every dispatcher it ships, and many
  * seeds, because the failure it guards against is invisible to every other metric. A car that
@@ -62,7 +70,25 @@ function assertConserved(result: SimulationResult): void {
   const generated = result.trace.passengerCount;
 
   expect(result.conservation.generated).toBe(generated);
-  expect(result.conservation.delivered + result.conservation.undelivered).toBe(generated);
+  /*
+   * The refusals, re-derived from the record before they are used in any arithmetic — so the
+   * equality below cannot be satisfied by an audit that counted the wrong thing. A refused leg
+   * carries `refusedAt`, never boarded and never alighted, which is the shape `#refuseAccess`
+   * promises and the shape `recordAccessRefusal` refuses to store any other way.
+   */
+  const refusedLegs = result.record.passengers.filter((leg) => leg.refusedAt !== undefined);
+  for (const leg of refusedLegs) {
+    expect(leg.boardedAt, leg.passengerId).toBeUndefined();
+    expect(leg.alightedAt, leg.passengerId).toBeUndefined();
+    expect(leg.refusedAt, leg.passengerId).toBe(leg.arrivedAt);
+  }
+  const accessRefused = result.conservation.accessRefused ?? 0;
+  // Journeys, not legs: a journey ends at its first refusal, so the two coincide today and the
+  // count is taken over journeys because that is what `generated` counts.
+  expect(new Set(refusedLegs.map((leg) => leg.journeyId)).size).toBe(accessRefused);
+  expect(result.conservation.delivered + result.conservation.undelivered + accessRefused).toBe(
+    generated,
+  );
   expect(result.conservation.undelivered).toBe(result.undelivered.length);
   expect(result.conservation.balanced).toBe(true);
 
@@ -122,10 +148,13 @@ function assertConserved(result: SimulationResult): void {
     if (journey.reason === 'riding') expect(journey.boardedAt).toBeDefined();
   }
 
-  // A completed run has nobody left over, by definition of the status.
+  // A completed run has nobody left over, by definition of the status — and a rider the building
+  // would not let travel is not "left over", they went away. `accessRefused` is the only term
+  // added here, and it is added rather than the equality relaxed: the run must still account for
+  // every journey exactly, and the refusals are already tied to the record above.
   if (result.status === 'completed') {
     expect(result.undelivered).toEqual([]);
-    expect(result.conservation.delivered).toBe(generated);
+    expect(result.conservation.delivered + accessRefused).toBe(generated);
   }
 }
 
@@ -173,7 +202,14 @@ describe('generated === delivered + explicitly undelivered', () => {
         );
         assertConserved(result);
         expect(result.status).toBe('completed');
-        expect(result.conservation.delivered).toBe(result.conservation.generated);
+        // Everybody the building would carry, carried. The refusals are the riders it would not,
+        // and they are subtracted rather than tolerated: `assertConserved` has already tied that
+        // count to legs carrying `refusedAt` in the record, so this is still "nowhere for a lost
+        // passenger to hide" (§ D266).
+        expect(result.conservation.delivered + (result.conservation.accessRefused ?? 0)).toBe(
+          result.conservation.generated,
+        );
+        expect(result.conservation.accessRefused ?? 0).toBeGreaterThan(0);
         expect(result.conservation.transfers).toBeGreaterThan(0);
       }
     }

@@ -87,7 +87,13 @@ describe('the diverting profile runs every shipped building without losing anybo
       // cannot stand at, or that lost the stop it was diverted for, shows up here first — a
       // simulation that deletes a passenger reports a *better* AWT for it.
       expect(result.conservation.balanced, buildingId).toBe(true);
-      expect(result.conservation.delivered, buildingId).toBe(result.conservation.generated);
+      // Everybody the credentials allow, carried; the rest named in `accessRefused` (§ D266).
+      // `undelivered` staying empty is what says the diversion lost nobody — a refused rider is a
+      // person the building would not carry, not a stop the diverter mislaid.
+      expect(
+        result.conservation.delivered + (result.conservation.accessRefused ?? 0),
+        buildingId,
+      ).toBe(result.conservation.generated);
       expect(result.conservation.generated, buildingId).toBeGreaterThan(20);
       expect(result.undelivered, buildingId).toEqual([]);
     });
@@ -139,7 +145,9 @@ describe('the double-deck shaft, which is the only geometry that normalises', ()
     expect(deck, 'no diversion reached a double-deck car; the deck branch is unexercised').toBeGreaterThan(0);
     expect(single).toBeGreaterThan(0);
     expect(result.conservation.balanced).toBe(true);
-    expect(result.conservation.delivered).toBe(result.conservation.generated);
+    expect(result.conservation.delivered + (result.conservation.accessRefused ?? 0)).toBe(
+      result.conservation.generated,
+    );
   });
 });
 

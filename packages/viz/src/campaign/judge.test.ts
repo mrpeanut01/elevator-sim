@@ -40,7 +40,7 @@ import { DATA_DIR, requireBuilding } from '../fixtures.test-helper.js';
 import { GOAL_KINDS, goalLabel } from '../scenario/goals.js';
 import type { PublishedGoalRates, PublishedScenario } from '../scenario/published.js';
 
-import { judgeStage } from './judge.js';
+import { judgeStage, type StageReport } from './judge.js';
 import { parseCampaign, type CampaignContext } from './parse.js';
 import { batchRequestForStage } from './stageRun.js';
 import type { Campaign, CampaignStage } from './types.js';
@@ -160,15 +160,33 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
     });
     expect(uncleared.cleared).toBe(false);
 
-    /* Stage 4 on `destination-eta` is the measured clear `campaign.test.ts` § stage 4 pins. */
-    const stage = stageAt(3);
-    const result = runBatch(batchRequestForStage(stage, 'destination-eta'), resourcesFor(stage));
-    const cleared = judgeStage({
-      stage,
-      published: publishedFor(stage),
-      result,
-      report: batchReport(result),
-    });
+    /*
+     * A **measured** clear, and it is stage 5 rather than stage 4 since § D265 — see
+     * `campaign.test.ts` § *stage 5, played*, which sweeps the twelve shipped profiles and records
+     * that the clear moved buildings when § D254 changed what every conventional arm on an
+     * access-zoned building does.
+     *
+     * Searched rather than pinned to a profile id for that file's reason: which profile clears is a
+     * measurement that will move again, and a test naming one gets re-pinned without anybody
+     * re-reading the claim. What this file needs is *a* cleared verdict to check the headline of.
+     */
+    const stage = stageAt(4);
+    let cleared: StageReport | undefined;
+    for (const profile of config.dispatcherProfiles.profiles) {
+      const attempt = runBatch(batchRequestForStage(stage, profile.id), resourcesFor(stage));
+      const verdict = judgeStage({
+        stage,
+        published: publishedFor(stage),
+        result: attempt,
+        report: batchReport(attempt),
+      });
+      if (verdict.cleared) {
+        cleared = verdict;
+        break;
+      }
+    }
+    expect(cleared, 'no shipped profile clears stage 5, so this case has no cleared verdict to check').toBeDefined();
+    if (cleared === undefined) return;
     expect(cleared.cleared).toBe(true);
 
     for (const verdict of [uncleared, cleared]) {

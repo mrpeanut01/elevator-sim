@@ -30,6 +30,7 @@ describe('StreamSet — required streams', () => {
       'patience',
       'modeChoice',
       'dayVariation',
+      'credential',
     ]);
   });
 
@@ -384,6 +385,19 @@ const GOLDEN_STREAMS: Readonly<Record<StreamName, GoldenVector>> = {
     initState: 8223398147818347272n,
     initSeq: 8791436940513750610n,
     firstDraws: [626451509, 78136351, 4266053562, 1214740073],
+  },
+  /*
+   * Added, never rebaselined: a new *name* gets new parameters and moves nothing above it, which
+   * is the property the header calls out ("reordering STREAM_NAMES in a way that changes a name's
+   * spelling"). Produced the way the rest were — an independent BigInt implementation of FNV-1a-64,
+   * SplitMix64 and `pcg_setseq_64_xsh_rr_32` written from the specifications, then confirmed
+   * against this module. That implementation reproduces `arrivals`' four draws above exactly,
+   * which is what makes it evidence rather than a transcription of the code under test.
+   */
+  credential: {
+    initState: 6419364212881892576n,
+    initSeq: 9369841324602713275n,
+    firstDraws: [4180617894, 3874291952, 653796123, 2278565795],
   },
 };
 

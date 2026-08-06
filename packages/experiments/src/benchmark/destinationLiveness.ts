@@ -124,8 +124,23 @@ export interface PanelCounts {
   /** `conventional` or `destination-dispatch`, off `RunRecord.passengerModel`. */
   readonly passengerModel: string;
   readonly legs: number;
-  /** Legs the panel named a car for. Equals {@link legs} under a panel and 0 without one. */
+  /**
+   * Legs the panel named a car for. Equals {@link legs} **minus {@link refusedLegs}** under a
+   * panel, and 0 without one.
+   *
+   * The subtraction is `DECISIONS.md` § D266's: a leg the building turned away for want of a
+   * credential never reached a landing queue, so no panel was ever asked about it and no promise
+   * could have been made. `core`'s own `#reconcile` nets the same term out of the same identity.
+   */
   readonly promisedLegs: number;
+  /**
+   * Legs the building turned away for want of a credential (§ D265, § D266). `0` on every building
+   * that declares no `accessZones`.
+   *
+   * Counted here rather than read off `conservation.accessRefused` for {@link wrongCarBoardings}'
+   * reason: a claim checked only by the code that makes it is not checked.
+   */
+  readonly refusedLegs: number;
   /**
    * Legs that boarded a car other than the one they were promised. **Must be 0.**
    *
@@ -439,10 +454,12 @@ export async function measureDestinationLiveness(
     const reference = referenceCars.get(subject.building) ?? new Map<string, string>();
 
     let promisedLegs = 0;
+    let refusedLegs = 0;
     let wrongCarBoardings = 0;
     let differentCarThanConventional = 0;
     let comparedLegs = 0;
     for (const passenger of result.record.passengers) {
+      if (passenger.refusedAt !== undefined) refusedLegs += 1;
       if (passenger.assignedCarId !== undefined) {
         promisedLegs += 1;
         if (passenger.carId !== undefined && passenger.carId !== passenger.assignedCarId) {
@@ -475,6 +492,7 @@ export async function measureDestinationLiveness(
           passengerModel: result.record.passengerModel ?? 'conventional',
           legs: result.record.passengers.length,
           promisedLegs,
+          refusedLegs,
           wrongCarBoardings,
           brokenPromises: result.conservation.brokenPromises,
           differentCarThanConventional,

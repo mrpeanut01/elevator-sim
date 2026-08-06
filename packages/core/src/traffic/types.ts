@@ -582,6 +582,18 @@ export const CREDENTIAL_ASSIGNMENTS = ['none', 'permitted-first'] as const;
 export type CredentialAssignment = (typeof CREDENTIAL_ASSIGNMENTS)[number];
 
 /**
+ * A run's override of `data/traffic-profiles.json`'s `credentialGap` block.
+ *
+ * One field, and the block exists rather than a bare number so that the config surface and the
+ * reference file have the same shape — the property that stops the two drifting into two
+ * different names for one quantity. See {@link TrafficConfig.credentialGap}.
+ */
+export interface CredentialGapOverride {
+  /** Share, `0..1`. See `config/types.ts` § `CredentialGapConfig`. */
+  readonly wrongZoneShare: number;
+}
+
+/**
  * Explicit overrides for the geometry of whichever demand template is selected.
  *
  * An optimizer sampling {@link TRAFFIC_PARAMETERS} needs a way to inject a candidate without
@@ -801,6 +813,20 @@ export interface TrafficConfig {
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   /** Default `permitted-first`. */
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * Override `data/traffic-profiles.json`'s `credentialGap` block. docs/14 § 3.4.
+   *
+   * Unset means *the data decides*, which is the only honest default: the shipped share is a
+   * declared, uncited assumption with its reasoning attached, and a second value invented here
+   * would be a second source of truth for it. `{ wrongZoneShare: 0 }` is the control arm — every
+   * rider holds a credential for wherever they are going, which is what the model did before the
+   * gap existed and what every figure measured under `credentialAssignment: 'permitted-first'`
+   * and no gap was measured under.
+   *
+   * Consumed only where a building declares `accessZones`; a building that declares none produces
+   * a byte-identical trace at every value of it.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   /**
    * Drop a journey needing more than this many elevator legs. Default 6.
    *
@@ -1164,6 +1190,21 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     default: TRAFFIC_DEFAULTS.credentialAssignment,
     description:
       'How a passenger bound for an access-restricted floor acquires a credential. permitted-first assigns the first group in declared zone order; none leaves every passenger unbadged.',
+  },
+  {
+    id: 'traffic.credentialGap.wrongZoneShare',
+    type: 'continuous',
+    // The whole unit interval, and the bound is the quantity's own rather than a taste: it is a
+    // share of journeys. 0 is the control arm (everybody correctly badged, which is what every
+    // figure published before this parameter existed was measured under) and 1 is the degenerate
+    // arm (nobody inside the building may cross a zone boundary), and both are legitimate ends of
+    // a sweep. The *shipped* value is not a search bound at all — it is an uncited assumption with
+    // its reasoning in `data/traffic-profiles.json`, which is where a reader has to go for it.
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    description:
+      "Share of journeys that begin inside the building and end inside an access zone the traveller's own floor does not already reach, which are made by somebody not holding a credential for it. Unset means the credentialGap block in data/traffic-profiles.json, which is the only honest default: the number is an uncited assumption stated there with its reasoning, and a second value here would be a second source of truth for it. 0 is the control arm — every rider holds a credential for wherever they are going. It is consumed only where a building declares accessZones; a building that declares none is byte-identical at every value.",
   },
   {
     id: 'traffic.maxLegs',
