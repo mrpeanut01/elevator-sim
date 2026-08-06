@@ -24,7 +24,6 @@
 import {
   CREDENTIAL_ASSIGNMENTS,
   DEMAND_LEVELS,
-  DEMAND_TEMPLATE_IDS,
   INTERFLOOR_WEIGHTINGS,
   PATIENCE_DISTRIBUTIONS,
 } from '@elevator-sim/core';
@@ -35,7 +34,6 @@ import type {
   CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
-  DemandTemplateId,
   DirectionalSplit,
   DispatchPolicyOptions,
   DoorCrowdingConfig,
@@ -305,14 +303,13 @@ function parseTrafficArm(value: unknown, path: string): TrafficArmSpec {
   rejectUnknown(record, ['id', 'demandTemplate', 'durationS', 'reportWindow', 'demand'], path);
   return {
     id: asString(record['id'], `${path}.id`),
+    // A string, not a member of `DEMAND_TEMPLATE_IDS`. `DECISIONS.md` § D274: since § D273 a
+    // `demandTemplates` record may author its own phases and answer to an id no compiled-in union
+    // contains, and the catalogue an experiment runs against is the one it loads. An unknown id is
+    // refused by `resolveDemandTemplate`, by name, with the shapes it can build listed — which is a
+    // better message than this one gave and is checked against the data the run actually uses.
     ...(present(record, 'demandTemplate')
-      ? {
-          demandTemplate: asMember<DemandTemplateId>(
-            record['demandTemplate'],
-            DEMAND_TEMPLATE_IDS,
-            `${path}.demandTemplate`,
-          ),
-        }
+      ? { demandTemplate: asString(record['demandTemplate'], `${path}.demandTemplate`) }
       : {}),
     ...(present(record, 'durationS')
       ? { durationS: asFiniteNumber(record['durationS'], `${path}.durationS`) }

@@ -305,8 +305,19 @@ export interface StoredRunConfig {
    * have moved on, and re-deriving it would mean loading `data/` to read a label.
    */
   readonly trafficProfileId: string;
-  /** `'rise-and-fall'`/`'constant-iso'`, or the fully resolved template when one was supplied. */
-  readonly demandTemplate: DemandTemplateId | ResolvedDemandTemplate;
+  /**
+   * The id of the `demandTemplates` record the run selected, or the fully resolved template when
+   * one was supplied.
+   *
+   * `string` rather than `DemandTemplateId` since `DECISIONS.md` § D274. A record may author its own
+   * phases (§ D273) and therefore answer to an id no closed union can contain, and a stored result
+   * has no catalogue to check one against — the file it was measured from may not even be on disk
+   * when the record is read back. So the id is stored and echoed as written, and the check that it
+   * *resolves* happens where a catalogue exists: at replay, in `resolveDemandTemplate`, which throws
+   * by name. Validating against a compiled-in list here would have rejected an honest record for
+   * naming a template this build had never heard of.
+   */
+  readonly demandTemplate: string | ResolvedDemandTemplate;
   /** Demand horizon in seconds, when the run overrode the template's own duration. */
   readonly durationS?: number | undefined;
   readonly demand?: StoredDemandOptions | undefined;

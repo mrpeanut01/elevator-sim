@@ -253,6 +253,41 @@ export interface BatchSizeConfig extends Commented {
   readonly weights?: readonly number[] | undefined;
 }
 
+/**
+ * One authored segment of a template's {@link DemandTemplate.phases} list. `DECISIONS.md` § D273.
+ *
+ * Minutes, beside {@link DemandTemplate.durationMin} and {@link DemandTemplate.startOfDayMin} —
+ * human units in the reference file with the unit in the identifier, converted once at resolution.
+ * Intensity is the dimensionless multiplier `ResolvedDemandTemplate` already carries: `1` is the
+ * building's own nominal arrival rate, and a phase cannot exceed it, because *how much demand there
+ * is* comes from the building and `traffic.demandLevel` while a template says only what **shape** it
+ * takes over the period.
+ *
+ * The two splits are the same opt-in pair `directionalSplitAtStart` and `directionalSplitAtEnd` are,
+ * moved down one level: a phase list that declares them varies the mix **within** the period rather
+ * than across it, and `lunch-two-way`'s arc is the special case of a three-phase list that does.
+ * Declared on every phase of a list or on none — see `config/demandPhases.ts` for why a partial
+ * declaration is the dangerous one.
+ *
+ * A phase may carry its own `$comment`, and on a day profile that is the point: the whole claim such
+ * a record makes is that it is *a sequence of cited peaks separated by derived interpolations*, and
+ * the only place that survives review is beside each phase.
+ */
+export interface DemandPhaseRecord extends Commented {
+  /** Minutes after the run's own start, `[0, durationMin]`. The first phase begins at 0. */
+  readonly startMin: number;
+  /** Minutes after the run's own start. The last phase ends exactly at `durationMin`. */
+  readonly endMin: number;
+  /** Intensity multiplier at {@link startMin}, `[0, 1]`. */
+  readonly startIntensity: number;
+  /** Intensity multiplier at {@link endMin}, `[0, 1]`. */
+  readonly endIntensity: number;
+  /** Directional mix at {@link startMin}. Declared with {@link endSplit} or not at all. */
+  readonly startSplit?: DirectionalSplit | undefined;
+  /** Directional mix at {@link endMin}. See {@link startSplit}. */
+  readonly endSplit?: DirectionalSplit | undefined;
+}
+
 /** A demand shape over a run: how long, and which window is reported. */
 export interface DemandTemplate extends Commented {
   readonly id: string;
@@ -299,6 +334,31 @@ export interface DemandTemplate extends Commented {
    * one's citation status is in that template's own `$comment` in `data/traffic-profiles.json`.
    */
   readonly startOfDayMin?: number | undefined;
+  /**
+   * The period's phases, authored outright instead of built from a named shape. § D273.
+   *
+   * **Present is what selects the path.** `resolveDemandTemplate` takes a record with `phases`
+   * before it looks at `id` at all, so a record here is not a sixth `if (record.id === …)` and
+   * adding a day profile is not a code change — which is CLAUDE.md invariant 7 applied to the one
+   * thing about a template that was still code: not the ramp, which genuinely is a shape, but the
+   * *sequence* of ramps a day is made of.
+   *
+   * **Absent on all five templates that shipped before it, and absent is not "one phase".** A
+   * record without this field selects its shape by id exactly as it always did, and
+   * `traffic/phaseListIdentity.test.ts` holds the five to that byte for byte.
+   *
+   * The list must be contiguous, ascending, and cover `[0, durationMin]` exactly, with matched
+   * endpoints at every interior boundary — the guarantees the five shape builders supplied by
+   * construction and an authored list cannot. `config/demandPhases.ts` is the single authority, read
+   * by `schema.ts` here and by the resolver there.
+   *
+   * **Two things a phase list refuses by name, both because they would answer the wrong question.**
+   * `templateOverrides.durationS` refits the whole shape, so a sixteen-hour day squeezed into
+   * fifteen minutes is a fifteen-minute day with a five-minute lunch; and `dayVariation.peakShiftS`
+   * moves the outermost interior knot, which on a day is minutes from the start. See
+   * `traffic/demandTemplate.ts` for both refusals and § D275 for why neither is a bound to relax.
+   */
+  readonly phases?: readonly DemandPhaseRecord[] | undefined;
 }
 
 /** Body-mass distribution. Must be a distribution: the load sensor measures it. */

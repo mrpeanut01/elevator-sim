@@ -220,22 +220,45 @@ describe('a template that declares no directional mix generates exactly the trac
    * can go stale — add a fourth template and this assertion names it, instead of the pins below
    * quietly covering two of four and reporting green.
    */
-  it('exactly one shipped template varies the mix, and it is the one added for it', () => {
+  it('exactly two shipped templates vary the mix, in the two forms that can', () => {
     // **Derived from the records, not from a list with a hard-coded tail.** The previous form was
     // `toEqual([...SHIPPED_BEFORE, 'lunch-two-way'])`, which named the mix-varying template only by
     // being last — so `shift-change` and `evening-egress` failed it merely by existing, while a
     // fourth template that really did vary the mix could have been appended and passed. The comment
     // above asks for the partition; this computes it.
+    //
+    // **And the filter has to look in two places since `DECISIONS.md` § D273.** A record declares a
+    // mix arc as the *period's* endpoints (`directionalSplitAtStart`/`AtEnd`, which is
+    // `lunch-two-way`'s form) or knot by knot inside an authored `phases` list (`office-day`'s).
+    // Filtering on the first alone would have called the day profile flat while it swings from
+    // 85/5/10 to 5/85/10, which is the partition going stale in exactly the way this test exists to
+    // catch.
     const varying = config.trafficProfiles.demandTemplates
-      .filter((entry) => entry.directionalSplitAtStart !== undefined || entry.directionalSplitAtEnd !== undefined)
+      .filter(
+        (entry) =>
+          entry.directionalSplitAtStart !== undefined ||
+          entry.directionalSplitAtEnd !== undefined ||
+          (entry.phases ?? []).some((phase) => phase.startSplit !== undefined),
+      )
       .map((entry) => entry.id);
-    expect(varying).toEqual(['lunch-two-way']);
+    expect(varying).toEqual(['lunch-two-way', 'office-day']);
 
-    // Every shipped id has a record, and every record is a shipped id: the two lists cannot drift
-    // apart without this failing, which is what makes the filter above trustworthy.
-    expect(config.trafficProfiles.demandTemplates.map((entry) => entry.id).sort()).toEqual(
-      [...DEMAND_TEMPLATE_IDS].sort(),
+    // Every id this module can build **with no record to read** has a record. The converse stopped
+    // holding at § D274 and stopping was the point: `DEMAND_TEMPLATE_IDS` is the *fallback shape*
+    // list, and since § D273 a record can author its own phases and answer to an id no union can
+    // contain. So the containment is asserted one way, and the extra records are named — which is
+    // strictly more than the old equality said, because it also says *which* records are the ones
+    // no shape backs.
+    const shipped = config.trafficProfiles.demandTemplates.map((entry) => entry.id);
+    expect(shipped).toEqual(expect.arrayContaining([...DEMAND_TEMPLATE_IDS]));
+    expect(shipped.filter((id) => !(DEMAND_TEMPLATE_IDS as readonly string[]).includes(id))).toEqual(
+      ['office-day'],
     );
+    // And each of those really does carry its own phases, or it would be a record nothing builds.
+    for (const entry of config.trafficProfiles.demandTemplates) {
+      if ((DEMAND_TEMPLATE_IDS as readonly string[]).includes(entry.id)) continue;
+      expect(entry.phases, entry.id).toBeDefined();
+    }
 
     // And the templates whose traces are pinned below still declare no mix, which is the property
     // those pins depend on.

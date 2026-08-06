@@ -188,6 +188,307 @@
       "reportWindow": "peak-5min",
       "shape": "ramp up to peak, hold, ramp down",
       "$comment": "The office evening down-peak: the building emptying at the end of a working day. It exists because `evening-egress` was doing this job under a venue's name and a venue's comment, and one record cannot hold two clocks -- see DECISIONS.md section D263. The calendar's `quarter-end` period selects THIS record; `evening-egress` keeps the ballroom. CITED: that an office evening down-peak is a design case in its own right. It is one of the four office traffic types the reference set names alongside the morning up-peak, the lunch mixed peak and random interfloor traffic (Elevator World, *Fundamentals of Traffic Analysis*, cited in docs/02-elevator-reference.md's source list; CIBSE Guide D treats the same four). It is NOT an event egress under another name, which is the whole reason this record is not a copy of `evening-egress`'s numbers. NOT CITED, and stated plainly rather than filled in with a plausible figure: the down-peak's own ARRIVAL RATE. docs/03-traffic-and-statistics.md tabulates the office UP-peak at 11-15 %pop/5min (standard) and 15-17 % (prestige) and names it the governing peak; no page in this project's reference set gives a %pop/5min band for the office down-peak. The literature does say the evening flow is the more concentrated of the two, and that is exactly why quoting an unsourced multiple of the up-peak here would be the plausible-looking reference CLAUDE.md forbids. STRUCTURAL, and named so a reader does not go hunting: a `demandTemplates` record has NO rate field at all. The level a run is actually drawn at comes from the building's `arrivalRatePctPop5min` and the declared `traffic.demandLevel` parameter, and this record sets neither. What a template carries is the shape of demand over the period, not how much of it there is. DERIVED, not cited: every geometric number. The 30-minute duration, the 5-minute hold and the zero baseline are `rise-and-fall`'s own, inherited unchanged, so this record adds no uncited geometry -- the same discipline `lunch-two-way` and `shift-change` were authored under. LIMITATION, and it is the consequence of that inheritance: the shape is SYMMETRIC, and a real office down-peak is not. Departures synchronise at the front -- the working day ends at one time for most of the building -- and then trail long into the evening, so the true shape has a steeper rise than fall. Expressing that needs a skewed shape this module does not have and a skew figure no source here publishes, so it is neither cited nor modelled, and it is named here rather than implied by a symmetric ramp. CONSEQUENCE, measured rather than left to be discovered: because the geometry is `rise-and-fall`'s, a run of this template draws the SAME passengers as a run of `rise-and-fall` at the same seed -- `packages/core/src/traffic/templateAdditionIdentity.test.ts` asserts it on the legs. That is a declaration, not a defect: what this record adds is the hour and the period's identity, and section D244's rule 1 is that the hour moves nothing. A record that claimed a shape it did not have would be the section D112 defect; a record that says out loud which shape it shares is not. DIRECTION, and this record authors NONE: it declares no `directionalSplitAtStart`/`directionalSplitAtEnd`, deliberately. Those two fields are the model's way of saying *the mix MOVES within the run*, which is `lunch-two-way`'s arc and is not true of a down-peak -- a down-peak's mix is a level, not an arc -- and authoring a constant pair would also silently disable the calendar's own `splitBias`, which is where the shipped office down-peak's outgoing bias actually comes from. NOT CITED: the mix itself. The office down-peak's split is the morning up-peak's reversed -- roughly 5 incoming / 85 outgoing / 10 interfloor against the shipped `office-standard` profile's 85/5/10 -- and that is a statement of the mechanism (in the morning everyone rides up from the lobby; in the evening everyone rides down to it), not a quoted table. LIMITATION: because this record authors no mix, a run of it keeps each floor's own profile split unless the caller biases it, exactly as `evening-egress`'s ORIGIN limitation says of that shape; `quarter-end` biases 0.5 toward 0.1/0.8/0.1, which off an 85/5/10 office profile leaves incoming the LARGER share, and `packages/viz/src/shift/calendar.test.ts` already says so rather than claiming a down-peak it did not run. CLOCK (startOfDayMin 1035 = 17:15). NOT CITED: the hour. Guide D and ISO 8100-32 tabulate design PEAKS, not clocks. NOT CITED either: 17:30 itself, an assumption about when a working day ends -- it is the one figure carried over from `evening-egress`'s clock note, because it was always an assumption about an OFFICE and it belongs to this record. DERIVED: 17:15, by placing the template's HOLD rather than its start, the same derivation `rise-and-fall`'s 08:30 is. The hold is the reported five minutes and sits centred in the 30-minute run, at +12.5 to +17.5 min, so a start of 17:15 puts the reported peak at 17:27:30-17:32:30, centred on 17:30. Read the pair together: the same building's day opens at 08:30 for a peak at 08:45 and closes at 17:15 for a peak at 17:30. LIMITATION: as for `rise-and-fall`, the derivation is a function of durationMin and of the 5-minute hold, so changing either leaves 17:15 no longer centring the hold on 17:30, and nothing in the code will say so. Nothing statistical reads startOfDayMin today -- intensityAt, splitAt and integratedIntensityS never see it -- so the assumption is free, and it stops being free the moment a phase boundary becomes a measurement boundary. DECISIONS.md sections D244 and D263."
+    },
+    {
+      "id": "office-day",
+      "name": "Office working day",
+      "recommended": false,
+      "durationMin": 600,
+      "startOfDayMin": 480,
+      "reportWindow": "full-run",
+      "shape": "a whole working day: up-peak, mid-morning, lunch two-way, afternoon, down-peak, authored phase by phase",
+      "$comment": "An office working day, 08:00-18:00, authored as an explicit phase list -- the first record in this file whose SHAPE is its own data rather than a builder in traffic/demandTemplate.ts (DECISIONS.md section D273). The construction is the only one defensible against Guide D: a day profile is a SEQUENCE OF CITED PEAKS SEPARATED BY DERIVED INTERPOLATIONS. Anything more confident is inventing a source, so each phase says which of the two it is in its own $comment. CITED: that the three periods are office design cases in their own right -- CIBSE Guide D names the morning up-peak, the lunchtime two-way peak and the evening down-peak, and docs/03 tabulates the standard-office up-peak at 11-15 %pop/5min as the governing one. CITED: the lunch mix, 45% incoming / 45% outgoing / 10% interfloor (Guide D 2010, carried into 2020; BCO Guide to Specification 2014 pairs the same split with a 13%/5min lunchtime two-way demand). DERIVED, and inherited rather than invented: the three peaks' geometry is `rise-and-fall`'s own -- a 12.5-minute ramp, a 5-minute hold, a 12.5-minute ramp -- so this record adds no uncited peak duration; and ALL THREE placements are the shipped records' own, so this day invents no hour of its own. The morning hold lands at 08:42:30-08:47:30 and the lunch period runs 12:15-12:45, exactly where section D244 put `rise-and-fall`'s 08:30 and `lunch-two-way`'s 12:15; the evening ramp begins at 17:15 and holds at 17:27:30-17:32:30, exactly where section D263 put `office-down-peak`. DERIVED, and REPRODUCED rather than asserted: the lunch mix knots. Over 12:15-12:45 the arc is `lunch-two-way`'s, linear from 0/90/10 to 90/0/10, and the two interior knots (0.375/0.525/0.1 and 0.525/0.375/0.1) are that same line evaluated at +12.5 and +17.5 minutes -- so this day CONTAINS the cited period rather than approximating it, which packages/core/src/traffic/phaseListIdentity.test.ts asserts against `lunch-two-way` itself. DERIVED, from a conservation argument rather than a table: the balanced 45/45/10 between the peaks. An office at steady occupancy neither fills nor empties, so incoming must equal outgoing; the interfloor share is held at the CITED 10% throughout, which is the assumption `lunch-two-way` already makes about its own arc. The morning mix is `office-standard`'s own 85/5/10 taken from this file, and the evening mix is its reverse -- a statement of the mechanism (in the morning everyone rides up from the lobby, in the evening everyone rides down to it), not a quoted table. NOT CITED: the inter-peak intensity of 0.25, and no figure was invented for it. No page in this project's reference set gives a %pop/5min band for office inter-peak or interfloor traffic. 0.25 is chosen to sit clearly below the peaks and clearly above the opening trickle, the way `shift-change`'s troughFraction of 0.35 is chosen, and it is an assumption. NOT CITED: the 0.05 opening and closing trickle, inherited from `evening-egress`'s baselineFraction for the reason that record gives -- a building before its doors open is not empty. NOT CITED: the evening peak's height, which this record takes EQUAL to the morning's. The literature says the evening flow is the more concentrated of the two; quoting an unsourced multiple of the up-peak would be the plausible-looking reference CLAUDE.md forbids, so the equality is stated as an assumption instead -- and section D263 refused the same figure for `office-down-peak` on the same ground. It could not have been authored as a rate in any case: a demandTemplates record has no rate field -- the level comes from the building's arrivalRatePctPop5min and the declared traffic.demandLevel, and a template carries the SHAPE of demand over a period, never how much of it there is. CLOCK (startOfDayMin 480 = 08:00). NOT CITED: the hour, as for every template in this file. DERIVED: 08:00, by placing the morning hold rather than the start -- a 30-minute quiet period before an up-peak that begins at the derived 08:30 puts the opening at 08:00, and the day then closes at 18:00. LIMITATION, four, all structural. (1) `recommended` is FALSE and must stay false: one day is one long run whose waiting times are serially correlated exactly as `constant-iso`'s are, so 'reported over the whole day' is a description and not a licence to build a confidence interval across days -- docs/03 section The independence condition. (2) The peaks are symmetric ramps and a real office day is not: departures synchronise at the front and trail long into the evening. Expressing that needs a skewed shape this module does not have and a skew figure no source here publishes. (3) The day is UNSLICED. templateOverrides.durationS is refused against a phase list by name, because rescaling a ten-hour schedule into a shorter run gives a short day with a proportionally short lunch; choosing which PART of a day to run is a separate field that does not exist yet (DECISIONS.md section D275). (4) dayVariation.peakShiftS is refused for the same class of reason: one shift would slide the morning, the lunch and the evening together, which is a late clock rather than a late peak. DECISIONS.md sections D273 and D276.",
+      "phases": [
+        {
+          "startMin": 0,
+          "endMin": 30,
+          "startIntensity": 0.05,
+          "endIntensity": 0.05,
+          "startSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "$comment": "08:00-08:30. The building opens on a trickle of early arrivals: baseline 0.05, inherited from evening-egress's baselineFraction, and the morning mix, because everyone moving at this hour is coming in."
+        },
+        {
+          "startMin": 30,
+          "endMin": 42.5,
+          "startIntensity": 0.05,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "$comment": "08:30-08:42:30. The CITED morning up-peak begins. Its 12.5-minute ramp is rise-and-fall's own, and 08:30 is the hour section D244 derived for that template -- so this is the shipped up-peak on the clock it was already placed at."
+        },
+        {
+          "startMin": 42.5,
+          "endMin": 47.5,
+          "startIntensity": 1.0,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "$comment": "08:42:30-08:47:30. The up-peak hold: five minutes at the building's full nominal rate, at office-standard's own 85/5/10. This is rise-and-fall's reported window, inside a day that reports the whole of itself."
+        },
+        {
+          "startMin": 47.5,
+          "endMin": 60,
+          "startIntensity": 1.0,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "$comment": "08:47:30-09:00. The up-peak's down-ramp, which lands on the inter-peak level rather than on zero. The ramp's LENGTH is rise-and-fall's; where it lands is this record's own and is NOT CITED."
+        },
+        {
+          "startMin": 60,
+          "endMin": 90,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.85,
+            "outgoing": 0.05,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "$comment": "09:00-09:30. A DERIVED interpolation, not a period: the mix relaxes from the arrival peak to balanced while the level holds. Nothing is cited about this half hour except that it is not a peak."
+        },
+        {
+          "startMin": 90,
+          "endMin": 225,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "$comment": "09:30-11:45. Mid-morning. Balanced by conservation -- an office at steady occupancy neither fills nor empties, so incoming equals outgoing -- with the interfloor share held at the CITED 10%."
+        },
+        {
+          "startMin": 225,
+          "endMin": 255,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.0,
+            "outgoing": 0.9,
+            "interfloor": 0.1
+          },
+          "$comment": "11:45-12:15. A DERIVED lead-in: the mix swings from balanced out to the lunch arc's outgoing extreme, so that the cited arc can begin at 12:15 without a step. The arc's own time-average IS this balanced mix, which is why the lead-in leaves from it."
+        },
+        {
+          "startMin": 255,
+          "endMin": 267.5,
+          "startIntensity": 0.25,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.0,
+            "outgoing": 0.9,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.375,
+            "outgoing": 0.525,
+            "interfloor": 0.1
+          },
+          "$comment": "12:15-12:27:30. The CITED lunch two-way period opens, on lunch-two-way's own hour and with its own endpoint mix. Everyone is going down to leave; nobody has come back yet."
+        },
+        {
+          "startMin": 267.5,
+          "endMin": 272.5,
+          "startIntensity": 1.0,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.375,
+            "outgoing": 0.525,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.525,
+            "outgoing": 0.375,
+            "interfloor": 0.1
+          },
+          "$comment": "12:27:30-12:32:30. The lunch hold. The mix knots here and at the next boundary are the cited arc evaluated at +12.5 and +17.5 minutes, so the mix over 12:15-12:45 is lunch-two-way's line exactly rather than an approximation of it."
+        },
+        {
+          "startMin": 272.5,
+          "endMin": 285,
+          "startIntensity": 1.0,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.525,
+            "outgoing": 0.375,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.9,
+            "outgoing": 0.0,
+            "interfloor": 0.1
+          },
+          "$comment": "12:32:30-12:45. The arc has crossed 45/45/10 at 12:30 and is now incoming-dominant: the return. Intensity falls back to the inter-peak level."
+        },
+        {
+          "startMin": 285,
+          "endMin": 315,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.9,
+            "outgoing": 0.0,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "$comment": "12:45-13:15. A DERIVED interpolation back to balanced, the mirror of the 11:45 lead-in."
+        },
+        {
+          "startMin": 315,
+          "endMin": 495,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "$comment": "13:15-16:15. The afternoon. The longest phase in the day and the one with the least cited about it: a level, a balanced mix, and three hours of neither."
+        },
+        {
+          "startMin": 495,
+          "endMin": 555,
+          "startIntensity": 0.25,
+          "endIntensity": 0.25,
+          "startSplit": {
+            "incoming": 0.45,
+            "outgoing": 0.45,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "$comment": "16:15-17:15. A DERIVED interpolation: the mix swings from balanced to outgoing-dominant as the working day ends, before the level moves at all."
+        },
+        {
+          "startMin": 555,
+          "endMin": 567.5,
+          "startIntensity": 0.25,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "$comment": "17:15-17:27:30. The CITED evening down-peak begins, on `office-down-peak`'s own hour: section D263 derived 17:15 for that record by centring its hold on 17:30, and this ramp starts at the same instant. The mix is the morning's reversed -- a statement of the mechanism rather than a quoted table."
+        },
+        {
+          "startMin": 567.5,
+          "endMin": 572.5,
+          "startIntensity": 1.0,
+          "endIntensity": 1.0,
+          "startSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "$comment": "17:27:30-17:32:30. The down-peak hold, centred on 17:30 -- `office-down-peak`'s reported five minutes, to the second. Its HEIGHT is taken equal to the morning's, which is an assumption: section D263 records that no page in this reference set gives a %pop/5min band for the office down-peak, and quoting an unsourced multiple of the up-peak would be the plausible-looking reference CLAUDE.md forbids."
+        },
+        {
+          "startMin": 572.5,
+          "endMin": 585,
+          "startIntensity": 1.0,
+          "endIntensity": 0.05,
+          "startSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "$comment": "17:32:30-17:45. The down-peak decays to the closing trickle."
+        },
+        {
+          "startMin": 585,
+          "endMin": 600,
+          "startIntensity": 0.05,
+          "endIntensity": 0.05,
+          "startSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "endSplit": {
+            "incoming": 0.05,
+            "outgoing": 0.85,
+            "interfloor": 0.1
+          },
+          "$comment": "17:45-18:00. The last of the building leaving. The day ends on the same 0.05 it opened on, pointed the other way."
+        }
+      ]
     }
   ],
   "passengerMass": {

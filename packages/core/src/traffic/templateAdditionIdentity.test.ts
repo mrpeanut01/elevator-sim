@@ -85,9 +85,17 @@ describe('the split shipped two records where there was one', () => {
     expect(shipped).toContain(ADDED);
     expect(before).not.toContain(ADDED);
     expect(shipped.length).toBe(before.length + 1);
-    // Every shipped id has a record and every record is a shipped id, so `SHIPPED_BEFORE` above is
-    // the real set rather than a list that could quietly cover four of five.
-    expect([...shipped].sort()).toEqual([...DEMAND_TEMPLATE_IDS].sort());
+    // Every id this module can build **with no record to read** has a record, so `SHIPPED_BEFORE`
+    // above is the real set rather than a list that could quietly cover four of five.
+    //
+    // Asserted as a containment rather than an equality since `DECISIONS.md` § D274: the catalogue
+    // is now the wider of the two, because § D273 lets a record author its own `phases` and answer
+    // to an id no compiled-in union contains. The extra records are named rather than tolerated, so
+    // this still fails on a record nobody meant to add.
+    expect(shipped).toEqual(expect.arrayContaining([...DEMAND_TEMPLATE_IDS]));
+    expect(shipped.filter((id) => !(DEMAND_TEMPLATE_IDS as readonly string[]).includes(id))).toEqual(
+      ['office-day'],
+    );
   });
 
   it('leaves the two records meaning two different things', () => {

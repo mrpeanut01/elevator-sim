@@ -12,6 +12,7 @@
 
 import { z } from 'zod';
 
+import { demandPhaseIssues } from './demandPhases.js';
 import {
   AGGREGATIONS,
   ASSIGNMENT_MODES,
@@ -511,6 +512,24 @@ export const trafficProfilesSchema = z
         discardLastMin: nonNegative.optional(),
         directionalSplitAtStart: directionalSplitSchema.optional(),
         directionalSplitAtEnd: directionalSplitSchema.optional(),
+        // The authored phase list. § D273. Declared here because this is a `strictObject`: a
+        // `data/` author cannot give a template a schedule without the schema admitting one, and
+        // the structural rules below are what the five shape builders used to guarantee by
+        // construction. `.min(1)` is repeated in `demandPhaseIssues` rather than trusted from
+        // here, because the resolver is reachable without the schema.
+        phases: z
+          .array(
+            z.strictObject({
+              $comment: comment,
+              startMin: nonNegative,
+              endMin: nonNegative,
+              startIntensity: fraction,
+              endIntensity: fraction,
+              startSplit: directionalSplitSchema.optional(),
+              endSplit: directionalSplitSchema.optional(),
+            }),
+          )
+          .optional(),
         // The template's hour, minutes after local midnight. Declared here because this is a
         // `strictObject`: a `data/` author cannot give a template a clock without the schema
         // admitting one, which is the property that keeps the field from being a second, unvalidated
@@ -581,6 +600,49 @@ export const trafficProfilesSchema = z
           message:
             'directionalSplitAtStart and directionalSplitAtEnd are declared together or not at all; one alone gives the run a mix arc with an unauthored endpoint',
         });
+      }
+      // § D273. An authored phase list has to keep by declaration what the five shape builders
+      // keep by construction; `config/demandPhases.ts` is the one place those rules are written,
+      // and the resolver runs the same function against the same list in seconds.
+      const { phases } = template;
+      if (phases !== undefined) {
+        if (template.directionalSplitAtStart !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['demandTemplates', index, 'directionalSplitAtStart'],
+            message:
+              'a template authors its mix as a phase list or as the period endpoints, never both: directionalSplitAtStart/AtEnd describe one arc across the whole period, and phases[].startSplit/endSplit describe the mix knot by knot. Two declarations of one quantity is how the one nobody is reading becomes the one that is right',
+          });
+        }
+        if (template.discardFirstMin !== undefined || template.discardLastMin !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['demandTemplates', index, 'discardFirstMin'],
+            message:
+              'discardFirstMin and discardLastMin belong to the ISO constant shape, which discards a warm-up because one long run has no other way to reach steady state. A phase list authors its own quiet periods as phases and is reported over the whole of what it authored, so a discard here would be a field nothing reads',
+          });
+        }
+        for (const issue of demandPhaseIssues(
+          phases.map((phase) => ({
+            start: phase.startMin,
+            end: phase.endMin,
+            startIntensity: phase.startIntensity,
+            endIntensity: phase.endIntensity,
+            ...(phase.startSplit === undefined ? {} : { startSplit: phase.startSplit }),
+            ...(phase.endSplit === undefined ? {} : { endSplit: phase.endSplit }),
+          })),
+          template.durationMin,
+          'min',
+        )) {
+          ctx.addIssue({
+            code: 'custom',
+            path:
+              issue.index < 0
+                ? ['demandTemplates', index, 'phases']
+                : ['demandTemplates', index, 'phases', issue.index, issue.field],
+            message: issue.message,
+          });
+        }
       }
     });
   });

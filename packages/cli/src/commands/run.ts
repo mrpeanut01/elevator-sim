@@ -18,11 +18,9 @@
  */
 
 import {
-  DEMAND_TEMPLATE_IDS,
   SimulationError,
   Simulation,
   WARNING_CODES,
-  type DemandTemplateId,
   type LoadedConfig,
   type SimulationConfig,
   type SimulationResult,
@@ -41,6 +39,7 @@ import {
   loadData,
   randomSeed,
   requireBuilding,
+  requireDemandTemplate,
   requireDispatcher,
   requireTrafficProfile,
   resolveDataDir,
@@ -103,11 +102,16 @@ export const RUN_FLAGS: readonly FlagSpec[] = [
     defaultText: 'the demand template’s own (1800 s)',
   },
   {
+    // No `choices` list, deliberately (§ D274). A static one is checked at *parse* time against
+    // the ids this build compiled, and the authority is the `demandTemplates` records the run
+    // loads — which `--data <dir>` can change and which, since § D273, may author their own
+    // phases and answer to ids no compiled-in list contains. `requireDemandTemplate` checks the
+    // value against the catalogue instead, with the same "available / did you mean" error every
+    // other data-derived flag gives.
     name: 'template',
     kind: 'string',
     placeholder: '<id>',
-    summary: 'demand template',
-    choices: [...DEMAND_TEMPLATE_IDS],
+    summary: 'demand template; `elevator-sim list` names the ones this data directory ships',
     defaultText: 'rise-and-fall',
   },
   {
@@ -231,15 +235,23 @@ export interface RunPlan {
 const DISCLAIMER_CODES: readonly string[] = [WARNING_CODES.missingFloorPairs];
 
 /**
- * Whether a `--template` value is one core knows how to build.
+ * The `--template` id, checked against the catalogue this run loaded. § D274.
  *
- * Derived from `DEMAND_TEMPLATE_IDS` rather than a disjunction of string literals, which is what
- * the flag's `choices` list is derived from too — so a template added to `core` is offered, parsed
- * and applied by this command without anybody remembering three places. The predicate is not
- * redundant with `choices`: `planRun` is exported and is called in tests with hand-built args.
+ * **This is the non-test caller of the authored-phase-list path.** § D273 made a template's phases
+ * authorable as data, and `data/traffic-profiles.json` ships `office-day` — a ten-hour office day as
+ * an explicit phase list. Nothing about that is reachable unless something can *name* it, and this
+ * is the something: `elevator-sim run --building midtown-office --dispatcher collective --template
+ * office-day` resolves the record, builds its phases and runs them. `elevator-sim list` prints it
+ * beside the other five from the same file, and `watch` reaches it through this same `planRun`.
+ *
+ * The previous predicate asked `DEMAND_TEMPLATE_IDS.includes(value)` and, on a miss, **silently
+ * dropped the flag** — a run with `--template office-day` would have quietly run `rise-and-fall`
+ * and printed the flag back in its own reproduce line. That is worse than the widening it now
+ * needs: a mistyped template is a different experiment reported as the one you asked for.
  */
-function isDemandTemplateId(value: string | undefined): value is DemandTemplateId {
-  return value !== undefined && (DEMAND_TEMPLATE_IDS as readonly string[]).includes(value);
+function demandTemplateIdOf(config: LoadedConfig, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return requireDemandTemplate(config, value).id;
 }
 
 export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
@@ -254,6 +266,7 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
   const seed = numberFlag(parsed, 'seed') ?? randomSeed();
   const durationS = numberFlag(parsed, 'duration');
   const template = stringFlag(parsed, 'template');
+  const templateId = demandTemplateIdOf(config, template);
   const rate = numberFlag(parsed, 'rate');
   const window = stringFlag(parsed, 'window');
 
@@ -278,7 +291,7 @@ export function planRun(config: LoadedConfig, parsed: ParsedArgs): RunPlan {
     // and let the summary's own saturation test decide what may be quoted.
     onTimeout: 'report',
     ...(durationS === undefined ? {} : { durationS }),
-    ...(isDemandTemplateId(template) ? { demandTemplate: template } : {}),
+    ...(templateId === undefined ? {} : { demandTemplate: templateId }),
     ...(rate === undefined ? {} : { demand: { arrivalRatePctPop5min: rate } }),
     ...(window === 'full-run' || window === 'peak-5min' ? { reportWindow: window } : {}),
   };

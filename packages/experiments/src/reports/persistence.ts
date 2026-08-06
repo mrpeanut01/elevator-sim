@@ -59,7 +59,6 @@ import { dirname } from 'node:path';
 import {
   CREDENTIAL_ASSIGNMENTS,
   DEMAND_LEVELS,
-  DEMAND_TEMPLATE_IDS,
   INTERFLOOR_WEIGHTINGS,
   METRICS_SCHEMA_VERSION,
   PERCENTILE_METHODS,
@@ -70,7 +69,7 @@ import {
   normalizeSeed,
   parseRunRecord,
   summarizeRun,
-  type DemandTemplateId,
+  type DirectionalSplit,
   type ResolvedBuilding,
   type ResolvedDemandTemplate,
   type RunRecord,
@@ -632,19 +631,48 @@ function parseStoredRunConfig(value: unknown, path: Path): StoredRunConfig {
   });
 }
 
+/** The three shares of a stored `DirectionalSplit`, wherever one is nested. */
+function parseStoredSplit(value: unknown, path: Path): DirectionalSplit {
+  const inner = expectObject(value, path);
+  rejectUnknownKeys(inner, path, ['incoming', 'outgoing', 'interfloor']);
+  return Object.freeze({
+    incoming: expectNumber(inner['incoming'], [...path, 'incoming']),
+    outgoing: expectNumber(inner['outgoing'], [...path, 'outgoing']),
+    interfloor: expectNumber(inner['interfloor'], [...path, 'interfloor']),
+  });
+}
+
 /**
- * A demand template: either one of the two shipped ids, or a fully resolved template.
+ * A demand template: the id of a `demandTemplates` record, or a fully resolved template.
  *
  * The resolved form is validated field by field rather than waved through. It is the one part of a
  * stored configuration that is a *value* rather than a reference, so nothing downstream will catch
  * a malformed one — `generateTrace` takes a resolved template at its word, and a template with a
  * phase gap in it produces a plausible run against demand nobody asked for.
+ *
+ * ## The id is a string, and that is `DECISIONS.md` § D274 rather than a loosening
+ *
+ * It was `expectEnum(value, path, DEMAND_TEMPLATE_IDS)`, which asks *"is this one of the shapes this
+ * build compiles?"* — and that has been the wrong question since `resolveDemandTemplate` started
+ * looking the id up in the loaded catalogue first. Since § D273 it is also **answerable wrongly**: a
+ * record may author its own phases and answer to an id no union contains, so an honest run of
+ * `office-day` would have stored fine and failed to read back. A stored record has no catalogue to
+ * check against — the `data/` it was measured from need not be on disk — so the id is echoed as
+ * written and the check that it *resolves* happens at replay, where a catalogue exists and
+ * `resolveDemandTemplate` throws by name.
+ *
+ * ## Four keys this used to drop, and one it used to reject outright
+ *
+ * The key list was written when a resolved template had nine fields. It has since grown
+ * `startOfDayS` (§ D244), `meanDirectionalSplit` (§ D169) and `authoredPhaseList` (§ D273), and its
+ * phases grew `startSplit`/`endSplit` — so a stored *resolved* `lunch-two-way` round-tripped with
+ * its mix arc silently deleted, which replays a **different crowd** and is exactly the invariant-5
+ * failure the comments beside `demandOptionsOf` are about; and a stored resolved `rise-and-fall`
+ * was rejected outright, because `rejectUnknownKeys` had never heard of the hour. All five are
+ * carried now, spread-or-omitted so a template without one still reads back without the key.
  */
-function parseDemandTemplate(
-  value: unknown,
-  path: Path,
-): DemandTemplateId | ResolvedDemandTemplate {
-  if (typeof value === 'string') return expectEnum(value, path, DEMAND_TEMPLATE_IDS);
+function parseDemandTemplate(value: unknown, path: Path): string | ResolvedDemandTemplate {
+  if (typeof value === 'string') return expectString(value, path);
 
   const object = expectObject(value, path);
   rejectUnknownKeys(object, path, [
@@ -657,17 +685,32 @@ function parseDemandTemplate(
     'reportWindowEndS',
     'peakIntensity',
     'intensityIntegralS',
+    'meanDirectionalSplit',
+    'startOfDayS',
+    'authoredPhaseList',
   ]);
 
   const phases = expectArray(object['phases'], [...path, 'phases']).map((phase, index) => {
     const phasePath: Path = [...path, 'phases', index];
     const entry = expectObject(phase, phasePath);
-    rejectUnknownKeys(entry, phasePath, ['startS', 'endS', 'startIntensity', 'endIntensity']);
+    rejectUnknownKeys(entry, phasePath, [
+      'startS',
+      'endS',
+      'startIntensity',
+      'endIntensity',
+      'startSplit',
+      'endSplit',
+    ]);
     return Object.freeze({
       startS: expectNumber(entry['startS'], [...phasePath, 'startS']),
       endS: expectNumber(entry['endS'], [...phasePath, 'endS']),
       startIntensity: expectNumber(entry['startIntensity'], [...phasePath, 'startIntensity']),
       endIntensity: expectNumber(entry['endIntensity'], [...phasePath, 'endIntensity']),
+      ...spread(
+        'startSplit',
+        readOptional(entry, 'startSplit', phasePath, parseStoredSplit),
+      ),
+      ...spread('endSplit', readOptional(entry, 'endSplit', phasePath, parseStoredSplit)),
     });
   });
 
@@ -687,6 +730,16 @@ function parseDemandTemplate(
       ...path,
       'intensityIntegralS',
     ]),
+    ...spread(
+      'meanDirectionalSplit',
+      readOptional(object, 'meanDirectionalSplit', path, parseStoredSplit),
+    ),
+    ...spread('startOfDayS', readOptional(object, 'startOfDayS', path, expectNumber)),
+    // `true` or absent, never `false` — the shape the field itself keeps, so a template that is not
+    // a phase list reads back without the key rather than with one that says "no".
+    ...(readOptional(object, 'authoredPhaseList', path, expectBoolean) === true
+      ? { authoredPhaseList: true as const }
+      : {}),
   });
 }
 
@@ -1032,7 +1085,7 @@ function parseSummarizeOptions(value: unknown, path: Path): StoredSummarizeOptio
  * Config projection
  * -------------------------------------------------------------------------- */
 
-function demandTemplateOf(config: SimulationConfig): DemandTemplateId | ResolvedDemandTemplate {
+function demandTemplateOf(config: SimulationConfig): string | ResolvedDemandTemplate {
   const template = config.demandTemplate;
   if (template === undefined) return 'rise-and-fall';
   return template;
