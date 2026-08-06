@@ -19,7 +19,15 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { specFromBuilding } from '../authoring/buildingSpec.js';
-import { DEFAULT_LEVERS, DWELL_SETTINGS, type DwellChoice } from '../authoring/dispatcherSpec.js';
+import {
+  DEFAULT_LEVERS,
+  DWELL_SETTINGS,
+  specIsDirty,
+  type DwellChoice,
+} from '../authoring/dispatcherSpec.js';
+import { patternIsDirty, specFromTrafficProfile } from '../authoring/patternSpec.js';
+import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
+import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
 import { contractById, contractForBuilding } from '../shift/contracts.js';
 import { goalsForDay } from '../shift/goals.js';
@@ -27,7 +35,15 @@ import { SANDBOX_CONTRACT_ID, closeDay, outcomeOf } from '../shift/week.js';
 import type { GoalReading, WeekState } from '../shift/types.js';
 
 import type { BrowserResources } from './data.js';
-import { initialState, shiftRunConfigOf, withBuilding, type ViewerState } from './state.js';
+import {
+  buildingConfigOf,
+  initialState,
+  profileById,
+  shiftRunConfigOf,
+  withBuilding,
+  withDispatcher,
+  type ViewerState,
+} from './state.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -270,6 +286,183 @@ describe('withBuilding', () => {
     const state = Object.freeze(base());
     expect(() => withBuilding(state, resources, 'vertical-city')).not.toThrow();
     expect(state.buildingId).not.toBe('vertical-city');
+  });
+
+  /* ---------------------------------------------------------------------- *
+   * The fabric does not travel — GitHub issue #46
+   * ---------------------------------------------------------------------- */
+
+  /** Garden Apartments' first bank, with a shaft added — a fabric that is definitely not as built. */
+  function withGardenFabric(state: ViewerState): ViewerState {
+    const authored = buildingConfigOf(resources, state.savedBuildings, 'garden-apartments');
+    if (authored === undefined) throw new Error('garden-apartments is not loaded');
+    const classes = commissionableClasses(resources.elevatorSpecs);
+    const built = asBuiltChoices(authored, classes);
+    const first = built[0];
+    if (first === undefined) throw new Error('garden-apartments has no bank');
+    return {
+      ...state,
+      commissioning: withBankChoice(built, { ...first, shafts: first.shafts + 1 }),
+    };
+  }
+
+  it('clears the fabric when the building changes — issue #46', () => {
+    /*
+     * The choices are keyed by **bank id**, and a bank id is a fact about one building. Carried
+     * over, Garden Apartments' `main` was drawn under Midtown Office's name — the previous
+     * scenario's shafts on the new building's screen — and the review summed capital over hardware
+     * that is not there.
+     */
+    const before = withGardenFabric(base());
+    expect(before.commissioning.length).toBeGreaterThan(0);
+    expect(withBuilding(before, resources, 'midtown-office').commissioning).toEqual([]);
+  });
+
+  it('leaves the fabric alone when the building does not actually change', () => {
+    /*
+     * The coach select fires `change` for a re-pick of the building already running. Discarding a
+     * fabric there would be the inert-control failure with the sign flipped: the control moves, and
+     * then it moves back on its own.
+     */
+    const before = withGardenFabric(base());
+    expect(withBuilding(before, resources, before.buildingId).commissioning).toEqual(
+      before.commissioning,
+    );
+  });
+
+  it('the carried fabric really did reach the run, so clearing it is not cosmetic', () => {
+    /*
+     * **Move the control and require the run to change, compared on the legs** — the standing
+     * requirement pointed at the defect rather than at the fix. Without this the test above would
+     * pass against a `commissioning` field nothing reads, and would be asserting its own arithmetic.
+     *
+     * Midtown Office at 1 800 s and not Garden Apartments at 900: `probes.test-helper.ts` records
+     * why, having hit it — Garden produces 20 legs and two hydraulic cars answer every one, so a
+     * third car is never assigned and a live control reads dead.
+     */
+    const state: ViewerState = { ...base(), buildingId: 'midtown-office', shiftLengthS: 1800 };
+    const authored = buildingConfigOf(resources, state.savedBuildings, 'midtown-office');
+    if (authored === undefined) throw new Error('midtown-office is not loaded');
+    const classes = commissionableClasses(resources.elevatorSpecs);
+    const built = asBuiltChoices(authored, classes);
+    const first = built[0];
+    if (first === undefined) throw new Error('midtown-office has no bank');
+    const moved = withBankChoice(built, { ...first, shafts: first.shafts + 1 });
+
+    const legsOf = (choices: ViewerState['commissioning']): string =>
+      JSON.stringify(
+        recordRun(shiftRunConfigOf(resources, { ...state, commissioning: choices }).config, {
+          recordDecisions: false,
+        }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+      );
+
+    expect(
+      legsOf(moved),
+      'a shaft was commissioned and the run produced the same legs — the fabric reaches nothing, ' +
+        'so clearing it on a building change proves nothing either',
+    ).not.toBe(legsOf([]));
+  }, 300_000);
+
+  /* ---------------------------------------------------------------------- *
+   * The traffic editor's copy follows the building — GitHub issue #65
+   * ---------------------------------------------------------------------- */
+
+  it('re-seeds the traffic editor’s untouched copy with the building — issue #65', () => {
+    /*
+     * `sourcePatternOf` resolves `editingPatternId: 'building'` through `state.buildingId`, so an
+     * untouched copy of Garden Apartments' profile was being compared against Vertical City's the
+     * instant the building moved — and the editor said **edited — not saved** about a document
+     * nobody had edited. Asserted as *not dirty against its own new source*, which is the question
+     * the flag actually asks, rather than against a transcribed profile id.
+     */
+    const next = withBuilding(base(), resources, 'secure-tower');
+    const wanted = buildingConfigOf(resources, next.savedBuildings, 'secure-tower');
+    const source = specFromTrafficProfile(resources.trafficProfiles, wanted?.trafficProfile);
+    expect(next.editingPatternId).toBe('building');
+    expect(patternIsDirty(next.patternSpec, source)).toBe(false);
+  });
+
+  it('keeps an edited traffic copy, on the same rule the building editor keeps its own', () => {
+    const state = base();
+    const edited: ViewerState = {
+      ...state,
+      patternSpec: { ...state.patternSpec, ratePctPop5min: state.patternSpec.ratePctPop5min + 3 },
+    };
+    expect(withBuilding(edited, resources, 'secure-tower').patternSpec).toStrictEqual(
+      edited.patternSpec,
+    );
+  });
+
+  it('leaves a named or saved pattern alone, because it is not about the building', () => {
+    /*
+     * The condition is `editingPatternId === 'building'` and nothing else. A reader editing a
+     * shipped profile has a document that has nothing to do with which building is running, and
+     * re-seeding there would throw their work away on a control that was not about it.
+     */
+    const state = base();
+    const onAProfile: ViewerState = { ...state, editingPatternId: 'office-uppeak' };
+    expect(withBuilding(onAProfile, resources, 'secure-tower').patternSpec).toStrictEqual(
+      state.patternSpec,
+    );
+  });
+});
+
+describe('withDispatcher — GitHub issue #65', () => {
+  it('takes the editor’s untouched working copy to the dispatcher that is now driving', () => {
+    /*
+     * The rail wrote `dispatcherId` and nothing else, so picking a profile from the list left the
+     * editor showing the cost-function line, the advice and the weights of whichever profile had
+     * been opened before — under a card marked *selected*.
+     */
+    const next = withDispatcher(base(), resources, 'nearest-car');
+    expect(next.dispatcherId).toBe('nearest-car');
+    expect(next.editingDispatcherId).toBe('nearest-car');
+    expect(specIsDirty(next.dispatcherSpec, profileById(resources, [], 'nearest-car'))).toBe(false);
+  });
+
+  it('keeps an edited copy, on the rule the building editor keeps its own', () => {
+    const state = base();
+    const firstTerm = Object.keys(state.dispatcherSpec.weights)[0];
+    if (firstTerm === undefined) throw new Error('the opening dispatcher weights no term');
+    const edited: ViewerState = {
+      ...state,
+      dispatcherSpec: {
+        ...state.dispatcherSpec,
+        weights: {
+          ...state.dispatcherSpec.weights,
+          [firstTerm]: (state.dispatcherSpec.weights[firstTerm] ?? 0) + 0.5,
+        },
+      },
+    };
+    const next = withDispatcher(edited, resources, 'nearest-car');
+    expect(next.dispatcherId).toBe('nearest-car');
+    expect(next.editingDispatcherId).toBe(state.editingDispatcherId);
+    expect(next.dispatcherSpec).toStrictEqual(edited.dispatcherSpec);
+  });
+
+  it('moves the run — the pick is not only an editor transition', () => {
+    /*
+     * **Move the control and require the run to change, compared on the legs.** Without this the
+     * two assertions above would be about a field nothing reads, which is the shape this repository
+     * counts. Midtown at 1 800 s for `probes.test-helper.ts`'s measured reason.
+     */
+    const state: ViewerState = { ...base(), buildingId: 'midtown-office', shiftLengthS: 1800 };
+    const legsOf = (at: ViewerState): string =>
+      JSON.stringify(
+        recordRun(shiftRunConfigOf(resources, at).config, { recordDecisions: false }).recording.legs.map(
+          (leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1],
+        ),
+      );
+    expect(
+      legsOf(withDispatcher(state, resources, 'nearest-car')),
+      'the dispatcher card was pressed and the run produced the same legs',
+    ).not.toBe(legsOf(state));
+  }, 300_000);
+
+  it('is pure — the state it is handed is never written to', () => {
+    const state = Object.freeze(base());
+    expect(() => withDispatcher(state, resources, 'nearest-car')).not.toThrow();
+    expect(state.dispatcherId).not.toBe('nearest-car');
   });
 });
 

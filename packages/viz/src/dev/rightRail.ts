@@ -82,6 +82,8 @@ import {
   buildingConfigOf,
   disclosureOf,
   profileById,
+  withBuilding,
+  withDispatcher,
   type SavedPattern,
   type ViewerState,
 } from './state.js';
@@ -833,7 +835,18 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
               selected: entry.id === state.dispatcherId,
               help: `Profile id \`${entry.id}\`.`,
               onPick: () => {
-                context.update({ dispatcherId: entry.id });
+                /*
+                 * The whole transition, not the id — issue #65. `withDispatcher` takes the editor's
+                 * working copy along while it is untouched, on `withBuilding`'s rule and for its
+                 * reason: writing `dispatcherId` alone left the editor describing a profile nobody
+                 * is running, under a card marked *selected*.
+                 *
+                 * A whole `ViewerState` **is** a `Partial<ViewerState>`, so this merges to exactly
+                 * the state the transition returned. No new member on {@link MountContext}: a
+                 * `replace` would be the one thing that seam's docstring forbids a panel — writing a
+                 * state directly rather than asking for a change.
+                 */
+                context.update(withDispatcher(state, resources, entry.id));
                 context.runShift();
               },
             }),
@@ -890,7 +903,15 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
               selected: id === state.buildingId,
               help: `Building id \`${id}\`.`,
               onPick: () => {
-                context.update({ buildingId: id });
+                /*
+                 * `withBuilding`, not a `buildingId` patch — the same hole as the dispatcher card
+                 * beside it, on the control where it costs the most. Writing the id alone skipped
+                 * the week's move into (and out of) the building's scenario, left the fabric keyed
+                 * by the previous building's bank ids (issue #46), and left both working copies on
+                 * the building that is no longer running. `dev/main.ts`'s coach select has always
+                 * called this function; this card is the other writer and did not.
+                 */
+                context.update(withBuilding(state, resources, id));
                 context.runShift();
               },
             });
