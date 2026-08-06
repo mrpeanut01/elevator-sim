@@ -708,6 +708,41 @@ describe('a version-2 envelope — the one the missing bump broke', () => {
     expect(envelope['schemaVersion']).toBe(3);
   });
 
+  it('reads a version-2 envelope that already carries the key, because those exist', () => {
+    /*
+     * The population the bump itself creates, and it is not hypothetical: the build that shipped
+     * `windowStartS` without moving the version wrote envelopes labelled 2 whose `freePlay`
+     * *does* carry the field. Anyone who played under it holds one.
+     *
+     * Strictly those are version-3 sessions wearing a version-2 number, and refusing them would be
+     * defensible on the label. It would also take a week away from the players who were on the
+     * broken build — to punish them for a number this repository got wrong — which is the outcome
+     * the whole module exists to avoid. The stored value is authentic: they really did make that
+     * selection. So it is read, and `withWindowStart` leaves an existing key alone rather than
+     * overwriting it with `null`, which is what would silently discard the choice.
+     */
+    const slots = memoryStore();
+    const menu = menuState();
+    slots.written.set(
+      SESSION_KEY,
+      JSON.stringify({
+        schemaVersion: 2,
+        session: {
+          week: openWeek(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id),
+          settings: menu.settings,
+          freePlay: { ...menu.freePlay, windowStartS: 1_800 },
+        },
+        library: { buildings: [], dispatchers: [], patterns: [], classes: [] },
+      }),
+    );
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The stored selection, not `null`. A completion that overwrote would read as 0 or null here
+    // and the player's chosen part of the day would be gone without a word.
+    expect(result.snapshot.freePlay.windowStartS).toBe(1_800);
+  });
+
   it('still refuses a version-2 envelope that is genuinely malformed', () => {
     // The bump must not have turned the shape check off. A version-2 session missing `week` is
     // not an older shape, it is a broken one, and it must still be refused by name — otherwise
