@@ -25,6 +25,25 @@
       Claude Design handoff vendored at `docs/design/elevator-sim-reimagined.dc.html`.
       Where a section deviates from the handoff there is a comment saying so and
       naming the § 4 row that records why.
+
+      ----------------------------------------------------------------------------
+      DO NOT ADD `<meta name="elevator-sim-api">` HERE.
+
+      The viewer finds its API through that tag, and this file is the one place it
+      may not be written, because a hostname committed here would point a local
+      development build at production (§ D243 § 1). Two producers put it in, each
+      knowing something this document does not, and exactly one of them fires:
+
+        * the server, as it reads the build off disk, with the value "/" — the
+          container serving the page and the API from one origin (§ D243);
+        * the build, from `ELEVATOR_SIM_API_ORIGIN`, with an absolute origin — the
+          bundle a CDN serves, which never passes through the server (§ D257,
+          `packages/viz/apiOrigin.mjs`).
+
+      A tag declared here would suppress both, since both are idempotent — and the
+      page would load, draw, and dead-end every account, leaderboard and challenge
+      surface with no failing status code anywhere. That is not a hypothetical: it
+      is play-tester issues #21, #28, #29, #30, #32 and #34.
       ============================================================================
     -->
     <style>

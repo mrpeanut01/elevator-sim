@@ -37,6 +37,24 @@
  * does — it is serving both. So {@link loadStaticBundle} injects the tag into `index.html` as it
  * reads it. A bundle served from a CDN with no server never passes through this function, never gets
  * a tag, and keeps exactly today's behaviour, which is the property § D215 § 4 was protecting.
+ *
+ * ## Since § D257 there is a second producer, and this one is unchanged
+ *
+ * "Keeps exactly today's behaviour" above stopped being good enough the moment the viewer acquired
+ * somewhere else to live. A cold first page load of the shipped container was measured at **32.2 s**
+ * against **0.13 s** warm, because `minReplicas: 0` and the page is served by the process that is
+ * asleep — so the bundle moved to a CDN, and a CDN-served bundle with no tag is precisely the
+ * dead-ending page this section was written about.
+ *
+ * So `packages/viz/apiOrigin.mjs` declares the tag **at build time**, from a deploy parameter, with
+ * an absolute origin. Nothing in this file changes as a result, and that is the point: the container
+ * still serves the page in local development and in the current deployment, and it must keep being
+ * right for that. The two producers are mutually exclusive by construction — the container image
+ * builds with no parameter, the static host builds with one — and {@link withApiOriginTag}'s
+ * idempotence is what makes even the overlap safe rather than merely unlikely.
+ *
+ * `packages/server/src/http/static.test.ts` drives **both** modules in one file, because neither can
+ * see the other and a contract with two implementations rots at whichever one nobody looks at.
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -118,6 +136,93 @@ export const SAME_ORIGIN_API = '/';
 const API_ORIGIN_META_TAG = `<meta name="${API_ORIGIN_META_NAME}" content="${SAME_ORIGIN_API}" />`;
 
 /**
+ * Everything wrong with a value offered as an **exact origin**, or an empty array.
+ *
+ * Two callers, one shape. `main.ts` checks `ELEVATOR_SIM_ALLOW_ORIGIN` with it — the origin CORS
+ * names — and `packages/viz/apiOrigin.mjs` carries the same rules for the origin the built page is
+ * told about, because those two values have to be the *same string* for a split deployment to work
+ * and a rule enforced on one of them is not enforced.
+ *
+ * There are deliberately two implementations rather than an import: `server` may not depend on
+ * `viz`, and `viz`'s copy has to load in a bundler config that this package's compilation cannot
+ * reach. `static.test.ts` drives both over one table of cases and requires identical verdicts,
+ * which is the check a shared constant would only have looked like.
+ *
+ * Strict about values that are *nearly* right, because those are the ones that produce a
+ * working-looking deployment. `https://api.example/` and `https://api.example` are the same origin
+ * to a browser and different strings to the header comparison a CORS check actually performs, so a
+ * trailing slash fails here rather than in somebody's console.
+ */
+export function originIssues(value: string): readonly string[] {
+  if (value.trim().length === 0) return ['it is empty'];
+
+  const issues: string[] = [];
+  if (value !== value.trim()) issues.push('it has leading or trailing whitespace');
+  const trimmed = value.trim();
+
+  if (trimmed === '*') {
+    return [
+      'it is "*", which is not an origin. A wildcard here would publish an API that answers ' +
+        'session-bearing requests from any page on the web',
+    ];
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return ['it is not an absolute URL — expected something like "https://elevator-sim.example"'];
+  }
+
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    issues.push(`its scheme is "${url.protocol.replace(':', '')}" — expected http or https`);
+  }
+  if (url.username !== '' || url.password !== '') issues.push('it carries credentials');
+  if (url.pathname !== '/') issues.push(`it has a path ("${url.pathname}") — an origin has none`);
+  if (url.search !== '') issues.push('it has a query string');
+  if (url.hash !== '') issues.push('it has a fragment');
+  // The whole-string comparison is the one that catches a trailing slash, an uppercase scheme and a
+  // redundant `:443`, none of which the field-by-field checks above see.
+  if (issues.length === 0 && trimmed !== url.origin) {
+    issues.push(`it is not in canonical form — write it as "${url.origin}"`);
+  }
+  return issues;
+}
+
+/** The exact origin a value denotes, or a thrown error naming every reason it is not one. */
+export function requireOrigin(value: string, what: string): string {
+  const issues = originIssues(value);
+  if (issues.length > 0) {
+    throw new Error(
+      `${what} is not a usable origin (${JSON.stringify(value)}):\n  ${issues.join('\n  ')}\n` +
+        'An origin is a scheme, a host and an optional port — for example ' +
+        'https://elevsim-app.example.azurecontainerapps.io — with no trailing slash.',
+    );
+  }
+  return value.trim();
+}
+
+/**
+ * Whether a document **declares** the tag — as opposed to merely mentioning it.
+ *
+ * The comment strip is not defensive tidiness; it is a bug that was found by a test rather than
+ * reasoned about. `packages/viz/index.html` carries a comment telling the next reader not to add
+ * this tag by hand, and that comment necessarily contains the attribute it is warning about. A
+ * plain regex over the document matched the *warning*, concluded the page already declared an
+ * origin, and skipped the injection — so the prose written to prevent the dead-ending viewer
+ * produced one. `querySelector`, which is what the page itself runs, does not see comments; this
+ * has to agree with it or the two disagree about what the document says.
+ *
+ * The literal is deliberately still in `index.html`, and is therefore this function's live case:
+ * delete the strip and `static.test.ts` reddens against the real shipped document.
+ */
+export function declaresApiOrigin(html: string): boolean {
+  return new RegExp(`name=["']${API_ORIGIN_META_NAME}["']`, 'iu').test(
+    html.replace(/<!--[\s\S]*?-->/gu, ''),
+  );
+}
+
+/**
  * Put the tag in a document's `<head>`, unless it already declares one.
  *
  * Idempotent on purpose. A bundle that already carries the tag has been told its origin by somebody
@@ -130,7 +235,7 @@ const API_ORIGIN_META_TAG = `<meta name="${API_ORIGIN_META_NAME}" content="${SAM
  * exists to stop, one level down.
  */
 export function withApiOriginTag(html: string): string {
-  if (new RegExp(`name=["']${API_ORIGIN_META_NAME}["']`, 'iu').test(html)) return html;
+  if (declaresApiOrigin(html)) return html;
   const head = /<head[^>]*>/iu.exec(html);
   if (head === null) return `${API_ORIGIN_META_TAG}\n${html}`;
   const at = head.index + head[0].length;
