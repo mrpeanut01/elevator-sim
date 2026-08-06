@@ -25,6 +25,7 @@ import { asPerReplicationGoal, goalLabel, measureGoalRate, type GoalSpec } from 
 import { GOAL_BLOCKER, GOAL_JUDGEMENT, type GoalDisposition, type GoalRateClass } from './goals.js';
 import { MIN_SEEDS_PER_GOAL } from './published.js';
 import type { BatchResult } from '../batch/types.js';
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /** One goal on one arm of the batch that just ran. */
 export interface GoalReportRow {
@@ -60,6 +61,20 @@ export interface GoalReport {
    * that prints both must say which it is looking at.
    */
   readonly floorNote: string | null;
+  /**
+   * The words these rows used, explained — issue #22, and this is the surface that most needs it.
+   *
+   * Every row is labelled with a raw kebab-case goal id: `no-divergence`, `answer-the-demand`,
+   * `long-waits-under (≤ 10 %)`. A player has no way to tell what those measure, and they sit
+   * next to the Simulation tab's *"Get 61 % of riders away inside a minute"*, so the plain wording
+   * plainly exists somewhere and was not being used here.
+   *
+   * `goalLabel` is **unchanged** and still returns the id. § D240's rule 1: the id is what the
+   * campaign file, the published table and every other surface call this goal, and swapping it
+   * for prose here would leave a reader unable to match the row to anything else in the product.
+   * The explanation goes beside it.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 /**
@@ -117,7 +132,18 @@ export function goalReport(
   }
 
   const replications = result.arms[0]?.replications.length ?? 0;
-  return { rows, withheld, floorNote: floorNote(replications) };
+  const note = floorNote(replications);
+  /*
+   * The goal **labels** are in the corpus as well as the sentences, because a withheld goal has
+   * no sentence at all — `everyone-can-get-there` appears on this surface only as a label beside
+   * its reason, and it is the row whose name explains itself least.
+   */
+  const texts = [
+    note ?? '',
+    ...rows.flatMap((row) => [row.label, row.sentence]),
+    ...withheld.flatMap((entry) => [entry.label, entry.reason]),
+  ];
+  return { rows, withheld, floorNote: note, glossary: glossaryFor(texts) };
 }
 
 function floorNote(replications: number): string | null {

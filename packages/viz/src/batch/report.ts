@@ -74,6 +74,7 @@ import {
   type BatchReplication,
   type BatchResult,
 } from './types.js';
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /* -------------------------------------------------------------------------- *
  * Shape
@@ -238,6 +239,21 @@ export interface BatchReport {
   readonly budgetNote: string | null;
   readonly arms: readonly BatchArmSummary[];
   readonly comparisons: readonly BatchComparison[];
+  /**
+   * The statistics words this report used, explained — issue #22.
+   *
+   * **Derived from the sentences above, not declared.** `glossaryFor` is handed exactly the text
+   * this report is about to draw, so a row that never fired never explains its vocabulary and a
+   * reworded sentence changes what attaches without anybody maintaining a list. A per-surface
+   * list would be § D152's shape one layer down: derived-looking only because today's wording
+   * happens to fit it.
+   *
+   * Additive, and that is the whole of the contract with the reader. Every field above comes back
+   * byte-identical to what it was before this existed — the plain language **leads** the run's own
+   * words and never replaces them, which is § D240's rule 1 and what `mode/glossary.test.ts`
+   * asserts by looking for a `plain` sentence inside a `sentence` and finding none.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 /* -------------------------------------------------------------------------- *
@@ -278,7 +294,8 @@ export function batchReport(result: BatchResult): BatchReport {
     });
   }
 
-  return {
+  const arms = result.arms.map((arm) => summariseArm(arm));
+  const report = {
     buildingId: result.buildingId,
     buildingName: result.buildingName,
     seed: result.seed,
@@ -291,9 +308,29 @@ export function batchReport(result: BatchResult): BatchReport {
     crnSentence: crnSentence(result),
     traceKey: result.crn.traceKey,
     budgetNote: budgetNote(replications),
-    arms: result.arms.map((arm) => summariseArm(arm)),
+    arms,
     comparisons,
-  };
+  } as const;
+
+  return { ...report, glossary: glossaryFor(reportText(report)) };
+}
+
+/**
+ * Every string this report puts in front of a reader, for {@link glossaryFor} to read.
+ *
+ * Assembled from the report rather than from the inputs, so a word explained here is a word the
+ * reader was actually shown. It deliberately includes the **labels** — `95th-percentile wait` and
+ * `drive work (proxy)` are drawn as column headings whether or not their row had a number to
+ * report, so a batch whose every estimate was suppressed still explains what the columns meant.
+ */
+function reportText(report: Omit<BatchReport, 'glossary'>): readonly string[] {
+  const texts = [report.demandClause, report.crnSentence, report.budgetNote ?? ''];
+  for (const arm of report.arms) texts.push(arm.sentence, ...arm.reasons);
+  for (const comparison of report.comparisons) {
+    texts.push(comparison.summary.sentence, comparison.summary.remedy ?? '');
+    for (const row of comparison.rows) texts.push(row.label, row.sentence, row.note);
+  }
+  return texts;
 }
 
 function budgetNote(replications: number): string | null {

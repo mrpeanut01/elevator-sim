@@ -23,6 +23,7 @@ import { playerSafeDescription } from './words.js';
 import type { CampaignStage } from './types.js';
 import { goalLabel } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /** One editable dial, as the briefing lists it. */
 export interface BriefedDimension {
@@ -48,6 +49,15 @@ export interface StageBriefing {
   /** What each goal will be judged on, before it is judged. */
   readonly goals: readonly string[];
   readonly editable: readonly BriefedDimension[];
+  /**
+   * The words the brief used, explained — issue #22.
+   *
+   * A brief is the one surface that says them **before** the run rather than after it: the seed
+   * note names a holdout set, the goal lines name the kebab-case kinds, and the editable list is
+   * a set of dimensions. Explaining them here is the cheapest place in the product to do it,
+   * because the reader has not yet been handed a number to misread.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 export interface BriefingInput {
@@ -66,7 +76,7 @@ export function briefingFor(input: BriefingInput): StageBriefing {
       ? "at the building's own traffic profile"
       : `at ${String(stage.traffic.arrivalRatePctPop5min)} % of population arriving per 5 minutes`;
 
-  return {
+  const briefing = {
     stageId: stage.id,
     name: stage.name,
     teaches: stage.teaches,
@@ -101,5 +111,28 @@ export function briefingFor(input: BriefingInput): StageBriefing {
       id,
       help: playerSafeDescription(input.dimensionHelp.get(id)),
     })),
-  };
+  } as const;
+
+  return { ...briefing, glossary: glossaryFor(briefingText(briefing)) };
+}
+
+/**
+ * Every string the briefing shows, for {@link glossaryFor} to read.
+ *
+ * The authored `sentences` are in it. A stage author writing *"watch what happens to the 95th-
+ * percentile wait"* in `data/campaign.json` has used a word this vocabulary owns, and a glossary
+ * that read only the derived half would explain the words the code wrote and not the words a
+ * person did — which is the half a reader is most likely to meet first.
+ */
+function briefingText(briefing: Omit<StageBriefing, 'glossary'>): readonly string[] {
+  return [
+    briefing.teaches,
+    ...briefing.sentences,
+    briefing.configuration,
+    briefing.seedNote,
+    ...briefing.facts,
+    ...briefing.withheld,
+    ...briefing.goals,
+    ...briefing.editable.map((dimension) => dimension.help ?? ''),
+  ];
 }

@@ -18877,3 +18877,182 @@ between `'traffic.batchSize.weight'` and `'traffic.dayVariation.maxDemandFactor'
 outside this lane's file ownership, so the line is **named here rather than added** — the guard is
 doing exactly what it was written to do, and what it is asking for is a decision that a new
 unsearchable row was intended.
+
+---
+
+## D277 — the vocabulary is a module, and the first thing it found was a copy of itself
+
+**Date: 2026-08-06 · Written with the code.** Issue #22 asks for a glossary across Compare, Lab and
+Parameters. The obvious build is six explanations where the six sets of words appear. That is
+rejected, and the product owner's decision comment says why in one line: *it is how you get four
+definitions of paired difference that drift apart.* This repository already carries the defect
+twice — the band palette held as its own copy in **four** modules (§ D251), and
+`live/decisions.ts#TERM_PHRASES` duplicating by hand the `terms[].measures` and `serves` prose
+`data/dispatcher-profiles.json` already authors. Neither was wrong on the day it was written.
+
+**§ D251's fourth copy is the one this lane should be read against.** Three of the four were found
+by a contrast walk, because they painted words and a word has a ratio. The fourth — `live/honesty.ts`
+holding `rgba(224,176,64,.07)`, the dark value of `--band-1`, as the honesty card's wash — carries
+no word, so no walk could reach it, *"and it would have survived a fix that chased the reported
+ratios and stopped."* That is the argument for mechanising a duplication check rather than fixing
+the instances somebody happened to see, and it is exactly what clause 3 below is: the sweep that
+found this lane's own copy found it in a module no reader had complained about.
+
+So the lane's first deliverable is **the single source, not the copy**: `mode/glossary.ts`, one
+entry per term, consumed by every surface that says the word.
+
+### Why `mode/`, and why `glossaryFor` derives rather than declares
+
+`docs/12` § 2.2 already put the vocabulary here — *"`mode/disclosure.ts` already holds the
+vocabulary that has to move"* — and § D240 built the first half of it against that sentence.
+`disclosure.ts` explains a **figure** in the Casual view of one run; this explains a **word**, on
+any surface, in either view.
+
+No surface declares which terms it uses. `glossaryFor` reads the surface's **own emitted text** and
+returns the terms that text contains. A hand-written list per surface would be § D152's shape one
+layer down — derived-looking only because today's sentences happen to fit it — and it would rot
+silently the first time somebody reworded a sentence. Derived, a rewording changes what attaches,
+and a term nothing says any more is caught rather than kept.
+
+### The anti-drift property, asserted four ways
+
+*"There is a single source"* is a property, not an intention, so `mode/glossary.test.ts` asserts it
+rather than trusting it. Each clause catches a different way it could be true today and false in a
+month:
+
+1. **Defined once.** No two entries share an id, a term, an explanation or a trigger phrase — and
+   no phrase may be a *prefix* of another, because `appearsAs` matches at a leading word boundary
+   and not a trailing one, so a prefix would attach two terms to one word.
+2. **Read, not copied.** Every wired surface's entries are asserted `toBe` — the same objects as
+   `GLOSSARY_TERMS`', by reference. `toEqual` would pass the defect this suite exists to catch,
+   because equal strings are exactly what two copies look like on the day they are written. This is
+   `honesty/surfaces.ts`' own reason for seeding `GOAL_BLOCKER` by reference: *"the string the
+   sweep checks and the string a player reads are the same object."*
+3. **Not duplicated in the tree.** No explanation appears as a literal in any module but
+   `mode/glossary.ts`, swept with `honesty/derive.test-helper.ts#deriveProseLiterals`.
+4. **Attached to something real.** Every term names a phrase the shipped source actually prints. A
+   term for a word nothing says is a ghost, and `derive.test.ts` already records why a list of
+   ghosts is worse than no list.
+
+### What clause 3 found on its first run, and it was in this lane's own work
+
+`wt95`'s explanation was a **byte-for-byte copy** of `mode/disclosure.ts`'s
+`CASUAL_LEAD_BY_FIGURE[WT95_ID]`. Written by hand, from the same source, into the module built to
+stop exactly that — which is the argument for mechanising the check rather than against it.
+
+Closed by making `disclosure.ts` a **consumer**: `WT95_ID` and `TTD_ID` now read `glossaryPlain`,
+and the second copy is gone rather than reworded. The line between what moved and what stayed is
+not arbitrary, and the instructive case is the one that did **not** move. `long-waits` stayed:
+the glossary owns *long-wait threshold*, which is the **line**, and the disclosure entry is about
+the **share of rides that crossed it**. Two related sentences about two different quantities are
+not a duplication, and collapsing them to make a count look tidier would have lost the figure's
+own meaning. `demand`, `awt` and `service-level` stayed for the same reason one level up — nothing
+on Compare or Lab draws a paired demand bar or names the single worst wait, so there is no second
+surface for them to drift against.
+
+### Two rules carried from § D240, and one bug the boundary rule hid
+
+**Explain the term beside the run's own words, never in place of them.** The glossary arrives as
+its own field; not one `sentence` or `note` is rewritten. Asserted by looking for an explanation
+inside a surface's own sentence and finding none. `goalLabel` is deliberately **unchanged** and
+still returns the raw kebab-case kind — `no-divergence`, `long-waits-under (≤ 10 %)` — because that
+id is what the campaign file, the published table and every other surface call the goal, and
+swapping it for prose here would leave a reader unable to match the row to anything else.
+
+**The wording may never become a ranking.** Swept with `mode/disclosure.test.ts`'s own banned
+pattern rather than a second list. It refused one entry: *dead gate* read *"a control that silently
+does nothing is worse than one that says why it cannot"*. The comparison is between two designs
+rather than two dispatchers, so the rule was arguably not aimed at it — and exempting it was the
+other option and is the one that erodes. `campaign/words.ts` records that *"a rule with one
+carve-out is a rule with a place to hide"*. Reworded, at no cost to what it says.
+
+The sweep is scoped to `plain` and not to `term`, because `term` is a **surface's** wording quoted
+back rather than this module's — `beat-the-baseline` is a goal id, not a claim. That scope is only
+honest while `term` cannot be anything the product does not already print, which is what clause 4
+above makes true. The two assertions are load-bearing together and neither is on its own.
+
+**And the boundary rule hid a real bug.** `appearsAs` was matched as `\b` + phrase
+unconditionally. `\b` matches between a word character and a non-word one, so `\b%` requires a
+letter or digit immediately before the `%` — and the string this vocabulary has to match is
+`95 % interval`, with a space. The `confidence-interval` term therefore attached **nowhere**, in
+the corpus as well as in the test, and would have shipped explaining a word it could never reach:
+a definition that is correct, wired, tested in isolation and connected to nothing, which is this
+repository's own dead-seam shape arriving inside a glossary. A phrase opening on a non-word
+character now gets no leading boundary, because the character is the boundary.
+
+---
+
+## D278 — the glossary is driven through the honesty search, because that is what the search is for
+
+**Date: 2026-08-06 · Written with the code.** `honesty/derive.test.ts` partitions every derived
+text producer into *driven by an adapter* or *excluded with a reason*, and an unclassified one is
+red. `mode/glossary.ts` exports two producers, so it had to be one or the other.
+
+**It is driven.** An exclusion would have had to argue that prose written to explain a confidence
+interval is not the kind of prose R1, R2, R10, R11 and R13 are about, and there is no version of
+that argument that survives being written down: this is player-facing copy about **what a number
+means**, which is the closest thing to the search's own subject the package contains. The module
+was authored knowing it would be swept, and the wording that came out of it is different for that.
+
+Every rule the sweep applies is one this table could plausibly break, which is why the choice is
+not ceremonial:
+
+- **R10** — the natural way to explain an interval is *"there is a 95 % chance"*, which is the
+  Budescu misreading the rule exists for. `probabilityWordIn` runs over every `plain` **and** every
+  `term`; `certain` is on that list as well as `likely`, and both ends of the scale had to be
+  written around.
+- **R11** — the natural way to explain kilojoules is to call a small number good. § D106's
+  measurement is why that is wrong rather than merely imprecise: `nearest-car` sits on the Pareto
+  front at six of eight matrix cells **because it carries fewer people**. The entry says drive work
+  is an estimate of work done, that it sits beside the waits and is never folded into them, and
+  that a small figure is a measurement of the driving and not an achievement. It is asserted
+  against `properties.ts`' own three patterns — an energy quantity *and* a wait quantity *and* a
+  scoring word in one string is a folded axis — in the test rather than only in the search, so the
+  rule fails at the unit rather than 4 650 simulations later.
+- **R2** — the whole risk of a plain-language layer is that *"this run cannot tell them apart"*
+  drifts into *"A is better"*.
+
+### Provenance is `authored`, and that is a decision rather than a default
+
+Not `schema`. `schema` is the one provenance `isResultBearing` returns `false` for, and it exists
+for a narrow thing: `core`'s own description of its own dial, re-printed by the Parameters tab
+unaltered, with no run behind it for a probability word to translate. This text is this package's
+own writing about results. Marking it `schema` would have been an exemption dressed as a category —
+and it would have exempted precisely the sentences most able to break R10.
+
+`term` seeds as `label` and `plain` as `prose`. The split is not cosmetic: R13's frequency clause
+skips labels, and `95th-percentile wait` is a name rather than a restatement of anything.
+
+### The adapter renders twice, and the second rendering is the liveness half
+
+1. **The whole table**, on every case — so no entry can hide behind never having been selected.
+2. **What `glossaryFor` actually selected** from the shipped batch report's own sentences, which is
+   the call the Compare tab makes.
+
+Without the second, a selector that matched nothing would leave every assertion true over a corpus
+with no evidence the vocabulary is ever attached to anything — wave 8's fifth false-negative shape,
+a harness reporting no failures for every case. It is the same instrument that caught the `\b%`
+bug in § D277, one layer out.
+
+`BATCH_REPORT` and `CAMPAIGN` deliberately do **not** seed their surfaces' new `glossary` fields.
+Those fields hold these same objects by reference, so seeding them again would put one sentence
+into the corpus under two surface ids and make the search look broader than it is.
+
+### What is wired, and what is named rather than claimed
+
+Wired this pass, all of them pure functions whose reports now carry a derived `glossary`:
+`batch/report.ts#batchReport`, `scenario/goalReport.ts#goalReport`, `campaign/judge.ts#judgeStage`,
+`campaign/brief.ts#briefingFor`, `campaign/dimensions.ts#admitProfile`, and
+`mode/disclosure.ts`'s two Casual leads.
+
+**The DOM mounts are not**, and they are stated here rather than left to be discovered. The
+vocabulary reaches a screen only when a panel draws the field, and three panels do not yet:
+`dev/batchPanel.ts`, `dev/campaignPanel.ts` and `dev/parameterForm.ts`. That is § D240's own second
+finding repeating one lane over — *the renderings are better and nothing draws them* — and it is
+recorded as an open gap with its named fix, not as coverage. Two of the six terms in issue #22's
+own list, *dead gate* and *authorable*, are produced **only** in files this lane does not own
+(`dev/parameterForm.ts`, `controls/editedProfile.ts`), so they are defined here and drawn nowhere
+until that routing lands. They are held to clause 4 of § D277 like every other entry: both are
+asserted to be phrases the shipped source really prints, so the definitions cannot quietly become
+ghosts while they wait.
+
