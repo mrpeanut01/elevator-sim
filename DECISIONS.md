@@ -19834,7 +19834,7 @@ disagree the day the space moves.
 
 ---
 
-## D279 — the ten-hour day is offered because it ships, and this is the smaller of the two fixes § D276 named
+## D282 — the ten-hour day is offered because it ships, and this is the smaller of the two fixes § D276 named
 
 **Date: 2026-08-06 · Written after the code.** The red test § D276 left named, closed.
 
