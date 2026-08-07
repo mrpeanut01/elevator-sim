@@ -25,6 +25,7 @@
 
 import type { LockedOutLanding } from '../access/lockedOut.js';
 import { describeLockedOut } from '../access/lockedOut.js';
+import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
 import { STATE_GLYPHS } from '../access/zoning.js';
 import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
@@ -740,6 +741,23 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
    */
   const lockedOut = describeLockedOut(input.lockedOutLandings ?? [], { short: true });
   if (lockedOut !== '') banner.push(lockedOut);
+  /*
+   * A landing every rider on it was promised one full car — § D29's cost, made visible.
+   *
+   * Above the saturation clause deliberately, and the ordering is by *cause* exactly as
+   * `docs/03`'s abandonment-above-censoring ordering is. A reader looking at a crowd standing
+   * still beside cars that are not taking them is looking for the reason; "SATURATED — AWT
+   * suppressed" is true and sends them after a statistic, and it is the second thing they need.
+   *
+   * Derived here rather than taken as a new `SceneInput` field, because everything it needs is
+   * already handed in: the queues carry the promise, the shafts carry the capacity. A conventional
+   * run has no promises and this contributes nothing to the banner.
+   */
+  const pinned = describePinnedQueues(
+    pinnedQueuesAt(input.queues ?? [], recording.shafts, recording.passengerModel),
+    { short: true },
+  );
+  if (pinned !== '') banner.push(pinned);
   if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
   // `D10` — a call no car answered is never left to the landing selector alone. See

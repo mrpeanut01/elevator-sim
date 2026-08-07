@@ -187,6 +187,26 @@ export const STANDARD_CORPUS: readonly number[] = Object.freeze([
   9001, 9002, 9003, 9004, 9005, 9006, 9007, 9008, 9009, 9010, 9011, 9012, 9013, 9014, 9015, 9016,
   9017, 9018, 9019, 9020, 9021, 9022, 9023, 9024, 9025, 9026, 9027, 9028, 9029, 9030, 9031, 9032,
   9033, 9034, 9035, 9036, 9037, 9038, 9039, 9040, 9041, 9042, 9043, 9044, 9045, 9046, 9047, 9048,
+  /*
+   * 9068 — the one seed here chosen for a *surface* rather than drawn in sequence, and it is
+   * pinned with the measurement that chose it.
+   *
+   * `frame/pinnedQueue.ts` describes a landing where more riders are promised one car than it
+   * holds — § D29's write-once cost, made visible. The corpus 9001–9048 draws **three**
+   * destination-panel cases (9018 secure-tower, 9025 garden-apartments, 9035 mixed-use-high-rise)
+   * and the surface fires on **none** of them: measured, 0 of 11 sampled instants each, because a
+   * 26-person car needs sustained load to be over-subscribed and those three do not reach it.
+   *
+   * An adapter that renders nothing certifies a surface it never looked at — which is precisely
+   * what `honesty.test.ts`'s *"every adapter produced at least one string"* case exists to catch,
+   * and it caught this one. 9068 draws `vertical-city` / `destination-panel` over 840 s at the
+   * building's own rate and fires at **9 of 11** sampled instants.
+   *
+   * Extending the corpus rather than declaring the adapter silent, because *silent in the always-on
+   * tier* is the weaker claim: `campaign/judge.ts#judgeStage` earns it by being structurally
+   * impossible here (`stageProbability: 0`), and this surface is not — it simply had no case.
+   */
+  9068,
 ]);
 
 /** Seeds for the opt-in deep campaign. `count` cases starting from `from`. */
