@@ -666,14 +666,37 @@ Its seven numbered recommendations map **one-to-one, in order**, onto #99, #100,
 independent corroborations.** They should be weighted as a single observation, which is what the
 wave rule in `ISSUE_TRIAGE_PLAN.md` § 2 already assumed.
 
-### ⚠ The tester played a DEPLOYED build, not this tree
+### ✅ E-7 RESOLVED — the deployed build is content-identical to this tree
 
 > *"playing the build at `elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io`"*
 
-The working branch is `feat/azure-app-deployment`. **No wave-B or wave-C observation can be assumed
-to describe HEAD** until the deployed commit is identified. This does not invalidate the reports —
-it means a "cannot reproduce" against the local tree is not a refutation. Recorded as a standing
-caveat on every `NOT REPRODUCIBLE-FROM-CODE` verdict in this document.
+The tester played a deployment, not the local tree, which initially put every
+`NOT REPRODUCIBLE-FROM-CODE` verdict in doubt. **It is now settled, from the deployment history.**
+
+`gh run list --workflow=deploy-viz.yml`:
+
+| time (UTC) | commit | branch | result |
+|---|---|---|---|
+| 02:13:46 | `2f2a7b4` | main | **success** |
+| **03:02:14** | **`769eb61`** | feat/azure-app-deployment | **success** |
+| 03:44:12 | `faf935b` | main | cancelled |
+| 03:44:13 | `769eb61` | feat/azure-app-deployment | skipped |
+
+**`git diff 769eb61 faf935b` is EMPTY.** `faf935b` (local HEAD, the tree every verification lane
+read) is a **merge commit** — parents `2f2a7b4` and `769eb61` — whose tree is identical to
+`769eb61`. **`faf935b` was never deployed, and did not need to be: it is the same content.**
+
+**Waves B and C (#99–#119, filed 03:42–04:00) were played against `769eb61` ≡ HEAD.** So every
+code-level verdict in this document is a verdict about exactly what the tester saw.
+
+**Wave A (#90–#98, filed 03:00–03:04) straddles the 03:02 deploy** and was mostly authored against
+`2f2a7b4`. The delta `2f2a7b4 → 769eb61` is **purely additive** — a new `frame/pinnedQueue.ts`
+plus honesty and canvas additions, 450 insertions, 0 deletions — and touches **none** of wave A's
+subject matter (menu, scenarios, free-play defaults, onboarding). #97's claim is unaffected.
+
+> **Consequence: the refutations stand.** #99's Midtown Office default, #117's three identical
+> baselines, #106's Settings symptom and #97's missing scenario list are **not** deployment
+> artifacts. They are refuted against the build that was actually played.
 
 ### The Midtown Office default, reconciled
 

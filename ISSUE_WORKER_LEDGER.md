@@ -67,7 +67,7 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 |---|---|---|
 | **E-0** | **Teaching tool / research sandbox, or mass-market management sim?** Stated by the tester report, not by any issue. **E-1 and E-2 are both downstream of it** | **Open — decide first** |
 | **E-1** | Build deterministic intraday intervention (re-simulate from t=0 on each event)? Or ship only the honesty fallback (#104)? | **Open — needs a human.** Touches the run model, Invariants 2 and 5, and replay verification. **Scope reduced**: #116's "no economy" premise is refuted (see E-7) |
-| **E-7** | Deployed-build divergence: the tester played an Azure deployment, not HEAD. Identify the deployed commit before treating any "cannot reproduce" as a refutation | **Open — blocks confident closure of #99, #117, and #106's Settings claim** |
+| **E-7** | Deployed-build divergence: the tester played an Azure deployment, not HEAD | **RESOLVED 2026-08-07.** `git diff 769eb61 faf935b` is empty — HEAD is a merge commit with the deployed tree. Waves B/C were played against HEAD's content. Wave A's delta is purely additive and untouching. **All refutations stand.** |
 | **E-2** | Is Casual a real layout, or is the toggle removed? | **Open — needs a human.** Both branches large and opposite |
 | **E-3** | Board seeding (#101 residual): fabricate reference scores, or reframe the empty state? | **Open.** Interacts with the anti-cheat replay guarantee |
 | **E-4** | Phase 9's honesty sweep does not cover *temporal* honesty — it samples `t=0` and passes whole-run claims. Record as a named gap? | **Open.** See findings § J |
