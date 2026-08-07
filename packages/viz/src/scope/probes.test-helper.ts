@@ -685,7 +685,18 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
 export const SINK_IS_A_MOUNT: Readonly<Record<string, string>> = Object.freeze({
   'viewer.editingDispatcherId': 'read by mountDispatcherEditor to title its own panel; no pure sink exists to call',
   'viewer.editingPatternId': 'read by mountTrafficEditor to title its own panel; no pure sink exists to call',
-  'viewer.editingClassId': 'read by mountMachinesEditor to title its own panel; no pure sink exists to call',
+  /*
+   * Corrected in issue #114, and it was wrong in both halves. It named a *title* the editor does
+   * not draw from this field — `mountMachinesEditor` titles from `state.machineSpec.name`, which is
+   * the draft rather than its subject — and it omitted the reader a player could actually see, the
+   * right rail, which highlighted this pointer in a six-card list that wrote it back. That list is
+   * gone: `mountRightRail` reports the classes the running building's cars are built to, and reads
+   * this field no longer. What is left is the editor, and what it uses the field for is the one
+   * question that needs the *subject* rather than the draft: is the draft still identical to it.
+   */
+  'viewer.editingClassId':
+    'read by mountMachinesEditor to resolve the class the draft is a diff against — the ' +
+    'edited-not-saved flag and the live parse preview; no pure sink exists to call',
   'viewer.editingBuildingId': 'read by mountBuildingEditor, and by withBuilding’s pristine check, which is not a display',
 });
 
