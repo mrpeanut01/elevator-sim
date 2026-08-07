@@ -137,37 +137,24 @@ export function runIdentityIssues(
   }
 
   /*
-   * Which part of the day — § D288, and the one refusal here that is about the **server** rather
-   * than about this browser.
+   * There is deliberately **no refusal for `windowStartS` here any more**, and the absence is the
+   * record of one.
    *
-   * The three above name something only this machine has. This one names something a submission
-   * cannot carry: `RunSubmission` is six fields — building, dispatcher, template, rate, `durationS`
-   * and seed — and the window is in none of them. The board does not store a number the client
-   * sends; it **re-simulates the seed for itself** (§ D214 § 3), so what would actually happen is
-   * worse than a mislabelled row.
+   * § D288 refused a windowed run outright, because `RunSubmission` was six fields — building,
+   * dispatcher, template, rate, `durationS`, seed — and the window was in none of them. That was
+   * not a mislabelling worry: the board **re-simulates the seed for itself** (§ D214 § 3), so a
+   * lunch peak would have been replayed over the whole day and come back either as a 422 the
+   * player reads as an accusation, or as a different and entirely correct answer to a different
+   * question.
    *
-   * The server would replay `office-day` at `durationS: 1800`, which reaches `core` as
-   * `templateOverrides.durationS` on an authored phase list and is **refused by name** (§ D275) —
-   * so a posted lunch peak comes back as a 422, and `client.ts`'s own docstring says what that
-   * reads as: *"a 422 that means 'your score did not replay' and must not read as an accusation."*
-   * On a shape template it is quieter and no better: the replay rescales the geometry instead of
-   * cutting it, and returns a different, entirely legitimate answer to a different question. Neither
-   * number is wrong. They are answers about two different runs, and nothing in the exchange could
-   * say so.
+   * The refusal named its own fix — *"one field on `RunSubmission`, one line in `configHashOf`, and
+   * the replay honouring it"* — and all three have landed. The window now travels, digests into the
+   * board identity so a morning and a lunch are ranked apart, and is passed to the replay as
+   * `windowStartS`/`windowEndS`. `submission.test.ts` and `verify.test.ts` hold the three halves.
    *
-   * It is a refusal rather than a seventh field because `packages/server` is where that field goes
-   * and it was not this lane's to change. Closing it is one field on `RunSubmission`, one line in
-   * `configHashOf`, and the replay honouring it; when that lands, this block is what should be
-   * deleted.
+   * Left as a comment rather than deleted because a reader looking for *why is a windowed run
+   * allowed to post* should find the answer where the refusal used to be, not in a commit.
    */
-  if (state.windowStartS !== null) {
-    issues.push({
-      key: 'viewer.windowStartS',
-      scope: 'between-games',
-      message:
-        'this run is one part of a longer day, and a submission records only how long a run was — so the board would replay this seed over the whole period and get a different, equally correct answer',
-    });
-  }
 
   /* The scope questions, walked from the table rather than listed. */
   for (const { key, field } of viewerControls()) {

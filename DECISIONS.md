@@ -20777,3 +20777,84 @@ browser holding a session written by an earlier build — which no test fixture,
 fresh profile has. It was found by opening the deployed page and reading the notice, and the
 notice was only readable because § D289's cache defect had already been fixed enough for the app
 to boot at all.
+
+---
+
+## D291 — a run that is one part of a day can be posted, and § D288's refusal is deleted
+
+**Status: shipped.** `SubmittedRun` and `RunSubmission` gain `windowStartS`, `configHashOf` digests
+it, and `configFor` passes it to the replay. `scope/runIdentity.ts`'s refusal is gone.
+
+§ D288 refused a windowed submission and named its own fix in the same breath — *"one field on
+`RunSubmission`, one line in `configHashOf`, and the replay honouring it; when that lands, this
+block is what should be deleted."* All three landed together, because any two of them without the
+third is worse than the refusal was.
+
+### One field, not two
+
+The far end is `windowStartS + durationS`. The viewer already carries a window as a start and a
+length (`menu/types.ts`), `durationS` is already on the wire, and a second submitted end could
+disagree with the first — so the server derives it.
+
+### Why the digest writes `undefined` and not `null`
+
+Two parts of one day are different runs and must be ranked apart, so the window has to be in the
+board's identity. But writing `null` for a whole-period run would add a key to the canonical string
+that was never there and **fork every board that already exists** — every honest score posted before
+this change relocated for a selection its player never made.
+
+`canonicalJson` drops `undefined`, so a whole-period run digests to exactly the string it digested
+before the field existed. Pinned against the literal digest — `d77c9681da72ea7aea293a204a1b55ff`,
+computed from the pre-change field set — rather than against a recomputation, which would move with
+the code and prove nothing. `0` is a window and is **not** dropped: `?? undefined` keeps *starts at
+the top of the day* apart from *no window*, where `|| undefined` would fold one into the other.
+
+### `durationS` **or** a window, never both — found by running it
+
+The first version of `configFor` added the window and left `durationS` in place. `office-day` threw:
+
+```text
+templateOverrides.durationS cannot be applied to demand template "office-day": its phases are
+authored, not computed …
+```
+
+which is § D275 refusing exactly the case the window exists for. `durationS` reaches
+`runSimulation` as a template override and **refits the geometry**; a part of a day cannot travel as
+one. `viz`'s `dev/state.ts` already had the branch, and the server now mirrors it in the same shape —
+deliberately a mirror rather than one side normalising for the other, because the two have to agree
+about what a submission means and the way they agree is that both build it the same way.
+
+### What is asserted
+
+Three properties, each shown to fail without its half. Neutering the replay's window fails **3**
+tests; not dropping `null` from the digest fails the no-fork test.
+
+- the replay receives the window, and **not** `durationS`;
+- an honest windowed submission is **accepted end to end**;
+- a claim from one part replayed against another is refused `metrics-do-not-reproduce`.
+
+The fixture is `garden-apartments` on `office-day`, and the obvious one — a `midtown-office` lunch
+peak — is **unusable and the reason is recorded**: it saturates, so `verifySubmission` refuses it
+`awt-not-quotable` before the window bears on the outcome at all, and a test accepting that refusal
+would assert nothing about windows. The two windows used measured `awtIsValid` at AWT 9.20 s and
+11.92 s, so the accept is a real accept and the cross-window refusal is caused by the window.
+
+### The key-parity test caught the change, and then caught a second thing
+
+`menu/challenge.test.ts` derives the config's key set from `configFor`'s **source** rather than
+listing it. Moving `durationS` onto a ternary broke it, correctly — and fixing it surfaced a defect
+in the test itself: its matcher took the *first* key of *one* arm, so `windowEndS`, a second key on
+one arm, was unreachable by construction. It now flattens nested literals and takes every key from
+both arms.
+
+Its assertion changed shape too. `durationS` and the window are alternatives, so a challenge config
+legitimately lacks the window pair — asserted as **exactly** that pair rather than filtered out, so
+a new key added anywhere in `configFor`, including inside the window arm, still fails here.
+
+### What did not change
+
+`ChallengeConfig` has no window and passes `null` **by construction, not by default**: every entry
+in `CHALLENGE_ROTATION` names an hour record — `rise-and-fall`, `lunch-two-way`, `evening-egress` —
+which already is the part of the day it means. Windowing exists to cut a *day* template and no
+challenge names one. If one ever does, `ChallengeConfig` gains the field and
+`challengeDefinitionIssues` gains the bound.

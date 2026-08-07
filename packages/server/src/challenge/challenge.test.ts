@@ -290,6 +290,7 @@ function honestSeed(
       demandTemplateId: challenge.config.demandTemplateId,
       arrivalRatePctPop5min: challenge.config.arrivalRatePctPop5min,
       durationS: challenge.config.durationS,
+      windowStartS: null,
       seed,
     },
     resources,

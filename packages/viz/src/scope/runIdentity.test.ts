@@ -71,30 +71,33 @@ describe('the predicate answers the question it claims to', () => {
     }
   });
 
-  it('refuses a run that is one part of a longer day, because no board can record which part', () => {
+  it('lets a run that is one part of a longer day be posted, now the submission carries which part', () => {
     /*
-     * § D288. Not a scope question and not a *this browser alone* question — the third kind: a run
-     * a **submission** cannot carry. `RunSubmission` is six fields and the window is in none of
-     * them, and the board re-simulates rather than trusting the client — so posting a lunch peak
-     * would have the server replay the seed over the whole ten hours and answer a different
-     * question, correctly.
+     * The inverse of what this case used to assert, and the inversion is the point.
      *
-     * Asserted against the whole-period control in the same case, because the claim is that the
-     * window is what refuses it and not the length: both arms are thirty minutes.
+     * § D288 refused a windowed run outright: `RunSubmission` was six fields, the window was in
+     * none of them, and the board **re-simulates** rather than trusting the client — so posting a
+     * lunch peak would have had the server replay the seed over the whole ten hours and answer a
+     * different question, correctly. The refusal named its own fix, and all three parts of it have
+     * landed: the field is on the wire, `configHashOf` digests it so a morning and a lunch are
+     * ranked apart, and `configFor` passes it to the replay as `windowStartS`/`windowEndS`.
+     *
+     * Still asserted against the whole-period control in the same case, for the reason the refusal
+     * gave: both arms are thirty minutes, so nothing here turns on the length.
      */
     const base = { ...baseState(), shiftLengthS: 1800 };
     expect(runIdentityIssues({ ...base, windowStartS: null }, RESOURCES)).toEqual([]);
-
-    const windowed = runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES);
-    expect(windowed.map((issue) => issue.key)).toEqual(['viewer.windowStartS']);
-    expect(windowed[0]?.message).toContain('part of a longer day');
-    // The reason names the replay rather than only the row, because that is what actually happens.
-    expect(windowed[0]?.message).toContain('replay');
-    // ...and it survives `shift-week`, which permits every scope: this is not a scope refusal, so
-    // permitting `between-days` must not clear it.
+    expect(runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES)).toEqual([]);
+    // Under `shift-week`, which permits every scope, for symmetry with the refusal this replaced.
     expect(
-      runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES, 'shift-week').length,
-    ).toBe(1);
+      runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES, 'shift-week'),
+    ).toEqual([]);
+    // Non-vacuity: this function still refuses things, so an empty array above is a decision about
+    // the window rather than a function that stopped working.
+    expect(
+      runIdentityIssues({ ...base, windowStartS: 30 * 60, buildingId: 'not-a-building' }, RESOURCES)
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it('reports every reason rather than the first', () => {

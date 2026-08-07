@@ -43,6 +43,24 @@ export interface SubmittedRun {
   /** `null` means the building's own traffic profile — a distinct selection, and hashed as one. */
   readonly arrivalRatePctPop5min: number | null;
   readonly durationS: number;
+  /**
+   * Where in the day the run starts, or `null` for the whole period — `DECISIONS.md` § D285/§ D286.
+   *
+   * **The far end is `windowStartS + durationS`**, so this is one field rather than two: the viewer
+   * carries the window as a start and a length (`menu/types.ts`), and a second end here would be a
+   * second source of truth for a number `durationS` already fixes.
+   *
+   * Without it a windowed run could not be posted at all, and § D288 refused it in the client for
+   * exactly that reason. The refusal was right and the reason is worth keeping, because it is not
+   * *"the row would be mislabelled"*: the board does not store what a client claims, it
+   * **re-simulates the seed itself** (§ D214 § 3). A lunch peak submitted without this field is
+   * replayed over the whole day, and the server either refuses it by name — `office-day` at
+   * `durationS: 1800` reaches `core` as `templateOverrides.durationS` on an authored phase list and
+   * is rejected (§ D275) — or, on a shape template, quietly returns a different and entirely
+   * correct answer to a different question. Neither number is wrong; they are about two different
+   * runs, and nothing in the exchange could have said so.
+   */
+  readonly windowStartS: number | null;
   /** Decimal digits, 1–20. Validated before it reaches the kernel. */
   readonly seed: string;
 }
@@ -108,6 +126,23 @@ export interface ResolvedDataFacts {
  *
  * The digest is over a canonical JSON string with sorted keys, so a field reordered in a record does
  * not silently fork a board.
+ *
+ * ## Why the window is `undefined` when absent rather than `null`
+ *
+ * Two runs of one seed over two parts of a day are **different runs** and belong on different
+ * boards, so `windowStartS` has to be in here. But writing it as `null` for a whole-period run
+ * would put a key in the canonical string that was never there before and **fork every board that
+ * already exists** — every honest score posted before the window field, moved to a new board for a
+ * selection its player did not make.
+ *
+ * `canonicalJson` drops `undefined` entries, so a whole-period run digests to **exactly** the string
+ * it digested before this field existed, and a windowed run gets its own board. That is the same
+ * argument the module makes at the top, applied to itself: a change that does not alter what a run
+ * measured must not move the board it is on.
+ *
+ * `0` is a window and is not dropped — `windowStartS: 0` means *starts at the top of the day*,
+ * which is a selection, and `?? undefined` distinguishes it from `null` correctly where `|| undefined`
+ * would not.
  */
 export function configHashOf(run: SubmittedRun, facts: ResolvedDataFacts): string {
   const canonical = canonicalJson({
@@ -116,6 +151,7 @@ export function configHashOf(run: SubmittedRun, facts: ResolvedDataFacts): strin
     demandTemplateId: run.demandTemplateId,
     arrivalRatePctPop5min: run.arrivalRatePctPop5min,
     durationS: run.durationS,
+    windowStartS: run.windowStartS ?? undefined,
     buildingDigest: facts.buildingDigest,
     dispatcherDigest: facts.dispatcherDigest,
     templateDigest: facts.templateDigest,
@@ -153,6 +189,17 @@ export function digestOf(value: unknown): string {
 export const ACCEPTED_DURATIONS_S: readonly number[] = Object.freeze([300, 900, 1800, 3600, 7200]);
 
 /**
+ * The outer bound on a window, in seconds.
+ *
+ * A day, not a template's period. The named record's own length is the kernel's business and it
+ * refuses a window past it **by name** (`windowIdentity.test.ts`, *"refuses a window past the end
+ * of the period, naming both lengths"*); this constant only stops a number that could not be a
+ * time of day at all from reaching a simulation. `viz`'s stored-selection validator uses the same
+ * bound for the same reason.
+ */
+const SECONDS_IN_A_DAY = 86_400;
+
+/**
  * Everything structurally wrong with a submission, or an empty array.
  *
  * Runs **before** the simulation, because verification costs real CPU and an unauthenticated shape
@@ -169,6 +216,27 @@ export function submissionIssues(submission: Submission): readonly string[] {
   const rate = run.arrivalRatePctPop5min;
   if (rate !== null && (!Number.isFinite(rate) || rate <= 0 || rate > 100)) {
     issues.push('arrivalRatePctPop5min must be null or a percentage in (0, 100]');
+  }
+  /*
+   * Bounded by a day, and by the day rather than by the named template's own period — the same
+   * bound `viz`'s `validate.ts` puts on the stored selection, for the same reason it gives: a
+   * window naming a part that `data/` has since moved is a run the kernel will refuse **by name**,
+   * which is a better answer than a shape error here.
+   *
+   * The far end is checked too, because `durationS` is validated against a fixed list above and a
+   * window is not: `windowStartS + durationS` past the end of a day is a submission the generator
+   * would reject, and refusing it here keeps an unauthenticated shape error from commanding a
+   * simulation — which is this function's whole job.
+   */
+  const windowStartS = run.windowStartS;
+  if (windowStartS !== null) {
+    if (!Number.isFinite(windowStartS) || windowStartS < 0 || windowStartS >= SECONDS_IN_A_DAY) {
+      issues.push(`windowStartS must be null or a second within a day [0, ${SECONDS_IN_A_DAY})`);
+    } else if (windowStartS + run.durationS > SECONDS_IN_A_DAY) {
+      issues.push(
+        `windowStartS + durationS must not run past the end of a day (${SECONDS_IN_A_DAY} s)`,
+      );
+    }
   }
   for (const [name, id] of [
     ['buildingId', run.buildingId],

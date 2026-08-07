@@ -30,6 +30,7 @@ const RUN: SubmittedRun = Object.freeze({
   demandTemplateId: 'rise-and-fall',
   arrivalRatePctPop5min: 6,
   durationS: 900,
+  windowStartS: null,
   seed: '1',
 });
 

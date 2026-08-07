@@ -102,7 +102,6 @@ export function configFor(
     // rounding it would replay a different run and reject an honest player.
     seed: BigInt(run.seed),
     demandTemplate: run.demandTemplateId as SimulationConfig['demandTemplate'],
-    durationS: run.durationS,
     // `report`, not `throw`. A run that times out with people still in the system is a legitimate
     // outcome to submit — it simply will not be ranked, because `awtIsValid` is false and the gate
     // below refuses it. Throwing would turn "your dispatcher was overwhelmed" into a server error.
@@ -110,6 +109,27 @@ export function configFor(
     ...(run.arrivalRatePctPop5min === null
       ? {}
       : { demand: { arrivalRatePctPop5min: run.arrivalRatePctPop5min } }),
+    /*
+     * `durationS` **or** a window, never both — § D285/§ D286, and this branch is a deliberate
+     * mirror of `viz`'s `dev/state.ts`, which makes the same choice in the same shape. The client
+     * and the server have to agree about what a submission means, and the way they agree is that
+     * both build the config this way rather than that one of them normalises for the other.
+     *
+     * The reason is not tidiness. `durationS` reaches `runSimulation` as
+     * `templateOverrides.durationS`, which **refits the template's geometry** — a shorter ramp
+     * around the same hold — so a part of a day cannot travel as one. And on an authored phase list
+     * `core` refuses the override outright (§ D275), which is the *one* kind of template that has
+     * parts worth selecting: passing both would throw on exactly the case the window exists for.
+     * Measured, not reasoned — the first version of this passed both and
+     * `office-day` threw `templateOverrides.durationS cannot be applied`.
+     *
+     * The far end is derived rather than submitted. The viewer carries a window as a start and a
+     * length, so `durationS` already fixes it, and a second number on the wire could disagree with
+     * the first.
+     */
+    ...(run.windowStartS === null
+      ? { durationS: run.durationS }
+      : { windowStartS: run.windowStartS, windowEndS: run.windowStartS + run.durationS }),
   } as SimulationConfig;
 }
 

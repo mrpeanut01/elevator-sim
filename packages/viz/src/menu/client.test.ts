@@ -134,6 +134,7 @@ describe('the leaderboard client', () => {
         demandTemplateId: 'rise-and-fall',
         arrivalRatePctPop5min: null,
         durationS: 900,
+        windowStartS: null,
         seed: '1',
       },
       claimed: { awtS: 1, wt95S: 1, ttdMeanS: 1, pctOverLongWait: 0, awtIsValid: true },

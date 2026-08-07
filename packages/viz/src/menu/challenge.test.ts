@@ -173,15 +173,49 @@ describe('the run configuration is the one the server will replay', () => {
     const keys = new Set<string>();
     // Terms written straight into the returned object, shorthand or keyed.
     for (const match of text.matchAll(/^ {4}([A-Za-z]\w*)[,:]/gmu)) keys.add(match[1] ?? '');
-    // Terms the server spreads conditionally: `...(x === undefined ? {} : { key: … })`.
-    for (const match of text.matchAll(/\?\s*\{\}\s*:\s*\{\s*(\w+):/gu)) keys.add(match[1] ?? '');
+    /*
+     * Terms the server spreads conditionally — `...(cond ? A : B)` — taking **every** key from
+     * **both** arms rather than the first key of one.
+     *
+     * The earlier version matched only `? {} : { key: …}`, which is the shape every conditional in
+     * `configFor` had until `durationS` moved onto a ternary against the window (§ D285). Two
+     * things then went wrong at once and are worth naming, because a narrower fix would have hidden
+     * the second: `durationS` stopped being matched at all, and `windowEndS` — a *second* key on
+     * one arm — was never reachable by a pattern that stops at the first.
+     *
+     * Nested literals are flattened to a placeholder first, so `{ demand: { rate: … } }` yields
+     * `demand` and not the inner key, which is not a config term.
+     */
+    for (const spread of text.matchAll(/\.\.\.\(([\s\S]*?)\),\n/gu)) {
+      for (const arm of (spread[1] ?? '').matchAll(/\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/gu)) {
+        const flat = (arm[1] ?? '').replace(/\{[^{}]*\}/gu, 'Ø');
+        for (const key of flat.matchAll(/(\w+)\s*:/gu)) keys.add(key[1] ?? '');
+      }
+    }
 
     // A regex that stopped matching would otherwise produce an empty set and a silent pass.
     expect(keys.size).toBeGreaterThanOrEqual(8);
 
     const built = challengeRunConfigs(viewOf(), RESOURCES, 'collective');
     if (!built.ok) throw new Error(built.detail);
-    expect(Object.keys(built.runs[0]?.config ?? {}).sort()).toEqual([...keys].sort());
+    const builtKeys = Object.keys(built.runs[0]?.config ?? {});
+
+    // Nothing the client assigns is absent from the server's own source.
+    expect(builtKeys.filter((key) => !keys.has(key))).toEqual([]);
+    /*
+     * And exactly one pair goes the other way. `durationS` and the window are **alternatives** —
+     * § D285, and `configFor` picks one branch — so a config that names a length cannot also name a
+     * part of a day, and no challenge names one: `CHALLENGE_ROTATION` is authored entirely on hour
+     * records, which already are the part of the day they mean.
+     *
+     * Asserted as an exact set rather than filtered out, so this stays the mechanism it was: a
+     * *new* key added anywhere in `configFor` — including inside the window arm — still fails here
+     * rather than being quietly absorbed by an exclusion.
+     */
+    expect([...keys].filter((key) => !builtKeys.includes(key)).sort()).toEqual([
+      'windowEndS',
+      'windowStartS',
+    ]);
   });
 
   it('treats a null rate as the building’s own profile, by omitting the key rather than zeroing it', () => {

@@ -90,6 +90,18 @@ export interface RunSubmission {
   readonly demandTemplateId: string;
   readonly arrivalRatePctPop5min: number | null;
   readonly durationS: number;
+  /**
+   * Which part of the day, or `null` for the whole period — § D285/§ D286.
+   *
+   * On the wire because the server **re-simulates the seed itself** rather than storing what a
+   * client claims (§ D214 § 3), so a window it could not see is a window it would replay over the
+   * whole day. § D288 refused a windowed submission in `scope/runIdentity.ts` for precisely that
+   * reason, and named this field as the fix; the refusal is gone and this is what replaced it.
+   *
+   * A start and no end, matching {@link FreePlaySelection}: the far end is
+   * `windowStartS + durationS`, and `durationS` is already here.
+   */
+  readonly windowStartS: number | null;
   readonly seed: string;
 }
 
