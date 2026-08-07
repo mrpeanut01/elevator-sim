@@ -1,0 +1,120 @@
+# ISSUE_WORKER_LEDGER.md
+
+One row per open issue. Dispositions are evidence-backed; the evidence lives in
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
+[`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
+
+**Snapshot:** 2026-08-07 · 29 open (#90–#119, no #95) · 0 open PRs · branch
+`feat/azure-app-deployment`, clean · `npm run typecheck` **passes** · `npm test` **passes (exit 0)**.
+
+**No GitHub state has been changed.** No issue closed, combined, labelled, or commented on. Every
+row below is a *proposed* disposition awaiting authorization.
+
+Legend — **Verified**: `code` traced to file:line · `run` reproduced by a recorded run ·
+`—` not yet verified.
+
+---
+
+## Confirmed defects, ready to schedule
+
+| # | title (short) | P | verified | disposition | canonical | next action |
+|---|---|---|---|---|---|---|
+| **108** | St Jude URL crashes the viewer | P1 | **code** | **Fix** | — | Union the viz type at 3 sites; add the derived-from-disk building-load guard test |
+| **106** | Typing swallows the next click | P1 | **code** | **Fix** — *issue's diagnosis corrected* | — | Stop the rebuild at `main.ts:1531-1534`. **Must land before #111.** |
+| **107** | Building switch destroys campaign progress | **P0** | — | **Fix** | — | Save slot per scenario; confirm-before-abandon. Verify first. |
+| **111** | Free play refuses Start on a valid config | P1 | **code** | **Fix** — *2b mechanism corrected* | — | **Blocked by #106.** Then `input` validation + re-derive part on template change |
+| **109** | Rail publishes the result before the run | P1 | **code** | **Fix** | — | Gate `drawDrivers` on `shiftIsOver`; draw the retraction; `N of M` not `All N` |
+| **114** | Machines rail changes nothing | P1 | **code** | **Fix — mark read-only** | — | Drop `onPick`, derive highlight from building, add speed to the envelope gate |
+| **112** | Competitive loop never rendered | P2 | **code** | **Fix** | — | Drop `boardsRequested` latch; render `challenge.board.entries` |
+| **113** | Custom dispatchers can't be proved | P2 | **code** | **Fix** | — | Persist on `saved*` patch (~5 lines) **first**; Compare selects later |
+| **119** | Compare default resolves nothing | P2 | **run** | **Fix** | — | Render INDISTINGUISHABLE as an answer; draw intervals; **do not** tune the default for its verdict |
+| **117** | WHAT MOVED compares a phantom run | P2 | **code (partial)** | **Fix + investigate** | — | Split `playerHasChosen`. **Headline symptom unexplained — needs a driven repro.** |
+| **99** | Free play defaults saturate | P2 | **run** | **Fix — premise corrected** | — | Curate the opening pair. Default is Chancery + `nearest-car`, **not** Midtown + collective |
+| **97** | "Scenarios" goes nowhere | P2 | **code** | **Rescope — premise refuted** | — | A scenario list *does* exist. Two real one-line bugs found instead |
+| **118** | Export PNG / `copy run` point away | P2 | **code (partial)** | **Fix** | — | Export the Day report card; copy a URL. **Blocked by #108** (shared link is a coin flip) |
+| **104** | No explanation for locked controls | P2 | — | **Fix** | — | Inline "locked for this shift" note. Cheapest honesty fix; also #116's named fallback |
+| **102** | Comparison mixes buildings and modes | P2 | — | **Combine → #117** | **#117** | #117 rec 2 is #102's entire ask |
+| **105** | "Completed" appears mid-playback | P3 | **code** | **Combine → #109** | **#109** | `canvas.ts:1780` reads `result.status`. **Canvas footer, not rail** — fix must cover both |
+
+## Combines — unique scope must transfer before closure
+
+| # | title (short) | disposition | canonical | scope that MUST be preserved |
+|---|---|---|---|---|
+| **101** | Leaderboard shows no scores | **Combine (partial)** | **#112** | *Board seeding is NOT a duplicate* — it is a product decision. Server has no seeding path at all; zero entries is correct behaviour |
+| **100** | Casual surfaces engineer jargon | **Combine** | **#110** | The panel checklist: live-metrics header, dispatcher cards, Day report. #110 argues shape; #100 supplies the list |
+| **98** | No onboarding / guided first run | **Combine** | **#90** | In-sim tooltips per panel; move *How to play* to top or a persistent `?` |
+| **103** | No motion, doors, or people | **Combine** | **#115** | The *two-renderer* proposal (animated = Casual, schematic = Engineer). #115 asks for one stage. Interacts with **E-2** |
+| **94** | Building switch resets config | **Rescope, keep open** | #107 (reset half) | Dispatcher portability; traffic preservation; persistent building header anchor. **#107's save-slot fix does not cover these** |
+
+## Design — blocked on a human decision
+
+| # | title (short) | blocked on | note |
+|---|---|---|---|
+| **116** | Point of view (design charter) | **E-1** | **Epic — do not close.** Holds the only cost measurements in the backlog (181/828/1521 ms) |
+| **96** | Simulation stage is passive | **E-1** | Overlaps #116 § 2 |
+| **110** | "Casual" is not a mode | **E-2** | Measured: 44 words of 919; three surfaces byte-identical |
+| **115** | Nothing to watch | **E-2** | Also carries a separable defect: `LIVE METRICS` clips its own text, undetectable by DOM checks |
+| **90** | No "Start here" entry point | — | Schedule after defects |
+| **91** | Inter-day loop is invisible | — | Schedule after defects |
+| **92** | Editor has no "Run this" | — | Schedule after defects |
+| **93** | Leaderboard has no social hooks | — | Related to #112, not duplicate: "build what does not exist" vs "render what does" |
+
+---
+
+## Escalations
+
+| id | question | status |
+|---|---|---|
+| **E-0** | **Teaching tool / research sandbox, or mass-market management sim?** Stated by the tester report, not by any issue. **E-1 and E-2 are both downstream of it** | **Open — decide first** |
+| **E-1** | Build deterministic intraday intervention (re-simulate from t=0 on each event)? Or ship only the honesty fallback (#104)? | **Open — needs a human.** Touches the run model, Invariants 2 and 5, and replay verification. **Scope reduced**: #116's "no economy" premise is refuted (see E-7) |
+| **E-7** | Deployed-build divergence: the tester played an Azure deployment, not HEAD. Identify the deployed commit before treating any "cannot reproduce" as a refutation | **Open — blocks confident closure of #99, #117, and #106's Settings claim** |
+| **E-2** | Is Casual a real layout, or is the toggle removed? | **Open — needs a human.** Both branches large and opposite |
+| **E-3** | Board seeding (#101 residual): fabricate reference scores, or reframe the empty state? | **Open.** Interacts with the anti-cheat replay guarantee |
+| **E-4** | Phase 9's honesty sweep does not cover *temporal* honesty — it samples `t=0` and passes whole-run claims. Record as a named gap? | **Open.** See findings § J |
+| **E-5** | Auth token lockout | **DECIDED 2026-08-07 — fix at the rate limiter.** Token stays in memory; the documented decision is not reversed; #112 rec 3 not adopted as written |
+| **E-6** | Branch topology | **DECIDED 2026-08-07 — one owner, one sequenced branch**: #106 → #111 → #97a → #112 → #113 |
+
+---
+
+## Defects found during triage that no issue reports
+
+These were surfaced by verification, not by a reporter. Each needs its own issue.
+
+| id | defect | evidence |
+|---|---|---|
+| **N-1** | **The provisional retraction never reaches the screen.** `mood.test.ts:325-330` asserts it in words; the only shipped renderer drops `mood.headline`. Sole signal is `.mood-provisional { font-style: italic }` — no text, violating the rail's own KB-15 second-channel promise | findings § J |
+| **N-2** | **`VizSummary` cannot see `accessRefused` or `abandoned`.** `describeSummary` (`recordRun.ts:487-489`) copies only 3 of 5 conservation fields, so the viz layer *cannot* phrase "All N" correctly even if it wanted to. 7 of 8 buildings declare `accessZones` | findings § J |
+| **N-3** | **Stale sheet resurrection.** Toggling *show energy axis* mid-run resurrects the previous run's filed sheet. `main.ts:585-588` documents an invariant that is false | findings § J |
+| **N-4** | **Enter does not submit, and Tab-then-Enter is broken.** No `<form>`, no `submit` handler; `restoreFocus` yanks focus back to the field. No keyboard path around #106 | findings § E |
+| **N-5** | **Boot menu is painted stale and never refreshed.** `drawMenu()` precedes `runShift()` in `boot()`; neither `renderAll` nor `runShift` redraws it. Root cause of #97's quoted string | findings § I |
+| **N-6** | **The honesty harness cannot see a presentation pointer drawn as a live control.** `mountRightRail` is on the undriven-mount exemption list. Generalises to `editingDispatcherId`, `editingPatternId`, `editingBuildingId` | findings § F |
+| **N-7** | **`walk.test.ts` cannot see cross-select invalidation.** `:283-327` re-reads only the same row, so one select breaking another's validity is invisible. The exact hole #111 § 2b falls through | findings § I |
+| **N-8** | **Two further missing-custom-profile sites** beyond #113's four: the challenge dispatcher select (`catalogue.ts:125`), and `batchPanel.ts:635-637` silently inheriting nothing on a custom building | findings § H |
+
+---
+
+## Reporter claims that did NOT survive verification
+
+Recorded so no engineer implements them. **Every one of these would have caused wasted or harmful work.**
+
+| issue | claim | finding |
+|---|---|---|
+| **#106** | Rebuild is triggered by `input` (per keystroke) | **Wrong.** There is no `input` listener anywhere in the menu. It is `change`, on blur. **Implementing as written — switching to `input` — makes the defect strictly worse** |
+| **#106** | Settings selects show the same defect | **Unsupported.** `applyTheme()` runs synchronously *before* `drawMenu()`. Split off; needs a runtime repro |
+| **#114** | "Add the legs test — today that test would fail" | **Backwards.** `scope.test.ts:61-77` exists and **passes**, asserting inertness. Making the panel live turns the suite red unless the field is re-scoped first |
+| **#114** | The rail renders the cards twice | **Refuted.** One rail list; the second is the Building editor's panel. "Render it once" is not actionable as written |
+| **#114** | Speed is editable only behind *Save as a new building* | **Partly refuted.** The commissioning screen writes class **and** speed **live, no save** |
+| **#113** | Custom dispatchers vanish because storage paths differ | **Refuted.** One writer, one reader. Real cause: `saveSessionNow()` has two call sites, neither a Save button |
+| **#113** | Feeding profiles into Compare is "the highest-value fix, no new features" | **Refuted on effort.** Crosses a Worker boundary; `runBatch.ts:271-278` **throws** for an unresolvable arm, so options alone convert a silent omission into a runtime error |
+| **#112** | Nothing in the UI mentions replay verification | **Refuted.** Five sites say it. Under-sold, not absent |
+| **#112** | Persist the auth token | **Reverses a decision documented twice as deliberate.** Superseded by decision E-5 |
+| **#109** | `delivered · All N` matches no other figure | **Refuted.** Matches `conservation.delivered` exactly; gaps are legs-vs-journeys or the playhead |
+| **#109** | Stale figures survive into the next run | **Refuted for the rail**; true for the Day report via a different defect (N-3) the issue does not mention |
+| **#109** | The stairs / worst-wait disagreements are bugs | **Refuted as arithmetic.** Documented intentional basis differences. The defect is labelling |
+| **#117** | Three consecutive runs printed an identical baseline | **Not reproducible from code.** The confirmed defect poisons **one** delta, not three |
+| **#111** | Sim-screen seed has `maxlength=20` | **Refuted.** `maxlength` appears nowhere. The menu is the **stricter** field — the issue's framing is inverted |
+| **#111** | Re-picking the identical option clears the refusal | **Unlikely.** A native `<select>` fires no `change` for the already-selected option. **Stickier than reported** |
+| **#97** | `?mode=scenarios`; no scenario list; menu reloads | **Refuted.** `mode` accepts only `basic`/`advanced`; 8 cards render into `#scenario-list`; a menu navigate changes no URL |
+| **#99** | Free play defaults to Midtown Office + collective | **Refuted.** It is `buildings[0]`/`dispatchers[0]` = **Chancery House + Nearest car**. The real default is *worse* than reported |
+| **#116** | The two saturating buildings are Midtown and Vertical City | **Unconfirmed at my configuration** (I measured Midtown + Mixed-Use). Shape and count confirmed; the specific pair needs reproduction on #116's own terms |
+| **#116** | "There is no economy … a shaft **is** free, and instant" | **Refuted.** *Commission the building* is a capital-budget mechanic with a fixed capital-unit ceiling, locked in before the week. **#116 missed that screen twice** — also when claiming speed is only editable behind *Save as a new building*. Rescope §3 to "surface the economy that exists" |
