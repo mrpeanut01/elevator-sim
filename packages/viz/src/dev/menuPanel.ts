@@ -20,7 +20,7 @@
  * fails somewhere in the runner has moved an explainable error to a place with no words for it.
  */
 
-import { el, fill, setText } from './dom.js';
+import { el, fill, on, reconcile, setText, type ElementSpec } from './dom.js';
 import {
   canSubmitForm,
   formIssues,
@@ -137,6 +137,131 @@ export interface MenuPanelHost {
  */
 type KeepControl = <T extends HTMLElement>(control: T, key: string) => T;
 
+/* -------------------------------------------------------------------------- *
+ * Keeping the node a pointer is standing on — GitHub issue #106
+ * -------------------------------------------------------------------------- */
+
+/** One element an overlay is keeping, and the tag it was made as. */
+interface Kept {
+  readonly tag: string;
+  readonly node: HTMLElement;
+}
+
+/**
+ * What each overlay kept from its **previous** draw, by key.
+ *
+ * A `WeakMap` on the root rather than a module-level map, for {@link CONTROLS}' reason: two overlays
+ * would otherwise share one set of nodes, and the second would silently steal the first's.
+ */
+const RETAINED = new WeakMap<HTMLElement, Map<string, Kept>>();
+
+/** Ask for the element under a key: the one from the last draw, or a new one. */
+type Retain = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  key: string,
+  spec?: ElementSpec,
+) => HTMLElementTagNameMap[K];
+
+/**
+ * The four things every builder below needs, as one argument.
+ *
+ * Threaded rather than reached for, because there is no such thing as *the current draw* — the
+ * retainer is per draw by construction (see {@link retainer}), and a builder that could reach a
+ * previous one would reuse a node this draw has already given to somebody else.
+ */
+interface Draw {
+  readonly doc: Document;
+  readonly retain: Retain;
+  readonly keep: KeepControl;
+  /** What Enter in a text field presses, or `undefined` when the screen has nothing to submit. */
+  readonly submit: (() => void) | undefined;
+}
+
+/**
+ * The other half of {@link reconcile} — GitHub issue #106.
+ *
+ * `reconcile` will leave a child alone when it is already in the right place, and *the same node
+ * being handed back next draw* is what makes that possible. This is where that comes from: a key
+ * names a **role** in the screen — the title, the list, this row's control — and the element that
+ * played it last time plays it again.
+ *
+ * ## Three things fall out of it, and only the first is what the issue asked for
+ *
+ * The submit button survives the redraw its own `mousedown` causes, so the click lands. **A text
+ * field keeps its caret**, because a retained `<input>` is never rebuilt and its `value` is written
+ * only when it differs — which is what makes it safe to redraw this overlay on *every keystroke*,
+ * the thing issue #111's per-keystroke validation is about to do. And a `<details>` the reader
+ * opened stays open, which it did not before.
+ *
+ * ## Why the map is rebuilt every draw rather than accumulated
+ *
+ * A key is unique **within a screen** — {@link MenuAffordance}'s own contract — and screens differ.
+ * Accumulating would hand a `select` from Settings to a row on Free play that happened to share an
+ * id, carrying its options and its listeners with it. So each draw publishes only what it used, and
+ * a node nobody asked for this time is simply not offered next time. The tag is stored beside the
+ * node and checked, so even a within-screen collision cannot return the wrong kind of element.
+ */
+function retainer(root: HTMLElement, doc: Document): Retain {
+  const before = RETAINED.get(root) ?? new Map<string, Kept>();
+  const now = new Map<string, Kept>();
+  RETAINED.set(root, now);
+  return <K extends keyof HTMLElementTagNameMap>(tag: K, key: string, spec: ElementSpec = {}) => {
+    const kept = before.get(key);
+    const node =
+      kept !== undefined && kept.tag === tag
+        ? (kept.node as HTMLElementTagNameMap[K])
+        : el(doc, tag, spec);
+    /*
+     * Re-applied on the reuse path, because the class is the one part of a spec a screen can change
+     * under a role that keeps its key. Everything else — a `type`, an `aria-*` — is written at
+     * creation, and anything a builder needs kept current it writes itself on every draw.
+     */
+    if (spec.className !== undefined && node.className !== spec.className) {
+      node.className = spec.className;
+    }
+    now.set(key, { tag, node });
+    return node;
+  };
+}
+
+/**
+ * What Enter in a text field presses — the second half of GitHub issue #106.
+ *
+ * ## The defect, which is separate from the swallowed click and was confirmed with it
+ *
+ * The account screen is a form in every sense a player can see and in none a browser can: the
+ * fields are a `<div>`, the submit is `<button type="button">` with a click listener, and the
+ * overlay's own keydown handler owns Escape and Tab. So Enter in the address field did nothing at
+ * all, on the one screen where pressing Enter after typing an address is the most ordinary thing a
+ * person does.
+ *
+ * ## Why the submit is still not inside a `<form>`
+ *
+ * {@link renderMenu}'s comment on the account screen's ordering refuses that move and the refusal
+ * still holds: the submit is a {@link MenuAffordance} whose label, refusal and intent are decided
+ * by `menu/screens.ts`, and a button built inside a form beside its own click handler is the
+ * decision-in-a-render that split exists to stop. A real `<form>` would also need a `submit`
+ * listener calling `preventDefault` on every path, because there is nowhere for it to post.
+ *
+ * ## So the rule is the browser's own, applied to the rows the screen decided
+ *
+ * HTML's implicit submission presses *the form's first submit button*, and refuses when there is
+ * none. This is that, over `MenuScreenView.rows`: the first `commit` row that is **enabled**. It
+ * decides nothing a screen has not already decided — a refused Start stays refused, and Enter does
+ * exactly as little as clicking the disabled button it names does, with the same `disabledWhy`
+ * already on the page saying why.
+ */
+function implicitSubmit(
+  rows: readonly MenuAffordance[],
+  host: MenuPanelHost,
+): (() => void) | undefined {
+  const row = rows.find((candidate) => candidate.kind === 'commit' && candidate.enabled);
+  if (row === undefined) return undefined;
+  return () => {
+    host.dispatch(row.intent);
+  };
+}
+
 /**
  * Draw the current screen. **Decides nothing.**
  *
@@ -167,6 +292,25 @@ type KeepControl = <T extends HTMLElement>(control: T, key: string) => T;
  * and ships a dead control: `dispatchMenu` returns `void` and has no `never` arm. Binding Escape to
  * `back` instead is still refused, for § D249's reason — it would work on five screens and do
  * nothing on the root.
+ *
+ * ## And it draws in a way that survives being drawn under a pointer — GitHub issue #106
+ *
+ * The other thing here that is not *turn a row into an element*. A text field commits on `change`,
+ * `change` fires on blur, and blur is the default action of `mousedown` — so pressing a button
+ * beside a field redraws this overlay **between the press and the release**. While that redraw was
+ * `fill`, it replaced every child, and a browser will not dispatch a click whose `mousedown`
+ * element has left the document: *"Type into the Account email field, click Email me a link once:
+ * no request, no error, no notice."*
+ *
+ * Two rules follow and both are load-bearing for the validation issue #111 adds next door, which
+ * will make this redraw happen on **every keystroke**. Anything a pointer can stand on is kept
+ * across draws ({@link retainer}) and written in place, so no press and no caret is ever thrown
+ * away; and the containers that hold controls are written with {@link reconcile} rather than
+ * `fill`, so a line appearing elsewhere on the screen does not carry the button off with it.
+ *
+ * `fill` is still right wherever nothing in the container can be pressed — the guide's paragraphs,
+ * an issue list, a board's rows — and for a `<select>`'s options, which a browser presses inside a
+ * popup of its own rather than in this tree.
  */
 export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const doc = host.doc;
@@ -197,11 +341,12 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   });
 
   /*
-   * Which control the reader was on, read **before** the fill that destroys it.
+   * Which control the reader was on, read **before** the write that could destroy it.
    *
-   * `fill` replaces every child, so the focused element is gone by the time the new tree exists —
-   * which is why focus fell out of this overlay on every state change, not only when somebody
-   * tabbed past the end. See {@link restoreFocus}.
+   * It could, and since {@link retainer} it usually does not: a control that keeps its key keeps
+   * its element, so the ordinary redraw now leaves focus exactly where it was. This is still read
+   * because a redraw that changes *screens* legitimately takes the control away. See
+   * {@link restoreFocus}.
    */
   const wasOn = focusedControlKey(doc, root);
 
@@ -211,13 +356,21 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     controls.push(control);
     return control;
   };
+  const draw: Draw = {
+    doc,
+    retain: retainer(root, doc),
+    keep,
+    submit: implicitSubmit(view.rows, host),
+  };
 
   const children: Node[] = [];
-  const heading = el(doc, 'h1', { className: 'menu-title' });
+  const heading = draw.retain('h1', 'title', { className: 'menu-title' });
   setText(heading, view.title);
   children.push(heading);
 
-  for (const notice of view.notices) children.push(noticeLine(doc, notice));
+  view.notices.forEach((notice, index) => {
+    children.push(noticeLine(draw, `notice.${String(index)}`, notice));
+  });
 
   /*
    * **The account screen puts its form above its buttons, and that ordering is the fix** — GitHub
@@ -238,28 +391,30 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
    * a click.
    */
   const accountFirst = view.screen === 'account';
-  const accountBlocks: Node[] = [];
   if (accountFirst && account.notice !== undefined) {
-    accountBlocks.push(noticeLine(doc, account.notice));
+    children.push(noticeLine(draw, 'account.notice', account.notice));
   }
   if (accountFirst && (account.user === undefined || naming)) {
-    accountBlocks.push(accountForm(doc, host, account, naming, keep));
+    children.push(accountForm(draw, host, account, naming));
   }
-  children.push(...accountBlocks);
 
-  const list = el(doc, 'div', { className: 'menu-list' });
-  for (const row of view.rows) list.append(affordance(doc, host, row, keep));
+  const list = draw.retain('div', 'list', { className: 'menu-list' });
+  const rows: Node[] = view.rows.map((row) => affordance(draw, host, row));
   // The seventh entry on the root, and it is an entry rather than a row: see the comment on
   // `MenuScreenView.guide` for why the guide carries no intent and asks nothing of the shell.
-  if (view.guide !== undefined) list.append(guideEntry(doc, view.guide, keep));
+  if (view.guide !== undefined) rows.push(guideEntry(draw, view.guide));
+  reconcile(list, ...rows);
   children.push(list);
 
-  if (view.issues.length > 0) children.push(issueList(doc, view.issues));
+  if (view.issues.length > 0) children.push(issueList(draw, 'issues', view.issues));
 
   // The one screen with content an affordance cannot express: a table of somebody else's runs.
-  if (view.screen === 'leaderboard') children.push(boardTable(doc, board));
+  if (view.screen === 'leaderboard') children.push(boardTable(draw, board));
 
-  fill(root, ...children);
+  // `reconcile` and not `fill`, and the whole of issue #106 is in that word: this container holds
+  // controls, and a container of controls may not be rebuilt under a pointer that is already down
+  // on one of them.
+  reconcile(root, ...children);
   asModal(doc, root, view.title, controls, host.dispatch);
   // `HTMLElement.hidden` is `boolean | string` since `hidden="until-found"` — and every string it
   // can hold is a *hidden* state, so truthiness is the whole of the question rather than a coercion
@@ -412,19 +567,45 @@ function focusedControlKey(doc: Document, root: HTMLElement): string | undefined
 }
 
 /**
- * Put the reader back where they were, or bring them in if they were not here.
+ * Whether this overlay has had the reader in it since it was last opened.
+ *
+ * Not *where* they are — {@link CONTROL_KEY} answers that. This answers *have they been here at
+ * all*, which is the one thing that tells an empty `document.activeElement` mid-blur apart from an
+ * empty one on a dialog that has just gone up. Cleared while hidden, because coming back is
+ * arriving again. See {@link restoreFocus}.
+ */
+const HAS_HELD_FOCUS = new WeakSet<HTMLElement>();
+
+/**
+ * Put the reader back where they were, bring them in if they have never been here, and — the case
+ * this used to get wrong — leave them alone while the browser is in the middle of moving them.
  *
  * ## Why this is not a nicety
  *
- * `fill` replaces every child on every redraw, so **every** state change dropped focus to `<body>`
- * — and the overlay sits last in the document, so the next Tab from `<body>` walks into the shell
- * *behind* the menu rather than into the menu. That is how issue #68's reporter reached the seed
- * field: not by tabbing past the end of a short list, but by tabbing forward from nowhere.
+ * A redraw that rebuilds the tree destroys the focused element, so **every** state change dropped
+ * focus to `<body>` — and the overlay sits last in the document, so the next Tab from `<body>`
+ * walks into the shell *behind* the menu rather than into the menu. That is how issue #68's
+ * reporter reached the seed field: not by tabbing past the end of a short list, but by tabbing
+ * forward from nowhere.
  *
- * So the two branches are one rule with two causes. The reader was on a control and it no longer
- * exists: find the one with the same key, because a control keeps its identity across a redraw even
- * though its element does not. The reader was not in the overlay at all and the overlay is up:
- * bring them to the first control, which is what opening a modal is supposed to do.
+ * ## The third branch, and why the first two were a trap on their own — GitHub issue #106
+ *
+ * `change` on a text field fires **during a blur**, and a blur is the default action of both
+ * `mousedown` and Tab. At that instant `document.activeElement` is the body: the old element has
+ * been let go and the new one has not been taken up. So a redraw driven by a field commit looked
+ * exactly like a dialog that had just opened, and this function did what a dialog that has just
+ * opened wants — it pulled focus to `controls[0]`.
+ *
+ * On the account screen `controls[0]` is the email field, which is the field the reader has just
+ * left. So Tab out of the address and into *Email me a link* put focus straight back in the
+ * address, on every attempt, and there was no keyboard route to the button at all. The pointer had
+ * the same problem from the other end (see {@link reconcile}), which is why the issue reads as one
+ * defect and is two.
+ *
+ * The signal that separates the two cases is not *is anything focused* but *has anybody ever been
+ * in here*: a blur can only happen to a reader who was already standing on something.
+ * {@link HAS_HELD_FOCUS} is that, and nothing finer would do — the key of the control they were on
+ * is already gone by the time `change` fires.
  *
  * **Never while hidden.** `dev/main.ts#closeMenu` sets `hidden` and later draws still run, so
  * without this guard leaving the menu would immediately steal focus back into it.
@@ -435,10 +616,37 @@ function restoreFocus(
   controls: readonly HTMLElement[],
   wasOn: string | undefined,
 ): void {
-  if (root.hidden || controls.length === 0) return;
-  if (wasOn === undefined && root.contains(doc.activeElement)) return;
-  const again = controls.find((control) => control.getAttribute(CONTROL_KEY) === wasOn);
-  (again ?? controls[0])?.focus();
+  if (root.hidden) {
+    HAS_HELD_FOCUS.delete(root);
+    return;
+  }
+  if (controls.length === 0) return;
+
+  const active = doc.activeElement;
+  // Already inside, which since `retainer` is the ordinary case rather than the lucky one: the
+  // control the reader is standing on is the same element it was before the draw.
+  if (active !== null && root.contains(active)) {
+    HAS_HELD_FOCUS.add(root);
+    return;
+  }
+
+  // They were on a control of ours and this draw took it away — a screen change. The one with the
+  // same key if there is one, the top of the new screen if there is not.
+  const again =
+    wasOn === undefined
+      ? undefined
+      : controls.find((control) => control.getAttribute(CONTROL_KEY) === wasOn);
+  if (again !== undefined) {
+    again.focus();
+    HAS_HELD_FOCUS.add(root);
+    return;
+  }
+  if (wasOn === undefined && HAS_HELD_FOCUS.has(root)) return;
+
+  const first = controls[0];
+  if (first === undefined) return;
+  first.focus();
+  HAS_HELD_FOCUS.add(root);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -460,12 +668,7 @@ function restoreFocus(
  * function is an exhaustive switch, so the seventh such intent cannot be added without an arm. See
  * its docstring for the whole of the argument.
  */
-function affordance(
-  doc: Document,
-  host: MenuPanelHost,
-  row: MenuAffordance,
-  keep: KeepControl,
-): HTMLElement {
+function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLElement {
   const withValue = (value: string): MenuIntent => withChosenValue(row.intent, value);
 
   /*
@@ -474,44 +677,55 @@ function affordance(
    * that never matches `document.activeElement` and a trap that never fires.
    */
   if (row.kind === 'select') {
-    return selectRow(doc, row.label, row.value ?? '', row.options ?? [], keep, row.id, (id) => {
+    return selectRow(draw, row.label, row.value ?? '', row.options ?? [], row.id, (id) => {
       host.dispatch(withValue(id));
     });
   }
   if (row.kind === 'toggle') {
-    return toggleRow(doc, row.label, row.value === 'on', keep, row.id, (value) => {
+    return toggleRow(draw, row.label, row.value === 'on', row.id, (value) => {
       host.dispatch(withValue(value ? 'on' : 'off'));
     });
   }
   if (row.kind === 'text') {
-    return textRow(doc, row.label, 'text', row.value ?? '', keep, row.id, (value) => {
+    return textRow(draw, row.label, 'text', row.value ?? '', row.id, (value) => {
       host.dispatch(withValue(value));
     });
   }
 
-  const button = el(doc, 'button', {
+  const button = draw.retain('button', `row.${row.id}`, {
     className: row.kind === 'back' ? 'menu-back' : row.kind === 'commit' ? 'menu-start' : 'menu-row',
     attrs: { type: 'button' },
   });
-  const name = el(doc, 'span', { className: 'menu-row-name' });
+  /*
+   * The spans are retained too, and that is not tidiness — it is the whole of issue #106 on this
+   * control. A browser remembers the **innermost** element the pointer went down on, and on a row
+   * that is the `.menu-row-name` span rather than the button around it. Rebuilding the label while
+   * keeping the button would drop the click just as surely as rebuilding the button did.
+   */
+  const name = draw.retain('span', `name.${row.id}`, { className: 'menu-row-name' });
   setText(name, row.label);
   const kids: Node[] = [name];
   // Disabled **and** explained, always. A control that refuses in silence moves an explainable
   // error to the one moment with no words for it.
   const detail = row.enabled ? row.detail : (row.disabledWhy ?? row.detail);
   if (detail !== undefined && detail.length > 0) {
-    const help = el(doc, 'span', { className: 'menu-row-detail' });
+    const help = draw.retain('span', `detail.${row.id}`, { className: 'menu-row-detail' });
     setText(help, detail);
     kids.push(help);
   }
-  fill(button, ...kids);
-  if (!row.enabled) button.setAttribute('disabled', 'disabled');
-  button.addEventListener('click', () => {
+  reconcile(button, ...kids);
+  if (row.enabled) button.removeAttribute('disabled');
+  else button.setAttribute('disabled', 'disabled');
+  on(button, 'click', () => {
     host.dispatch(row.intent);
   });
   // A disabled button is not focusable, so it is not in the ring. Putting it there would build a
   // trap whose last member cannot be reached, and Tab would walk straight past it into the shell.
-  if (row.enabled) keep(button, row.id);
+  // Written **both ways** since the button outlives the draw: a row that has just been refused
+  // would otherwise keep the key it was registered under when it was still pressable, and the trap
+  // would go on offering a control Tab can no longer reach.
+  if (row.enabled) draw.keep(button, row.id);
+  else button.removeAttribute(CONTROL_KEY);
   return button;
 }
 
@@ -544,43 +758,54 @@ function affordance(
  * note paragraph. Nothing new is introduced, and the entry therefore looks like the six above it
  * because it is made of the same parts.
  */
-function guideEntry(doc: Document, guide: MenuGuide, keep: KeepControl): HTMLElement {
-  const block = el(doc, 'details', {});
+function guideEntry(draw: Draw, guide: MenuGuide): HTMLElement {
+  /*
+   * Retained, and here that buys something a reader can feel: the browser owns this entry's
+   * open/closed state, and a `<details>` rebuilt on every redraw slams shut under somebody who had
+   * opened it and then touched any other control on the screen.
+   */
+  const block = draw.retain('details', 'row.guide');
 
   // Structured exactly as `affordance` builds a navigate row, so the closed entry is visually the
   // seventh member of the list rather than a different kind of thing that happens to sit under it.
   // Kept in the focus ring because `summary` is focusable without a `tabindex`, so a trap that did
   // not know about it would end one control short of where Tab actually goes.
-  const summary = keep(el(doc, 'summary', { className: 'menu-row' }), 'guide');
-  const name = el(doc, 'span', { className: 'menu-row-name' });
+  const summary = draw.keep(draw.retain('summary', 'control.guide', { className: 'menu-row' }), 'guide');
+  const name = draw.retain('span', 'guide.name', { className: 'menu-row-name' });
   setText(name, guide.title);
-  const lead = el(doc, 'span', { className: 'menu-row-detail' });
+  const lead = draw.retain('span', 'guide.lead', { className: 'menu-row-detail' });
   setText(lead, guide.summary);
-  fill(summary, name, lead);
+  reconcile(summary, name, lead);
 
-  const body = el(doc, 'div', {});
+  const body = draw.retain('div', 'guide.body');
+  const lines: Node[] = [];
   for (const section of guide.sections) {
-    const heading = el(doc, 'p', { className: 'menu-row-name' });
+    const heading = el(draw.doc, 'p', { className: 'menu-row-name' });
     setText(heading, section.heading);
-    body.append(heading);
+    lines.push(heading);
     for (const paragraph of section.body) {
-      const line = el(doc, 'p', { className: 'menu-note' });
+      const line = el(draw.doc, 'p', { className: 'menu-note' });
       setText(line, paragraph);
-      body.append(line);
+      lines.push(line);
     }
   }
+  // `fill`, not `reconcile`: prose, and nothing in here is pressable.
+  fill(body, ...lines);
 
-  fill(block, summary, body);
+  reconcile(block, summary, body);
   return block;
 }
 
-function issueList(doc: Document, issues: readonly string[]): HTMLElement {
-  const list = el(doc, 'ul', { className: 'menu-issues' });
-  for (const issue of issues) {
-    const item = el(doc, 'li', {});
-    setText(item, issue);
-    list.append(item);
-  }
+function issueList(draw: Draw, key: string, issues: readonly string[]): HTMLElement {
+  const list = draw.retain('ul', key, { className: 'menu-issues' });
+  fill(
+    list,
+    ...issues.map((issue) => {
+      const item = el(draw.doc, 'li', {});
+      setText(item, issue);
+      return item;
+    }),
+  );
   return list;
 }
 
@@ -621,17 +846,17 @@ function issueList(doc: Document, issues: readonly string[]): HTMLElement {
  * they cannot see."*
  */
 function accountForm(
-  doc: Document,
+  draw: Draw,
   host: MenuPanelHost,
   state: AccountState,
   naming: boolean,
-  keep: KeepControl,
 ): HTMLElement {
-  const wrap = el(doc, 'div', { className: 'menu-account' });
+  const wrap = draw.retain('div', 'account.form', { className: 'menu-account' });
+  const blocks: Node[] = [];
 
   const field = (label: string, type: 'text' | 'email', key: string, value: string): void => {
-    wrap.append(
-      textRow(doc, label, type, value, keep, `account.${key}`, (next) => {
+    blocks.push(
+      textRow(draw, label, type, value, `account.${key}`, (next) => {
         host.dispatch({ kind: 'account-form', patch: { [key]: next } });
       }),
     );
@@ -648,16 +873,21 @@ function accountForm(
   const issues = formIssues(state);
   const typed = naming ? state.form.displayName.length : state.form.email.length;
   if (issues.length > 0 && typed > 0) {
-    wrap.append(issueList(doc, issues.map((issue) => issue.message)));
+    blocks.push(issueList(draw, 'account.issues', issues.map((issue) => issue.message)));
   }
   if (!canSubmitForm(state) && state.retryInMs !== undefined) {
     // The 429 gate, said where the form is. § D242 charges its budgets per address and per caller,
     // so a form that stayed live after a refusal would spend a second request on somebody who did
     // nothing wrong — and the server has already said it will refuse it.
-    wrap.append(
-      noticeLine(doc, 'That request was refused for now. Wait for the time named above before asking again.'),
+    blocks.push(
+      noticeLine(
+        draw,
+        'account.retry',
+        'That request was refused for now. Wait for the time named above before asking again.',
+      ),
     );
   }
+  reconcile(wrap, ...blocks);
   return wrap;
 }
 
@@ -673,28 +903,37 @@ function accountForm(
  * metric orders the rows and the others sit beside it, never combined. And a board with nothing in
  * it says so in words rather than drawing an empty table that reads like a failure.
  */
-function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
-  const wrap = el(doc, 'div', { className: 'menu-leaderboard' });
-  if (view.notice !== undefined) wrap.append(noticeLine(doc, view.notice));
+function boardTable(draw: Draw, view: LeaderboardView): HTMLElement {
+  const doc = draw.doc;
+  /*
+   * Only the wrapper is retained, and that is enough: everything inside it is prose and figures,
+   * and a reader cannot press any of it. What the wrapper buys is that the *rest* of the screen —
+   * the rows above it — is not shifted about when a board arrives.
+   */
+  const wrap = draw.retain('div', 'board', { className: 'menu-leaderboard' });
+  const blocks: Node[] = [];
+  if (view.notice !== undefined) blocks.push(noticeLine(draw, 'board.notice', view.notice));
 
   const page = view.page;
   if (page === undefined) {
     // Nothing to read, so the screen shows the **shape** of what would be read — issue #34.
-    if (view.boards.length === 0) wrap.append(exampleBoard(doc));
+    if (view.boards.length === 0) blocks.push(exampleBoard(doc));
+    fill(wrap, ...blocks);
     return wrap;
   }
 
   const note = el(doc, 'p', { className: 'menu-note' });
   setText(note, page.note);
-  wrap.append(note);
+  blocks.push(note);
 
   if (page.entries.length === 0) {
     const empty = el(doc, 'p', {});
     setText(empty, 'Nothing has been posted to this board yet.');
-    wrap.append(empty);
+    blocks.push(empty);
     // A board that exists and is empty is still a board whose shape is worth showing — and it is
     // the one case where the reader is about to be the first row on it.
-    wrap.append(exampleBoard(doc));
+    blocks.push(exampleBoard(doc));
+    fill(wrap, ...blocks);
     return wrap;
   }
 
@@ -718,7 +957,8 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
     fill(row, name, figures, seed);
     table.append(row);
   }
-  wrap.append(table);
+  blocks.push(table);
+  fill(wrap, ...blocks);
   return wrap;
 }
 
@@ -797,8 +1037,8 @@ function exampleBoard(doc: Document): HTMLElement {
   return wrap;
 }
 
-function noticeLine(doc: Document, text: string): HTMLElement {
-  const line = el(doc, 'p', { className: 'menu-notice' });
+function noticeLine(draw: Draw, key: string, text: string): HTMLElement {
+  const line = draw.retain('p', key, { className: 'menu-notice' });
   setText(line, text);
   return line;
 }
@@ -808,28 +1048,41 @@ function noticeLine(doc: Document, text: string): HTMLElement {
  * -------------------------------------------------------------------------- */
 
 function selectRow(
-  doc: Document,
+  draw: Draw,
   label: string,
   value: string,
   options: readonly { readonly id: string; readonly name: string; readonly detail?: string | undefined }[],
-  keep: KeepControl,
   key: string,
   onChange: (id: string) => void,
 ): HTMLElement {
-  const row = el(doc, 'label', { className: 'menu-select' });
-  const text = el(doc, 'span', {});
+  const row = draw.retain('label', `row.${key}`, { className: 'menu-select' });
+  const text = draw.retain('span', `label.${key}`);
   setText(text, label);
-  const select = keep(el(doc, 'select', {}), key);
-  for (const option of options) {
-    const node = el(doc, 'option', { attrs: { value: option.id } });
-    setText(node, option.detail === undefined ? option.name : `${option.name} — ${option.detail}`);
-    if (option.id === value) node.setAttribute('selected', 'selected');
-    select.append(node);
-  }
-  select.addEventListener('change', () => {
-    onChange((select as HTMLSelectElement).value);
+  const select = draw.keep(draw.retain('select', `control.${key}`), key);
+  // The `<select>` is retained and its options are not, which is the one place issue #106's rule
+  // does not reach: an option is pressed inside a popup the browser owns, never in this tree, so
+  // rebuilding the list under a pointer costs nothing. The element the pointer is standing on here
+  // is the select, and that stays.
+  fill(
+    select,
+    ...options.map((option) => {
+      const node = el(draw.doc, 'option', { attrs: { value: option.id } });
+      setText(node, option.detail === undefined ? option.name : `${option.name} — ${option.detail}`);
+      if (option.id === value) node.setAttribute('selected', 'selected');
+      return node;
+    }),
+  );
+  /*
+   * The attribute above is the option's *default* selectedness, which is what a freshly built
+   * `<select>` picks up. This one is the live value, and it is written because the element now
+   * outlives the draw: a retained select whose options were replaced would otherwise hold whatever
+   * the browser fell back to rather than what the state says.
+   */
+  if (options.some((option) => option.id === value) && select.value !== value) select.value = value;
+  on(select, 'change', () => {
+    onChange(select.value);
   });
-  fill(row, text, select);
+  reconcile(row, text, select);
   return row;
 }
 
@@ -846,45 +1099,74 @@ function selectRow(
  * autofill, on the one field a player is least willing to retype.
  *
  * The value is set as a property and not an attribute, so re-rendering does not blow away what the
- * player is mid-way through typing.
+ * player is mid-way through typing — **and only when it differs**, which is the stronger half.
+ * Assigning `value` to a text input moves the caret to the end of the string even when the string
+ * is unchanged, so a redraw during an edit would send a reader correcting the middle of an address
+ * back to the end of it. That is not a live defect today because nothing redraws per keystroke; it
+ * is written this way because issue #111's validation is about to, and `restoreFocus` restores a
+ * control and has never restored a caret.
+ *
+ * ## Enter, and why it is here rather than in a `<form>`
+ *
+ * See {@link implicitSubmit} for what Enter presses and why the submit stays outside a form. Two
+ * details belong here, next to the handler. The value is **committed first**, because the browser
+ * has not fired `change` yet and submitting would otherwise validate and send the string as it was
+ * before the reader typed. And `preventDefault` is called, because a text input's own Enter
+ * behaviour is to fire that `change` — a second commit of a value the state already holds, landing
+ * *after* the request has started and clearing the notice it had just put on the screen.
+ * `account.ts#updateForm` refuses a commit that changes nothing for the same reason, so the pair is
+ * belt and braces rather than one guard doing all the work.
  */
 function textRow(
-  doc: Document,
+  draw: Draw,
   label: string,
   type: 'text' | 'email',
   value: string,
-  keep: KeepControl,
   key: string,
   onChange: (value: string) => void,
 ): HTMLElement {
-  const row = el(doc, 'label', { className: 'menu-text' });
-  const text = el(doc, 'span', {});
+  const row = draw.retain('label', `row.${key}`, { className: 'menu-text' });
+  const text = draw.retain('span', `label.${key}`);
   setText(text, label);
-  const input = keep(el(doc, 'input', { attrs: { type } }), key) as HTMLInputElement;
-  input.value = value;
-  input.addEventListener('change', () => {
+  const input = draw.keep(draw.retain('input', `control.${key}`, { attrs: { type } }), key);
+  if (input.value !== value) input.value = value;
+  on(input, 'change', () => {
     onChange(input.value);
   });
-  fill(row, text, input);
+  const submit = draw.submit;
+  on(input, 'keydown', (event) => {
+    if ((event as KeyboardEvent).key !== 'Enter' || submit === undefined) return;
+    event.preventDefault();
+    onChange(input.value);
+    submit();
+  });
+  reconcile(row, text, input);
   return row;
 }
 
 function toggleRow(
-  doc: Document,
+  draw: Draw,
   label: string,
   value: boolean,
-  keep: KeepControl,
   key: string,
   onChange: (value: boolean) => void,
 ): HTMLElement {
-  const row = el(doc, 'label', { className: 'menu-toggle' });
-  const text = el(doc, 'span', {});
+  const row = draw.retain('label', `row.${key}`, { className: 'menu-toggle' });
+  const text = draw.retain('span', `label.${key}`);
   setText(text, label);
-  const input = keep(el(doc, 'input', { attrs: { type: 'checkbox' } }), key);
+  const input = draw.keep(
+    draw.retain('input', `control.${key}`, { attrs: { type: 'checkbox' } }),
+    key,
+  );
+  // The attribute is the box's *default* state and the property is its live one. Both, and both
+  // ways: a retained box the reader has already ticked stays ticked otherwise, however firmly the
+  // state it is drawn from says the setting is off.
   if (value) input.setAttribute('checked', 'checked');
-  input.addEventListener('change', () => {
-    onChange((input as HTMLInputElement).checked);
+  else input.removeAttribute('checked');
+  if (input.checked !== value) input.checked = value;
+  on(input, 'change', () => {
+    onChange(input.checked);
   });
-  fill(row, text, input);
+  reconcile(row, text, input);
   return row;
 }
