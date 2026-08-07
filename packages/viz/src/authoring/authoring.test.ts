@@ -782,6 +782,135 @@ describe('the building spec', () => {
     ]);
   });
 
+  it('carries a floor below the lobby without moving the floors above it', () => {
+    /*
+     * **One defect, three shipped symptoms, and it was silent in all three.** `BuildingSpec`'s
+     * floor vocabulary ran `0 … floors` with the lobby at the bottom, so `specFromBuilding` had
+     * nowhere to put a basement and gave it the first slot *above* the lobby. Every floor in the
+     * building then moved up one, and `floorIdOf` printed the shifted number:
+     *
+     * - `crown-hotel`'s `back-of-house` zone named `B1` going in and `2` coming out — which moved
+     *   housekeeping, engineering and security off the back of house and onto a guest bedroom
+     *   floor, a credential fact that is *wrong* rather than merely coarse.
+     * - `st-jude-hospital`'s main stair joined `G` to `1` over the building's own 4.0 m floor-to-
+     *   floor going in, and `G` to `3` over 8.80 m coming out — two floors of climb the building
+     *   does not have, and the whole `use` propensity priced against it.
+     * - `midtown-office` lost its `P1` altogether, because it is flagged `isEntrance` and every
+     *   entrance was folded onto floor 0. That one is the third and nothing named it.
+     *
+     * All three are reached by opening the building in the editor and pressing save without
+     * touching a control. This test is written against the round trip rather than against
+     * {@link floorIdOf}, so it fails on the unfixed source rather than failing to compile against
+     * it.
+     */
+    const crown = parseBuilding(read('buildings/crown-hotel.json'));
+    const crownOut = buildingFromSpec(specFromBuilding(crown, 'crown-hotel'), { specs: SPECS });
+    expect((crownOut.floors ?? []).slice(0, 3).map((floor) => [floor.id, floor.index])).toStrictEqual([
+      ['B1', -1],
+      ['G', 0],
+      ['2', 1],
+    ]);
+    expect((crownOut.accessZones ?? []).map((zone) => [zone.id, zone.floors])).toStrictEqual([
+      ['back-of-house', ['B1']],
+    ]);
+    // The bank opens onto it, as the document's own `servesFloors` does — a zoned floor no car
+    // reaches is a different building from the one that was loaded.
+    expect(crownOut.banks[0]?.servesFloors.slice(0, 2)).toStrictEqual(['B1', 'G']);
+
+    const jude = parseBuilding(read('buildings/st-jude-hospital.json'));
+    const judeSpec = specFromBuilding(jude, 'st-jude-hospital');
+    const judeOut = buildingFromSpec(judeSpec, { specs: SPECS });
+    expect((judeOut.floors ?? []).slice(0, 3).map((floor) => floor.id)).toStrictEqual([
+      'LG',
+      'G',
+      '1',
+    ]);
+    expect((judeOut.transportModes ?? []).map((mode) => mode.connects)).toStrictEqual([['G', '1']]);
+    expect((judeOut.accessZones ?? []).map((zone) => zone.floors)).toStrictEqual([['2', '3'], ['LG']]);
+    /*
+     * And the geometry the renumbering dragged with it. The stair's own `$comment` states the rise
+     * between its two landings; on the shifted spec it read `8.80 m`, because the basement was
+     * counted as a storey of the tower **and** the pitch was averaged over a span that included the
+     * drop to it. The document's floor-to-floor is 4.0 m.
+     */
+    expect(judeSpec.floorHeightM).toBe(4);
+    expect((judeOut.transportModes ?? [])[0]?.$comment).toMatch(
+      /rise between these two landings is 4\.00 m/,
+    );
+
+    /*
+     * The third building. `P1` is a way into the building rather than a floor with people on it, so
+     * the flag is carried beside the id and the population stays zero — otherwise the round trip
+     * either deletes a street door or fills a car park with tenants.
+     */
+    const midtown = parseBuilding(read('buildings/midtown-office.json'));
+    const midtownOut = buildingFromSpec(specFromBuilding(midtown, 'midtown-office'), { specs: SPECS });
+    expect((midtownOut.floors ?? [])[0]).toMatchObject({
+      id: 'P1',
+      index: -1,
+      isEntrance: true,
+      population: 0,
+    });
+    expect((midtownOut.floors ?? [])[1]).toMatchObject({ id: 'G', index: 0, isEntrance: true });
+  });
+
+  it('names a floor by the one id the document uses, in a warning as well as in the JSON', () => {
+    /*
+     * One translation, or the reader is shown two buildings. `validateSpec`'s orphan branch minted
+     * its own id — `floor === 0 ? 'G' : String(floor)` — beside a stranded-floor branch one line
+     * above it that went through `floorIdOf`, so the same floor was `6` in one sentence and `7` in
+     * the next, and `7` is what `buildingFromSpec` actually writes into `floors[].id`.
+     *
+     * Pinned behaviourally rather than by reading the source, because what matters is that the
+     * warning and the document agree about which floor is being talked about.
+     */
+    const spec: BuildingSpec = { ...BLANK_SPEC, floors: 8, cars: 1, bandByCar: { 0: [0, 5] } };
+    const orphaned = orphanFloors(spec);
+    expect(orphaned).toStrictEqual([6, 7, 8]);
+    const written = new Set((buildingFromSpec(spec, { specs: SPECS }).floors ?? []).map((f) => f.id));
+    const named = orphaned.map((floor) => floorIdOf(spec, floor));
+    expect(named).toStrictEqual(['7', '8', '9']);
+    expect(named.every((id) => written.has(id))).toBe(true);
+    expect(validateSpec(spec, undefined).find((line) => line.startsWith('No shaft serves'))).toBe(
+      `No shaft serves floor ${named.join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
+    );
+  });
+
+  it('renumbers a tower whose floor numbers are not a contiguous run, and says so', () => {
+    /*
+     * The limitation {@link specFromBuilding}'s docstring states, pinned by a run rather than left
+     * as a sentence — `CLAUDE.md`'s rule for a stated refusal. The spec holds *how many* floors are
+     * above the lobby and *what the first of them is called*; a building that skips a number in the
+     * middle is neither, so a tower with no thirteenth floor comes back with `14` renamed `13`.
+     *
+     * No shipped building has a gap — this one is synthetic — and the assertion is here so that the
+     * day one does, the docstring is red rather than quietly wrong.
+     */
+    const gapped = parseBuilding({
+      id: 'gapped',
+      name: 'Gapped',
+      type: 'office',
+      trafficProfile: 'office-standard',
+      floors: [
+        { id: 'G', index: 0, heightM: 0, population: 0, isEntrance: true },
+        { id: '12', index: 12, heightM: 3.6, population: 40 },
+        { id: '14', index: 14, heightM: 7.2, population: 40 },
+        { id: '15', index: 15, heightM: 10.8, population: 40 },
+      ],
+      banks: [
+        {
+          id: 'main',
+          servesFloors: ['G', '12', '14', '15'],
+          cars: [
+            { id: 'A', spec: 'geared-traction', ratedSpeedMps: 2.5, ratedLoadLb: 2500 },
+          ],
+        },
+      ],
+    });
+    const rebuilt = buildingFromSpec(specFromBuilding(gapped, 'gapped'), { specs: SPECS });
+    expect((rebuilt.floors ?? []).map((floor) => floor.id)).toStrictEqual(['G', '12', '13', '14']);
+  });
+
   it('seeds a new escalator from the rise, by the derivation Vertical City performs by hand', () => {
     /*
      * `vertical-city`'s four `$comment`s derive 21.2 s from a 4.5 m rise — 30° inclination (the
@@ -1476,7 +1605,7 @@ describe('the building editor is not decoration', () => {
       const planner = RoutePlanner.forBuilding(resolved);
       const stranded = new Set(unreachableFloors(candidate));
       for (let floor = 1; floor <= candidate.floors; floor += 1) {
-        expect([floor, planner.plan('G', floorIdOf(floor)) !== undefined]).toStrictEqual([
+        expect([floor, planner.plan('G', floorIdOf(candidate, floor)) !== undefined]).toStrictEqual([
           floor,
           !stranded.has(floor),
         ]);

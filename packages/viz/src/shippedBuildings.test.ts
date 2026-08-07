@@ -58,6 +58,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  expandFloors,
   parseBuilding,
   parseElevatorSpecs,
   resolveBuilding,
@@ -131,6 +132,46 @@ describe.each(SHIPPED)('%s — the viewer can open it', (id) => {
     expect(spec, id).toBeDefined();
     const rebuilt = buildingFromSpec(spec as BuildingSpec, { specs: SPECS });
     expect(() => resolveBuilding(parseBuilding(rebuilt as unknown), SPECS), id).not.toThrow();
+  });
+
+  it('keeps every floor id the document declares, including any below the lobby', () => {
+    /*
+     * **The floor id is the key every other part of a document names a floor by** — `servesFloors`,
+     * `accessZones[].floors`, `transportModes[].connects` — so a round trip that renumbers the
+     * floors has silently rewritten all three, and each of them means something different about
+     * the building.
+     *
+     * It was renumbering three of the eight. `BuildingSpec`'s floor vocabulary had no room below
+     * the lobby, so `specFromBuilding` dealt a basement the first slot *above* it and every floor
+     * in the building moved up one: `crown-hotel`'s `back-of-house` zone went in naming `B1` and
+     * came out naming `2`, which is a guest bedroom floor, and `st-jude-hospital`'s main stair went
+     * in joining `G` to `1` and came out joining `G` to `3`. `midtown-office` lost its `P1` outright
+     * — it is flagged `isEntrance`, and every entrance was folded onto the lobby.
+     *
+     * Asserted over the whole directory rather than over the three, because the five with no floor
+     * beneath the lobby are the arms that would keep passing if the vocabulary lost it again. The
+     * entrance flags are asserted beside the ids for the same reason `population` is not: a
+     * misplaced entrance is a street door in the wrong place, which changes where people arrive,
+     * while a flattened population is § 4.5's declared loss.
+     */
+    const source = expandFloors(config);
+    const rebuilt = buildingFromSpec(specFromBuilding(config, id), { specs: SPECS });
+    const written = rebuilt.floors ?? [];
+    expect(written.map((floor) => floor.id), id).toStrictEqual(source.map((floor) => floor.id));
+    expect(
+      written.filter((floor) => floor.isEntrance === true).map((floor) => floor.id),
+      id,
+    ).toStrictEqual(source.filter((floor) => floor.isEntrance === true).map((floor) => floor.id));
+    /*
+     * And a floor the document put below datum stays below it. The id alone would pass on a
+     * building that kept the name `B1` and hung it off the first floor above the lobby, which is
+     * the shape the defect actually had.
+     */
+    const belowById = new Map(source.map((floor) => [floor.id, floor.heightM < 0]));
+    expect(
+      written.filter((floor) => floor.heightM < 0).map((floor) => floor.id),
+      id,
+    ).toStrictEqual(source.filter((floor) => belowById.get(floor.id) === true).map((floor) => floor.id));
   });
 
   it('carries every transport mode through the round trip on the arm it was authored on', () => {
