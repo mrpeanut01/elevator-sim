@@ -20858,3 +20858,80 @@ in `CHALLENGE_ROTATION` names an hour record — `rise-and-fall`, `lunch-two-way
 which already is the part of the day it means. Windowing exists to cut a *day* template and no
 challenge names one. If one ever does, `ChallengeConfig` gains the field and
 `challengeDefinitionIssues` gains the bound.
+
+---
+
+## D292 — the write-once promise's cost is drawn, and § D29 is not touched
+
+**Status: shipped.** A player reported Vertical City's lobby after the peak: *"numerous people in
+the lobby and cars on the lobby floor, but they were not serving riders, they were just sitting
+there."*
+
+### What was actually happening, measured
+
+`vertical-city` / `destination-panel`, seed 101390945715201, 2 h:
+
+| | |
+|---|---|
+| legs waiting at `G` when the run ended | **936** |
+| of those, promised to one car (`shuttle-S1`) | **764** |
+| `shuttle-S1` capacity | **26** |
+| promised to `shuttle-S1` over the run / carried | **1531 / 761** |
+| promised to `shuttle-S5`, an identical car in the same bank | **68** |
+
+Same building, same seed, `collective` and `eta`: **0 undelivered**, AWT valid. `destination-panel`:
+**989 undelivered**, AWT suppressed. So it is the dispatcher, and it is not Vertical City alone —
+`midtown-office` strands 895 the same way.
+
+### The first conclusion was wrong, and the wrong fix was nearly built
+
+The obvious reading is a dispatch defect: a queue pinned to a full car while seven identical cars
+idle, and `promisesRevoked: 0`. The fix would be to revoke and reassign a promise the promised car
+cannot keep.
+
+**That is exactly what § D29 refuses, on purpose.** It weighed re-offering and rejected it because
+it *"quietly recovers the deferral advantage Level 1 is supposed to surrender, which flatters the
+thing being measured — the failure mode this project's statistical discipline exists to prevent"*.
+It rejected a tunable as *"this repository's documented defect class"*. And it says outright that
+*"a non-zero count is a **result**, not a failure."*
+
+`published.ts` carries **84** `destination-panel` references, and `dispatcherBenchmark.test.ts`
+already prices this exact mechanism at 37 s of WT95. Changing it would have overturned a reasoned
+decision, invalidated every one of those intervals, and improved the measured result by removing the
+cost being measured.
+
+**So the model is right and stays.** CLAUDE.md's instruction to evaluate a rule rather than defer to
+it cuts both ways: evaluated, this rule holds, and the thing that fails is somewhere else.
+
+### The defect is that none of it was visible
+
+The screen said `TIMED-OUT — 335 undelivered`, `4 landings locked out`, `riders with no credential at
+all`, `SATURATED — AWT suppressed`. Every one true; not one of them what was happening. `core`
+counts `brokenPromises` and **`viz` had no non-test reference to it at all** — measured, not
+inferred. The player was shown four correct sentences about other things and left to conclude the
+software was broken.
+
+`frame/pinnedQueue.ts` says the missing one, on the banner above the saturation clause — ordered by
+cause, the same ordering `docs/03` uses for abandonment above censoring.
+
+### The trigger is arithmetic, not a number somebody picked
+
+A group is reported when it is **larger than the promised car's own capacity**, because the promise
+then provably cannot be kept in one trip. `capacityPersons` is read off the shaft, so the rule is a
+property of the building rather than a constant this module invented.
+
+The copy names the car, the capacity and the trips needed, and says what the trade bought — a test
+asserts it contains none of *fail, broken, error, bug, stuck, fault*, because § D29 calls this a
+result and copy calling it a fault would be the repository contradicting its own decision record.
+
+### Two guards fired during the work, and both were right
+
+- **The honesty derivation** refused a new player-facing text producer that was in no adapter and no
+  exclusion. Registered rather than excluded: it makes a *causal* claim — a named car is why a crowd
+  is standing still — and a causal sentence going stale is what this apparatus is for.
+- **The always-on honesty tier** then refused it for rendering nothing: *"an adapter whose renderer
+  silently returns nothing certifies a surface it never looked at."* True — the corpus 9001–9048
+  draws three `destination-panel` cases and the surface fires on **0 of 11** sampled instants in
+  each. Seed **9068** (`vertical-city` / `destination-panel`, 840 s) fires at **9 of 11** and is now
+  pinned, with that measurement beside it. The corpus was extended rather than the adapter declared
+  silent, because *silent* is a claim `judgeStage` earns structurally and this surface had not.

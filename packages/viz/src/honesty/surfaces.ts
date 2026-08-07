@@ -40,6 +40,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONAL_NOTE, STATE_WORDS } from '../access/zoning.js';
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
+import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
@@ -930,6 +931,39 @@ const RIDER_QUEUE: SurfaceAdapter = {
             });
           }
         }
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The write-once promise's cost, as the player is told it — § D29, § D291's sibling.
+ *
+ * Swept rather than excluded because it is the newest thing on the banner and it makes a *causal*
+ * claim: it says a named car is why a crowd is standing still. A sentence like that going stale —
+ * naming a car that is not the one, or surviving a change to how promises work — is the failure
+ * this whole apparatus exists to catch, and it is the shape `patternSwitching` and the traffic
+ * editor's mean-group-size refusal both had.
+ */
+const PINNED_QUEUES: SurfaceAdapter = {
+  id: 'frame/pinnedQueue.ts#describePinnedQueues',
+  covers: [
+    'frame/pinnedQueue.ts#describePinnedQueues',
+    'frame/pinnedQueue.ts#pinnedQueuesAt',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    for (const at of sampleTimes(context.recording)) {
+      const { queues } = context.bundleAt(at);
+      const pinned = pinnedQueuesAt(queues, context.recording.shafts, context.recording.passengerModel);
+      if (pinned.length === 0) continue;
+      for (const short of [false, true]) {
+        seeds.push({
+          field: `describePinnedQueues(@${at.toFixed(0)}s, short=${String(short)})`,
+          text: describePinnedQueues(pinned, { short }),
+          role: 'observation',
+        });
       }
     }
     return singleRun(this.id, seeds);
@@ -4289,6 +4323,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   LIVE_RAIL,
   RIDER_QUEUE,
   ACCESS,
+  PINNED_QUEUES,
   MODE,
   EDITOR,
   CONTROLS,
