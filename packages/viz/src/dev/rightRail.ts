@@ -40,12 +40,35 @@
  * `meansAreSuppressed(recording)`, and says which gate withheld it. Nothing here reaches for
  * `meanWaitS`, `wait95S` or `meanTimeToDestinationS` at all.
  *
+ * ## Three of the four segments pick, and the fourth reports — issue #114
+ *
+ * `docs/12` § 1.4 R2 gives every segment *"a list of selectable cards"*, and the Machines segment
+ * shipped one: six cards, `aria-pressed` on one of them, in the identical form as the three lists
+ * above it. **It selected nothing.** Its `onPick` wrote `ViewerState.editingClassId`, which is
+ * declared `presentation` in `scope/surface.ts` and is read by the machines *editor* to name its
+ * draft — `shiftRunConfigOf` has never read it, and `scope.test.ts` requires the legs to stay
+ * byte-identical when it moves. So the player moved a control, the run did not change, and the
+ * screen looked right: § D219's defect, drawn as six cards.
+ *
+ * The fix is **not** to make it live, because there is nothing coherent for it to write: a machine
+ * class is a fact about a **bank**, and the two surfaces that own it are the commissioning screen
+ * (per bank, straight into the next run) and the building editor (one class across a building you
+ * draw, behind its save). What this segment can honestly do is **report** —
+ * {@link runningClassesOf} derives the classes the running building's cars are actually built to —
+ * and **say that it reports**, which is § D227's rule pointed at a list instead of a slider.
+ *
+ * The deviation from R2 is deliberate, and the constraint that forced it is one the handoff's own
+ * prototype did not have: its toy simulator gives a building one machine, and this one gives every
+ * bank its own.
+ *
  * ## KB-15
  *
  * The rail has one colour-bearing state — which card in a list is selected — and `dom.ts`'s
  * `pick` carries it as `aria-pressed` rather than as a class, so the selection is a fact a screen
- * reader has. The machine-class advisory leads with `⚠` when it fires, and reads as an ordinary
- * sentence when it does not.
+ * reader has. The Machines segment therefore has **no** colour-bearing state and no `pick` at all:
+ * a card that cannot be pressed may not carry the attribute that says which one is pressed. The
+ * machine-class advisory leads with `⚠` when it fires, and reads as an ordinary sentence when it
+ * does not.
  */
 
 import {
@@ -73,7 +96,7 @@ import { statLineOf } from '../shift/contracts.js';
 
 import type { BrowserResources } from './data.js';
 import { resolveEdited } from './data.js';
-import { fill, fillPlate, pick, setHidden, setText, type PlateEntry } from './dom.js';
+import { el, fill, fillPlate, pick, plateRow, setHidden, setText, type PlateEntry } from './dom.js';
 import type { RailElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
@@ -559,6 +582,114 @@ function capacityPhrase(cars: ResolvedCars): string {
  * -------------------------------------------------------------------------- */
 
 /**
+ * One machine class the running building actually has cars built to.
+ *
+ * Counts, speeds and ids — no sentence. The strings this becomes belong to the mount; the part
+ * worth holding to account is the **decision**, which is *which classes is this building running,
+ * and how much of it runs each*. See {@link runningClassesOf}.
+ */
+export interface RunningMachineClass {
+  /** The `spec` its cars declare, present even when the class library carries no record of it. */
+  readonly id: string;
+  /** The class record, or `undefined` when nothing in the library carries {@link id}. */
+  readonly machineClass: MachineClass | undefined;
+  readonly cars: number;
+  readonly speedMinMps: number;
+  readonly speedMaxMps: number;
+  /** The banks running it, in the building's own order, by name where a bank declares one. */
+  readonly banks: readonly string[];
+}
+
+/**
+ * What the running building is built to, ordered by how much of it runs each class.
+ *
+ * ## Why this is derived from the cars and not from a pointer
+ *
+ * The rail used to highlight `ViewerState.editingClassId`, and that field is seeded once at boot
+ * from `classes[2]` — a positional index into `data/elevator-specs.json`, which is *Geared
+ * traction*. `withBuilding` does not touch it. So the segment said **Geared traction** on every
+ * building forever: on Garden Apartments, whose two cars are hydraulic; on Chancery House, whose
+ * six are gearless; on Vertical City, whose sky-lobby shuttle is ultra high-speed. It also
+ * disagreed with the building editor's own class chips, which have always read the building.
+ *
+ * A car carries its class on `ResolvedCar.spec`, so the question has an answer that cannot go
+ * stale, and the answer is a **list**: four of the eight shipped buildings run more than one
+ * class, and two of those four run both inside a single bank. Anything that reduced this to one
+ * class would be inventing the reduction.
+ *
+ * Ordered by car count, descending, and `sort` is stable — so classes with the same count keep the
+ * building's own bank order, and the first entry is the class most of the building is built to.
+ * That is the one the `NAMEPLATE` describes, and the plate names it in its own first row rather
+ * than leaving the choice implicit.
+ */
+export function runningClassesOf(
+  building: ResolvedBuilding | undefined,
+  classes: readonly MachineClass[],
+): readonly RunningMachineClass[] {
+  if (building === undefined) return [];
+  const found = new Map<
+    string,
+    { cars: number; min: number; max: number; readonly banks: string[] }
+  >();
+  for (const bank of building.banks) {
+    const label = bank.name ?? bank.id;
+    for (const car of bank.cars) {
+      const entry = found.get(car.spec) ?? {
+        cars: 0,
+        min: car.ratedSpeedMps,
+        max: car.ratedSpeedMps,
+        banks: [],
+      };
+      entry.cars += 1;
+      entry.min = Math.min(entry.min, car.ratedSpeedMps);
+      entry.max = Math.max(entry.max, car.ratedSpeedMps);
+      if (!entry.banks.includes(label)) entry.banks.push(label);
+      found.set(car.spec, entry);
+    }
+  }
+  return [...found.entries()]
+    .map(([id, entry]) => ({
+      id,
+      machineClass: classes.find((known) => known.id === id),
+      cars: entry.cars,
+      speedMinMps: entry.min,
+      speedMaxMps: entry.max,
+      banks: entry.banks,
+    }))
+    .sort((a, b) => b.cars - a.cars);
+}
+
+/**
+ * A speed, or a band of them, in the two decimals the nameplate's own `rated speed` row uses.
+ */
+function speedPhrase(lowMps: number, highMps: number): string {
+  return lowMps === highMps
+    ? `${lowMps.toFixed(2)} m/s`
+    : `${lowMps.toFixed(2)}–${highMps.toFixed(2)} m/s`;
+}
+
+/**
+ * The sentence this panel carries in **every** state, including the states where nothing is wrong.
+ *
+ * § D227's rule, and it is the half that rule calls the more dangerous one inverted: a control that
+ * writes nothing must say so. This segment draws no control at all now, which satisfies the rule
+ * structurally and leaves a reader with the question the six cards used to answer wrongly — *then
+ * where do I change the machine?* — so the sentence answers it, and names both surfaces that really
+ * do write, in the words those surfaces use for themselves.
+ *
+ * Both destinations are pinned by `rightRail.test.ts` against the modules that author their labels,
+ * so a screen renamed elsewhere turns this sentence red rather than leaving it pointing at nothing.
+ * That is weaker than driving the menu and is stated rather than dressed up.
+ */
+const MACHINES_ARE_REPORTED =
+  'Nothing here is pickable, and that is deliberate: this panel reports the classes the running ' +
+  'building’s cars are built to, and the choice is made on two other screens. Commission the ' +
+  'building (Menu → Campaign) sets one bank’s class and its rated speed, and reaches the next run ' +
+  'with no save; the building editor sets one class and one speed across a whole building you ' +
+  'draw, behind Save as a new building. The machine editor below authors a class — it does not ' +
+  'decide which cars are built to it.';
+
+/**
  * The `NAMEPLATE` plate. Engineer mode only — `#rail-nameplate-block` is hidden in casual (B1).
  *
  * The class record supplies the envelope; `data/elevator-specs.json`'s **file-level** `doors`,
@@ -655,19 +786,47 @@ export function nameplateVisibleIn(mode: 'casual' | 'engineer'): boolean {
 }
 
 /**
- * Whether the running building's rise sits inside the class's envelope.
+ * Whether the running building sits inside the class's envelope — rise, floor count **and the
+ * speed its cars actually run** — followed by {@link MACHINES_ARE_REPORTED}.
  *
- * **An advisory, and it says so.** `config/parse.ts` raises the same finding as a *warning* —
- * *"the reference envelope is application guidance, not a hard limit"* — and builds the bank
- * anyway, so the run happens and its figures describe a machine outside its class. A line here
- * that said the loader refuses would be describing behaviour this project does not have.
+ * **An advisory, and it says so.** `config/parse.ts` raises all three findings as *warnings* —
+ * `rise-exceeds-class`, `floors-exceed-class`, `speed-outside-class-range`, the first of them
+ * carrying *"the reference envelope is application guidance, not a hard limit"* — and builds the
+ * bank anyway, so the run happens and its figures describe a machine outside its class. A line
+ * here that said the loader refuses would be describing behaviour this project does not have.
+ *
+ * ## The speed clause, and why it was missing for so long
+ *
+ * The envelope was checked on rise and floor count and **never on speed**, so this line told a
+ * reader that *"Chancery House is inside this class's envelope"* for Ultra high-speed — a class
+ * banded 10.00–20.50 m/s — about a building whose cars run at 5.00. The plate two rows above
+ * already said the opposite in as many words: *"A car outside the band is not a car of this
+ * class."* The code now honours that sentence, and `config/parse.ts` was already honouring it.
+ *
+ * ## Which cars are measured, which is the part that can be got wrong quietly
+ *
+ * **The cars built to this class**, when the building has any — not every car in the building.
+ * Four of the eight shipped buildings run more than one class (Crown Hotel and St Jude inside one
+ * bank; Mixed-Use and Vertical City across banks), and measuring all of them against one class's
+ * band raises a `⚠` on Vertical City about a sky-lobby shuttle that is correctly an ultra
+ * high-speed car and correctly runs at 10 m/s. That would replace a false *inside the envelope*
+ * with a false alarm, which is not an improvement. It also matches the loader, whose envelope
+ * checks run *"once per class in the bank"* over the classes a bank actually uses.
+ *
+ * A class **no** car here is built to has nothing of its own to measure, so the building's own
+ * cars are compared instead: that pair is not reachable from the panel any more — the class comes
+ * from the cars now — but it is reachable from a caller, and answering *inside the envelope* about
+ * a class the building does not run is the claim this function exists to stop making.
  */
 export function machineWarningOf(
   machineClass: MachineClass,
   building: ResolvedBuilding | undefined,
 ): string {
   if (building === undefined) {
-    return 'The class sets the speed band, the rise it can serve and the loads it is built in.';
+    return (
+      'The class sets the speed band, the rise it can serve and the loads it is built in. ' +
+      MACHINES_ARE_REPORTED
+    );
   }
   const heights = building.floors.map((floor) => floor.heightM);
   const rise = heights.length > 1 ? Math.max(...heights) - Math.min(...heights) : 0;
@@ -683,16 +842,29 @@ export function machineWarningOf(
       `${String(floors)} floors against a class rated for ${String(machineClass.maxFloors)}`,
     );
   }
+  const cars = building.banks.flatMap((bank) => bank.cars);
+  const ofThisClass = cars.filter((car) => car.spec === machineClass.id);
+  const measured = (ofThisClass.length > 0 ? ofThisClass : cars).map((car) => car.ratedSpeedMps);
+  if (measured.length > 0) {
+    const low = Math.min(...measured);
+    const high = Math.max(...measured);
+    if (low < machineClass.speedMinMps || high > machineClass.speedMaxMps) {
+      over.push(
+        `cars running at ${speedPhrase(low, high)} against a class banded ` +
+          `${speedPhrase(machineClass.speedMinMps, machineClass.speedMaxMps)}`,
+      );
+    }
+  }
   if (over.length === 0) {
     return (
       `${building.name} is inside this class's envelope. The class sets the speed band, the rise ` +
-      'it can serve and the loads it is built in.'
+      `it can serve and the loads it is built in. ${MACHINES_ARE_REPORTED}`
     );
   }
   return (
     `⚠ ${over.join(', and ')}. That is an advisory rather than a refusal: the loader raises it as ` +
     'a warning and builds the bank anyway, so the run happens and the figures describe a machine ' +
-    'outside its class.'
+    `outside its class. ${MACHINES_ARE_REPORTED}`
   );
 }
 
@@ -948,38 +1120,40 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
         buildingPlate(buildingPlateOf(building, recording, state.mode));
       }
 
-      /* ---- Machines ---- */
-      const classes = allClasses(resources, state.savedClasses);
-      const selectedClass =
-        classes.find((entry) => entry.id === state.editingClassId) ?? classes[0];
+      /*
+       * ---- Machines ----
+       *
+       * The one segment with no `pick` in it, and no `context.update` either. See the module
+       * docstring: the six cards it used to draw wrote `editingClassId`, which no run reads, so
+       * what is drawn now is what the building is built to. Nothing in this block can change a
+       * run, which is why it is the only one of the four that never calls `runShift`.
+       */
+      const running = runningClassesOf(building, allClasses(resources, state.savedClasses));
+      const shownClass = running[0]?.machineClass;
       setText(ui.machinesNote, machinesNoteOf(building));
+      const runningRows = runningRowsOf(running);
       machinesList(
-        classes.map((entry) => `${entry.id}${entry.id === selectedClass?.id ? '*' : ''}`).join('|'),
-        () =>
-          classes.map((entry) =>
-            pick(doc, {
-              title: entry.name,
-              sub: plainDescription(entry),
-              tag: entry.yours ? 'YOURS' : entry.application,
-              selected: entry.id === selectedClass?.id,
-              help: entry.application,
-              onPick: () => {
-                context.update({ editingClassId: entry.id });
-              },
-            }),
-          ),
+        // The help is in the signature as well as the row, because it names the banks — two
+        // buildings can run the same class in the same numbers and not in the same shafts.
+        runningRows.map((row) => `${row.k} · ${row.v} · ${row.help ?? ''}`).join(' | '),
+        () => [
+          el(doc, 'div', {
+            className: 'plate',
+            children: runningRows.map((row) => plateRow(doc, row.k, row.v, row.help)),
+          }),
+        ],
       );
       // § 1.4 R3 / B1 — the nameplate is engineer-only. Casual gets a lever, not a lecture.
       const engineer = nameplateVisibleIn(disclosureOf(state.mode));
       setHidden(ui.nameplateBlock, !engineer);
-      if (engineer && selectedClass !== undefined) {
-        machinesPlate(nameplateOf(selectedClass, resources.elevatorSpecs));
+      if (engineer && shownClass !== undefined) {
+        machinesPlate(nameplateOf(shownClass, resources.elevatorSpecs));
       }
       setText(
         ui.machinesWarning,
-        selectedClass === undefined
-          ? 'No machine class is loaded.'
-          : machineWarningOf(selectedClass, building),
+        shownClass === undefined
+          ? unknownClassNoteOf(building)
+          : machineWarningOf(shownClass, building),
       );
     },
   };
@@ -1037,6 +1211,61 @@ function machinesNoteOf(building: ResolvedBuilding | undefined): string {
   const speeds = building.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
   if (speeds.length === 0) return 'no cars';
   return `running at ${Math.max(...speeds).toFixed(2)} m/s`;
+}
+
+/**
+ * The running classes as plate rows — the segment's list slot, in the rail's read-only component.
+ *
+ * A plate rather than cards, and the swap is the whole point: `pick` is a `<button>` carrying
+ * `aria-pressed`, so a list of them promises a selection to a pointer, to a keyboard and to a
+ * screen reader alike. Three of those promises were false here. The plate is what this rail
+ * already uses for *facts about what is running*, and it makes no promise at all.
+ *
+ * A class the library cannot name still gets a row, under the `spec` its cars declare: the
+ * building is running *something*, and a panel that dropped the row would be quieter about a
+ * misconfiguration than about a working one.
+ */
+function runningRowsOf(running: readonly RunningMachineClass[]): readonly PlateEntry[] {
+  if (running.length === 0) {
+    // `buildingPlateOf`'s own answer to the same question, in the same words: a row that says
+    // there is nothing yet, rather than an empty box a reader has to interpret.
+    return [
+      {
+        k: 'machine class',
+        v: 'not resolved',
+        help: 'Read off the running building’s cars; nothing has resolved yet.',
+      },
+    ];
+  }
+  return running.map((entry) => ({
+    k: entry.machineClass?.name ?? entry.id,
+    v:
+      `${String(entry.cars)} car${entry.cars === 1 ? '' : 's'} at ` +
+      speedPhrase(entry.speedMinMps, entry.speedMaxMps),
+    help: `${entry.banks.join(' · ')} — ${machineHelpOf(entry.machineClass)}`,
+  }));
+}
+
+/** A class's own one-liner, or the sentence for a `spec` the class library does not carry. */
+function machineHelpOf(machineClass: MachineClass | undefined): string {
+  return machineClass === undefined
+    ? 'no class of this id is loaded, so the nameplate below cannot describe these cars'
+    : plainDescription(machineClass);
+}
+
+/**
+ * The prose slot when no running car resolves to a class — before a building has resolved, and for
+ * a car whose `spec` the library does not carry.
+ *
+ * The refusal is repeated here rather than skipped: the panel says what it is for in every state it
+ * has, and *the one state where something is wrong* is the worst one to drop it in.
+ */
+function unknownClassNoteOf(building: ResolvedBuilding | undefined): string {
+  const head =
+    building === undefined
+      ? 'No building has resolved yet, so there is no machine to describe.'
+      : `${building.name} has no car this page can match to a machine class.`;
+  return `${head} ${MACHINES_ARE_REPORTED}`;
 }
 
 /** Rebuild a list only when its signature changes. See {@link mountRightRail}'s docstring. */
