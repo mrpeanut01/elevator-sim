@@ -70,6 +70,20 @@ function runFor(challenge: IssuedChallenge, dispatcherProfileId: string, seed: s
     demandTemplateId: challenge.config.demandTemplateId,
     arrivalRatePctPop5min: challenge.config.arrivalRatePctPop5min,
     durationS: challenge.config.durationS,
+    /*
+     * Never a window, and that is a property of what a challenge *is* rather than a gap here.
+     *
+     * `ChallengeConfig` names a demand template outright, and every definition in
+     * `CHALLENGE_ROTATION` names an **hour** record — `rise-and-fall`, `lunch-two-way`,
+     * `evening-egress` — which already is the part of the day it means. Windowing exists to cut a
+     * *day* template (§ D285) and no challenge names one.
+     *
+     * So this is `null` by construction, not by default. If a challenge is ever authored on
+     * `office-day`, `ChallengeConfig` gains the field and `challengeDefinitionIssues` gains the
+     * bound — and until then a hard-coded `null` here is the accurate statement rather than a
+     * placeholder.
+     */
+    windowStartS: null,
     seed,
   };
 }

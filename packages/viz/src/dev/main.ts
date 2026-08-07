@@ -1808,6 +1808,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
         demandTemplateId: menuState.freePlay.demandTemplateId,
         arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
         durationS: state.shiftLengthS,
+        // `state`, not `menuState.freePlay`, and the distinction matters here more than it does on
+        // the lines above: this is the window the run *was simulated with*, and the menu holds the
+        // window currently *selected*. They agree until somebody changes the selection after a run
+        // and before posting, and then only one of them describes the seed the server is about to
+        // replay. § D285.
+        windowStartS: state.windowStartS,
         seed: state.seed.toString(),
       },
       claimed: claim.claimed,

@@ -9,7 +9,7 @@
 
 import { describe, expect, it, beforeAll } from 'vitest';
 
-import { loadConfig, runSimulation, type LoadedConfig } from '@elevator-sim/core';
+import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 
 import { configHashOf, digestOf, submissionIssues, type Submission } from './submission.js';
 import {
@@ -43,6 +43,7 @@ const RUN = Object.freeze({
   demandTemplateId: 'rise-and-fall',
   arrivalRatePctPop5min: 6,
   durationS: 900,
+  windowStartS: null,
   seed: '20260804',
 });
 
@@ -158,6 +159,117 @@ describe('the cheap gate runs before the expensive one', () => {
       }),
     ).toEqual([]);
   });
+
+  it('refuses a window that could not be a time of day, or that runs off the end of one', () => {
+    const claimed = { awtS: 12, wt95S: 30, ttdMeanS: 40, pctOverLongWait: 2, awtIsValid: true };
+    const issuesFor = (windowStartS: number | null): string =>
+      submissionIssues({ run: { ...RUN, windowStartS }, claimed }).join(' ');
+
+    expect(issuesFor(-1)).toMatch(/windowStartS/u);
+    expect(issuesFor(86_400)).toMatch(/windowStartS/u);
+    expect(issuesFor(Number.NaN)).toMatch(/windowStartS/u);
+    // `RUN` is 900 s, so a start 300 s before midnight runs past the end of the day.
+    expect(issuesFor(86_400 - 300)).toMatch(/past the end of a day/u);
+
+    // And the ones that must pass: a real window, the first instant of the day, and no window.
+    expect(issuesFor(255 * 60)).toBe('');
+    expect(issuesFor(0)).toBe('');
+    expect(issuesFor(null)).toBe('');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A run that is one part of a day — § D285, and the refusal it replaced
+ * -------------------------------------------------------------------------- */
+
+describe('a windowed run can be posted, and is replayed over the part it names', () => {
+  /**
+   * A lunch peak cut out of the shipped ten-hour day.
+   *
+   * `office-day` rather than an hour record, because the window only means something on a template
+   * long enough to have parts — and because `office-day` is the case that used to fail *loudly*:
+   * replayed without a window it reaches `core` as `templateOverrides.durationS` on an authored
+   * phase list and is refused by name (§ D275).
+   */
+  const LATER_START_S = 150 * 60;
+  const EARLIER_START_S = 30 * 60;
+
+  const WINDOWED = Object.freeze({
+    ...RUN,
+    demandTemplateId: 'office-day',
+    arrivalRatePctPop5min: null,
+    durationS: 1800,
+    windowStartS: LATER_START_S,
+  });
+
+  /**
+   * Both parts are quotable, which is why these two and not a busier pair.
+   *
+   * A lunch peak on `midtown-office` was the obvious fixture and it is **not usable here**: it
+   * saturates, so `verifySubmission` refuses it `awt-not-quotable` before the window has any
+   * bearing on the outcome, and a test that accepted that refusal would be asserting nothing about
+   * windows. These two measured `awtIsValid` at the shipped rate — AWT 9.20 s and 11.92 s — so the
+   * accept below is a real accept and the refusal after it is caused by the window rather than by
+   * a mean the board would decline either way.
+   */
+  const config = (windowStartS: number): SimulationConfig => {
+    const built = configFor({ ...WINDOWED, windowStartS }, resources);
+    if (typeof built === 'string') throw new Error(`fixture does not resolve: ${built}`);
+    return built;
+  };
+
+  it('replays the window the player ran, not the whole day', () => {
+    // The half that makes the field mean anything. A submission that carried the window and a
+    // replay that ignored it would be *worse* than not carrying it: boards would separate by
+    // window and then verify every entry against the whole period, so an honest lunch peak would
+    // come back as `metrics-do-not-reproduce` — this product's one accusation, spent on a field
+    // the server declined to read.
+    const built = config(LATER_START_S) as unknown as Record<string, unknown>;
+    expect(built['windowStartS']).toBe(LATER_START_S);
+    // Derived, never submitted: the far end is `windowStartS + durationS`, so a second number on
+    // the wire could disagree with the first.
+    expect(built['windowEndS']).toBe(LATER_START_S + 1800);
+    // And `durationS` is *not* also passed. Both would throw on this template (§ D275) — measured,
+    // not reasoned: the first version of `configFor` passed both and `office-day` refused it.
+    expect('durationS' in built).toBe(false);
+  });
+
+  it('accepts an honest windowed submission end to end', () => {
+    // The whole point, driven through the verifier rather than asserted about the config: this is
+    // the run § D288 refused outright in the client, and it now posts.
+    const claimed = metricsOf(runSimulation(config(LATER_START_S)).summary);
+    expect(claimed.awtIsValid, 'fixture must be quotable or the accept proves nothing').toBe(true);
+    const verification = verifySubmission({ run: WINDOWED, claimed }, resources);
+    expect(verification.ok, JSON.stringify(verification.ok ? {} : verification)).toBe(true);
+  });
+
+  it('refuses the same claim replayed against a different part of the day', () => {
+    // Non-vacuity for the two above, and the sharpest form of it. If the window were ignored, a
+    // claim from one part would verify against a replay of another and this would pass — the two
+    // runs would *be* the same run. It fails because they are not.
+    const laterClaim = metricsOf(runSimulation(config(LATER_START_S)).summary);
+    const earlierClaim = metricsOf(runSimulation(config(EARLIER_START_S)).summary);
+    // The premise, asserted rather than assumed: the two parts really do measure differently.
+    expect(laterClaim.awtS).not.toBeCloseTo(earlierClaim.awtS, 3);
+
+    const verification = verifySubmission(
+      { run: { ...WINDOWED, windowStartS: EARLIER_START_S }, claimed: laterClaim },
+      resources,
+    );
+    expect(verification.ok).toBe(false);
+    if (verification.ok) return;
+    expect(verification.code).toBe('metrics-do-not-reproduce');
+  });
+
+  it('leaves a run with no window reaching the kernel with no window key at all', () => {
+    // `'windowStartS' in config` rather than `=== undefined`, because a key present and undefined
+    // is a different object from a key absent, and `core`'s own identity guards read the first —
+    // `windowIdentity.test.ts` asserts exactly that about the template it produces.
+    const config = configFor(RUN, resources);
+    if (typeof config === 'string') throw new Error(`fixture does not resolve: ${config}`);
+    expect('windowStartS' in (config as object)).toBe(false);
+    expect('windowEndS' in (config as object)).toBe(false);
+  });
 });
 
 /* -------------------------------------------------------------------------- *
@@ -196,6 +308,40 @@ describe('a board is keyed by what it measures', () => {
     // ...and the engine's own model version, because a v1 score and a v2 score are not comparable
     // however identical the rest is.
     expect(configHashOf(RUN, { ...facts, trafficModel: 'v2' })).not.toBe(base);
+  });
+
+  it('ranks two parts of one day apart, because they are different runs', () => {
+    // § D285. A morning window and a lunch window over the same seed measure different traffic;
+    // ranking them together would be comparing a rush hour with a lull and calling one dispatcher
+    // better. The whole-period run is a third thing again.
+    const base = configHashOf(RUN, facts);
+    const morning = configHashOf({ ...RUN, windowStartS: 30 * 60 }, facts);
+    const lunch = configHashOf({ ...RUN, windowStartS: 255 * 60 }, facts);
+    expect(new Set([base, morning, lunch]).size).toBe(3);
+  });
+
+  it('treats a window starting at zero as a selection, not as its absence', () => {
+    // `0` is *the run starts at the top of the day*, `null` is *there is no window*. They are two
+    // different statements and `?? undefined` is what keeps them apart — `|| undefined` would fold
+    // the first into the second and silently rank a windowed run on the whole-period board.
+    expect(configHashOf({ ...RUN, windowStartS: 0 }, facts)).not.toBe(configHashOf(RUN, facts));
+  });
+
+  it('leaves every board that already exists exactly where it was', () => {
+    /*
+     * The regression this field could most easily have caused, and the reason `configHashOf` writes
+     * the window as `undefined` rather than `null` when there is none.
+     *
+     * Every score posted before the window existed was a whole-period run. Adding a key to the
+     * canonical string would have moved all of them to a new board — honest entries relocated for a
+     * selection their players never made, on a leaderboard whose entire premise is that a board
+     * survives everything except a change to what it measured.
+     *
+     * Asserted against the literal digest rather than against a recomputation, because a
+     * recomputation would change with the code and prove nothing. This hex is what a
+     * whole-period `RUN` on these facts hashed to before `windowStartS` existed.
+     */
+    expect(configHashOf(RUN, facts)).toBe('d77c9681da72ea7aea293a204a1b55ff');
   });
 
   it('does not fork a board over key order in a record', () => {
