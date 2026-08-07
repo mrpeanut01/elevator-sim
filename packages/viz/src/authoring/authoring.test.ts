@@ -94,13 +94,24 @@ const read = (path: string): unknown =>
 const SPECS: ElevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
 const TRAFFIC: TrafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
 const PROFILES = parseDispatcherProfiles(read('dispatcher-profiles.json'));
-const BUILDING_IDS = [
-  'garden-apartments',
-  'midtown-office',
-  'secure-tower',
-  'mixed-use-high-rise',
-  'vertical-city',
-] as const;
+/*
+ * The project's own list, not a second copy of it — GitHub issue #108.
+ *
+ * This file kept five names where eight ship, and the three it omitted were `chancery-house`,
+ * `crown-hotel` and `st-jude-hospital`. The loop below is called *reads every shipped building
+ * into a spec whose shape survives a rebuild*, and st-jude is precisely the building it did not
+ * read: the only one declaring the stairs arm of `traversalTimeS`, which the viewer narrowed to
+ * `number` and crashed on. A suite that says *every* over a hand-written subset is the failure
+ * mode `CLAUDE.md`'s standing requirement is written about, one layer up — not a seam nothing
+ * calls, but a breadth claim nothing checks.
+ *
+ * `fixtures.test-helper.ts` already carries the complete list, and it is *guarded*:
+ * `recordRun.test.ts`'s *the fixture list covers every building the project ships* compares it
+ * against {@link shippedBuildingIds} and fails when they disagree. So the fix is to import that
+ * one rather than derive a third — the pinning is deliberate (a new building should arrive with
+ * a visible diff), and it only works if there is one list to pin.
+ */
+import { BUILDING_IDS } from '../fixtures.test-helper.js';
 
 function configFor(
   profile: DispatcherProfile,
@@ -672,7 +683,7 @@ describe('the building spec', () => {
      * with nothing on screen saying so. Three shipped buildings declare zones: `secure-tower`
      * (5), `mixed-use-high-rise` (2), `vertical-city` (2).
      *
-     * Asserted over all five, not only the three, because the two that declare `[]` are the arms
+     * Asserted over all eight, not only the three, because the five that declare `[]` are the arms
      * that would keep passing if the field were dropped again.
      */
     for (const id of BUILDING_IDS) {
@@ -690,7 +701,7 @@ describe('the building spec', () => {
      * lost their escalators — every lobby-level crossing charged back to a lift, which is the
      * **110 of 593 journeys** § D147 § 6 measured before the field existed at all.
      *
-     * Asserted over all five buildings rather than the one, because the four that declare none are
+     * Asserted over all eight buildings rather than the one, because the seven that declare none are
      * the arms that would keep passing if the field were dropped again — and the key must stay
      * absent on them, not become `[]`, so a download still reads like the document it came from.
      */
@@ -710,13 +721,28 @@ describe('the building spec', () => {
        * that holds. The key set is asserted exactly instead, so a field that starts or stops
        * surviving turns this red and forces the docstring to be rewritten with it.
        */
-      for (const mode of written) {
-        expect(Object.keys(mode).sort(), id).toStrictEqual([
-          '$comment',
-          'connects',
-          'id',
-          'traversalTimeS',
-        ]);
+      /*
+       * The key set now depends on the arm, and the docstring above says this is the moment to
+       * rewrite it — GitHub issue #108.
+       *
+       * An escalator carries the four fields it always did. A **stair** additionally carries
+       * `kind` and `use`, and that is not an enhancement: `traversalTimeS` may only take the
+       * directional `{ upS, downS }` arm on a mode that declares what it is and which way it
+       * runs, so emitting the pair without them writes a document `parseBuilding` refuses. The
+       * pair is the whole reason the union exists — climbing costs more than descending — so a
+       * round trip that kept the numbers and dropped the kind would be the same defect with a
+       * longer fuse.
+       *
+       * Still asserted exactly, per the reasoning above; it is the *expectation* that became
+       * arm-dependent, not the strictness.
+       */
+      for (const [index, mode] of written.entries()) {
+        const directional = typeof source[index]?.traversalTimeS === 'object';
+        expect(Object.keys(mode).sort(), `${id} mode ${String(index)}`).toStrictEqual(
+          directional
+            ? ['$comment', 'connects', 'id', 'kind', 'traversalTimeS', 'use']
+            : ['$comment', 'connects', 'id', 'traversalTimeS'],
+        );
       }
       expect(written.map((mode) => mode.id), id).toStrictEqual(source.map((mode) => mode.id));
       expect(written.map((mode) => mode.connects), id).toStrictEqual(
