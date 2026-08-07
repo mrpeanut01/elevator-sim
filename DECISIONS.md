@@ -20935,3 +20935,110 @@ result and copy calling it a fault would be the repository contradicting its own
   each. Seed **9068** (`vertical-city` / `destination-panel`, 840 s) fires at **9 of 11** and is now
   pinned, with that measurement beside it. The corpus was extended rather than the adapter declared
   silent, because *silent* is a claim `judgeStage` earns structurally and this surface had not.
+
+## D293 — the rail withholds the whole day until the playhead reaches it, and `All N` is retired
+
+`recordRun` simulates the whole day up front, and four of the five mood drivers read that finished
+summary. So on a cold load with zero clicks the rail published the run's ending — *"All 34 people
+got where they were going"*, *"the longest wait was 76 s"* — beside a footer reading
+`paused · 0 arrived, 0 carried`. The Day report has refused this since § D223; the rail did not
+apply the rule to itself.
+
+`drawDrivers` now gates on `shiftIsOver`, **the predicate the rail already owned and did not use**
+(`leftRail.ts:894-896`, used by `basisAt` for the mood and honesty cards). `MoodDriver` carries a
+`basis` reusing `live/types.ts`'s `WaitBandBasis` rather than a new union.
+
+**The retraction is now words.** `mood.test.ts:325-330` has always asserted it — *"A flag no
+renderer is obliged to read is not a retraction"* — against `BuildingMood.headline`, **a field the
+only shipped renderer drops**. The surviving signal was `.mood-provisional { font-style: italic }`:
+typography alone, on a card whose own docstring is a KB-15 table promising every signal a second
+channel. That is a test passing on a property nothing renders, and it is the honesty-harness
+analogue of a dead seam.
+
+**`All N` is gone, and the reason is a fourth outcome.** The sentence branched on
+`undelivered > 0`, but the conservation identity is
+`generated === delivered + undelivered + abandoned + accessRefused`, and a refused rider is in
+**neither** bucket (§ D265, § D266). Seven of eight shipped buildings declare `accessZones`.
+Measured on `secure-tower`: **252 generated, 247 delivered, 0 undelivered, 5 turned away for want
+of a credential** — so the old branch asserted *All 247* over five people refused at the door.
+`${delivered} of ${generated}` is printed unconditionally instead. It never lies. Carrying
+`accessRefused` into `VizSummary` is a schema-version change and is **not** done here; the interim
+form needs none.
+
+**The honesty corpus shrank by 588 strings** (`RAIL_VIEW` 1 225 → 637), because four of five sample
+instants now yield two rows instead of five. That is a published figure moving for a correct
+reason, and it is recorded rather than regenerated. **The sweep is green at 0 violations, and it
+does not cover temporal honesty at all**: `honesty/surfaces.ts:427-430` samples `t=0`, which *is*
+`startedAt`, so the offending string was already in the corpus and already passing. Phase 9's
+verdict is unchanged; this is a gap in what it covers, named here.
+
+## D294 — the canvas footer is scoped rather than gated, because a bitmap has no later
+
+The strip under the stage read `completed · N generated · window …` from the moment the recording
+existed, because `recording.status` is `result.status` — the whole-run simulation result, not the
+playback state. Issue #105 read it as the shift being over; issue #109 attributed it to the left
+rail, which it is not (`render/canvas.ts:1780`), so a rail-only fix would have left it on screen.
+
+It is **scoped, not gated**: `simulation completed · 200 arrivals generated over the whole day ·
+window peak-5min 60–360 s`. Gating would strip § 7.4's window clause off every PNG exported
+mid-run — one honesty rule spending another. The rail may withhold because the reader still has the
+screen; a bitmap has no later. `recording.status` is still printed verbatim, so `timed-out` is not
+rounded off.
+
+## D295 — the machines rail draws what the building runs, and issue #114's fix was refused
+
+The rail drew six machine classes as `pick` cards in the identical form as the three live selectors
+above it, and selecting one changed nothing: `onPick` wrote `editingClassId`, which
+`shiftRunConfigOf` never reads.
+
+**This was not an undiscovered seam, and that is the point.** `scope/surface.ts:244-247` already
+declares the field `presentation`, and `scope/scope.test.ts:61-77` already runs the standing
+"move the control" harness against it **in the negative direction**, requiring byte-identical legs.
+The harness verifies that a state field is inert. **It does not verify that an inert field is drawn
+as inert** — `mountRightRail` sits on the undriven-mount exemption list
+(`honesty/derive.test.ts:72`) and no test invoked it. The same gap is open for
+`editingDispatcherId`, `editingPatternId` and `editingBuildingId`.
+
+So this is § D227's rule in its first direction — *a control that writes nothing must say so* — and
+the fix is to stop drawing a pointer as a control, not to wire the pointer up. **Issue #114 asked
+for the opposite** (*"add the legs test — today that test would fail"*); that test exists, passes,
+and making the panel live would have turned the suite red. A class is an envelope, not a thing a run
+has, and `Commission the building` already answers the question properly — per bank, live, with the
+speed inside the band.
+
+Two symptoms closed with it. The rail no longer disagrees with the building editor's chip list,
+because both now derive from the building's own cars; and the pre-selection is no longer
+`classes[2]`, a positional index seeded once at boot and never re-derived, which read *Geared
+traction* on every building forever. `machineWarningOf` now compares rated speed against the class
+band — it was gated on rise and floor count only, which is why it called Chancery House *"inside
+this class's envelope"* for Ultra high-speed while its cars run at 5 m/s, contradicting the
+nameplate two rows above it.
+
+## D296 — the viewer carries core's traversal-time union, and a breadth claim was checked
+
+`?building=st-jude-hospital` crashed to a bare `TypeError` on a URL the application writes itself.
+`core` declares `traversalTimeS` as a union — a `number` for an escalator, `{ upS, downS }` for
+stairs, because climbing costs more than descending — and the viewer narrowed it to `number` at
+three sites. `st-jude-hospital` is the only shipped building on the stairs arm.
+
+The label is **`26.0 s up / 19.0 s down`**, not the issue's `26.0 / 19.0 s`: the asymmetry *is* the
+modelling content, and two numbers without a word for which is the climb hands back the symmetric
+stair the schema refuses to let anyone author. A stair gets **no** EN 115-1 derivation — that
+arithmetic describes a belt on a 30° incline and printing it beside a stair's pair would be a
+stated mechanism that is false. The editor's seconds control **refuses** three ways rather than
+half-writing the pair: disabled, the write declined a second time, and said in the panel. `downS`
+is never dropped.
+
+Two further sites were broken more quietly and are fixed with it. `validateSpec`'s traversal guard
+tested `{ upS, downS } > 0` — `NaN > 0` is `false`, so a good stair fell **through** the guard and
+was reported as taking `[object Object] s`. Its dead-end warning raised *"neither is a transfer
+level"* against a stair, which `traffic/route.ts` filters out of the routing graph entirely: a true
+fact about floors welded to a false claim about the mechanism.
+
+**Why nothing caught it is the finding worth keeping.** `authoring/authoring.test.ts` already
+round-tripped *"every shipped building"* — over a **hand-written five-name list**, where eight
+ship, omitting exactly `chancery-house`, `crown-hotel` and `st-jude-hospital`. Not a seam nothing
+calls: **a breadth claim nothing checks.** The new guard derives its ids from `readdirSync` and
+asserts against the pinned list both ways; stashing the source fix turns it red with the exact
+reported `TypeError`.
+
