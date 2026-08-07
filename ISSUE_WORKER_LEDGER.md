@@ -90,6 +90,10 @@ These were surfaced by verification, not by a reporter. Each needs its own issue
 | **N-6** | **The honesty harness cannot see a presentation pointer drawn as a live control.** `mountRightRail` is on the undriven-mount exemption list. Generalises to `editingDispatcherId`, `editingPatternId`, `editingBuildingId` | findings § F |
 | **N-7** | **`walk.test.ts` cannot see cross-select invalidation.** `:283-327` re-reads only the same row, so one select breaking another's validity is invisible. The exact hole #111 § 2b falls through | findings § I |
 | **N-8** | **Two further missing-custom-profile sites** beyond #113's four: the challenge dispatcher select (`catalogue.ts:125`), and `batchPanel.ts:635-637` silently inheriting nothing on a custom building | findings § H |
+| **N-9** | **`BuildingSpec` could not express a basement**, so three of eight shipped buildings silently corrupted on an untouched editor round trip — `crown-hotel`'s `back-of-house` zone moved `B1 → 2`, putting housekeeping/engineering/security on a guest floor. **FIXED**, § D297 | found during integration |
+| **N-10** | Floor pitch averaged over all non-entrance floors, counting the basement drop as a storey — `st-jude` 4.0 → 4.4 m, `crown-hotel` 3.1 → 3.3 m. **FIXED** with N-9 | § D297 |
+| **N-11** | `validateSpec`'s orphan branch minted its own id one line below a branch using `floorIdOf` — **off by one on every building, basement or not**. **FIXED** with N-9 | § D297 |
+| **N-12** | `midtown-office` lost `P1` entirely on round trip: it is flagged `isEntrance` and every entrance folded onto floor 0. **FIXED** with N-9 | § D297 |
 
 ---
 
