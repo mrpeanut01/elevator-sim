@@ -88,9 +88,12 @@ import type {
   BankConfig,
   BuildingConfig,
   BuildingType,
+  DirectionalTraversalTime,
   ElevatorSpecs,
   FloorConfig,
+  StairsUseConfig,
   TransportModeConfig,
+  TransportModeKind,
 } from '@elevator-sim/core/browser';
 
 import { credentialGroupsIn } from '../access/zoning.js';
@@ -146,6 +149,15 @@ export interface SpecAccessZone {
  *
  * `connects` is a fixed pair for the reason the schema makes it one: a machine with three landings
  * is two machines.
+ *
+ * **Three fields carry `core`'s two kinds rather than one, and the narrowing that used to sit here
+ * was a crash.** This interface declared `traversalTimeS: number` while `transportModeSchema`
+ * declares a union, so `?building=st-jude-hospital` — the one shipped building with a stair —
+ * reached `toFixed` on an object and took the whole viewer down before a frame was drawn
+ * (issue #108). A type that is narrower than the data it is read from does not protect anything;
+ * it moves the failure from the compiler to the browser. {@link kind} and {@link use} come with it
+ * because a stairs mode is refused without them: emitting the pair and dropping the kind would
+ * turn a crash into a document the loader will not open, which is the same defect one layer down.
  */
 export interface SpecTransportMode {
   readonly id: string;
@@ -153,6 +165,11 @@ export interface SpecTransportMode {
   readonly connects: readonly [number, number];
   /**
    * Landing-to-landing seconds, **including** stepping on and stepping off.
+   *
+   * A scalar for an escalator, `{ upS, downS }` for stairs — `core`'s union verbatim, and the two
+   * arms are not interchangeable in either direction: `transportModeSchema` refuses a scalar on a
+   * stairs mode because a symmetric stair is a stair with its modelling content deleted, and
+   * refuses a pair on an escalator because one belt runs at one speed.
    *
    * Carried rather than derived, and that is a decision with a cost either way. Deriving it from
    * the building's own floor height ({@link escalatorSecondsFor}) would keep it honest when the
@@ -162,8 +179,57 @@ export interface SpecTransportMode {
    * round trip that quietly rewrites an authored, cited reference value is worse than a seeded one
    * a reader can see and change, so the derivation seeds a *new* machine and never overwrites a
    * loaded one.
+   *
+   * The derivation is an **escalator** one — EN 115-1, a 30° incline at 0.5 m/s — so it seeds only
+   * the scalar arm. A stair's two numbers come from a climbing and a descending speed and this
+   * editor has no control that authors one; see {@link withTransportSeconds} for the refusal.
    */
-  readonly traversalTimeS: number;
+  readonly traversalTimeS: number | DirectionalTraversalTime;
+  /**
+   * What the machine is. Absent means `escalator`, which is what every machine this editor
+   * *authors* is — {@link withTransportSeconds} and the *+ escalator* button write nothing else.
+   *
+   * It is carried anyway, because a loaded document may declare `stairs` and dropping the field on
+   * the way back out would hand `parseBuilding` a directional traversal time on an escalator, which
+   * it refuses in as many words.
+   */
+  readonly kind?: TransportModeKind | undefined;
+  /**
+   * The propensity pair a stairs mode is refused without — who actually walks, by the *sign* of the
+   * floor delta.
+   *
+   * Carried for {@link kind}'s reason and no other: nothing in this editor writes it, and a stair
+   * with no `use` is a mode the loader will not accept, so dropping it would make the round trip
+   * destructive on the one building that has one.
+   */
+  readonly use?: StairsUseConfig | undefined;
+}
+
+/**
+ * One machine's traversal time as a reader sees it — `21.2 s`, or `26.0 s up / 19.0 s down`.
+ *
+ * **Both directions are named, and the compact `26.0 / 19.0 s` the issue suggested is deliberately
+ * not what this returns.** The asymmetry *is* the modelling content of a stair — `core`'s schema
+ * refuses a scalar on one for exactly that reason — so a label that prints two numbers without
+ * saying which is the climb re-symmetrises them in the reader's head, which is the defect the union
+ * exists to prevent wearing a different hat. The words are `up` and `down` because that is what the
+ * document's own fields are called (`upS`, `downS`, and `use.up` / `use.down` beside them), so a
+ * reader moving between the screen and the JSON is reading one vocabulary.
+ */
+export function traversalTimeLabel(traversalTimeS: number | DirectionalTraversalTime): string {
+  /*
+   * Every number is a local before it reaches a template — `transportCommentFor`'s constraint, and
+   * it bit here too. `honesty/derive.test-helper.ts` reads a dotted member expression inside a
+   * substitution as prose, so `${traversalTimeS.toFixed(1)} s` made this an unclassified
+   * **player-facing text** surface and `derive.test.ts` went red naming it. Measured, not guessed.
+   */
+  if (typeof traversalTimeS === 'number') {
+    const seconds = traversalTimeS.toFixed(1);
+    return `${seconds} s`;
+  }
+  const up = traversalTimeS.upS.toFixed(1);
+  const down = traversalTimeS.downS.toFixed(1);
+  return `${up} s up / ${down} s down`;
 }
 
 /** The editor's whole state. Flat, total, slider-shaped. */
@@ -709,6 +775,17 @@ export function withTransportEnd(
  * Clamped to a positive value, because `transportModeSchema` requires one and this is the only
  * control that could write otherwise. {@link validateSpec} still carries the refusal, for a spec
  * that reached a non-positive time by some route this function did not author.
+ *
+ * **A directional time is left exactly as it was, and the refusal is the point.** The control that
+ * calls this is one `<input type="number">`; a stairs mode is two numbers whose *difference* is the
+ * whole reason `core` declares the union at all. Writing the typed figure over the pair would keep
+ * the climb and throw the descent away — a control that silently deletes the field it was pointed
+ * at — and `transportModeSchema` would then refuse the document for symmetrising a stair, which is
+ * a refusal about a tuple rather than about the control the reader touched. So the pair is carried
+ * through untouched and the editor **says** it cannot write it (`dev/buildingEditor.ts`'s
+ * `transportNoteOf`, and the disabled input beside it). § D227: a control that cannot write
+ * something must say so, and the sentence that says so is pinned by a test rather than by this
+ * comment.
  */
 export function withTransportSeconds(
   spec: BuildingSpec,
@@ -716,9 +793,11 @@ export function withTransportSeconds(
   seconds: number,
 ): readonly SpecTransportMode[] {
   const wanted = Number.isFinite(seconds) ? Math.round(seconds * 10) / 10 : 0;
-  return spec.transportModes.map((mode) =>
-    mode.id === modeId ? { ...mode, traversalTimeS: Math.min(600, Math.max(0.1, wanted)) } : mode,
-  );
+  return spec.transportModes.map((mode) => {
+    if (mode.id !== modeId) return mode;
+    if (typeof mode.traversalTimeS !== 'number') return mode;
+    return { ...mode, traversalTimeS: Math.min(600, Math.max(0.1, wanted)) };
+  });
 }
 
 /**
@@ -739,13 +818,20 @@ export function withTransportSeconds(
  * reader can see and fix on the control that set it, so it is written out and {@link validateSpec}
  * says the loader will refuse the building — the same split {@link accessZonesOf} draws between a
  * zone covering no floor and a zone naming no credential group.
+ *
+ * `kind` and `use` are written **only when the mode carries them**, which on everything this editor
+ * authors means never: an absent `kind` is `escalator` to the schema, and emitting `"escalator"` on
+ * all four of Vertical City's machines would add a key to a document that never had one. They exist
+ * so a *loaded* stair survives the round trip — see {@link SpecTransportMode.kind}.
  */
 export function transportModesOf(spec: BuildingSpec): readonly TransportModeConfig[] {
   return writtenTransportModes(spec).map((mode) => ({
     $comment: transportCommentFor(spec, mode),
     id: mode.id,
     connects: [floorIdOf(mode.connects[0]), floorIdOf(mode.connects[1])] as readonly [string, string],
+    ...(mode.kind === undefined ? {} : { kind: mode.kind }),
     traversalTimeS: mode.traversalTimeS,
+    ...(mode.use === undefined ? {} : { use: mode.use }),
   }));
 }
 
@@ -759,12 +845,21 @@ export function transportModesOf(spec: BuildingSpec): readonly TransportModeConf
  * derivation by hand four times; here it is computed, so it cannot go stale: it is re-derived from
  * the current spec on every emit rather than carried from whatever the geometry used to be.
  *
- * **Two branches, and the second is the one that keeps the first honest.** A value still equal to
+ * **Three branches, and the second is the one that keeps the first honest.** A value still equal to
  * {@link escalatorSecondsFor} is derived, and the derivation is written out with this building's
  * own numbers. A value that is not — a reader's edit, or a figure that came back through
  * {@link specFromBuilding} off a document whose floors are not evenly pitched — is labelled as the
  * author's and is **not** claimed to be cited. Writing the derivation beside a number it does not
  * produce would be the stale-citation defect this function exists to avoid.
+ *
+ * **The third is a stairs mode, and it prints no derivation at all.** The EN 115-1 arithmetic below
+ * is about a *belt on a 30° incline at 0.5 m/s*; a stair's two numbers come from a climbing and a
+ * descending speed over the same rise, and `st-jude-hospital` cites Fruin for exactly that. Running
+ * the escalator method beside a stair's pair and calling the difference "not the figure this
+ * building's geometry gives" would be a **stated mechanism that is false** — the defect
+ * `CLAUDE.md` opens on, in the one place this editor writes provenance. So the stairs branch says
+ * what the numbers are, says they came in on the loaded document and are not this editor's to
+ * derive, and stops.
  */
 function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): string {
   const [low, high] = [Math.min(...mode.connects), Math.max(...mode.connects)];
@@ -787,13 +882,35 @@ function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): strin
   const incline = inclineM.toFixed(2);
   const inclineS = (inclineM / ESCALATOR_SPEED_MPS).toFixed(1);
   const derived = derivedS.toFixed(1);
-  const declared = mode.traversalTimeS.toFixed(1);
   const pitch = spec.floorHeightM.toFixed(2);
   const lowId = floorIdOf(low);
   const highId = floorIdOf(high);
   const lowAt = heightOf(low);
   const highAt = heightOf(high);
   const where = `${lowId} at ${lowAt} m, ${highId} at ${highAt} m, ${pitch} m floor to floor`;
+  /*
+   * The stairs branch, taken before a single word of the escalator derivation is assembled. Every
+   * local below this point describes a belt on an incline, and none of them is true of a stair, so
+   * the early return is what stops an escalator's provenance being printed beside a stair's pair.
+   */
+  if (typeof mode.traversalTimeS !== 'number') {
+    const pair = traversalTimeLabel(mode.traversalTimeS);
+    return (
+      `Traversal time SET BY HAND and NOT cited: ${pair}, landing to landing. This is a stairs ` +
+      `mode, and the EN 115-1 escalator derivation this editor performs for an escalator is ` +
+      `deliberately NOT printed beside it: a stair's two times come from a climbing and a ` +
+      `descending speed over the rise, not from a belt on a 30 degree incline at 0.5 m/s, so ` +
+      `quoting that method here would be a citation for a machine this is not. The pair arrived ` +
+      `on the document this spec was read from and no control in this editor authors one, so it ` +
+      `is carried through unchanged and the document's own comment — which carried whatever ` +
+      `citation it had — does not survive the round trip. See the declaring building in ` +
+      `data/buildings/ for it. This spec's own rise between these two landings is ${rise} m ` +
+      `(${where}), stated as geometry and NOT as the rise the pair was measured over: the round ` +
+      `trip cannot preserve an uneven floor pitch, so the two need not agree and the numbers ` +
+      `above are not re-derived from this one.`
+    );
+  }
+  const declared = mode.traversalTimeS.toFixed(1);
   const method =
     'inclination 30 degrees, which BS EN 115-1 makes the only permitted angle above a 6 m rise ' +
     'and which is the common commercial compromise below it; nominal speed 0.5 m/s, the common ' +
@@ -827,6 +944,21 @@ function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): strin
     `${derived} s by the EN 115-1 method — ${method}. The declared value is the author's and this ` +
     `comment is not a citation for it.${beyond}${source}`
   );
+}
+
+/**
+ * What to call these machines in a warning — `Escalator`, `Stair`, or `Machine` for a mixed set.
+ *
+ * A noun, not a cosmetic. Every one of {@link validateSpec}'s transport warnings said *Escalator*
+ * unconditionally, and `st-jude-hospital`'s `main-stair` is a stair; a warning that misnames the
+ * thing it is about sends a reader looking for a machine the building does not have. The mixed case
+ * falls back rather than guessing, because the warning that takes a list is one sentence about
+ * several machines and picking either noun would be wrong about some of them.
+ */
+function machineNoun(modes: readonly SpecTransportMode[]): string {
+  const kinds = new Set(modes.map((mode) => mode.kind ?? 'escalator'));
+  if (kinds.size !== 1) return 'Machine';
+  return kinds.has('stairs') ? 'Stair' : 'Escalator';
 }
 
 /** {@link transportModesOf} in the spec's own floor-number vocabulary. */
@@ -1073,7 +1205,7 @@ export function validateSpec(
   );
   if (offTower.length > 0) {
     problems.push(
-      `Escalator ${offTower.map((mode) => mode.id).join(', ')} connect${offTower.length === 1 ? 's' : ''} ` +
+      `${machineNoun(offTower)} ${offTower.map((mode) => mode.id).join(', ')} connect${offTower.length === 1 ? 's' : ''} ` +
         `a floor this tower does not have — it is ${String(spec.floors + 1)} floors tall now. ` +
         'A connection is a pair of floors, so there is nothing to shorten the way a zone shortens ' +
         'its floor list: the whole machine is left out of the saved document rather than refused, ' +
@@ -1083,24 +1215,61 @@ export function validateSpec(
   const selfJoined = spec.transportModes.filter((mode) => mode.connects[0] === mode.connects[1]);
   for (const mode of selfJoined) {
     problems.push(
-      `Escalator ${mode.id} starts and ends on floor ${floorIdOf(mode.connects[0])}. The loader ` +
+      `${machineNoun([mode])} ${mode.id} starts and ends on floor ${floorIdOf(mode.connects[0])}. The loader ` +
         'refuses a connection whose two ends name one floor — a machine that starts and ends on ' +
         'the same floor moves nobody — so it is left out of the saved document instead of being ' +
         'written and refused.',
     );
   }
   for (const mode of writtenTransportModes(spec)) {
-    if (mode.traversalTimeS > 0) continue;
+    /*
+     * **Both arms, and the union is why this loop had to move.** `{ upS, downS } > 0` is `NaN > 0`
+     * — `false` — so the directional arm fell straight through to the message and printed
+     * `[object Object] s` about a stair whose two times are perfectly good. A guard that fires on
+     * the shape it cannot read is worse than one that does not fire at all: it sends a reader to
+     * fix a number that is not wrong. Every declared time must clear zero, whichever arm it is on.
+     */
+    const times =
+      typeof mode.traversalTimeS === 'number'
+        ? [mode.traversalTimeS]
+        : [mode.traversalTimeS.upS, mode.traversalTimeS.downS];
+    if (times.every((seconds) => seconds > 0)) continue;
     problems.push(
-      `Escalator ${mode.id} takes ${String(mode.traversalTimeS)} s to ride. The loader refuses a ` +
+      `${machineNoun([mode])} ${mode.id} takes ${traversalTimeLabel(mode.traversalTimeS)} to ride. The loader refuses a ` +
         'traversal time that is not greater than zero, so this building will not build until it ' +
         'is raised. Unlike a floor this tower no longer has, it is written to the document as it ' +
         'stands, because it is a number on a control the reader can see.',
     );
   }
+  /*
+   * A stairs mode with no propensity pair. Unreachable through the two doors this module owns —
+   * `transportModeSchema` refuses the document, and no control here authors `kind: 'stairs'` — and
+   * stated anyway, on {@link withTransportSeconds}'s grounds: `validateSpec` exists for the spec
+   * that arrived by a route this file did not author, and a stair nobody would ever climb is the
+   * inert-by-construction shape `CLAUDE.md` names eleven times.
+   */
+  for (const mode of writtenTransportModes(spec)) {
+    if ((mode.kind ?? 'escalator') !== 'stairs' || mode.use !== undefined) continue;
+    problems.push(
+      `Stair ${mode.id} declares no use pair. Stairs are chosen rather than structural — the ` +
+        'router never plans a journey over one — so without a propensity for each direction ' +
+        'nobody would ever take it, and the loader refuses the building rather than shipping a ' +
+        'machine that moves no one.',
+    );
+  }
   const skies = new Set(spec.skyFloors);
   const deadEnds = writtenTransportModes(spec).filter(
-    (mode) => !mode.connects.some((floor) => skies.has(floor)),
+    /*
+     * **Stairs are exempt, because the sentence below is about the router and the router never
+     * sees one.** `traffic/route.ts#routeTopologyOf` filters `kind: 'stairs'` out of its edge set:
+     * a stair is offered to a rider whose journey already begins and ends on its two floors, and a
+     * transfer level neither adds to that nor takes from it. Raising *"neither is a transfer
+     * level"* against a stair would be a true observation about the floors attached to a false
+     * claim about what it costs the building — the stale-mechanism defect, in a warning.
+     */
+    (mode) =>
+      (mode.kind ?? 'escalator') !== 'stairs' &&
+      !mode.connects.some((floor) => skies.has(floor)),
   );
   for (const mode of deadEnds) {
     problems.push(
@@ -1314,9 +1483,9 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
      * escalators and charged every lobby-level crossing back to a lift, with nothing on any
      * surface saying so.
      *
-     * **The claim is exactly three fields, and it is narrower than "lossless".** `id`, `connects`
-     * and `traversalTimeS` survive; `name` and `$comment` do not, and both losses are deliberate
-     * rather than overlooked:
+     * **The claim is exactly five fields, and it is narrower than "lossless".** `id`, `connects`,
+     * `traversalTimeS`, `kind` and `use` survive; `name` and `$comment` do not, and both losses are
+     * deliberate rather than overlooked:
      *
      * - `name` is a label naming floors — *"Ground lobby escalator pair (G <-> 2)"* — and there is
      *   no control here to edit one. Carrying it would mean a reader who moved a landing kept a
@@ -1327,6 +1496,13 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
      *   read back. {@link transportModesOf} writes a fresh one derived from the spec's own
      *   geometry instead, and labels the value uncited when it is not the figure that geometry
      *   gives — which is what `vertical-city`'s four machines come back as.
+     *
+     * **It was three, and the two that joined them are not an enhancement — they are the other half
+     * of issue #108.** `kind` and `use` are the fields that make a `{ upS, downS }` traversal time
+     * *legal*: drop them and `st-jude-hospital`'s stair comes back out as a directional time on an
+     * escalator, which `transportModeSchema` refuses in as many words. Carrying the pair and
+     * dropping the kind would have turned a crash into a document that will not open, which is the
+     * same defect with a longer fuse.
      *
      * `authoring.test.ts` asserts the surviving key set exactly, so a field that starts or stops
      * surviving turns that test red and this paragraph has to be rewritten with it.
@@ -1341,10 +1517,19 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
         id: mode.id,
         connects: mode.connects.map((floorId) => floorNumberById.get(floorId)),
         traversalTimeS: mode.traversalTimeS,
+        ...(mode.kind === undefined ? {} : { kind: mode.kind }),
+        ...(mode.use === undefined ? {} : { use: mode.use }),
       }))
       .filter(
-        (mode): mode is { id: string; connects: [number, number]; traversalTimeS: number } =>
-          mode.connects.every((floor) => floor !== undefined),
+        (
+          mode,
+        ): mode is {
+          id: string;
+          connects: [number, number];
+          traversalTimeS: number | DirectionalTraversalTime;
+          kind?: TransportModeKind;
+          use?: StairsUseConfig;
+        } => mode.connects.every((floor) => floor !== undefined),
       ),
   };
 }
