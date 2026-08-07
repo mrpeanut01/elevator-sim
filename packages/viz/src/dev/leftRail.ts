@@ -45,6 +45,15 @@
  * | honesty card | amber or green edge | the `⚠`/`✓` glyph and the title sentence |
  * | decision rows | the outcome palette | the head reads `A → Level 12`, `A ⇄ Level 12` or `no car for Level 12` — three different sentences, not three colours |
  * | mood drivers | the three level colours | `MOOD_GLYPH`'s `○ ◑ ●`, and each row states its own number |
+ * | a card drawn short of the end | italics, and nothing else until issue #109 | the retraction row — `·` and a sentence naming every reading withheld and what brings it back |
+ *
+ * The last row is the one this table was wrong about. `.mood-provisional { font-style: italic; }`
+ * was the *whole* of R6 on this card: the rail draws `mood.drivers`, `mood.caveat` and
+ * `mood.provisional` and has never drawn `mood.headline` — the headline here is `moodOf(bands)`'s —
+ * so the *So far* sentence `render/mood.ts` writes for exactly this purpose reached the canvas and
+ * not the rail. A promise a table makes on behalf of a surface is worth what § D227 says a stated
+ * refusal is worth: nothing, until a test holds it. {@link moodDriverPanelOf} now carries it, and
+ * `leftRail.test.ts` holds it.
  */
 
 import type { SimTime } from '@elevator-sim/core/browser';
@@ -726,20 +735,103 @@ export interface MoodDriverRow {
 }
 
 /**
- * `render/mood.ts`'s rows, as the rail draws them.
+ * The mood card's driver block — the rows, and the sentence that stands in for the ones withheld.
  *
- * Every driver is reported, including the calm ones — that is the gauge's own rule and its
- * docstring says why: *a gauge that lists only what went wrong cannot be told apart from a gauge
- * that looked at only one thing.* The class is derived from `driver.level` rather than from
- * `driver.id`, because `index.html`'s own comment forbids a stylesheet rule keyed on an id.
+ * One shape rather than two so that the retraction cannot be dropped by a renderer that draws the
+ * rows: it **is** a row. That is issue #109's second half in one design decision — see
+ * {@link moodDriverPanelOf}.
  */
-export function moodDriverRowsOf(mood: BuildingMood): readonly MoodDriverRow[] {
-  return mood.drivers.map((driver) => ({
+interface MoodDriverPanel {
+  readonly rows: readonly MoodDriverRow[];
+  /** R2, in the component. Drawn in both disclosure modes, finished shift or not. */
+  readonly caveat: string;
+}
+
+/** The label the retraction row carries, and the class that italicises it. Pinned by the tests. */
+const RETRACTION_LABEL = 'the whole shift';
+const RETRACTION_CLASS = 'mood-provisional';
+
+/**
+ * `render/mood.ts`'s rows, as the rail draws them — **gated on whether the shift is over**.
+ *
+ * ## The defect this closes (issue #109)
+ *
+ * `record/recordRun.ts` is *"the only place in the package that runs a simulation"* and it
+ * simulates the **whole day up front**; `dev/main.ts` runs one on a cold load with zero clicks. So
+ * by the first paint there is a finished recording, the playhead is at the start, and four of the
+ * five drivers — every one whose `MoodDriver.basis` is `'whole-run'` — were reporting the end
+ * of the day beside a clock reading the beginning of it. The rail's gates are all
+ * `recording === undefined`, which boot's own run makes false before anything is drawn, so the
+ * card's only remaining nod to R6 was `provisional` italics.
+ *
+ * The rule is not invented here. `dev/reportPanel.ts`'s `runProgressOf`/`watchingReportView` (§ D223,
+ * issue #16) already refuse a whole-day sheet at a part-day playhead, in the sheet's own words, and
+ * `reportPanel.test.ts` pins it by asserting the watching view's figures are empty *and* that the
+ * whole-day `carried` appears in none of its strings. This is that rule on the rail, and the
+ * refusal is worded in the same phrase — *two answers to one question*.
+ *
+ * ## Why `over` is a parameter and not recomputed
+ *
+ * `drawDrivers` passes {@link shiftIsOver}, which is the rail's one home for the decision and the
+ * same call `basisAt` makes for the mood and honesty cards; a panel that asked the question itself
+ * would be the second copy that docstring warns about. {@link moodDriverRowsOf} feeds
+ * `!mood.provisional` instead, because it is called from a context holding a mood and no clock —
+ * and `leftRail.test.ts` pins the two answers identical at every sampled playhead on a real
+ * recording, so the honesty sweep enumerates exactly the rows the screen draws rather than a set
+ * that merely resembles them.
+ *
+ * Every driver still standing is reported, including the calm ones — that is the gauge's own rule
+ * and its docstring says why: *a gauge that lists only what went wrong cannot be told apart from a
+ * gauge that looked at only one thing.* Withholding is by `basis`, which is a fact about where a
+ * number came from, and never by level: a card that dropped its bad news mid-run would be this
+ * defect wearing the fix's clothes.
+ *
+ * The class is derived from `driver.level` rather than from `driver.id`, because `index.html`'s own
+ * comment forbids a stylesheet rule keyed on an id.
+ */
+function moodDriverPanelOf(mood: BuildingMood, over: boolean): MoodDriverPanel {
+  const drivers = over ? mood.drivers : mood.drivers.filter((driver) => driver.basis === 'now');
+  const rows: MoodDriverRow[] = drivers.map((driver) => ({
     label: driver.label,
     glyph: MOOD_GLYPH[driver.level],
     text: driver.text,
     levelClass: `mood-${driver.level}`,
   }));
+  /*
+   * KB-15, and the reason this is a row rather than a flag or a font style.
+   *
+   * `mood.test.ts` has asserted since this unit shipped that *"a flag no renderer is obliged to
+   * read is not a retraction — the words carry it too"*, pinning it on `mood.headline`. The rail
+   * does not draw `mood.headline`; its card headline is `moodOf(bands)`. So the entire retraction
+   * on this surface was `.mood-provisional { font-style: italic; }` — a colour-only signal in
+   * everything but hue, on the card whose docstring above is a table promising every signal a
+   * second channel in text. The words are now the signal and the italics are the second channel,
+   * which is the order KB-15 asks for.
+   *
+   * `'·'` is `shift/goals.ts`'s pending glyph, not a `MOOD_GLYPH`: the withheld readings are not a
+   * mood level, and giving them one would put a calm ○ or a distressed ● on a row that has
+   * deliberately measured nothing.
+   */
+  if (!over && mood.retraction !== '') {
+    rows.push({
+      label: RETRACTION_LABEL,
+      glyph: '·',
+      text: mood.retraction,
+      levelClass: RETRACTION_CLASS,
+    });
+  }
+  return { rows, caveat: mood.caveat };
+}
+
+/**
+ * The same rows, for a caller that holds a mood and no clock — the honesty sweep, chiefly.
+ *
+ * `mood.provisional` is `atS < endedAt` computed by `buildingMood` from the very two numbers
+ * {@link shiftIsOver} compares, so this is the same gate reached by the other of its two doors, not
+ * a looser one. `leftRail.test.ts` asserts the equality rather than arguing it.
+ */
+export function moodDriverRowsOf(mood: BuildingMood): readonly MoodDriverRow[] {
+  return moodDriverPanelOf(mood, !mood.provisional).rows;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -923,13 +1015,25 @@ function drawDrivers(
   // abandonment horizon, and the per-5-minute rates) lead with a plain-language sentence in Casual
   // and are unchanged in Engineer.
   const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t), mode);
-  const rows = moodDriverRowsOf(mood);
+  /*
+   * Issue #109. `shiftIsOver` — the rail's one home for the decision, and the same call `basisAt`
+   * makes two surfaces up — decides whether this card may publish the day. Everything about *what
+   * to say* stays in `moodDriverPanelOf`, which is why there is no `if` here: this function reads a
+   * clock and hands the answer over.
+   *
+   * The whole-run gate is `shiftIsOver` and **not** `recording === undefined`, which is the gate
+   * every other branch in this file uses and the reason the defect survived review. Boot runs a
+   * simulation with zero clicks, so `recording === undefined` is false before the first paint and
+   * a gate keyed on it is open for the whole of the run it was meant to guard.
+   */
+  const panel = moodDriverPanelOf(mood, shiftIsOver(recording, t));
+  const rows = panel.rows;
   surfaces.drivers(
-    `${String(mood.provisional)}|${rows.map((driver) => driver.text).join('|')}`,
+    rows.map((driver) => `${driver.levelClass}|${driver.text}`).join('||'),
     () => [
       ...rows.map((driver) =>
         el(doc, 'div', {
-          className: mood.provisional ? 'mood-driver mood-provisional' : 'mood-driver',
+          className: 'mood-driver',
           children: [
             el(doc, 'span', { className: 'mood-label', text: driver.label }),
             el(doc, 'span', {
@@ -941,7 +1045,7 @@ function drawDrivers(
       ),
       // R2 in the component: what this is not. Shown in both disclosure modes, because a casual
       // reader is the one most likely to read a mood as a verdict on the dispatcher.
-      el(doc, 'p', { className: 'mood-caveat', text: mood.caveat }),
+      el(doc, 'p', { className: 'mood-caveat', text: panel.caveat }),
     ],
   );
 }

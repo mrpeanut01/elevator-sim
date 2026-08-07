@@ -336,6 +336,60 @@ describe('drawScene', () => {
     ).toBe(true);
   });
 
+  /*
+   * Issue #105 — the footer published the **simulation's** outcome as if it were the playback's.
+   *
+   * `recording.status` is `result.status` off `record/recordRun.ts`, which simulates the whole day
+   * before the first frame is painted, and it was drawn bare: `completed · 360 generated · …`,
+   * directly under the playback progress bar. At a playhead a quarter of the way in, the word and
+   * the bar were two answers to one question.
+   *
+   * Fixed by **scoping** rather than by gating, and the tests below pin both halves of that choice:
+   * every term now names what it is true of, *and* the § 7.4 window clause still reaches an
+   * exported PNG at every playhead — which a gate would have taken away.
+   */
+  it('names what finished, not the playback, and says which window the count covers', () => {
+    const early = draw(frame({ simTimeS: 1 }))
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    const footer = early.find((line) => line.includes(windowClause(RECORDING.summary)));
+    expect(footer).toBeDefined();
+    expect(footer).toBe(
+      `simulation ${RECORDING.status} · ` +
+        `${String(RECORDING.summary.generated)} arrivals generated over the whole day · ` +
+        `${windowClause(RECORDING.summary)}`,
+    );
+    // The premise: the playhead really is near the start of a recording that really is finished.
+    expect(RECORDING.status).toBe('completed');
+    expect(RECORDING.endedAt).toBeGreaterThan(1);
+    // No bare status verb standing on its own where a reader reads it as the transport's.
+    expect(footer).not.toMatch(/(^|·\s)completed\b/);
+  });
+
+  it('keeps the footer at every playhead, because a bitmap has no later', () => {
+    // The reason this surface is scoped rather than withheld: **Export PNG** bakes the canvas into
+    // a file, and § 7.4 requires every figure on it to carry its window. Gating the caption the way
+    // `dev/leftRail.ts` gates the mood drivers would strip the window clause off every PNG exported
+    // mid-run — one honesty rule spending another.
+    for (const simTimeS of [0, 30, 60, 119, 120]) {
+      const lines = draw(frame({ simTimeS }))
+        .calls.filter((call) => call.op === 'fillText')
+        .map((call) => String(call.args[0]));
+      expect(
+        lines.some((line) => line.includes(windowClause(RECORDING.summary))),
+        `no window clause at ${String(simTimeS)} s`,
+      ).toBe(true);
+    }
+  });
+
+  it('does not round a timed-out run up to a friendlier word', () => {
+    const timedOut: VizRecording = { ...RECORDING, status: 'timed-out' };
+    const lines = draw(frame(), timedOut)
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]));
+    expect(lines.some((line) => line.startsWith('simulation timed-out · '))).toBe(true);
+  });
+
   it('is a pure function of its inputs: equal frames draw equal call sequences', () => {
     expect(draw(frame()).transcript).toBe(draw(frame()).transcript);
   });
@@ -904,6 +958,9 @@ describe('drawScene draws the building mood — D4, and R1’s payoff', () => {
     headline: `headline for ${level}`,
     drivers: [],
     provisional,
+    // Issue #109. `drawScene` draws `glyph` and `headline`; the retraction belongs to the left
+    // rail's driver block, which this file does not mount. Present so the record is complete.
+    retraction: provisional ? 'The run has not finished.' : '',
     caveat: 'not a verdict on the dispatcher',
   });
 

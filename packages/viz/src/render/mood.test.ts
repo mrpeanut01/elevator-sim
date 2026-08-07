@@ -326,4 +326,79 @@ describe('R6 — a mood read before the run ends is a preview and says so', () =
     expect(buildingMood(observations({}, [], 100)).headline).toContain('So far');
     expect(buildingMood(observations({}, [], 900)).headline).not.toContain('So far');
   });
+
+  /*
+   * Issue #109. The assertion above was true and reached no reader on the surface that matters.
+   * `dev/leftRail.ts` draws `drivers`, `caveat` and `provisional`, and **never `headline`** — the
+   * rail's card headline is `live/bands.ts`'s `moodOf`. So the whole of R6 on the card that shows
+   * the drivers was `.mood-provisional { font-style: italic; }`, a signal with no words in it. The
+   * three tests below are the same claim made about a field the rail does read.
+   */
+  it('carries the retraction in a field of its own, non-empty exactly while provisional', () => {
+    expect(buildingMood(observations({}, [], 0)).retraction).not.toBe('');
+    expect(buildingMood(observations({}, [], 899.9)).retraction).not.toBe('');
+    expect(buildingMood(observations({}, [], 900)).retraction).toBe('');
+    expect(buildingMood(observations({}, [], 1e6)).retraction).toBe('');
+  });
+
+  it('names every reading it withholds, and reads them off the drivers', () => {
+    const mood = buildingMood(observations({}, [], 100));
+    const withheld = mood.drivers.filter((driver) => driver.basis === 'whole-run');
+    // Not a typed list: every label the classification produces is in the sentence, and the one
+    // driver that survives the gate is not.
+    expect(withheld).toHaveLength(4);
+    for (const driver of withheld) {
+      expect(mood.retraction, `the retraction must name "${driver.label}"`).toContain(driver.label);
+    }
+    expect(mood.retraction).not.toContain('standing right now');
+    // It offers both ways back rather than only refusing.
+    expect(mood.retraction).toContain('Play the shift through');
+    expect(mood.retraction).toContain('two answers to one question');
+  });
+
+  it('classifies each driver by the window its own number was folded over', () => {
+    // The field a renderer gates on. `standing` is the only one `queueAt` re-folds at the playhead;
+    // the other four come off `summary`, which `recordRun` finished before the first frame.
+    const mood = buildingMood(observations({}, [], 100));
+    expect(
+      Object.fromEntries(mood.drivers.map((driver) => [driver.id, driver.basis])),
+    ).toEqual({
+      overwhelmed: 'whole-run',
+      abandoned: 'whole-run',
+      stranded: 'whole-run',
+      standing: 'now',
+      demand: 'whole-run',
+    });
+  });
+});
+
+describe('the delivered driver counts against everybody who turned up — issue #109', () => {
+  /*
+   * `All ${delivered} people got where they were going` was asserted over `undelivered === 0`, and
+   * `core`'s identity (`sim/types.ts`) is
+   * `generated === delivered + undelivered + abandoned + accessRefused`. An `accessRefused` rider
+   * is in **neither** bucket, so on the seven of eight shipped buildings that declare `accessZones`
+   * the card could print *All N* over riders turned away at the door. `leftRail.test.ts` drives the
+   * real `secure-tower` run where that happens; these are the two arms in isolation.
+   */
+  it('prints the denominator on both arms, and “All” on neither', () => {
+    const short = buildingMood(observations({ generated: 200, delivered: 196, undelivered: 0 }));
+    const stranded = (mood: ReturnType<typeof buildingMood>): string =>
+      mood.drivers.find((driver) => driver.id === 'stranded')?.text ?? '';
+    expect(stranded(short)).toBe('196 of 200 people got where they were going.');
+
+    const held = buildingMood(observations({ generated: 200, delivered: 190, undelivered: 6 }));
+    expect(stranded(held)).toBe(
+      '190 of 200 people got where they were going. 6 were still in the building when the run ended.',
+    );
+    for (const mood of [short, held]) expect(stranded(mood)).not.toContain('All ');
+  });
+
+  it('leaves the level alone — what the gauge judges did not move, only what it says', () => {
+    const level = (undelivered: number): string =>
+      buildingMood(observations({ generated: 200, delivered: 200 - undelivered, undelivered }))
+        .drivers.find((driver) => driver.id === 'stranded')?.level ?? '';
+    expect(level(0)).toBe('calm');
+    expect(level(6)).toBe('frustrated');
+  });
 });
