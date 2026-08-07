@@ -246,7 +246,7 @@ describe('the elevation’s floor rows', () => {
     const rows = elevationRowsOf({ ...TOWER, skyFloors: [6] });
     expect(rows.find((row) => row.floor === 0)?.badge).toBe('⌂');
     expect(rows.find((row) => row.floor === 6)?.badge).toBe('⇄');
-    expect(rows.find((row) => row.floor === 6)?.label).toBe(`⇄ ${floorIdOf(6)}`);
+    expect(rows.find((row) => row.floor === 6)?.label).toBe(`⇄ ${floorIdOf(TOWER, 6)}`);
     expect(rows.find((row) => row.floor === 5)?.badge).toBe('');
   });
 
@@ -513,7 +513,7 @@ describe('the floor multi-select', () => {
     expect(choices.at(-1)?.isEntrance).toBe(true);
     // There is no id here the document does not have — `ED-14`'s error made unreachable, § 10.2.
     expect(choices.map((choice) => choice.floorId)).toStrictEqual(
-      elevationRowsOf(TOWER).map((row) => floorIdOf(row.floor)),
+      elevationRowsOf(TOWER).map((row) => floorIdOf(TOWER, row.floor)),
     );
   });
 
@@ -738,7 +738,7 @@ describe('the landing pickers', () => {
     const choices = transportFloorChoicesOf(LOBBIES, 'escalator-1', 0);
     expect(choices).toHaveLength(TOWER.floors + 1);
     expect(choices.map((choice) => choice.floorId)).toStrictEqual(
-      elevationRowsOf(TOWER).map((row) => floorIdOf(row.floor)),
+      elevationRowsOf(TOWER).map((row) => floorIdOf(TOWER, row.floor)),
     );
     expect(choices.filter((choice) => choice.chosen).map((choice) => choice.floor)).toStrictEqual([6]);
     expect(choices.filter((choice) => choice.isTransfer).map((choice) => choice.floor)).toStrictEqual([6]);

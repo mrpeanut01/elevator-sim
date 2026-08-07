@@ -48,6 +48,31 @@
  * control over *this building's own floors* rather than a text box that can name a floor the
  * document does not have — § 10.2's *"the control should make it unreachable"*.
  *
+ * ## Floors below the lobby, and why the number is not the whole story
+ *
+ * The floor-number vocabulary runs **`-belowLobby.length … 0 … floors`**: the lobby is `0`, a row
+ * above it is positive, and a row below it is negative with `-1` nearest the lobby. That is the
+ * positional reading the paragraph above insists on, extended downward, and it is what
+ * {@link BuildingSpec.belowLobby} adds.
+ *
+ * It is added because leaving it out was **destructive and silent**. `floorIdOf` used to be
+ * `floor === 0 ? 'G' : String(floor + 1)` over a vocabulary with no room beneath the lobby, so
+ * `specFromBuilding` dealt a basement the first slot *above* the lobby and every floor in the
+ * building moved up one: `crown-hotel`'s `back-of-house` zone named `B1` going in and `2` coming
+ * out, which put housekeeping, engineering and security on a guest bedroom floor, and
+ * `st-jude-hospital`'s main stair joined `G` to `1` going in and `G` to `3` coming out. Both were
+ * reached by opening the building and saving it untouched.
+ *
+ * **What a floor number cannot carry is the floor's name, and only below the lobby.** Above it a
+ * name is arithmetic — {@link BuildingSpec.firstFloorNumber} and one per floor after it. Below it
+ * the three shipped basements are `B1`, `P1` and `LG`: a car park, a plant floor and a lower
+ * ground, three names for one position, so a rule that minted any of them would rename the other
+ * two. So `belowLobby` holds the ids — and holds *only* those, which is the line this module keeps:
+ * every **reference** to a floor is still a number ({@link SpecAccessZone.floors},
+ * {@link SpecTransportMode.connects}, `skyFloors`, `bandByCar`), so nothing goes stale when the
+ * floor slider moves. The list's own length is how many floors are below the lobby, so there is no
+ * second count to drift against it.
+ *
  * ## Sky lobbies are two mechanisms, and they are deliberately kept apart
  *
  * A sky lobby in this editor is **two** independent facts, and collapsing them would repeat the
@@ -127,12 +152,17 @@ export function personsOf(ratedLoadLb: number): number {
  *
  * `core`'s {@link AccessZone} names floors by **id**; this names them by floor number, because the
  * floor a reader clicks in the multi-select is a row of the elevation and a spec that stored ids
- * would go stale the moment the floor slider moved. {@link accessZonesOf} is the translation, and
- * it is the only place the two vocabularies meet.
+ * would go stale the moment the floor slider moved. {@link accessZonesOf} is the translation for a
+ * zone, and it is the only place a zone's two vocabularies meet — it reaches {@link floorIdOf},
+ * which is the one function in this module that turns a floor number into an id and the only place
+ * any arithmetic on an id happens.
  */
 export interface SpecAccessZone {
   readonly id: string;
-  /** Floor numbers, `0` being the lobby. Kept in the order the reader (or the document) gave. */
+  /**
+   * Floor numbers, `0` being the lobby and a negative one a floor below it. Kept in the order the
+   * reader (or the document) gave.
+   */
   readonly floors: readonly number[];
   /** Credential groups permitted on those floors. Empty is a document the loader refuses. */
   readonly credentialGroups: readonly string[];
@@ -145,7 +175,8 @@ export interface SpecAccessZone {
  * The {@link SpecAccessZone} precedent, followed exactly: `core`'s {@link TransportModeConfig}
  * names floors by **id**, and this names them by floor number, because the floor a reader picks is
  * a row of the elevation and a spec holding ids would go stale the moment the floor slider moved.
- * {@link transportModesOf} is the translation and the only place the two vocabularies meet.
+ * {@link transportModesOf} is the translation for a machine, and it reaches the same
+ * {@link floorIdOf} a zone's does.
  *
  * `connects` is a fixed pair for the reason the schema makes it one: a machine with three landings
  * is two machines.
@@ -161,7 +192,10 @@ export interface SpecAccessZone {
  */
 export interface SpecTransportMode {
   readonly id: string;
-  /** The two floor numbers it joins, `0` being the lobby. The two must differ. */
+  /**
+   * The two floor numbers it joins, `0` being the lobby and a negative one a floor below it. The
+   * two must differ.
+   */
   readonly connects: readonly [number, number];
   /**
    * Landing-to-landing seconds, **including** stepping on and stepping off.
@@ -232,6 +266,22 @@ export function traversalTimeLabel(traversalTimeS: number | DirectionalTraversal
   return `${up} s up / ${down} s down`;
 }
 
+/**
+ * One floor below the lobby, in the editor's own vocabulary.
+ *
+ * Two fields, and both are here because a floor number cannot carry them. The **id** is not
+ * derivable from the position — see {@link floorIdOf} — and the **entrance** flag is a modelled
+ * fact rather than a label: `midtown-office` declares its car park `isEntrance`, so arrivals reach
+ * the building through it and it carries no resident population. Dropping the flag would move a
+ * street door and put people in a car park; the editor authors neither, and carries both.
+ */
+export interface SpecBelowLobbyFloor {
+  /** The id the document gave it — `B1`, `P1`, `LG`. */
+  readonly id: string;
+  /** Whether the document declares it an entrance: a second street door, at the back or below. */
+  readonly isEntrance?: boolean | undefined;
+}
+
 /** The editor's whole state. Flat, total, slider-shaped. */
 export interface BuildingSpec {
   readonly id: string;
@@ -240,6 +290,27 @@ export interface BuildingSpec {
   readonly trafficProfile: string;
   /** Floors above the lobby. The lobby itself is always floor 0 and is never counted here. */
   readonly floors: number;
+  /**
+   * Floors below the lobby, **nearest the lobby first** — floor `-1`, then `-2`, and so on. Its
+   * length is how many there are, so nothing can disagree with it about the count.
+   *
+   * Empty on five of the eight shipped buildings, and on everything this editor authors: there is
+   * no control that digs a basement, and {@link specFromBuilding} is the only thing that fills this.
+   * A loaded one is carried rather than dropped, for {@link SpecTransportMode.kind}'s reason and no
+   * other — dropping it renumbered every floor above it.
+   */
+  readonly belowLobby: readonly SpecBelowLobbyFloor[];
+  /**
+   * The number the first floor above the lobby carries — `2` in a building with no floor `1`.
+   *
+   * A convention, not an id: it is one integer, it survives the floor slider, and it is what makes
+   * `floor 1` mean *the first row above the lobby* while still printing what the document printed.
+   * Seven of the eight shipped buildings say `2` (there is no first floor; the lobby is the ground
+   * floor and the next one up is the second) and `st-jude-hospital` says `1`. Carried rather than
+   * assumed because assuming it renamed every floor of that hospital, including the two its
+   * `clinical` access zone names.
+   */
+  readonly firstFloorNumber: number;
   readonly floorHeightM: number;
   /** What each floor was designed to hold. Does not change when tenants come and go. */
   readonly capacityPerFloor: number;
@@ -283,6 +354,8 @@ export const BLANK_SPEC: BuildingSpec = Object.freeze({
   type: 'office' as BuildingType,
   trafficProfile: 'office-standard',
   floors: 12,
+  belowLobby: Object.freeze([]),
+  firstFloorNumber: 2,
   floorHeightM: 3.6,
   capacityPerFloor: 80,
   occupancyPct: 85,
@@ -376,23 +449,92 @@ export function populationAt(spec: BuildingSpec, floor: number): number {
   return Math.max(0, Math.round(spec.capacityPerFloor * (occupancyAt(spec, floor) / 100)));
 }
 
+/**
+ * The bottom of the building, as a floor number: `0` with no basement, `-1` with one, and so on.
+ *
+ * Every loop over the building's floors starts here rather than at `0`. It is the negated length of
+ * {@link BuildingSpec.belowLobby}, which is held *nearest the lobby first*, so its last element is
+ * the deepest floor and the one this names.
+ */
+export function lowestFloorOf(spec: BuildingSpec): number {
+  // `0 - n` rather than `-n`, because unary minus on zero is **negative** zero and negative zero is
+  // not `0` to `toStrictEqual`, `Object.is` or a `Map` key. A building with no basement must return
+  // the same `0` the lobby is, or it starts failing comparisons for a reason that has nothing to do
+  // with floors. `0 - 0` is `+0`; `-0` is not.
+  return 0 - spec.belowLobby.length;
+}
+
+/** How many floors this building has in total — the elevation's row count. */
+export function floorCountOf(spec: BuildingSpec): number {
+  return spec.floors - lowestFloorOf(spec) + 1;
+}
+
+/**
+ * Whether this floor is a way in from the street.
+ *
+ * The lobby always is. A floor below it is one only when the document said so — `midtown-office`'s
+ * `P1` does, and it is the reason this is a question rather than `floor === 0`: an entrance carries
+ * no resident population, so getting it wrong either invents people in a car park or takes a door
+ * away from a building that has one.
+ */
+export function isEntranceFloor(spec: BuildingSpec, floor: number): boolean {
+  if (floor === 0) return true;
+  if (floor >= 0) return false;
+  return spec.belowLobby[-floor - 1]?.isEntrance === true;
+}
+
+/** Every floor that can hold people: the whole building, less its entrances. Bottom floor first. */
+function occupiableFloorsOf(spec: BuildingSpec): readonly number[] {
+  const floors: number[] = [];
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    if (!isEntranceFloor(spec, floor)) floors.push(floor);
+  }
+  return floors;
+}
+
 export function totalPopulation(spec: BuildingSpec): number {
   let total = 0;
-  for (let floor = 1; floor <= spec.floors; floor += 1) total += populationAt(spec, floor);
+  for (const floor of occupiableFloorsOf(spec)) total += populationAt(spec, floor);
   return total;
 }
 
 export function totalCapacity(spec: BuildingSpec): number {
-  return spec.floors * spec.capacityPerFloor;
+  return occupiableFloorsOf(spec).length * spec.capacityPerFloor;
 }
 
+/**
+ * Total travel, bottom floor to top.
+ *
+ * Measured over the whole shaft rather than over the floors above the lobby, because a bank that
+ * opens onto a basement really does travel that far and `maxRiseM` is a claim about the machine.
+ */
 export function riseM(spec: BuildingSpec): number {
-  return spec.floors * spec.floorHeightM;
+  return (spec.floors - lowestFloorOf(spec)) * spec.floorHeightM;
 }
 
-/** Floor ids, lobby first, in index order. `G`, then `2`, `3`, … as the shipped buildings do. */
-export function floorIdOf(floor: number): string {
-  return floor === 0 ? 'G' : String(floor + 1);
+/**
+ * A floor number as this building's own floor id — the **one** translation between the two
+ * vocabularies, and the only place in this module where any arithmetic on an id happens.
+ *
+ * Three cases, and the first is why this takes a spec at all:
+ *
+ * - **Below the lobby** (`-1` nearest it): whatever the document called that floor, held on
+ *   {@link BuildingSpec.belowLobby}. It is not derivable, and that is measured rather than assumed
+ *   — the three shipped buildings with a basement call the same position `B1`, `P1` and `LG`, so
+ *   any rule that minted one of them would rename the other two.
+ * - **The lobby** (`0`): `G`. All eight shipped buildings agree, so there is nothing here to carry;
+ *   a field nothing varies is a control that changes nothing.
+ * - **Above the lobby**: {@link BuildingSpec.firstFloorNumber} at floor 1, one per floor after it.
+ *
+ * The fallback below the list is a floor no building has — a mode end left pointing under a tower
+ * whose basement was removed. It is named `B2`-style rather than left `undefined` because the only
+ * callers for it are {@link validateSpec}'s messages, and a warning that says *floor undefined* is
+ * a warning about the formatter rather than about the building.
+ */
+export function floorIdOf(spec: BuildingSpec, floor: number): string {
+  if (floor === 0) return 'G';
+  if (floor < 0) return spec.belowLobby[-floor - 1]?.id ?? `B${String(-floor)}`;
+  return String(floor + spec.firstFloorNumber - 1);
 }
 
 /**
@@ -404,21 +546,23 @@ export function floorIdOf(floor: number): string {
  * `mixed-use-high-rise` and `vertical-city` actually ship.
  */
 export function defaultBandOf(spec: BuildingSpec, car: number): readonly [number, number] {
+  const lowest = lowestFloorOf(spec);
   const skies = [...spec.skyFloors].filter((floor) => floor > 0 && floor < spec.floors).sort((a, b) => a - b);
-  if (skies.length === 0) return [0, spec.floors];
-  const bounds = [0, ...skies, spec.floors];
+  if (skies.length === 0) return [lowest, spec.floors];
+  const bounds = [lowest, ...skies, spec.floors];
   const segments: (readonly [number, number])[] = [];
   for (let i = 0; i < bounds.length - 1; i += 1) {
     segments.push([bounds[i] as number, bounds[i + 1] as number]);
   }
-  return segments[car % segments.length] ?? [0, spec.floors];
+  return segments[car % segments.length] ?? [lowest, spec.floors];
 }
 
 export function bandOf(spec: BuildingSpec, car: number): readonly [number, number] {
   const pinned = spec.bandByCar[car];
   if (pinned === undefined) return defaultBandOf(spec, car);
-  const low = Math.max(0, Math.min(spec.floors, Math.min(pinned[0], pinned[1])));
-  const high = Math.max(0, Math.min(spec.floors, Math.max(pinned[0], pinned[1])));
+  const lowest = lowestFloorOf(spec);
+  const low = Math.max(lowest, Math.min(spec.floors, Math.min(pinned[0], pinned[1])));
+  const high = Math.max(lowest, Math.min(spec.floors, Math.max(pinned[0], pinned[1])));
   return low === high ? [low, Math.min(spec.floors, low + 1)] : [low, high];
 }
 
@@ -469,7 +613,9 @@ export function orphanFloors(spec: BuildingSpec): readonly number[] {
     for (const floor of servedFloorsOf(spec, car)) served.add(floor);
   }
   const orphans: number[] = [];
-  for (let floor = 0; floor <= spec.floors; floor += 1) if (!served.has(floor)) orphans.push(floor);
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    if (!served.has(floor)) orphans.push(floor);
+  }
   return orphans;
 }
 
@@ -522,7 +668,9 @@ export function unreachableFloors(spec: BuildingSpec): readonly number[] {
     frontier = next;
   }
   const stranded: number[] = [];
-  for (let floor = 0; floor <= spec.floors; floor += 1) if (!seen.has(floor)) stranded.push(floor);
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    if (!seen.has(floor)) stranded.push(floor);
+  }
   return stranded;
 }
 
@@ -585,8 +733,9 @@ export function carLabelOf(car: number): string {
  */
 export function zoneFloorsOf(spec: BuildingSpec, zone: SpecAccessZone): readonly number[] {
   const kept: number[] = [];
+  const lowest = lowestFloorOf(spec);
   for (const floor of zone.floors) {
-    if (floor < 0 || floor > spec.floors) continue;
+    if (floor < lowest || floor > spec.floors) continue;
     if (!kept.includes(floor)) kept.push(floor);
   }
   return kept;
@@ -608,7 +757,7 @@ export function accessZonesOf(spec: BuildingSpec): readonly AccessZone[] {
     if (floors.length === 0) continue;
     zones.push({
       id: zone.id,
-      floors: floors.map((floor) => floorIdOf(floor)),
+      floors: floors.map((floor) => floorIdOf(spec, floor)),
       credentialGroups: [...zone.credentialGroups],
     });
   }
@@ -828,7 +977,10 @@ export function transportModesOf(spec: BuildingSpec): readonly TransportModeConf
   return writtenTransportModes(spec).map((mode) => ({
     $comment: transportCommentFor(spec, mode),
     id: mode.id,
-    connects: [floorIdOf(mode.connects[0]), floorIdOf(mode.connects[1])] as readonly [string, string],
+    connects: [floorIdOf(spec, mode.connects[0]), floorIdOf(spec, mode.connects[1])] as readonly [
+      string,
+      string,
+    ],
     ...(mode.kind === undefined ? {} : { kind: mode.kind }),
     traversalTimeS: mode.traversalTimeS,
     ...(mode.use === undefined ? {} : { use: mode.use }),
@@ -883,8 +1035,8 @@ function transportCommentFor(spec: BuildingSpec, mode: SpecTransportMode): strin
   const inclineS = (inclineM / ESCALATOR_SPEED_MPS).toFixed(1);
   const derived = derivedS.toFixed(1);
   const pitch = spec.floorHeightM.toFixed(2);
-  const lowId = floorIdOf(low);
-  const highId = floorIdOf(high);
+  const lowId = floorIdOf(spec, low);
+  const highId = floorIdOf(spec, high);
   const lowAt = heightOf(low);
   const highAt = heightOf(high);
   const where = `${lowId} at ${lowAt} m, ${highId} at ${highAt} m, ${pitch} m floor to floor`;
@@ -963,10 +1115,11 @@ function machineNoun(modes: readonly SpecTransportMode[]): string {
 
 /** {@link transportModesOf} in the spec's own floor-number vocabulary. */
 function writtenTransportModes(spec: BuildingSpec): readonly SpecTransportMode[] {
+  const lowest = lowestFloorOf(spec);
   return spec.transportModes.filter(
     (mode) =>
       mode.connects[0] !== mode.connects[1] &&
-      mode.connects.every((floor) => floor >= 0 && floor <= spec.floors),
+      mode.connects.every((floor) => floor >= lowest && floor <= spec.floors),
   );
 }
 
@@ -1009,17 +1162,24 @@ export function buildingFromSpec(
 ): BuildingConfig {
   const floors: FloorConfig[] = [];
   const skies = new Set(spec.skyFloors);
-  for (let floor = 0; floor <= spec.floors; floor += 1) {
+  /*
+   * Bottom floor first, which for a building with a basement is a negative index — `config/schema.ts`
+   * says so in as many words (*"floor index must be an integer (negative for basements)"*), and all
+   * three shipped basements are at `-1`. Height follows the same sign, so a basement lands below
+   * datum rather than above it.
+   */
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    const entrance = isEntranceFloor(spec, floor);
     const config: {
       -readonly [K in keyof FloorConfig]: FloorConfig[K];
     } = {
-      id: floorIdOf(floor),
+      id: floorIdOf(spec, floor),
       index: floor,
       heightM: Math.round(floor * spec.floorHeightM * 100) / 100,
-      population: floor === 0 ? 0 : populationAt(spec, floor),
+      population: entrance ? 0 : populationAt(spec, floor),
     };
-    if (floor === 0) config.isEntrance = true;
-    if (floor !== 0 && skies.has(floor)) config.isTransferFloor = true;
+    if (entrance) config.isEntrance = true;
+    if (!entrance && skies.has(floor)) config.isTransferFloor = true;
     floors.push(config);
   }
 
@@ -1027,7 +1187,7 @@ export function buildingFromSpec(
   const banks: BankConfig[] = groups.map((group, index) => {
     const servesFloors: string[] = [];
     for (let floor = group.band[0]; floor <= group.band[1]; floor += 1) {
-      servesFloors.push(floorIdOf(floor));
+      servesFloors.push(floorIdOf(spec, floor));
     }
     /*
      * A band that starts above the lobby still lands in the lobby — that is what a high-rise bank
@@ -1040,7 +1200,13 @@ export function buildingFromSpec(
      * building this loader builds without complaint — measured, not assumed — and it is one a
      * reader can strand, so {@link unreachableFloors} guards it at the control.
      */
-    if (group.band[0] > 0 && group.lobby && !servesFloors.includes('G')) servesFloors.unshift('G');
+    // Through {@link floorIdOf} like every other crossing, rather than the literal `'G'` this line
+    // used to hold. The two agree today and the rule is what matters: one function turns a floor
+    // number into an id, so a building that renamed its lobby could not rename it here only.
+    const lobbyId = floorIdOf(spec, 0);
+    if (group.band[0] > 0 && group.lobby && !servesFloors.includes(lobbyId)) {
+      servesFloors.unshift(lobbyId);
+    }
     return {
       /*
        * The single-bank case keeps the id every shipped building uses, so a spec that describes
@@ -1049,7 +1215,10 @@ export function buildingFromSpec(
        */
       id: groups.length === 1 ? 'main' : `bank-${String(index + 1)}`,
       name:
-        group.band[0] === 0
+        // `<= 0` rather than `=== 0`: a band that reaches the lobby *or below it* is the main bank.
+        // On a building with a basement the default band starts at `-1`, and `=== 0` named it
+        // `Floors -1–23`.
+        group.band[0] <= 0
           ? 'Main bank'
           : group.lobby
             ? `Floors ${String(group.band[0])}–${String(group.band[1])}`
@@ -1143,7 +1312,7 @@ export function validateSpec(
     const named =
       stranded.length > 6
         ? `${String(stranded.length)} floors have a shaft`
-        : `Floor${stranded.length === 1 ? '' : 's'} ${stranded.map((floor) => floorIdOf(floor)).join(', ')} ${stranded.length === 1 ? 'has' : 'have'} a shaft`;
+        : `Floor${stranded.length === 1 ? '' : 's'} ${stranded.map((floor) => floorIdOf(spec, floor)).join(', ')} ${stranded.length === 1 ? 'has' : 'have'} a shaft`;
     problems.push(
       `${named} nobody can board from the lobby — nothing connects ${stranded.length === 1 ? 'it' : 'them'} to the entrance, directly or through a transfer level. The loader builds this without a word; the run then generates no trip to those floors at all, so the mean it reports is over the people it could still carry.`,
     );
@@ -1152,7 +1321,14 @@ export function validateSpec(
     problems.push(
       orphans.length > 6
         ? `No shaft serves ${String(orphans.length)} floors — a call there is one nobody may answer, which looks nothing like a slow one.`
-        : `No shaft serves floor ${orphans.map((floor) => (floor === 0 ? 'G' : String(floor))).join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
+        /*
+         * Through {@link floorIdOf} like every other crossing. This branch minted its own id —
+         * `floor === 0 ? 'G' : String(floor)` — which is neither the id the document carries nor
+         * the one the warning two lines above prints for the same floor: it named floor 6 `6`
+         * where the building calls it `7`. A second rule for turning a number into an id is the
+         * same defect as a second floor vocabulary, at the width of one message.
+         */
+        : `No shaft serves floor ${orphans.map((floor) => floorIdOf(spec, floor)).join(', ')} — a call there is one nobody may answer, which looks nothing like a slow one.`,
     );
   }
   /*
@@ -1169,7 +1345,7 @@ export function validateSpec(
   const written = spec.accessZones.filter((zone) => zoneFloorsOf(spec, zone).length > 0);
   for (const zone of written) {
     if (zone.credentialGroups.length > 0) continue;
-    const floors = zoneFloorsOf(spec, zone).map((floor) => floorIdOf(floor));
+    const floors = zoneFloorsOf(spec, zone).map((floor) => floorIdOf(spec, floor));
     problems.push(
       `Access zone ${zone.id} covers floor ${floors.join(', ')} and names no credential group, so ` +
         'no credential opens those floors at all. Those are calls no car may legally answer, and the ' +
@@ -1184,7 +1360,7 @@ export function validateSpec(
   if (trimmed.length > 0) {
     problems.push(
       `Access zone ${trimmed.map((zone) => zone.id).join(', ')} name${trimmed.length === 1 ? 's' : ''} ` +
-        `a floor this tower does not have — it is ${String(spec.floors + 1)} floors tall now. Those ` +
+        `a floor this tower does not have — it is ${String(floorCountOf(spec))} floors tall now. Those ` +
         'floors are left out of the saved document rather than refused, so the zone covers fewer ' +
         'floors than it says.',
     );
@@ -1201,12 +1377,12 @@ export function validateSpec(
    * then the state it builds without a word and a reader cannot see.
    */
   const offTower = spec.transportModes.filter((mode) =>
-    mode.connects.some((floor) => floor < 0 || floor > spec.floors),
+    mode.connects.some((floor) => floor < lowestFloorOf(spec) || floor > spec.floors),
   );
   if (offTower.length > 0) {
     problems.push(
       `${machineNoun(offTower)} ${offTower.map((mode) => mode.id).join(', ')} connect${offTower.length === 1 ? 's' : ''} ` +
-        `a floor this tower does not have — it is ${String(spec.floors + 1)} floors tall now. ` +
+        `a floor this tower does not have — it is ${String(floorCountOf(spec))} floors tall now. ` +
         'A connection is a pair of floors, so there is nothing to shorten the way a zone shortens ' +
         'its floor list: the whole machine is left out of the saved document rather than refused, ' +
         'and the run routes as though it had never been there.',
@@ -1215,7 +1391,7 @@ export function validateSpec(
   const selfJoined = spec.transportModes.filter((mode) => mode.connects[0] === mode.connects[1]);
   for (const mode of selfJoined) {
     problems.push(
-      `${machineNoun([mode])} ${mode.id} starts and ends on floor ${floorIdOf(mode.connects[0])}. The loader ` +
+      `${machineNoun([mode])} ${mode.id} starts and ends on floor ${floorIdOf(spec, mode.connects[0])}. The loader ` +
         'refuses a connection whose two ends name one floor — a machine that starts and ends on ' +
         'the same floor moves nobody — so it is left out of the saved document instead of being ' +
         'written and refused.',
@@ -1273,8 +1449,8 @@ export function validateSpec(
   );
   for (const mode of deadEnds) {
     problems.push(
-      `Escalator ${mode.id} joins floor ${floorIdOf(mode.connects[0])} and floor ` +
-        `${floorIdOf(mode.connects[1])}, and neither is a transfer level. A journey may only ` +
+      `Escalator ${mode.id} joins floor ${floorIdOf(spec, mode.connects[0])} and floor ` +
+        `${floorIdOf(spec, mode.connects[1])}, and neither is a transfer level. A journey may only ` +
         'change onto a lift at a transfer level, so this machine carries the people who start on ' +
         'one of those two floors and finish on the other, and nobody else — it is not a way ' +
         'through. The loader builds it without a word. Mark one of the two a sky lobby if it was ' +
@@ -1292,9 +1468,9 @@ export function validateSpec(
           'outside its class.',
       );
     }
-    if (spec.floors + 1 > machineClass.maxFloors) {
+    if (floorCountOf(spec) > machineClass.maxFloors) {
       problems.push(
-        `${String(spec.floors + 1)} floors is past the ${String(machineClass.maxFloors)}-floor limit for ${machineClass.name.toLowerCase()}.`,
+        `${String(floorCountOf(spec))} floors is past the ${String(machineClass.maxFloors)}-floor limit for ${machineClass.name.toLowerCase()}.`,
       );
     }
   }
@@ -1317,7 +1493,7 @@ export function occupancyLine(spec: BuildingSpec): string {
 /** The handoff's summary line, § 1.3 M11. */
 export function buildingSummary(spec: BuildingSpec): string {
   return (
-    `${String(spec.floors + 1)} floors · ${riseM(spec).toFixed(1)} m of travel · ` +
+    `${String(floorCountOf(spec))} floors · ${riseM(spec).toFixed(1)} m of travel · ` +
     `${String(totalPopulation(spec))} people · ${String(spec.cars)} cars at ` +
     `${spec.ratedSpeedMps.toFixed(2)} m/s · ${String(personsOf(spec.ratedLoadLb))} persons each`
   );
@@ -1352,6 +1528,10 @@ function normalize(spec: BuildingSpec): unknown {
     type: spec.type,
     trafficProfile: spec.trafficProfile,
     floors: spec.floors,
+    // Both halves of the below-lobby vocabulary, so a spec that lost a basement — or renamed the
+    // first floor above the lobby — reads as the different building it saves as.
+    belowLobby: spec.belowLobby.map((floor) => [floor.id, floor.isEntrance === true]),
+    firstFloorNumber: spec.firstFloorNumber,
     floorHeightM: spec.floorHeightM,
     capacityPerFloor: spec.capacityPerFloor,
     occupancyPct: spec.occupancyPct,
@@ -1400,31 +1580,92 @@ function declaredFloorsOf(config: BuildingConfig): readonly FloorConfig[] {
 }
 
 /**
+ * Which declared floor the spec calls floor `0`.
+ *
+ * The lowest entrance **at or above datum**, because that is the one a reader means by *the lobby*:
+ * `midtown-office` flags both `G` and its car park `P1`, and calling `P1` the lobby would put the
+ * building's ground floor one storey up and leave the tower numbered from a basement.
+ *
+ * The three fallbacks are for documents this function may be handed directly rather than through
+ * `parseBuilding` — the lowest entrance wherever it is, then index `0`, then the bottom floor — so
+ * a building with no entrance at all still reads rather than throwing.
+ */
+function lobbyIndexOf(declared: readonly FloorConfig[]): number {
+  const entrances = declared.filter((floor) => floor.isEntrance === true);
+  const chosen =
+    entrances.find((floor) => floor.index >= 0) ??
+    entrances[0] ??
+    declared.find((floor) => floor.index === 0) ??
+    declared[0];
+  return chosen?.index ?? 0;
+}
+
+/**
+ * The number the document prints on the first floor above the lobby.
+ *
+ * Read off that floor's own id, which is the only place it is written. Seven of the eight shipped
+ * buildings say `2` — there is no floor `1`, the lobby *is* the ground floor — and
+ * `st-jude-hospital` says `1`. A non-numeric id (a `floorRanges` pattern like `L{index}`) falls
+ * back to the common case and the ids do not survive the round trip; see {@link specFromBuilding}.
+ */
+function firstFloorNumberOf(above: readonly FloorConfig[]): number {
+  const first = above[0];
+  if (first === undefined) return 2;
+  const declared = Number(first.id);
+  return Number.isInteger(declared) && declared > 0 ? declared : 2;
+}
+
+/**
  * Read a shipped building back into the editor's shape.
  *
- * Lossy in one direction and honest about it: a shipped building's floors have ids and per-floor
- * traffic profiles that a `floors × capacity × occupancy` model cannot express. What comes back is
- * the *shape* — how tall, how many people, how many cars, how fast — so a reader can start from
- * Midtown Office and change one thing. The document editor beneath the elevation is where the parts
- * this drops are edited, which is why it is still there (§ 4.5).
+ * Lossy in one direction and honest about it: a shipped building's floors have labels and per-floor
+ * traffic profiles and per-floor populations that a `floors × capacity × occupancy` model cannot
+ * express. What comes back is the *shape* — how tall, how many people, how many cars, how fast — so
+ * a reader can start from Midtown Office and change one thing. The document editor beneath the
+ * elevation is where the parts this drops are edited, which is why it is still there (§ 4.5).
  *
  * **Access zoning is no longer one of the parts it drops.** Zone floors are matched by their
- * **position** in the building's own non-entrance floor order — the same convention `skyFloors`
- * below already uses — never by arithmetic on the id, because a floor id is a string and
- * `mixed-use-high-rise` has no floor at index 1 at all. On all five shipped buildings the ids come
- * back identical, which `authoring.test.ts` asserts against the documents rather than asserting the
- * mapping.
+ * **position** relative to the lobby — the same convention `skyFloors` below already uses — never
+ * by arithmetic on the id, because a floor id is a string and `mixed-use-high-rise` has no floor at
+ * index 1 at all. On all eight shipped buildings the ids come back identical, which
+ * `authoring.test.ts` and `shippedBuildings.test.ts` assert against the documents rather than
+ * asserting the mapping.
+ *
+ * **Floor ids are no longer one of them either, and that is what {@link BuildingSpec.belowLobby}
+ * and {@link BuildingSpec.firstFloorNumber} are for.** Every floor id of every shipped building
+ * survives exactly. What still does not survive is a building whose floor numbers are **not a
+ * contiguous run** above the lobby — a tower with no thirteenth floor comes back with every floor
+ * above the gap renumbered down one — because the spec holds a count of floors and the number the
+ * first of them carries, and a gap is neither. No shipped building has one; a test pins the
+ * behaviour on a synthetic one so this paragraph is a measurement rather than a claim.
+ *
+ * `index` is the other thing that moves, and it always did: the spec numbers floors by position, so
+ * a rebuilt `midtown-office` writes floor `2` at index 1 where the document wrote it at index 2.
+ * The id is what every other part of a document names a floor by — `servesFloors`, `accessZones`,
+ * `transportModes.connects` — and it is what is held exact.
  */
 export function specFromBuilding(config: BuildingConfig, id: string): BuildingSpec {
   const declared = declaredFloorsOf(config);
-  const floors = declared.filter((floor) => floor.isEntrance !== true);
+  const lobbyIndex = lobbyIndexOf(declared);
   /*
-   * Floor id to the spec's own floor number. Position `i` in the non-entrance list is spec floor
-   * `i + 1`; every entrance is spec floor 0, which is what `buildingFromSpec` writes back — and
-   * Midtown Office really does declare two of them.
+   * Three groups by position rather than by flag, which is the change that closed the basement
+   * defect. This used to split on `isEntrance`, which put a basement in the first slot *above* the
+   * lobby and moved every floor in the building up one — `crown-hotel`'s `back-of-house` zone came
+   * back naming a guest bedroom floor. A floor below the lobby is below it whether or not it is
+   * also a way in.
+   */
+  const below = declared.filter((floor) => floor.index < lobbyIndex).reverse();
+  const floors = declared.filter((floor) => floor.index > lobbyIndex);
+  /*
+   * Floor id to the spec's own floor number. Position `i` above the lobby is spec floor `i + 1`;
+   * position `i` below it is spec floor `-(i + 1)`; the lobby is 0. That is exactly what
+   * {@link buildingFromSpec} writes back.
    */
   const floorNumberById = new Map<string, number>();
-  for (const floor of declared) if (floor.isEntrance === true) floorNumberById.set(floor.id, 0);
+  below.forEach((floor, index) => {
+    floorNumberById.set(floor.id, -(index + 1));
+  });
+  for (const floor of declared) if (floor.index === lobbyIndex) floorNumberById.set(floor.id, 0);
   floors.forEach((floor, index) => {
     floorNumberById.set(floor.id, index + 1);
   });
@@ -1445,6 +1686,15 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
     type: config.type,
     trafficProfile: config.trafficProfile,
     floors: Math.max(3, floors.length),
+    /*
+     * The ids, and the entrance flag beside each — the two things a floor number cannot carry.
+     * Nearest the lobby first, so element `i` is spec floor `-(i + 1)`.
+     */
+    belowLobby: below.map((floor) => ({
+      id: floor.id,
+      ...(floor.isEntrance === true ? { isEntrance: true } : {}),
+    })),
+    firstFloorNumber: firstFloorNumberOf(floors),
     floorHeightM: Math.max(2.8, Math.round((pitch / Math.max(1, floors.length - 1)) * 10) / 10),
     capacityPerFloor: capacity,
     occupancyPct: Math.max(10, Math.min(120, Math.round((mean / capacity) * 100 / 5) * 5)),
