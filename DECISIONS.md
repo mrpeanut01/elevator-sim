@@ -21042,3 +21042,59 @@ calls: **a breadth claim nothing checks.** The new guard derives its ids from `r
 asserts against the pinned list both ways; stashing the source fix turns it red with the exact
 reported `TypeError`.
 
+
+## D297 — the editor's floor vocabulary has a below-lobby half, and a basement's name is data
+
+`BuildingSpec` numbered floors `0 … floors` with the lobby at the bottom, so `specFromBuilding`
+gave a basement the first slot **above** the lobby, and `floorIdOf` — `floor === 0 ? 'G' :
+String(floor + 1)` — printed every floor one too high. **Three of the eight shipped buildings were
+affected, all silently**, and the trip that does it is opening the building in the editor and
+saving it untouched.
+
+- `crown-hotel`'s `back-of-house` zone named `B1` going in and `2` coming out, moving
+  `housekeeping`, `engineering` and `security` onto a guest bedroom floor. That is a credential
+  fact that is **wrong**, not coarse.
+- `st-jude-hospital`'s stair went from `G↔1` over 4.00 m to `G↔3` over 8.80 m, and its `clinical`
+  zone from `2, 3` to `4, 5`.
+- `midtown-office`, which nothing had named, **lost `P1` outright**: it is flagged `isEntrance` and
+  every entrance was folded onto floor 0.
+
+**This is not a dead seam and it is not a stale refusal. It is a third shape**, and it is
+[§ D296](#d296)'s defect one field over: a vocabulary that was live, correct, and **narrower than
+the data it read**. A type or a numbering that cannot express what ships does not protect anything
+— it relocates the failure. The rule that follows is the standing requirement in a new direction:
+**a round trip is pinned by the documents it round-trips, over the directory rather than over a
+list.**
+
+The vocabulary now runs `-belowLobby.length … 0 … floors`, and the two vocabularies stay apart:
+every *reference* to a floor is still a number, so nothing goes stale when the floor slider moves.
+What a number cannot carry is the floor's **name**, and only below the lobby — the three shipped
+basements are `B1`, `P1` and `LG`, **three names for one position**, so any minting rule would
+rename two of them. `belowLobby` therefore holds names and only names, and its own length is the
+count, so there is no second number to drift. `firstFloorNumber` carries the other half: seven
+shipped buildings have no floor `1`, and `st-jude-hospital` does. Defaults (`[]`, `2`) reproduce
+the old behaviour bit-for-bit on basement-free buildings.
+
+**Three further defects were found underneath it, and two were never about basements at all.**
+Floor pitch was averaged over all non-entrance floors, so the drop to a basement counted as a
+storey — `st-jude-hospital` came back at **4.4 m** against its authored 4.0 (that is the 8.80 m in
+the stair symptom) and `crown-hotel` at **3.3 m** against 3.1. `validateSpec`'s orphan branch
+minted its own id, `String(floor)`, one line below a branch that used `floorIdOf`, so the same
+floor was `6` in one sentence, `7` in the next, and `7` in the document — **wrong on every
+building, basement or not**. And `skyFloors` positions were shifted by a basement, latent only
+because no shipped building declares both.
+
+**The claim this file made about `accessZonesOf` was false and is corrected rather than
+preserved.** It said the function was *"the translation, and it is the only place the two
+vocabularies meet"*. `transportModesOf`, `buildingFromSpec` and four `validateSpec` messages
+crossed too. The true global claim is that **`floorIdOf` is the one function that turns a floor
+number into an id, and the only place arithmetic on an id happens** — made true by routing the two
+id-minting sites through it, and pinned **behaviourally** (the orphan warning must name the id the
+document carries) rather than by reading the source.
+
+**What stays lossy is stated and pinned by a run.** A tower whose floor numbers are not a
+contiguous run above the lobby — no thirteenth floor — comes back renumbered. No shipped building
+has a gap, so a **synthetic** building holds the docstring to it. `index` still moves, as it always
+did; the **id** is what is held exact, because the id is what `servesFloors`, `accessZones` and
+`transportModes.connects` name a floor by.
+
