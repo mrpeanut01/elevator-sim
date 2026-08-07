@@ -53,6 +53,7 @@ import type { ReportWindow, RunRecord, RunSummary } from '../metrics/types.js';
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -298,6 +299,14 @@ export interface SimulationDemandOptions {
   readonly entranceWeights?: Readonly<Record<string, number>> | undefined;
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * Override `data/traffic-profiles.json`'s `credentialGap` block. `DECISIONS.md` § D265.
+   *
+   * Unset means the reference data decides. `{ wrongZoneShare: 0 }` is the control arm — every
+   * rider correctly badged, which is what the model did before the gap existed and what every
+   * figure this repository published before it was measured under.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   readonly maxLegs?: number | undefined;
   /** How long demand holds at peak, which is also the reported window. `rise-and-fall` only. */
   readonly peakWindowS?: number | undefined;
@@ -434,8 +443,16 @@ export interface SimulationConfig {
    * comparison of anything. See {@link SimulationResult.trafficModel} for how a run reports it.
    */
   readonly trafficModel?: TrafficModelVersion | undefined;
-  /** `rise-and-fall` (default), `constant-iso`, or an already-resolved template. */
-  readonly demandTemplate?: DemandTemplateId | ResolvedDemandTemplate | undefined;
+  /**
+   * The id of a record in `trafficProfiles.demandTemplates`, or an already-resolved template.
+   * Defaults to `rise-and-fall`.
+   *
+   * `string` rather than `DemandTemplateId` since § D274: a record may author its own phases and
+   * therefore answer to an id the closed union cannot contain. The catalogue is the authority, so
+   * a caller taking this from user input validates it against `trafficProfiles.demandTemplates`
+   * before building the config — `cli/src/commands/run.ts` is the worked example.
+   */
+  readonly demandTemplate?: string | ResolvedDemandTemplate | undefined;
   /**
    * Length of the demand horizon, seconds. Defaults to the template's own duration.
    *
@@ -444,11 +461,33 @@ export interface SimulationConfig {
    */
   readonly durationS?: number | undefined;
   /**
+   * Run only `[windowStartS, windowEndS)` of the template's period. `DECISIONS.md` § D285.
+   *
+   * **The other kind of window, and the two are not the same control.** {@link reportWindow} narrows
+   * *what is measured* out of a run that happened in full; this narrows *what is run*. A player who
+   * picks the lunch peak of a ten-hour day is asking for the second — the morning is not simulated
+   * and then hidden, it does not happen.
+   *
+   * Handed to the generator as `TrafficConfig.windowStartS`/`windowEndS` rather than folded into
+   * {@link durationS}, which becomes `templateOverrides.durationS` and refits a shape's geometry.
+   * That distinction is the whole of § D275: `durationS` travels in every stored `RunConfig` and
+   * every leaderboard submission, so a second meaning for it would leave every board still
+   * verifying and every stored row a claim about a run nobody made.
+   *
+   * Both or neither. Absent means the run covers the whole period, which is byte-identical to the
+   * run before this field existed.
+   */
+  readonly windowStartS?: number | undefined;
+  /** End of the run's part of the template's period, seconds, exclusive. See {@link windowStartS}. */
+  readonly windowEndS?: number | undefined;
+  /**
    * Which window the summary is computed over.
    *
    * Defaults to the template's own measurement window — the peak 5 minutes for
    * `rise-and-fall`. `'full-run'` and `'peak-5min'` are the two derived selections; an explicit
    * {@link ReportWindow} overrides both.
+   *
+   * Narrows the *report*, never the run — see {@link windowStartS} for the one that narrows the run.
    */
   readonly reportWindow?: WindowSelection | undefined;
   readonly demand?: SimulationDemandOptions | undefined;
@@ -734,7 +773,33 @@ export interface ConservationAudit {
   readonly stairsTransitS?: number;
 
   /**
-   * `generated === delivered + undelivered + (abandoned ?? 0) && legsCreated === legsRecorded`.
+   * Journeys the building **turned away for want of a credential** (`DECISIONS.md` § D266).
+   *
+   * Absent — not `0` — on every building that declares no `accessZones`, and on every run where
+   * everybody happened to be correctly badged, so such a run carries the audit object it always
+   * did.
+   *
+   * **A published figure, for {@link stairsJourneys}' reason and § D106's.** A refused rider
+   * leaves the lift system: they reached a landing, the readers said no, and no car ever carried
+   * them. The served-leg count falls with them, so a comparison across configurations with
+   * different refusal rates **compares different populations** — and a building that refuses more
+   * people will report a shorter mean wait for exactly that reason. Without this count that
+   * shortfall reads as better service.
+   *
+   * Counted in **neither** {@link delivered} nor {@link undelivered}: they did not get there, and
+   * they are not still in the system. They are in `WaitStatistics.unservedCount` — they were never
+   * served, which is literally true — so a refusal rate large enough to bias the mean is caught by
+   * `awtIsValid`'s existing censoring ground. **Named limitation:** that ground's sentence
+   * attributes the censoring to a backlog, which is the wrong cause here; a ground of its own,
+   * placed above `censored` the way `abandoned` is, is the right fix and is a change to
+   * `metrics/awtValidity.ts`'s ground table that widens `AwtInvalidGround` and every total
+   * `Record` over it in `packages/viz`. § D266 records why this lane did not make it.
+   */
+  readonly accessRefused?: number;
+
+  /**
+   * `generated === delivered + undelivered + (abandoned ?? 0) + (accessRefused ?? 0) &&
+   * legsCreated === legsRecorded`.
    */
   readonly balanced: boolean;
 }
@@ -908,6 +973,25 @@ export interface StageActivity {
    * See `Simulation.#kioskAllows` and § T50-D1.
    */
   readonly kioskRefusedLegs: number;
+  /**
+   * Distinct legs the building turned away for want of a credential (`DECISIONS.md` § D266): the
+   * rider reached the landing, their badge did not open the floor they were going to, and no car
+   * was ever sent.
+   *
+   * Zero on the three shipped buildings that declare no `accessZones`, and on any run configured
+   * with `traffic.credentialGap.wrongZoneShare: 0`. Distinct from {@link kioskRefusedLegs}, which
+   * is the *interface* refusing a destination it cannot authorize; this is the *credential*
+   * failing to authorize one. Both leave a rider uncarried and they have different fixes, so they
+   * are counted apart.
+   *
+   * **Absent, not `0`, when nobody was refused** — unlike {@link kioskRefusedLegs} beside it, and
+   * the asymmetry is deliberate rather than untidy. `structuralDigestOfResult` hashes every key
+   * whatever its value, so a key present on every run would move every pinned identity digest in
+   * the repository to say nothing. Present and `0` is not available here: it would be exactly the
+   * claim *"this run could have refused somebody and did not"*, which is true of the five zoned
+   * buildings and meaningless on the other three.
+   */
+  readonly accessRefusedLegs?: number;
 }
 
 /**

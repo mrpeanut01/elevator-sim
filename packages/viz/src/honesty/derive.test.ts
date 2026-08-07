@@ -138,10 +138,12 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'drawer; its one authored string is the drawer toggle — `Controls ▸` / `Close controls` — ' +
         'which names a control rather than a result, and `surfaces.test.ts` asserts it directly ' +
         'alongside the breakpoint it must agree with. `dev/state.ts` is configuration: it answers ' +
-        '*what is the simulator being asked for*, and its one string table, `SHIFT_LENGTHS`, ' +
-        'names a duration (*Standard shift — 30 min*) rather than anything the run produced. Both ' +
-        'are derived only because the two-adjacent-words scanner reads hyphenated ids ' +
-        '(`garden-apartments`, `lunch-two-way`) as prose.',
+        '*what is the simulator being asked for*, and it now authors no string table at all — ' +
+        '`SHIFT_LENGTHS` was its one, and § D286 deleted it in favour of `menu/partsOfDay.ts`, ' +
+        'whose labels are player-facing and are **driven** by the `MENU` adapter rather than ' +
+        'excused here. What is left returns ids. Both modules are derived only because the ' +
+        'two-adjacent-words scanner reads hyphenated ids (`garden-apartments`, `lunch-two-way`) ' +
+        'as prose.',
       ids: [
         /*
          * `shift/incidents.ts` is the same false positive one directory over. It returns
@@ -190,8 +192,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // round-trip asserts.
         'dev/main.ts#deepLinkSearchOf',
         'dev/state.ts#initialState',
-        'dev/state.ts#SHIFT_LENGTHS',
+        /*
+         * Returns a demand template **id** — `rise-and-fall`, `office-day` — so the scanner reads
+         * the hyphen as a word break and nothing else. It authors no sentence; what a player reads
+         * about the template it names is the part labels `partsOfDay` produces from it, which the
+         * `MENU` adapter drives.
+         */
+        'dev/state.ts#shiftDemandTemplateId',
         'dev/state.ts#shiftRunConfigOf',
+        /*
+         * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
+         * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
+         * they are hyphenated. They return a boolean and two `WeekState`s between them and author
+         * no sentence at all. What a player is *told* about a free-play run is the report sheet's
+         * `single-run` framing, which the `REPORT_PANEL` adapter already drives on both subjects.
+         */
+        'dev/state.ts#advancesTheWeek',
+        'dev/state.ts#closedWeekOf',
+        'dev/state.ts#weekForSession',
       ],
     },
     {
@@ -279,12 +297,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'dev/buildingEditor.ts#specTrackOf',
         /*
-         * The transport timeline's segment palette, exported so the traffic editor's preview strip
-         * can draw the same bands rather than keep a second copy of the five hex pairs — the
-         * duplication `dev/tokens.test.ts` exists to stop. Four `{bg, fg}` pairs assert nothing; the
+         * The transport timeline's segment palettes, exported so the traffic editor's preview
+         * strip can draw the same bands rather than keep a second copy of them — the duplication
+         * `dev/tokens.test.ts` exists to stop. Six background/foreground pairs assert nothing; the
          * segment's own `label` and `title` are prose and `LIVE_RAIL` drives both.
+         *
+         * The two singles joined the group in § D251 and the reason is worth stating, because they
+         * were classified by accident before it. Every value in all three used to be a hex, and a
+         * hex is not prose to {@link PROSE}'s eye — `PHASE_PALETTE` was derived only because its
+         * *keys* are `'ramp-up'` and `'ramp-down'`. The values are `var(--phase-quiet)` and the
+         * rest now, which read as prose on the hyphen, so the two that had been silently
+         * unclassified became visibly unclassified. Their reason was always this one.
          */
         'live/timeline.ts#PHASE_PALETTE',
+        'live/timeline.ts#QUIET_PALETTE',
+        'live/timeline.ts#UNKNOWN_PALETTE',
       ],
     },
     {
@@ -331,15 +358,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'menu/types.ts#MENU_SCREENS',
         /*
-         * The account screen's *shape*, not its sentences. `EMPTY_FORM` and `SIGNED_OUT` are blank
-         * records whose only string is the mode id `sign-in`, which the two-adjacent-words scanner
-         * reads as prose; `MAX_DISPLAY_NAME` is the integer 32. Every sentence these records ever
-         * carry comes from `formIssues`, `postingRefusal` or `signedIn`, and `MENU` drives all
-         * three — including `postingRefusal`'s two arms, which is the distinction it exists for.
+         * The account screen's shape used to be here — `EMPTY_FORM`, `SIGNED_OUT` and
+         * `MAX_DISPLAY_NAME` — and it is gone rather than moved.
+         *
+         * They were producers by accident: the two-adjacent-words scanner read the mode id
+         * `sign-in` as prose, and `MAX_DISPLAY_NAME`'s span reached the `'sign-in' | 'register'`
+         * union beneath it. § D241 § 7 deleted the mode, because a form that asked for a display
+         * name only when the address was new would tell the person filling it in whether the
+         * address was new. With no mode there is no string in any of the three, so the derivation
+         * no longer finds them and an exclusion for them would be a ghost.
          */
-        'menu/account.ts#EMPTY_FORM',
-        'menu/account.ts#SIGNED_OUT',
-        'menu/account.ts#MAX_DISPLAY_NAME',
       ],
     },
     {
@@ -408,11 +436,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         /*
          * Returns a boolean, or a record whose prose came from somewhere already driven.
          * `canSubmitForm` answers *may this be sent* and is derived only through `formIssues`,
-         * which `MENU` drives directly. `signedOut` passes the **caller's** notice through
-         * unchanged and authors nothing — its one literal is the empty state it copies.
+         * which `MENU` drives directly.
+         *
+         * `linkRetryInMsOf` returns a **number of milliseconds** out of a 429 body. Its one
+         * literal is the wire code `too-many-link-requests`, which the scanner reads as two
+         * adjacent words and which no player ever sees: the sentence beside that refusal is the
+         * server's, carried by `Failure.detail` and shown unrewritten, because § D242 § 4 has the
+         * server word it — it names a duration and deliberately does not name which of the two
+         * budgets was spent.
+         *
+         * `signedOut` is no longer here and is not a gap: it passes the caller's notice through
+         * unchanged and its one literal was `SIGNED_OUT`'s mode id, which § D241 § 7 deleted, so
+         * the derivation no longer finds it at all.
          */
         'menu/account.ts#canSubmitForm',
-        'menu/account.ts#signedOut',
+        'menu/account.ts#linkRetryInMsOf',
         /*
          * Transport plumbing. `createClient` no longer authors a sentence — its three own wordings
          * moved to `CLIENT_FAILURES`, which `MENU` drives — and everything else it carries is the
@@ -474,6 +512,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'asserts its wording directly — the count, the total, every id, and the file to look in.',
       ids: ['dev/elementMap.ts#ELEMENT_IDS', 'dev/elementMap.ts#MissingElementsError'],
     },
+    {
+      reason:
+        'Moves a string the player chose from one field of a `MenuIntent` to another, and authors ' +
+        'none of its own. **The id/key case a third time**: every literal in it is a `case` tag of ' +
+        'a discriminated union — `set-free-play`, `set-commissioning` — which the two-adjacent-' +
+        'words scanner reads as a phrase because the tags are hyphenated. Nothing it returns is ' +
+        'shown; what it returns is an intent, whose *value* is an option id `menu/screens.ts#screenOf` ' +
+        'produced and the `MENU` adapter already sweeps, and whose effect on the screen arrives ' +
+        'through `applyIntent` — driven, and covered there. Putting it in an adapter instead would ' +
+        'have been a coverage claim for prose that does not exist.',
+      ids: ['menu/screens.ts#withChosenValue'],
+    },
   ]);
 
 const excludedIds = new Set(NOT_PLAYER_FACING.flatMap((group) => group.ids));
@@ -534,6 +584,27 @@ describe('the surface set is derived from the source tree', () => {
       expect(group.ids.length, JSON.stringify(group.reason.slice(0, 40))).toBeGreaterThan(0);
       expect(group.reason.length, group.ids[0]).toBeGreaterThan(80);
     }
+  });
+
+  it('excludes only producers that still exist — a ghost exclusion is red', async () => {
+    /*
+     * The mirror of *every adapter is attached to something real*, which sits a few lines below and
+     * has always been asserted. Exclusions had no such check, so an id whose producer was later
+     * deleted stayed in {@link NOT_PLAYER_FACING} forever — carrying a reason for a decision about
+     * a symbol that no longer exists, and quietly widening the exemption list against a future
+     * producer that happens to take the same name.
+     *
+     * Not hypothetical: three ghosts accumulated behind `mode` and had to be removed by hand when
+     * § D241 deleted the sign-in/register split. Nothing was red while they sat there.
+     */
+    const ids = new Set((await deriveTextProducers()).map((producer) => producer.id));
+    const ghosts = [...excludedIds].filter((id) => !ids.has(id)).sort();
+    expect(
+      ghosts,
+      'NOT_PLAYER_FACING names a producer that no longer exists. Delete the id — an exclusion ' +
+        'outliving the thing it excused is the stale-assertion defect this repository counts, ' +
+        'and it silently pre-approves whatever takes that name next.',
+    ).toEqual([]);
   });
 
   it('negative control: an invented producer would be unclassified', async () => {

@@ -24,6 +24,8 @@ import {
   type DispatcherSpec,
 } from '../authoring/dispatcherSpec.js';
 
+import { baseState, legsOf } from '../scope/probes.test-helper.js';
+
 import {
   dwellChipsOf,
   dwellHintOf,
@@ -31,6 +33,7 @@ import {
   humanTermName,
   leverRowsOf,
   nextSavedId,
+  runThisDispatcherStateOf,
   shortTermNameOf,
   termRowsOf,
   vectorLineOf,
@@ -207,5 +210,72 @@ describe('saved ids', () => {
     expect(nextSavedId('yours', ['yours-1', 'yours-3'])).toBe('yours-2');
     // Deleting the middle of three and saving again must not reuse a live id.
     expect(nextSavedId('yours', ['yours-1', 'yours-2'])).toBe('yours-3');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * "Now use this" — issue #65
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The verb the panel did not have, and § D177's rule pointed at it.
+ *
+ * The complaint was that after tuning thirteen weight sliders the only offers are **Close** and
+ * **Save as a new dispatcher** — so a reader has to know that filing also selects, and has to go
+ * back to the right-hand rail to run anything they did not file. The last test here is the one that
+ * makes the new control more than a label: selecting a different dispatcher and running has to move
+ * the legs, or the button is decoration with a confident tooltip.
+ */
+describe('the editor can run what it is showing — issue #65', () => {
+  const profileOf = (id: string): DispatcherProfile => {
+    const found = LIBRARY.profiles.find((entry) => entry.id === id);
+    if (found === undefined) throw new Error(`no profile ${id}`);
+    return found;
+  };
+  const COLLECTIVE = profileOf('collective');
+  const CLEAN: DispatcherSpec = specFromProfile(COLLECTIVE, COLLECTIVE.name);
+
+  it('offers to save first when the weights differ from the profile they came from', () => {
+    const edited: DispatcherSpec = { ...CLEAN, weights: { ...CLEAN.weights, waitTime: 91 } };
+    expect(runThisDispatcherStateOf(edited, COLLECTIVE, 'collective', 'collective')).toBe(
+      'saveFirst',
+    );
+  });
+
+  it('goes off, rather than pretending, when it is already the one driving', () => {
+    // An enabled control whose press changes nothing is the defect this repository counts. The
+    // reader is looking at exactly what the shift is running, so the button says that.
+    expect(runThisDispatcherStateOf(CLEAN, COLLECTIVE, 'collective', 'collective')).toBe(
+      'alreadyDriving',
+    );
+  });
+
+  it('offers a plain selection when an unedited other profile is open', () => {
+    expect(runThisDispatcherStateOf(CLEAN, COLLECTIVE, 'nearest-car', 'collective')).toBe('select');
+  });
+
+  it('treats a profile that no longer exists as something to save rather than to select', () => {
+    // The reader deleted the saved dispatcher they were editing. There is nothing to point the run
+    // at, so the honest offer is to file it again.
+    expect(runThisDispatcherStateOf(CLEAN, undefined, 'collective', 'gone-1')).toBe('saveFirst');
+  });
+
+  it('and the press really moves the run — § D177, compared on the legs', () => {
+    /*
+     * The `savesFirst: false` arm end to end: what the button does in that arm is write
+     * `dispatcherId` and re-run, so that is what is measured. Same building, same seed, same
+     * traffic, same shift length — the dispatcher is the only thing that moved, and neither arm may
+     * be empty.
+     */
+    const before = { ...baseState(), dispatcherId: 'collective' };
+    const after = { ...before, dispatcherId: 'nearest-car' };
+    expect(runThisDispatcherStateOf(CLEAN, COLLECTIVE, before.dispatcherId, 'nearest-car')).toBe(
+      'select',
+    );
+    const control = legsOf(before);
+    const moved = legsOf(after);
+    expect(JSON.parse(control)).not.toHaveLength(0);
+    expect(JSON.parse(moved)).not.toHaveLength(0);
+    expect(moved).not.toBe(control);
   });
 });

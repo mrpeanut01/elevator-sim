@@ -31,6 +31,27 @@
  * abandoned anything, and can have abandoned a dozen with an empty lobby.
  *
  * Nothing here is an estimate and nothing here is suppressible. Every figure is a head count.
+ *
+ * ## Two bases, because one of them inverts at the terminal instant
+ *
+ * {@link waitBandsAt} answers *who is standing at `t`*, which is the design's card and is right for
+ * every `t` inside a run. It is wrong at exactly one `t`, and always in the flattering direction: a
+ * run that **completes** runs on until the last passenger is delivered, so its final frame has an
+ * empty lobby *by construction*, and a card keyed on the queue there reports the calmest band about
+ * the worst possible day. That is not a stale playhead — the reading tracks the playhead correctly,
+ * and the playhead is at a moment whose answer is structurally zero.
+ *
+ * Measured rather than argued: `midtown-office` under `collective` over an hour of demand ends
+ * `saturated`, 1 392 of 1 392 carried, **781 past the 900 s horizon**, 18.0 % served inside a
+ * minute, peak queue 392 at the ground floor — and `waitBandsAt(recording, endedAt)` is
+ * `[0, 0, 0, 0]`, so the card read *"Everyone is getting on with their day"* over it.
+ *
+ * So `basis: 'whole-run'` bands the same people by **the worst wait each of them realised** by `t`,
+ * which is non-decreasing in `t` and does not empty when the lobby does. It is a second question,
+ * not a correction: the rail asks the live one while the playhead is inside the run and the
+ * retrospective one once it has reached the end, and {@link moodOf} writes different sentences for
+ * the two so a reader is never left to guess which they are looking at.
+ * See [`DECISIONS.md` § D239](../../../../DECISIONS.md).
  */
 
 import type { SimTime } from '@elevator-sim/core/browser';
@@ -38,7 +59,13 @@ import type { SimTime } from '@elevator-sim/core/browser';
 import type { VizRecording } from '../contract/types.js';
 import { queueAt } from '../frame/overlay.js';
 
-import type { Mood, WaitBandCount, WaitBandDefinition, WaitBands } from './types.js';
+import type {
+  Mood,
+  WaitBandBasis,
+  WaitBandCount,
+  WaitBandDefinition,
+  WaitBands,
+} from './types.js';
 
 /**
  * The four bands, in ascending severity — design `:1365–1371` for the boundaries and the colours,
@@ -47,6 +74,23 @@ import type { Mood, WaitBandCount, WaitBandDefinition, WaitBands } from './types
  * Frozen, and the single source of all four: the palette (requirement S7), the boundaries, both
  * label sets and the face glyphs. Three copies of a palette is the defect class this repository
  * has closed ten times.
+ *
+ * ## `color` is a token name, not a value — § D251
+ *
+ * It used to be `#3fb27f`, `#e0b040`, `#e0773a`, `#e0473a` — the four dark-mode band hexes, in a
+ * module `dev/leftRail.ts` and `dev/main.ts` write into inline `style="color:…"` attributes. The
+ * page also declares those four values, twice, as `--band-0…3` with a light twin for each; so this
+ * file was the **second** copy, and the one nothing could theme, because
+ * `:root[data-theme='light']` cannot reach an inline style. The measured cost was **19 of the 26
+ * remaining light-mode AA failures**: the mood legend at 1.77–3.61:1, the served figure and the
+ * goal rows at 1.87–2.48, the stage legend's four discs at 1.68–3.42.
+ *
+ * Naming the token instead of restating its value is the whole fix, and it costs nothing: every
+ * consumer of this field writes it into CSS, and CSS resolves `var(--band-0)` against whichever
+ * block is live. This is the same move `dev/leftRail.ts` had already made for every colour that
+ * was *not* a band — its `INK`/`DIM`/`FAINT` are `var(--text)`/`var(--dimmer)`/`var(--faint)` and
+ * always were. **Nothing here may be handed to a canvas**: `render/tokens.ts` is what the stage
+ * reads, and it holds the same four values as literals for that reason.
  */
 export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
   Object.freeze({
@@ -55,7 +99,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 30,
     label: 'breezy',
     legendLabel: 'under 30 s',
-    color: '#3fb27f',
+    color: 'var(--band-0)',
     face: '◡',
   }),
   Object.freeze({
@@ -64,7 +108,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 60,
     label: 'tapping foot',
     legendLabel: 'a minute',
-    color: '#e0b040',
+    color: 'var(--band-1)',
     face: '◠',
   }),
   Object.freeze({
@@ -73,7 +117,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: 120,
     label: 'checking watch',
     legendLabel: 'two minutes',
-    color: '#e0773a',
+    color: 'var(--band-2)',
     face: '⌄',
   }),
   Object.freeze({
@@ -82,7 +126,7 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     toS: undefined,
     label: 'taking the stairs',
     legendLabel: 'gave up',
-    color: '#e0473a',
+    color: 'var(--band-3)',
     face: '×',
   }),
 ]);
@@ -93,23 +137,50 @@ export const BAND_COLORS: readonly string[] = Object.freeze(WAIT_BANDS.map((band
 /**
  * The face's tinted disc, one per band — design `:2302`.
  *
- * Written out rather than computed from {@link WAIT_BANDS}: the design's fourth tint is `.16`
- * alpha where the other three are `.14`, and deriving them would quietly correct a value the
- * designer chose.
+ * Written out rather than computed from {@link WAIT_BANDS}: the design's fourth tint is 16 %
+ * where the other three are 14 %, and deriving them would quietly correct a value the designer
+ * chose.
+ *
+ * `color-mix` rather than the `rgba(63,178,127,.14)` these were, for {@link WAIT_BANDS}' reason
+ * and by the route `index.html`'s own token test names — *declare a token, or use `color-mix`*.
+ * The mix is against `transparent`, which is exactly what an alpha was: the disc sits on the mood
+ * card and takes 14 % of the band over whatever is under it.
  */
 const MOOD_BG: readonly string[] = Object.freeze([
-  'rgba(63,178,127,.14)',
-  'rgba(224,176,64,.14)',
-  'rgba(224,119,58,.14)',
-  'rgba(224,71,58,.16)',
+  'color-mix(in srgb, var(--band-0) 14%, transparent)',
+  'color-mix(in srgb, var(--band-1) 14%, transparent)',
+  'color-mix(in srgb, var(--band-2) 14%, transparent)',
+  'color-mix(in srgb, var(--band-3) 16%, transparent)',
 ]);
 
-/** The headline for each band — design `:2288–2293`, verbatim. */
+/** The headline for each band — design `:2288–2293`, verbatim. Present tense, and it is live. */
 const MOOD_HEADLINES: readonly string[] = Object.freeze([
   'Everyone is getting on with their day.',
   'A few people are checking their phones.',
   'The lobby is starting to notice.',
   'The stairwell door is getting a workout.',
+]);
+
+/**
+ * The headline for each band once the shift is over — the design has none, because its card only
+ * ever ran live.
+ *
+ * **Past tense, deliberately, and it is the second signal rather than decoration.** The live copy
+ * and the retrospective copy have to be distinguishable by a reader who is looking at one of them
+ * and not both, and a tense is a distinction that survives a screenshot, a greyscale rendering and
+ * a screen reader — which the tint on the face does not (KB-15).
+ *
+ * The first entry is the one that had to be written most carefully. *"Everyone is getting on with
+ * their day"* over a drained lobby was the whole defect; its replacement is a claim about **wait
+ * ages over the whole shift** and nothing else, so it may not read as a verdict on the run. Nobody
+ * having waited thirty seconds is genuinely all this card measured, and the honesty card beside it
+ * and the mood drivers under it are what speak for the rest.
+ */
+const RUN_OVER_HEADLINES: readonly string[] = Object.freeze([
+  'Nobody stood for long today.',
+  'A few people were kept waiting today.',
+  'The lobby noticed, more than once.',
+  'The stairwell door got a workout.',
 ]);
 
 /**
@@ -132,31 +203,42 @@ export function bandOf(waitedS: number): WaitBandDefinition {
 }
 
 /**
- * Everybody standing at `t`, banded by how long they have stood.
+ * The banding at `t`, on one of the two bases.
  *
+ * On the default `'now'` basis: everybody **standing** at `t`, banded by how long they have stood.
  * Membership and wait ages come from `queueAt`, which is the module that already decides who is
  * waiting (`arrivedAt <= t` and not yet boarded, right-continuous at both ends). Re-deciding it
  * here would be a second answer to a question `frame/overlay.ts` has already answered — the
  * failure this project has a rule about — and would let the stacked bar disagree with the queue
- * glyphs drawn under it on the same frame.
+ * glyphs drawn under it on the same frame. `bands.test.ts` asserts the total equals
+ * `frameAt(recording, t).totalWaiting` on every shipped building, at both ends of the run.
  *
- * Pure, and deliberately uncached: the playhead scrubs backwards, and a cache keyed on "the last
- * `t` we saw" returns the wrong frame the instant the reader drags left.
+ * On `'whole-run'`: everybody whose call had been **registered** by `t`, banded by the worst wait
+ * each of them realised by then. See the module docstring for why this basis exists.
+ *
+ * The parameter defaults so that every caller written before the second basis existed keeps the
+ * reading it had, and so that the *choice* is made once, visibly, by the surface that knows whether
+ * the shift is over. A caller that takes the default has chosen the live reading.
+ *
+ * Pure on both bases, and deliberately uncached: the playhead scrubs backwards, and a cache keyed
+ * on "the last `t` we saw" returns the wrong frame the instant the reader drags left.
  */
-export function waitBandsAt(recording: VizRecording, simTimeS: SimTime): WaitBands {
+export function waitBandsAt(
+  recording: VizRecording,
+  simTimeS: SimTime,
+  basis: WaitBandBasis = 'now',
+): WaitBands {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
   const tally = WAIT_BANDS.map(() => 0);
   let total = 0;
   let longestCurrentWaitS: number | undefined;
 
-  for (const queue of queueAt(recording, t)) {
-    for (const rider of queue.riders) {
-      const index = bandIndexOf(rider.waitedS);
-      tally[index] = (tally[index] ?? 0) + 1;
-      total += 1;
-      if (longestCurrentWaitS === undefined || rider.waitedS > longestCurrentWaitS) {
-        longestCurrentWaitS = rider.waitedS;
-      }
+  for (const waitedS of basis === 'now' ? standingWaitsAt(recording, t) : realisedWaitsBy(recording, t)) {
+    const index = bandIndexOf(waitedS);
+    tally[index] = (tally[index] ?? 0) + 1;
+    total += 1;
+    if (longestCurrentWaitS === undefined || waitedS > longestCurrentWaitS) {
+      longestCurrentWaitS = waitedS;
     }
   }
 
@@ -178,12 +260,43 @@ export function waitBandsAt(recording: VizRecording, simTimeS: SimTime): WaitBan
 
   return {
     atS: t,
+    basis,
     total,
     counts,
     worst: requireBand(worstIndex),
     worstIndex,
     longestCurrentWaitS,
   };
+}
+
+/** The wait age of everybody standing at `t` — `queueAt`'s answer, unaltered. */
+function* standingWaitsAt(recording: VizRecording, t: SimTime): Generator<number> {
+  for (const queue of queueAt(recording, t)) {
+    for (const rider of queue.riders) yield rider.waitedS;
+  }
+}
+
+/**
+ * The **worst wait each rider had realised** by `t`, for everybody whose call was registered by
+ * then.
+ *
+ * A rider who boarded contributes the wait they actually served; a rider still standing
+ * contributes the wait they have stood so far, which is a lower bound and is banded as one. Both
+ * are non-decreasing in `t`, so this banding never un-happens as the playhead advances — the same
+ * property, and for the same reason, that `observations.ts` derives `abandoned` from a crossing
+ * time rather than from `t - arrivedAt > horizonS`.
+ *
+ * Deliberately over `recording.legs` and not over the landing fold: the legs are what `queueAt`
+ * walks too, so the two bases count one population and a rider cannot be in the whole-run banding
+ * and absent from the live one.
+ */
+function* realisedWaitsBy(recording: VizRecording, t: SimTime): Generator<number> {
+  for (const leg of recording.legs) {
+    if (leg.arrivedAt > t) break; // sorted by `(arrivedAt, passengerId)` — see `VizLeg`
+    const { boardedAt } = leg;
+    const endedAt = boardedAt !== undefined && boardedAt <= t ? boardedAt : t;
+    yield Math.max(0, endedAt - leg.arrivedAt);
+  }
 }
 
 /**
@@ -195,12 +308,18 @@ export function waitBandsAt(recording: VizRecording, simTimeS: SimTime): WaitBan
  * the sentence would otherwise keep claiming two minutes about a band somebody had moved.
  *
  * The sub-line for a band with nobody in it is never reached: {@link waitBandsAt} only ever
- * reports a worst band that is occupied, or the first band when the lobby is empty, and the first
- * band's sub-line (*nobody has waited a minute*) is true of an empty lobby too.
+ * reports a worst band that is occupied, or the first band when the banding is over nobody, and
+ * the first band's sub-line (*nobody has waited a minute*) is true of an empty lobby too.
+ *
+ * On `basis: 'whole-run'` the strings are **not** the design's, because the design has no card for
+ * a finished shift. They are past tense and they name their own scope; see {@link moodOf}.
  */
-export function moodAt(recording: VizRecording, simTimeS: SimTime): Mood {
-  const bands = waitBandsAt(recording, simTimeS);
-  return moodOf(bands);
+export function moodAt(
+  recording: VizRecording,
+  simTimeS: SimTime,
+  basis: WaitBandBasis = 'now',
+): Mood {
+  return moodOf(waitBandsAt(recording, simTimeS, basis));
 }
 
 /**
@@ -215,17 +334,39 @@ export function moodOf(bands: WaitBands): Mood {
   const band = requireBand(index);
   const longest = Math.round(Math.max(bands.longestCurrentWaitS ?? 0, 0));
   const fumingCount = bands.counts[WAIT_BANDS.length - 1]?.count ?? 0;
-  const subs: readonly string[] = [
-    'nobody has waited a minute',
-    `longest wait ${String(longest)} s`,
-    `longest wait ${String(longest)} s · queues building`,
-    `${String(fumingCount)} riders past two minutes`,
-  ];
+  const live = bands.basis === 'now';
+
+  /*
+   * The live sub-lines are the design's. The retrospective ones are written against the same four
+   * bands and say two things the live ones do not need to: that the figure is over the whole shift,
+   * and — in the first band — that the claim is about **waiting** and not about the day.
+   *
+   * `nobody has waited a minute` was the sentence that sat directly above `served under 60 s 18%`
+   * on the run that produced this fix, and it read as a summary because it *is* phrased as one. The
+   * retrospective first line names its scope instead, so the two can be read together without one
+   * of them being a lie.
+   */
+  const subs: readonly string[] = live
+    ? [
+        'nobody has waited a minute',
+        `longest wait ${String(longest)} s`,
+        `longest wait ${String(longest)} s · queues building`,
+        `${String(fumingCount)} riders past two minutes`,
+      ]
+    : [
+        'across the whole shift, nobody stood half a minute',
+        `across the whole shift · longest wait ${String(longest)} s`,
+        `across the whole shift · longest wait ${String(longest)} s`,
+        `across the whole shift · ${String(fumingCount)} riders stood past two minutes, ` +
+          `the longest ${String(longest)} s`,
+      ];
+  const headlines = live ? MOOD_HEADLINES : RUN_OVER_HEADLINES;
   return {
+    basis: bands.basis,
     bandId: band.id,
     index,
     face: band.face,
-    headline: MOOD_HEADLINES[index] ?? MOOD_HEADLINES[0] ?? '',
+    headline: headlines[index] ?? headlines[0] ?? '',
     sub: subs[index] ?? subs[0] ?? '',
     edge: band.color,
     bg: MOOD_BG[index] ?? MOOD_BG[0] ?? 'transparent',

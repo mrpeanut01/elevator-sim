@@ -740,17 +740,25 @@ export interface CostRequest {
   readonly boardingMassKg?: number | undefined;
 }
 
-/** Why a car cannot serve a request. Diagnostic; the contract is the boolean. */
+/**
+ * Why a car cannot serve a request. Diagnostic; the contract is the boolean.
+ *
+ * **There is one access-zoning reason and it names the destination.** A `accessDenied` sat
+ * here until § D254, reported when the *pickup* floor was restricted — a question a lift is
+ * never asked, because a credential governs where you may go and not where you may be
+ * collected. It is gone rather than narrowed: the only request whose `floorId` is a
+ * destination is a car call, no non-test caller in this repository builds one for
+ * {@link infeasibilityOf}, and a branch kept alive for a caller that does not exist is the
+ * dead seam this project counts (docs/05-roadmap.md § Standing requirement).
+ */
 export const INFEASIBILITY_REASONS = [
   /** The car's service mode does not accept this kind of call. */
   'serviceMode',
   /** **Service zoning**: the shaft does not open onto the requested floor. */
   'serviceZone',
-  /** **Access zoning**: the credential may not reach the requested floor. */
-  'accessDenied',
   /** The declared destination is outside this shaft's service zone. */
   'destinationServiceZone',
-  /** The credential may not reach the declared destination. */
+  /** **Access zoning**: the credential may not reach the declared destination. */
   'destinationAccessDenied',
   /** Load is at or above `overloadThreshold`: doors held, the car will not start. */
   'overload',

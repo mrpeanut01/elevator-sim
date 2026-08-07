@@ -1,0 +1,9 @@
+# A filled-in parameter file carries the owner's org/repo and chosen names. Not secret, and not
+# the repository's business either. `main.parameters.example.json` is the committed template.
+#
+# Scoped to this directory rather than added to `infra/.gitignore`, whose rules belong to the
+# compute-offload lane and should not have to know this lane exists.
+main.parameters.json
+
+# Compiled ARM output from `az bicep build`. The Bicep is the source; the JSON is a build artefact.
+main.json

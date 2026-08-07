@@ -2,35 +2,57 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "_comment": [
-    "Copy to main.parameters.json (which .gitignore excludes) and fill in.",
-    "Nothing here is a secret. The GitHub credential is set separately with `az keyvault secret set`",
-    "after the deployment; see infra/README.md § 3. adminSshPublicKey is a PUBLIC key, but it is",
-    "still yours, so it is passed at deploy time rather than committed."
+    "Copy to main.parameters.json (which infra/.gitignore excludes) and fill in.",
+    "",
+    "TWO OF THESE ARE SECRETS AND THIS FILE HOLDS NEITHER. `appSecret` and `databaseAdminPassword`",
+    "are shown here as empty strings on purpose: a placeholder that looks like a value is how a",
+    "development secret reaches production. Generate both, and prefer passing them on the command",
+    "line from a password manager over writing them into your copy of this file at all —",
+    "infra/README.md § 3 shows that form.",
+    "",
+    "  appSecret:             openssl rand -base64 48",
+    "  databaseAdminPassword: openssl rand -base64 24"
   ],
   "parameters": {
-    "githubRepositoryUrl": {
-      "value": "https://github.com/OWNER/elevator-sim"
+    "containerImage": {
+      "value": "REGISTRY.azurecr.io/elevator-sim:TAG"
     },
-    "adminSshPublicKey": {
-      "value": "ssh-ed25519 AAAA... your-key-here"
+    "containerRegistryServer": {
+      "value": "REGISTRY.azurecr.io"
     },
-    "runnerCount": {
-      "value": 2
-    },
-    "vmSize": {
-      "value": "Standard_D8ds_v5"
-    },
-    "useSpot": {
-      "value": true
-    },
-    "egressMode": {
-      "value": "instancePublicIp"
-    },
-    "budgetAlertEmail": {
+    "appSecret": {
       "value": ""
     },
-    "monthlyBudgetAmount": {
-      "value": 250
+    "databaseAdminPassword": {
+      "value": ""
+    },
+    "namePrefix": {
+      "value": "elevsim"
+    },
+    "senderAddress": {
+      "value": ""
+    },
+    "_comment_viewerOrigin": [
+      "Empty is the shipped state: one Container App serving the viewer and the API from one",
+      "origin. Fill it in ONLY when the viewer is hosted separately (infra/azure/swa/), and then",
+      "with the static site's origin and no trailing slash. It moves ELEVATOR_SIM_ORIGIN and",
+      "ELEVATOR_SIM_ALLOW_ORIGIN together; the server refuses to boot if they disagree.",
+      "Order and the third value: docs/16-static-site-deployment.md § 3."
+    ],
+    "viewerOrigin": {
+      "value": ""
+    },
+    "minReplicas": {
+      "value": 0
+    },
+    "maxReplicas": {
+      "value": 2
+    },
+    "databaseSku": {
+      "value": "Standard_B1ms"
+    },
+    "databaseStorageGb": {
+      "value": 32
     }
   }
 }

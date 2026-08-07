@@ -69,10 +69,23 @@ export const CARD_RAISED = '#131924';
 export const EDGE = '#212a36';
 /** Body text and every figure. */
 export const TEXT = '#e8edf4';
-/** An eyebrow, a caption, a label that is not the subject. */
-export const TEXT_DIM = '#6d7b8d';
-/** Secondary prose — dimmer than {@link TEXT}, brighter than {@link TEXT_DIM}. */
-export const TEXT_MUTED = '#8b98a9';
+/**
+ * An eyebrow, a caption, a label that is not the subject.
+ *
+ * **Raised from the artefact's `#6d7b8d` — § D235.** See {@link FLOOR_LABEL} for the measurement
+ * and the argument; this is the middle rung of the same ladder, and it moved because the rung
+ * below it had to come up past where it was standing. `#6d7b8d` was 3.77:1 on {@link RAISED} —
+ * the ground under a selected `.pick`, where `.pick-sub` is drawn — so it failed WCAG 2.2 AA on
+ * its own account before the ladder was considered.
+ */
+export const TEXT_DIM = '#8b98a9';
+/**
+ * Secondary prose — dimmer than {@link TEXT}, brighter than {@link TEXT_DIM}.
+ *
+ * **Raised from the artefact's `#8b98a9` — § D235.** This one cleared AA already (5.54:1 at its
+ * worst); it moved to keep a *visible* step above {@link TEXT_DIM}, which took its old value.
+ */
+export const TEXT_MUTED = '#9aa7b8';
 /** Focus, selection, and the mid-load car. */
 export const ACCENT = '#4f9ee8';
 
@@ -98,7 +111,15 @@ export const EDGE_STRONG = '#2f3a49';
 export const HAIRLINE = '#1a212c';
 /** The dotted rule under a term that carries a tooltip. Lighter than a control's border. */
 export const HINT_UNDERLINE = '#3f4b5c';
-/** Ink below {@link FLOOR_LABEL}: present, and never carrying a word that matters. */
+/**
+ * Ink below {@link FLOOR_LABEL}: present, and never carrying a word that matters.
+ *
+ * Left at the artefact's value while the three rungs above it were raised (§ D235), and the
+ * reason is that its docstring is *true of it and of nothing else on this ladder*: no rule in
+ * `index.html` names `--faint`'s neighbour `--fainter`, and no `render/` drawing function reads
+ * `Theme.fainter`. It carries no word, so there is no word to make legible. If a caller ever
+ * draws with it, it needs the same treatment {@link FLOOR_LABEL} got, in the same commit.
+ */
 export const TEXT_FAINTER = '#3d4956';
 /** A link, and the accent where it has to survive being read as prose. */
 export const ACCENT_SOFT = '#7fb6f0';
@@ -168,14 +189,30 @@ export const DOOR_GAP = 'rgba(5,8,13,0.92)';
  * -------------------------------------------------------------------------- */
 
 /**
- * A floor with nothing special about it.
+ * A floor with nothing special about it, and the stylesheet's `--faint`.
  *
  * **Not {@link TEXT_DIM}, and that is the design's own distinction rather than ours**: the label
  * gutter is scenery and an eyebrow is content, and the artefact draws them two different greys.
  * It also happens to close a collision this file would otherwise have had — a test that
  * identified a floor label by its fill matched every dimmed caption on the canvas.
+ *
+ * ## Raised from the artefact's `#4d5a6b` — § D235
+ *
+ * The distinction above is real and the *value* the artefact gave it was not survivable, because
+ * the claim underneath it — *the gutter is scenery* — is false of this implementation. `--faint`
+ * is the ink of sixteen text rules in `index.html`: the Compare/Lab/Parameters tab labels, the
+ * timeline's o'clock ticks, `.decision-time`, `.legend-title`, `.eyebrow-note`, `.slider-sub`,
+ * `.zmatrix th`, and more. A floor id in the gutter is not scenery either — it is the only thing
+ * that says which floor a car is standing at.
+ *
+ * Measured: `#4d5a6b` is **2.75:1** on {@link PAGE}, **2.60:1** on {@link CARD}, **2.31:1** on
+ * {@link RAISED}. WCAG 2.2 AA asks 4.5:1 for text below 18.66 px bold / 24 px, and every one of
+ * those sites is 9–12 px. `#7c899a` is **4.57:1** on {@link RAISED}, the worst of the five dark
+ * surfaces, and 5.43:1 on {@link PAGE}.
+ *
+ * The step below it, `TEXT_FAINTER`, is **not** raised: nothing draws it. See that constant.
  */
-export const FLOOR_LABEL = '#4d5a6b';
+export const FLOOR_LABEL = '#7c899a';
 /** The entrance floor, `⌂`. */
 export const FLOOR_LABEL_ENTRANCE = '#6f8fd6';
 /** A transfer floor / sky lobby, `⇄`. */
@@ -407,9 +444,13 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
   edgeMid: '#bac4d3',
   edgeStrong: '#9aa7b9',
   hintUnderline: '#8593a7',
+  // The three sub-`text` rungs are § D235's ladder in this mode: each clears 4.5:1 against
+  // `page`, the *darkest* light surface and therefore the worst ground for dark ink — 7.08:1,
+  // 5.61:1 and 4.67:1, against the 6.24 / 4.22 / 2.97 they replaced. `fainter` stays where it
+  // was for the reason `TEXT_FAINTER` gives: nothing draws it.
   text: '#101720',
-  textMuted: '#4a5666',
-  textDim: '#64707f',
+  textMuted: '#424e5d',
+  textDim: '#515d6c',
   fainter: '#99a3b0',
   accent: '#1c6fc4',
   // The link colour. *Darker* than the accent here and lighter than it in dark — in both modes
@@ -494,7 +535,7 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
 
   /* -- Floor labels. The gutter is scenery and stays a step below the ink; the three special
      floors keep their hues (blue entrance, violet transfer, tan restricted) at reading value. */
-  floorLabel: '#7e8998',
+  floorLabel: '#5d6978',
   floorLabelEntrance: '#37599f',
   floorLabelTransfer: '#7b3f96',
   floorLabelRestricted: '#86612a',
@@ -519,7 +560,12 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
      is there and not one inch less: the two are drawn on the same row, `canvas.test.ts` counts
      riders *by their fill*, and one string for both claims makes that count measure something
      else. The band keeps § S7's ladder value and the direction pair moves — in both modes. */
-  waitingUp: '#0f7a72',
+  // `#0d7069`, one step down from the `#0f7a72` this shipped as — § D236. The `▲` is *text* on
+  // the stage key as well as a mark on the canvas, and the key sits on `--bg`, the darkest light
+  // surface: `#0f7a72` measured 4.34:1 there, under WCAG AA's 4.5 for a 10.5 px glyph. Found by
+  // driving the light theme, not by arithmetic — `theme.test.ts` measures `--panel`, where the
+  // old value was 4.83 and passed.
+  waitingUp: '#0d7069',
   waitingDown: '#8438b0',
 
   /* -- The out-of-service badge. The filled pill is `over` at 0.9, as it is in dark, so its text
@@ -527,7 +573,9 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
   oosOn: 'rgba(188,58,32,0.9)',
   oosOnText: '#fdf2ef',
   oosOff: 'rgba(16,24,36,0.07)',
-  oosOffText: '#64707f',
+  // Follows `textDim`, as the dark mode's `OOS_OFF_TEXT = TEXT_DIM` does. `theme.test.ts` holds
+  // the two modes to the same collision set, so this one moves whenever `textDim` does.
+  oosOffText: '#515d6c',
 
   /* -- Alarms and relief. `relief` is the third green and must stay clear of the other two for
      the reason `RELIEF` gives; here it is the *deepest*, where in dark it is the brightest. */

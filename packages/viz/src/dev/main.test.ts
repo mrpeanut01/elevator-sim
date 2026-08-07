@@ -41,12 +41,17 @@ import {
 } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { WAIT_BANDS } from '../live/bands.js';
+import { BAND_COLORS, WAIT_BANDS, bandOf, waitBandsAt } from '../live/bands.js';
+import * as tokens from '../render/tokens.js';
+import type { VizRecording } from '../contract/types.js';
 import { buildLayout, type ShaftGeometry } from '../render/layout.js';
 import type { VizFloor } from '../contract/types.js';
 
 import type { BrowserResources } from './data.js';
 import { recordRun } from '../record/recordRun.js';
+
+import { disclosureItems } from '../mode/disclosure.js';
+import type { DisclosureItem } from '../mode/types.js';
 
 import {
   deepLinkDefaultsOf,
@@ -56,6 +61,8 @@ import {
   seedEntryOf,
   seekActionForKey,
   shaftsForBank,
+  stageLayoutFor,
+  transportStatusOf,
   waitLegendEntries,
 } from './main.js';
 import { initialState, profileById, shiftRunConfigOf, type ViewerState } from './state.js';
@@ -89,6 +96,21 @@ describe('the legend is the wait bands, not a copy of them', () => {
       WAIT_BANDS.map((band) => band.legendLabel),
     );
     expect(entries.map((entry) => entry.color)).toEqual(WAIT_BANDS.map((band) => band.color));
+  });
+
+  it('states each band’s own boundary, derived from its two numbers and nothing else', () => {
+    // The fourth entry is the one that needs it: `gave up` is the handoff's word for a band that
+    // counts people **still standing** past two minutes, and `bands.ts` says so at length. A bare
+    // label could carry that; a label with a head count on it is a figure.
+    const entries = waitLegendEntries();
+    expect(entries.map((entry) => entry.rangeLabel)).toEqual(['0–30 s', '30–60 s', '60–120 s', '120 s+']);
+    // …and the same claim the other way round, so a band whose boundary moves takes the words with
+    // it rather than leaving four hand-typed ranges describing the old ones.
+    for (const [index, band] of WAIT_BANDS.entries()) {
+      const entry = entries[index];
+      expect(entry?.rangeLabel).toContain(String(band.fromS));
+      if (band.toS !== undefined) expect(entry?.rangeLabel).toContain(String(band.toS));
+    }
   });
 
   it('has one entry per band and four distinct colours', () => {
@@ -128,6 +150,195 @@ describe('index.html holds no second copy of the legend', () => {
     // needs a handle to keep it, and `elementMap.ts` is where a handle is declared.
     const markup = await legendMarkup();
     expect(markup).toContain('id="legend-title"');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The transport strip reads the disclosure layer — GitHub issue #71
+ * -------------------------------------------------------------------------- */
+
+describe('the status strip is worded by the reader’s mode', () => {
+  /**
+   * A real run's disclosure items, built the way `dev/main.ts` builds them.
+   *
+   * `midtown-office` for `recordingOf`'s measured reason a few hundred lines down: Garden
+   * Apartments at the viewer's defaults is six floors of almost nobody, and a run with no queue in
+   * it is a run whose figures cannot tell two modes apart.
+   */
+  function itemsOf(): readonly DisclosureItem[] {
+    const state: ViewerState = { ...initialState(resources, 424242n), buildingId: 'midtown-office' };
+    const recording = recordRun(shiftRunConfigOf(resources, state).config, {
+      recordDecisions: false,
+    }).recording;
+    return disclosureItems({
+      recording,
+      dispatcherName: recording.dispatcherProfileId,
+      /*
+       * Empty, and it is the honest value here rather than a shortcut. `dev/main.ts`'s own
+       * `lockedOutAt` is a shell closure that needs the loaded building document and the running
+       * profile; what it feeds is the `locked-out` item, which neither figure below reads. An empty
+       * set means *this caller does not know*, which `lockedOut.ts` is explicit is a different
+       * claim from *this building restricts nothing* — and neither claim touches `awt` or `wt95`.
+       */
+      lockedOut: [],
+    });
+  }
+
+  it('says something different in each mode — § D230', () => {
+    /*
+     * **Move the control and require the rendering to change** — the standing requirement's form
+     * for a disclosure control. § D240 § 2 measured the old state: `AWT · WT95` was byte-identical
+     * in both modes, one of six strings that made Casual *less* informative than Engineer for the
+     * audience it names — because this line was built from `recording.summary` directly while the
+     * per-mode renderings were computed on every recording and dropped with `void itemsIn;`.
+     */
+    const items = itemsOf();
+    const advanced = transportStatusOf(items, 'advanced');
+    const basic = transportStatusOf(items, 'basic');
+    expect(advanced, 'the strip says nothing at all about a run that happened').toBeDefined();
+    expect(basic, 'Casual is drawing no status line').toBeDefined();
+    expect(basic, 'the disclosure selector was moved and the strip did not change').not.toBe(
+      advanced,
+    );
+  }, 300_000);
+
+  it('carries each figure’s n, which is R13 clause one', () => {
+    /*
+     * The honesty search found this on the **shipped** strip, the moment the line entered the
+     * corpus: `AWT 13.1 s · WT95 27.4 s` is an estimate with no count beside it, and *"`n = 5` is
+     * not a caveat on `11.3 s`; it is part of what `11.3 s` means"*. Six generated cases failed in
+     * both modes. The count was on the `Rendering` all along and the strip was not reading it.
+     */
+    const line = transportStatusOf(itemsOf(), 'advanced') ?? '';
+    expect(line, `the strip publishes a figure with no sample: ${line}`).toContain('n =');
+  }, 300_000);
+
+  it('says nothing at all when there is no run', () => {
+    // `undefined`, never `''`. The strip's transient messages share this element — the copied
+    // provenance line, the batch progress — and blanking one of them would take a sentence off
+    // the screen at the moment a reader is being told something.
+    expect(transportStatusOf([], 'advanced')).toBeUndefined();
+  });
+
+  it('carries a refused mean’s reason, and carries it once', () => {
+    /*
+     * Two regressions this routing had on the way, both found by printing what the function
+     * returns rather than by reasoning about it, and both worse than the line being replaced.
+     *
+     * The first draft dropped the reason entirely — `average wait suppressed (n = 201 rides)` and
+     * nothing about why, where the old strip read `AWT suppressed — <the run's own reason>`. That
+     * is R3 with the refusal deleted, on the surface a reader glances at without opening a panel.
+     *
+     * The second appended it per figure and printed a 300-character sentence **twice**, because
+     * `awt` and `wt95` are refused by one `awtIsValid` call and carry the same words.
+     *
+     * `midtown-office` at the viewer's defaults is a run whose mean really is refused, which is
+     * what makes this case reachable at all — asserted below rather than assumed.
+     */
+    const items = itemsOf();
+    const line = transportStatusOf(items, 'advanced') ?? '';
+    expect(line, 'this fixture no longer refuses its mean, so the case is vacuous').toContain(
+      'suppressed',
+    );
+    const reason = items.find((item) => item.id === 'awt')?.advanced.note ?? '';
+    expect(reason, 'the refused figure carries no reason to route').not.toBe('');
+    expect(line, 'the strip refuses a figure and does not say why').toContain(reason);
+    expect(
+      line.split(reason).length - 1,
+      'the same refusal is printed once per figure — twice, for one gate',
+    ).toBe(1);
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The scenery yields to the building — GitHub issue #41
+ * -------------------------------------------------------------------------- */
+
+describe('the stage asks for less gutter when the shafts do not fit', () => {
+  /**
+   * Vertical City's thirty-five shafts, on a canvas the size the stage gets at a 1920 px viewport.
+   *
+   * The width is the **canvas box**, not the window: the shell puts two rails beside the stage, so
+   * 1920 of screen is about 1200 of plot. 1232 is the figure `MIN_PLOT_SHARE`'s own note measures
+   * against, so it is the one used here rather than a new one invented for this case.
+   */
+  const CANVAS = { width: 1232, height: 720 };
+
+  const FLOOR_IDS = Array.from({ length: 10 }, (_ignored, index) => `L${String(index)}`);
+
+  const shaftsOf = (count: number): readonly ShaftGeometry[] =>
+    Array.from({ length: count }, (_ignored, index) => ({
+      carId: `car-${String(index)}`,
+      bankId: 'main',
+      label: `C${String(index)}`,
+      servedFloorIds: FLOOR_IDS,
+    }));
+
+  const floors: readonly VizFloor[] = FLOOR_IDS.map((id, index) => ({
+    id,
+    name: id,
+    index,
+    heightM: index * 3.5,
+    population: 40,
+    isEntrance: index === 0,
+    isTransferFloor: false,
+  }));
+
+  it('draws every shaft of the tallest shipped building at a desktop canvas — issue #41', () => {
+    /*
+     * Measured before the change: **Vertical City shows 27 of 35 at 1920**. `RS-05`'s *"showing 27
+     * of 35"* notice was doing its job and saying so, and eight shafts of a building whose whole
+     * subject is its shafts were off the picture on the largest screen anybody has — because
+     * `QUEUE_GUTTER_PX` and `OVERLAY_WIDTH_PX` were handed over unchanged whatever was being drawn.
+     */
+    const layout = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(35), wantsOverlay: true });
+    expect(layout.hiddenShaftCount, 'shafts are still being dropped at a desktop canvas').toBe(0);
+    expect(layout.columns).toHaveLength(35);
+  });
+
+  it('is inert for a building that already fitted', () => {
+    /*
+     * The other direction, and the one that would be expensive to get wrong: a ladder that yielded
+     * scenery it did not need to would take the live-metrics panel off a six-shaft building for no
+     * reason. The first rung is the request that shipped, so a picture that was right does not move.
+     */
+    const roomy = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(6), wantsOverlay: true });
+    const asShipped = buildLayout({
+      ...CANVAS,
+      floors,
+      shafts: shaftsOf(6),
+      gutterRightPx: 280,
+      overlayWidthPx: 250,
+    });
+    expect(roomy.overlay, 'a building that fits lost its metrics panel').toBeDefined();
+    expect(roomy.plot).toEqual(asShipped.plot);
+  });
+
+  it('never re-enables an overlay RS-03 has dropped', () => {
+    // `wantsOverlay` answers a different question — the canvas is too narrow for the panel at all —
+    // and a rung that turned it back on would be this function overruling that rule.
+    const narrow = stageLayoutFor({
+      width: 600,
+      height: 720,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(narrow.overlay).toBeUndefined();
+  });
+
+  it('still draws a picture when nothing on the ladder fits them all', () => {
+    // A stage that refused to draw would turn *some shafts do not fit* into *no picture at all*,
+    // which is § D234's own defect. `RS-05`'s notice is what covers this case, and it needs columns.
+    const phone = stageLayoutFor({
+      width: 360,
+      height: 640,
+      floors,
+      shafts: shaftsOf(35),
+      wantsOverlay: false,
+    });
+    expect(phone.columns.length).toBeGreaterThan(0);
+    expect(phone.hiddenShaftCount).toBeGreaterThan(0);
   });
 });
 
@@ -637,11 +848,260 @@ describe('the words and the colours are the handoff’s', () => {
   });
 
   it('finds all four band colours in the vendored prototype', async () => {
-    const design = await handoff();
-    for (const band of WAIT_BANDS) {
-      expect(design.toLowerCase(), `the handoff does not use ${band.color}`).toContain(
-        band.color.toLowerCase(),
+    /*
+     * **Read where the colour now lives — § D251.** `WaitBandDefinition.color` was `#3fb27f` and
+     * is `var(--band-0)`, because the four hexes here were a second copy of the palette that no
+     * `:root[data-theme]` block could repaint — nineteen light-mode AA failures' worth. The claim
+     * this case makes is unchanged and the chain that carries it is three links long, each pinned
+     * by its own test: `WAIT_BANDS` names `--band-0…3` (`live/palette.test.ts`), `index.html`
+     * declares them at `render/tokens.ts`'s values in both modes (`dev/tokens.test.ts`), and the
+     * dark values are the handoff's — which is what this asserts.
+     */
+    const design = (await handoff()).toLowerCase();
+    expect(BAND_COLORS).toEqual([
+      'var(--band-0)',
+      'var(--band-1)',
+      'var(--band-2)',
+      'var(--band-3)',
+    ]);
+    const values = [
+      tokens.BAND_SETTLING,
+      tokens.BAND_WAITING,
+      tokens.BAND_LONG,
+      tokens.BAND_ABANDONED,
+    ];
+    expect(values).toHaveLength(WAIT_BANDS.length);
+    for (const value of values) {
+      expect(design, `the handoff does not use ${value}`).toContain(value.toLowerCase());
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The legend is a reading, not only a key — play-test issue #19
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The stage legend named the four colours and never said how many people were in any of them, so
+ * the one surface that keys the stage could not tell a reader one person from thirty. The counts
+ * come from `live/bands.ts`'s own tally at the playhead — the same scan the stage draws from — so
+ * this is a restatement of a figure rather than a second one, and the assertions below are written
+ * against `waitBandsAt` rather than against a remembered number.
+ *
+ * The left rail's mood bar (L2) already carried its counts and is deliberately untouched: it is a
+ * different instrument on a different card, and `leftRail.ts` documents its KB-15 compliance.
+ */
+describe('every legend key carries its live head count', () => {
+  /**
+   * A run with queues in it.
+   *
+   * `midtown-office` rather than the opening building: Garden Apartments at the viewer's defaults
+   * is six floors of almost nobody, and eleven samples of it found no instant with a single person
+   * standing — which the vacuity guard below caught rather than passing quietly.
+   */
+  const recordingOf = (): VizRecording => {
+    const state: ViewerState = { ...initialState(resources, 424242n), buildingId: 'midtown-office' };
+    return recordRun(shiftRunConfigOf(resources, state).config, { recordDecisions: false })
+      .recording;
+  };
+
+  it('reports no count at all before there is a run, rather than reporting zero', () => {
+    // `—` and `0` are two different states: *nothing has happened* and *nobody is waiting*. The
+    // second is a result, and a legend that printed `0` for the first would be claiming it.
+    for (const entry of waitLegendEntries()) expect(entry.count).toBeUndefined();
+    for (const entry of waitLegendEntries(undefined)) expect(entry.count).toBeUndefined();
+  });
+
+  it('takes every count from waitBandsAt, at the playhead, and never recomputes one', () => {
+    const recording = recordingOf();
+    const span = recording.endedAt - recording.startedAt;
+    let sawSomebody = false;
+    for (let step = 0; step <= 10; step += 1) {
+      const at = recording.startedAt + (span * step) / 10;
+      const bands = waitBandsAt(recording, at);
+      const entries = waitLegendEntries(bands);
+      expect(entries.map((entry) => entry.count)).toEqual(bands.counts.map((count) => count.count));
+      // The row is a partition of the people standing right now, so it has to sum to the number
+      // standing. `bands.ts` guarantees that against `frameAt(...).totalWaiting` by construction.
+      const total = entries.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+      expect(total).toBe(bands.total);
+      if (bands.total > 0) sawSomebody = true;
+    }
+    // A run in which nobody ever waits would make every assertion above vacuously true.
+    expect(sawSomebody, 'no sampled instant had anybody standing — the test proves nothing').toBe(
+      true,
+    );
+  });
+
+  it('moves when the playhead moves — the counts are not a boot-time snapshot', () => {
+    /*
+     * The defect this guards is the one the wiring below fixes: `drawLegend` used to run only from
+     * `renderAll`, which fires when the *state* changes. Counts drawn there would freeze at
+     * whichever frame last changed the state while the playhead ran on underneath them.
+     */
+    const recording = recordingOf();
+    const span = recording.endedAt - recording.startedAt;
+    const readings = new Set<string>();
+    for (let step = 0; step <= 20; step += 1) {
+      const at = recording.startedAt + (span * step) / 20;
+      readings.add(
+        waitLegendEntries(waitBandsAt(recording, at))
+          .map((entry) => String(entry.count))
+          .join('·'),
       );
+    }
+    expect(readings.size).toBeGreaterThan(1);
+  });
+});
+
+describe('the legend’s counts are wired to the 60 Hz path', () => {
+  /** `main.ts` as text. The wiring is inside `boot()`, which no Node test can call. */
+  async function mainSource(): Promise<string> {
+    return readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+  }
+
+  /** One nested function's body, from its declaration to the first close at its own indent. */
+  async function bodyOf(name: string): Promise<string> {
+    const source = await mainSource();
+    const start = source.indexOf(`function ${name}(`);
+    expect(start, `main.ts has no ${name}`).toBeGreaterThan(-1);
+    const end = source.indexOf('\n  }', start);
+    expect(end).toBeGreaterThan(start);
+    return source.slice(start, end);
+  }
+
+  it('redraws the legend from renderLive, which is what the playhead runs', async () => {
+    expect(
+      await bodyOf('renderLive'),
+      'renderLive does not call drawLegend, so the counts would state whichever frame last ' +
+        'changed the state rather than the frame on screen',
+    ).toContain('drawLegend(view)');
+  });
+
+  it('still redraws it from renderAll, so a state change is not the only trigger either', async () => {
+    expect(await bodyOf('renderAll')).toContain('drawLegend(view)');
+  });
+
+  it('keys the row on the bands and not on the counts, so 60 Hz does not rebuild it', async () => {
+    /*
+     * `keyedFill` rebuilds whenever its key changes. A key carrying the counts would therefore
+     * replace four entries sixty times a second, churning the accessibility tree and dropping a
+     * hover mid-read — the exact cost `fillLegend`'s own docstring exists to avoid.
+     */
+    const body = await bodyOf('drawLegend');
+    const key = /fillLegend\(\s*(.+?),\s*\(\) =>/s.exec(body)?.[1] ?? '';
+    expect(key, 'drawLegend no longer calls fillLegend with a key').not.toBe('');
+    expect(key).toContain('entry.label');
+    expect(key).toContain('entry.color');
+    expect(key, 'the fill key carries a figure that moves every frame').not.toContain('count');
+  });
+});
+
+describe('index.html styles the count without restating a band', () => {
+  it('declares .legend-count once, and still spells no band word or colour', async () => {
+    const html = await indexHtml();
+    expect(html.split('.legend-count {')).toHaveLength(2);
+    const markup = await legendMarkup();
+    for (const band of WAIT_BANDS) {
+      expect(markup).not.toContain(band.legendLabel);
+      expect(markup).not.toContain(band.color);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The cold-start wait — § D247 § 6
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The wait ladder grades the **player's** wait in the mood bar's own words, and the grading is
+ * checked against the mood bar.
+ *
+ * The joke only works if it is true. `WAIT_LADDER` is deliberately not derived from `WAIT_BANDS` —
+ * it is chrome about a person staring at a browser, not a statistic about a run, and routing it
+ * through the run-figure machinery would make it one. What it must not do is **misname a band**: a
+ * screen that called twenty seconds *tapping foot* would be teaching a reader this product's own
+ * vocabulary wrongly, on the one surface where they are paying attention to it.
+ *
+ * This is the pin. Two rules, and the first is the one that catches a draft: a rung may only name a
+ * band the elapsed time has actually reached, and a rung that names any band must name the one the
+ * reader is in. The drafted ladder failed both — it put *tapping foot* at 20 s (the band starts at
+ * 30 s) and *taking the stairs* at 45 s (it starts at 120 s), which is wrong by a factor of nearly
+ * three.
+ *
+ * The ladder lives inside `main()`, which no Node test can call, so it is read as text. That is
+ * this file's own established method — `bodyOf` above does the same for the legend wiring.
+ */
+describe('the cold-start ladder names the band the player is actually in', () => {
+  /** `WAIT_LADDER`'s rungs, out of `main.ts`'s source, with the comments between them removed. */
+  async function rungs(): Promise<readonly { readonly afterMs: number; readonly text: string }[]> {
+    const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const declared = source.indexOf('const WAIT_LADDER');
+    expect(declared, 'main.ts has no WAIT_LADDER').toBeGreaterThan(-1);
+    // From the opening bracket, not from the name: the type annotation in between spells `afterMs`
+    // too, and splitting on it produced a phantom first rung with no sentence in it.
+    const start = source.indexOf('Object.freeze([', declared);
+    expect(start).toBeGreaterThan(declared);
+    const end = source.indexOf('\n  ]);', start);
+    expect(end).toBeGreaterThan(start);
+    const block = source
+      .slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
+      .replace(/\/\/[^\n]*/gu, ' ');
+    return block
+      .split(/afterMs:\s*/u)
+      .slice(1)
+      .map((part) => ({
+        afterMs: Number((/^([\d_]+)/u.exec(part)?.[1] ?? '0').replace(/_/gu, '')),
+        // Concatenated, because a rung's sentence is written as several adjoined literals and a
+        // band word can fall across the join.
+        text: [...part.matchAll(/'([^']*)'/gu)].map((match) => match[1]).join(''),
+      }));
+  }
+
+  it('never names a band the wait has not reached', async () => {
+    for (const rung of await rungs()) {
+      for (const band of WAIT_BANDS) {
+        if (!rung.text.includes(band.label)) continue;
+        expect(
+          rung.afterMs / 1000,
+          `"${band.label}" is claimed at ${String(rung.afterMs / 1000)} s and starts at ${String(band.fromS)} s`,
+        ).toBeGreaterThanOrEqual(band.fromS);
+      }
+    }
+  });
+
+  it('names the band the reader is in, whenever it names one at all', async () => {
+    for (const rung of await rungs()) {
+      const named = WAIT_BANDS.filter((band) => rung.text.includes(band.label));
+      if (named.length === 0) continue;
+      const here = bandOf(rung.afterMs / 1000);
+      expect(
+        named.map((band) => band.label),
+        `the rung at ${String(rung.afterMs / 1000)} s does not name ${here.label}`,
+      ).toContain(here.label);
+    }
+  });
+
+  it('is a ladder that climbs, and reaches the measured cold start', async () => {
+    const ladder = await rungs();
+    expect(ladder.length).toBeGreaterThanOrEqual(4);
+    for (const [index, rung] of ladder.entries()) {
+      expect(rung.text.length, `rung ${String(index)} has no sentence`).toBeGreaterThan(20);
+      if (index > 0) expect(rung.afterMs).toBeGreaterThan(ladder[index - 1]?.afterMs ?? 0);
+    }
+    // The first rung has to arrive before a player concludes the button did nothing, and the last
+    // has to be past 32.2 s — the measured cold start — or the ladder stops exactly where the
+    // waiting stops being explainable.
+    expect(ladder[0]?.afterMs).toBeLessThanOrEqual(5_000);
+    expect(ladder[ladder.length - 1]?.afterMs).toBeGreaterThan(32_200);
+  });
+
+  it('promises no progress it cannot measure', async () => {
+    // There is no progress to report — a container is starting and will not say how far — and a bar
+    // or a percentage here is the same defect as a figure a run does not support.
+    for (const rung of await rungs()) {
+      expect(rung.text).not.toMatch(/%|per cent|percent|almost there|nearly done/iu);
     }
   });
 });

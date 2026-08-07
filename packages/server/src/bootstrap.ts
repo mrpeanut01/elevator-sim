@@ -10,10 +10,12 @@
  * **No secret, no server.** `requireSecret` throws and this does not catch it. § D214 § 5: a
  * placeholder default is how a development secret reaches production.
  *
- * **No outbox in production.** The dev mailer writes confirmation links to a file in the clear, so a
- * production server configured with it would be publishing account-takeover links to disk. That
- * combination is refused here rather than trusted to be noticed — the mailer module's own docstring
- * promises this refusal exists, and this is it.
+ * **No outbox in production.** The dev mailer writes sign-in links to a file in the clear, so a
+ * production server configured with it would be publishing account-takeover links to disk. Since
+ * § D241 that is literal rather than nearly so: the mailed link *is* the credential, and a directory
+ * full of them is a directory full of working keys. That combination is refused here rather than
+ * trusted to be noticed — the mailer module's own docstring promises this refusal exists, and this
+ * is it.
  *
  * **No server ships a challenge it cannot run.** § D218's rotation names buildings, templates and
  * durations, and a challenge naming an id this server does not ship would fail at the moment a
@@ -32,23 +34,42 @@ import {
 } from './challenge/schedule.js';
 import type { ChallengeDataFacts } from './challenge/submission.js';
 import { createApi, type Api, type ApiDeps } from './http/api.js';
+import { acsMailerFrom } from './mail/acsMailer.js';
 import { OutboxMailer, type Mailer } from './mail/mailer.js';
 import { digestOf, type ResolvedDataFacts, type SubmittedRun } from './leaderboard/submission.js';
 import type { VerificationResources } from './leaderboard/verify.js';
+import type { Sql } from './store/sql.js';
 import { Store } from './store/store.js';
 
 export interface BootstrapOptions {
   /** Where `data/` lives. */
   readonly dataDir: string;
-  /** SQLite path, or `':memory:'`. */
-  readonly databasePath: string;
+  /**
+   * The database, already connected.
+   *
+   * Injected rather than built here, for the reason the mailer is: this function assembles a
+   * server out of things it is handed, and a bootstrap that constructed its own connection could
+   * only ever be tested against the database it chose. `main.ts` builds the production `PgSql`
+   * from the environment and is the named non-test caller; tests hand it a `PgliteSql`, which is
+   * PostgreSQL in-process rather than a stand-in for one.
+   */
+  readonly sql: Sql;
   /** `process.env`, or whatever a test wants it to be. */
   readonly env: Readonly<Record<string, string | undefined>>;
-  /** The public origin confirmation links point at, e.g. `https://elevator.example`. */
+  /**
+   * The public origin sign-in links point at, e.g. `https://elevator.example`.
+   *
+   * **The viewer's origin, which since § D257 need not be this server's.** A sign-in link resolves
+   * to a page, and the page can be on a CDN while this process is not; `main.ts`'s
+   * `viewerOriginFrom` is what reads it and the only caller that supplies it.
+   */
   readonly publicOrigin: string;
   /** Injected so a test is not at the mercy of the clock, and a server is. */
   readonly now?: () => number;
-  /** Overridden by tests. Defaults to the outbox driver, which production refuses. */
+  /**
+   * Overridden by tests. Otherwise the environment chooses: Azure Communication Services when it
+   * is configured, and the outbox driver — which production refuses — when it is not.
+   */
   readonly mailer?: Mailer;
 }
 
@@ -57,7 +78,7 @@ export interface Server {
   readonly store: Store;
   readonly mailer: Mailer;
   readonly config: LoadedConfig;
-  close(): void;
+  close(): Promise<void>;
 }
 
 /** Thrown when the environment asks for a combination that is not safe to run. */
@@ -73,17 +94,24 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
   const config = await loadConfig(options.dataDir);
   const now = options.now ?? ((): number => Date.now());
 
-  const mailer = options.mailer ?? new OutboxMailer(options.env['ELEVATOR_SIM_OUTBOX'] ?? '.outbox.jsonl');
+  // Three sources, most explicit first: what a test passed, what the environment configures, and
+  // the development driver. The middle one is new — until it existed, `AcsMailer`'s absence meant
+  // the refusal below could not be satisfied by *any* environment, so a production boot was not
+  // merely refused, it was impossible.
+  const mailer = options.mailer ?? acsMailerFrom(options.env) ?? new OutboxMailer(options.env['ELEVATOR_SIM_OUTBOX'] ?? '.outbox.jsonl');
   if (options.env['NODE_ENV'] === 'production' && mailer instanceof OutboxMailer) {
     throw new UnsafeConfigurationError(
-      'The development mailer writes confirmation links to a file in the clear. Configure a real ' +
-        'mailer before running in production, or unset NODE_ENV=production.',
+      'The development mailer writes sign-in links to a file in the clear, and since § D241 each ' +
+        'one signs somebody in. Configure a real ' +
+        'mailer before running in production, or unset NODE_ENV=production. Set ' +
+        'ELEVATOR_SIM_ACS_ENDPOINT (managed identity) or ELEVATOR_SIM_ACS_CONNECTION_STRING, ' +
+        'together with ELEVATOR_SIM_MAIL_FROM.',
     );
   }
 
   assertChallengesAreRunnable(config);
 
-  const store = new Store({ path: options.databasePath, now });
+  const store = await Store.open({ sql: options.sql, now });
   const resources: VerificationResources = {
     buildingsById: config.buildingsById,
     dispatcherProfilesById: config.dispatcherProfilesById,
@@ -100,7 +128,7 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     challengeFactsFor: challengeFactsResolver(config),
     secret,
     now,
-    confirmUrl: (token) => `${options.publicOrigin.replace(/\/$/u, '')}/api/confirm?token=${encodeURIComponent(token)}`,
+    signInUrl: signInUrlFor(options.publicOrigin),
   };
 
   return {
@@ -108,10 +136,44 @@ export async function bootstrap(options: BootstrapOptions): Promise<Server> {
     store,
     mailer,
     config,
-    close: () => {
-      store.close();
+    close: async () => {
+      await store.close();
     },
   };
+}
+
+/** The fragment key the viewer reads a sign-in token out of. Named once; the client mirrors it. */
+export const SIGN_IN_FRAGMENT_KEY = 'sign-in';
+
+/**
+ * Where a sign-in link points: **the viewer, with the token in the URL fragment**.
+ *
+ * Both halves are security decisions and neither is a formatting preference.
+ *
+ * **The viewer and not the API**, because a link in a mailbox is fetched by machines. Mail clients
+ * prefetch, scanners and link-rewriting appliances resolve every URL in a message before a human
+ * sees it, and a link that pointed at a redeeming endpoint would be spent by whichever robot got
+ * there first — a login that fails for exactly the people whose employer is careful about links.
+ * This URL resolves to a page. `http/api.ts`'s redeem route is a `POST`, which is the second and
+ * independent reason the same thing cannot happen.
+ *
+ * **The fragment and not the query string**, because a fragment is never transmitted. It does not
+ * appear in the request line, so it cannot reach an access log, a proxy, an ingress trace or a
+ * `Referer` header sent to anything the page later loads. A token in `?token=` is a token in a log
+ * file on the way to being a token in a support ticket.
+ *
+ * The viewer reads {@link SIGN_IN_FRAGMENT_KEY} out of `location.hash`, posts it to
+ * `/api/auth/redeem`, and clears the hash.
+ *
+ * **`publicOrigin` is the viewer's, not this server's, and § D257 is where that stops being the
+ * same sentence.** Once the bundle is served from a static host, a link built from this process's
+ * own origin opens a page that has no fragment reader on it — the API answers, the browser is shown
+ * JSON, and the account is never signed in. Nothing in this function changes; what changed is that
+ * the value it is given is now a deploy parameter with a wrong answer that used to be unreachable.
+ */
+export function signInUrlFor(publicOrigin: string): (token: string) => string {
+  const origin = publicOrigin.replace(/\/$/u, '');
+  return (token) => `${origin}/#${SIGN_IN_FRAGMENT_KEY}=${encodeURIComponent(token)}`;
 }
 
 /**

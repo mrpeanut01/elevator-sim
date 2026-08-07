@@ -82,11 +82,24 @@ beforeAll(async () => {
     logLevel: 'error',
   });
   await server.listen();
-  const address = server.httpServer?.address();
-  if (address === null || address === undefined || typeof address === 'string') {
-    throw new Error('the dev server did not report a port');
+  /*
+   * `resolvedUrls`, not `httpServer.address()`.
+   *
+   * The inline `server: { port: 0 }` above does not win: `vite.config.ts` pins
+   * `{ port: 5174, strictPort: true }`, so the server serves where the **config** says and the
+   * socket this test was reading reported something else. Every case then loaded
+   * `ERR_CONNECTION_REFUSED` and failed — on any machine that has a Chromium, and before any of
+   * the changes in this wave. It stayed invisible because the whole tier skips without
+   * `ELEVATOR_SIM_CHROMIUM`, so the one condition that runs these cases is the one nobody has.
+   *
+   * `resolvedUrls` is Vite's own answer to *where am I actually serving*, which is the question,
+   * and it stays right if the pinned port moves again.
+   */
+  const local = server.resolvedUrls?.local[0];
+  if (local === undefined) {
+    throw new Error('the dev server did not report a local URL');
   }
-  origin = `http://127.0.0.1:${String(address.port)}`;
+  origin = local.replace(/\/$/, '');
   browser = await chromium.launch({ executablePath: CHROMIUM });
 }, 120_000);
 

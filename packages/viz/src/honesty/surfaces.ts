@@ -55,6 +55,7 @@ import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../c
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
 import { disclosureItems } from '../mode/disclosure.js';
+import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
@@ -139,6 +140,7 @@ import {
   zoneChoicesOf,
 } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
+import { transportStatusOf } from '../dev/main.js';
 import {
   dwellHintOf,
   flagLineOf,
@@ -169,6 +171,7 @@ import {
   figureViewOf,
   goalRowViewOf,
   reportViewOf,
+  runProgressOf,
 } from '../dev/reportPanel.js';
 import {
   buildingPlateOf,
@@ -1203,6 +1206,31 @@ const BATCH_REPORT: SurfaceAdapter = {
       }
     }
     for (const [index, comparison] of report.comparisons.entries()) {
+      /*
+       * The roll-up and its remedy — seeded like any other batch string, and **with no `comparison`
+       * shape**, which is the honest classification rather than a convenience.
+       *
+       * `checkSingleRunComparative`'s batch clauses read `RenderedText.comparison` to ask *"does
+       * this string name a winner the row was not entitled to?"*. The summary names no arm at all:
+       * it counts rows by verdict and points at the row that does. Attaching a shape here would
+       * mean inventing a `favours` and a `pairs` for a sentence that has neither, and the search
+       * would then be checking a fiction. What it is still swept for is everything textual — R10's
+       * word list and R13's frequency form — which is what a counting sentence can actually break.
+       */
+      seeds.push({
+        field: `comparisons[${String(index)}].summary.sentence`,
+        text: comparison.summary.sentence,
+        role: 'prose',
+        declaredCount: comparison.rows[0]?.totalPairs ?? 0,
+      });
+      if (comparison.summary.remedy !== null) {
+        seeds.push({
+          field: `comparisons[${String(index)}].summary.remedy`,
+          text: comparison.summary.remedy,
+          role: 'reason',
+          declaredCount: comparison.rows[0]?.totalPairs ?? 0,
+        });
+      }
       for (const row of comparison.rows) {
         const energyAxis = BATCH_METRIC_CLASS[row.metric] === 'axis';
         const shape = {
@@ -1318,6 +1346,17 @@ const MODE: SurfaceAdapter = {
     'mode/disclosure.ts#BASIC_WINDOW_VALUE',
     'mode/parity.ts#parityViolations',
     'mode/parity.ts#parityRefusal',
+    /*
+     * The transport's status strip — GitHub issue #71, and it belongs to **this** adapter rather
+     * than to one of its own.
+     *
+     * `dev/main.ts#transportStatusOf` composes two of the renderings above into one line. An
+     * adapter of its own would have to build the same items from the same recording to drive it,
+     * which is a second answer to *what does this run disclose* — and the parity check a few lines
+     * down would then be checking a list that is not the list on screen. So it is seeded here, off
+     * the items that were already derived.
+     */
+    'dev/main.ts#transportStatusOf',
   ],
   render(context) {
     const { recording } = context;
@@ -1375,6 +1414,34 @@ const MODE: SurfaceAdapter = {
     for (const [index, broken] of parityViolations(items).entries()) {
       seeds.push({ field: `parityViolations[${String(index)}]`, text: broken.message, role: 'reason' });
     }
+    /*
+     * The line the transport actually prints, in both modes — issue #71.
+     *
+     * `estimate`, because that is what it is: `AWT` and `WT95` are the two figures `awtIsValid`
+     * speaks for, and on a run whose mean is refused this line carries the refusal instead. Seeding
+     * it as anything softer would exempt the one string on the shell that a reader glances at
+     * without opening a panel.
+     */
+    for (const mode of VIEW_MODES) {
+      const status = transportStatusOf(items, mode);
+      if (status === undefined) continue;
+      const awt = itemsIn(items, mode).find((item) => item.id === 'awt');
+      seeds.push({
+        field: `${mode}.transportStatus`,
+        text: status,
+        role: 'estimate',
+        /*
+         * The `n` is **on the line**, which is what makes seeding it as an estimate legal — and it
+         * is there because this seed put it there. Driven into the corpus reading `AWT 13.1 s ·
+         * WT95 27.4 s`, the search failed six cases on R13 clause one at once; the count comes off
+         * the same `Rendering` the value does, so `declaredCount` reads it from the item rather
+         * than re-parsing the line this adapter just built.
+         */
+        declaredCount: awt?.rendering.count === undefined ? undefined : countOf(awt.rendering.count),
+        countShown: awt?.rendering.count !== undefined,
+      });
+    }
+
     const refusal = parityRefusal(items);
     if (refusal !== undefined) seeds.push({ field: 'parityRefusal', text: refusal, role: 'reason' });
 
@@ -2495,6 +2562,19 @@ const REPORT_PANEL: SurfaceAdapter = {
     'dev/reportPanel.ts#goalRowViewOf',
     'dev/reportPanel.ts#diagnosisRowsOf',
     'dev/reportPanel.ts#emptyReportView',
+    'dev/reportPanel.ts#runProgressOf',
+    /*
+     * The lever cards, and the table that decides which of them navigate — issue #38.
+     *
+     * They reach this adapter through `reportViewOf`, which is `leverRowsOf(shaped.levers)`, and the
+     * loop below already seeds every card's title and body. `LEVER_SURFACES` is named here rather
+     * than excluded because it is not separable from them: the derived scanner reads its hyphenated
+     * ids as prose, and the honest answer is that the words a player sees on those cards **are**
+     * driven — what the table adds is a `TabName`, which is an element id and reaches no sentence.
+     * An exclusion would have had to claim the cards are unchecked, which is false.
+     */
+    'dev/reportPanel.ts#leverRowsOf',
+    'dev/reportPanel.ts#LEVER_SURFACES',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -2618,6 +2698,25 @@ const REPORT_PANEL: SurfaceAdapter = {
     seeds.push({ field: 'emptyReportView.lede', text: empty.lede, role: 'prose' });
     if (empty.framing.kind === 'week-day') {
       seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
+    }
+
+    /*
+     * The third sheet — issue #16, § D223.
+     *
+     * A filed report drawn while the playhead is short of `endedAt` is replaced by a sheet that
+     * says the day is not over, because the header, the footer and the rail are all describing an
+     * instant the filed sheet is hours past. Driven here for exactly the reason the empty sheet is:
+     * a state of this surface that the search does not reach is an unchecked one, and its lede is
+     * the only sentence on the surface that names two clock times of its own composition.
+     */
+    const filed = bundle.days[0]?.report;
+    if (filed !== undefined) {
+      const running = reportViewOf(
+        filed,
+        runProgressOf({ recording: context.recording, simTimeS: context.recording.startedAt }),
+      );
+      seeds.push({ field: 'runningReportView.title', text: running.title, role: 'label' });
+      seeds.push({ field: 'runningReportView.lede', text: running.lede, role: 'prose' });
     }
 
     return singleRun(this.id, seeds);
@@ -3345,6 +3444,11 @@ const MENU: SurfaceAdapter = {
     'menu/menu.ts#canStart',
     'menu/catalogue.ts#catalogueOf',
     'menu/catalogue.ts#buildingDetail',
+    // § D286. Its prose is the option labels and the sentence under them — *Morning rush —
+    // 08:30–09:00*, *30 min of demand … then however long it takes to clear* — which is exactly the
+    // kind of claim the honesty properties exist for: a label that named a clock the run did not use
+    // would be R1's defect with a friendly face. Driven below rather than excused.
+    'menu/partsOfDay.ts#partsOfDay',
     'menu/account.ts#formIssues',
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
@@ -3376,6 +3480,20 @@ const MENU: SurfaceAdapter = {
     }
     for (const entry of catalogue.demandTemplates) {
       seeds.push({ field: `template.${entry.id}.detail`, text: entry.detail ?? '', role: 'label' });
+      /*
+       * Every part of every shipped template, both strings. The label carries a clock range and the
+       * detail carries a quantity of demand, so both are claims about the run a player is about to
+       * start — and the second is the one issue #80 was filed about, where the number named the
+       * demand schedule and was read as the run.
+       */
+      for (const part of entry.parts ?? []) {
+        seeds.push({ field: `template.${entry.id}.part.${part.id}.label`, text: part.label, role: 'label' });
+        seeds.push({
+          field: `template.${entry.id}.part.${part.id}.detail`,
+          text: part.detail,
+          role: 'observation',
+        });
+      }
     }
 
     const challengeSelection = {
@@ -3383,25 +3501,29 @@ const MENU: SurfaceAdapter = {
       metric: 'awtS',
     };
     const challengeInput = { view: CHALLENGE_VIEW, runsDone: 3 };
+    // The opening template's shortest offered part, taken from the catalogue rather than written
+    // here — the same derivation the menu itself uses, so a sweep cannot drive a selection the menu
+    // would never produce. § D286.
+    const openingTemplateId = catalogue.demandTemplates[0]?.id ?? '';
+    const openingPart = [...(catalogue.demandTemplates[0]?.parts ?? [])].sort(
+      (left, right) => left.durationS - right.durationS,
+    )[0];
     const whole = {
       buildingId: catalogue.buildings[0]?.id ?? '',
       dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
-      demandTemplateId: catalogue.demandTemplates[0]?.id ?? '',
+      demandTemplateId: openingTemplateId,
       arrivalRatePctPop5min: null,
-      durationS: 900,
+      durationS: openingPart?.durationS ?? 1800,
+      windowStartS: openingPart?.windowStartS ?? null,
       seed: '20260804',
     };
     const broken = { ...whole, buildingId: 'demolished', seed: 'not-a-seed', durationS: 7 };
     /*
-     * A third selection, valid in every field and refused on a **cross-field** rule: the longest
-     * template's own period against the shortest offered run. Driven separately because its
-     * sentence carries two numbers a reader will act on, and a wrong one sends them to change the
-     * axis that was already right.
+     * A third selection, valid in every field and refused on a **cross-field** rule: a part that
+     * belongs to a different template. Driven separately because its sentence names what *is*
+     * offered, and a wrong one sends a reader to change the axis that was already right.
      */
-    const longest = [...catalogue.demandTemplates].sort(
-      (left, right) => (right.minimumDurationS ?? 0) - (left.minimumDurationS ?? 0),
-    )[0];
-    const tooShort = { ...whole, demandTemplateId: longest?.id ?? whole.demandTemplateId, durationS: 300 };
+    const tooShort = { ...whole, durationS: 300, windowStartS: null };
 
     for (const [label, selection] of [
       ['whole', whole],
@@ -3427,22 +3549,42 @@ const MENU: SurfaceAdapter = {
      *
      * Driven for the same reason the broken selection above is: every sentence here is one a
      * player only ever meets when something has gone wrong, which is where careless wording
-     * actually lives. `postingRefusal` gets **both** of its arms — signed out, and signed in but
-     * unconfirmed — because collapsing them is the specific mistake it exists to avoid.
+     * actually lives.
+     *
+     * **`postingRefusal` has one arm now, and the second was not dropped from this sweep — it was
+     * deleted from the product.** § D241 § 5 removed `confirmed` along with the password: a mailed
+     * link cannot issue a session to somebody who has not proved they can read the address, so the
+     * flag would have been true for everybody who could ever observe it. What replaced it is the
+     * *naming* prompt, which is a prompt rather than a gate, so it is driven through `signedIn`'s
+     * notice below instead of through a refusal.
+     *
+     * Both of `formIssues`'s questions are driven, because they are asked at different moments and
+     * a sweep that only saw the address would never read a word about the name.
      */
-    const account = updateForm(SIGNED_OUT, { mode: 'register', email: 'nope', password: 'short' });
-    for (const [index, issue] of formIssues(account.form).entries()) {
-      seeds.push({
-        field: `account.issue.${String(index)}.${issue.field}`,
-        text: issue.message,
-        role: 'reason',
-      });
+    const player = {
+      id: 'u1',
+      email: 'p@example.test',
+      displayName: 'player-9f2c1a4b7e05',
+      displayNameChosen: false,
+    };
+    const badAddress = updateForm(SIGNED_OUT, { email: 'nope' });
+    const badName = updateForm(signedIn(SIGNED_OUT, 'token', player), { displayName: 'x' });
+    for (const [stage, state] of [
+      ['address', badAddress],
+      ['name', badName],
+    ] as const) {
+      for (const [index, issue] of formIssues(state).entries()) {
+        seeds.push({
+          field: `account.${stage}.issue.${String(index)}.${issue.field}`,
+          text: issue.message,
+          role: 'reason',
+        });
+      }
     }
-    const player = { id: 'u1', email: 'p@example.test', displayName: 'A player', confirmed: false };
     for (const [label, state] of [
       ['signed-out', SIGNED_OUT],
-      ['unconfirmed', signedIn(SIGNED_OUT, 'token', player)],
-      ['confirmed', signedIn(SIGNED_OUT, 'token', { ...player, confirmed: true })],
+      ['unnamed', signedIn(SIGNED_OUT, 'token', player)],
+      ['named', signedIn(SIGNED_OUT, 'token', { ...player, displayName: 'A player', displayNameChosen: true })],
     ] as const) {
       const refusal = postingRefusal(state);
       if (refusal !== undefined) {
@@ -4041,6 +4183,103 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
   },
 };
 
+/**
+ * The statistics vocabulary — issue #22, driven rather than excluded.
+ *
+ * ## Why this is an adapter and not an entry in `NOT_PLAYER_FACING`
+ *
+ * Because it is player-facing copy about **what a number means**, which is the closest thing to
+ * the honesty search's own subject that this package contains. An exclusion would have had to
+ * argue that prose written to explain a confidence interval is not the kind of prose R1, R2, R10,
+ * R11 and R13 are about, and there is no version of that argument that survives being written
+ * down. `mode/glossary.ts` was authored knowing it would be swept.
+ *
+ * The sweep is not decorative. Every rule it applies is one this table could plausibly break:
+ * **R10** because a natural way to explain an interval is *"there is a 95 % chance"*, which is
+ * exactly the misreading Budescu measured; **R11** because a natural way to explain kilojoules is
+ * to call a small number good; **R2** because the whole risk of a plain-language layer is that
+ * *"this run cannot tell them apart"* drifts into *"A is better"*.
+ *
+ * ## Two renderings, and the second is what makes this more than a string dump
+ *
+ * 1. **The whole table.** Every term and every explanation, on every case — so no entry can hide
+ *    behind never having been selected by a run.
+ * 2. **What the batch actually selected.** `glossaryFor` run over the shipped batch report's own
+ *    sentences, which is the call the Compare tab makes. This is the liveness half: a selector
+ *    that matched nothing would leave `honesty.test.ts`'s per-surface assertion looking at a
+ *    corpus with no evidence the vocabulary is ever attached to anything.
+ *
+ * ## Provenance is `authored`, deliberately
+ *
+ * Not `schema`. `schema` is the one provenance R10 does not scope to — it exists for `core`'s own
+ * description of its own dial, re-printed unaltered, which has no run behind it. This text is
+ * this package's own writing about results, so it is result-bearing and the probability-word rule
+ * applies to it in full. Picking `schema` would have been an exemption dressed as a category.
+ *
+ * ## What the roles say, and why `term` is not `prose`
+ *
+ * `GlossaryTerm.term` is seeded `label` — *"a name, a unit, a heading"* — because it is exactly
+ * that: the product's own word, quoted back. `GlossaryTerm.plain` is `prose`. The split matters
+ * for R13's frequency clause, which skips labels: `95th-percentile wait` is a name and not a
+ * restatement of anything.
+ *
+ * The batch report, goal report, stage verdict and stage briefing each now carry a `glossary`
+ * field holding **these same objects by reference**, so the strings seeded here are the strings
+ * those surfaces draw. That is why `BATCH_REPORT` and `CAMPAIGN` do not seed their `glossary`
+ * fields a second time: it would put one sentence into the corpus under two surface ids and make
+ * the search look broader than it is.
+ */
+const GLOSSARY: SurfaceAdapter = {
+  id: 'mode/glossary.ts#glossaryFor',
+  covers: [
+    'mode/glossary.ts#glossaryFor',
+    'mode/glossary.ts#GLOSSARY_TERMS',
+    // The keyed lookup `mode/disclosure.ts` uses for the two Casual leads the glossary owns. It
+    // returns a `plain` this adapter already seeds, so driving it separately would put one
+    // sentence in the corpus twice; listing it here is the claim that seeding the table drives it.
+    'mode/glossary.ts#glossaryPlain',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    for (const entry of GLOSSARY_TERMS) {
+      seeds.push({
+        field: `${entry.id}.term`,
+        text: entry.term,
+        role: 'label',
+        provenance: 'authored',
+      });
+      seeds.push({
+        field: `${entry.id}.plain`,
+        text: entry.plain,
+        role: 'prose',
+        provenance: 'authored',
+      });
+    }
+    /*
+     * The selector, on the batch the case actually ran — the Compare tab's own call. Seeded by the
+     * *selected* term's id rather than by its text, so this half of the corpus is a claim about
+     * which words were attached and the text itself is not duplicated under a second field.
+     */
+    const selected = glossaryFor([
+      context.report.demandClause,
+      context.report.crnSentence,
+      ...context.report.arms.map((arm) => arm.sentence),
+      ...context.report.comparisons.flatMap((comparison) =>
+        comparison.rows.flatMap((row) => [row.label, row.sentence, row.note]),
+      ),
+    ]);
+    for (const entry of selected) {
+      seeds.push({
+        field: `selected.${entry.id}`,
+        text: entry.term,
+        role: 'label',
+        provenance: 'authored',
+      });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -4076,6 +4315,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   SELECTOR,
   CHALLENGE,
   CALENDAR_AND_FABRIC,
+  // Appended, for the reason stated at `SHIFT_REPORT` above: `faults.ts` corrupts the first string
+  // matching a shape, so an adapter inserted earlier would move every fault onto a different
+  // surface and silently change what the shrink assertions are about.
+  GLOSSARY,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

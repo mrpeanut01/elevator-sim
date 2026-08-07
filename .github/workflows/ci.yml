@@ -19,28 +19,13 @@
 # axis would spend runner minutes re-confirming the one variable already eliminated while leaving the
 # one that has never been isolated — the platform — untested.
 #
-# ## The Linux leg can move to hardware the project owner controls, and by default it has not
+# Both legs are GitHub-hosted, and both runner labels are literals in this file. The self-hosted
+# Azure runner pool that used to sit behind a `CI_LINUX_RUNNER_LABEL` repository variable has been
+# removed — template, runbook and workflow guard — so there is no way to retarget a leg without
+# editing this file, which is the point.
 #
-# `docs/15-compute-offload-contract.md` § 2 puts the Linux leg on self-hosted runners sized for this
-# workload. The switch is the repository variable `CI_LINUX_RUNNER_LABEL`, and **unset is the
-# shipped state**: with no variable set, `${{ vars.CI_LINUX_RUNNER_LABEL || 'ubuntu-latest' }}`
-# resolves to `ubuntu-latest` and this workflow does exactly what it did before, on the runners it
-# did it on. Nothing queues for a runner that does not exist, because nothing asks for one.
-#
-# Two things the variable deliberately cannot do, both asserted by the `matrix shape` job below
-# against this file:
-#
-#   * It cannot touch the macOS leg. `macos-latest` is a literal here. Azure has no macOS, the
-#     matrix exists to compare two platforms, and a configurable second leg is precisely how one
-#     leg comes to be standing alone.
-#   * It cannot point the Linux leg at a different architecture without the run saying so. Per the
-#     contract § 0.2, an Ampere/ARM runner is a THIRD pin environment, not a cheaper x86 one —
-#     § D201 found the § D196 pin set exactly inverted between Linux and darwin/arm64. The
-#     architecture check below fails the leg rather than quietly producing a third pin set.
-#
-# The matrix identifies a leg by `platform` (`linux`/`macos`) and names its runner separately, so
-# the job names — and therefore any required-status-check names — are the same whether the offload
-# is on or off.
+# The matrix still identifies a leg by `platform` (`linux`/`macos`) and names its runner separately,
+# so the job names — and therefore any required-status-check names — are stable.
 name: CI
 
 on:
@@ -54,35 +39,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Reads this file and asserts that it still describes a two-platform comparison, and that the
-  # Linux leg's default is still `ubuntu-latest`. Pinned to a GitHub-hosted runner on purpose: its
-  # whole subject is whether the self-hosted switch has eaten a leg, and a guard that runs on the
-  # fleet it is guarding cannot report that the fleet is missing.
-  #
-  # No `npm ci` — the guard uses `node:test`, `node:assert` and `node:fs` and nothing installed,
-  # matching review.yml's `gates` job, so it cannot fail for a reason unrelated to what it checks.
-  matrix-shape:
-    name: matrix shape
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '26'
-
-      - name: The matrix still compares two operating systems
-        run: node --test 'infra/checks/*.test.mjs'
-
   suite:
     name: suite (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    # Stated rather than inherited. The suite reads the tree and writes nothing, and once the Linux
-    # leg can run on hardware the owner pays for, the token this job hands to whatever a pull
-    # request contains should be the smallest one that still checks out. See infra/README.md § 9 on
-    # fork pull requests, which is the risk this narrows and does not close.
+    # Stated rather than inherited. The suite reads the tree and writes nothing, so the token this
+    # job hands to whatever a pull request contains is the smallest one that still checks out.
     permissions:
       contents: read
     strategy:
@@ -96,7 +57,7 @@ jobs:
         # sight, which is how a Node axis would come back.
         include:
           - platform: linux
-            runner: ${{ vars.CI_LINUX_RUNNER_LABEL || 'ubuntu-latest' }}
+            runner: ubuntu-latest
           - platform: macos
             runner: macos-latest
 
@@ -114,7 +75,7 @@ jobs:
         # Printed before anything can fail, because when a pin splits the matrix this block is the
         # first thing a reader needs and the last thing a failed run would otherwise show. § D201's
         # standing rule is that a run is a machine and not only a commit, so the runner's own name
-        # is here too: on a self-hosted leg it is the only thing that says which VM answered.
+        # and architecture are recorded here rather than assumed.
         run: |
           echo "platform    : ${{ matrix.platform }}"
           echo "runner label: ${{ matrix.runner }}"
@@ -126,16 +87,17 @@ jobs:
 
       - name: The Linux leg is x86-64, or it is a third pin environment
         if: matrix.platform == 'linux'
-        # Contract § 0.2. `ubuntu-latest` is x86-64, and a self-hosted pool that is not would not
-        # be a cheaper version of this leg — it would be a third platform whose pin set nobody has
+        # Contract § 0.2. `ubuntu-latest` is x86-64 today, and a Linux leg that is not would not be
+        # a cheaper version of this one — it would be a third platform whose pin set nobody has
         # measured. § D201 found the § D196 pins EXACTLY INVERTED between Linux and darwin/arm64,
         # 26 failing and the 26 they superseded passing, so a silent architecture swap here would
-        # reproduce that investigation from scratch. Failing loudly costs one red run; not failing
-        # costs a wave.
+        # reproduce that investigation from scratch. Kept after the self-hosted pool was removed
+        # because the thing it guards is GitHub changing what `ubuntu-latest` means, which is not
+        # this repository's decision to make either. Failing loudly costs one red run.
         run: |
           arch="$(uname -m)"
           if [ "$arch" != "x86_64" ]; then
-            echo "::error title=The Linux leg is not x86-64::runner '${{ runner.name }}' reports $arch. docs/15-compute-offload-contract.md § 0.2 requires the self-hosted Linux pool to match ubuntu-latest; an ARM pool is a separate decision with its own measurement. Unset CI_LINUX_RUNNER_LABEL to fall back to ubuntu-latest."
+            echo "::error title=The Linux leg is not x86-64::runner '${{ runner.name }}' reports $arch. docs/15-compute-offload-contract.md § 0.2 requires the Linux leg to be x86-64; an ARM leg is a separate decision with its own measurement."
             exit 1
           fi
 

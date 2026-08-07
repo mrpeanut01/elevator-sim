@@ -164,6 +164,17 @@ export interface FootBand {
 export interface Layout {
   readonly width: number;
   readonly height: number;
+  /**
+   * The margin around everything, pixels — the resolved {@link LayoutOptions.paddingPx}.
+   *
+   * Carried for the reason {@link pitchPx} is: a renderer that needed it was re-deriving it from
+   * a literal. `render/canvas.ts#drawNotices` is the caller — the notices row sits *above* the
+   * plot, where nothing else is drawn, so it is measured against the canvas rather than against
+   * the plot's own narrower width. Bounding it by the plot is what truncated *"showing 1 of 6
+   * shafts"* to a single `…` on a phone: the row that explains a squeezed picture was being given
+   * the squeezed picture's budget.
+   */
+  readonly paddingPx: number;
   /** The shaft area: everything between the label gutters and below the header. */
   readonly plot: Rect;
   /**
@@ -354,6 +365,88 @@ const MAX_SHAFT_WIDTH_PX = 96;
 const MIN_SHAFT_WIDTH_PX = 18;
 const SHAFT_GAP_PX = 10;
 
+/**
+ * The gap a bank falls back to when the roomy one cannot hold the building — § D236.
+ *
+ * At `MIN_SHAFT_WIDTH_PX` the roomy gap is **36 %** of the pitch, so a third of the plot's width
+ * is being spent on air at exactly the moment there is not enough of it. Tightening to 4 px is
+ * worth five shafts on Vertical City at 1920 × 1080 and three at 1440 — measured, not estimated:
+ * 22 → 27 and 14 → 17.
+ *
+ * It is a **fallback**, not the gap: a bank that fits at 10 px keeps 10 px, so no picture that was
+ * legible becomes tighter. And it does not go below 4: the recess, its hairline and the
+ * travelling cable are all drawn at the shaft's edges, and shafts that touch stop reading as
+ * separate machines. Below this the answer is one bank, not thinner air.
+ */
+const TIGHT_SHAFT_GAP_PX = 4;
+
+/* -------------------------------------------------------------------------- *
+ * The plot's share — § D236, and the reason a phone drew one shaft of six
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The smallest share of the canvas the shafts are allowed to be squeezed to.
+ *
+ * ## The failure this closes
+ *
+ * `dev/main.ts` asks for `gutterRightPx: 280` — the rider-queue gutter — on **every** canvas
+ * width, and adds a 250 px metrics panel above 900. At a 360 px canvas (the floor `drawStage`
+ * clamps to, which is what a 375 px phone gets) that is `360 − 24 − 72 − 280 = −16`, and
+ * `Math.max(1, …)` below turned it into a **one-pixel plot**. `capacity` is `max(1, …)` as well,
+ * so the stage drew **exactly one shaft** of every building on every phone — one of Garden
+ * Apartments' two, one of Chancery House's six, one of Vertical City's thirty-five — with
+ * three-quarters of the canvas blank beside it, and the notice that would have said so truncated
+ * by the same one-pixel budget to a single `…`.
+ *
+ * Two `Math.max(1, …)` guards, each locally correct, turning a caller's over-request into a
+ * picture that was wrong without being empty.
+ *
+ * ## Why the clamp belongs here rather than at the caller
+ *
+ * The same argument {@link LayoutOptions.headerPx} already makes and this file already acts on:
+ * *"a caller asking for a header too short to hold its own rows is asking for the overprint this
+ * band exists to prevent"*. A caller asking for gutters wider than the canvas is asking for a plot
+ * with nothing in it, and the layout is the one place that can see both numbers. The gutters are
+ * *scenery around the subject*; the subject does not yield to them.
+ *
+ * The share is 45 %. On every desktop width this is inert — at a 1232 px canvas the requested
+ * gutters already leave the plot 49 % — so no existing picture moves.
+ */
+const MIN_PLOT_SHARE = 0.45;
+
+/** Narrowest left gutter that still holds a floor id at the 12 px monospace face. */
+const MIN_GUTTER_LEFT_PX = 40;
+/** Narrowest right gutter that still holds a landing's `▲12` at the same face. */
+const MIN_GUTTER_RIGHT_PX = 44;
+
+/**
+ * Shrink the two gutters and the overlay until the plot has {@link MIN_PLOT_SHARE} of the canvas.
+ *
+ * In request order of what yields first, which is the order of how much each is *asking* for
+ * beyond its own minimum: the overlay panel is a whole surface and goes first (it is
+ * supplementary — `RX-05` already drops it below 900 px of canvas), then the right gutter, then
+ * the left. Each stops at its own floor rather than at zero, because a gutter that cannot hold a
+ * floor id is not a smaller gutter, it is a missing label.
+ */
+function fitGutters(
+  inner: number,
+  requested: { readonly left: number; readonly right: number; readonly overlay: number },
+): { readonly left: number; readonly right: number; readonly overlay: number } {
+  const want = Math.max(0, inner * MIN_PLOT_SHARE);
+  let { left, right, overlay } = requested;
+  const shortfall = (): number => want - (inner - left - right - overlay);
+  if (shortfall() <= 0) return { left, right, overlay };
+
+  overlay = Math.max(0, overlay - shortfall());
+  if (shortfall() <= 0) return { left, right, overlay };
+
+  right = Math.max(MIN_GUTTER_RIGHT_PX, right - shortfall());
+  if (shortfall() <= 0) return { left, right, overlay };
+
+  left = Math.max(MIN_GUTTER_LEFT_PX, left - shortfall());
+  return { left, right, overlay };
+}
+
 /* -------------------------------------------------------------------------- *
  * The rider lane — see {@link Layout.riderLane}
  * -------------------------------------------------------------------------- */
@@ -396,14 +489,22 @@ const MAX_RIDER_LANE_PX = 220;
 const MIN_LABEL_PITCH_PX = 14;
 
 export function buildLayout(options: LayoutOptions): Layout {
-  const gutterLeft = options.gutterLeftPx ?? DEFAULTS.gutterLeftPx;
-  const gutterRight = options.gutterRightPx ?? DEFAULTS.gutterRightPx;
   const footer = options.footerPx ?? DEFAULTS.footerPx;
   const padding = options.paddingPx ?? DEFAULTS.paddingPx;
   // Clamped, not trusted: a header shorter than its own rows draws two labels on top of each
   // other, which is the defect this band exists to close. See {@link LayoutOptions.headerPx}.
   const header = Math.max(minHeaderPx(padding), options.headerPx ?? minHeaderPx(padding));
-  const overlayWidth = Math.max(0, options.overlayWidthPx ?? 0);
+
+  // Clamped for the same reason, one axis over — see {@link MIN_PLOT_SHARE}. Inert wherever the
+  // caller's request already leaves the plot its share, which is every desktop width.
+  const { left: gutterLeft, right: gutterRight, overlay: overlayWidth } = fitGutters(
+    Math.max(0, options.width - 2 * padding),
+    {
+      left: options.gutterLeftPx ?? DEFAULTS.gutterLeftPx,
+      right: options.gutterRightPx ?? DEFAULTS.gutterRightPx,
+      overlay: Math.max(0, options.overlayWidthPx ?? 0),
+    },
+  );
 
   const plot: Rect = {
     x: padding + gutterLeft,
@@ -475,15 +576,17 @@ export function buildLayout(options: LayoutOptions): Layout {
   // How many shafts fit at the minimum legible width. Beyond that they are *not* laid out at
   // all: squeezing a thirteenth shaft into 4 px is the silent truncation RS-05 forbids, and the
   // count of the ones left out is reported instead.
-  const capacity = Math.max(
-    1,
-    Math.floor((available + SHAFT_GAP_PX) / (MIN_SHAFT_WIDTH_PX + SHAFT_GAP_PX)),
-  );
+  const capacityAt = (gap: number): number =>
+    Math.max(1, Math.floor((available + gap) / (MIN_SHAFT_WIDTH_PX + gap)));
+  // The air between shafts yields before the shafts do — see {@link TIGHT_SHAFT_GAP_PX}. Only
+  // when the roomy gap cannot hold the whole building, so a bank that already fits is untouched.
+  const shaftGap = capacityAt(SHAFT_GAP_PX) >= total ? SHAFT_GAP_PX : TIGHT_SHAFT_GAP_PX;
+  const capacity = capacityAt(shaftGap);
   const count = Math.min(total, capacity);
   const shown = options.shafts.slice(0, count);
-  const rawWidth = count === 0 ? 0 : (available - SHAFT_GAP_PX * (count - 1)) / count;
+  const rawWidth = count === 0 ? 0 : (available - shaftGap * (count - 1)) / count;
   const shaftWidth = Math.max(MIN_SHAFT_WIDTH_PX, Math.min(MAX_SHAFT_WIDTH_PX, rawWidth));
-  const totalWidth = count * shaftWidth + Math.max(0, count - 1) * SHAFT_GAP_PX;
+  const totalWidth = count * shaftWidth + Math.max(0, count - 1) * shaftGap;
 
   /*
    * Where the bank sits, and whether there is a lobby beside it.
@@ -509,7 +612,7 @@ export function buildLayout(options: LayoutOptions): Layout {
       : undefined;
 
   const columns: ShaftColumn[] = shown.map((shaft, index) => {
-    const x = originX + index * (shaftWidth + SHAFT_GAP_PX);
+    const x = originX + index * (shaftWidth + shaftGap);
     return {
       carId: shaft.carId,
       bankId: shaft.bankId,
@@ -584,6 +687,7 @@ export function buildLayout(options: LayoutOptions): Layout {
   return {
     width: options.width,
     height: options.height,
+    paddingPx: padding,
     plot,
     header: headerBand,
     foot,

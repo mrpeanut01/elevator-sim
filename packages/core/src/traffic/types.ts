@@ -77,6 +77,17 @@ export class TrafficError extends Error {
  * the lunch mixed peak, outgoing-dominant as occupants leave the building and incoming-dominant
  * as they return. Its intensity geometry is `rise-and-fall`'s, unchanged, so the only thing it
  * adds is the mix arc — see {@link DemandPhase.startSplit}.
+ *
+ * **`evening-egress` and `office-down-peak` are two records for what was once one** (`DECISIONS.md`
+ * § D263). `evening-egress` is the **venue** case — a ballroom emptying, a cinema turning out — and
+ * its step is the point of it. `office-down-peak` is the **office end of day**, a design case in its
+ * own right rather than an egress under another name, and its intensity geometry is
+ * `rise-and-fall`'s. Splitting them is what let each one carry the hour that is true of it: a
+ * building empties at 17:30 and a function turns out at 22:30, and § D244 gives a record exactly one
+ * hour. Since the geometry is shared, an `office-down-peak` run draws the **same passengers** as a
+ * `rise-and-fall` run at the same seed — declared in the record's own `$comment` and asserted by
+ * `traffic/templateAdditionIdentity.test.ts`, because what that record adds is the hour and the
+ * period's identity, not a shape.
  */
 export const DEMAND_TEMPLATE_IDS = [
   'rise-and-fall',
@@ -84,6 +95,7 @@ export const DEMAND_TEMPLATE_IDS = [
   'lunch-two-way',
   'shift-change',
   'evening-egress',
+  'office-down-peak',
 ] as const;
 
 export type DemandTemplateId = (typeof DEMAND_TEMPLATE_IDS)[number];
@@ -121,6 +133,35 @@ export interface DemandPhase {
   readonly startSplit?: DirectionalSplit | undefined;
   /** Directional mix at {@link endS}. See {@link startSplit}. */
   readonly endSplit?: DirectionalSplit | undefined;
+}
+
+/**
+ * Which part of a template's period a run covers — `DECISIONS.md` § D285, the field
+ * [§ D275](DECISIONS.md) named and deliberately left unbuilt.
+ *
+ * **A new field, never a reinterpretation of {@link ResolvedDemandTemplate.durationS}.** That is the
+ * whole of why it exists: `durationS` travels in every stored `RunConfig` and every leaderboard
+ * submission, so giving it a second meaning would leave every board still verifying and every old
+ * row a claim about a different run. `durationS` keeps meaning *how long the run was*; this says
+ * *where in the day the run was cut from*.
+ *
+ * Both ends are seconds into the template's **own** period, `0` being the instant the record starts
+ * — 08:00 for `office-day`. Half-open `[startS, endS)`, matching {@link inReportWindow} and the
+ * arrival bound in `poissonBatch.ts`.
+ */
+export interface ResolvedDemandWindow {
+  /** Seconds into the template's period at which this run's demand begins. */
+  readonly startS: number;
+  /** Seconds into the template's period at which this run's demand stops. Above {@link startS}. */
+  readonly endS: number;
+  /**
+   * The period the window was cut from, seconds — the record's own `durationMin × 60`.
+   *
+   * Carried rather than left derivable so that a trace is self-describing: a reader holding one
+   * knows it is half an hour *of a ten-hour day* without re-resolving the record it came from. It is
+   * also what a presentation layer needs to draw the window in the day it belongs to.
+   */
+  readonly periodS: number;
 }
 
 /**
@@ -168,6 +209,94 @@ export interface ResolvedDemandTemplate {
    *    variation of the mix and in nothing else — not in the mean mix, and not in total demand.
    */
   readonly meanDirectionalSplit?: DirectionalSplit | undefined;
+  /**
+   * Seconds after local midnight at which `t = 0` of this run falls — **absent when the template
+   * has no hour**. `DECISIONS.md` § D244.
+   *
+   * The runtime view of `DemandTemplate.startOfDayMin`, converted at resolution the way
+   * `durationMin` becomes {@link durationS}. `constant-iso` declares none, and absent means *"this
+   * template has no hour"* rather than *"its hour is midnight"* — omitted, not `undefined`-valued,
+   * for the reason {@link meanDirectionalSplit} is.
+   *
+   * ## Invisible to the simulation, and that is the load-bearing property
+   *
+   * `intensityAt`, `splitAt` and `integratedIntensityS` are the whole of this module's evaluation
+   * surface, and **none of them reads this field**. A run's arrivals, batches, destinations, masses
+   * and metrics are therefore exactly what they were before the field existed, at every seed and
+   * every template — proved by a run in `traffic/dayStartIdentity.test.ts` rather than argued here,
+   * and the same property is what keeps `sim/oracle.test.ts`'s closed-form comparison green by
+   * construction.
+   *
+   * It travels with the template rather than beside it because a template *is* the period: the
+   * hour and the shape go stale together or not at all. {@link shiftTemplatePeak} carries it
+   * unchanged — a peak shift moves the busy part *within* the period, and a period that started at
+   * 08:30 still started at 08:30 when its peak ran ten minutes late.
+   *
+   * **Not a tunable, deliberately.** It is absent from {@link TRAFFIC_PARAMETERS} and from
+   * {@link DemandTemplateOverrides}: an optimizer sampling *what hour it is* would add a search
+   * dimension that cannot move a cost, which is the `destination-eta` `rideTime: 0` defect
+   * (`DECISIONS.md` § D112) with a different key name.
+   */
+  readonly startOfDayS?: number | undefined;
+  /**
+   * `true` when {@link phases} was **authored as data** rather than computed from a named shape —
+   * `data/traffic-profiles.json → demandTemplates[].phases`. `DECISIONS.md` § D273.
+   *
+   * **Absent, never `false`, on all five templates that shipped before it.** The omitted-not-
+   * `undefined` discipline {@link startOfDayS} keeps, for a sharper reason: this key is inside
+   * every `PassengerTrace` and therefore inside every `SimulationResult`, so a `false` on the
+   * shipped shapes would move `traffic/transportIdentity.test.ts`'s fifteen pinned digests to record
+   * that a template is *not* something.
+   *
+   * ## It is a marker, and two refusals are what read it
+   *
+   * A shape builder's geometry can be refitted, because two numbers generate it. An authored list
+   * cannot, and the two knobs that assume it can are refused by name rather than left to do
+   * something plausible:
+   *
+   * - **`templateOverrides.durationS`** would rescale a sixteen-hour day into a fifteen-minute one
+   *   and leave it with a five-minute lunch. Selecting *which part of a day to run* is a different
+   *   question and needs a different field; reinterpreting `durationS` would change what a stored
+   *   leaderboard score means, since `durationS` travels in every submission.
+   * - **{@link DayVariationConfig.peakShiftS}** moves every interior knot by one amount, and
+   *   {@link maxPeakShiftS} takes its limit from the **outermost** one. On a day the first boundary
+   *   is minutes in, so the limit collapses to those minutes and almost every declared shift is
+   *   refused with a message about a phase boundary the author never thought of as the peak.
+   *
+   * Both refusals are `traffic/demandTemplate.ts`'s, and both are stated in the same shape as the
+   * existing `constant-iso` one: a template that cannot absorb a knob says so by name instead of
+   * absorbing it into something that looks like it worked.
+   *
+   * **The first of the two is now answered rather than only refused.** {@link window} is the field
+   * § D275 named, and the refusal message names it back: `durationS` still cannot rescale a
+   * schedule, and `windowStartS`/`windowEndS` selects a part of one instead.
+   */
+  readonly authoredPhaseList?: true | undefined;
+  /**
+   * Which part of its own period this template was cut to — **absent when the run covers the whole
+   * of it**, which is every run that predates `DECISIONS.md` § D285.
+   *
+   * Omitted rather than `{ startS: 0, endS: durationS }` on an unwindowed template, keeping the
+   * discipline {@link startOfDayS} and {@link authoredPhaseList} set for the same reason each of
+   * them gives: this key sits inside every `PassengerTrace` and therefore inside every
+   * `SimulationResult`, and `traffic/transportIdentity.test.ts` hashes a key's *presence*. A window
+   * spelled out on every unwindowed run would move fifteen pinned digests to record that a run is
+   * not a slice.
+   *
+   * ## What the other fields mean once this is present
+   *
+   * The template is **re-based**: {@link durationS} is the window's own length, {@link phases} are
+   * clipped and shifted so `t = 0` is the window's start, {@link startOfDayS} is the *window's*
+   * hour rather than the record's, and {@link peakIntensity}, {@link intensityIntegralS} and
+   * {@link meanDirectionalSplit} are derived over the window. So every downstream reader — the
+   * kernel's deadline, the report window, the phase strip — sees a period that begins at zero, and
+   * nothing had to learn what a window is. This field is what says which period it was.
+   *
+   * {@link reportWindowStartS} and {@link reportWindowEndS} become the whole of the window, for the
+   * reason § D273 gives about a phase list reporting over the whole of itself: five minutes cut out
+   * of a lunch peak reports one instant of it and calls it the period.
+   */
+  readonly window?: ResolvedDemandWindow | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -388,6 +517,25 @@ export interface PassengerTrace {
   readonly buildingId: string;
   readonly template: ResolvedDemandTemplate;
   readonly durationS: number;
+  /**
+   * Seconds after local midnight at which `arrivalTimeS === 0` falls — **present only when the
+   * template declares an hour**. `DECISIONS.md` § D244.
+   *
+   * Copied from {@link ResolvedDemandTemplate.startOfDayS}, and beside {@link durationS} for the
+   * reason {@link reportWindowStartS} is beside it: a reader with the trace in hand should not have
+   * to reach into `template` to learn when the run is and how long it lasts. The template remains
+   * the single authority — the copy is made in one place, at the same moment `durationS` is, so the
+   * two cannot disagree.
+   *
+   * Spread-or-omit, never `?? 0`: a trace under `constant-iso`, which has no hour, must be the
+   * object it was before templates could carry one, and `structuralDigestOfResult` hashes a key's
+   * presence as well as its value.
+   *
+   * **Nothing downstream of the generator reads it to decide anything.** It is a label on the run,
+   * like {@link buildingId}; adding it moved no arrival, no leg and no metric, which
+   * `traffic/dayStartIdentity.test.ts` holds byte for byte.
+   */
+  readonly startOfDayS?: number;
   readonly reportWindowStartS: number;
   readonly reportWindowEndS: number;
   /** Batches in `(time, generation sequence)` order. */
@@ -520,6 +668,18 @@ export type InterfloorWeighting = (typeof INTERFLOOR_WEIGHTINGS)[number];
 export const CREDENTIAL_ASSIGNMENTS = ['none', 'permitted-first'] as const;
 
 export type CredentialAssignment = (typeof CREDENTIAL_ASSIGNMENTS)[number];
+
+/**
+ * A run's override of `data/traffic-profiles.json`'s `credentialGap` block.
+ *
+ * One field, and the block exists rather than a bare number so that the config surface and the
+ * reference file have the same shape — the property that stops the two drifting into two
+ * different names for one quantity. See {@link TrafficConfig.credentialGap}.
+ */
+export interface CredentialGapOverride {
+  /** Share, `0..1`. See `config/types.ts` § `CredentialGapConfig`. */
+  readonly wrongZoneShare: number;
+}
 
 /**
  * Explicit overrides for the geometry of whichever demand template is selected.
@@ -655,16 +815,58 @@ export interface TrafficConfig {
    */
   readonly trafficModel?: TrafficModelVersion | undefined;
   /**
-   * Demand shape. A {@link DemandTemplateId} is looked up in `profiles.demandTemplates`; a
+   * Demand shape. An **id** is looked up in `profiles.demandTemplates`; a
    * {@link ResolvedDemandTemplate} is used as given. Defaults to `rise-and-fall`.
+   *
+   * `string` rather than {@link DemandTemplateId} since § D274. The lookup was always against the
+   * loaded catalogue first, so the union has always been the *fallback* list — the shapes this
+   * module can build when no record answers — and since § D273 a record can author its own phases
+   * and answer to an id no union could contain. Validate the string against the records you loaded;
+   * `resolveDemandTemplate` throws by name for one that answers to neither.
    */
-  readonly template?: DemandTemplateId | ResolvedDemandTemplate | undefined;
+  readonly template?: string | ResolvedDemandTemplate | undefined;
   /**
    * Geometry overrides applied on top of the `demandTemplates` record — duration, peak hold,
    * baseline, ISO discards. Rejected when {@link template} is an already-resolved template,
    * which carries its geometry with it and would silently ignore them.
    */
   readonly templateOverrides?: DemandTemplateOverrides | undefined;
+  /**
+   * Run only `[windowStartS, windowEndS)` of the selected template's period. `DECISIONS.md` § D285.
+   *
+   * Declared as a pair of plain seconds rather than as a nested object because that is the shape
+   * § D275 named it in, and because the two are validated against each other and against the
+   * template's own length in one place. Both or neither: one alone is refused by name, the way a
+   * phase declaring `startSplit` without `endSplit` is.
+   *
+   * **Not a {@link DemandTemplateOverrides} member, and the distinction is the point.** An override
+   * *refits the template's geometry* — a 900 s `rise-and-fall` is a shorter ramp around the same
+   * hold. A window leaves the geometry exactly as authored and selects part of it, which is why it
+   * is the answer to the question `templateOverrides.durationS` is refused for on a phase list
+   * (§ D275): rescaling a ten-hour day into fifteen minutes gives a fifteen-minute day with a
+   * five-minute lunch, and running 12:15–12:45 of it gives the lunch.
+   *
+   * ## The day is drawn first and then cut, and that is what makes the window a *view*
+   *
+   * The trace is generated over the template's **whole** period exactly as it was before this field
+   * existed — same streams, same draws, same order — and only then filtered to the window and
+   * re-based. So the passengers of a 08:30–09:00 run are *the same records*, with the same ids,
+   * masses, destinations and credentials, as the 08:30–09:00 passengers of the whole day at the
+   * same seed. Two consequences that are the reason for the extra work:
+   *
+   * 1. Common random numbers survive a window change (CLAUDE.md invariant 2). Two windows of one
+   *    seed are two parts of one day rather than two unrelated draws, so a morning-versus-evening
+   *    comparison is paired on the day.
+   * 2. The day a player *runs* today and the day a player would *look at* under a continuously
+   *    simulated schedule contain the same demand, so moving the window from generation to
+   *    presentation does not change which crowd the window names.
+   *
+   * Absent — never `0`/`durationS` — when the run covers the whole period; `traffic/windowIdentity.test.ts`
+   * holds an unwindowed run byte-identical to the run before the field existed.
+   */
+  readonly windowStartS?: number | undefined;
+  /** End of the run's part of the period, seconds, exclusive. See {@link windowStartS}. */
+  readonly windowEndS?: number | undefined;
   /** Which point of each profile's rate range to use. Default `typical`. */
   readonly demandLevel?: DemandLevel | undefined;
   /**
@@ -741,6 +943,20 @@ export interface TrafficConfig {
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   /** Default `permitted-first`. */
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * Override `data/traffic-profiles.json`'s `credentialGap` block. docs/14 § 3.4.
+   *
+   * Unset means *the data decides*, which is the only honest default: the shipped share is a
+   * declared, uncited assumption with its reasoning attached, and a second value invented here
+   * would be a second source of truth for it. `{ wrongZoneShare: 0 }` is the control arm — every
+   * rider holds a credential for wherever they are going, which is what the model did before the
+   * gap existed and what every figure measured under `credentialAssignment: 'permitted-first'`
+   * and no gap was measured under.
+   *
+   * Consumed only where a building declares `accessZones`; a building that declares none produces
+   * a byte-identical trace at every value of it.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   /**
    * Drop a journey needing more than this many elevator legs. Default 6.
    *
@@ -1022,10 +1238,19 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
   {
     id: 'traffic.template',
     type: 'categorical',
+    // **Narrower than the shipped catalogue since § D274, and named rather than left to be found.**
+    // These are the shapes this module can build with *no record to read*; a record that authors its
+    // own `phases` (§ D273) answers to an id no compiled-in list can contain, and `office-day` is
+    // the first one that does. So a generic optimizer sampling this row will not offer a day
+    // profile. That is the right answer rather than a gap to close: which traffic pattern a building
+    // faces is a **scenario axis**, not a knob to search — CLAUDE.md § Tuning discipline says *tune
+    // per traffic pattern*, which means holding this fixed and searching the weights inside it — and
+    // a `values` list read from `data/` at module load would make this declaration a function of a
+    // file the type system cannot see. A study that wants a day profile names it on the traffic arm.
     values: [...DEMAND_TEMPLATE_IDS],
     default: TRAFFIC_DEFAULTS.templateId,
     description:
-      'Demand shape. rise-and-fall is a 30 min terminating run reported over its peak 5 minutes and is the only one that supports confidence intervals across replications; constant-iso is a single 120 min run for cross-checking.',
+      'Demand shape, as one of the shapes this build can construct without a data record. rise-and-fall is a 30 min terminating run reported over its peak 5 minutes and is the only one that supports confidence intervals across replications; constant-iso is a single 120 min run for cross-checking. A data record may also author its own phase list and be selected by id, which this list cannot enumerate — see DECISIONS.md § D274.',
   },
   {
     id: 'traffic.demandLevel',
@@ -1104,6 +1329,21 @@ export const TRAFFIC_PARAMETERS: readonly TrafficParameterSpec[] = [
     default: TRAFFIC_DEFAULTS.credentialAssignment,
     description:
       'How a passenger bound for an access-restricted floor acquires a credential. permitted-first assigns the first group in declared zone order; none leaves every passenger unbadged.',
+  },
+  {
+    id: 'traffic.credentialGap.wrongZoneShare',
+    type: 'continuous',
+    // The whole unit interval, and the bound is the quantity's own rather than a taste: it is a
+    // share of journeys. 0 is the control arm (everybody correctly badged, which is what every
+    // figure published before this parameter existed was measured under) and 1 is the degenerate
+    // arm (nobody inside the building may cross a zone boundary), and both are legitimate ends of
+    // a sweep. The *shipped* value is not a search bound at all — it is an uncited assumption with
+    // its reasoning in `data/traffic-profiles.json`, which is where a reader has to go for it.
+    range: [0, 1],
+    scale: 'linear',
+    default: null,
+    description:
+      "Share of journeys that begin inside the building and end inside an access zone the traveller's own floor does not already reach, which are made by somebody not holding a credential for it. Unset means the credentialGap block in data/traffic-profiles.json, which is the only honest default: the number is an uncited assumption stated there with its reasoning, and a second value here would be a second source of truth for it. 0 is the control arm — every rider holds a credential for wherever they are going. It is consumed only where a building declares accessZones; a building that declares none is byte-identical at every value.",
   },
   {
     id: 'traffic.maxLegs',

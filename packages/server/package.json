@@ -8,10 +8,15 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
@@ -19,6 +24,13 @@
     "serve": "node dist/main.js"
   },
   "dependencies": {
-    "@elevator-sim/core": "*"
+    "@azure/communication-email": "^1.1.0",
+    "@azure/identity": "^4.13.1",
+    "@elevator-sim/core": "*",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/pg": "^8.20.4"
   }
 }

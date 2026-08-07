@@ -12,6 +12,7 @@ import {
   ConfigError,
   formatConfigIssues,
   loadConfig,
+  type DemandTemplate,
   type DispatcherProfile,
   type LoadedConfig,
   type ResolvedBuilding,
@@ -86,6 +87,27 @@ export function requireDispatcher(
 
 export function requireTrafficProfile(config: LoadedConfig, id: string): TrafficProfile {
   return pick(id, config.trafficProfilesById, 'traffic profile', '--traffic');
+}
+
+/**
+ * The id of a `demandTemplates` record in **the data directory this run loaded**. § D274.
+ *
+ * `--template` used to be checked against `core`'s `DEMAND_TEMPLATE_IDS`, at parse time, through
+ * the flag's own `choices` list — and that was the wrong authority twice over. It listed the shapes
+ * *this build compiles* rather than the templates *this data directory ships*, so `--data <dir>`
+ * against a directory with its own templates was rejected before the directory was even read; and
+ * since `DECISIONS.md` § D273 a record may author its own `phases`, so a perfectly valid shipped
+ * template can have an id no compiled-in union contains. `office-day` is the first one that does,
+ * and it is the reason this function exists rather than an argument that it should.
+ *
+ * The same `pick` every other data-derived flag uses, so the error is the one a reader already
+ * knows: what is available, the nearest match, and `elevator-sim list`.
+ */
+export function requireDemandTemplate(config: LoadedConfig, id: string): DemandTemplate {
+  const index = new Map(
+    config.trafficProfiles.demandTemplates.map((template) => [template.id, template]),
+  );
+  return pick(id, index, 'demand template', '--template');
 }
 
 /**

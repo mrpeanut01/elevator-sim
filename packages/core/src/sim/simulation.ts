@@ -256,7 +256,6 @@ interface ActiveCall {
  */
 const STRUCTURAL_INELIGIBILITY: ReadonlySet<string> = new Set([
   'serviceZone',
-  'accessDenied',
   'destinationServiceZone',
   'destinationAccessDenied',
 ]);
@@ -639,6 +638,10 @@ export class Simulation {
   readonly #kioskWithoutCredential: boolean;
   /** Legs the bare kiosk refused. See {@link #kioskAllows}. */
   readonly #kioskRefusedLegs = new Set<string>();
+  /** Legs turned away for want of a credential. See {@link #refuseAccess}. */
+  readonly #accessRefusedLegs = new Set<string>();
+  /** Journeys ended by an access refusal. See {@link ConservationAudit.accessRefused}. */
+  readonly #accessRefusedJourneys = new Set<string>();
 
   #ran = false;
 
@@ -1101,6 +1104,11 @@ export class Simulation {
       doubleDeckDeckFullRefusals: this.#doubleDeckDeckFullRefusals,
       deckMismatchLegs: this.#deckMismatchLegs.size,
       kioskRefusedLegs: this.#kioskRefusedLegs.size,
+      // Omitted at zero, never `0`: `structuralDigestOfResult` hashes every key whatever its
+      // value, so a key on every run would move every pinned identity digest to say nothing.
+      ...(this.#accessRefusedLegs.size === 0
+        ? {}
+        : { accessRefusedLegs: this.#accessRefusedLegs.size }),
     });
   }
 
@@ -1481,9 +1489,71 @@ export class Simulation {
     // The leg carries its own `arrivedAt`; there is no second clock to pass in, and a runner
     // that supplied one could put the record and the model a fraction of a second apart.
     this.#recorder.recordArrival(passenger);
+    // Recorded first and turned away second, deliberately: the person walked to the lift, and a
+    // record that omitted them would make the refusal invisible to every count taken over the
+    // record — which is exactly the shortfall `ConservationAudit.stairsJourneys` exists to stop
+    // being inferred from an absence.
+    if (!this.#credentialAllows(passenger)) {
+      this.#refuseAccess(passenger);
+      return;
+    }
     this.#observeArrival(passenger);
     this.#building.requireFloor(passenger.originFloorId).addWaiting(passenger);
     this.#armPatience(passenger);
+  }
+
+  /**
+   * Whether this leg's rider may legally alight where the leg is going.
+   *
+   * The same question {@link #bankCanCarry} and {@link #carCanCarry} ask, asked once, at the
+   * landing, before any car is involved — because the answer is a fact about the pair
+   * `(credential, floor)` and no dispatch decision can change it. Those two keep asking it, which
+   * is defence in depth rather than duplication: they run on legs this one has already passed, and
+   * a future model that admitted somebody conditionally would still be refused at the doorway.
+   */
+  #credentialAllows(passenger: Passenger): boolean {
+    return this.#building.isAccessPermitted(
+      passenger.credentialGroup,
+      passenger.destinationFloorId,
+    );
+  }
+
+  /**
+   * **The building turning somebody away for want of a credential** (`DECISIONS.md` § D266).
+   *
+   * They reached the landing, the readers said no, and they left. Not delivered, not waiting, not
+   * abandoned — a fourth outcome, and each of those three would be a different lie:
+   *
+   * - **Delivered** would say somebody got where they were going who did not.
+   * - **Waiting** would leave them standing on a landing for the rest of the run, so their
+   *   censored wait would run past the 900 s horizon and `awtIsValid`'s `starved` ground would
+   *   suppress the mean of every access-zoned building. A credential refusal reported as a
+   *   service failure is precisely the confusion this whole feature exists to end, and it is what
+   *   [§ D254](../../../../DECISIONS.md) found the old defect doing.
+   * - **Abandoned** would put it in `RunSummary.abandonment`, so a run declaring no
+   *   `sim.patience` would report riders giving up, and the rate a reader judges patience by would
+   *   be measuring access zoning.
+   *
+   * **They are not silently dropped, and that is the whole care of it.** The leg is in the record,
+   * carries `refusedAt`, counts in `WaitStatistics.unservedCount` — they *were* never served — and
+   * the total is published as `ConservationAudit.accessRefused` and
+   * `StageActivity.accessRefusedLegs`, beside the mean their absence flatters, on exactly the
+   * footing `EnergyStatistics.workPerServedLegKJ` sits beside raw energy
+   * ([§ D106](../../../../DECISIONS.md)). A configuration that improves its wait by carrying fewer
+   * people has not improved anything, and the count is how a reader sees that.
+   *
+   * No call is opened for them and no bank is told they arrived, which is what a destination
+   * terminal does in a real building: it reads the badge and declines the request. **Under a
+   * conventional up-down-button system the reader is inside the car**, so a real wrong-zone rider
+   * boards, presses a button that does not light and rides somewhere before walking back — a stop
+   * and a place in a car this model does not charge the building for. The cost of the gap is
+   * therefore *understated* under conventional control, and that direction is stated here rather
+   * than left to be discovered.
+   */
+  #refuseAccess(passenger: Passenger): void {
+    this.#accessRefusedLegs.add(passenger.id);
+    this.#accessRefusedJourneys.add(passenger.journeyId);
+    this.#recorder.recordAccessRefusal(passenger, passenger.arrivedAt);
   }
 
   /**
@@ -1920,20 +1990,25 @@ export class Simulation {
   /**
    * Note that a landing cannot be collected as things stand, and stop asking on a timer.
    *
-   * The overwhelmingly common cause is an **access-restricted pickup floor under
-   * `up-down-buttons`**. `Car.estimateCost` applies access zoning to the floor named in the
-   * request, and a conventional landing call carries no credential by construction, so every
-   * car in the bank reports `accessDenied` and the call is unassignable. On Secure Tower that
-   * is every down and interfloor trip from floors 2–30; the same shape appears on Mixed-Use
-   * High-Rise and Vertical City.
+   * **This docstring used to describe an access-restricted *pickup* floor as the overwhelmingly
+   * common cause, and it was describing a defect it had mistaken for a design.** `estimateCost`
+   * applied access zoning to the floor named in the request; under `up-down-buttons` a landing
+   * call carries no credential by construction, so every car refused every landing call raised
+   * on a restricted floor and no access-zoned building could be operated by any conventional
+   * dispatcher at any budget. That is fixed — the credential question is asked about the
+   * destination and not about the pickup (§ D254) — so the cause named here no longer exists,
+   * and the sentence is kept as a correction rather than deleted, because the claim it made is
+   * repeated across this repository and a reader who meets it elsewhere needs to find its
+   * refutation.
+   *
+   * What remains reachable is the genuine article: a `destinationServiceZone` or
+   * `destinationAccessDenied` refusal — a disclosed destination this bank does not serve, or one
+   * the disclosed credential may not reach. `#kioskAllows` is the shipped instance.
    *
    * The runner does not paper over it. The passengers stay on the landing, are counted in
    * {@link SimulationResult.undelivered}, the run is reported `timed-out`, and a warning names
    * the call — because a quietly-shortened run of a system that cannot serve a tenth of its
-   * traffic is exactly the "confident nonsense" CLAUDE.md exists to prevent. A credential-aware
-   * profile (`dispatch.callType: 'mobile-credential'`) serves these landings, which is the
-   * documented advantage of moving authorization earlier rather than an accident of this
-   * module.
+   * traffic is exactly the "confident nonsense" CLAUDE.md exists to prevent.
    *
    * The warning is emitted at the end rather than here, and only for calls that were still
    * stuck when the run finished: a landing can be freed by a car that stopped for some other
@@ -3191,11 +3266,18 @@ export class Simulation {
    * the policy is *allowed* to use it is `dispatch.callType`'s decision, not the runner's:
    * `costRequestFor` forwards it only under `mobile-credential` and drops it under
    * `up-down-buttons`, so a conventional run cannot accidentally benefit from information the
-   * passenger never gave it. Supplying it here is what lets a credential-aware profile serve an
-   * access-controlled building at all — which conventional dispatch measurably cannot, at any
-   * budget, because a landing call carries no credential and every car answers `accessDenied`.
+   * passenger never gave it.
    *
-   * **That is a claim about authorization, and it is the only one the measurements support.** This
+   * **This paragraph used to end by saying conventional dispatch cannot serve an
+   * access-controlled building at any budget, because every car answers `accessDenied`. That was
+   * true of the code and false of the world, and § D254 removed the cause.** The credential was
+   * being checked against the *pickup* floor, which is not a question a lift is asked; with it
+   * asked about the destination instead, `collective` delivers 725 of 725 on
+   * `mixed-use-high-rise` where it previously delivered 642. What the credential still buys is
+   * real and much smaller — see § D256 for the measured figure — and it is no longer the
+   * difference between operable and inoperable.
+   *
+   * **The surviving claim is about authorization, and it is the only one the measurements support.** This
    * docstring used to say the credential makes access control *cheaper* because authorization and
    * optimization happen in the same step; measured at n = 150 per building under CRN, the
    * destination's contribution to optimization is **smaller** on the access-controlled building
@@ -3880,6 +3962,20 @@ export class Simulation {
       );
     }
 
+    /*
+     * The credential gap's own refusals, said out loud once, in the run's own words (§ D266).
+     *
+     * The same argument the kiosk line above rests on, one cause over: nothing else in the run
+     * mentions these people. They never opened a call, so no landing looks odd; the queue behind
+     * them was collected normally; and the only other trace of them is a count in
+     * `conservation.accessRefused` that a reader has to already be looking for.
+     */
+    if (this.#accessRefusedLegs.size > 0) {
+      this.#warnings.push(
+        `${String(this.#accessRefusedLegs.size)} leg(s) were turned away for want of a credential: the rider reached the landing and their credential does not permit the floor they were going to, so no car in the building may legally carry them and none was sent. They are counted in conservation.accessRefused and in stageActivity.accessRefusedLegs, and they are neither delivered nor waiting — read the count beside the mean, because every per-leg figure this run reports is taken over the riders who could travel and a building that refuses more people reports a shorter wait for exactly that reason (DECISIONS.md § D106's rule, one axis over; § D265, § D266). No dispatcher setting reaches this: the fix is a credential, or the building's access zoning.`,
+      );
+    }
+
     for (const [callId, reasons] of this.#unservable) {
       const active = this.#activeCalls.get(callId);
       if (active === undefined) continue;
@@ -3931,6 +4027,7 @@ export class Simulation {
     const undelivered: UndeliveredJourney[] = [];
     let delivered = 0;
     let abandoned = 0;
+    let accessRefused = 0;
 
     // Which car took each leg, so an undelivered rider can be named with the car it is in.
     const carOfLeg = new Map<string, string>();
@@ -4015,6 +4112,18 @@ export class Simulation {
         continue;
       }
 
+      /*
+       * **A rider the readers turned away is a fourth outcome** (§ D266), and it is `undelivered`
+       * for the same reason abandonment is not: that list is *"who is still in the system"*, and
+       * it decides whether the run reports `timed-out`. Somebody the building would not let
+       * travel is in no queue and no car, so filing them there would report a run as having
+       * failed to drain when it drained perfectly — and would blame the lifts for a credential.
+       */
+      if (this.#accessRefusedLegs.has(last.id)) {
+        accessRefused += 1;
+        continue;
+      }
+
       const reason: UndeliveredReason = last.hasAlighted
         ? 'transferring'
         : last.hasBoarded
@@ -4045,9 +4154,9 @@ export class Simulation {
         `${legsCreated} legs were created but ${legsRecorded} reached the recorder; the difference is invisible to every metric`,
       );
     }
-    if (delivered + undelivered.length + abandoned !== generated) {
+    if (delivered + undelivered.length + abandoned + accessRefused !== generated) {
       problems.push(
-        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered and ${abandoned} as abandoned`,
+        `${generated} journeys were generated but ${delivered} were delivered, ${undelivered.length} accounted for as undelivered, ${abandoned} as abandoned and ${accessRefused} as refused for want of a credential`,
       );
     }
 
@@ -4121,7 +4230,14 @@ export class Simulation {
      * patience, which is every run this repository has published.
      */
     const abandonedLegs = this.#abandonedLegs.size;
-    const promisableLegs = legsCreated - abandonedLegs;
+    /*
+     * **A refused leg is netted out for the same reason, one step earlier** (§ D266). It never
+     * reached a landing queue, so no panel ever saw it and no promise could have been made about
+     * it — and without this term the first destination-dispatch run on an access-zoned building
+     * would fail its own conservation audit for a reason that is not a defect. Zero on every
+     * building that declares no `accessZones`.
+     */
+    const promisableLegs = legsCreated - abandonedLegs - this.#accessRefusedLegs.size;
     if (this.#panelAssigns && undelivered.length === 0 && promisesInForce !== promisableLegs) {
       problems.push(
         `${promisableLegs} legs were created and not abandoned and every journey was delivered, but ${promisesInForce} promises were in force at the end (${this.#legsAssigned} made, ${this.#promisesRevoked} revoked, ${this.#promisesAbandoned} voided by abandonment); ${promisableLegs - promisesInForce} boarded without being promised anything`,
@@ -4167,11 +4283,23 @@ export class Simulation {
             stairsJourneys: this.#stairsTaken.size,
             stairsTransitS: this.#stairsTransitS,
           }),
+      /*
+       * Present only when the building actually turned somebody away — absent, not `0`, on every
+       * building that declares no `accessZones` and on every run where everybody is correctly
+       * badged, so such a run carries the audit object it always did and `structuralDigestOfResult`
+       * (which hashes every key whatever its value) is unmoved for it.
+       *
+       * On the audit for `stairsJourneys`' reason: a refused rider leaves the lift system, so the
+       * served-leg count falls and any comparison across configurations with different refusal
+       * rates compares different populations. Without the count that shortfall reads as a better
+       * building.
+       */
+      ...(accessRefused === 0 ? {} : { accessRefused }),
       balanced:
         problems.length === 0 &&
         legsCreated === legsRecorded &&
         this.#wrongCarBoardings === 0 &&
-        delivered + undelivered.length + abandoned === generated,
+        delivered + undelivered.length + abandoned + accessRefused === generated,
     });
 
     return { audit, undelivered, problems };
@@ -4305,6 +4433,11 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     // `generateTrace` rejects overrides against an already-resolved template, which carries its
     // own geometry; passing an empty record would trip that check for no benefit.
     ...(Object.keys(templateOverrides).length === 0 ? {} : { templateOverrides }),
+    // § D285, and carried straight through rather than folded into `templateOverrides`: an override
+    // refits the template's geometry and a window leaves it exactly as authored. That is what makes
+    // this the answer to the refusal `durationS` gets on a phase list rather than a way round it.
+    ...(config.windowStartS === undefined ? {} : { windowStartS: config.windowStartS }),
+    ...(config.windowEndS === undefined ? {} : { windowEndS: config.windowEndS }),
     ...(demand.demandLevel === undefined ? {} : { demandLevel: demand.demandLevel }),
     ...(demand.arrivalRatePctPop5min === undefined
       ? {}
@@ -4322,6 +4455,10 @@ function traceConfigFor(config: SimulationConfig, streams: StreamSet): TrafficCo
     ...(demand.credentialAssignment === undefined
       ? {}
       : { credentialAssignment: demand.credentialAssignment }),
+    // Spread-or-omit for `passengerMass`'s reason: unset means the reference data decides, and a
+    // default here would be a second source of truth for a number `data/traffic-profiles.json`
+    // already states with its reasoning attached (§ D265).
+    ...(demand.credentialGap === undefined ? {} : { credentialGap: demand.credentialGap }),
     ...(demand.maxLegs === undefined ? {} : { maxLegs: demand.maxLegs }),
     // docs/14 §§ 2.1-2.2. Spread-or-omit, never `?? <a default of this file's own>`: unset means
     // the reference data decides, and a default invented here would be a second source of truth

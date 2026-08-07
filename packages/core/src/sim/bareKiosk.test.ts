@@ -191,9 +191,15 @@ describe('a destination kiosk with no credential refuses a passenger, not a queu
       expect(journey.carId, journey.legId).toBeUndefined();
     }
     expect(bare.conservation.balanced).toBe(true);
-    expect(bare.conservation.delivered + bare.conservation.undelivered).toBe(
-      bare.conservation.generated,
-    );
+    // `accessRefused` is the credential gap's own terminus (§ D266), and it is added rather than
+    // the equality relaxed: this building declares zones, so a few riders are turned away for a
+    // badge before the kiosk is ever consulted, and they are a different refusal with a different
+    // fix. Both are accounted for; neither is tolerated as a shortfall.
+    expect(
+      bare.conservation.delivered +
+        bare.conservation.undelivered +
+        (bare.conservation.accessRefused ?? 0),
+    ).toBe(bare.conservation.generated);
 
     // And the run says so out loud rather than leaving a row in `undelivered` that reads as
     // ordinary overflow.

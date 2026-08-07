@@ -1,6 +1,6 @@
 {
   "generatedBy": "Authored. Validated at load by packages/viz/src/campaign/parse.ts against data/scenario-goals.json, against collectSearchSpace() and against data/buildings/. packages/viz/src/campaign/campaign.test.ts runs that validator over this file.",
-  "contract": "docs/10-experience-layer-contract.md § 5.2 (the scenario shape), § 5.3 (the four fail states), § 5.4 (the seven-stage progression). Goals are SELECTED, never authored: every kind below appears in this stage's `goals` bucket in data/scenario-goals.json, and the bar each is judged against is the count that table published for the shipped setting on these same seeds. DECISIONS.md § D160 — a rate of 0 or 1 is a fact for the brief, anything between is a batch goal, and there is no single-run goal left for a stage to carry.",
+  "contract": "docs/10-experience-layer-contract.md \u00a7 5.2 (the scenario shape), \u00a7 5.3 (the four fail states), \u00a7 5.4 (the seven-stage progression). Goals are SELECTED, never authored: every kind below appears in this stage's `goals` bucket in data/scenario-goals.json, and the bar each is judged against is the count that table published for the shipped setting on these same seeds. DECISIONS.md \u00a7 D160 \u2014 a rate of 0 or 1 is a fact for the brief, anything between is a batch goal, and there is no single-run goal left for a stage to carry.",
   "stages": [
     {
       "id": "stage-1-first-call",
@@ -8,7 +8,7 @@
       "teaches": "a call, a car, a wait",
       "brief": [
         "Garden Apartments is a small building with a gentle trickle of demand.",
-        "Watch a call appear at a landing, a car answer it, and the wait end — those three things are what every dispatcher in this simulator is made of.",
+        "Watch a call appear at a landing, a car answer it, and the wait end \u2014 those three things are what every dispatcher in this simulator is made of.",
         "Nothing here is hard. The stage exists so that the next six have something to be different from."
       ],
       "building": "garden-apartments",
@@ -61,7 +61,7 @@
       "teaches": "rise and fall, and the gap between demand offered and demand carried",
       "brief": [
         "Midtown Office at two and a half percent of its population arriving every five minutes: busy, and still under the level at which it stops coping.",
-        "Two counts matter here — how many people arrived, and how many were carried — and the gap between them is the thing a dispatcher can move.",
+        "Two counts matter here \u2014 how many people arrived, and how many were carried \u2014 and the gap between them is the thing a dispatcher can move.",
         "This is the first stage where a number changes when you change a dial."
       ],
       "building": "midtown-office",
@@ -197,7 +197,7 @@
       "teaches": "service zoning, and a journey with two waits",
       "brief": [
         "Mixed-Use High-Rise has two banks that reach different parts of the building, so a single journey can involve two waits and a transfer.",
-        "Service zoning is which floors a shaft physically reaches — not who is allowed in, and not how the dispatcher thinks; the three are different concepts with different fixes.",
+        "Service zoning is which floors a shaft physically reaches \u2014 not who is allowed in, and not how the dispatcher thinks; the three are different concepts with different fixes.",
         "Keep the queues from running away while you learn to tell them apart."
       ],
       "building": "mixed-use-high-rise",
@@ -249,12 +249,12 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "no-divergence",
+          "kind": "deliver-everyone",
           "threshold": null
         },
         {
-          "kind": "long-waits-under",
-          "threshold": 10
+          "kind": "answer-the-demand",
+          "threshold": null
         },
         {
           "kind": "beat-the-baseline",
@@ -271,11 +271,11 @@
     {
       "id": "stage-5-credentials",
       "name": "Credentials",
-      "teaches": "access zoning, by failing at it first",
+      "teaches": "access zoning, and the one problem no dial reaches",
       "brief": [
-        "Secure Tower puts a credential on most of its floors, and the dispatcher you start on cannot read one.",
-        "Ten of the twelve shipped dispatchers are in the same position, so a call from a restricted floor is not slow — it is unanswerable, and no amount of tuning the waiting weight reaches it.",
-        "Change what the call carries, and watch the locked-out landings clear."
+        "Secure Tower puts a credential on most of its floors, and a few people every run are heading for one their badge does not open.",
+        "Those riders are turned away where they stand. It is not congestion and it is not the dispatcher: more cars would not carry them, and neither would a setting that reads the badge \u2014 a reader that can see the wrong badge still says no.",
+        "So watch what the rest of the run does. Everything you can move here is about the people who can travel, and the report counts the ones who could not beside the average rather than inside it."
       ],
       "building": "secure-tower",
       "traffic": {
@@ -308,6 +308,10 @@
       },
       "replications": 50,
       "goals": [
+        {
+          "kind": "deliver-everyone",
+          "threshold": null
+        },
         {
           "kind": "no-divergence",
           "threshold": null
@@ -406,10 +410,6 @@
           "threshold": null
         },
         {
-          "kind": "no-divergence",
-          "threshold": null
-        },
-        {
           "kind": "answer-the-demand",
           "threshold": null
         },
@@ -478,7 +478,7 @@
       "name": "The headline address",
       "teaches": "that spare cars are not the same as a short interval",
       "brief": [
-        "Nineteen floors, 612 people, six cars at 5 m/s — the smallest crowd in the campaign on the tightest promise.",
+        "Nineteen floors, 612 people, six cars at 5 m/s \u2014 the smallest crowd in the campaign on the tightest promise.",
         "This is the only building here with more lift than it needs, and it still has to earn a 25 s interval. Capacity is not the constraint; where the spare cars wait between bursts is.",
         "Watch the energy figure beside the wait. A car that drives more to be in the right place has spent something, and this is the stage where that trade is visible."
       ],
@@ -536,7 +536,7 @@
       "name": "Both ways at once",
       "teaches": "demand with no dominant direction, and a car unlike its neighbours",
       "brief": [
-        "Guests arrive and leave all day, so there is no rush hour to point a dispatcher at — the traffic is two-way from the first minute to the last.",
+        "Guests arrive and leave all day, so there is no rush hour to point a dispatcher at \u2014 the traffic is two-way from the first minute to the last.",
         "Four guest cars share the bank with one service lift at 1.75 m/s, less than two thirds their speed. Nothing in the configuration says it is the wrong car for a guest; only its speed and its capacity do.",
         "A hard rule against reversing direction is worth less here than anywhere else in the campaign. It is on by default, and it is yours to turn off."
       ],
@@ -574,10 +574,6 @@
       "replications": 50,
       "goals": [
         {
-          "kind": "deliver-everyone",
-          "threshold": null
-        },
-        {
           "kind": "answer-the-demand",
           "threshold": null
         },
@@ -600,7 +596,7 @@
       "brief": [
         "A hospital never empties, and its busiest moments are shift changes rather than a morning arrival.",
         "Two of the five cars are bed lifts: bigger, slower, and the wrong answer to an ordinary hall call. They are in the same bank as the other three and the dispatcher has only their speed, capacity and transfer time to tell them apart.",
-        "Outpatients on floor 1 holds 180 people. When a clinic ends it empties downward — a crowd from the middle of the building rather than from the lobby, which is a shape no earlier stage produces."
+        "Outpatients on floor 1 holds 180 people. When a clinic ends it empties downward \u2014 a crowd from the middle of the building rather than from the lobby, which is a shape no earlier stage produces."
       ],
       "building": "st-jude-hospital",
       "traffic": {
@@ -640,16 +636,8 @@
           "threshold": null
         },
         {
-          "kind": "no-divergence",
-          "threshold": null
-        },
-        {
           "kind": "answer-the-demand",
           "threshold": null
-        },
-        {
-          "kind": "long-waits-under",
-          "threshold": 10
         },
         {
           "kind": "beat-the-baseline",

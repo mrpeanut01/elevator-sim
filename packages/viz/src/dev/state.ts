@@ -38,6 +38,7 @@ import {
   doorTimingFor,
   profileFromSpec,
   specFromProfile,
+  specIsDirty as dispatcherSpecIsDirty,
   type DispatcherSpec,
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
@@ -58,6 +59,7 @@ import {
 import {
   DEFAULT_PATTERN,
   demandFromSpec,
+  patternIsDirty,
   specFromTrafficProfile,
   trafficProfilesWithPattern,
   type PatternSpec,
@@ -74,7 +76,7 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
-import { contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
 import { SHIFT_EVENTS, eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
@@ -85,8 +87,8 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, openWeek, takeContract, withContract } from '../shift/week.js';
-import type { ShiftEvent, WeekState } from '../shift/types.js';
+import { SANDBOX_CONTRACT_ID, closeDay, openWeek, takeContract, withContract } from '../shift/week.js';
+import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
@@ -94,28 +96,65 @@ import type { BrowserResources } from './data.js';
 import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
 import type { RailSegment, TabName } from './elementMap.js';
 
-/**
- * How long a shift is, in simulated seconds of demand.
- *
- * The handoff's day is sixteen hours and this simulator does not have one — `docs/12` § 4.1 is the
- * argument and this select is the consequence. The four lengths are the two shipped demand
- * templates' own horizons and two multiples of the recommended one: `rise-and-fall` is 30 minutes
- * and `constant-iso` is two hours, so a reader can run a shift that matches a published figure's
- * horizon exactly rather than one this UI invented.
- *
- * The default is **30 minutes**, the template's own, for the same reason: it is the horizon every
- * number in `docs/05-roadmap.md` was measured over, so the first thing a reader sees is comparable
- * with the project's own results.
+/*
+ * `SHIFT_LENGTHS` stood here: four narrative options, *Short shift — 15 min* to *Full period — 2 h*,
+ * writing the same `shiftLengthS` field that Free play's five numeric *Run length* options wrote
+ * (issue #82). Both are gone — § D286. The options now come from `partsOfDay`, derived from the
+ * loaded records' own hours, and they are the same options in both modes: one name, one list, one
+ * meaning. Nothing is authored here because there is nothing left to author — a part's length is the
+ * period it names and its label is its clock. See `menu/partsOfDay.ts` for the derivation, and for
+ * why a length control could not be relabelled into an honest one.
  */
-export const SHIFT_LENGTHS: readonly { readonly seconds: number; readonly label: string }[] =
-  Object.freeze([
-    { seconds: 900, label: 'Short shift — 15 min' },
-    { seconds: 1800, label: 'Standard shift — 30 min' },
-    { seconds: 3600, label: 'Long shift — 1 h' },
-    { seconds: 7200, label: 'Full period — 2 h' },
-  ]);
 
+/**
+ * The shift a page with no scenario opens on, seconds — `rise-and-fall`'s own thirty minutes.
+ *
+ * Unchanged by § D286 and for its original reason: it is the horizon every number in
+ * `docs/05-roadmap.md` was measured over, so the first thing a reader sees is comparable with the
+ * project's own results. It is a *length* rather than a part because a contract declares a length
+ * (`ScenarioContract.shiftLengthS`) and the scenarios were authored against the templates' periods;
+ * {@link ViewerState.windowStartS} opens at `null`, the whole of whatever period that is.
+ */
 export const DEFAULT_SHIFT_LENGTH_S = 1800;
+
+/**
+ * The shift a scenario opens on — its own, when it authors one, else the shipped default.
+ * § D234, issue #27.
+ *
+ * Called from exactly two places, and the pair is the decision: {@link initialState}, because the
+ * page opens on `CONTRACTS[0]`, and `scenariosPanel`'s `take`, because taking an assignment
+ * restarts the week and is the one moment a player has asked for this scenario rather than for
+ * this shift length.
+ *
+ * It is deliberately **not** called from `withBuilding`. Changing building from the coach select is
+ * not taking an assignment — the player is on day 4 with a streak and they still are — and
+ * re-seeding there would throw away a length they had chosen, which is the inert-control failure
+ * with the sign flipped: the control would move and then move back on its own.
+ *
+ * `ScenarioContract.shiftLengthS` says why one building needs this at all, with the measurement.
+ */
+export function shiftLengthForContract(contractId: string): number {
+  return contractById(contractId)?.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S;
+}
+
+/**
+ * The demand template a shift will actually run, given a state — the id the parts are derived from.
+ *
+ * Exported because `dev/main.ts` needs the same answer `shiftRunConfigOf` reaches, and two
+ * expressions for *which template is running* is how the select comes to offer parts of a period
+ * the run is not using. The calendar's own override is deliberately **not** consulted: a period may
+ * swap the template for a scheduled day, and offering the player parts of a template the calendar
+ * chose for them would let a control move something the calendar owns.
+ */
+export function shiftDemandTemplateId(
+  resources: BrowserResources,
+  state: ViewerState,
+  building: BuildingConfig | undefined,
+): string {
+  const spec = selectedPatternSpec(resources, state, building);
+  const fromPattern = spec === undefined ? 'rise-and-fall' : demandFromSpec(spec).demandTemplate;
+  return state.freePlay?.demandTemplateId ?? fromPattern;
+}
 
 /** A dispatcher the reader saved. */
 export interface SavedDispatcher {
@@ -226,6 +265,19 @@ export interface ViewerState {
   readonly pattern: PatternSelection;
   readonly shiftLengthS: number;
   /**
+   * Where in the demand template's period this shift begins, seconds — `null` for the whole of it.
+   *
+   * `DECISIONS.md` § D286, and the other half of {@link shiftLengthS}. Together they are *which part
+   * of the day you run*: a length says how much demand, this says which part of the schedule it is
+   * cut from, and neither has taken on the other's meaning. `shiftLengthS` still travels into the
+   * leaderboard's `durationS` meaning exactly what it always meant.
+   *
+   * `null` rather than `0`, and carried into `SimulationConfig` as *no field at all*: a run over the
+   * whole of a period is byte-identical to the run before this existed, which is the property
+   * `traffic/windowIdentity.test.ts` holds to.
+   */
+  readonly windowStartS: number | null;
+  /**
    * What Free Play asked for, over and above the pattern select — or `undefined`, which is the
    * campaign's state and every published figure's.
    *
@@ -296,18 +348,136 @@ export interface ViewerState {
   readonly withheld: readonly string[];
 }
 
+/* -------------------------------------------------------------------------- *
+ * Whose progress is this? — § D231
+ * -------------------------------------------------------------------------- */
+
 /**
- * Change which building is running, taking the editor's working copy with it **when it is
+ * Whether a run in this play mode may write {@link ViewerState.week} — § D231.
+ *
+ * ## The defect this exists to end, which was data loss rather than a wrong caption
+ *
+ * `dev/main.ts`'s `closeShift` shaped the report sheet's `subject` on `playMode` and called
+ * `closeDay(state.week, outcome)` **above that branch, unconditionally**. So a Free Play run — the
+ * one whose own sheet prints *"one run, not part of a week — nothing is banked"* — closed a day
+ * into the week, and `saveSessionNow()` on the next line wrote it to `localStorage`. A player who
+ * had banked clean shifts on a scenario and then pressed **Free play** to try a silly dispatcher
+ * came back to a week whose Day-1 history entry was the free-play run's, and it survived a reload
+ * (issue #64).
+ *
+ * It is the same class as `closeShift`'s own *"three panels, two answers"* comment one layer down:
+ * there, the sheet said *your own building* while the rail counted the shift as banked; here, the
+ * sheet says *nothing is banked* while the week is being overwritten. The comment fixed what the
+ * sheet **said**. This fixes what the run **does**.
+ *
+ * ## Why an exhaustive switch and not `mode === 'free-play'`
+ *
+ * A ninth {@link PlayMode} must be a compile error here rather than a silent `false` — or, worse,
+ * a silent `true`, which is the direction that loses somebody's week. `scope/types.ts` makes the
+ * same argument for the union itself: *a named category is a compile error when a fifth one
+ * appears.*
+ *
+ * ## Endless banks nothing and still advances the week, which is not a contradiction
+ *
+ * `week.ts`'s `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no contract, so
+ * `closeDay` already banks nothing and clears nothing there. What endless *does* have is a week —
+ * days, growth, a streak, a seven-day history — and *"the same week with no assignment: it grows"*
+ * is the menu row's own promise. A mode that stopped closing days would stop growing the building,
+ * which is the whole of what a player pressed **Keep going** for.
+ *
+ * Free Play is the opposite: `enterFreePlay` opens a *fresh* week at day 1 precisely so the run is
+ * reproducible from its own selection and postable to a leaderboard. That week is scaffolding for
+ * one run, and writing it over the campaign's is the bug.
+ */
+export function advancesTheWeek(mode: PlayMode): boolean {
+  switch (mode) {
+    case 'shift-week':
+    case 'endless':
+      return true;
+    case 'free-play':
+    case 'ranked':
+    case 'stage-campaign':
+    case 'incidents':
+    case 'calendar':
+    case 'commissioning':
+      return false;
+  }
+}
+
+/**
+ * The week a closed day produces — the whole of {@link advancesTheWeek}'s consequence, in one
+ * place a test can reach.
+ *
+ * Returns {@link ViewerState.week} **unchanged, by identity** when the mode does not advance it, so
+ * *"the scenario week is untouched"* is checkable with `toBe` rather than with a deep compare that
+ * a future field could slip past.
+ */
+export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState {
+  if (!advancesTheWeek(state.playMode)) return state.week;
+  return closeDay(state.week, outcome);
+}
+
+/**
+ * The week that belongs in the saved session — § D231, and the other half of the same guard.
+ *
+ * `saveSessionNow` writes the whole of `ViewerState`, and `closeShift` is not its only caller:
+ * changing a setting saves too. So a guard on `closeDay` alone still lost the week the moment a
+ * free-play player flipped the theme, because `enterFreePlay` has *already* replaced
+ * `state.week` in memory by then. The week on disk is the campaign's and stays the campaign's
+ * until a mode that owns one closes a day.
+ *
+ * `stored` is what `loadSession` last read back, or `undefined` on a first visit — in which case
+ * there is nothing to protect and the current week is written, which is the ordinary path.
+ */
+export function weekForSession(state: ViewerState, stored: WeekState | undefined): WeekState {
+  if (advancesTheWeek(state.playMode)) return state.week;
+  return stored ?? state.week;
+}
+
+/**
+ * Change which building is running, taking the editors' working copies with it **when they are
  * untouched**.
  *
- * The two halves are both needed and they pull against each other. Leaving the copy alone means
+ * The two halves are both needed and they pull against each other. Leaving a copy alone means
  * opening the building editor after picking Vertical City shows Garden Apartments, which is a panel
  * describing a building nobody is looking at. Re-seeding it unconditionally means a reader who has
  * spent five minutes dragging an elevation loses it by touching the building select.
  *
- * So: re-seed only when the copy still equals the building it was read from. That is the ordinary
+ * So: re-seed only when the copy still equals the thing it was read from. That is the ordinary
  * rule for a working copy, and it is checkable here because `buildingSpec.ts` already has to answer
  * *is this dirty?* for the editor's own **edited — not saved** flag. One question, one answer.
+ *
+ * ## Two working copies, not one — GitHub issue #65
+ *
+ * The rule above was applied to `buildingSpec` and to nothing else, and the traffic editor is read
+ * from the building too: `sourcePatternOf` resolves `editingPatternId: 'building'` through
+ * `state.buildingId`, so the moment the building changed, the editor's untouched copy of Garden
+ * Apartments' profile was being compared against Vertical City's — and the panel said
+ * **edited — not saved** about a document nobody had edited. That is a *stale refusal*'s mirror
+ * image: a claim that work is at risk when none is, which trains a reader to ignore the one flag
+ * that means something. `patternSpec` now follows `buildingSpec`, under the same pristine guard and
+ * for the same reason.
+ *
+ * ## And the fabric does not follow — it is cleared
+ *
+ * {@link ViewerState.commissioning} is a `BankChoice` per **bank id**, and bank ids are a fact about
+ * one building. Carrying Garden Apartments' `main` over to Vertical City makes a choice set that
+ * `commissionedBuilding` will apply by name to whatever bank happens to share the id and drop on
+ * the floor otherwise — so the commissioning screen drew the previous scenario's shafts under the
+ * new building's name, and the review's capital figure was summed over hardware that is not there
+ * (issue #46).
+ *
+ * Empty is *as built*, and byte-identical to it, so clearing is the one value that means **nothing
+ * has been decided about this building** — which is exactly true the instant a different building
+ * arrives. It is not a re-seed for the same reason `asBuiltChoices` is not stored: a screen that
+ * has not been opened has decided nothing, and `commissioningInput` builds the as-built set when it
+ * needs one.
+ *
+ * There is no pristine guard on this half, and that is the difference rather than an omission. A
+ * working copy can be dirty *against its source* because it is a document being edited; a choice
+ * set cannot, because the bank ids it is keyed by stop existing. Nothing is preserved by keeping
+ * it — see `state.test.ts`, which moves the fabric, changes building, and requires the fabric to be
+ * gone.
  */
 export function withBuilding(
   state: ViewerState,
@@ -345,15 +515,98 @@ export function withBuilding(
       : contract.id === state.week.contractId
         ? state.week
         : takeContract(state.week, contract.id);
-  const next: ViewerState = { ...state, buildingId, week };
+  /*
+   * The fabric is dropped whenever the building actually moves, and left alone when it does not —
+   * `withBuilding` is called from the coach select on every `change`, including one that re-picks
+   * the building already running, and a re-pick that silently discarded a fabric would be the
+   * control moving back on its own.
+   */
+  const moved = buildingId !== state.buildingId;
+  const next: ViewerState = {
+    ...state,
+    buildingId,
+    week,
+    ...(moved ? { commissioning: [] } : {}),
+  };
+  const withPattern = moved ? withReseededPattern(next, resources, state) : next;
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
   const pristine =
     source !== undefined &&
     !buildingSpecIsDirty(state.buildingSpec, specFromBuilding(source, state.editingBuildingId));
-  if (!pristine) return next;
+  if (!pristine) return withPattern;
   const wanted = buildingConfigOf(resources, state.savedBuildings, buildingId);
+  if (wanted === undefined) return withPattern;
+  return {
+    ...withPattern,
+    buildingSpec: specFromBuilding(wanted, buildingId),
+    editingBuildingId: buildingId,
+  };
+}
+
+/**
+ * Take the traffic editor's working copy to the new building, when it is still the old one's.
+ *
+ * Only ever called for `editingPatternId: 'building'`, and that is the whole of the condition: a
+ * reader editing a *named* profile or one they saved is editing a document that has nothing to do
+ * with which building is running, and re-seeding there would throw their work away on a control
+ * that was not about it. `'building'` is the one selection whose source `sourcePatternOf` resolves
+ * through `state.buildingId`, so it is the one that goes stale when the building changes.
+ *
+ * `before` is the state as it was, because the dirty question is *"is this copy still the old
+ * building's profile?"* and the new building's is the wrong thing to ask it against.
+ */
+function withReseededPattern(
+  next: ViewerState,
+  resources: BrowserResources,
+  before: ViewerState,
+): ViewerState {
+  if (before.editingPatternId !== 'building') return next;
+  const was = buildingConfigOf(resources, before.savedBuildings, before.buildingId);
+  const source = specFromTrafficProfile(resources.trafficProfiles, was?.trafficProfile);
+  if (patternIsDirty(before.patternSpec, source)) return next;
+  const wanted = buildingConfigOf(resources, next.savedBuildings, next.buildingId);
   if (wanted === undefined) return next;
-  return { ...next, buildingSpec: specFromBuilding(wanted, buildingId), editingBuildingId: buildingId };
+  return {
+    ...next,
+    patternSpec: specFromTrafficProfile(resources.trafficProfiles, wanted.trafficProfile),
+  };
+}
+
+/**
+ * Change which dispatcher is driving, taking the editor's working copy with it — GitHub issue #65.
+ *
+ * `withBuilding`'s rule, on the other rail card, and it was missing for exactly as long: the rail
+ * wrote `dispatcherId` alone, so picking **collective** from the list left `editingDispatcherId` and
+ * `dispatcherSpec` on whatever profile had been opened before — a cost-function line, an advice
+ * sentence and a weight grid describing a dispatcher nobody is running, under a card marked
+ * *selected*. `runThisDispatcherStateOf` then offered *use this one* about the profile already
+ * driving, because it compares the two ids.
+ *
+ * The pristine guard is the same and it is load-bearing for the same reason: a reader who has spent
+ * five minutes moving weights and then wants to see what `collective` does keeps their copy, and the
+ * editor's **edited — not saved** flag goes on saying so. `specIsDirty` is the one question, asked
+ * once, exactly as `buildingSpecIsDirty` is above.
+ */
+export function withDispatcher(
+  state: ViewerState,
+  resources: BrowserResources,
+  dispatcherId: string,
+): ViewerState {
+  const next: ViewerState = { ...state, dispatcherId };
+  if (dispatcherId === state.dispatcherId) return next;
+  const source = allDispatchers(resources, state.savedDispatchers).find(
+    (profile) => profile.id === state.editingDispatcherId,
+  );
+  if (dispatcherSpecIsDirty(state.dispatcherSpec, source)) return next;
+  const wanted = allDispatchers(resources, state.savedDispatchers).find(
+    (profile) => profile.id === dispatcherId,
+  );
+  if (wanted === undefined) return next;
+  return {
+    ...next,
+    dispatcherSpec: specFromProfile(wanted, wanted.name),
+    editingDispatcherId: dispatcherId,
+  };
 }
 
 /** The disclosure mode in the handoff's own words. `mode/` calls the two levels basic/advanced. */
@@ -391,7 +644,12 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     buildingId,
     dispatcherId,
     pattern: 'building',
-    shiftLengthS: DEFAULT_SHIFT_LENGTH_S,
+    // The opening scenario's own shift, which for `c1` is an hour — § D234. The page opens on
+    // `CONTRACTS[0]`, so the length the tutorial is graded over is the length it opens on.
+    shiftLengthS: shiftLengthForContract(contractForBuilding(buildingId)?.id ?? ''),
+    // The whole of whatever period the opening template declares. `null` rather than `0`, so the
+    // first run a reader sees is byte-identical to the run before § D285 existed.
+    windowStartS: null,
     // `undefined`, not a default template. The campaign owns the run until Free Play says
     // otherwise, and every published figure in this repository was measured with no override.
     freePlay: undefined,
@@ -479,6 +737,46 @@ export function buildingConfigOf(
   const mine = saved.find((entry) => entry.id === id);
   if (mine !== undefined) return mine.config;
   return resources.entries.find((entry) => entry.config.id === id)?.config;
+}
+
+/**
+ * The building the state is *pointing at*, resolved — for the chrome to describe before a run
+ * exists. § D234, issue #36.
+ *
+ * ## What this is not, and why the distinction is the whole of the fix
+ *
+ * `ShiftRunConfig.building` is the building a run **resolved to**: grown to the day, commissioned,
+ * with the day's incidents written onto it. That is the right thing for the header to describe
+ * while a recording is on screen, and `dev/main.ts` holds it from the last `runShift`.
+ *
+ * It is the wrong thing to describe when there is **no** recording, and the shell had nothing else.
+ * Pressing *Take the next assignment* moves `buildingId` and clears the recording without running,
+ * so the header drew the new building's **name** — read from `state.buildingId` — beside the
+ * previous building's **specs**, held from the last run: `Midtown Office · 6 floors · 2 cars ·
+ * 0.63 m/s · 135 people`, where Midtown Office is 21 floors, 4 cars, 2.5 m/s and 1,710 people. A
+ * player reading that is told the next challenge is the size of the tutorial.
+ *
+ * So: the **shipped** building, not a grown one. Nothing has been run, so there is no day to have
+ * grown it to, and quoting today's population against a run that has not happened would be the
+ * caption-that-does-not-describe-the-picture failure in the other direction.
+ *
+ * `undefined` when the id resolves to nothing, which is the same answer `buildingConfigOf` gives
+ * and the same one the chrome already handles.
+ */
+export function resolvedBuildingOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): ResolvedBuilding | undefined {
+  // The shipped set first and by identity, so the ordinary case costs no parse: `resources.entries`
+  // already carries each one resolved against the shipped specs.
+  const shipped = resources.entries.find((entry) => entry.config.id === state.buildingId);
+  if (shipped !== undefined) return shipped.resolved;
+  const saved = state.savedBuildings.find((entry) => entry.id === state.buildingId);
+  if (saved === undefined) return undefined;
+  return resolveBuilding(
+    parseBuilding(saved.config as unknown),
+    specsWithSaved(resources, state.savedClasses),
+  );
 }
 
 /** The building's display name, without loading the whole document to read it. */
@@ -715,7 +1013,25 @@ export function shiftRunConfigOf(
       elevatorSpecs: specs,
       dispatcherProfiles,
       seed: state.seed,
-      durationS: state.shiftLengthS,
+      /*
+       * `durationS` **or** a window, never both — § D286, and the branch is what makes the control
+       * honest rather than what makes it work.
+       *
+       * `durationS` becomes `templateOverrides.durationS` inside `runSimulation`, which *refits the
+       * template's geometry*: a 900 s `rise-and-fall` is a shorter ramp around the same five-minute
+       * hold, which is issue #81's rescale. So a part of the day may not travel as one. It travels
+       * as `windowStartS`/`windowEndS`, which leave the schedule exactly as authored and select
+       * from it, and the run's demand horizon then comes from the window rather than from here.
+       *
+       * On a phase-list template `core` would refuse the override outright (§ D275), so this is not
+       * merely tidier: passing both would throw on the one template that has parts to select.
+       */
+      ...(state.windowStartS === null
+        ? { durationS: state.shiftLengthS }
+        : {
+            windowStartS: state.windowStartS,
+            windowEndS: state.windowStartS + state.shiftLengthS,
+          }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
       demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
@@ -790,7 +1106,10 @@ function sameArmMap(
 function selectedPatternSpec(
   resources: BrowserResources,
   state: ViewerState,
-  building: BuildingConfig,
+  // Accepted and unused (see `void building` below), and widened to admit `undefined` so that
+  // `shiftDemandTemplateId` — whose caller looks a building up by id and may not find one — can
+  // reach the same answer without inventing a building to satisfy a parameter nobody reads.
+  building: BuildingConfig | undefined,
 ): PatternSpec | undefined {
   // `undefined` is the comparable default: no override at all. See the docstring above.
   if (state.pattern === 'building') return undefined;

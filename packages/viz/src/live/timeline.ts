@@ -40,12 +40,20 @@ import type { VizPhase, VizRecording } from '../contract/types.js';
 import type { TickLabel, TimelineSegment } from './types.js';
 
 /**
- * The hour the shift starts, in seconds since midnight. 06:00, as the design rules its timeline.
+ * The hour a run starts at when it declares none. 06:00, as the design rules its timeline.
  *
  * The **only** number in this module that is not the run's own, and it is a caption rather than a
  * modelling constant: nothing statistical reads it, no simulated quantity changes if it moves,
  * and the demand template underneath is unaffected. It exists so that a reader sees *07:12* over
  * a morning peak instead of *4 320 s*.
+ *
+ * **It is now the fallback rather than the answer** — issue #83. Every shipped template but one
+ * declares its own hour (§ D244), a *part* of a day declares the part's (§ D285), and
+ * `dev/main.ts` reads the run's and passes it in. A `lunch-two-way` drawn at 06:00 was worse than
+ * no clock at all, because a player concluded from it that the traffic pattern did not matter much.
+ * The default survives for the two cases that genuinely have no hour: `constant-iso`, which
+ * declares none on purpose, and a recording restored from a file, whose hour `VizRecording` does
+ * not carry.
  */
 export const DAY_START_S = 6 * 3600;
 
@@ -66,14 +74,21 @@ export function hhmm(todS: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-/** Time of day at a playhead position, seconds since midnight. */
-export function timeOfDayAt(simTimeS: SimTime): number {
-  return DAY_START_S + simTimeS;
+/**
+ * Time of day at a playhead position, seconds since midnight.
+ *
+ * `dayStartS` is the run's own hour and defaults to {@link DAY_START_S} — see that constant for why
+ * the default is a fallback rather than the answer. `undefined` is accepted as well as omission, so
+ * a caller holding `trace.startOfDayS` for a template that declares no hour can pass it straight
+ * through rather than restating the default at the call site.
+ */
+export function timeOfDayAt(simTimeS: SimTime, dayStartS: number | undefined = DAY_START_S): number {
+  return (dayStartS ?? DAY_START_S) + simTimeS;
 }
 
-/** The header's clock, `hh:mm`, at a playhead position. */
-export function clockAt(simTimeS: SimTime): string {
-  return hhmm(timeOfDayAt(simTimeS));
+/** The header's clock, `hh:mm`, at a playhead position. See {@link timeOfDayAt} for `dayStartS`. */
+export function clockAt(simTimeS: SimTime, dayStartS?: number | undefined): string {
+  return hhmm(timeOfDayAt(simTimeS, dayStartS));
 }
 
 /* -------------------------------------------------------------------------- *
@@ -102,19 +117,40 @@ interface SegmentPalette {
  * | `#161e2a/#6d7b8d` | `STEADY` | `flat`, above zero | Neutral mid for a template that simply holds below its peak. `constant-iso` is two hours of this and is `STEADY`, not a two-hour rush. |
  * | `#131a24/#5d6b7d` | `QUIET` | `flat`, at zero | The dimmest pair for a segment asking for nothing at all. |
  * | `#151c27/#5d6b7d` | `TRICKLE` | the unlabelled fallback | Dim and mute, for the band drawn when the recording carries no schedule. It has to *look* like it is not claiming anything, because it is not. |
+ *
+ * ## The values are token names now, and the hexes above are history — § D251
+ *
+ * Every pair in that table used to be *written here*, and `dev/main.ts` puts a segment's `bg` and
+ * `fg` into an inline `style`. **An inline style is not reached by `:root[data-theme='light']`**,
+ * so the strip stayed dark on a light page however complete the palette was, and the label — a
+ * pre-§ D235 `#6d7b8d`, a value the ink ladder had already left behind — measured **3.15:1 in
+ * both modes**. That is this repository's signature defect, wearing a transport bar's hat: a
+ * palette held in a second place, where nothing that themes the page can see it.
+ *
+ * So the six pairs are `--phase-*` in `index.html`, derived from tokens the palette already
+ * declares, and this module names them. The hexes stay in the table above because they are what
+ * the handoff drew and the derivation is answerable to them; they are no longer what the page
+ * paints. `live/palette.test.ts` asserts that no colour literal survives anywhere in this
+ * directory, and that every custom property named here is one `index.html` declares.
  */
 export const PHASE_PALETTE: Readonly<Record<VizPhase['kind'], SegmentPalette>> = Object.freeze({
-  'ramp-up': Object.freeze({ bg: '#2c2418', fg: '#dbb075' }),
-  hold: Object.freeze({ bg: '#2a2033', fg: '#c69ad8' }),
-  'ramp-down': Object.freeze({ bg: '#20291f', fg: '#9fc48a' }),
-  flat: Object.freeze({ bg: '#161e2a', fg: '#6d7b8d' }),
+  'ramp-up': Object.freeze({ bg: 'var(--phase-rising)', fg: 'var(--phase-rising-ink)' }),
+  hold: Object.freeze({ bg: 'var(--phase-peak)', fg: 'var(--phase-peak-ink)' }),
+  'ramp-down': Object.freeze({ bg: 'var(--phase-clearing)', fg: 'var(--phase-clearing-ink)' }),
+  flat: Object.freeze({ bg: 'var(--phase-steady)', fg: 'var(--phase-ink)' }),
 });
 
 /** `flat` at zero intensity is not the same segment as `flat` below peak. See {@link PHASE_PALETTE}. */
-export const QUIET_PALETTE: SegmentPalette = Object.freeze({ bg: '#131a24', fg: '#5d6b7d' });
+export const QUIET_PALETTE: SegmentPalette = Object.freeze({
+  bg: 'var(--phase-quiet)',
+  fg: 'var(--phase-ink-quiet)',
+});
 
 /** The band drawn when nothing is known. See {@link PHASE_PALETTE}. */
-export const UNKNOWN_PALETTE: SegmentPalette = Object.freeze({ bg: '#151c27', fg: '#5d6b7d' });
+export const UNKNOWN_PALETTE: SegmentPalette = Object.freeze({
+  bg: 'var(--phase-unknown)',
+  fg: 'var(--phase-ink-quiet)',
+});
 
 export interface TimelineOptions {
   /**

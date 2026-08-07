@@ -55,14 +55,60 @@
  * `#report-forecast-name` and `#report-taught`, not to the box drawn around them, so hiding the
  * field alone would leave the words *Tomorrow* and *What this taught* standing over nothing. Until
  * the markup carries an id of its own, {@link cardOf} climbs one level, and it climbs exactly one.
+ *
+ * The same reach, one section over: `<h3>Where it went wrong</h3>` and `<h3>Levers you actually
+ * have</h3>` are authored siblings of `#report-diagnosis` and `#report-levers`. {@link headingOf}
+ * climbs to them so that the first can be **written from the sheet** — a fixed *where it went wrong*
+ * fired on a shift where nothing did, issue #56 — and so that both are hidden with their own list on
+ * the two sheets that have no rows at all.
+ *
+ * ## A new sheet opens at its own top — issue #62
+ *
+ * The report auto-opens when a run plays out, and it is the game handing a reader their result. It
+ * opened at the offset they left the *previous* sheet at: two thirds down, on the lever cards, with
+ * the verdict and every stat tile above the fold and nothing indicating they were there. Because
+ * `runId` is `building-profile-seed`, a re-run of one selection draws a visually identical region,
+ * so it read as a sheet that had not updated. {@link sheetIdentityOf} is the whole of the test, and
+ * the write is deferred until the panel is actually on screen — a `scrollTop` written into a
+ * `display: none` tabpanel is dropped, and the sheet files while the reader is still on the run
+ * surface.
+ *
+ * ## A sheet is a statement about a whole day, so it waits for the whole day — § D223
+ *
+ * The simulator runs a day to its end and then plays it back, so `main.ts`'s `closeShift` can file a
+ * complete account of a run the reader is four minutes into — and it does, because opening this tab
+ * is one of the two ways `closeShift` is reached. Every other surface on the screen reads the
+ * **playhead**: the header's clock, the footer's `n arrived, n carried`, the left rail's goals. Issue
+ * #16 is what that costs. A player re-ran a filed selection, opened this tab at once, and read
+ * `06:00 FILLING` and `0 carried` in the chrome beside `CARRIED 360` on the sheet — one screen, two
+ * answers to *how did today go?*.
+ *
+ * The figures were not stale. `runId` is `building-profile-seed`, so a re-run of the same selection
+ * is bit-identical and the sheet was a true account **of the recording**. What was false was the
+ * sheet presenting itself as *the state of the run on screen* while the run on screen was at 06:00.
+ *
+ * So there is a third state, and {@link runProgressOf} is the whole of the test: while the playhead
+ * is short of `endedAt`, a filed sheet is replaced by a sheet that says the day is still running and
+ * names the time it has reached. **It carries no figure at all**, and that is not timidity — every
+ * cell on this grid is a whole-run quantity. `CARRIED`, `DEEPEST QUEUE` and `TOOK THE STAIRS` come
+ * from observations folded at `endedAt`; `AVERAGE WAIT`, `WORST WAIT` and the energy pair come from
+ * `VizSummary`, which is summarised once over the whole run and cannot be re-derived at a playhead.
+ * A part-day mean is exactly the thin sample CLAUDE.md's `awtIsValid` grounds exist to refuse, and
+ * inventing one to avoid an empty box is the `docs/10` R3 failure with extra steps. The surface that
+ * *does* read a shift while it runs is the left rail, and the copy points there.
+ *
+ * Two consequences, both deliberate. Scrubbing back after a day has been filed and re-opening this
+ * tab shows the running sheet again — the screen is at 09:14, so the sheet declines to be at 18:00,
+ * which is the property being bought rather than a lapse in it. And with the transport looping, the
+ * playhead reaches `endedAt` only in passing, so the sheet is mostly the running one; a run on repeat
+ * has no *finished* instant to agree with.
  */
 
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
-import type { ReportNextStep, ShapedDayReport } from '../shift/report.js';
+import { clockOf, type ReportNextStep, type ShapedDayReport } from '../shift/report.js';
 import type {
   ClearedAward,
-  DayReport,
   FigureTone,
   GoalReading,
   ReportDiagnosis,
@@ -72,12 +118,28 @@ import type {
 import { nextDay, takeContract } from '../shift/week.js';
 
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
-import type { ReportElements } from './elementMap.js';
+import type { ReportElements, TabName } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 
 /* -------------------------------------------------------------------------- *
  * The view — every string and every colour this surface will show
  * -------------------------------------------------------------------------- */
+
+/**
+ * The verdict's colour, one arm per verdict.
+ *
+ * A `Record` rather than a ternary, for the reason `shift/report.ts` gives about `VERDICT_VOICE`:
+ * a fourth verdict must be a **compile error here** rather than silently inheriting whatever an
+ * `else` branch happened to say. That is not hypothetical — this was a two-arm ternary written
+ * when there were two verdicts, and `ungraded` (§ D234) landed in its `else`.
+ */
+const VERDICT_COLOUR: Readonly<Record<ShapedDayReport['verdict'], string>> = Object.freeze({
+  cleared: 'var(--ok)',
+  missed: 'var(--warn)',
+  // Neutral, and deliberately the same token the empty sheet below uses. A day nobody judged is
+  // not a day that went wrong, and amber is this palette's word for *went wrong*.
+  ungraded: 'var(--dim)',
+});
 
 /** One cell of the figure grid, ready to instantiate. */
 export interface FigureView {
@@ -119,6 +181,102 @@ export interface DiagnosisRowView {
 export interface LeverRowView {
   readonly title: string;
   readonly body: string;
+  /**
+   * The tab this card's advice is carried out on, or `undefined` for one that names no surface.
+   *
+   * GitHub issue #38. *"The Building tab will let you feel how much it buys"* names a tab and does
+   * not go there: the card is the one place on this sheet that tells a reader to do something, and
+   * it was the one place with nothing to press. Every other pointer on the surface — the Compare
+   * block under the small print — is already a navigation, so this is the existing seam applied to
+   * the four cards rather than a new idea.
+   *
+   * `undefined` rather than a default. A card whose advice is a *dispatcher* choice is carried out
+   * on a surface this sheet cannot name without picking one for the reader, which is the one thing
+   * `docs/10` R2 forbids it; see {@link LEVER_SURFACES}.
+   */
+  readonly surface?: TabName | undefined;
+}
+
+/**
+ * Which tab carries out each lever's advice — **the two that are a fabric change, and no others.**
+ *
+ * Issue #38, and the restraint is the decision rather than an omission.
+ *
+ * *Add a car* and *Zone the tower* are both edits to the building document: a car is a `CarConfig`
+ * and zoning is a bank's `servesFloors`, and the Building tab is where both are authored. Naming it
+ * is a statement about **where a control lives**, which is checkable and cannot go stale silently —
+ * `reportPanel.test.ts` asserts every id here is a card `shift/report.ts` can actually emit.
+ *
+ * The other two are deliberately absent. *Weight fairness up* and *Ask where they're going* are
+ * both **a different dispatcher**, and a card that navigated to the dispatcher editor with a lever
+ * named would be this sheet recommending a dispatch strategy off one replication — `docs/10` R2,
+ * and CLAUDE.md's *never declare one dispatcher better than another without a paired-t interval
+ * that excludes zero*. The sheet may say what today showed; it may not point at the control that
+ * would make one profile beat another. Their cards keep their words and stay unclickable, which is
+ * the honest difference and is asserted in both directions.
+ *
+ * Keyed on `ReportLever.id`, which is stable and is the same id the shift layer matches
+ * observations against — so a fifth lever arrives here as a missing entry (no navigation) rather
+ * than as a wrong one.
+ */
+export const LEVER_SURFACES: Readonly<Record<string, TabName>> = Object.freeze({
+  'add-a-car': 'building',
+  'zone-the-tower': 'building',
+});
+
+/**
+ * One `before → after` pair — **both of them strings the sheets themselves published**.
+ *
+ * There is no third field. A signed change would be arithmetic in a file that has none, and it
+ * would be the sheet doing the reader's subtraction *and* choosing which direction is good. The two
+ * values are what the two sheets printed, in the words they printed them in — which is what makes a
+ * withheld cell survive the pairing intact: `withheld → 58.3 s` is the shift layer's own refusal,
+ * copied, rather than a hole where a difference could not be taken.
+ */
+export interface DeltaRowView {
+  readonly label: string;
+  readonly before: string;
+  readonly after: string;
+}
+
+/**
+ * *What moved since the run before this one* — issue #38, and the loop's missing half.
+ *
+ * ## What was reported
+ *
+ * Clicking a dispatcher in the right rail re-simulates the whole shift on the same seed instantly,
+ * which is the game. The second sheet is then a fresh sheet with no reference to the first: the
+ * only string mentioning the earlier run is the grey `attempt 2 at this day`. A player who swapped
+ * `collective` for `capacity-aware` had 288 fewer riders take the stairs **and** made the unluckiest
+ * rider 642 s worse, and had to screenshot both reports to find that out. The rail's *best day so
+ * far* moved 18 % → 20 %, so the one lesson the app volunteers is the one it least wants taught.
+ *
+ * ## Why this is not the comparison R2 forbids
+ *
+ * *Took the stairs: 483, was 771* is not an inferential claim about dispatchers. It is a statement
+ * about two runs that already happened, of exactly the kind every other number on this sheet is.
+ * What R2 forbids is the **verdict**, and this block never renders one: no arrow that means good, no
+ * colour, no ordering, no sum. {@link ReportDeltaView.note} carries the refusal in the same visual
+ * unit as the rows, and the *Take it to Compare* box already under the small print names the surface
+ * that may settle it.
+ *
+ * ## And why it names what was **run**, not only what came out
+ *
+ * The trap this block could set is worse than the silence it replaces: showing six numbers that
+ * moved, without saying that the seed moved too, invites a reader to attribute the change to the one
+ * thing they touched. So {@link ReportDeltaView.selection} pairs the identity lines — the building
+ * and dispatcher, the seed and span, and which day the sheet is of — and a reader can see whether
+ * the two runs were even asked the same question.
+ */
+export interface ReportDeltaView {
+  /** What the block is. Always present when the block is. */
+  readonly caption: string;
+  /** What differs about *what was run*. Empty when the two runs were the same selection. */
+  readonly selection: readonly DeltaRowView[];
+  /** Figures whose printed value differs, in the sheet's own order. Empty when none did. */
+  readonly figures: readonly DeltaRowView[];
+  /** The sentence under the rows — the refusal, or the reason nothing moved. Never empty. */
+  readonly note: string;
 }
 
 /** The green banner, present only on the day that banked the last clean shift. */
@@ -172,7 +330,13 @@ export type FramingView = WeekFramingView | SingleRunFramingView;
 
 /** Everything the sheet shows, in one value. The empty state is a member of this type, not a hole. */
 export interface ReportView {
-  /** `false` before any shift has been closed. The sheet is drawn either way — it is never hidden. */
+  /**
+   * Whether this sheet is presenting an account of a run.
+   *
+   * `false` on **both** of the two sheets that are not one: before any shift has been closed, and
+   * while the run a closed shift is an account *of* has not been played out (see the module
+   * docstring). The sheet is drawn in every case — it is never hidden.
+   */
   readonly filed: boolean;
   /**
    * Where the question this sheet may not answer is answered — on **both** shapes of sheet.
@@ -193,7 +357,26 @@ export interface ReportView {
   readonly verdictColour: string;
   readonly goals: readonly GoalRowView[];
   readonly diagnosis: readonly DiagnosisRowView[];
+  /**
+   * What the diagnosis list is headed — `shift/report.ts`'s string, unread and unedited.
+   *
+   * `index.html` authors that heading as a fixed `<h3>Where it went wrong</h3>`, so it fired on a
+   * shift where nothing did (issue #56). The words are the shift layer's because they are a claim
+   * about the run: they come out of the same {@link ShapedDayReport.verdict} the banner does, so a
+   * green **Shift cleared** cannot stand above *where it went wrong*.
+   *
+   * `''` on both unfiled sheets, where the list is empty and the heading is hidden with it.
+   */
+  readonly diagnosisHeading: string;
   readonly levers: readonly LeverRowView[];
+  /**
+   * What moved since the sheet before this one, or `null` when there is nothing to say.
+   *
+   * `null` on the first filed sheet of a session — there is no earlier run — and on **both** sheets
+   * that are not an account of a played-out run: § D223's rule is that a sheet reporting a whole day
+   * waits for the whole day, and a delta is made of that sheet's figures, so it waits too.
+   */
+  readonly delta: ReportDeltaView | null;
   readonly smallPrint: string;
   /** What this is a sheet **of** — and the whole of what differs between the two shapes. */
   readonly framing: FramingView;
@@ -325,7 +508,14 @@ export function diagnosisRowsOf(rows: readonly ReportDiagnosis[]): readonly Diag
 }
 
 export function leverRowsOf(levers: readonly ReportLever[]): readonly LeverRowView[] {
-  return levers.map((lever) => ({ title: lever.title, body: lever.body }));
+  return levers.map((lever) => {
+    const surface = LEVER_SURFACES[lever.id];
+    return {
+      title: lever.title,
+      body: lever.body,
+      ...(surface === undefined ? {} : { surface }),
+    };
+  });
 }
 
 /**
@@ -339,6 +529,126 @@ export function leverRowsOf(levers: readonly ReportLever[]): readonly LeverRowVi
  */
 function cardOf(node: HTMLElement): HTMLElement {
   return node.parentElement ?? node;
+}
+
+/**
+ * The `<h3>` a section's list hangs under, when the markup has one.
+ *
+ * The same one-level reach {@link cardOf} makes, and for the same reason: `index.html` gives the id
+ * to the list (`#report-diagnosis`, `#report-levers`) and leaves the heading beside it as an
+ * unaddressed sibling, so a panel that writes only the list cannot say what the list is *called* —
+ * which is issue #56 in one sentence — and cannot hide the caption when the list is empty.
+ *
+ * `undefined` rather than a throw when the sibling is not a heading: a markup change that moves the
+ * `<h3>` degrades to *the heading keeps the words `index.html` authored*, which is the behaviour
+ * this file had before, rather than to an exception inside a render loop. **The fix that removes
+ * this reach is an id on each heading in `index.html`**, which this lane does not own.
+ */
+function headingOf(list: HTMLElement): HTMLElement | undefined {
+  const previous = list.previousElementSibling;
+  if (previous === null || previous.tagName !== 'H3') return undefined;
+  return previous instanceof HTMLElement ? previous : undefined;
+}
+
+/**
+ * Which filed sheet this is, as one string — or `''` for *not a filed sheet at all*.
+ *
+ * The signal behind both of this panel's pieces of continuity: a new account is owed its own top
+ * (issue #62) and becomes the thing the *next* account is differenced against (issue #38).
+ *
+ * Issue #62: the report auto-opens when a run plays out, and it opened at whatever offset the reader
+ * left the previous sheet at — two thirds down, on the lever cards, with the verdict, every stat
+ * tile and the goal list above the fold and nothing saying so. On a second run of one selection the
+ * visible region is genuinely identical, so it reads as a sheet that failed to update.
+ *
+ * The identity is the sheet's own **words**, not `runId`: `runId` is `building-profile-seed`, so
+ * re-running one selection produces a bit-identical recording (§ D223) and keying on it would refuse
+ * to scroll on exactly the retry the reader is trying to compare. The meta block is what separates
+ * those two — it carries `attempt 2 at this selection` — so it is in the key.
+ *
+ * Deliberately **not** the drawn view: the running sheet's lede names the playhead's clock and
+ * changes every frame, and a key that moved with it would fight a reader trying to scroll. The
+ * `''` arm is exactly `ReportView.filed === false`, computed from the same two inputs
+ * {@link reportViewOf} decides it from, so the two cannot disagree.
+ */
+function sheetIdentityOf(report: ShapedDayReport | undefined, progress: RunProgress): string {
+  if (report === undefined || progress.kind === 'watching') return '';
+  return [report.title, ...report.metaLines].join('\n');
+}
+
+/* -------------------------------------------------------------------------- *
+ * The delta — issue #38
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The three identity lines a reader needs to know whether two runs were asked the same question.
+ *
+ * A fixed table rather than a walk over `metaLines`, because the block's whole value is that a
+ * reader can tell a **seed change** from a **dispatcher change**, and an unlabelled positional diff
+ * cannot. Indices 0 and 1 are `metaLinesFor`'s first two entries and are present on both shapes of
+ * sheet; the lines after them (the day's event, the attempt) are the sheet's own narration of the
+ * retry and are already on the page above this block.
+ */
+const SELECTION_ROWS: readonly { readonly label: string; readonly of: 'title' | 0 | 1 }[] =
+  Object.freeze([
+    Object.freeze({ label: 'THE SHEET', of: 'title' as const }),
+    Object.freeze({ label: 'BUILDING & DISPATCHER', of: 0 as const }),
+    Object.freeze({ label: 'SEED & SPAN', of: 1 as const }),
+  ]);
+
+/**
+ * What moved between two filed sheets — and nothing else.
+ *
+ * Pure, total, and **arithmetic-free**: every value is a string one of the two sheets already
+ * published, paired by figure id, so a withheld cell pairs as the word `withheld` and an unmeasured
+ * energy cell as `not recorded`. Nothing here re-derives, re-rounds or subtracts. See
+ * {@link ReportDeltaView} for why that is the design and not a shortcut.
+ *
+ * Rows are emitted only where the two strings **differ**, so the block answers *what changed* rather
+ * than reprinting the grid. When nothing differs at all the block is still drawn, and says why: the
+ * run id is building, dispatcher and seed, so an unchanged selection reproduces bit-identically
+ * (§ D223) and *"the report did not update"* is the reading this replaces.
+ */
+function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): ReportDeltaView {
+  const lineOf = (report: ShapedDayReport, of: 'title' | 0 | 1): string =>
+    of === 'title' ? report.title : (report.metaLines[of] ?? '');
+
+  const selection: DeltaRowView[] = [];
+  for (const row of SELECTION_ROWS) {
+    const before = lineOf(previous, row.of);
+    const after = lineOf(current, row.of);
+    if (before !== after) selection.push({ label: row.label, before, after });
+  }
+
+  const was = new Map(previous.figures.map((cell) => [cell.id, cell.value]));
+  const figures: DeltaRowView[] = [];
+  for (const cell of current.figures) {
+    const before = was.get(cell.id);
+    // A figure the earlier sheet did not carry is not a change; it is a sheet of a different shape.
+    if (before === undefined || before === cell.value) continue;
+    figures.push({ label: cell.label, before, after: cell.value });
+  }
+
+  const moved = selection.length > 0 || figures.length > 0;
+  return {
+    caption: 'What moved since the run before this one',
+    selection,
+    figures,
+    note: moved
+      ? /*
+         * The refusal, in the same visual unit as the rows it qualifies. It states what the block
+         * **is** — two sheets, side by side — and what would be needed to turn it into a result,
+         * which is the sentence the small print already makes this sheet's thesis. No word here
+         * orders the two runs, and nothing in the block is coloured: the reported case moved four
+         * figures in two directions at once, and the point is precisely that it is a trade.
+         */
+        'Two runs are two runs. This is what the two sheets printed, side by side — not a result, ' +
+        'and not a direction. Which setting is better needs 50 or more paired runs against the ' +
+        'same passengers and an interval that excludes zero, which is what Compare is for.'
+      : 'Nothing moved. A run is identified by its building, its dispatcher and its seed, so this ' +
+        'is the same day simulated again and it reproduces exactly — the sheet is not stale, ' +
+        'there was nothing new to say.',
+  };
 }
 
 function clearedBannerOf(award: ClearedAward | null): ClearedBannerView | null {
@@ -377,7 +687,11 @@ export function emptyReportView(): ReportView {
     verdictColour: 'var(--dim)',
     goals: [],
     diagnosis: [],
+    // Nothing to head. The heading is hidden with its empty list rather than left standing over one.
+    diagnosisHeading: '',
     levers: [],
+    // Nothing has been filed, so there is no earlier sheet and no later one to move from it.
+    delta: null,
     smallPrint: '',
     // Nothing has been run, so there is no question to take anywhere yet.
     nextStep: undefined,
@@ -399,6 +713,73 @@ export function emptyReportView(): ReportView {
       nextDayLabel: 'Open the doors on tomorrow',
       canAdvance: false,
     },
+  };
+}
+
+/**
+ * The run on screen, mid-day — the state a filed sheet may not be drawn over. See the module
+ * docstring.
+ *
+ * The two clock strings are `shift/report.ts`'s {@link clockOf}, not this module's: there is no
+ * arithmetic in this file, and *what time is it in this building* has exactly one implementation
+ * that the header band, the transport ticks and this sheet all read.
+ */
+export interface WatchingRun {
+  readonly kind: 'watching';
+  /** Where the playhead is, as `HH:MM` on the shift clock. */
+  readonly atClock: string;
+  /** Where the run ends, as `HH:MM`. */
+  readonly endsAtClock: string;
+}
+
+/**
+ * How much of the run on screen has been watched — the one thing this surface needs from outside the
+ * report to know whether the report is a statement about what is on the screen.
+ */
+export type RunProgress = { readonly kind: 'played-out' } | WatchingRun;
+
+/**
+ * Read the playhead against the run it is in.
+ *
+ * `Playback.simTimeS` is clamped into `[startedAt, endedAt]` and reaches `endedAt` exactly when the
+ * transport reports `ended`, so the comparison is an equality in the case that matters rather than a
+ * tolerance. No recording is `played-out` rather than `watching`: there is then no clock on the
+ * screen for the sheet to disagree with, and `reportViewOf` has already answered the no-run case
+ * with the empty sheet.
+ */
+export function runProgressOf(view: Pick<ViewAt, 'recording' | 'simTimeS'>): RunProgress {
+  const recording = view.recording;
+  if (recording === undefined || view.simTimeS >= recording.endedAt) return { kind: 'played-out' };
+  return {
+    kind: 'watching',
+    atClock: clockOf(view.simTimeS),
+    endsAtClock: clockOf(recording.endedAt),
+  };
+}
+
+/**
+ * The sheet a day still being watched gets — issue #16's fix, and § D223.
+ *
+ * Built on {@link emptyReportView} rather than beside it, because the half these two share is the
+ * half that must not drift: *no figure, no goal, no verdict, nothing to advance to*. What differs is
+ * the words, and the words are the whole point — the empty sheet's lede tells a reader to press
+ * *Run this shift*, which is advice for something this reader has already done.
+ *
+ * The copy names three things that exist: the timeline (a click on it seeks — `main.ts`'s `scrubTo`),
+ * the left rail, and the playhead's own clock. It promises no figure, because there is none it could
+ * keep — see the module docstring on why a part-day cell cannot be honestly drawn.
+ */
+function watchingReportView(progress: WatchingRun): ReportView {
+  const { atClock, endsAtClock } = progress;
+  return {
+    ...emptyReportView(),
+    title: 'The day is still running',
+    lede:
+      `This sheet reports a whole day at once, and you are watching ${atClock} of a shift that ` +
+      `runs to ${endsAtClock}. It waits for the playhead: a finished day’s figures beside a clock ` +
+      `reading ${atClock} would be two answers to one question. The day is already simulated end ` +
+      'to end, so play it through — or click the far end of the timeline — and the sheet is here. ' +
+      'The left rail reads the shift while it runs.',
   };
 }
 
@@ -425,18 +806,35 @@ function framingOf(report: ShapedDayReport): FramingView {
 }
 
 /**
- * The whole sheet, filed or not. The only decision this surface makes.
+ * The whole sheet — nothing filed, still being watched, or filed. The only decision this surface
+ * makes.
  *
- * **The bare `DayReport` arm is a transition, and it is not a guess.** `types.ts`'s `DayReport` is
- * by construction the week-day sheet — it declares `streakLine`, `contractLine`, `forecast` and
- * `nextDayName` as required fields — so a caller still holding one is holding a day of a week and
- * is read as such. It is here so this panel compiles against a `ViewerState.report` that has not
- * yet been widened to `ShapedDayReport`; when it is, this arm and the `'of' in report` test both
- * go, and nothing else in the function changes.
+ * The three arms are ordered by what a reader is owed. *Nothing has been run* outranks everything,
+ * because a sheet cannot be about a run that does not exist. *The run is still on screen* comes
+ * next, and it outranks a filed sheet on purpose: the report may be true of the recording and still
+ * be the wrong thing to draw, because the rest of the screen is describing an instant the sheet is
+ * hours past. See the module docstring.
+ *
+ * `progress` defaults to `played-out` so that a caller holding only a report — the honesty sweep
+ * enumerating this surface's strings, a test asserting the filed sheet — gets the filed sheet.
+ * `mountReport` never takes the default: it reads the playhead off the same {@link ViewAt} the
+ * header and the footer are drawn from, which is what makes *two answers on one screen*
+ * unconstructible rather than unlikely.
+ *
+ * **The bare `DayReport` arm is gone**, and its own docstring said when it would be: *"it is here so
+ * this panel compiles against a `ViewerState.report` that has not yet been widened to
+ * `ShapedDayReport`; when it is, this arm and the `'of' in report` test both go."* It was. Every
+ * caller in the tree — `dev/main.ts` through `ViewerState.report`, and `honesty/surfaces.ts` — hands
+ * over a shaped sheet, so the arm reconstructed a discriminator nothing had lost.
  */
-export function reportViewOf(report: ShapedDayReport | DayReport | undefined): ReportView {
+export function reportViewOf(
+  report: ShapedDayReport | undefined,
+  progress: RunProgress = { kind: 'played-out' },
+  previous?: ShapedDayReport | undefined,
+): ReportView {
   if (report === undefined) return emptyReportView();
-  const shaped: ShapedDayReport = 'of' in report ? report : { ...report, of: 'week-day' };
+  if (progress.kind === 'watching') return watchingReportView(progress);
+  const shaped: ShapedDayReport = report;
   return {
     filed: true,
     // Both shapes carry it — see {@link SingleRunFramingView}.
@@ -446,10 +844,27 @@ export function reportViewOf(report: ShapedDayReport | DayReport | undefined): R
     lede: shaped.lede,
     figures: shaped.figures.map(figureViewOf),
     verdictLine: shaped.verdictLine,
-    verdictColour: shaped.verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)',
+    /*
+     * Three verdicts, three colours — and the third is **neutral**, not a warning.
+     *
+     * This was a two-arm ternary when `verdict` had two values, so `ungraded` (§ D234) fell to the
+     * `else` and a day nobody judged was drawn in the same amber as a day that missed its bars.
+     * *Too quiet to grade* is not a failure and must not be coloured as one; `var(--dim)` is the
+     * neutral this file already uses for the empty sheet a few hundred lines up, so the third arm
+     * is the existing vocabulary rather than a new colour.
+     *
+     * Written as an exhaustive record for the reason § D237 gives about `VERDICT_VOICE`: a fourth
+     * verdict must fail to compile here rather than silently inherit whatever the `else` says.
+     */
+    verdictColour: VERDICT_COLOUR[shaped.verdict],
     goals: shaped.goals.map(goalRowViewOf),
     diagnosis: diagnosisRowsOf(shaped.diagnosis),
+    diagnosisHeading: shaped.diagnosisHeading,
     levers: leverRowsOf(shaped.levers),
+    // Issue #38. `undefined` on the first sheet of a session, and on the two sheets above that
+    // return before this expression is reached — a delta of a day that is still running would be
+    // the § D223 defect with a second run's numbers in it.
+    delta: previous === undefined ? null : reportDeltaOf(previous, shaped),
     smallPrint: shaped.smallPrint,
     framing: framingOf(shaped),
   };
@@ -470,6 +885,30 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   const ui = elements;
   const doc = ui.title.ownerDocument;
   let latest: ViewAt | undefined;
+  /**
+   * The two headings `index.html` authors as unaddressed siblings. Resolved once, at mount, so a
+   * per-frame render does not walk the DOM for them.
+   */
+  const diagnosisHeading = headingOf(ui.diagnosis);
+  const leversHeading = headingOf(ui.levers);
+  /** `.sheet` — the element `index.html` gives `overflow: auto`. Issue #62. */
+  const scroller = ui.title.closest('.sheet');
+  /** {@link sheetIdentityOf} of the last **filed** sheet drawn. Unfiled sheets never move it. */
+  let filedIdentity: string | undefined;
+  /** Whether the top of a new sheet is still owed to the reader. See the render. */
+  let owesTop = false;
+  /** The filed sheet on screen now, and the one before it — issue #38's *was* column. */
+  let currentSheet: ShapedDayReport | undefined;
+  /**
+   * The filed sheet before the one on screen, which is what the current one is differenced against.
+   *
+   * It lives here rather than in `ViewerState` because the state does not carry one and this lane
+   * does not own `dev/state.ts`. That is not only a constraint: continuity of the *drawn* sheet is
+   * exactly the right relation — the earlier run in the delta is the one the reader actually read,
+   * not one the shell remembers on their behalf. It is lost on reload, which is honest, because so
+   * is the reader's memory of it.
+   */
+  let previousSheet: ShapedDayReport | undefined;
 
   /**
    * *Take the next assignment.*
@@ -486,8 +925,15 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
      * Read through the view rather than off the report. The banner belongs to the week-day framing,
      * so asking the drawn view for it is the one question that stays correct whichever shape of
      * sheet the state is holding — and a single run has no award to take by construction.
+     *
+     * The *drawn* view, playhead included: a banner that is not on the screen may not be actioned
+     * from it. Without `runProgressOf` here this handler would read a cleared award off a sheet the
+     * render is refusing to draw, which is the same disagreement one layer down.
      */
-    const framing = view === undefined ? undefined : reportViewOf(view.state.report).framing;
+    const framing =
+      view === undefined
+        ? undefined
+        : reportViewOf(view.state.report, runProgressOf(view)).framing;
     const nextId =
       framing?.kind === 'week-day' ? (framing.cleared?.nextContractId ?? null) : null;
     if (view !== undefined && nextId !== null) {
@@ -605,18 +1051,40 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   function drawLevers(view: ReportView): void {
     fill(
       ui.levers,
-      ...view.levers.map((lever) =>
-        el(doc, 'div', {
-          className: 'report-lever',
-          children: [
-            el(doc, 'div', {
-              text: lever.title,
-              style: { 'font-size': '13px', 'font-weight': '600' },
-            }),
-            el(doc, 'div', { className: 'figure-note', text: lever.body }),
-          ],
-        }),
-      ),
+      ...view.levers.map((lever) => {
+        const words = [
+          el(doc, 'div', {
+            text: lever.title,
+            style: { 'font-size': '13px', 'font-weight': '600' },
+          }),
+          el(doc, 'div', { className: 'figure-note', text: lever.body }),
+        ];
+        /*
+         * **A card that names a tab goes there** — issue #38.
+         *
+         * A `<button>` rather than a click handler on the `<div>` that was here: the card is
+         * reached by Tab, announced as a control, and pressed with Space or Enter, none of which a
+         * clickable div is. `type="button"` because this sheet sits inside no form and a default
+         * submit would reload the page.
+         *
+         * A card with no surface stays the `<div>` it was, and that is the § D177 rule kept rather
+         * than bent: an element that looks pressable and does nothing is the inert control this
+         * repository counts, so the two cards that may not navigate do not look as though they can.
+         */
+        if (lever.surface === undefined) {
+          return el(doc, 'div', { className: 'report-lever', children: words });
+        }
+        const surface = lever.surface;
+        const card = el(doc, 'button', {
+          className: 'report-lever report-lever-goes',
+          attrs: { type: 'button' },
+          children: words,
+        });
+        card.addEventListener('click', () => {
+          context.openTab(surface);
+        });
+        return card;
+      }),
     );
   }
 
@@ -637,10 +1105,80 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   const nextStepBox = el(doc, 'div', { children: [nextStepLabel, nextStepWhy] });
   ui.smallPrint.insertAdjacentElement('afterend', nextStepBox);
 
+  /*
+   * *What moved since the run before this one* — issue #38, and the second block `index.html` has
+   * no slot for. Built here for the reason `nextStepBox` is: the markup is the handoff's, and the
+   * handoff drew one sheet at a time.
+   *
+   * It sits directly under the lede and **above** the figure grid, which is where the question it
+   * answers is asked: the reader has just re-run a shift with one thing changed and wants to know
+   * what that did. No colour anywhere in it — see {@link ReportDeltaView}.
+   */
+  const deltaCaption = el(doc, 'div', { className: 'eyebrow' });
+  const deltaRows = el(doc, 'div', { style: { display: 'grid', gap: '4px', 'margin-top': '6px' } });
+  const deltaNote = el(doc, 'p', { className: 'figure-note' });
+  const deltaBox = el(doc, 'div', {
+    style: { margin: '14px 0 0', padding: '11px 13px', border: '1px solid var(--edge)', 'border-radius': '10px' },
+    children: [deltaCaption, deltaRows, deltaNote],
+  });
+  ui.lede.insertAdjacentElement('afterend', deltaBox);
+
+  /** One `LABEL  before → after` line. The arrow is a separator, never a direction. */
+  function deltaRow(row: DeltaRowView): HTMLElement {
+    return el(doc, 'div', {
+      style: { display: 'flex', 'flex-wrap': 'wrap', gap: '4px 8px', 'font-size': '12px' },
+      children: [
+        el(doc, 'span', {
+          text: row.label,
+          style: { font: '600 11px var(--mono)', color: 'var(--dim)', 'min-width': '150px' },
+        }),
+        // `was` in words as well as in position, because a bare arrow is a signal with one channel.
+        el(doc, 'span', { text: `was ${row.before}`, style: { color: 'var(--dim)' } }),
+        // Decorative: `was` already carries the relation in words, so a screen reader hears it once.
+        el(doc, 'span', { text: '→', attrs: { 'aria-hidden': 'true' }, style: { color: 'var(--dim)' } }),
+        el(doc, 'span', { text: row.after }),
+      ],
+    });
+  }
+
+  function drawDelta(view: ReportView): void {
+    const delta = view.delta;
+    setHidden(deltaBox, delta === null);
+    setText(deltaCaption, delta?.caption ?? '');
+    setText(deltaNote, delta?.note ?? '');
+    fill(deltaRows, ...(delta === null ? [] : [...delta.selection, ...delta.figures].map(deltaRow)));
+  }
+
   return {
     render(view: ViewAt): void {
       latest = view;
-      const drawn = reportViewOf(view.state.report);
+      /*
+       * The playhead is read off the same `ViewAt` that `drawHeader` and `drawFooter` are given in
+       * the same `renderAll`, so the sheet and the chrome cannot be describing different instants —
+       * issue #16, § D223.
+       */
+      const progress = runProgressOf(view);
+      /*
+       * The rotation, and it happens **before** the view is built rather than after it.
+       *
+       * A new filed account arrives: the sheet that was on screen becomes the one this sheet is
+       * differenced against (issue #38), and the reader is owed the top of the new one (issue #62).
+       * Rotating after the view is drawn would make every sheet its own predecessor on the very
+       * next frame — `renderAll` runs sixty times a second — and every delta would read *nothing
+       * moved* one frame after appearing.
+       *
+       * Only a **filed** identity moves it. Pressing *Run this shift* clears the report, so an
+       * unfiled sheet stands between every pair of filed ones; rotating on that would hand the next
+       * delta an `undefined` predecessor and lose the run the reader just read.
+       */
+      const identity = sheetIdentityOf(view.state.report, progress);
+      if (identity !== '' && identity !== filedIdentity) {
+        previousSheet = currentSheet;
+        currentSheet = view.state.report;
+        filedIdentity = identity;
+        owesTop = true;
+      }
+      const drawn = reportViewOf(view.state.report, progress, previousSheet);
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
        * the same value, so a slot can never be left showing yesterday's sentence on a sheet that
@@ -652,6 +1190,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       setText(ui.title, drawn.title);
       fill(ui.meta, ...drawn.metaLines.map((line) => el(doc, 'div', { text: line })));
       setText(ui.lede, drawn.lede);
+      drawDelta(drawn);
       drawFigures(drawn);
 
       setText(ui.verdict, drawn.verdictLine);
@@ -667,6 +1206,17 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       drawGoals(drawn);
       drawDiagnosis(drawn);
       drawLevers(drawn);
+      /*
+       * The heading says what the section is, so it is written from the sheet rather than left as
+       * `index.html`'s fixed *Where it went wrong* (issue #56) — and it is hidden with its list
+       * rather than left standing over an empty box, which is this module's own rule for a slot with
+       * nothing in it, applied to the caption instead of the field.
+       */
+      if (diagnosisHeading !== undefined) {
+        setText(diagnosisHeading, drawn.diagnosisHeading);
+        setHidden(diagnosisHeading, drawn.diagnosis.length === 0);
+      }
+      if (leversHeading !== undefined) setHidden(leversHeading, drawn.levers.length === 0);
 
       setText(ui.forecastName, week?.forecast.name ?? '');
       setText(ui.forecastNote, week?.forecast.note ?? '');
@@ -686,6 +1236,23 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       ui.nextDay.disabled = !(week?.canAdvance ?? false);
       // No tomorrow to open the doors on. The Back button is the whole of a single run's CTA row.
       setHidden(ui.nextDay, week === null);
+
+      /*
+       * A new sheet opens at its own top — issue #62, second half.
+       *
+       * The scroll is written only while the panel is on screen: `renderAll` draws every panel on
+       * every frame, tab or no tab, and `index.html` hides a tabpanel with `display: none`, where
+       * `scrollTop` is not writable. The sheet files while the reader is still on the run surface —
+       * `main.ts`'s `closeShift` sets the report and the tab in one patch — so a write at the moment
+       * the identity changed would land on an element with no layout and be dropped.
+       *
+       * The flag is cleared on the write rather than on the identity change, so a reader who scrolls
+       * *this* sheet keeps their place: `owesTop` is false from then until a different sheet arrives.
+       */
+      if (owesTop && scroller !== null && view.state.tab === 'report') {
+        scroller.scrollTop = 0;
+        owesTop = false;
+      }
     },
   };
 }

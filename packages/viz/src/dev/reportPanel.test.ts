@@ -50,8 +50,10 @@ import {
   emptyReportView,
   figureViewOf,
   goalRowViewOf,
+  LEVER_SURFACES,
   leverRowsOf,
   reportViewOf,
+  runProgressOf,
   toneColourOf,
   type FigureView,
   type ReportView,
@@ -61,6 +63,8 @@ import {
 let config: LoadedConfig;
 let clean: VizRecording;
 let saturated: VizRecording;
+/** `clean`'s selection, run a second time — the same run, not a second one. See the #16 suite. */
+let again: VizRecording;
 
 function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: number): VizRecording {
   const base: SimulationConfig = fixtureConfig(config, {
@@ -140,19 +144,75 @@ function cell(view: ReportView, label: string): FigureView {
 }
 
 /**
+ * The two sheets `main.ts`'s `closeShift` files when one selection is run, filed, and run again.
+ *
+ * The week is carried from the first close into the second, which is the whole of what makes the
+ * second sheet say *attempt 2 at this selection* — `week.ts`'s `retry` branch keys on `closedDay`.
+ * A pair of independently opened weeks would both say *attempt 1* and the suite below would be
+ * asserting against a sequence the shell cannot produce.
+ */
+function attemptsOf(
+  first: VizRecording,
+  second: VizRecording,
+  day = 4,
+): readonly [ShapedDayReport, ShapedDayReport] {
+  const goals = goalsForDay(day);
+  let week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
+  const filed: ShapedDayReport[] = [];
+  for (const recording of [first, second]) {
+    const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    week = closeDay(
+      week,
+      outcomeOf({
+        day,
+        dayIdx: week.dayIdx,
+        eventId: 'ordinary',
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goals, observations),
+      }),
+    );
+    filed.push(
+      dayReportOf({
+        recording,
+        observations,
+        goals,
+        week,
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        subject: { kind: 'week-day' },
+      }),
+    );
+  }
+  const [one, two] = filed;
+  if (one === undefined || two === undefined) throw new Error('two closes produced fewer sheets');
+  return [one, two];
+}
+
+/** The sheet as `mountReport` would draw it with the playhead at `simTimeS`. */
+function drawnAt(report: ShapedDayReport, recording: VizRecording, simTimeS: number): ReportView {
+  return reportViewOf(report, runProgressOf({ recording, simTimeS }));
+}
+
+/**
  * Every string the sheet will put on the page **that is a reading off this recording**.
  *
- * Two families of string are excluded, and neither exclusion is hidden here — the suite below pins
- * both by name, so a clock time appearing anywhere else on the sheet is a failure:
+ * One family of string is excluded, and the exclusion is not hidden here — the suite below pins it
+ * by name, so a clock time appearing anywhere else on the sheet is a failure:
  *
- * - **The four lever bodies.** *Zone the tower* reads *"Superb at 08:30, wasteful by mid-morning"* —
- *   generic lift-engineering advice about morning peaks, identical on every run and every building.
  * - **The forecast's event name and note.** `shift/events.ts` ships the handoff's event copy
  *   verbatim, and two of the five carry an office-day hour (*Fire drill, 14:00*, *half a car until
  *   11:30*). They are tomorrow's flavour text, not a reading of today's recording.
  *
- * Both are shipped by `shift/`, which this lane does not own. Everything derived from the run is in
- * the list below and is held to the rule without exception.
+ * **The lever bodies used to be excluded too, and no longer are.** The exclusion said they were
+ * *"generic lift-engineering advice … identical on every run and every building"*, which was the
+ * defect issue #55 reported: they are now ordered and annotated from what the run showed, so they
+ * are a reading of this recording and are held to the rule with everything else.
+ *
+ * `delta` is deliberately **not** here: half of its strings are the *previous* sheet's, and that
+ * sheet had a span of its own. The delta suite sweeps it against both runs' spans, which is a
+ * stronger claim than this walk could make.
  */
 function everyString(view: ReportView): readonly string[] {
   const framing = view.framing;
@@ -161,6 +221,7 @@ function everyString(view: ReportView): readonly string[] {
     ...view.metaLines,
     view.lede,
     view.verdictLine,
+    view.diagnosisHeading,
     view.smallPrint,
     // The framing, whichever it is. A shape whose strings this walk did not reach would be a hole
     // in every rule below — so both arms are listed and neither may be dropped.
@@ -180,7 +241,7 @@ function everyString(view: ReportView): readonly string[] {
   for (const figure of view.figures) out.push(figure.label, figure.value, figure.note);
   for (const goal of view.goals) out.push(goal.label, goal.display, goal.help);
   for (const row of view.diagnosis) out.push(row.when, row.what, row.why);
-  for (const lever of view.levers) out.push(lever.title);
+  for (const lever of view.levers) out.push(lever.title, lever.body);
   return out;
 }
 
@@ -189,7 +250,9 @@ beforeAll(async () => {
   clean = runOf('garden-apartments', 12, 900);
   // `shift/report.test.ts`'s own saturating fixture: Midtown Office at 25 %pop/5 min.
   saturated = runOf('midtown-office', 25, 900);
-}, 120_000);
+  // The same three arguments, a second time. Nothing about the call differs, which is the point.
+  again = runOf('garden-apartments', 12, 900);
+}, 180_000);
 
 describe('the premises this suite rests on', () => {
   it('has one run whose mean is publishable and one whose is not', () => {
@@ -370,6 +433,130 @@ describe('the empty state, which is drawn rather than hidden', () => {
   it('names no weekday it has not earned', () => {
     expect(weekFraming(emptyReportView()).nextDayLabel).toBe('Open the doors on tomorrow');
   });
+
+  it('is still the empty sheet while a run nothing has been filed for is playing', () => {
+    // The path issue #16 did *not* break, pinned so the fix above cannot quietly take it over: with
+    // no report there is no account to be premature about, and the design's own empty case stands.
+    expect(reportViewOf(undefined, runProgressOf({ recording: again, simTimeS: again.startedAt })))
+      .toEqual(emptyReportView());
+  });
+});
+
+describe('a filed sheet may not describe a day the screen has not reached — issue #16, § D223', () => {
+  /*
+   * Driven on the deployed viewer 2026-08-05. A Free Play day was run and filed; *Run this shift*
+   * was pressed again with nothing changed; the Day Report tab was opened at once. The chrome read
+   * `06:00 FILLING` and `running · 0 arrived, 0 carried` and the rail read `carried today 0`, while
+   * the sheet read `CARRIED 360` and `AVERAGE WAIT 146.7 s`. One screen, two answers.
+   *
+   * The issue filed it as stale figures held over from the previous run. It is not: `runId` is
+   * `building-profile-seed`, `main.ts`'s `runShift` writes `report: undefined`, and `openTab`
+   * re-files from the new recording — which is bit-identical, because the selection did not change.
+   * The sheet was a true account of the recording and the wrong thing to draw, because every other
+   * surface was describing the playhead. The first test below is that premise, asserted rather than
+   * assumed, so a future reader does not go looking for a cache that was never there.
+   */
+  it('the premise: re-running one selection is the same run again, not a stale one', () => {
+    expect(again.runId).toBe(clean.runId);
+    expect(again.summary.meanWaitS).toBe(clean.summary.meanWaitS);
+    expect(observationsAt(again, again.endedAt).carried).toBe(
+      observationsAt(clean, clean.endedAt).carried,
+    );
+  });
+
+  it('puts no count on the sheet that the chrome’s own clock contradicts', () => {
+    const [, second] = attemptsOf(clean, again);
+    // The two numbers that were on the screen together. The footer folds at the playhead; the sheet
+    // folds at `endedAt`, and at the start of a re-run those are 0 and the whole day.
+    const atStart = observationsAt(again, again.startedAt);
+    const wholeDay = observationsAt(again, again.endedAt);
+    expect(atStart.carried).toBe(0);
+    expect(wholeDay.carried).toBeGreaterThan(0);
+
+    const watching = drawnAt(second, again, again.startedAt);
+    // No cell can carry it, because there is no cell: every figure on this grid is a whole-run
+    // quantity and none of them can be honestly re-derived at a playhead.
+    expect(watching.figures).toEqual([]);
+    expect(everyString(watching).join('\n')).not.toMatch(
+      new RegExp(`\\b${String(wholeDay.carried)}\\b`),
+    );
+    // The refusal is the mean's too — the figure the issue named beside `CARRIED`.
+    expect(everyString(watching).join('\n')).not.toContain(again.summary.meanWaitS.toFixed(1));
+  });
+
+  it('says the day is still running, and does not repeat advice the reader has already taken', () => {
+    const [, second] = attemptsOf(clean, again);
+    const watching = drawnAt(second, again, again.startedAt);
+    expect(watching.filed).toBe(false);
+    expect(watching.title).toBe('The day is still running');
+    expect(watching.title).not.toBe(second.title);
+    // The empty sheet's lede tells a reader to press *Run this shift*. This reader just did.
+    expect(watching.lede).not.toContain('Run this shift');
+    expect(watching.lede).not.toBe(emptyReportView().lede);
+    // It names where the playhead is and where the day ends, and both are clock times this run has.
+    expect(watching.lede).toContain(clockOf(again.startedAt));
+    expect(watching.lede).toContain(clockOf(again.endedAt));
+  });
+
+  it('offers nothing to advance to, and no award to take, while the day is unfinished', () => {
+    const [, second] = attemptsOf(clean, again);
+    const framing = weekFraming(drawnAt(second, again, again.startedAt));
+    expect(framing.canAdvance).toBe(false);
+    expect(framing.cleared).toBeNull();
+    expect(drawnAt(second, again, again.startedAt).goals).toEqual([]);
+    expect(drawnAt(second, again, again.startedAt).verdictLine).toBe('');
+  });
+
+  it('draws the filed sheet whole, and unchanged, once the playhead reaches the end', () => {
+    const [, second] = attemptsOf(clean, again);
+    const done = drawnAt(second, again, again.endedAt);
+    expect(done).toEqual(reportViewOf(second));
+    expect(cell(done, 'CARRIED').value).toBe(
+      String(observationsAt(again, again.endedAt).carried),
+    );
+  });
+
+  it('keeps the attempt line coherent — the filed sheet numbers it, the running one claims nothing', () => {
+    const [first, second] = attemptsOf(clean, again);
+    // `shift/report.ts` prints no attempt line on the first, by design; the second is the one the
+    // player saw. Neither number moves because of anything this panel does.
+    expect(first.metaLines.some((line) => line.includes('attempt'))).toBe(false);
+    expect(second.metaLines.some((line) => line.includes('attempt 2'))).toBe(true);
+    expect(drawnAt(second, again, again.startedAt).metaLines).toEqual([]);
+    expect(drawnAt(second, again, again.endedAt).metaLines).toEqual(second.metaLines);
+  });
+
+  it('prints no clock time the run did not have, at any playhead', () => {
+    const [, second] = attemptsOf(clean, again);
+    const inside = new Set<string>();
+    for (let t = again.startedAt; t <= again.endedAt; t += 30) inside.add(clockOf(t));
+    inside.add(clockOf(again.endedAt));
+    const playheads = [
+      again.startedAt,
+      (again.startedAt + again.endedAt) / 2,
+      again.endedAt - 1,
+    ];
+    for (const at of playheads) {
+      for (const text of everyString(drawnAt(second, again, at))) {
+        for (const found of text.match(/\d{2}:\d{2}/g) ?? []) {
+          expect(inside.has(found), `${found} in "${text}" is outside the run`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('reads the playhead against the run, and calls the last instant played out', () => {
+    expect(runProgressOf({ recording: again, simTimeS: again.endedAt })).toEqual({
+      kind: 'played-out',
+    });
+    expect(runProgressOf({ recording: again, simTimeS: again.endedAt - 1 })).toEqual({
+      kind: 'watching',
+      atClock: clockOf(again.endedAt - 1),
+      endsAtClock: clockOf(again.endedAt),
+    });
+    // No run on screen is no clock to disagree with. `reportViewOf` has already answered that case.
+    expect(runProgressOf({ recording: undefined, simTimeS: 0 })).toEqual({ kind: 'played-out' });
+  });
 });
 
 describe('the rest of the sheet', () => {
@@ -405,14 +592,100 @@ describe('the rest of the sheet', () => {
     }
   });
 
-  it('draws the four levers verbatim', () => {
-    const report = reportOf(clean);
-    expect(leverRowsOf(report.levers).map((row) => row.title)).toEqual([
-      'Add a car',
-      'Zone the tower',
-      'Weight fairness up',
-      'Ask where they’re going',
-    ]);
+  it('draws the levers the shift layer handed it, in that order and unedited', () => {
+    /*
+     * This assertion changed shape with issue #55 and is stronger, not weaker. It used to pin four
+     * hard-coded titles, which passed precisely *because* the section was a frozen constant. What it
+     * pins now is the property that matters at this layer: the panel is a pane of glass. Whatever
+     * order and whatever bodies `shift/report.ts` decided on, that is what gets drawn — asserted on
+     * two runs whose lever lists are known to differ, so a renderer that re-sorted or re-worded
+     * anything fails on at least one of them.
+     */
+    for (const recording of [clean, saturated]) {
+      const report = reportOf(recording);
+      expect(leverRowsOf(report.levers).map((row) => ({ title: row.title, body: row.body }))).toEqual(
+        report.levers.map((lever) => ({ title: lever.title, body: lever.body })),
+      );
+    }
+    expect(reportOf(clean).levers.map((lever) => lever.id)).not.toEqual(
+      reportOf(saturated).levers.map((lever) => lever.id),
+    );
+  });
+
+  it('sends the two fabric cards to the tab they name — issue #38', () => {
+    /*
+     * *"The blunt instrument. Costs a shaft, works immediately, and the **Building tab** will let
+     * you feel how much it buys."* The card is the one place on this sheet that tells a reader to
+     * do something, and it was the one place with nothing to press: it named a tab in prose and did
+     * not go there. Every other pointer on the surface — the Compare block under the small print —
+     * has been a navigation since it landed.
+     */
+    const rows = leverRowsOf(reportOf(clean).levers);
+    const addACar = rows.find((row) => row.title === 'Add a car');
+    expect(addACar, 'this run no longer offers the card the issue names').toBeDefined();
+    expect(addACar?.surface, 'the card names the Building tab and goes nowhere').toBe('building');
+  });
+
+  it('leaves the two dispatcher cards unclickable, and that is the restraint — R2', () => {
+    /*
+     * *Weight fairness up* and *Ask where they're going* are both **a different dispatcher**, and a
+     * card that navigated to the dispatcher editor with a lever named would be this sheet
+     * recommending a dispatch strategy off one replication — `docs/10` R2, and CLAUDE.md's *never
+     * declare one dispatcher better than another without a paired-t interval that excludes zero*.
+     *
+     * Asserted in both directions on the same run, so the case cannot pass by there being no
+     * navigable card at all.
+     */
+    const rows = leverRowsOf(reportOf(clean).levers);
+    const navigable = rows.filter((row) => row.surface !== undefined).map((row) => row.title);
+    const inert = rows.filter((row) => row.surface === undefined).map((row) => row.title);
+    expect(navigable.length, 'no card navigates anywhere, so the pair below proves nothing').toBeGreaterThan(0);
+    expect(inert, 'a dispatcher card acquired a destination').toContain('Weight fairness up');
+  });
+
+  it('names only cards the shift layer can actually emit', () => {
+    /*
+     * The table is keyed on `ReportLever.id`, and a hand-written key set is the shape this
+     * repository keeps finding stale. So it is checked against the ids `shift/report.ts` produces,
+     * over both fixture runs, rather than against a list transcribed beside it.
+     */
+    const emitted = new Set(
+      [clean, saturated].flatMap((recording) => reportOf(recording).levers.map((lever) => lever.id)),
+    );
+    for (const id of Object.keys(LEVER_SURFACES)) {
+      expect(emitted.has(id), `LEVER_SURFACES names "${id}", which no run emits`).toBe(true);
+    }
+  });
+
+  it('heads the diagnosis with the shift layer’s own words, and never with a fixed one — issue #56', () => {
+    // `index.html` authors `<h3>Where it went wrong</h3>`, which fired on a shift where nothing did.
+    // The view carries the heading so the mount can write it, and it agrees with the banner by
+    // construction — both come out of the same verdict.
+    const cleared = reportViewOf(reportOf(clean));
+    expect(cleared.verdictLine).toBe('Shift cleared');
+    expect(cleared.diagnosisHeading).toBe(reportOf(clean).diagnosisHeading);
+    expect(cleared.diagnosisHeading.toLowerCase()).not.toContain('wrong');
+
+    const missed = reportViewOf(reportOf(saturated));
+    expect(missed.verdictLine).toBe('Shift missed');
+    expect(missed.diagnosisHeading).toBe('Where it went wrong');
+    // No row on a cleared sheet is drawn in a colour that implies a fault.
+    for (const row of cleared.diagnosis) expect(row.accent).toBe('var(--edge-strong)');
+    expect(missed.diagnosis.some((row) => row.accent === 'var(--bad)')).toBe(true);
+  });
+
+  it('writes and hides the section headings, and does so from the list they head', async () => {
+    /*
+     * No jsdom, so the drawing half is pinned at the source in the idiom the DR-13 suite uses. The
+     * failure it guards is the one this change could introduce: a heading written but never hidden
+     * would leave *The tightest moment* standing over nothing on the empty sheet.
+     */
+    const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+    expect(panel).toContain('setText(diagnosisHeading, drawn.diagnosisHeading)');
+    expect(panel).toContain('setHidden(diagnosisHeading, drawn.diagnosis.length === 0)');
+    expect(panel).toContain('setHidden(leversHeading, drawn.levers.length === 0)');
+    expect(emptyReportView().diagnosisHeading).toBe('');
+    expect(emptyReportView().diagnosis).toEqual([]);
   });
 
   it('accents a diagnosis row from its tone, and a plain row from nothing', () => {
@@ -615,6 +888,204 @@ describe('the mount hides a slot it has nothing to put in', () => {
     for (const forbidden of ['toFixed(', 'Math.round(', 'Math.min(', 'Math.max(']) {
       expect(body, forbidden).not.toContain(forbidden);
     }
+  });
+});
+
+describe('what moved since the run before this one — issue #38', () => {
+  /*
+   * ## What was reported
+   *
+   * Clicking a dispatcher in the right rail re-simulates the whole shift on the same seed instantly.
+   * The second Day report is a fresh sheet with no reference to the first: the reporter swapped
+   * `collective` for `capacity-aware`, had 288 fewer riders take the stairs *and* made the unluckiest
+   * rider 642 s worse, and had to screenshot both sheets to find that out. Meanwhile the rail's
+   * *best day so far* moved 18 % → 20 %, so the one lesson the app volunteered was the one it least
+   * wants taught.
+   *
+   * ## The line this suite holds
+   *
+   * A delta may say **what the two sheets printed**. It may not order them, colour them, or sum
+   * them, because two runs are n = 1 against n = 1 and CLAUDE.md's first rule is about exactly that.
+   * So: every value in the block is a string one of the two sheets already published (no arithmetic,
+   * so a withheld cell survives the pairing as the word), the note carries the refusal, and the
+   * identity rows are there so a reader cannot attribute a change to the wrong cause.
+   */
+  const deltaOf = (previous: ShapedDayReport, current: ShapedDayReport) => {
+    const delta = reportViewOf(current, { kind: 'played-out' }, previous).delta;
+    if (delta === null) throw new Error('expected a delta');
+    return delta;
+  };
+
+  it('is absent on the first sheet of a session, and on both sheets that are not a filed run', () => {
+    // § D223: a sheet reporting a whole day waits for the whole day, and a delta is made of that
+    // sheet's figures. Neither unfiled state may carry one.
+    expect(reportViewOf(reportOf(clean)).delta).toBeNull();
+    expect(emptyReportView().delta).toBeNull();
+    const [, second] = attemptsOf(clean, again);
+    expect(drawnAt(second, again, again.startedAt).delta).toBeNull();
+  });
+
+  it('pairs the figures that moved, and only those', () => {
+    const before = reportOf(clean);
+    const after = reportOf(saturated);
+    const delta = deltaOf(before, after);
+    const moved = new Map(delta.figures.map((row) => [row.label, row]));
+    expect(moved.size).toBeGreaterThan(0);
+    for (const cell of after.figures) {
+      const wasCell = before.figures.find((candidate) => candidate.id === cell.id);
+      const row = moved.get(cell.label);
+      if (wasCell?.value === cell.value) {
+        expect(row, `${cell.label} did not move and is listed anyway`).toBeUndefined();
+        continue;
+      }
+      expect(row?.before).toBe(wasCell?.value);
+      expect(row?.after).toBe(cell.value);
+    }
+  });
+
+  it('copies both values verbatim, so a refused figure stays refused in the was column', () => {
+    /*
+     * The property that makes R3 hold here for free: there is no arithmetic, so there is no
+     * difference to fail to take. A saturated run's `AVERAGE WAIT` pairs as the literal word, and no
+     * digit of the mean it refuses appears anywhere in the block.
+     */
+    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const wait = delta.figures.find((row) => row.label === 'AVERAGE WAIT');
+    expect(wait?.after).toBe(WITHHELD);
+    expect(wait?.after).not.toMatch(/\d/);
+    const text = [...delta.selection, ...delta.figures]
+      .flatMap((row) => [row.label, row.before, row.after])
+      .join('\n');
+    for (const places of [0, 1, 2]) {
+      expect(text).not.toContain(saturated.summary.meanWaitS.toFixed(places));
+    }
+    // And the other direction: the earlier sheet's publishable mean is quoted exactly as it printed.
+    expect(wait?.before).toBe(`${clean.summary.meanWaitS.toFixed(1)} s`);
+  });
+
+  it('names what was run, so a change cannot be pinned on the wrong cause', () => {
+    // Six numbers moving with no word about the seed invites a reader to credit the one thing they
+    // touched. The identity rows are the guard, and they are the run's own meta lines.
+    const before = reportOf(clean);
+    const after = reportOf(saturated);
+    const delta = deltaOf(before, after);
+    const labels = delta.selection.map((row) => row.label);
+    expect(labels).toContain('BUILDING & DISPATCHER');
+    expect(labels).toContain('SEED & SPAN');
+    const building = delta.selection.find((row) => row.label === 'BUILDING & DISPATCHER');
+    expect(building?.before).toBe(before.metaLines[0]);
+    expect(building?.after).toBe(after.metaLines[0]);
+  });
+
+  it('says so, rather than nothing, when the same selection produced the same day', () => {
+    /*
+     * § D223's own finding, turned into a sentence a player can read: `runId` is
+     * `building-profile-seed`, so re-running one selection is the same run again. The block that
+     * would otherwise be empty is where *"the report did not update"* gets answered.
+     */
+    const [first, second] = attemptsOf(clean, again);
+    const delta = deltaOf(first, second);
+    expect(delta.figures).toEqual([]);
+    expect(delta.selection).toEqual([]);
+    expect(delta.note).toContain('Nothing moved');
+    expect(delta.note).toContain('reproduces exactly');
+    // The two sheets are not identical — the second says `attempt 2` — so this is a real pairing.
+    expect(second.metaLines.some((line) => line.includes('attempt 2'))).toBe(true);
+  });
+
+  it('states no verdict, orders nothing, and carries the refusal in its own words', () => {
+    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const prose = [delta.caption, delta.note].join('\n');
+    // R2's own construction. A block that ordered two runs would say it here or nowhere.
+    expect(prose).not.toMatch(/\b(?:improved|worse than|better than|beats?\b|outperform)/i);
+    expect(delta.note).toContain('Two runs are two runs');
+    expect(delta.note).toContain('50 or more paired runs');
+    expect(delta.note).toContain('interval that excludes zero');
+    expect(delta.note).toContain('Compare');
+  });
+
+  it('gives no row a colour, because there is no direction to signal — KB-15 and R2', () => {
+    // Asserted structurally: `DeltaRowView` has three fields and none of them is a colour, a tone or
+    // a direction. A green *took the stairs* would be the verdict this block exists not to state.
+    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    for (const row of [...delta.selection, ...delta.figures]) {
+      expect(Object.keys(row).sort()).toEqual(['after', 'before', 'label']);
+    }
+  });
+
+  it('prints no clock time either run did not have', () => {
+    // The rule `everyString` applies to one sheet, applied to a block made of two: the `after`
+    // column must sit inside this run's span, and the `before` column inside the earlier one's.
+    const inside = (recording: VizRecording): ReadonlySet<string> => {
+      const times = new Set<string>();
+      for (let t = recording.startedAt; t <= recording.endedAt; t += 30) times.add(clockOf(t));
+      times.add(clockOf(recording.endedAt));
+      return times;
+    };
+    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    for (const row of [...delta.selection, ...delta.figures]) {
+      for (const [text, span] of [
+        [row.before, inside(clean)],
+        [row.after, inside(saturated)],
+      ] as const) {
+        for (const found of text.match(/\d{2}:\d{2}/g) ?? []) {
+          expect(span.has(found), `${found} in "${text}" is outside its own run`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('rotates once per sheet, before the view is built', async () => {
+    /*
+     * The mount's continuity is not reachable without a DOM, so it is pinned at the source in the
+     * DR-13 idiom. Both halves matter and both were got wrong first: rotating **after** the view is
+     * built makes every sheet its own predecessor on the next frame — sixty frames a second — and
+     * rotating on an **unfiled** identity throws away the sheet the reader just read, because
+     * pressing *Run this shift* clears the report between every pair of filed ones.
+     */
+    const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+    const rotate = panel.indexOf('previousSheet = currentSheet;');
+    const build = panel.indexOf('const drawn = reportViewOf(');
+    expect(rotate).toBeGreaterThan(-1);
+    expect(build).toBeGreaterThan(-1);
+    expect(rotate, 'the rotation must precede the view it feeds').toBeLessThan(build);
+    expect(panel).toContain("if (identity !== '' && identity !== filedIdentity)");
+  });
+});
+
+describe('a new sheet opens at its own top — issue #62', () => {
+  /*
+   * The report auto-opens when a run plays out, and it opened at the offset the reader left the
+   * previous sheet at: two thirds down, on the lever cards, with the verdict, the eight stat tiles
+   * and the goal list above the fold and nothing indicating they were there. Because a re-run of one
+   * selection is bit-identical (§ D223), the visible region is genuinely the same between runs, so
+   * it reads as a sheet that failed to update.
+   *
+   * There is no jsdom, so the identity that drives the reset is asserted through the view — a new
+   * account must be distinguishable from the one before it — and the write itself at the source.
+   */
+  it('a re-run of one selection is a different sheet, even though it is the same run', () => {
+    // The case the fix must not miss. `runId` is `building-profile-seed`, so keying the reset on the
+    // recording would refuse to scroll on exactly the retry the reader is trying to compare.
+    const [first, second] = attemptsOf(clean, again);
+    expect(again.runId).toBe(clean.runId);
+    expect([first.title, ...first.metaLines]).not.toEqual([second.title, ...second.metaLines]);
+  });
+
+  it('writes the top only while the panel is on screen, and clears the debt on the write', async () => {
+    /*
+     * `index.html` hides a tabpanel with `display: none`, where `scrollTop` is not writable, and
+     * `main.ts`'s `closeShift` files the sheet and moves the tab in one patch — so a write at the
+     * instant the identity changed lands on an element with no layout and is dropped. The debt is
+     * cleared on the write rather than on the change, so a reader who scrolls *this* sheet keeps
+     * their place.
+     */
+    const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+    expect(panel).toContain("view.state.tab === 'report'");
+    expect(panel).toContain('scroller.scrollTop = 0;');
+    expect(panel).toContain('owesTop = false;');
+    // The scroll container is `.sheet`, which is the element `index.html` gives `overflow: auto`.
+    expect(panel).toContain("ui.title.closest('.sheet')");
   });
 });
 

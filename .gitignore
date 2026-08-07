@@ -8,6 +8,9 @@ dist/
 build/
 out/
 *.tsbuildinfo
+# The viewer's bundled web build (`npm run build:web -w @elevator-sim/viz`). Separate from `dist/`
+# because that one is `tsc -b`'s, and one directory written by two build systems is a race.
+dist-web/
 
 # Test / coverage
 coverage/

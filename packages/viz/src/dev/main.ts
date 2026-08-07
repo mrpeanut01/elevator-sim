@@ -43,7 +43,14 @@ import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
-  busy,
+  formIssues,
+  linkRequested,
+  linkRetryInMsOf,
+  namingStage,
+  pending,
+  postingRefusal,
+  rateLimited,
+  retryAllowed,
   signedIn,
   signedOut,
   updateForm,
@@ -56,8 +63,14 @@ import {
   challengeRunConfigs,
   challengeSubmissionOf,
 } from '../menu/challenge.js';
-import { claimedMetricsOf, createClient, fetchTransport } from '../menu/client.js';
+import {
+  claimedMetricsOf,
+  createClient,
+  fetchTransport,
+  type LeaderboardClient,
+} from '../menu/client.js';
 import { initialMenuState, navigate } from '../menu/menu.js';
+import { partById, partIdOf, partsOfDay } from '../menu/partsOfDay.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
 import {
@@ -75,12 +88,12 @@ import {
 import { asBuiltChoices, shaftChoices, speedChoices, withBankChoice } from '../commissioning/choices.js';
 import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
-import type { MenuState } from '../menu/types.js';
+import type { DayPart, MenuState } from '../menu/types.js';
 import { renderMenu, type LeaderboardView, type MenuPanelHost } from './menuPanel.js';
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { restrictedFloorIds } from '../access/zoning.js';
-import type { VizRecording } from '../contract/types.js';
+import type { VizFloor, VizRecording } from '../contract/types.js';
 import {
   landingAssignmentsAt,
   meansAreSuppressed,
@@ -88,14 +101,16 @@ import {
   queueAt,
   type LandingAssignment,
 } from '../frame/overlay.js';
-import { WAIT_BANDS } from '../live/bands.js';
+import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
+import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import {
   clockAt,
   DAY_START_S,
   phaseAt,
   playheadPctOf,
   tickLabelsOf,
+  timeOfDayAt,
   timelineOf,
 } from '../live/timeline.js';
 import { systemClock } from '../playback/clock.js';
@@ -111,7 +126,8 @@ import {
   type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
-import { buildLayout } from '../render/layout.js';
+import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
+import { AWT_ID, WT95_ID } from '../render/runSummary.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
 import { isViewMode, itemsIn, type DisclosureItem, type ViewMode } from '../mode/types.js';
@@ -122,8 +138,8 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
-import { dayReportOf } from '../shift/report.js';
-import { HISTORY_DAYS, closeDay, outcomeOf } from '../shift/week.js';
+import { dayReportOf, type DayReportInput } from '../shift/report.js';
+import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
@@ -149,7 +165,7 @@ import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
 import { mountParameterForm } from './parameterForm.js';
-import { mountReport } from './reportPanel.js';
+import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
 import { mountTrafficEditor } from './trafficEditor.js';
@@ -160,16 +176,18 @@ import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
-  DEFAULT_SHIFT_LENGTH_S,
-  SHIFT_LENGTHS,
   allBuildingIds,
   buildingConfigOf,
+  shiftDemandTemplateId,
+  closedWeekOf,
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
   initialState,
   profileById,
+  resolvedBuildingOf,
   shiftRunConfigOf,
+  weekForSession,
   withBuilding,
   type ViewerState,
 } from './state.js';
@@ -200,6 +218,43 @@ const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
 const OVERLAY_WIDTH_PX = 250;
 const OVERLAY_MIN_VIEWPORT_PX = 900;
+
+/**
+ * What the stage asks for around the plot, widest request first — GitHub issue #41.
+ *
+ * ## The defect: two numbers that were the same at every width and every building
+ *
+ * {@link QUEUE_GUTTER_PX} and {@link OVERLAY_WIDTH_PX} were passed to `buildLayout` unchanged
+ * whatever was being drawn, so 530 px of a canvas went to scenery whether the building had two
+ * shafts or thirty-five. Measured: **Vertical City draws 27 of 35 at a 1920 px viewport** —
+ * `RS-05`'s *"showing 27 of 35"* notice is doing its job and saying so, and eight shafts of a
+ * building whose whole subject is its shafts are off the picture on the largest screen anybody has.
+ *
+ * ## Why this is a ladder rather than arithmetic
+ *
+ * The obvious fix computes the plot width a shaft count needs and subtracts. It would need
+ * `MIN_SHAFT_WIDTH_PX` and the shaft gap, both private to `render/layout.ts`, and a copy of either
+ * is a second answer to *how wide is a legible shaft* that drifts the day that file is tuned — the
+ * failure this repository counts. So nothing here computes a fit: the shell **asks the layout** by
+ * building one and reading `Layout.hiddenShaftCount`, which is the layout's own measurement of
+ * exactly this question, already carried for the `RS-05` notice.
+ *
+ * The rungs yield in `fitGutters`' own order and for its stated reason — *the overlay panel is a
+ * whole surface and goes first, then the right gutter*. The last rung asks for **nothing**, which
+ * hands the layout its own documented default rather than a floor copied from it: this file never
+ * names a minimum, and `layout.ts` still clamps whatever it is handed.
+ *
+ * A building that fits on rung one stays on rung one, so no picture that was right moves.
+ */
+const STAGE_GUTTER_LADDER: readonly { readonly gutter: number; readonly overlay: boolean }[] =
+  Object.freeze([
+    { gutter: QUEUE_GUTTER_PX, overlay: true },
+    { gutter: QUEUE_GUTTER_PX, overlay: false },
+    { gutter: Math.round(QUEUE_GUTTER_PX / 2), overlay: false },
+    // `gutter: 0` is *ask for nothing*, which `buildLayout` reads as its own `DEFAULTS.gutterRightPx`
+    // — see the note above about never copying that number here.
+    { gutter: 0, overlay: false },
+  ]);
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
 /** How often the live region is re-announced. Every frame would be unusable. */
@@ -209,10 +264,34 @@ const ANNOUNCE_MS = 2000;
  * The wait-age legend — § 1.3 M4
  * ========================================================================== */
 
-/** One key of the wait-age legend: a colour to draw a disc in, and the words beside it. */
+/** One key of the wait-age legend: a colour to draw a disc in, the words beside it, and — since
+ *  the legend became a reading rather than a key — how many people are standing in it right now. */
 export interface WaitLegendEntry {
   readonly label: string;
   readonly color: string;
+  /**
+   * People standing in this band at the playhead, or `undefined` before there is a run.
+   *
+   * A head count, never an estimate and never suppressible — `live/bands.ts` says so in its own
+   * words, and nothing here divides anything. `undefined` is drawn as `—` rather than as `0`,
+   * because *no run yet* and *nobody waiting* are two different states and the second is a result.
+   */
+  readonly count: number | undefined;
+  /**
+   * The band's own boundary, for the entry's tooltip — `0–30 s`, `30–60 s`, `60–120 s`, `120 s+`.
+   *
+   * It earns its place on the fourth entry. `WAIT_BANDS[3].legendLabel` is the handoff's word
+   * *gave up* (`:233`), and `bands.ts` is explicit that the band counts **people still standing**
+   * past two minutes rather than people who abandoned — that is `observationsAt(…).abandoned`, a
+   * different population on a different clock. A bare label could carry that ambiguity harmlessly;
+   * a label with a *count* on it is a figure, so the boundary goes beside it.
+   *
+   * **Two numbers and a unit, deliberately, rather than a sentence.** It restates a bound the band
+   * already publishes, so it cannot be false unless `WAIT_BANDS` moves, in which case it moves
+   * with it — which is what makes it data rather than a claim about a run, and therefore not
+   * something `honesty/`'s search has anything to be true or false about.
+   */
+  readonly rangeLabel: string;
 }
 
 /**
@@ -231,23 +310,180 @@ export interface WaitLegendEntry {
  * decision-free half that puts it on the page — the pattern `dom.ts` documents, and the only one
  * that is testable in a suite with no jsdom.
  */
-export function waitLegendEntries(): readonly WaitLegendEntry[] {
-  return WAIT_BANDS.map((band) => ({ label: band.legendLabel, color: band.color }));
+export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitLegendEntry[] {
+  return WAIT_BANDS.map((band, index) => ({
+    label: band.legendLabel,
+    color: band.color,
+    count: bands?.counts[index]?.count,
+    rangeLabel: rangeLabelOf(band),
+  }));
 }
 
-/** One entry as a node: the handoff's `●` in the band's colour, then the band's words. */
-function legendEntryNode(doc: Document, entry: WaitLegendEntry): HTMLElement {
+/**
+ * The stage's layout: the widest scenery this canvas can afford **and still draw the building**.
+ *
+ * GitHub issue #41. Walks {@link STAGE_GUTTER_LADDER} and takes the first rung on which no shaft is
+ * hidden; falls through to the last rung when even that cannot hold them all, which is the honest
+ * answer on a phone and is where `RS-05`'s *"showing 6 of 12"* notice takes over. Nothing here
+ * decides how wide a shaft has to be — `Layout.hiddenShaftCount` is the layout's own measurement of
+ * whether they fit, and asking it is what keeps this file free of a copy of `render/layout.ts`'s
+ * private minimums.
+ *
+ * `wantsOverlay` stays the caller's, because it answers a different question — `RS-03` drops the
+ * live-metrics panel below 900 px of canvas whether or not the shafts fit — and a rung that
+ * re-enabled it would be this function overruling that rule.
+ */
+export function stageLayoutFor(options: {
+  readonly width: number;
+  readonly height: number;
+  readonly floors: readonly VizFloor[];
+  readonly shafts: readonly ShaftGeometry[];
+  readonly wantsOverlay: boolean;
+}): Layout {
+  const { wantsOverlay, ...rest } = options;
+  let last: Layout | undefined;
+  for (const rung of STAGE_GUTTER_LADDER) {
+    const layout = buildLayout({
+      ...rest,
+      ...(rung.gutter === 0 ? {} : { gutterRightPx: rung.gutter }),
+      overlayWidthPx: rung.overlay && wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+    });
+    if (layout.hiddenShaftCount === 0) return layout;
+    last = layout;
+  }
+  /*
+   * The ladder is a frozen non-empty tuple, so `last` is always assigned by the time this is
+   * reached. The fallback is a `buildLayout` at the narrowest rung rather than a throw: a stage
+   * that refused to draw would turn *some shafts do not fit* into *no picture at all*, which is
+   * § D234's own defect.
+   */
+  return last ?? buildLayout({ ...rest, overlayWidthPx: 0 });
+}
+
+/* ========================================================================== *
+ * The transport's reading of the run — GitHub issue #71
+ * ========================================================================== */
+
+/**
+ * The two figures the status strip carries, **as the reader's own mode words them**.
+ *
+ * ## The defect this closes
+ *
+ * The line was `AWT ${meanWaitS} s · WT95 ${wait95S} s`, built from `recording.summary` directly.
+ * Issue #71 diffed every rendered text node between the two modes on a completed shift and found
+ * that `AWT · WT95` is identical in both — one of six strings that made Casual, in the reporter's
+ * words, *less* informative than Engineer for the audience it names.
+ *
+ * The renderings that would have fixed it already existed and already reached this file:
+ * `disclosureItems` was called on every recording and its output dropped with `void itemsIn;`
+ * (§ D240 § 2). So this is not a new vocabulary — it is the shipped one, mounted.
+ *
+ * ## Why it reads the items rather than the summary
+ *
+ * Because the items are what parity is checked over, and a status line derived independently could
+ * disagree with the check that says the two modes agree. It also gets the **suppression** for free
+ * and in one place: `mode/disclosure.ts` already replaces a refused mean with the run's own reason,
+ * so this function has no `meansAreSuppressed` branch of its own to keep in step with `docs/10` R9.
+ *
+ * ## It carries each figure's `n`, and the honesty search is why
+ *
+ * The line it replaces read `AWT 13.1 s · WT95 27.4 s` and had done since it was written. Seeding it
+ * into the corpus made `honesty/properties.ts` fail on it immediately, at six generated cases in
+ * both modes: **an estimate with no count beside it** — R13 clause one, *"`n = 5` is not a caveat on
+ * `11.3 s`; it is part of what `11.3 s` means"*. The finding is about the shipped strip rather than
+ * about this function, and it had been invisible for the same reason the whole issue is: nothing on
+ * this line went through the layer that classifies a figure as an estimate.
+ *
+ * So the count comes with the value. `Rendering.count` already holds it, in the same visual unit,
+ * which is what makes this a **routing** change rather than a new claim: the figure, its window and
+ * its `n` were all sitting in the item the shell was throwing away.
+ *
+ * `undefined` — never an empty string — when there is no run or the items carry neither figure.
+ * The strip's transient messages live in the same element, and writing `''` over one of them would
+ * blank the screen at the moment a reader is being told something.
+ */
+export function transportStatusOf(
+  items: readonly DisclosureItem[],
+  mode: ViewMode,
+): string | undefined {
+  const drawn = itemsIn(items, mode);
+  const shown = [AWT_ID, WT95_ID]
+    .map((id) => drawn.find((item) => item.id === id))
+    .filter((item) => item !== undefined);
+  if (shown.length === 0) return undefined;
+
+  const figures = shown.map((item) => {
+    const { value, count } = item.rendering;
+    return count === undefined ? `${item.label} ${value}` : `${item.label} ${value} (${count})`;
+  });
+
+  /*
+   * **A refusal carries its reason, once.**
+   *
+   * Two things this had to be driven to get right, and printing what the function returns is what
+   * found both.
+   *
+   * The line it replaces read `AWT suppressed — <the run's own awtInvalidReason>`, and the first
+   * draft of this routing dropped the second half: on `midtown-office` at the viewer's defaults —
+   * a run whose mean *is* refused — it produced `average wait suppressed (n = 201 rides)` and
+   * nothing about why. That is R3 with the reason deleted, on the surface a reader glances at
+   * without opening a panel: a **worse** line than the one it replaced.
+   *
+   * Appending it per figure was the second draft, and it printed a 300-character refusal **twice**,
+   * because both figures are refused by the same `awtIsValid` call and carry the same sentence. So
+   * the reasons are deduplicated and said after the figures. Two figures refused for two different
+   * reasons — which no shipped ground produces today, since the gate is one call — would print
+   * both, in order, rather than silently choosing one.
+   *
+   * Only a `suppression` origin contributes: on a quotable figure the note is the window and the
+   * sample, and `figures` above already carries the sample.
+   */
+  const reasons = [
+    ...new Set(
+      shown
+        .filter((item) => item.origin.kind === 'suppression')
+        .map((item) => item.rendering.note)
+        .filter((note) => note !== undefined),
+    ),
+  ];
+  return [figures.join(' · '), ...reasons].join(' — ');
+}
+
+/** A band's boundary, as the two numbers it already publishes and the unit they are in. */
+function rangeLabelOf(band: WaitBandDefinition): string {
+  const from = String(band.fromS);
+  const to = band.toS;
+  return to === undefined ? `${from} s+` : `${from}–${String(to)} s`;
+}
+
+/**
+ * One entry as a node: the handoff's `●` in the band's colour, the band's words, and its count.
+ *
+ * `countNode` is passed in rather than created here because the four count nodes are the only part
+ * of this row that changes at 60 Hz — {@link WaitLegendEntry.count} moves every frame while the
+ * labels and the palette never move at all. The caller keeps the handles and writes them with
+ * `setText`, so the row is built exactly once and hovering an entry to read its `title` survives
+ * the playhead running underneath it.
+ */
+function legendEntryNode(
+  doc: Document,
+  entry: WaitLegendEntry,
+  countNode: HTMLElement,
+): HTMLElement {
   return el(doc, 'span', {
     className: 'legend-entry',
+    title: entry.rangeLabel,
     children: [
       el(doc, 'span', {
         text: '●',
         style: { color: entry.color },
         // The disc is the colour key; the words beside it are the claim. KB-15 — a reader who
-        // cannot separate amber from orange still reads *a minute* and *two minutes*.
+        // cannot separate amber from orange still reads *a minute* and *two minutes*, and now
+        // reads the head count too, which is a third signal that is not a colour either.
         attrs: { 'aria-hidden': 'true' },
       }),
       el(doc, 'span', { text: entry.label }),
+      countNode,
     ],
   });
 }
@@ -334,6 +570,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
   /**
+   * What the sheet on screen was shaped from, so a presentation setting can re-shape it.
+   *
+   * ## Why the input is held rather than the sheet re-assembled
+   *
+   * `showEnergyAxis` is presentation, and the `set-setting` arm's own rule is that presentation is
+   * *applied now, not at the next `adopt`* — a setting that only took effect on the next run is
+   * indistinguishable from an inert one for as long as a player stays on the screen, which is
+   * exactly how four of them went unnoticed (§ D250). `dayReportOf` is pure, so re-running it is
+   * free and safe; what is **not** safe is re-running `closeShift`, which banks the day, increments
+   * the attempt and can clear a contract. Holding the input separates *shape the sheet* from *file
+   * the day* without splitting `closeShift` into two functions that could drift about which
+   * recording they are describing.
+   *
+   * `undefined` before anything is filed, and it is never cleared: it is the input for whatever
+   * sheet `ViewerState.report` currently holds, and those two are written together and only here.
+   */
+  let filedReportInput: DayReportInput | undefined;
+  /**
    * Where the service badges were last drawn, for the click handler.
    *
    * Declared **here**, with the other boot-scope bindings, and not beside the function that reads
@@ -355,6 +609,49 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * fired.
    */
   let calendarCaption = '';
+  /**
+   * The hour the run on screen actually begins at, seconds after local midnight — issue #83.
+   *
+   * `DAY_START_S`, a flat 06:00, stood in every one of the four places this now reaches: the header
+   * clock, its empty state, the transport strip and the Day report. So `lunch-two-way` was drawn at
+   * breakfast and *Event egress* at dawn, and a player who picked *"CIBSE Guide D lunch two-way"*
+   * got a morning with a different mix. § D244 gave every template its own hour and § D285 gave a
+   * *part* of one its own; this is where the viewer finally reads them.
+   *
+   * **Captured from the run rather than re-derived from `state`**, and that is § D234's lesson at
+   * the one seam it would recur on: `state` is what the player has *selected* and the recording is
+   * what they are *watching*, and the two differ the moment a control moves before the next run.
+   * Reading the selection here would put the next run's clock on the last run's sheet.
+   *
+   * `undefined` before the first run and for a recording restored from a file, where the clock falls
+   * back to the shipped `DAY_START_S` — a recording's own hour is not in `VizRecording`, and
+   * inventing one from whatever is selected now would be exactly the defect above.
+   */
+  let runStartOfDayS: number | undefined;
+  /**
+   * Whether the player has entered a play mode — § D232, and the guard on every progression write.
+   *
+   * `false` for exactly as long as the menu overlay has never been dismissed. The shell opens **on
+   * the menu**, over a viewer that is already loaded and running, and boot's own `runShift()` sits
+   * below that overlay: a play-tester opened the deployed app, read the menu for two minutes,
+   * pressed nothing, and came back to `376 carried today`, all four goals ticked, `1 clean days
+   * running` and `1/3 banked this scenario` (issue #39). A full shift had run to completion and
+   * banked a clean day behind an opaque overlay.
+   *
+   * Two things follow from this flag and they are separate:
+   *
+   * 1. **The boot run does not play itself.** {@link adopt} hands `autoplay: false` while this is
+   *    false, so the stage is drawn at 06:00 and stays there. The picture survives — the browser
+   *    tier reads the bitmap and § D220's *draws the stage* is a claim about a frame, not about a
+   *    moving one — and the footer says `paused` rather than `running`, which is what a cold load
+   *    is.
+   * 2. **Nothing files.** {@link closeShift} returns early, so no day is closed, no attempt is
+   *    counted and no contract is cleared before the player has chosen anything.
+   *
+   * It is **not** the same question as *"is the menu hidden right now?"*. Re-opening the menu
+   * mid-week must not un-choose the mode the player is in; this latches once and never goes back.
+   */
+  let playerHasChosen = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -403,6 +700,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   const menuRoot = el(document, 'div', { className: 'menu-overlay' });
   document.body.append(menuRoot);
+  /**
+   * Where a wait is announced to a screen reader — see {@link announceWait}.
+   *
+   * Built here rather than declared in `index.html` for `menuRoot`'s own reason: `elementMap.ts`
+   * asserts that page's required shape, and a new required container would be a change to that
+   * contract for something that is chrome. Hidden by inline style rather than by a class, because
+   * the stylesheet is not this lane's to edit and a region hidden with `display:none` or
+   * `visibility:hidden` is a region assistive technology does not read at all.
+   */
+  const waitLiveRegion = el(document, 'div', {
+    className: 'menu-wait-live',
+    attrs: { role: 'status', 'aria-live': 'polite' },
+    style: {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      margin: '-1px',
+      padding: '0',
+      border: '0',
+      overflow: 'hidden',
+      'clip-path': 'inset(50%)',
+      'white-space': 'nowrap',
+    },
+  });
+  document.body.append(waitLiveRegion);
   // Derived once. Two calls would be two catalogues, and a panel drawing one while the reducer
   // validated against the other is the kind of disagreement that only shows up as a Start button
   // that refuses something the list offered.
@@ -427,18 +749,205 @@ function boot(ui: Elements, resources: BrowserResources): void {
     document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
   const client = apiOrigin === '' ? undefined : createClient(apiOrigin, fetchTransport(fetch));
 
-  let accountState: AccountState = SIGNED_OUT;
+  /*
+   * The three unavailability sentences, rewritten — issue #29, and the fix is two fixes.
+   *
+   * **The jargon.** *"This build was not compiled against a server"* uses *compiled* as a transitive
+   * verb with a preposition, implies the player could obtain a different build (there is no
+   * download; this is a hosted URL), and exposes an HTTP verb — *fetch* — as game vocabulary. It
+   * reads as a stack trace on the first prose most players meet.
+   *
+   * **The untruth.** It was never a compile-time fact. § D215 § 4 reads a `<meta>` tag at run time,
+   * and § D243 injects that tag from the server that is serving the page — so the same bytes are a
+   * connected build behind the server and an unconnected one behind a CDN. Saying *compiled* named
+   * the wrong mechanism and named it confidently.
+   *
+   * And the reassurance was false on its own terms: *"everything else on this menu works without
+   * one"* was printed on a menu where two of the other five rows also do not (#28). So these say
+   * **which** rows need a server and which do not, by name, and the case they describe is still
+   * real — a bundle served from a CDN with no server beside it never passes through § D243's
+   * injection and lands here.
+   */
+  const NO_SERVER_ROWS =
+    'Scenarios, Free play and Settings do not need one; Leaderboard and Account do.';
+  /*
+   * Issue #34's empty state, in the one channel this file owns.
+   *
+   * A designed empty state teaches the shape of the thing, and the shape is the part a player
+   * cannot guess: what a board *is*, what is on a row, and what orders it. The three nouns the
+   * screen used without defining — configuration, seed, metric — are defined here in the order a
+   * reader meets them.
+   *
+   * The last sentence is § D106 generalised and it is not decoration: four figures sit side by side,
+   * one of them orders the rows, and none is ever folded into another. A composite score over these
+   * would rank the configuration that carried fewest people highest.
+   */
+  const NO_SERVER_BOARDS =
+    'This site has no leaderboard server behind it, so there are no boards to read. Here is what ' +
+    'one is. A board is a single exact configuration — the same building, dispatcher, traffic ' +
+    'template, arrival rate and run length — and its rows are that configuration played on ' +
+    'different seeds, one row per posted run, so two rows differ only in which passengers turned ' +
+    'up. A seed is the number those passengers are generated from: same seed, same people, same ' +
+    'minute-by-minute demand. Every row carries the average wait, the 95th-percentile wait, the ' +
+    'mean time to destination and the share waiting over a minute, side by side. One of the four ' +
+    'orders the rows; the other three are shown beside it and are never combined into a score. ' +
+    `Picking a different dispatcher moves you to a different board rather than up this one. ${NO_SERVER_ROWS}`;
+  /*
+   * Issue #32, and the half of it that has nothing to do with the missing server.
+   *
+   * Four of the five questions the screen never answered — what is scored, what *the same seeds*
+   * means, how long a week runs, how a run gets submitted — are properties of the game's design and
+   * not of this week's data. They are answerable with the server off, and this is where they get
+   * answered, because § D218 § 3 says the client never invents *which* challenge is current and
+   * says nothing about the client explaining what a challenge is.
+   *
+   * The claim about comparability is the one to keep honest: common random numbers make two runs
+   * comparable **as runs**, and this screen still never says one dispatcher beat another. Compare
+   * is the only surface allowed to say that, and only with a paired-t interval that excludes zero.
+   */
+  const NO_SERVER_CHALLENGE =
+    'This site has no challenge server behind it, so there is no challenge to load. Here is what ' +
+    'one is. Everybody gets the same building, the same run length and the same numbered seeds — ' +
+    'the same seed generates the same passengers arriving at the same moments, so the only thing ' +
+    'that differs between two players is the dispatcher they chose. A challenge is scored over its ' +
+    'whole seed set rather than a lucky single run, and you submit the set in one go or not at ' +
+    'all: a partial set is a different question, not a smaller score. A challenge opens and closes ' +
+    'on the server’s clock, and the board stays readable after it shuts. Ordering a board on ' +
+    'one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
+    `another — Compare is the only screen allowed to say that. ${NO_SERVER_ROWS}`;
+  const NO_SERVER_SIGN_IN =
+    'This site has no account server behind it, so there is nowhere to sign in and nothing is ' +
+    `sent anywhere. ${NO_SERVER_ROWS}`;
+  const NO_SERVER_POST =
+    'This site has no leaderboard server behind it, so this run cannot be posted. It is still on ' +
+    'screen and still in the report — nothing about it is lost.';
+  /**
+   * What is said while a request is in flight, and what is said once it has been a while.
+   *
+   * § D243 § 4 and § D247: the Container App runs at `minReplicas: 0`, and a request to a sleeping
+   * one was measured at **32.2 s** against **0.13 s** warm. So a wait of half a minute here is a
+   * *correct* answer arriving slowly, and the two failures available are giving up — which reports
+   * `unreachable` about a server that is starting — and saying nothing, which is indistinguishable
+   * from a hang. Neither is taken: nothing is cancelled, and the wording escalates on a timer.
+   *
+   * ## The ladder is graded in the product's own vocabulary, and the grading is checked
+   *
+   * This is an app about waiting for lifts, and the player is now the one waiting. So the rungs
+   * name the band a **tenant** would be in at the same elapsed time — the four the mood bar uses.
+   * That is a joke and it is also a teaching device: a player learns what *breezy* and *checking
+   * watch* mean by being in them.
+   *
+   * **It is prose about the player's wait and never a statistic about a run.** Nothing here imports
+   * `live/bands.ts`, nothing routes through a surface that publishes run figures, and no rung
+   * carries a number about a simulation. What it must not do is *misname* a band, because a screen
+   * that called 20 s *tapping foot* would be teaching the reader the product's own vocabulary
+   * wrongly — so `main.test.ts` reads these rungs out of this file's source and checks each band
+   * word against `WAIT_BANDS`' real boundaries, which are 30 s, 60 s and 120 s.
+   *
+   * There is deliberately **no progress bar and no percentage.** There is no progress to report — a
+   * container is starting and it will not say how far — and inventing one is the same class of
+   * defect as a figure a run does not support.
+   */
+  const WAIT_LADDER: readonly { readonly afterMs: number; readonly text: string }[] = Object.freeze([
+    {
+      afterMs: 4_000,
+      text:
+        'Summoning the car. This site’s server shuts down when nobody is playing, which is what ' +
+        'keeps it free to leave running — so the first request after a quiet spell is starting it.',
+    },
+    {
+      // 10 s. Under 30 s, which is `breezy` — checked against WAIT_BANDS rather than asserted here.
+      afterMs: 10_000,
+      text: 'Still on its way. A tenant waiting this long is one your mood bar calls breezy.',
+    },
+    {
+      // 30 s: the breezy → tapping foot boundary, and about where the measured cold start lands.
+      afterMs: 30_000,
+      text:
+        'Thirty seconds — the exact point where your own mood bar stops calling a wait breezy and ' +
+        'starts calling it tapping foot. We are aware of the irony.',
+    },
+    {
+      // 60 s: tapping foot gives way to checking watch.
+      afterMs: 60_000,
+      text: 'A minute — long enough that your own mood bar has moved a tenant into checking watch.',
+    },
+    {
+      /*
+       * 120 s: checking watch → taking the stairs, and the rung that stops blaming the cold start.
+       * A sleeping container was measured at 32.2 s; four times that is not a cold start any more,
+       * and going on saying *it is just waking up* would be a reassurance that had stopped being
+       * true — which this repository has a standing rule about.
+       */
+      afterMs: 120_000,
+      text:
+        'Two minutes — your mood bar’s last band, taking the stairs, where a tenant gives up. You ' +
+        'do not have that option, and a cold start was measured at about half a minute, so this is ' +
+        'no longer a sleeping server. Nothing you typed is lost.',
+    },
+  ]);
+
+  /*
+   * The unavailability is said **on mount**, which is issue #30's own stated fix ordering.
+   *
+   * The screen used to be indistinguishable from a working login until the player pressed the
+   * button, at which point it admitted there had never been anywhere for the address to go. That
+   * ordering is the privacy problem rather than the layout one: whatever a player typed, they typed
+   * into a form with no stated purpose, and they could not have known before typing.
+   */
+  let accountState: AccountState = client === undefined ? signedOut(NO_SERVER_SIGN_IN) : SIGNED_OUT;
   let boardView: LeaderboardView = {
     boards: [],
     selected: undefined,
     page: undefined,
-    notice:
-      client === undefined
-        ? 'This build was not compiled against a leaderboard server, so there are no boards to show.'
-        : undefined,
+    notice: client === undefined ? NO_SERVER_BOARDS : undefined,
   };
   /** Requests are started here and never from a render — a render that fetched would loop. */
   let boardsRequested = false;
+
+  /* ---------------------------------------------------------------------- *
+   * Waking the container before the player needs it — § D247 § 5
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The three screens that talk to a server, and therefore the three that are worth waking for.
+   *
+   * Entering one is **intent**, and intent is minutes ahead of the request on the account screen
+   * (an address has to be typed) and seconds ahead on the other two. Waking on *submit* would be
+   * waking at the moment the wait starts, which buys nothing at all.
+   */
+  const WAKING_SCREENS: ReadonlySet<string> = new Set(['account', 'leaderboard', 'challenge']);
+  /**
+   * The floor between two wakes, so bouncing between **Back** and **Account** is not one request
+   * per bounce.
+   *
+   * Far below any scale-to-zero window, so it can never suppress a wake that was needed: a
+   * container that went to sleep did so after minutes of idleness, not inside thirty seconds.
+   */
+  const WAKE_MIN_INTERVAL_MS = 30_000;
+  let lastWakeMs = Number.NEGATIVE_INFINITY;
+
+  /**
+   * Fire and forget. **Nothing branches on the answer and nothing waits for it.**
+   *
+   * `/api/wake` answers from memory with no store call, so a 200 means *the process is running* and
+   * nothing more; treating a failure as meaningful would turn a courtesy into a dependency and make
+   * a database outage read as a server that is merely asleep. So the result is discarded here, in
+   * one place, rather than at each call site where somebody would eventually be tempted by it.
+   *
+   * The throttle reads `clock`, the shell's one `DisplayClock`, rather than `Date.now()`.
+   * `boundaries.test.ts` gives the wall clock exactly one home — `playback/clock.ts` — and it caught
+   * this: a second reader in `dev/main.ts` is precisely the drift that rule exists to stop, and it
+   * is not excused by the reading being *only a throttle*. The instant here is a real one and it is
+   * not a simulated second; invariant 3 is about `core/`, and this is the shell.
+   */
+  function wakeServer(): void {
+    if (client === undefined) return;
+    const nowMs = clock.now();
+    if (nowMs - lastWakeMs < WAKE_MIN_INTERVAL_MS) return;
+    lastWakeMs = nowMs;
+    void client.wake();
+  }
 
   /* ---------------------------------------------------------------------- *
    * This week's challenge
@@ -452,7 +961,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * countdown built by differencing two clocks would be the client answering a question the server
    * has already answered, one subtraction later.
    */
-  let challengeView: ChallengeScreenInput = { runsDone: 0 };
+  let challengeView: ChallengeScreenInput = {
+    runsDone: 0,
+    ...(client === undefined ? { notice: NO_SERVER_CHALLENGE } : {}),
+  };
   let challengeRequested = false;
   /**
    * The seed set this browser has simulated, paired with the seed each recording is *of*.
@@ -707,7 +1219,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
-    const written = saveSession(sessionStore, state, menuState);
+    /*
+     * **A mode that does not own a week does not write one** — § D231, issue #64's other half.
+     *
+     * Guarding `closeDay` alone was not enough. `enterFreePlay` replaces `state.week` with a fresh
+     * day-one week *the moment Free Play starts*, so any later save — and changing a setting saves
+     * — would have written that scaffolding over the campaign's banked days. The settings and the
+     * Free Play selection still persist, because those belong to the player rather than to the
+     * week; only the week itself is held back, and what is held back is whatever the slot already
+     * has.
+     */
+    const stored = loadSession(sessionStore);
+    const written = saveSession(
+      sessionStore,
+      { ...state, week: weekForSession(state, stored.ok ? stored.snapshot.week : undefined) },
+      menuState,
+    );
     /*
      * The refusal reaches the player, which is the whole reason the budget exists. A library that
      * outgrew the slot and stopped being written **in silence** would be the gap this closed,
@@ -753,9 +1280,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
           applyPlaybackSpeed();
           applyTheme();
           if (menuState.settings.reduceMotion) playback?.pause();
-          // The energy axis is a figure on a panel, so the panel has to be redrawn rather than
-          // nudged — `renderAll` is the chokepoint every state change already goes through.
-          if (intent.field === 'showEnergyAxis') renderAll();
+          /*
+           * The energy axis is a **figure on a sheet**, so the sheet is re-shaped and then the
+           * panel is redrawn — GitHub issue #70.
+           *
+           * `renderAll()` alone was this line, and it was honest about the shell and wrong about
+           * the Day report: the filed `ShapedDayReport` already holds its figure list, so redrawing
+           * the panel drew the same two kJ tiles again. `dayReportOf` is pure and re-running it is
+           * free; `closeShift` is what banks a day and is deliberately not re-entered. See
+           * {@link filedReportInput}.
+           */
+          if (intent.field === 'showEnergyAxis') {
+            if (filedReportInput !== undefined) {
+              filedReportInput = {
+                ...filedReportInput,
+                showEnergyAxis: menuState.settings.showEnergyAxis,
+              };
+              state = { ...state, report: dayReportOf(filedReportInput) };
+            }
+            renderAll();
+          }
           /*
            * The canvas is not part of `renderAll`'s panel sweep, and the playback tick only redraws
            * on a frame change — so without this a theme flip repainted the shell and left the stage
@@ -772,6 +1316,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // correct on its own.
         if (arrived) void loadBoards();
         if (next.screen === 'challenge' && menuStateBefore !== 'challenge') void loadChallenge();
+        /*
+         * Woken on arrival, on the same rule and for a different reason. `loadBoards` and
+         * `loadChallenge` are requests whose answers are drawn; this is a request whose answer is
+         * discarded, and it is here because *arriving* is the earliest honest signal that a player
+         * is about to need the server. The Account screen is the one that pays off: it fires when
+         * the screen opens and the request that matters is sent after an address has been typed.
+         */
+        if (next.screen !== menuStateBefore && WAKING_SCREENS.has(next.screen)) wakeServer();
         return;
       }
 
@@ -791,12 +1343,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
         if (entered === undefined) return;
+        // `enterFreePlay` selects the simulation tab — issue #23, and it is in the decision rather
+        // than here for the reason that module exists at all.
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu();
         runShift();
         return;
       }
+
+      case 'close':
+        /*
+         * The way out that is not a mode being entered — issues #40, #33 and #68. `renderAll`
+         * rather than `runShift`: leaving the menu is not asking for a different day, and re-running
+         * here would throw away the shift the player pressed **Resume** to get back to.
+         */
+        closeMenu();
+        renderAll();
+        return;
 
       case 'open-campaign':
         /*
@@ -829,6 +1393,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
         menuRoot.hidden = false;
         menuState = navigate(menuState, 'main');
         drawMenu();
+        /*
+         * Opening the Menu is the earliest intent there is, and it is the one that catches the case
+         * the screen-entry wake cannot: a player who has been running shifts for twenty minutes has
+         * touched no API at all, so the container that served the page has had time to scale back
+         * to zero underneath them. Boot is deliberately **not** a wake — `serve.ts` serves this page
+         * from the same container, so a page that loaded came out of a process that is awake.
+         */
+        wakeServer();
         return;
 
       case 'open-board': {
@@ -913,17 +1485,47 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
 
+      case 'commit-commissioning':
+        /*
+         * **The fabric stops being a draft** — GitHub issue #48.
+         *
+         * `state.commissioning` is already written, pick by pick, so this arm changes no choice.
+         * What it does is what the screen had no way to say: leave the design phase and open the
+         * week on it. `runShift` because the fabric is `between-games` and this is the moment
+         * between games — the player has finished choosing, and the run they see next is the one
+         * they chose. Every other commit in this switch does exactly this pair.
+         *
+         * No guard here on `review.admissible`: `menu/screens.ts` disables the row and says why,
+         * which is `docs/16` S7's rule that a control which cannot be honoured is not offered. A
+         * second check would be a second answer to *may this open a week*, and the two would
+         * disagree the day the review gains a gate.
+         */
+        state = { ...state, tab: 'run' };
+        closeMenu();
+        runShift();
+        return;
+
+      case 'reset-commissioning':
+        /*
+         * Back to as built — the screen's other verb. `[]` is `ViewerState.commissioning`'s *as
+         * built* and is byte-identical to the authored building, so this is one step rather than an
+         * undo stack: a per-pick history would be a second model of the choices beside the one the
+         * reducer holds.
+         *
+         * `drawMenu` and **not** `runShift`. The player is still on the commissioning screen and
+         * has not said they are finished; re-running here would spend a simulation on a fabric they
+         * are in the middle of deciding, and would move the shift under the menu they are reading.
+         */
+        state = { ...state, commissioning: [] };
+        drawMenu();
+        return;
+
       case 'run-challenge':
         runChallenge();
         return;
 
       case 'post-challenge':
         void postChallenge();
-        return;
-
-      case 'account-mode':
-        accountState = updateForm(accountState, { mode: intent.register ? 'register' : 'sign-in' });
-        drawMenu();
         return;
 
       case 'account-form':
@@ -933,30 +1535,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
       case 'account-submit': {
         if (client === undefined) {
-          accountState = withNotice(
-            accountState,
-            'This build was not compiled against a server, so there is nowhere to sign in.',
-          );
+          accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
           drawMenu();
           return;
         }
-        const form = accountState.form;
-        accountState = busy(accountState, true);
-        drawMenu();
-        const request =
-          form.mode === 'register'
-            ? client.register({
-                email: form.email.trim(),
-                displayName: form.displayName.trim(),
-                password: form.password,
-              })
-            : client.login({ email: form.email.trim(), password: form.password });
-        void request.then((result) => {
-          accountState = result.ok
-            ? signedIn(accountState, result.value.token, result.value.user)
-            : withNotice(accountState, result.detail);
+        /*
+         * The client's own rules first, and they are a courtesy rather than a gate: a malformed
+         * address refused here costs nobody a mail, and § D242 charges the per-address and
+         * per-caller budgets *before* it looks at the account — so a typo spent on the server is a
+         * budget spent on whoever owns that address.
+         */
+        const issues = formIssues(accountState);
+        if (issues.length > 0) {
+          accountState = withNotice(accountState, issues.map((issue) => issue.message).join(' '));
           drawMenu();
-        });
+          return;
+        }
+        void (namingStage(accountState) ? chooseDisplayName(client) : askForLink(client));
         return;
       }
 
@@ -970,6 +1565,168 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
     }
+  }
+
+  /* ---------------------------------------------------------------------- *
+   * Signing in — § D241, and the four things a link flow has to get right
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Say something now, and say something else if it takes a while. Returns the way to stop.
+   *
+   * § D243 § 4 measured a **28.7 s** cold start against the live app, so a request on this surface
+   * is allowed to take about half a minute and be perfectly healthy. Two obvious responses are both
+   * wrong. Cancelling it reports `unreachable` — *"the leaderboard server could not be reached"* —
+   * about a server that is reachable and starting, which is the one sentence in `CLIENT_FAILURES`
+   * that would be a lie here. Saying nothing for thirty seconds is indistinguishable from a hang,
+   * and a player who reloads mid-request has spent one of § D242's three per-address links.
+   *
+   * So nothing is cancelled — `menu/client.ts` sets no timeout and no `AbortSignal`, and asserts
+   * that about itself — and the *wording* escalates instead. The timer is beside the request rather
+   * than inside the client, because the client has no screen to write to.
+   */
+  function startWaiting(first: string): () => void {
+    accountState = pending(accountState, first);
+    announceWait(first);
+    drawMenu();
+    /*
+     * One timer per rung rather than one repeating tick, so a rung is announced exactly when it is
+     * reached and never re-announced. `aria-live` re-reads on every write, and a polite region
+     * rewritten every second is a screen reader talking over the player for half a minute.
+     */
+    const timers = WAIT_LADDER.map((rung) =>
+      window.setTimeout(() => {
+        accountState = pending(accountState, rung.text);
+        announceWait(rung.text);
+        drawMenu();
+      }, rung.afterMs),
+    );
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      announceWait('');
+    };
+  }
+
+  /**
+   * Say it to a screen reader as well as to the screen.
+   *
+   * A **visually hidden** region rather than a second visible line: the words are already on the
+   * panel, and printing them twice would be two copies for a sighted reader to reconcile. The
+   * `role="status"` plus `aria-live="polite"` pair is deliberate belt and braces — some readers key
+   * off the role and some off the attribute — and *polite* rather than *assertive* because a wait
+   * is not an alert and must not interrupt whatever the player is reading.
+   *
+   * It is written **only on a band change**, which is what one-timer-per-rung buys: a region
+   * rewritten on a tick would be read out again on every tick.
+   *
+   * Nothing here animates, so there is nothing for `settings.reduceMotion` to suppress — the
+   * escalation is a change of words, which a reader who has asked for less motion still wants.
+   */
+  function announceWait(text: string): void {
+    waitLiveRegion.textContent = text;
+  }
+
+  /**
+   * Ask for a sign-in link — the whole of what this screen collects.
+   *
+   * The 202 is shown in the **server's** words. It is identical whether or not the address has an
+   * account (§ D241 § 7), and a client that added *"welcome back"* or *"we have created your
+   * account"* to it would rebuild the account-enumeration oracle in prose after the server went to
+   * some trouble to close it on the wire.
+   *
+   * The 429 is the one refusal this file reads a field out of. § D242 gives a duration and
+   * deliberately does not say **which** of the two budgets was spent, because naming it would leak
+   * whether anybody else has been asking about the address; the duration is carried into the state
+   * so the form stops offering a second request the server has already promised to refuse.
+   */
+  async function askForLink(api: LeaderboardClient): Promise<void> {
+    const done = startWaiting('Asking for a sign-in link…');
+    const result = await api.requestLink(accountState.form.email.trim());
+    done();
+    if (result.ok) {
+      accountState = linkRequested(accountState, result.value);
+      drawMenu();
+      return;
+    }
+    const retryInMs = linkRetryInMsOf(result);
+    if (retryInMs === undefined) {
+      accountState = withNotice(accountState, result.detail);
+      drawMenu();
+      return;
+    }
+    accountState = rateLimited(accountState, result.detail, retryInMs);
+    drawMenu();
+    // The gate lifts on its own. A refusal a player has to guess their way out of is a refusal that
+    // teaches them the screen is broken.
+    window.setTimeout(() => {
+      accountState = retryAllowed(accountState);
+      drawMenu();
+    }, retryInMs);
+  }
+
+  /**
+   * Name yourself, once — § D241 § 7, and the second request the oracle forced.
+   *
+   * A name cannot travel with the link request, because a form that asked for one *only when the
+   * address was new* would say whether the address was new. So the account is minted with a
+   * generated name, `displayNameChosen` says so on the wire, and this is the rename over a session
+   * that already proves the address.
+   *
+   * **409 is reported as taken**, unlike a taken address, and the asymmetry is deliberate: a
+   * display name is drawn on every board, so it is already public.
+   */
+  async function chooseDisplayName(api: LeaderboardClient): Promise<void> {
+    const token = accountState.token;
+    if (token === undefined) return;
+    const done = startWaiting('Saving your name…');
+    const result = await api.setDisplayName(token, accountState.form.displayName.trim());
+    done();
+    accountState = result.ok
+      ? signedIn(accountState, token, result.value)
+      : withNotice(accountState, result.detail);
+    drawMenu();
+  }
+
+  /**
+   * Redeem a mailed link out of the URL fragment, then get rid of it.
+   *
+   * ## Why the token is in the fragment, and why this is the half that finishes the job
+   *
+   * § D241 § 4. A fragment is **never transmitted**, so a mail client, a scanner or a corporate
+   * link-rewriting appliance that fetches the URL cannot carry the token anywhere, let alone spend
+   * it; and it keeps the token out of access logs, ingress traces and `Referer`. That property is
+   * about the *link*. It says nothing about the address bar the player is now looking at, which is
+   * shoulder-surfable, copy-pasteable into a bug report and preserved by a reload — so the fragment
+   * is cleared here.
+   *
+   * **Cleared before the request, not after it.** A reload during a 28.7-second cold start would
+   * otherwise re-send a token that the first attempt is in the middle of spending, and the second
+   * attempt would come back `link-spent` — a correct refusal to an honest player, produced by this
+   * file rather than by anything they did.
+   *
+   * The token is never put into a notice, a log or a URL this build constructs. The three refusals
+   * that can come back — expired, spent, invalid — are the server's own sentences, and each is
+   * worded around whether asking again will help.
+   */
+  async function redeemLinkFromHash(): Promise<void> {
+    const linkToken = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('sign-in');
+    if (linkToken === null || linkToken === '') return;
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    // Opening a link is a request to sign in, so the screen that shows the outcome is the one the
+    // player is put on. A result written to a panel nobody navigates to is a result nobody reads.
+    menuState = navigate(menuState, 'account');
+    if (client === undefined) {
+      accountState = withNotice(accountState, NO_SERVER_SIGN_IN);
+      drawMenu();
+      return;
+    }
+    const done = startWaiting('Signing you in…');
+    const result = await client.redeem(linkToken);
+    done();
+    accountState = result.ok
+      ? signedIn(accountState, result.value.token, result.value.user)
+      : signedOut(result.detail);
+    drawMenu();
   }
 
   /**
@@ -991,10 +1748,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * diverging queue is caught as a wrong claim rather than silently corrected and ranked anyway.
    */
   async function submitScore(): Promise<void> {
+    /*
+     * Issue #21: all three of these were a bare `return`.
+     *
+     * **Post this run** is drawn as a filled primary action, and a filled primary action that
+     * consumes a click and produces nothing at all is worse than a disabled one — the player
+     * cannot tell whether it worked, whether it is still going, or whether the screen is broken.
+     * `menu/screens.ts` disables the row and supplies a `disabledWhy` for each of these cases, and
+     * that is the right place for the affordance; this is the backstop for every route that reaches
+     * the handler anyway, and it costs three sentences.
+     *
+     * The sentences are distinct on purpose, for `leaderboardBody`'s own reason: *there is no
+     * server* is about the deployment, *there is no run* is about the screen, and *nobody is
+     * signed in* is about the player. One sentence for all three would tell a signed-in player
+     * with a finished run to sign in.
+     */
     const recording = state.recording;
-    if (client === undefined || recording === undefined) return;
+    if (recording === undefined) {
+      accountState = withNotice(
+        accountState,
+        'There is no finished run to post yet. Run a shift from Scenarios or Free play, then come ' +
+          'back — the run on screen is what gets posted.',
+      );
+      drawMenu();
+      return;
+    }
+    if (client === undefined) {
+      accountState = withNotice(accountState, NO_SERVER_POST);
+      drawMenu();
+      return;
+    }
     const token = accountState.token;
-    if (token === undefined) return;
+    if (token === undefined) {
+      accountState = withNotice(accountState, postingRefusal(accountState) ?? NO_SERVER_SIGN_IN);
+      drawMenu();
+      return;
+    }
 
     /*
      * The fourth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
@@ -1008,8 +1797,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
 
-    accountState = busy(accountState, true);
-    drawMenu();
+    // Same escalation as the sign-in path: the server this posts to is the one § D243 measured at
+    // 28.7 s cold, and a primary action that goes quiet for half a minute reads as the dead button
+    // #21 is about.
+    const done = startWaiting('Posting this run…');
     const result = await client.submit(token, {
       run: {
         buildingId: state.buildingId,
@@ -1021,6 +1812,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       },
       claimed: claim.claimed,
     });
+    done();
     accountState = withNotice(
       accountState,
       result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
@@ -1036,7 +1828,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
     account: () => accountState,
     leaderboard: () => boardView,
     viewMode: () => state.mode,
-    challenge: () => (client === undefined ? undefined : challengeView),
+    /*
+     * Handed over **even with no server** — issue #32, and the change is one word.
+     *
+     * This returned `undefined` when there was no client, which sent `challengeBody` down its own
+     * fallback and printed the sentence #29 is about. The screen now always has a
+     * `ChallengeScreenInput`, so the sentence a player reads is `challengeView.notice`, which this
+     * file authored: what a challenge is, what is scored, what *the same seeds* buys, and how a set
+     * is submitted. None of that depended on the server, and four of #32's five questions were
+     * unanswerable only because the screen had nowhere to put the answer.
+     */
+    challenge: () => challengeView,
+    /*
+     * GitHub issue #28's one line, and the shell is the only thing that can write it.
+     *
+     * The origin comes from a `<meta>` tag read at run time (§ D215 § 4, § D243), so the same bytes
+     * are a connected build behind a server and an unconnected one behind a CDN — `menu/screens.ts`
+     * cannot tell and correctly says nothing when nobody has. `client` is `undefined` exactly when
+     * that lookup found no origin, which is the same fact `open-board` and `account-submit` already
+     * branch on, so this introduces no second answer to *is there a server*.
+     */
+    hasServer: () => client !== undefined,
+    shell: shellBehindMenu,
     calendarPeriodId: () => state.calendar?.id ?? '',
     commissioning: () => commissioningInput(),
     runState: () => {
@@ -1091,12 +1904,58 @@ function boot(ui: Elements, resources: BrowserResources): void {
     };
   }
 
+  /**
+   * Everything the overlay covers — issues #33 and #68, and the shell naming its own.
+   *
+   * Derived from `document.body` rather than listed, minus the two things this file appended to it,
+   * so an element added to `index.html` is covered on the day it lands. A hand-written list of the
+   * page's top-level elements would be the shape this repository keeps finding stale, on a guard
+   * whose going stale is silent: the shell would look right and one more thing behind the menu would
+   * be reachable.
+   *
+   * The two exemptions are both this file's own. The overlay cannot cover itself. And
+   * {@link waitLiveRegion} is a `role="status"` that announces **the menu's** own waits — a sign-in
+   * link taking half a minute (§ D243 § 4) — so hiding it from assistive technology while the menu
+   * is up would silence the one region the menu speaks through.
+   *
+   * Read fresh on every draw rather than captured once: `boot` appends both exemptions before the
+   * first `drawMenu`, and a list taken at mount would be a snapshot of a page that is still being
+   * assembled.
+   */
+  function shellBehindMenu(): readonly HTMLElement[] {
+    return [...document.body.children].filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child !== menuRoot && child !== waitLiveRegion,
+    );
+  }
+
   function drawMenu(): void {
     renderMenu(menuRoot, menuHost);
   }
 
+  /**
+   * Leave the menu — and the one place {@link playerHasChosen} is latched.
+   *
+   * Three of the four ways out are a mode being entered: **Start** (free play), **Open the doors**
+   * (the campaign) and **Keep going** (endless). **Resume** is the fourth, and it is a change of
+   * mind rather than a choice — GitHub issue #40, and the intent Escape presses.
+   *
+   * It latches `playerHasChosen` all the same, and that is deliberate rather than an oversight in
+   * the new arm. The flag gates autoplay on the next `adopt`, and a player who pressed **Resume** to
+   * get back to the shift they were watching has left the menu on purpose; a run they then re-roll
+   * should play, exactly as it would have had they never opened the menu. Resume itself starts
+   * nothing — there is no `adopt` on this path — so the shift on screen stays where the playhead
+   * left it.
+   *
+   * **It redraws**, because the overlay's `hidden` is what `menuPanel.ts#coverShell` reads to decide
+   * whether the shell behind is `inert`. Setting `hidden` without drawing would hide the menu and
+   * leave the page underneath it out of the accessibility tree and unclickable — issue #68 with the
+   * sign flipped, and the reason the covering is keyed on one value with one writer.
+   */
   function closeMenu(): void {
     menuRoot.hidden = true;
+    playerHasChosen = true;
+    drawMenu();
   }
 
   drawMenu();
@@ -1119,6 +1978,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * every state change drops hover, and hover is how the reader reads a `title`.
    */
   const fillLegend = keyedFill(ui.stage.legend);
+  /**
+   * The four count cells, held from the one build `fillLegend` ever does.
+   *
+   * The counts are live and the row is not: rebuilding four entries every frame would churn the
+   * accessibility tree sixty times a second and would drop a hover mid-read, which is the exact
+   * cost `fillLegend`'s docstring above exists to avoid. So the structure is keyed on the frozen
+   * band set and built once, and the playhead only ever writes text into these four nodes.
+   */
+  let legendCountCells: readonly HTMLElement[] = [];
 
   /* ---------------------------------------------------------------------- *
    * The mount context — the only thing a panel may do to the world
@@ -1135,7 +2003,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const revealed = new Set(state.revealedTabs);
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
-      if (tab === 'report') closeShift();
+      /*
+       * **A navigation files a day only when the day has been played out** — § D232, closing the
+       * half § D223 named and could not reach from its own lane.
+       *
+       * This arm was `if (tab === 'report') closeShift();` at any playhead. § D223 is precise about
+       * why that is wrong and about why it is *not* a lie: the simulator runs a day to its end and
+       * then plays it back, so what got banked was the true outcome of a day that really was
+       * simulated in full. What was wrong is that **a navigation had a progression side effect the
+       * reader did not ask for** — it incremented `week.attempt`, and it could bank a clean shift
+       * and clear a contract, on a run nobody had watched a second of.
+       *
+       * The guard is § D223's own: file only when the playhead has reached `endedAt`. That is the
+       * same instant the sheet itself agrees to be a whole-day account at, so the tab can no longer
+       * bank a day the sheet is simultaneously declining to report — the running sheet and the
+       * filed one now cover exactly the two sides of one condition.
+       *
+       * `tick` still files the ordinary way, from the transport reaching the end on the run tab.
+       * This arm remains reachable and necessary: a run that ended while the reader was on another
+       * surface never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected
+       * clock rather than off the frame loop — so its playhead *is* at `endedAt` by the time the
+       * reader opens the sheet, and the day files then.
+       */
+      if (tab === 'report' && playheadHasRunOut()) closeShift();
       renderAll();
       ui.tabs[tab].focus();
     },
@@ -1269,6 +2159,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
   applyTheme();
   renderAll();
   runShift();
+  /*
+   * The mailed link, redeemed on the way in.
+   *
+   * After `runShift()` so a slow redemption never delays the thing the page is for, and **before**
+   * `urlWritable` so the fragment is gone before anything else writes an address. It clears the
+   * fragment synchronously and then awaits, so nothing later in this file can observe the token and
+   * nothing this build writes can carry it.
+   */
+  void redeemLinkFromHash();
   urlWritable = true;
   /*
    * The one write boot itself owes — the `SH-09` residual (§ D198). The flip above happens after
@@ -1317,7 +2216,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
       resources,
       recording,
       simTimeS,
-      building,
+      /*
+       * The **last run's** building while a run is on screen, and the building the state is
+       * pointing at when there is not — § D234, issue #36.
+       *
+       * `building` is `shiftRunConfigOf`'s: grown to the day, commissioned, with the day's
+       * incidents on it, and therefore the right thing to describe the recording beside it. It is
+       * the wrong thing to describe when the recording has been cleared and nothing has re-run,
+       * which is exactly what *Take the next assignment* does — it moves `buildingId`, drops the
+       * recording, and does not run. The header then drew the new building's name against the old
+       * building's specs, and the picture underneath was the old building's frame stretched over
+       * the new one's box.
+       */
+      building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
     };
   }
@@ -1334,17 +2245,58 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawFooter(view);
     drawTransportChrome(view);
     drawParity();
-    drawLegend();
+    drawLegend(view);
     drawStage();
   }
 
-  /** § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else. */
-  function drawLegend(): void {
-    const entries = waitLegendEntries();
-    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => [
-      ui.stage.legendTitle,
-      ...entries.map((entry) => legendEntryNode(document, entry)),
-    ]);
+  /**
+   * § 1.3 M4 — the four wait-age keys, from `WAIT_BANDS` and from nowhere else, each carrying its
+   * live head count.
+   *
+   * ## Why the counts are here at all
+   *
+   * The row said what amber *means* and never how many people amber currently **is**, so a reader
+   * could not tell one person from thirty from the only surface that names the four colours the
+   * stage is drawing in. The left rail's mood bar already carries counts (L2) and is a different
+   * instrument on a different card; this is the key under the stage, and it now reads rather than
+   * merely keys. The words and the palette are still `WAIT_BANDS`' and are still written nowhere
+   * else.
+   *
+   * **Four head counts and no total.** The counts *are* the scale — an exact count separates one
+   * person from thirty in a way no bar and no max-marker can — and a total would be a fifth figure
+   * whose sentence (*"12 standing now"*) is a claim about a run, which `honesty/surfaces.ts` would
+   * have to drive rather than this file assert. Left out rather than smuggled past that search.
+   *
+   * ## Why it is cheap enough to run at 60 Hz
+   *
+   * One extra `waitBandsAt` — a single early-terminating pass over `recording.legs` up to `t` —
+   * beside the several `renderLive` already makes, and *no* DOM work on a frame where the digits
+   * did not change, because the structure is built once and `setText` no-ops on equal text. The
+   * canvas render in `drawStage` dominates this by orders of magnitude.
+   */
+  function drawLegend(view: ViewAt): void {
+    const bands =
+      view.recording === undefined ? undefined : waitBandsAt(view.recording, view.simTimeS);
+    const entries = waitLegendEntries(bands);
+    /*
+     * The key is deliberately the labels and colours only, and **not** the counts: keying on a
+     * figure that moves every frame would rebuild the row every frame, which is what holding the
+     * cells below exists to prevent.
+     */
+    fillLegend(entries.map((entry) => `${entry.label}·${entry.color}`).join('|'), () => {
+      const cells: HTMLElement[] = [];
+      const nodes = entries.map((entry) => {
+        const cell = el(document, 'span', { className: 'legend-count' });
+        cells.push(cell);
+        return legendEntryNode(document, entry, cell);
+      });
+      legendCountCells = cells;
+      return [ui.stage.legendTitle, ...nodes];
+    });
+    for (const [index, entry] of entries.entries()) {
+      const cell = legendCountCells[index];
+      if (cell !== undefined) setText(cell, entry.count === undefined ? '—' : String(entry.count));
+    }
   }
 
   /** Only what the playhead moves. Runs at 60 Hz. */
@@ -1354,6 +2306,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawHeader(view);
     drawFooter(view);
     drawPlayhead(view);
+    // The legend's counts are a reading at `t`, so they belong here and not only in `renderAll`.
+    // Left out, the row would state the counts of whichever frame last changed the state — a
+    // figure that is stale in exactly the way a scrubbing reader cannot see.
+    drawLegend(view);
     drawStage();
   }
 
@@ -1477,6 +2433,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (!isViewMode(value)) return;
       window.localStorage.setItem(MODE_KEY, value);
       context.update({ mode: value });
+      /*
+       * The status strip is written here as well as on `adopt` — issue #71, and see
+       * {@link drawTransportStatus} for why it is not in `renderAll`. These are the two moments the
+       * derived text can change: a new recording, and the reader moving this control. A mode change
+       * that left the strip on the previous mode's words would be the disclosure selector doing
+       * three-quarters of something, which is worse to read than doing none of it.
+       */
+      drawTransportStatus();
     });
     /*
      * The remembered mode, **unless the link named one**. A deep link is somebody sending a
@@ -1508,18 +2472,27 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     if (ui.header.viewMode.value !== state.mode) ui.header.viewMode.value = state.mode;
     setText(ui.header.buildingName, buildingNameOf(resources, state.savedBuildings, state.buildingId));
+    // `view.building`, not the boot-scope binding: the two differ exactly when there is no
+    // recording, which is the case § D234 is about. Reading the binding here is what put the
+    // tutorial's geometry under the next scenario's name.
     setText(
       ui.header.buildingSub,
-      building === undefined ? '' : statLineOf(building),
+      view.building === undefined ? '' : statLineOf(view.building),
     );
-    setText(ui.header.clock, view.recording === undefined ? '06:00' : clockAt(view.simTimeS));
+    setText(
+      ui.header.clock,
+      view.recording === undefined
+        ? clockAt(0, runStartOfDayS)
+        : clockAt(view.simTimeS, runStartOfDayS),
+    );
     const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
     setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
     setText(
       ui.header.dayLabel,
       `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
     );
-    const population = building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
+    const population =
+      view.building?.floors.reduce((total, floor) => total + floor.population, 0) ?? 0;
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
@@ -1567,6 +2540,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }, 1400);
   }
 
+  /**
+   * This run's disclosure items, in both modes at once — the layer's one shipped derivation.
+   *
+   * Asked here and handed to both consumers (`docs/16` S5). {@link drawParity} checks them whole and
+   * {@link drawTransportStatus} draws two of them; two calls would be two answers to *what does this
+   * run disclose*, and the parity check would then be checking a list that is not the list on
+   * screen — which is the one thing that check may not do.
+   */
+  function disclosureNow(): readonly DisclosureItem[] {
+    const recording = state.recording;
+    if (recording === undefined) return [];
+    return disclosureItems({
+      recording,
+      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
+      lockedOut: lockedOutAt(recording, recording.endedAt),
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    });
+  }
+
   function drawParity(): void {
     /*
      * Parity is a property of **what was mounted**, not of the mode toggle: § 4's rule is that
@@ -1574,19 +2566,37 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * items. So the items are derived from the recording and checked whole — a check over an empty
      * list would pass every time and say nothing.
      */
-    const recording = state.recording;
-    if (recording === undefined) {
-      setText(ui.header.modeParity, '');
-      return;
-    }
-    const items: readonly DisclosureItem[] = disclosureItems({
-      recording,
-      dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
-      lockedOut: lockedOutAt(recording, recording.endedAt),
-      showEnergyAxis: menuState.settings.showEnergyAxis,
-    });
-    setText(ui.header.modeParity, parityRefusal(items) ?? '');
-    void itemsIn;
+    const items = disclosureNow();
+    setText(ui.header.modeParity, items.length === 0 ? '' : (parityRefusal(items) ?? ''));
+  }
+
+  /**
+   * The transport's own reading of the run — **through the disclosure layer**, GitHub issue #71.
+   *
+   * ## What was here, and why it was the majority of the issue
+   *
+   * This line was built from `recording.summary` directly: `AWT 13.1 s · WT95 27.4 s`, mode-blind,
+   * on a screen whose mode selector claims to simplify things for a reader out of their depth. The
+   * disclosure layer's per-mode renderings *were* computed on every recording — and then dropped
+   * with `void itemsIn;`, a deliberate no-op keeping the import used (§ D240 § 2). So the layer had
+   * a non-test caller that used it for a check and discarded its output, which is the standing
+   * requirement's own shape one level in: **a call whose return value is dropped looks exactly like
+   * a caller and is not one.**
+   *
+   * ## Why this is written on adopt and on a mode change, and not in `renderAll`
+   *
+   * `#status` is also where four transient messages land — the copied provenance line, *copied*,
+   * *the shift did not run*, a batch's progress — each of which restores itself after its own
+   * moment. A writer inside `renderAll` would clobber whichever of those was on screen the next
+   * time any state moved, which is a regression wearing a fix. So the derived text is written at
+   * the two moments it can actually change: a new recording, and the reader moving the mode
+   * selector. One derivation ({@link transportStatusOf}), two call sites, and the transient
+   * messages keep the screen until one of those two happens — which is exactly what they did
+   * before.
+   */
+  function drawTransportStatus(): void {
+    const text = transportStatusOf(disclosureNow(), state.mode);
+    if (text !== undefined) setText(ui.transport.status, text);
   }
 
   /* ---------------------------------------------------------------------- *
@@ -1604,9 +2614,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
       runShift();
     });
     ui.coach.shiftLength.addEventListener('change', () => {
-      context.update({ shiftLengthS: Number(ui.coach.shiftLength.value) });
+      // One control, two fields — § D286. The option's id carries both halves of the selection, so
+      // this handler does not have to know what a part is; `freePlayPatch` is the same decision in
+      // the menu, and both go through the one parser.
+      const part = partById(coachParts(), ui.coach.shiftLength.value);
+      if (part === undefined) return;
+      context.update({ shiftLengthS: part.durationS, windowStartS: part.windowStartS });
       runShift();
     });
+  }
+
+  /**
+   * The parts of the day the campaign's select offers, for whatever template is about to run.
+   *
+   * Read through `shiftDemandTemplateId` rather than from `state.pattern` directly, so the options
+   * are parts of the period the run will actually use — a select offering a lunch peak of a template
+   * the run is not on is § D177's inert control with a plausible label.
+   */
+  function coachParts(): readonly DayPart[] {
+    return partsOfDay(
+      resources.trafficProfiles.demandTemplates,
+      shiftDemandTemplateId(resources, state, buildingConfigOf(resources, state.savedBuildings, state.buildingId)),
+    );
   }
 
   function drawCoach(view: ViewAt): void {
@@ -1633,10 +2662,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       ],
       state.pattern,
     );
+    /*
+     * *Part of the day*, derived from the loaded records and **the same list Free play offers** —
+     * issue #82, which reported one setting wearing two names, four narrative options here and five
+     * numeric ones there. `partsOfDay` is the single derivation; this select and `menu/screens.ts`
+     * both read it, so the two cannot drift into two answers again.
+     */
     fillSelect(
       ui.coach.shiftLength,
-      SHIFT_LENGTHS.map((entry) => ({ value: String(entry.seconds), label: entry.label })),
-      String(state.shiftLengthS),
+      coachParts().map((part) => ({ value: part.id, label: part.label })),
+      partIdOf(state.windowStartS, state.shiftLengthS),
     );
 
     /*
@@ -1716,6 +2751,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const recorded = recordRun(plan.config, {
         outOfServiceCarIds: plan.outOfServiceCarIds,
       });
+      // The template's own hour, moved on by the window when the run is a part of a day. Absent for
+      // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
+      runStartOfDayS = recorded.result.trace.startOfDayS;
       state = { ...state, recording: recorded.recording, report: undefined, withheld: plan.withheld };
       adopt(recorded.recording);
       renderAll();
@@ -1794,20 +2832,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * clause 4, because *asked* now includes the menu's own switch and not only the operating
        * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
        * asked for the same thing by a different route and was being ignored.
+       *
+       * **And nothing plays until a mode has been chosen** — § D232, issue #39. Boot's own
+       * `runShift()` lands under the menu overlay, so a page nobody had touched read
+       * `running · 0 arrived, 0 carried` on load and had carried 376 people by the time the reader
+       * finished the menu. The recording is still made and still drawn — the stage shows the
+       * building at 06:00, which is the start state a cold load should sit at — it simply does not
+       * start moving on its own behind a screen the player has not left yet.
        */
-      autoplay: shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
+      autoplay:
+        playerHasChosen &&
+        shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
     filedRunId = undefined;
     selectedLandingId = '';
     fillLandingSelect(recording);
     fillBankSelect(recording);
-    setText(
-      ui.transport.status,
-      meansAreSuppressed(recording)
-        ? `AWT suppressed — ${recording.summary.awtInvalidReason ?? 'the queues never settled'}`
-        : `AWT ${recording.summary.meanWaitS.toFixed(1)} s · WT95 ${recording.summary.wait95S.toFixed(1)} s`,
-    );
+    /*
+     * Through the disclosure layer — issue #71, and the suppression comes with it.
+     *
+     * This was a two-arm ternary over `meansAreSuppressed(recording)` reading `summary.meanWaitS`
+     * and `summary.wait95S` directly: mode-blind, and a **second** copy of the R9 refusal that
+     * `mode/disclosure.ts` already owns. Both problems go together, because the renderings this now
+     * reads are the ones `drawParity` checks — so the line on screen and the parity claim about it
+     * can no longer be about two different lists.
+     */
+    drawTransportStatus();
   }
 
   /**
@@ -1816,9 +2867,55 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The report is built from the **whole** recording rather than from the playhead: a day's account
    * is the day's, and a reader who paused at 09:00 has not made the afternoon not happen.
    */
+  /**
+   * Whether the caret is somewhere a navigation would throw work away.
+   *
+   * The DOM read, kept apart from {@link reportOpensItself}'s decision for the reason every panel
+   * in `dev/` states: a decision that needs a `document` cannot be tested. A `<select>` counts —
+   * an open dropdown unmounted underneath the reader is the same interruption as an unmounted
+   * textbox, minus the lost characters.
+   */
+  /** The focused element as a `(tagName, role)` pair — the DOM half of {@link spaceBelongsToFocus}. */
+  function activationRoleOf(active: Element | null): ActivationRole {
+    return {
+      tagName: active?.tagName ?? '',
+      role: active?.getAttribute('role')?.trim().toLowerCase() ?? '',
+    };
+  }
+
+  function focusIsInAControl(): boolean {
+    const active = document.activeElement;
+    return (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement
+    );
+  }
+
+  /**
+   * Whether the run on screen has been played to its end — the one test, asked in one place.
+   *
+   * `runProgressOf` is `dev/reportPanel.ts`'s and is imported rather than re-derived. It is the
+   * predicate that decides whether the sheet is allowed to be a whole-day account (§ D223), and
+   * *"may this day be filed"* has to be the same question or the tab banks a day the sheet on it is
+   * declining to report. Two answers to that is § D223's own two-answers screen, one layer down.
+   */
+  function playheadHasRunOut(): boolean {
+    return runProgressOf(viewAt()).kind === 'played-out';
+  }
+
   function closeShift(): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
+    /*
+     * Nothing is filed before the player has entered a mode — § D232, issue #39.
+     *
+     * The shell opens on the menu over a viewer that has already run boot's shift. Without this, a
+     * cold load with the overlay still up reached `tick`, found `playback.state === 'ended'`, and
+     * closed a day: `1 clean days running` and `1/3 banked this scenario` on a page nobody had
+     * touched. The run itself is real and stays on screen; what it may not do is count.
+     */
+    if (!playerHasChosen) return;
     filedRunId = recording.runId;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
@@ -1833,8 +2930,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
       carried: observations.carried,
       arrived: observations.arrived,
     });
-    const week = closeDay(state.week, outcome);
-    const report = dayReportOf({
+    /*
+     * **The week is written only by a mode that owns one** — § D231, issue #64.
+     *
+     * This line was `closeDay(state.week, outcome)`, unconditional, *above* the `playMode` branch
+     * forty lines down that shapes the sheet's `subject`. So a Free Play run advanced and wrote the
+     * scenario week while the sheet it produced printed *"one run, not part of a week — nothing is
+     * banked"* — and `saveSessionNow()` below put it in `localStorage`, where it survived a reload
+     * and took the player's banked shifts with it.
+     *
+     * The decision is `dev/state.ts`'s and is asserted there against a week with a banked day in
+     * it, because a decision made inside this closure needs a document, a canvas and a click to
+     * reach — which is why this one went four modes without a test.
+     */
+    const week = closedWeekOf(state, outcome);
+    filedReportInput = {
       recording,
       observations,
       goals,
@@ -1862,8 +2972,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
           : { kind: 'week-day' as const },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
-      dayStartS: DAY_START_S,
-    });
+      /*
+       * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
+       * a template that declares none (`constant-iso`) and for a recording restored from a file.
+       * See {@link runStartOfDayS} for why this is captured from the run rather than from `state`.
+       */
+      dayStartS: runStartOfDayS ?? DAY_START_S,
+      /*
+       * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
+       * one-field-and-one-caller fix.
+       *
+       * Every other caller of `dayReportOf` is describing a run rather than serving a preference —
+       * the honesty sweep, the acceptance suites — and gets the axis shown, which is what
+       * `DayReportInput.showEnergyAxis`'s `undefined` means. This is the shell, so it passes the
+       * player's own value, and the Day report's kJ pair is the first pixel `Settings.showEnergyAxis`
+       * has ever reached.
+       */
+      showEnergyAxis: menuState.settings.showEnergyAxis,
+    };
+    const report = dayReportOf(filedReportInput);
     /*
      * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
      * end, and the reader opening the sheet — and the second one has already set the tab. Setting
@@ -1871,7 +2998,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * navigation ends up fighting itself.
      */
     state = { ...state, week, report };
-    if (state.tab !== 'report') state = { ...state, tab: 'report' };
+    /*
+     * **The sheet opens itself only over a reader who is not doing something else** — § D233,
+     * issue #67.
+     *
+     * This was `if (state.tab !== 'report') state = { ...state, tab: 'report' };`, unconditional.
+     * At ×60 a shift ends about every thirty real seconds, so on the Simulation tab the pane was
+     * yanked to the Day report on that cadence: a play-tester typing in the **Seed** field had the
+     * textbox unmounted mid-word with the characters going nowhere and nothing to undo, and a click
+     * on the **Dispatcher** tab was overridden a moment later by a navigation they had not asked
+     * for.
+     *
+     * The auto-open is the handoff's own behaviour (`closeDay` fires at the end of the day and
+     * opens the sheet) and is kept, because the handoff wins disagreements about what the screen
+     * does. What it never described is a reader who has already gone somewhere else. So the two
+     * cases the issue reports are exactly the two the predicate refuses, and the ordinary case —
+     * watching the run, hands off — is unchanged.
+     */
+    if (reportOpensItself({ tab: state.tab, focusIsInAControl: focusIsInAControl() })) {
+      state = { ...state, tab: 'report' };
+    }
     // A closed day is the thing a player would most mind losing to a reload, so it is the moment
     // the session is written. `nextDay` goes through here on its way to the next sheet.
     saveSessionNow();
@@ -1886,7 +3032,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
     const context2d = canvas.getContext('2d');
-    if (recording === undefined || playback === undefined || context2d === null) return;
+    if (context2d === null) return;
 
     const box = canvas.parentElement?.getBoundingClientRect();
     const width = Math.max(360, Math.floor(box?.width ?? 800));
@@ -1898,18 +3044,44 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
     context2d.setTransform(ratio, 0, 0, ratio, 0, 0);
 
+    /*
+     * **No run, no picture** — § D234, issue #36's second half, and the reason the early return
+     * moved below the resize rather than being deleted.
+     *
+     * This function used to return before touching the canvas at all when there was no recording,
+     * so the last frame stayed painted at the backing size it was painted at. Pressing *Take the
+     * next assignment* left a 360×260 bitmap of Garden Apartments stretched across a 750×405 box —
+     * measured by the reporter — with its title, its shafts and its overflowing status strip still
+     * legible under the next scenario's name. Every other surface was already in the correct *no
+     * run yet* empty state; only the canvas was lying.
+     *
+     * The buffer is resized first and *then* cleared, in that order: clearing a stale-sized buffer
+     * and leaving it stale would fix the picture and keep the blur the moment anything drew again.
+     * The alt text goes with it, because a screen reader was being told about the previous run too.
+     */
+    if (recording === undefined || playback === undefined) {
+      context2d.clearRect(0, 0, width, height);
+      setHidden(ui.stage.alarm, true);
+      canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
+      return;
+    }
+
     const frame = playback.frame();
     const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
     // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
     // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
     const bank = shaftsForBank(recording.shafts, bankFilter);
-    const layout = buildLayout({
+    /*
+     * The scenery yields to the building — issue #41. `stageLayoutFor` walks a ladder of gutter and
+     * overlay requests and takes the first on which no shaft is hidden, instead of handing over the
+     * same two numbers at every width and every building.
+     */
+    const layout = stageLayoutFor({
       width,
       height,
       floors: recording.floors,
       shafts: bank.shafts,
-      gutterRightPx: QUEUE_GUTTER_PX,
-      overlayWidthPx: wantsOverlay ? OVERLAY_WIDTH_PX : 0,
+      wantsOverlay,
     });
     const overlay = overlayAt(recording, frame.simTimeS);
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
@@ -1927,7 +3099,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
         .map((entry) => entry.floorId),
       lockedOutLandings: lockedOut,
       queues: queueAt(recording, frame.simTimeS),
-      dayStartS: DAY_START_S,
+      /*
+       * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
+       * a template that declares none (`constant-iso`) and for a recording restored from a file.
+       * See {@link runStartOfDayS} for why this is captured from the run rather than from `state`.
+       */
+      dayStartS: runStartOfDayS ?? DAY_START_S,
       filteredBankId: bank.filtered ? bankFilter : undefined,
     });
     carBadgeHits = hits.carBadges;
@@ -2112,20 +3289,41 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
     fill(
       ui.transport.speedChips,
-      ...SPEEDS.map((speed) =>
-        chip(document, {
-          label: `×${String(speed)}`,
+      ...SPEEDS.map((speed) => {
+        const label = `×${String(speed)}`;
+        // `1 simulated seconds` was already on the tooltip; promoting the same sentence to the
+        // accessible name would have put the disagreement in a second place rather than fixing it.
+        const unit = speed === 1 ? 'second' : 'seconds';
+        const title = `${String(speed)} simulated ${unit} per real second`;
+        const node = chip(document, {
+          label,
           // Against `baseSpeed`, not `playback.speed` — the player's own multiplier is applied on
           // top, so comparing the product would leave no chip lit at any setting but ×1.
           selected: baseSpeed === speed,
-          title: `${String(speed)} simulated seconds per real second`,
+          title,
           onPick: () => {
             baseSpeed = speed;
             applyPlaybackSpeed();
             drawTransportChrome(viewAt());
           },
-        }),
-      ),
+        });
+        /*
+         * `×900` spoken is "times nine hundred" — a multiplier of nothing named. The sentence that
+         * says what it multiplies was on `title` alone, and a `title` waits a second for a hover,
+         * cannot be reached from a keyboard and does not exist on a touch device: a play-tester
+         * read this row as five unexplained numbers with no tooltips at all, which is what an
+         * undiscovered tooltip looks like from the outside. So **the same sentence** goes on the
+         * accessible name, from the same two locals — one wording, two channels, and no second
+         * copy to drift.
+         *
+         * It leads with the visible text, and that is WCAG 2.5.3 rather than style: a name that
+         * dropped `×900` would break speech input for a reader who can see the chip and says its
+         * label out loud. Set here rather than through `ChipSpec` because `dom.ts`'s chip is
+         * shared with rows whose visible words are already their whole claim.
+         */
+        node.setAttribute('aria-label', `${label} — ${title}`);
+        return node;
+      }),
     );
 
     const recording = view.recording;
@@ -2133,7 +3331,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       fill(ui.transport.ticks);
       return;
     }
-    const segments = timelineOf(recording);
+    // Same hour as the header and the sheet. Three surfaces reading three different clocks for one
+    // instant is the disagreement `clockOf`'s own docstring warns about.
+    const segments = timelineOf(recording, { dayStartS: runStartOfDayS ?? DAY_START_S });
     /*
      * The playhead is a child of the timeline and must survive the segments being replaced, so it
      * is re-appended rather than recreated: recreating it would drop the element `#playhead` names
@@ -2169,7 +3369,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const pct = playheadPctOf(recording, view.simTimeS);
     ui.transport.playhead.style.left = `${pct.toFixed(2)}%`;
     ui.transport.timeline.setAttribute('aria-valuenow', String(Math.round(pct * 10)));
-    ui.transport.timeline.setAttribute('aria-valuetext', clockAt(view.simTimeS));
+    /*
+     * **Seconds, and the frame step is why** — § D234, issue #69.
+     *
+     * The play-tester pressed the `,` advertised on the step button's own tooltip five times and
+     * reported that it does nothing. Driven in the browser tier, it does exactly what it promises:
+     * the playhead moved `5.15 % → 5.10 %`, the same distance the button's own click moves it. What
+     * is true is that **nothing on the page could show it**. One display frame at the default ×60
+     * is one simulated second — 0.06 % of a 1 800 s run, under half a pixel of timeline, and this
+     * slider's `aria-valuetext` was `hh:mm`. So the one reader the tooltip makes a promise to, and
+     * the only reader with no pixels to check it against, was told the shortcut exists and given a
+     * readout that could not move under it.
+     *
+     * `hh:mm:ss` here rather than a wider `aria-valuenow` scale, because `valuemax` lives in
+     * `index.html` and because a time is what this slider is *of*: `aria-valuetext` exists exactly
+     * so a slider announces its own units instead of a percentage. The header clock stays `hh:mm` —
+     * it is a caption on a day, not a readout on a control.
+     */
+    ui.transport.timeline.setAttribute('aria-valuetext', clockWithSecondsAt(view.simTimeS));
   }
 
   function fillLandingSelect(recording: VizRecording): void {
@@ -2291,6 +3508,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
       switch (event.key) {
         case ' ':
+          /*
+           * **Space belongs to a focused control first** — § D234, found while driving issue #69.
+           *
+           * This arm was an unconditional `event.preventDefault()`, and that is not a spare
+           * keystroke: `preventDefault` on a `keydown` of Space over a focused `<button>`
+           * **suppresses the button's own activation**. Measured in the browser tier — Space with
+           * `#step-back` focused toggled play/pause and did **not** step back — so the two controls
+           * the play-tester was alternating between were fighting each other for one key, and the
+           * one that lost is the one the platform promises.
+           *
+           * The timeline is deliberately *not* in the exempt set: `role="slider"` does not activate
+           * on Space in any platform convention, so a reader who has tabbed to the transport bar
+           * still gets play/pause from it. `KX-04`'s three `instanceof` guards above already
+           * excused inputs, textareas and selects; this is the fourth kind of control that owns the
+           * key, and the first one that owns it by *activation* rather than by typing.
+           */
+          if (spaceBelongsToFocus(activationRoleOf(document.activeElement))) break;
           event.preventDefault();
           playback?.toggle();
           drawTransportChrome(viewAt());
@@ -2361,6 +3595,136 @@ function boot(ui: Elements, resources: BrowserResources): void {
 }
 
 const MODE_KEY = 'elevator-sim.viewMode';
+
+/* ========================================================================== *
+ * Space, and who owns it — § D234, issue #69
+ * ========================================================================== */
+
+/** What the focused element is, as far as *does Space activate this?* is concerned. */
+export interface ActivationRole {
+  /** Upper-case, as `Element.tagName` gives it. `''` when nothing is focused. */
+  readonly tagName: string;
+  /** An explicit `role`, lower-cased, or `''`. An author's `role` outranks the tag. */
+  readonly role: string;
+}
+
+/**
+ * The ARIA roles whose platform contract is *Space activates me*.
+ *
+ * `slider` is deliberately absent and is the one worth naming: the transport timeline carries
+ * `role="slider"`, sliders are driven by arrows in every platform convention, and a reader who has
+ * tabbed onto the bar should still get play/pause from the space bar. `link` is absent too —
+ * a link is <kbd>Enter</kbd>.
+ */
+const SPACE_ACTIVATES_ROLES: ReadonlySet<string> = new Set([
+  'button',
+  'checkbox',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'switch',
+  'tab',
+]);
+
+/**
+ * Whether <kbd>Space</kbd> belongs to whatever is focused rather than to the transport — issue #69.
+ *
+ * ## The defect, found by driving rather than by reading
+ *
+ * `wireKeyboard`'s Space arm called `event.preventDefault()` unconditionally. On a focused
+ * `<button>` that **cancels the button's own activation** — the browser synthesises the click from
+ * the default action, and the default action had been prevented. Measured in the browser tier:
+ * Space with `#step-back` focused toggled play/pause and did not step a frame. So a reader
+ * alternating between the two transport controls the issue is about had them fighting for one key,
+ * and the loser was the one the platform guarantees.
+ *
+ * ## Why the answer is a role and not an `instanceof`
+ *
+ * The three guards above this in the handler are `instanceof HTMLInputElement` and friends, which
+ * is right for *typing*: a textarea owns every printable key by being a textarea. Activation is not
+ * a fact about a constructor — a `<div role="button">` owns Space and an `<a>` does not, and both
+ * are `HTMLElement`. Keeping the question as a `(tagName, role)` pair also keeps this decision
+ * testable without a document, which is the split the rest of `dev/` keeps.
+ *
+ * An `<input>` reaches this predicate as `INPUT` and would answer `true` for a checkbox — but it
+ * never gets here, because `KX-04`'s guard has already returned. Answering correctly anyway costs
+ * nothing and means the predicate is true on its own terms rather than only in context.
+ */
+export function spaceBelongsToFocus(focus: ActivationRole): boolean {
+  if (focus.role !== '') return SPACE_ACTIVATES_ROLES.has(focus.role);
+  return focus.tagName === 'BUTTON' || focus.tagName === 'SUMMARY' || focus.tagName === 'INPUT';
+}
+
+/* ========================================================================== *
+ * The transport clock — § D234, issue #69
+ * ========================================================================== */
+
+/**
+ * `hh:mm:ss` at a playhead position — the timeline slider's `aria-valuetext`, and the only place
+ * in the product that prints a second.
+ *
+ * `live/timeline.ts`'s `clockAt` is `hh:mm` and stays `hh:mm`: it is the header's *caption on a
+ * day*, and putting seconds on it would make a chrome line tick sixty times a minute for no
+ * reader's benefit. This is a *readout on a control*, and the control advertises a shortcut that
+ * moves the playhead by one simulated second at the shipped speed. A readout that could not
+ * resolve its own control's smallest move is what made the shortcut look dead.
+ *
+ * Built from `timeOfDayAt` rather than from a second copy of the day-start offset, so the two
+ * clocks cannot come to disagree about what 06:00 means.
+ */
+export function clockWithSecondsAt(simTimeS: number): string {
+  const wrapped = ((timeOfDayAt(simTimeS) % 86_400) + 86_400) % 86_400;
+  const hours = Math.floor(wrapped / 3600);
+  const minutes = Math.floor((wrapped % 3600) / 60);
+  const seconds = Math.floor(wrapped % 60);
+  return (
+    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:` +
+    String(seconds).padStart(2, '0')
+  );
+}
+
+/* ========================================================================== *
+ * When the report is allowed to open itself — § D233
+ * ========================================================================== */
+
+/** What decides whether a finished run may move the pane. Both facts are about the *reader*. */
+export interface ReportOpenInput {
+  /** The surface the reader is on when the run ends. */
+  readonly tab: TabName;
+  /** Whether the caret is inside an input, a textarea or a select. */
+  readonly focusIsInAControl: boolean;
+}
+
+/**
+ * Whether a run reaching its end may switch the pane to the Day report — `issue #67`.
+ *
+ * Two refusals, and each is one of the two the issue reports:
+ *
+ * - **The reader is not on the run.** They clicked *Dispatcher* while the shift was finishing, and
+ *   a moment later the selected tab was *Day report* — a click overridden by a timer they do not
+ *   control. A reader who has navigated has answered *where should I be* more recently than the
+ *   transport has.
+ * - **The reader is typing.** The Seed textbox was unmounted mid-word and the characters went
+ *   nowhere, with no error and nothing to undo. Silently discarding input is the worst class of
+ *   interruption, and it is the one a fixed cadence guarantees: at ×60 a shift ends roughly every
+ *   thirty real seconds, and with the loop chip on it never stops.
+ *
+ * Everything else is unchanged, deliberately. The design's own behaviour is that the day ending
+ * opens the sheet, and `docs/12`'s standing rule is that the handoff wins disagreements about what
+ * the screen does — so a reader watching the run, hands off the keyboard, still gets taken to the
+ * report the moment it is worth reading. What the handoff never described is a reader who is
+ * already somewhere else, and that is the whole of what this refuses.
+ *
+ * Being on the report tab already is *not* a refusal case: it is a no-op the caller skips anyway,
+ * and answering `true` there keeps the predicate a statement about the destination rather than
+ * about whether a write is redundant.
+ */
+export function reportOpensItself(input: ReportOpenInput): boolean {
+  if (input.focusIsInAControl) return false;
+  return input.tab === 'run' || input.tab === 'report';
+}
 
 /* ========================================================================== *
  * The bank filter — SG-15
@@ -2541,7 +3905,22 @@ export function deepLinkStateOf(
   if (isRailSegment(segment)) patch.railSegment = segment;
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
-  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? DEFAULT_SHIFT_LENGTH_S };
+  /*
+   * The **state's** opening length when the link names none, not the module constant — § D234.
+   *
+   * These two were `DEFAULT_SHIFT_LENGTH_S` and `deepLinkDefaultsOf(...).shiftLengthS`, two
+   * constants that happened to be equal, and `deepLinkSearchOf` omits `duration` whenever it equals
+   * the second. The moment `c1` gained an authored shift (issue #27) they stopped agreeing, and the
+   * round trip broke in the direction that is hardest to see: a link produced from an untouched page
+   * omitted `duration`, and applying it silently ran a 1 800 s shift where the page had run 3 600 —
+   * *"a different run wearing the same address"*, which is the failure this pair exists to prevent
+   * and which `main.test.ts` caught.
+   *
+   * `state` here is `initialState`'s, and `deepLinkDefaultsOf` reads the same function, so the
+   * writer's *default* and the reader's *fallback* are now one value by construction rather than by
+   * two literals staying in step.
+   */
+  return { ...state, ...patch, shiftLengthS: patch.shiftLengthS ?? state.shiftLengthS };
 }
 
 /**

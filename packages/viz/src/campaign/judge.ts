@@ -58,6 +58,7 @@ import {
 } from '../scenario/goals.js';
 import type { PublishedScenario } from '../scenario/published.js';
 import type { CampaignStage } from './types.js';
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /** One goal, judged on the batch that just ran. */
 export interface StageGoalVerdict {
@@ -90,6 +91,19 @@ export interface StageReport {
   /** Every goal met. `false` whenever any goal is `null`, because unjudged is not passed. */
   readonly cleared: boolean;
   readonly headline: string;
+  /**
+   * The words this verdict used, explained — issue #22.
+   *
+   * The Lab's verdict is the densest statistics prose the product draws: one sentence can carry
+   * *paired runs*, *an interval on the difference*, *the replication budget* and *a move along
+   * the front*. It is also the sentence a player is most invested in, which is exactly when a
+   * misread costs something.
+   *
+   * Explained beside, never instead. Nothing about `headline`, `sentence` or `note` changes —
+   * including the R2 clause on both branches of the headline, which is a caveat and not a
+   * vocabulary problem, and which this must not be read as replacing.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 export interface JudgeStageInput {
@@ -139,6 +153,7 @@ export function judgeStage(input: JudgeStageInput): StageReport {
 
   const met = goals.filter((goal) => goal.met === true).length;
   const cleared = goals.length > 0 && met === goals.length;
+  const headline = headlineFor(stage, goals, met, cleared, report.replications);
   return {
     stageId: stage.id,
     stageName: stage.name,
@@ -148,7 +163,16 @@ export function judgeStage(input: JudgeStageInput): StageReport {
     candidateProfileId: candidateArm?.dispatcherProfileId ?? '',
     goals,
     cleared,
-    headline: headlineFor(stage, goals, met, cleared, report.replications),
+    headline,
+    /*
+     * The verdict's own strings only — **not** `report`'s.
+     *
+     * A stage draws the batch report as well, and that report carries its own glossary derived
+     * from its own sentences. Folding the two together here would make this list say the verdict
+     * used words the verdict did not use, and a panel drawing both can concatenate two derived
+     * lists far more honestly than this function can guess at one.
+     */
+    glossary: glossaryFor([headline, ...goals.flatMap((goal) => [goal.label, goal.sentence, goal.note])]),
   };
 }
 

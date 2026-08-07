@@ -71,9 +71,34 @@ export function enterFreePlay(
      * exactly that inference. `docs/16` S1.
      */
     playMode: 'free-play',
+    /*
+     * **And the shell lands on the simulation** — GitHub issue #23.
+     *
+     * `closeMenu` hides the overlay and selects nothing, so Start dropped the player on whatever tab
+     * the shell happened to be on. Reaching Free Play from the Day report therefore hid the menu and
+     * left `panel-run` hidden: the reporter pressed *Start*, the screen went back to a sheet about
+     * the **previous** run, and the shift they had just configured was playing on a canvas nobody
+     * could see.
+     *
+     * It is here rather than in the shell's arm for this module's founding reason — a decision
+     * written inside a click handler needs a document and a click to reach, so it cannot be tested
+     * and it drifts. It is also the same fix as `docs/16` § 5 clause 6's, one arm over:
+     * `open-campaign` already selects `scenarios` explicitly, because a commit that leaves the page
+     * where it was is a commit whose result is somewhere else.
+     */
+    tab: 'run',
     dispatcherId: selection.dispatcherProfileId,
     seed: BigInt(selection.seed),
     shiftLengthS: selection.durationS,
+    /*
+     * The other half of the one selection, and the only place a start and a length become two ends
+     * of a window. § D286.
+     *
+     * `null` — the whole period — is carried as `null` rather than resolved to `0`: `core` reads the
+     * absence as *no window*, and a `[0, durationS)` window would be the same run carrying a key it
+     * did not need, which is the byte-identity § D285 is built on.
+     */
+    windowStartS: selection.windowStartS,
     freePlay: {
       demandTemplateId: selection.demandTemplateId,
       arrivalRatePctPop5min: selection.arrivalRatePctPop5min,

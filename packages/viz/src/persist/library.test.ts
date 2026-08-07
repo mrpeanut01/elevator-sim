@@ -53,7 +53,7 @@ import {
 } from '../dev/state.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
-import type { MenuState } from '../menu/types.js';
+import type { FreePlaySelection, MenuState } from '../menu/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import { openWeek } from '../shift/week.js';
 
@@ -544,8 +544,23 @@ describe('a library frame this build did not write', () => {
  * Version 1 — a week that must not be lost to a feature it never had
  * -------------------------------------------------------------------------- */
 
+/**
+ * A `freePlay` as an older build wrote it: no `windowStartS`, because the field did not exist.
+ *
+ * Built by **removing** the key from the current selection rather than by writing a literal, so the
+ * fixture stays a real version-1/2 selection as the rest of the shape moves. A literal would be a
+ * second copy of `FreePlaySelection` that nothing keeps in step, and the first thing it would fail
+ * to notice is the next field added the way `windowStartS` was.
+ */
+function withoutWindowStart(
+  freePlay: Readonly<FreePlaySelection>,
+): Omit<FreePlaySelection, 'windowStartS'> {
+  const { windowStartS: _dropped, ...rest } = freePlay;
+  return rest;
+}
+
 describe('a version-1 envelope', () => {
-  /** Exactly what version 1 wrote: two keys, and no library anywhere. */
+  /** Exactly what version 1 wrote: two keys, no library anywhere, and no `windowStartS`. */
   const v1 = (): Slots => {
     const slots = memoryStore();
     const menu = menuState();
@@ -554,17 +569,33 @@ describe('a version-1 envelope', () => {
       SESSION_KEY,
       JSON.stringify({
         schemaVersion: 1,
-        session: { week, settings: menu.settings, freePlay: menu.freePlay },
+        session: {
+          week,
+          settings: menu.settings,
+          freePlay: withoutWindowStart(menu.freePlay),
+        },
       }),
     );
     return slots;
   };
 
   it('is a version this build no longer writes — the control for the rest', () => {
-    expect(SESSION_SCHEMA_VERSION).toBe(2);
+    expect(SESSION_SCHEMA_VERSION).toBe(3);
     const slots = saved();
     const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
-    expect(envelope['schemaVersion']).toBe(2);
+    expect(envelope['schemaVersion']).toBe(3);
+  });
+
+  it('is a fixture that really lacks the key, or every assertion below is vacuous', () => {
+    // The fixture is derived from the live selection, so this is what stops it silently becoming a
+    // version-3 session wearing a version-1 number the day `withoutWindowStart` stops matching.
+    const slots = v1();
+    const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    const session = envelope['session'] as Record<string, unknown>;
+    const freePlay = session['freePlay'] as Record<string, unknown>;
+    expect('windowStartS' in freePlay).toBe(false);
+    // And the current build really does write it, so the two versions genuinely differ.
+    expect('windowStartS' in menuState().freePlay).toBe(true);
   });
 
   it('still restores its week, settings and selection', () => {
@@ -577,6 +608,17 @@ describe('a version-1 envelope', () => {
     expect(result.snapshot.week.contractId).toBe(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id);
     expect(result.snapshot.settings).toEqual(menuState().settings);
     expect(result.snapshot.freePlay).toEqual(menuState().freePlay);
+  });
+
+  it('reads the absent window as “the whole period”, which is what that build ran', () => {
+    // `null` is not a default filling a hole. It means *no window* (§ D286), and a build with no
+    // window concept ran the whole period on every run it ever did — so the absence determines the
+    // value rather than leaving it open. That is the test `types.ts` sets for reading an older
+    // envelope at all, and it is why version 3 does not refuse one.
+    const result = loadSession(v1().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.freePlay.windowStartS).toBeNull();
   });
 
   it('restores an empty library and calls nothing dropped', () => {
@@ -604,6 +646,117 @@ describe('a version-1 envelope', () => {
     const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
     expect(envelope['schemaVersion']).toBe(SESSION_SCHEMA_VERSION);
     expect(librarySize(loadLibrary(slots.store, context).library)).toBe(4);
+  });
+});
+
+/**
+ * The version that actually shipped broken, and the reason this block exists at all.
+ *
+ * `windowStartS` was added to `session.freePlay` **without** `SESSION_SCHEMA_VERSION` moving, so
+ * the envelope still said 2 and a real version-2 session — well-formed, correct version, one key
+ * short — was refused as `shape`. The player was told their saved week was *damaged*, which is
+ * false, and every player who had a week was told it. Version 3 is that bump, made after the fact.
+ */
+describe('a version-2 envelope — the one the missing bump broke', () => {
+  /** What version 2 wrote: a library beside the session, and no `windowStartS` inside it. */
+  const v2 = (): Slots => {
+    const slots = memoryStore();
+    const menu = menuState();
+    const week = openWeek(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id);
+    slots.written.set(
+      SESSION_KEY,
+      JSON.stringify({
+        schemaVersion: 2,
+        session: {
+          week,
+          settings: menu.settings,
+          freePlay: withoutWindowStart(menu.freePlay),
+        },
+        library: { buildings: [], dispatchers: [], patterns: [], classes: [] },
+      }),
+    );
+    return slots;
+  };
+
+  it('is restored rather than refused, and the week comes back whole', () => {
+    // The regression, stated as the outcome a player sees. Before the bump this was
+    // `ok: false` with `kind: 'shape'` and a notice saying the week was damaged.
+    const result = loadSession(v2().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.week.contractId).toBe(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id);
+    expect(result.snapshot.settings).toEqual(menuState().settings);
+  });
+
+  it('differs from a current session in exactly one key, and that key reads null', () => {
+    // The strong form of "nothing is invented": every other field is compared to the live
+    // selection, so a reading that quietly rebuilt the selection would fail here rather than pass
+    // on the one field it was asked about.
+    const result = loadSession(v2().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.freePlay.windowStartS).toBeNull();
+    expect(withoutWindowStart(result.snapshot.freePlay)).toEqual(
+      withoutWindowStart(menuState().freePlay),
+    );
+  });
+
+  it('is upgraded to 3 on the next save', () => {
+    const slots = v2();
+    expect(saveSession(slots.store, viewerWith(), menuState()).ok).toBe(true);
+    const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    expect(envelope['schemaVersion']).toBe(3);
+  });
+
+  it('reads a version-2 envelope that already carries the key, because those exist', () => {
+    /*
+     * The population the bump itself creates, and it is not hypothetical: the build that shipped
+     * `windowStartS` without moving the version wrote envelopes labelled 2 whose `freePlay`
+     * *does* carry the field. Anyone who played under it holds one.
+     *
+     * Strictly those are version-3 sessions wearing a version-2 number, and refusing them would be
+     * defensible on the label. It would also take a week away from the players who were on the
+     * broken build — to punish them for a number this repository got wrong — which is the outcome
+     * the whole module exists to avoid. The stored value is authentic: they really did make that
+     * selection. So it is read, and `withWindowStart` leaves an existing key alone rather than
+     * overwriting it with `null`, which is what would silently discard the choice.
+     */
+    const slots = memoryStore();
+    const menu = menuState();
+    slots.written.set(
+      SESSION_KEY,
+      JSON.stringify({
+        schemaVersion: 2,
+        session: {
+          week: openWeek(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id),
+          settings: menu.settings,
+          freePlay: { ...menu.freePlay, windowStartS: 1_800 },
+        },
+        library: { buildings: [], dispatchers: [], patterns: [], classes: [] },
+      }),
+    );
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The stored selection, not `null`. A completion that overwrote would read as 0 or null here
+    // and the player's chosen part of the day would be gone without a word.
+    expect(result.snapshot.freePlay.windowStartS).toBe(1_800);
+  });
+
+  it('still refuses a version-2 envelope that is genuinely malformed', () => {
+    // The bump must not have turned the shape check off. A version-2 session missing `week` is
+    // not an older shape, it is a broken one, and it must still be refused by name — otherwise
+    // this change would have traded a false "damaged" for a silent partial restore, which is the
+    // one outcome `SessionRestore` exists to prevent.
+    const slots = v2();
+    const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    delete (envelope['session'] as Record<string, unknown>)['week'];
+    slots.written.set(SESSION_KEY, JSON.stringify(envelope));
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.kind).toBe('shape');
+    expect(result.failure.message).toContain('week');
   });
 });
 

@@ -94,13 +94,27 @@ const WIRING: readonly (readonly [string, string, 'import' | 'same file'])[] = O
   ['verifySubmission', 'server/src/http/api.ts', 'import'],
   ['submissionIssues', 'server/src/http/api.ts', 'import'],
   ['configHashOf', 'server/src/http/api.ts', 'import'],
-  ['hashPassword', 'server/src/http/api.ts', 'import'],
-  ['passwordMatches', 'server/src/http/api.ts', 'import'],
-  ['signConfirmation', 'server/src/http/api.ts', 'import'],
-  ['verifyConfirmation', 'server/src/http/api.ts', 'import'],
+  // § D241's magic link, which replaced the password path rather than sitting beside it. Every
+  // symbol the old flow had — `hashPassword`, `passwordMatches`, `passwordIssues`, `PasswordHash`,
+  // the scrypt parameters, `signConfirmation`, `verifyConfirmation` — is **deleted**, so there is
+  // nothing here to keep pointing at. That is the point of the deletion: an unreachable login is
+  // this repository's own worst case, and an allowlist entry would have been the wrong answer.
+  ['signLoginToken', 'server/src/http/api.ts', 'import'],
+  ['verifyLoginToken', 'server/src/http/api.ts', 'import'],
+  ['constantTimeEquals', 'server/src/http/api.ts', 'import'],
+  ['LOGIN_TTL_MS', 'server/src/http/api.ts', 'import'],
+  ['FixedWindowLimiter', 'server/src/http/api.ts', 'import'],
   ['newSessionToken', 'server/src/http/api.ts', 'import'],
-  ['confirmationMessage', 'server/src/http/api.ts', 'import'],
+  ['signInMessage', 'server/src/http/api.ts', 'import'],
+  ['normaliseEmail', 'server/src/http/api.ts', 'import'],
+  ['signInUrlFor', 'server/src/bootstrap.ts', 'same file'],
+  ['SIGN_IN_FRAGMENT_KEY', 'server/src/bootstrap.ts', 'same file'],
   ['bearerOf', 'server/src/http/serve.ts', 'same file'],
+  // § D243. `withApiOriginTag` is called by the loader in its own file — the blind spot § D125
+  // records — and `clientIpOf` by `respond`, one function down from `serve`.
+  ['clientIpOf', 'server/src/http/serve.ts', 'same file'],
+  ['withApiOriginTag', 'server/src/http/static.ts', 'same file'],
+  ['SAME_ORIGIN_API', 'server/src/http/static.ts', 'same file'],
   // § D218's challenge board. The same chain one level down: `api.ts` is the non-test caller of
   // every player-facing piece, and `bootstrap.ts` is the non-test caller of the two that decide
   // whether the server may start at all.
@@ -142,8 +156,9 @@ describe('every export of server/ has a caller or a stated reason', () => {
       'store/Store',
       'leaderboard/verifySubmission',
       'leaderboard/configHashOf',
-      'accounts/hashPassword',
-      'accounts/signConfirmation',
+      'accounts/signLoginToken',
+      'accounts/verifyLoginToken',
+      'accounts/FixedWindowLimiter',
       'mail/OutboxMailer',
       'src/main',
       'challenge/issuedChallengeAt',

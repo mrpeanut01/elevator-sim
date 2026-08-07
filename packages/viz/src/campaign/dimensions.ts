@@ -33,6 +33,8 @@ import { candidateFromProfile } from '@elevator-sim/experiments/browser';
 import type { Candidate, ParameterValue, SearchSpace } from '@elevator-sim/experiments/browser';
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
+
 /** One dimension on which two profiles run different systems. */
 export interface MovedDimension {
   readonly id: string;
@@ -95,6 +97,15 @@ export interface ProfileAdmission {
   readonly outOfScope: readonly MovedDimension[];
   /** The reader's sentence — a fact about the choice, never a judgement of it. */
   readonly sentence: string;
+  /**
+   * The words that sentence used, explained — issue #22.
+   *
+   * This is where the word *dimension* reaches a player from code this lane owns, and it reaches
+   * them inside a refusal — *"also moves 2 dimensions this stage does not open"* — which is the
+   * worst moment to meet an undefined word, because the reader is being told no and has to work
+   * out what was said no to.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 /**
@@ -124,10 +135,11 @@ export function admitProfile(
       admissible: false,
       withinScope,
       outOfScope,
-      sentence:
+      ...admissionSentence(
         `"${candidate.id}" also moves ${String(outOfScope.length)} dimension` +
-        `${outOfScope.length === 1 ? '' : 's'} this stage does not open: ${named}. The batch is ` +
-        'not run, because a stage that judges a change it did not offer is judging something else.',
+          `${outOfScope.length === 1 ? '' : 's'} this stage does not open: ${named}. The batch is ` +
+          'not run, because a stage that judges a change it did not offer is judging something else.',
+      ),
     };
   }
   if (withinScope.length === 0) {
@@ -135,10 +147,11 @@ export function admitProfile(
       admissible: true,
       withinScope,
       outOfScope,
-      sentence:
+      ...admissionSentence(
         `"${candidate.id}" runs the same system as "${baseline.id}" on every declared dimension, ` +
-        'so the two arms are identical by construction and no row can separate them. That is the ' +
-        'control this surface is meant to survive.',
+          'so the two arms are identical by construction and no row can separate them. That is the ' +
+          'control this surface is meant to survive.',
+      ),
     };
   }
   const named = withinScope
@@ -148,6 +161,16 @@ export function admitProfile(
     admissible: true,
     withinScope,
     outOfScope,
-    sentence: `"${candidate.id}" moves ${String(withinScope.length)} of this stage's dimensions: ${named}.`,
+    ...admissionSentence(
+      `"${candidate.id}" moves ${String(withinScope.length)} of this stage's dimensions: ${named}.`,
+    ),
   };
+}
+
+/**
+ * The sentence and the terms it used, in one place — so the three arms above cannot come to
+ * disagree about which of them explains its words.
+ */
+function admissionSentence(sentence: string): Pick<ProfileAdmission, 'sentence' | 'glossary'> {
+  return { sentence, glossary: glossaryFor([sentence]) };
 }

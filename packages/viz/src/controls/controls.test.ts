@@ -33,7 +33,7 @@ import {
   describeCondition,
   resetControl,
 } from './controls.js';
-import { orchardSpace } from './fictionalSchema.test-helper.js';
+import { ORCHARD_PARAMETERS, orchardSpace } from './fictionalSchema.test-helper.js';
 import { renderUnsearchable } from './render.js';
 
 describe('the form is generated, and the evidence is a schema this product does not ship', () => {
@@ -150,6 +150,126 @@ describe('the form is generated, and the evidence is a schema this product does 
     );
     expect(lanterns?.enabled).toBe(false);
     expect(lanterns?.kind === 'stepper' ? lanterns.value : undefined).toBe(40);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The other end of every gate — issue #79, § D252
+ * -------------------------------------------------------------------------- */
+
+describe('a control that gates others says so, from the same declarations', () => {
+  /**
+   * Every edge the fictional schema declares, read straight off `ORCHARD_PARAMETERS` rather than
+   * written out here.
+   *
+   * The test is only worth anything if the expected set is derived: a hand-written *"these three
+   * gate something"* is the second list this whole feature exists to avoid, and it would keep
+   * passing after somebody added a sixth row with a gate on it.
+   */
+  const declaredGates = (): ReadonlyMap<string, readonly string[]> => {
+    const edges = new Map<string, string[]>();
+    for (const row of ORCHARD_PARAMETERS) {
+      for (const gate of Object.keys((row as { activeWhen?: object }).activeWhen ?? {})) {
+        edges.set(gate, [...(edges.get(gate) ?? []), row.id]);
+      }
+    }
+    return edges;
+  };
+
+  it('marks exactly the controls that gate something, whatever the current point', () => {
+    /*
+     * **The clause the issue asks for, and it is asserted in both directions over the whole
+     * space** — a field that appeared on everything would read as a success on the one row a
+     * single-control test looks at. It is checked at four different points, because the *presence*
+     * of the mark is structural while its two halves are not: `unlocks` and `holdsOpen` partition
+     * a control's dependants, so their total is the dependant count and does not move as the
+     * reader edits. That is what stops the badge vanishing at the moment somebody throws a switch.
+     */
+    const space = orchardSpace();
+    const gates = declaredGates();
+    const points = [
+      defaultValues(space),
+      new Map(defaultValues(space)).set('orchard.nightHarvest', true),
+      new Map(defaultValues(space)).set('orchard.pickersOnShift', 2),
+      new Map(defaultValues(space)).set('orchard.irrigation', 'none'),
+    ];
+    for (const values of points) {
+      for (const control of controlsFor(space, values)) {
+        const governed = [...control.unlocks, ...control.holdsOpen].sort();
+        expect(governed, `${control.id} at this point`).toEqual([...(gates.get(control.id) ?? [])].sort());
+      }
+    }
+  });
+
+  it('moves a dependant between the two halves when the gate moves, and nowhere else', () => {
+    const space = orchardSpace();
+    const shut = controlsFor(space, defaultValues(space)).find(
+      (control) => control.id === 'orchard.nightHarvest',
+    );
+    // `false` does not satisfy `['true']`, so night harvest is what is holding the lanterns shut.
+    expect(shut?.unlocks).toEqual(['orchard.lanternCount']);
+    expect(shut?.holdsOpen).toEqual([]);
+
+    const open = controlsFor(
+      space,
+      new Map(defaultValues(space)).set('orchard.nightHarvest', true),
+    ).find((control) => control.id === 'orchard.nightHarvest');
+    expect(open?.unlocks).toEqual([]);
+    expect(open?.holdsOpen).toEqual(['orchard.lanternCount']);
+  });
+
+  it('answers per gate, not per dependant: one control shut, its co-gate open', () => {
+    /*
+     * `orchard.lanternCount` is a conjunction of two gates. At the defaults the crew is six, which
+     * satisfies `{ min: 4 }` — so `pickersOnShift` is holding its half **open** while
+     * `nightHarvest` is holding the row shut. A reverse edge computed from *"is the dependant
+     * live"* rather than from *"is my own condition satisfied"* would put both in the same half
+     * and would tell a reader that hiring people unlocks lanterns.
+     */
+    const space = orchardSpace();
+    const controls = controlsFor(space, defaultValues(space));
+    const pickers = controls.find((control) => control.id === 'orchard.pickersOnShift');
+    expect(pickers?.unlocks).toEqual([]);
+    expect(pickers?.holdsOpen).toEqual(['orchard.lanternCount']);
+    expect(controls.find((c) => c.id === 'orchard.lanternCount')?.enabled).toBe(false);
+  });
+
+  it('says nothing about a control that gates nothing', () => {
+    const space = orchardSpace();
+    for (const id of ['orchard.litresPerTree', 'orchard.lanternCount']) {
+      const control = controlsFor(space, defaultValues(space)).find((c) => c.id === id);
+      expect(control?.unlocks, id).toEqual([]);
+      expect(control?.holdsOpen, id).toEqual([]);
+    }
+  });
+
+  it('finds the reverse edges of the shipped schema too, and the biggest one is real', () => {
+    /*
+     * The genericity claim is made above against the orchard; this is the *coverage* claim, which
+     * can only be made against the real schema — the same split this file's docstring describes.
+     * Derived from `space.parameters` on both sides, so a gate added to `data/` or to a `core`
+     * schema moves the expectation with it.
+     */
+    const space = collectSearchSpace();
+    const controls = controlsFor(space, defaultValues(space));
+    const expected = new Map<string, number>();
+    for (const parameter of space.parameters) {
+      for (const gate of Object.keys(parameter.activeWhen ?? {})) {
+        expected.set(gate, (expected.get(gate) ?? 0) + 1);
+      }
+    }
+    for (const control of controls) {
+      expect(control.unlocks.length + control.holdsOpen.length, control.id).toBe(
+        expected.get(control.id) ?? 0,
+      );
+    }
+    // …and the feature is exercised on real data rather than only on fruit: the shipped space has
+    // gating controls, and at least one governs several rows at once.
+    const governing = controls.filter((c) => c.unlocks.length + c.holdsOpen.length > 0);
+    expect(governing.length).toBeGreaterThan(0);
+    expect(
+      Math.max(...governing.map((c) => c.unlocks.length + c.holdsOpen.length)),
+    ).toBeGreaterThan(1);
   });
 });
 
@@ -290,6 +410,10 @@ describe('coverage of the shipped schema — the one claim that needs the real o
       'traffic.batchSize.distribution',
       'traffic.batchSize.mean',
       'traffic.batchSize.weight',
+      // § D265. Declared and not searchable for the same reason as its neighbours — but worth its
+      // own line, because what it declares is a share of riders who may not go where they are
+      // going, and an optimizer free to move it could improve a wait by refusing more people.
+      'traffic.credentialGap.wrongZoneShare',
       // docs/14 § 2.3. Three more rows that are declared and not searchable, for the reason every
       // other entry here is: `default: null`, and a search needs a point it can start from.
       'traffic.dayVariation.maxDemandFactor',

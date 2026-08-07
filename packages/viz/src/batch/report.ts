@@ -74,6 +74,7 @@ import {
   type BatchReplication,
   type BatchResult,
 } from './types.js';
+import { glossaryFor, type GlossaryTerm } from '../mode/glossary.js';
 
 /* -------------------------------------------------------------------------- *
  * Shape
@@ -136,6 +137,8 @@ export interface BatchComparisonRow {
 export interface BatchArmSummary {
   readonly armId: string;
   readonly dispatcherProfileId: string;
+  /** The profile's display name — see {@link BatchArmResult.dispatcherProfileName}. */
+  readonly dispatcherProfileName: string;
   readonly n: number;
   /** Replications whose own summary stands behind a mean. */
   readonly quotable: number;
@@ -149,12 +152,66 @@ export interface BatchArmSummary {
   readonly sentence: string;
 }
 
+/**
+ * The rows, counted by what they were entitled to say — **and nothing more than that.**
+ *
+ * ## Why this exists, and the sentence it is deliberately not
+ *
+ * The Compare tab produced eight metric rows and twelve goal rows with no line anywhere that
+ * stitched them together, so the one question the tab exists for went unanswered after a batch a
+ * reader had waited minutes for. A play-tester asked for *"a one-line verdict … plus per-row
+ * wording that names the direction"*.
+ *
+ * Half of that is available and half of it is forbidden, and the split is the whole design:
+ *
+ * - A row's **direction** is already named wherever this project permits one — `compareMetric`
+ *   emits `resolved` only on a paired-t interval that excludes zero at or above
+ *   {@link MIN_REPLICATION_BUDGET}, and that row's own sentence ends *"the … arm is the one that
+ *   came out ahead on this row"*. There was never a missing winner there.
+ * - A **verdict line that names a winner whenever the numbers differ** is CLAUDE.md's named
+ *   failure mode, and this project has refused its own learned-control feature three times on
+ *   exactly that ground.
+ *
+ * So this summary **counts and routes**. It says how many measures separated the two settings and
+ * *which* they were; it never says which arm, because the row does, under a gate this object does
+ * not re-derive. It is strictly weaker than the rows it summarises, which is what makes it
+ * incapable of asserting anything they do not.
+ *
+ * The other half is R3 one level up: a reader whose three headline rows came back empty was told
+ * *why* three times over in identical words and told **what to do** nowhere. {@link remedy} is
+ * that, and it is not the obvious sentence — see {@link remedyFor}.
+ */
+export interface BatchOutcomeSummary {
+  /** Rows whose verdict is `resolved`: an ordering this project's own rules permit. */
+  readonly resolved: readonly BatchMetric[];
+  /** Rows whose interval contains zero, or which had no spread to form one. */
+  readonly unresolved: readonly BatchMetric[];
+  /** Rows an arm's own summary refuses to quote, or that a broken CRN audit refuses. */
+  readonly suppressed: readonly BatchMetric[];
+  /** Rows at least one pair never measured. */
+  readonly unmeasured: readonly BatchMetric[];
+  /** R11's class: an interval drawn and a ranking refused. */
+  readonly shown: readonly BatchMetric[];
+  /** An interval excluding zero over fewer paired runs than the project budgets for. */
+  readonly underBudget: readonly BatchMetric[];
+  /** The count and the routing, in one sentence. Never a winner. */
+  readonly sentence: string;
+  /** What to do about the rows that said nothing, or `null` when every row spoke. */
+  readonly remedy: string | null;
+}
+
 export interface BatchComparison {
   readonly baselineArmId: string;
   readonly baselineProfileId: string;
+  /** The baseline profile's display name — the name the rest of the product calls it by. */
+  readonly baselineProfileName: string;
   readonly candidateArmId: string;
   readonly candidateProfileId: string;
+  /** The candidate profile's display name. */
+  readonly candidateProfileName: string;
   readonly rows: readonly BatchComparisonRow[];
+  /** What the rows added up to, and what to do about the ones that said nothing. */
+  readonly summary: BatchOutcomeSummary;
 }
 
 export interface BatchReport {
@@ -182,6 +239,21 @@ export interface BatchReport {
   readonly budgetNote: string | null;
   readonly arms: readonly BatchArmSummary[];
   readonly comparisons: readonly BatchComparison[];
+  /**
+   * The statistics words this report used, explained — issue #22.
+   *
+   * **Derived from the sentences above, not declared.** `glossaryFor` is handed exactly the text
+   * this report is about to draw, so a row that never fired never explains its vocabulary and a
+   * reworded sentence changes what attaches without anybody maintaining a list. A per-surface
+   * list would be § D152's shape one layer down: derived-looking only because today's wording
+   * happens to fit it.
+   *
+   * Additive, and that is the whole of the contract with the reader. Every field above comes back
+   * byte-identical to what it was before this existed — the plain language **leads** the run's own
+   * words and never replaces them, which is § D240's rule 1 and what `mode/glossary.test.ts`
+   * asserts by looking for a `plain` sentence inside a `sentence` and finding none.
+   */
+  readonly glossary: readonly GlossaryTerm[];
 }
 
 /* -------------------------------------------------------------------------- *
@@ -209,16 +281,21 @@ export function batchReport(result: BatchResult): BatchReport {
 
   for (const candidate of result.arms.slice(1)) {
     if (baseline === undefined) break;
+    const rows = BATCH_METRICS.map((metric) => compareMetric(metric, baseline, candidate, result));
     comparisons.push({
       baselineArmId: baseline.armId,
       baselineProfileId: baseline.dispatcherProfileId,
+      baselineProfileName: baseline.dispatcherProfileName,
       candidateArmId: candidate.armId,
       candidateProfileId: candidate.dispatcherProfileId,
-      rows: BATCH_METRICS.map((metric) => compareMetric(metric, baseline, candidate, result)),
+      candidateProfileName: candidate.dispatcherProfileName,
+      rows,
+      summary: summarise(rows, baseline, candidate),
     });
   }
 
-  return {
+  const arms = result.arms.map((arm) => summariseArm(arm));
+  const report = {
     buildingId: result.buildingId,
     buildingName: result.buildingName,
     seed: result.seed,
@@ -231,9 +308,29 @@ export function batchReport(result: BatchResult): BatchReport {
     crnSentence: crnSentence(result),
     traceKey: result.crn.traceKey,
     budgetNote: budgetNote(replications),
-    arms: result.arms.map((arm) => summariseArm(arm)),
+    arms,
     comparisons,
-  };
+  } as const;
+
+  return { ...report, glossary: glossaryFor(reportText(report)) };
+}
+
+/**
+ * Every string this report puts in front of a reader, for {@link glossaryFor} to read.
+ *
+ * Assembled from the report rather than from the inputs, so a word explained here is a word the
+ * reader was actually shown. It deliberately includes the **labels** — `95th-percentile wait` and
+ * `drive work (proxy)` are drawn as column headings whether or not their row had a number to
+ * report, so a batch whose every estimate was suppressed still explains what the columns meant.
+ */
+function reportText(report: Omit<BatchReport, 'glossary'>): readonly string[] {
+  const texts = [report.demandClause, report.crnSentence, report.budgetNote ?? ''];
+  for (const arm of report.arms) texts.push(arm.sentence, ...arm.reasons);
+  for (const comparison of report.comparisons) {
+    texts.push(comparison.summary.sentence, comparison.summary.remedy ?? '');
+    for (const row of comparison.rows) texts.push(row.label, row.sentence, row.note);
+  }
+  return texts;
 }
 
 function budgetNote(replications: number): string | null {
@@ -302,14 +399,29 @@ function summariseArm(arm: BatchArmResult): BatchArmSummary {
   return {
     armId: arm.armId,
     dispatcherProfileId: arm.dispatcherProfileId,
+    dispatcherProfileName: arm.dispatcherProfileName,
     n,
     quotable,
     saturated,
     timedOut,
     starved,
     reasons,
-    sentence: `${arm.dispatcherProfileId}: ${parts.join('; ')}.`,
+    /*
+     * **Name and id together, here and only here.** This is the row that establishes the pairing —
+     * the dispatcher rail, the status bar and the Free Play menu all say *Minimum estimated wait*
+     * and the batch used to say only `eta`, so a reader had to guess which of the twelve they had
+     * just run. The comparison sentences below carry the name alone: the mapping is established
+     * once, and eight rows of `Name (slug)` is a mapping restated until nobody reads it.
+     */
+    sentence: `${named(arm)}: ${parts.join('; ')}.`,
   };
+}
+
+/** `Minimum estimated wait (eta)` — the form the building picker already uses. */
+function named(arm: BatchArmResult): string {
+  return arm.dispatcherProfileName === arm.dispatcherProfileId
+    ? arm.dispatcherProfileId
+    : `${arm.dispatcherProfileName} (${arm.dispatcherProfileId})`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -470,6 +582,29 @@ function compareMetric(
     'compared here.';
 
   if (metricClass === 'axis') {
+    /*
+     * **The sign, in words — and the ranking still refused.**
+     *
+     * Reported by a play-tester against the shipped default, where this row read *"eta's drive
+     * work (proxy) differed from collective's by −651.8 kJ to −155.5 kJ"* and stopped. To learn
+     * that `eta` drove **less**, a reader had to notice the interval was negative and work out
+     * which arm was the subject of the subtraction — so the tab explained its non-answers in
+     * plain English and left its measurements as arithmetic homework.
+     *
+     * Stating the sign is not R11's concern and never was. R11 forbids *ordering* on this axis and
+     * forbids *aggregating* it with a wait, because the arm that drives least is often the arm
+     * that carried fewest people. *"Lower"* is the measurement; *"better"* is the claim. The word
+     * withheld is the second one, and the sentence says so rather than leaving the refusal to a
+     * note a reader may quote apart from it — § D171's shape.
+     */
+    const lower = estimate.upper < 0 ? candidate : baseline;
+    const higher = lower === candidate ? baseline : candidate;
+    const sign = Number.isFinite(estimate.lower) && Number.isFinite(estimate.upper) && !intervalContainsZero(estimate)
+      ? ` Across the whole of that interval ${lower.dispatcherProfileName}'s figure is the lower and ` +
+        `${higher.dispatcherProfileName}'s the higher — which is a measurement of drive work and ` +
+        'not a win: this row is an axis and no arm is named ahead on it.'
+      : ' That interval includes zero, so the two are not separated on this axis either — and an ' +
+        'axis names no arm ahead in any case.';
     return {
       ...base,
       verdict: 'shown',
@@ -478,8 +613,8 @@ function compareMetric(
       // R11, structurally: an energy row cannot name a winner even when its interval excludes zero.
       favours: null,
       sentence:
-        `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} differed from ` +
-        `${baseline.dispatcherProfileId}'s by ${range}.`,
+        `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} differed from ` +
+        `${baseline.dispatcherProfileName}'s by ${range}.${sign}`,
       note:
         `${arithmetic} Energy is an axis and never a score: measured across this project's own ` +
         'experiment matrix, the weakest shipped dispatcher sits on the Pareto front at six of ' +
@@ -497,8 +632,10 @@ function compareMetric(
       favours: null,
       sentence:
         `in ${runs(n)}, the difference in ${presentation.label} between ` +
-        `${candidate.dispatcherProfileId} and ${baseline.dispatcherProfileId} was ${range}. That ` +
-        `interval includes zero, so the two are not ordered at n = ${String(n)}.`,
+        `${candidate.dispatcherProfileName} and ${baseline.dispatcherProfileName} was ${range}. That ` +
+        `interval includes zero, so the two are not ordered at n = ${String(n)}: this batch cannot ` +
+        'resolve a difference on this measure, which is not the same as the two settings being ' +
+        'the same.',
       note: arithmetic,
     };
   }
@@ -531,8 +668,8 @@ function compareMetric(
       // The whole point: an interval that excludes zero over too few pairs orders nothing.
       favours: null,
       sentence:
-        `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} differed from ` +
-        `${baseline.dispatcherProfileId}'s by ${range}, and no arm is named ahead on this row: ` +
+        `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} differed from ` +
+        `${baseline.dispatcherProfileName}'s by ${range}, and no arm is named ahead on this row: ` +
         `${runs(n)} is below this project's replication budget of ` +
         `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)}, and an interval ` +
         'that excludes zero over too few paired runs is a direction this batch cannot support.',
@@ -548,8 +685,8 @@ function compareMetric(
     presentation.lowerIsBetter === null
       ? null
       : candidateIsLower === presentation.lowerIsBetter
-        ? candidate.dispatcherProfileId
-        : baseline.dispatcherProfileId;
+        ? candidate.dispatcherProfileName
+        : baseline.dispatcherProfileName;
   const direction = candidateIsLower ? 'lower' : 'higher';
   /*
    * Smallest magnitude first — **found by driving the panel**, not by a test. Taking
@@ -573,11 +710,152 @@ function compareMetric(
           ? 'candidate'
           : 'baseline',
     sentence:
-      `in ${runs(n)}, ${candidate.dispatcherProfileId}'s ${presentation.label} was ${direction} ` +
-      `than ${baseline.dispatcherProfileId}'s, by between ${magnitude}` +
+      `in ${runs(n)}, ${candidate.dispatcherProfileName}'s ${presentation.label} was ${direction} ` +
+      `than ${baseline.dispatcherProfileName}'s, by between ${magnitude}` +
       `${better === null ? '' : ` — the ${better} arm is the one that came out ahead on this row`}.`,
     note: arithmetic,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The summary — counting the rows, and routing the reader
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Roll the rows up into one sentence, and name what to do about the silent ones.
+ *
+ * Pure projection: every fact here is read off a {@link BatchComparisonRow.verdict} that
+ * {@link compareMetric} already decided under the gates it documents. Nothing is re-derived from an
+ * interval, so this function cannot reach a conclusion the rows do not already carry, and it cannot
+ * drift from them.
+ *
+ * See {@link BatchOutcomeSummary} for what it deliberately does not say.
+ */
+function summarise(
+  rows: readonly BatchComparisonRow[],
+  baseline: BatchArmResult,
+  candidate: BatchArmResult,
+): BatchOutcomeSummary {
+  const of = (verdict: BatchVerdict): readonly BatchMetric[] =>
+    rows.filter((row) => row.verdict === verdict).map((row) => row.metric);
+  const resolved = of('resolved');
+  const unresolved = of('unresolved');
+  const suppressed = of('suppressed');
+  const unmeasured = of('unmeasured');
+  const shown = of('shown');
+  const underBudget = of('under-budget');
+  const total = rows.length;
+  const pairs = rows[0]?.totalPairs ?? 0;
+
+  const clauses: string[] = [];
+  if (resolved.length > 0) {
+    /*
+     * **The measures, never the arms.** Each of these rows already names the arm ahead, under the
+     * one gate this project permits — a paired-t interval excluding zero at or above the budget.
+     * Repeating the winner here would be a second place deciding it; pointing at the row is not.
+     */
+    clauses.push(
+      `${String(resolved.length)} separated the two — ${labels(resolved)}, and each of those rows ` +
+        'names the arm ahead',
+    );
+  }
+  if (underBudget.length > 0) {
+    clauses.push(
+      `${String(underBudget.length)} measured a difference over too few paired runs to order the ` +
+        `two — ${labels(underBudget)}`,
+    );
+  }
+  if (unresolved.length > 0) {
+    clauses.push(
+      `${String(unresolved.length)} came back with an interval containing zero, which is no ` +
+        `difference this batch can resolve — ${labels(unresolved)}`,
+    );
+  }
+  if (suppressed.length > 0) {
+    clauses.push(
+      `${String(suppressed.length)} could not be compared at all — ${labels(suppressed)}`,
+    );
+  }
+  if (unmeasured.length > 0) {
+    clauses.push(`${String(unmeasured.length)} were never measured — ${labels(unmeasured)}`);
+  }
+  if (shown.length > 0) {
+    clauses.push(
+      `${String(shown.length)} are energy axes, shown and never ranked — ${labels(shown)}`,
+    );
+  }
+
+  return {
+    resolved,
+    unresolved,
+    suppressed,
+    unmeasured,
+    shown,
+    underBudget,
+    sentence:
+      `${candidate.dispatcherProfileName} against ${baseline.dispatcherProfileName}, over ` +
+      `${runs(pairs)} on the same passengers. Of ${String(total)} measures, ${clauses.join('; ')}.`,
+    remedy: remedyFor(suppressed.length > 0, unresolved.length > 0, pairs),
+  };
+}
+
+/**
+ * What to do about a row that said nothing — **and the obvious answer is wrong for half of them.**
+ *
+ * A play-tester waited out the shipped default, got three empty headline rows and the same 90-word
+ * justification printed three times, and observed that *"nothing tells the player what to do"*.
+ * CLAUDE.md's budget line makes *more replications* look like the answer to everything. It is the
+ * answer to exactly one of the two cases, and it is actively **wrong** for the other:
+ *
+ * - **An interval containing zero** is a statement about the batch, not about the settings: the
+ *   difference is smaller than this many paired runs can resolve. More replications narrow the
+ *   interval, and 50–200 is the budget.
+ * - **A suppressed row** is the complete-case rule firing — an estimate is reported only when
+ *   *every* pair stands behind one. Raising the count therefore makes suppression **more** likely,
+ *   not less: at the shipped Chancery House default one run in fifty saturates, so a hundred
+ *   replications would be expected to lose two. The lever is the load, and the panel has it.
+ *
+ * What is deliberately **not** suggested is changing the seed until the batch cooperates. That is
+ * choosing the outcome, and a remedy that taught it would undo everything else on this surface.
+ */
+function remedyFor(
+  anySuppressed: boolean,
+  anyUnresolved: boolean,
+  pairs: number,
+): string | null {
+  const parts: string[] = [];
+  if (anySuppressed) {
+    parts.push(
+      'A measure that could not be compared is the complete-case rule, not a failure: an estimate ' +
+        'is reported only when every paired run stands behind one, so more replications make this ' +
+        'more common rather than less. The lever is the load — lower "demand %pop/5 min" until the ' +
+        'queues stop growing, or run a building that copes with its own traffic. The rows below ' +
+        'are unaffected, because they are counts of what happened rather than means.',
+    );
+  }
+  if (anyUnresolved) {
+    parts.push(
+      pairs < MAX_REPLICATION_BUDGET
+        ? `A difference this batch cannot resolve is not a tie. Raising replications from ` +
+          `${String(pairs)} toward ${String(MAX_REPLICATION_BUDGET)} narrows the interval, and ` +
+          `${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} is what this ` +
+          'project budgets for. What is not a remedy is running it again on a different seed until ' +
+          'it separates: that chooses the answer.'
+        : `A difference this batch cannot resolve is not a tie. This batch is already at the top ` +
+          `of the project's ${String(MIN_REPLICATION_BUDGET)}–${String(MAX_REPLICATION_BUDGET)} ` +
+          'budget, so the honest reading is that the difference is smaller than this apparatus ' +
+          'resolves here — try a building or a demand level where the two settings have more to ' +
+          'disagree about.',
+    );
+  }
+  return parts.length === 0 ? null : parts.join(' ');
+}
+
+/** `average wait, 95th-percentile wait and door-to-door time` — the reader's names, listed. */
+function labels(metrics: readonly BatchMetric[]): string {
+  const names = metrics.map((metric) => BATCH_METRIC_PRESENTATION[metric].label);
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${String(names[names.length - 1])}`;
 }
 
 /* -------------------------------------------------------------------------- *

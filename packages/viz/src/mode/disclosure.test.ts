@@ -40,7 +40,12 @@ import { AWT_INVALID_GROUNDS } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, breadthConfig, fixtureConfig } from '../fixtures.test-helper.js';
+import {
+  DATA_DIR,
+  SUPPRESSED_BUILDING_ID,
+  fixtureConfig,
+  suppressedConfig,
+} from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { readRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
@@ -219,12 +224,19 @@ describe('shortening is not removing — parity still guards core’s sentence',
  * from *"the mechanism is wired"* — which is the roadmap's standing requirement (**name the non-test
  * caller**) pointed at a contract field rather than at a function.
  *
- * So this suite records **real runs** and asserts on what came out of them: `vertical-city` at the
- * shipped rates, which is the building `live/noMeans.test.ts` uses for the same reason (it saturates
- * hardest), and `garden-apartments`, which does not saturate and is therefore the control that keeps
- * the first assertion from being true of everything.
+ * So this suite records **real runs** and asserts on what came out of them: `suppressedConfig`,
+ * which is the fixture `live/noMeans.test.ts` uses for the same reason, and `garden-apartments`,
+ * which does not saturate and is therefore the control that keeps the first assertion from being
+ * true of everything.
+ *
+ * **The refused run is a rate, not a building** — `DECISIONS.md` § D260. This named `vertical-city`
+ * *"at the shipped rates"*, and § D254's pickup access check was what refused it; the building now
+ * completes at 100 % delivery on every seed tried. `suppressedConfig` states 16 % of population per
+ * five minutes, and its ground is `saturated` on all three seeds measured — which this file depends
+ * on more than the others do, because a fixture that wandered between grounds would make the
+ * per-ground lead assertion below about a different sentence each run.
  */
-const SUPPRESSED_ID = 'vertical-city';
+const SUPPRESSED_ID = SUPPRESSED_BUILDING_ID;
 
 let config: LoadedConfig;
 let suppressed: VizRecording;
@@ -232,7 +244,7 @@ let quotable: VizRecording;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
-  suppressed = recordRun(breadthConfig(config, SUPPRESSED_ID)).recording;
+  suppressed = recordRun(suppressedConfig(config)).recording;
   quotable = recordRun(fixtureConfig(config)).recording;
 }, 600_000);
 
@@ -312,5 +324,145 @@ describe('garden-apartments — the control: a quotable run carries no ground at
     const text = JSON.stringify(quotable);
     expect(text).not.toContain('awtInvalidGround');
     expect(text).not.toContain('awtInvalidReason');
+  }, 600_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * Issue #71 — the split has to exist, and parity cannot see whether it does
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The mode control has to change what is on the screen.**
+ *
+ * This is the roadmap's standing requirement — *move the control and require the run to change* —
+ * applied to a mode rather than to a slider, and it is the check `mode/parity.ts` structurally
+ * cannot be: all three of parity's rules fire on Basic **dropping** something, so a Basic rendering
+ * that is a byte-for-byte copy of Advanced passes it with zero violations. That is driven below
+ * rather than argued, because a limitation nobody has driven is one somebody will forget.
+ *
+ * Measured before the fix, on a real `chancery-house` run: twelve items, two hidden in Basic, three
+ * differing and **seven byte-identical** — and the seven carried exactly the vocabulary the mode
+ * exists to remove (*95th-percentile wait*, *door to door*, *rides over 60 s*, *the unluckiest
+ * rider*, `n = 44 rides`). See [`DECISIONS.md` § D240](../../../../DECISIONS.md).
+ *
+ * The assertion is about **every** figure Basic keeps rather than about a list of ids: a list would
+ * let a thirteenth figure through untranslated in silence, which is § D152's defect one layer over.
+ */
+describe('Casual and Engineer differ on every figure Casual keeps', () => {
+  const textOf = (rendering: {
+    readonly value: string;
+    readonly count?: string | undefined;
+    readonly note?: string | undefined;
+  }): string =>
+    [rendering.value, rendering.count, rendering.note]
+      .filter((part): part is string => part !== undefined)
+      .join(' | ');
+
+  it('parity passes a Basic mode that is a copy of Advanced — the gap this suite fills', () => {
+    const items = disclosureItems({
+      recording: suppressed,
+      dispatcherName: 'conventional collective',
+    });
+    const cloned = items.map((item) => ({ ...item, basic: item.advanced }));
+    // Not a criticism of parity: refusing Basic for being *too* informative would be refusing the
+    // safe direction. It is why the divergence claim needs a home, and this is the home.
+    expect(parityViolations(cloned)).toEqual([]);
+    expect(parityRefusal(cloned)).toBeUndefined();
+  }, 600_000);
+
+  /*
+   * The two runs compare different numbers of rows, and the difference is the point rather than a
+   * tolerance: on a refused run AWT, WT95 and TTD stop being negotiable figures and become
+   * `suppression` items, which § 4 puts on the never-hide list and which both modes must therefore
+   * carry. So the refused run has three fewer rows for this rule to bite on, and three more rows
+   * `parityViolations` is already the authority over.
+   */
+  it.each([
+    ['a refused run', (): VizRecording => suppressed, 5],
+    ['a quotable run', (): VizRecording => quotable, 8],
+  ])('%s: no figure reaches Casual in Engineer’s words', (_label, pick, atLeast) => {
+    const items = disclosureItems({
+      recording: pick(),
+      dispatcherName: 'conventional collective',
+      lockedOut: [],
+    });
+    const identical: string[] = [];
+    let compared = 0;
+    for (const item of items) {
+      const basic = item.basic;
+      // Hidden in Casual is a difference; § 4's non-negotiable rows are *required* to read the
+      // same, so only the negotiable half — the figures — is under test here.
+      if (basic === null) continue;
+      if (item.origin.kind !== 'figure' && item.origin.kind !== 'run-identity') continue;
+      compared += 1;
+      if (textOf(item.advanced) === textOf(basic)) identical.push(item.id);
+    }
+    // Not vacuous: a run producing no comparable figure would pass the loop above trivially.
+    expect(compared).toBeGreaterThanOrEqual(atLeast);
+    expect(identical).toEqual([]);
+  }, 600_000);
+
+  it('names the surfaces the issue names, and shows them differing', () => {
+    const items = disclosureItems({
+      recording: quotable,
+      dispatcherName: 'conventional collective',
+    });
+    const byId = new Map(items.map((item) => [item.id, item]));
+    for (const id of ['awt', 'wt95', 'window', 'run', 'ttd', 'long-waits', 'service-level']) {
+      const item = byId.get(id);
+      expect(item, `the run summary must produce "${id}"`).toBeDefined();
+      const basic = item?.basic ?? null;
+      expect(basic, `Casual must still draw "${id}"`).not.toBeNull();
+      if (item === undefined || basic === null) continue;
+      expect(`${id}: ${String(textOf(item.advanced) !== textOf(basic))}`).toBe(`${id}: true`);
+    }
+    // § 7.2's two "technical only" rows are the ones Casual drops outright, and they are the only
+    // two — a third would be Casual hiding a wait figure, which R11's own note forbids.
+    expect(items.filter((item) => item.basic === null).map((item) => item.id).sort()).toEqual([
+      'energy',
+      'interval',
+    ]);
+  }, 600_000);
+
+  it('translates without restating a figure, and without dropping the run’s own words', () => {
+    const items = disclosureItems({ recording: quotable });
+    for (const item of items) {
+      const basic = item.basic;
+      if (basic === null || item.origin.kind !== 'figure') continue;
+      // The value is carried through untouched — except the reporting window, which is the one
+      // value § 4 itself replaces. A plain retelling of `13.1 s` would be a second figure.
+      if (item.id !== 'window') expect(basic.value).toBe(item.advanced.value);
+      // The engineer's own sentence survives inside Casual's — a lead, never a replacement.
+      const advancedNote = item.advanced.note;
+      if (advancedNote !== undefined) expect(basic.note ?? '').toContain(advancedNote);
+      // R13 clause one: the sample size never leaves the figure's side. It changes notation only,
+      // and it names the same number.
+      if (item.advanced.count !== undefined) {
+        expect(basic.count).toBeDefined();
+        const digits = /(\d[\d\s,]*)/.exec(item.advanced.count)?.[1] ?? '';
+        expect(basic.count ?? '').toContain(digits.trim());
+        expect(basic.count ?? '').not.toContain('n =');
+      }
+    }
+  }, 600_000);
+
+  it('never turns a statistic into a ranking, however plainly it puts it', () => {
+    // The rule a plain-language layer is most able to break. *"An interval containing zero means
+    // this run cannot tell them apart"* is plain English; *"A is better"* is a different claim, and
+    // no wording here may become one — a single run may not order two settings at all.
+    const banned =
+      /\b(?:better than|worse than|faster than|slower than|beats?|outperform\w*|the best|the winner)\b/i;
+    for (const recording of [suppressed, quotable]) {
+      for (const item of disclosureItems({
+        recording,
+        dispatcherName: 'conventional collective',
+      })) {
+        for (const rendering of [item.advanced, item.basic]) {
+          if (rendering === null) continue;
+          const found = banned.exec(textOf(rendering));
+          expect(`${item.id}: ${found?.[0] ?? 'none'}`).toBe(`${item.id}: none`);
+        }
+      }
+    }
   }, 600_000);
 });

@@ -261,7 +261,23 @@ export function shaftChoices(current: number): readonly number[] {
 }
 
 /**
- * The speeds a machine class may run at — **its own declared band**, in five steps.
+ * The step sizes the speed ladder is allowed to use, smallest first.
+ *
+ * Round numbers, because the ladder's job is to be *chooseable*: `3.63 m/s` is not a speed anybody
+ * specifies, and a list of five of them reads as an interpolation rather than as a set of settings.
+ */
+const SPEED_STEPS_MPS: readonly number[] = Object.freeze([0.05, 0.1, 0.25, 0.5, 1, 2, 5]);
+
+/** Most intervals a band may be cut into. Eleven entries is the longest select worth scrolling. */
+const MAX_SPEED_INTERVALS = 10;
+
+/** A hundredth, because the select compares its value against the option id **as a string**. */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * The speeds a machine class may run at — **its own declared band**, on a round step.
  *
  * Derived from `data/elevator-specs.json` rather than authored, so a class whose band moves brings
  * its control with it. The band's endpoints are included because they are real settings: 2.5 m/s is
@@ -271,17 +287,51 @@ export function shaftChoices(current: number): readonly number[] {
  *
  * A control that offered a speed outside the band would be one the loader then refuses, which is
  * `docs/16` S7's *not offered rather than offered and refused*.
+ *
+ * ## Why the step is round, and the declared typical always offered — issue #45
+ *
+ * This used to cut the band into **exactly four equal steps**, and that is a subtler defect than it
+ * looks. The ladder is what the select's options are; the select's *value* is the bank's as-built
+ * speed; and a `<select>` whose value matches no option shows **its first option instead**. So on
+ * every building whose speed did not happen to land on one of the four cut points, the screen
+ * printed the bottom of the class band and called it *what the building already has*. That was
+ * **nine of the fourteen shipped banks** — Secure Tower's 4 m/s and Chancery House's 5 m/s both
+ * read `2.50 m/s`, contradicting the header on the same screen, and Midtown Office agreed only
+ * because 2.5 is the first cut point.
+ *
+ * Two changes fix it and neither is a special case. The step is the smallest of
+ * {@link SPEED_STEPS_MPS} that cuts the band into no more than {@link MAX_SPEED_INTERVALS}, so
+ * `gearless-traction`'s 2.5–7.0 goes in halves and therefore contains 3, 4 and 5 — the speeds the
+ * shipped buildings are actually written at. And the class's **declared `typical`** is always
+ * offered, because it is the one speed in the band the reference data names.
+ *
+ * That is the same set `buildingEditor.ts`'s `speedChipsOf` builds, minus its last line: it also
+ * adds *the value the document already carries*, which is the only construction that cannot miss.
+ * This function is not handed that value — `dev/main.ts`'s `optionsFor` calls it with the class
+ * alone — so the guarantee is carried by `commissioning.test.ts` instead, which asserts over
+ * **every bank of every shipped building** that its as-built speed is on the ladder its class
+ * offers. A building authored off the ladder fails that test rather than misreporting itself, and
+ * the fix at that point is to pass the current speed in.
  */
 export function speedChoices(machineClass: CommissionableClass | undefined): readonly number[] {
   if (machineClass === undefined) return Object.freeze([]);
-  const { speedMinMps: min, speedMaxMps: max } = machineClass;
-  const steps = 4;
-  const out: number[] = [];
-  for (let i = 0; i <= steps; i += 1) {
-    // Rounded to a hundredth: the control's value is compared against the choice's id as a string,
-    // so a float that printed one way and parsed another would leave a select unable to show its
-    // own current value.
-    out.push(Math.round((min + ((max - min) * i) / steps) * 100) / 100);
+  const low = Math.min(machineClass.speedMinMps, machineClass.speedMaxMps);
+  const high = Math.max(machineClass.speedMinMps, machineClass.speedMaxMps);
+  if (high - low < 1e-9) return Object.freeze([round2(low)]);
+
+  const width = high - low;
+  const step =
+    SPEED_STEPS_MPS.find((candidate) => width / candidate <= MAX_SPEED_INTERVALS + 1e-9) ??
+    width / MAX_SPEED_INTERVALS;
+
+  // Indexed rather than accumulated: `low += step` drifts, and a drifted 4.000000000000001 is a
+  // different option id from the `4` the bank is authored at, which is the whole bug above.
+  const offered = new Set<number>([round2(low), round2(high)]);
+  for (let index = 1; low + index * step < high - 1e-9; index += 1) {
+    offered.add(round2(low + index * step));
   }
-  return Object.freeze([...new Set(out)]);
+  const typical = machineClass.speedTypicalMps;
+  if (typical >= low - 1e-9 && typical <= high + 1e-9) offered.add(round2(typical));
+
+  return Object.freeze([...offered].sort((a, b) => a - b));
 }

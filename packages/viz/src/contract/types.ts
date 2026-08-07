@@ -303,6 +303,22 @@ export interface VizLeg {
   /** The bank that served this leg. `undefined` while unserved. */
   readonly bankId?: string | undefined;
   /**
+   * When the building **turned this leg away for want of a credential** — `DECISIONS.md` § D266.
+   *
+   * **Absent on every leg of every building that declares no `accessZones`**, and on every leg
+   * whose rider is correctly badged, so a recording from one of the three unzoned shipped buildings
+   * is byte-identical to one written before this field existed. A projection of
+   * `PassengerRecord.refusedAt`.
+   *
+   * **It is here because without it the viewer draws a lie.** A refused rider never boards and
+   * never gets a car, so on the two fields above they are indistinguishable from somebody standing
+   * on a landing for the rest of the run — which is exactly the reading § D266 refuses in `core`
+   * (*"they must not wait forever pretending to be a dispatcher failure"*) arriving one layer up.
+   * `frame/overlay.ts`'s `isWaitingAt` reads it, so a refused rider leaves the queue at the instant
+   * the building turns them away, and `access/lockedOut.ts` is where they are named instead.
+   */
+  readonly refusedAt?: SimTime | undefined;
+  /**
    * The car the **landing panel promised** this passenger, written once at arrival.
    *
    * `undefined` under the conventional model, where there is no panel and no promise. Under

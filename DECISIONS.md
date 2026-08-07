@@ -14242,3 +14242,6538 @@ asserted. The lever if it ever needs pulling is the same one the honesty tiers u
 - **The document tier** — § D220 § 2's middle rung. It is what closes the rest of `UX.md` § 27's
   `⚠️ mount` marks, and it is not built.
 - **`midtown-office` trips a `rise-exceeds-class` advisory** — 76.9 m of rise (a −3.5 m garage to a 73.4 m top floor) against `geared-traction`'s reference rating of 76 m. Worth someone's attention and **not a defect**: `core` states in the warning itself that *the reference envelope is application guidance, not a hard limit*, so the building is legal and deliberately so. What it costs is that commissioning cannot blame a player for a warning the shipped building already raises, which is why its diagnostic key had to include the **message** and not just the code and path — keyed on code+path, commissioning that bank as `hydraulic`, rated for 18 m, raised the same code at the same path and was silently forgiven as pre-existing.
+
+## D222 — the rule that said *never a tooltip*, re-decided on a measurement
+
+**Date: 2026-08-05 · Written after the code, and says so.** A play-tester's issue (#17) against the
+Parameters tab: *greyed-out controls lack visual explanation of why they are disabled*, and the
+inline sentence under the control — `not in effect: it needs answer.dwellPolicy to be adaptive — it
+is fixed` — *is easy to miss*. The suggested fix was to **move the reason into a tooltip on a `?`
+icon, to reduce page length**.
+
+`controls/render.ts`'s `frame()` docstring already answered that, in as many words: *"not as a
+tooltip, not as a colour. docs/10 R3's shape: the thing that is suppressed is replaced by why, never
+by a blank."* The first draft of this work quoted that sentence and rejected the issue on it. **That
+is the wrong way to use a rule** — a documented rule is a decision somebody made once, and a
+play-tester reporting that the screen does not work is evidence about that decision. So the rule was
+re-opened and asked to justify itself against the complaint.
+
+### What the rule was defending, and what the measurement says about it
+
+R3's purpose is that **a reader is never left with an unexplained dead control**. The tooltip
+proposal was argued from page length. That argument is checkable, so it was checked rather than
+answered — on the shipped dispatcher space, at the defaults the tab opens with:
+
+| | |
+|---|---|
+| controls | **58** |
+| inactive at the defaults | **20** (34 %) |
+| reason prose, all twenty | **1 797 characters** |
+| `control-help` prose, all fifty-eight | **20 464 characters** |
+| the reason, as a share of the tab's prose | **8.1 %** |
+
+**The wall of fine print is the description, not the reason.** Hiding every reason on the tab
+shortens the page by a twelfth and costs every touch and keyboard reader the sentence. The premise
+of the suggested mechanism does not survive its own measurement, so R3 stands — and now stands
+measured rather than quoted. `DISPATCH_PARAMETERS` alone is 16 inactive of 41, so this is not an
+artefact of one schema.
+
+### What the tester was right about, which no rule covered
+
+The reason was emitted **last**, below `control-help`. On the twenty inactive rows that description
+is a median of **318** and a maximum of **727** characters, so the explanation for a dead control sat
+a paragraph away from the control. *Easy to miss* was a correct report of a real defect; the defect
+was **adjacency**, and R3 never said anything about it either way. Three changes, none of them a
+hiding place:
+
+1. **A badge on the label line** — `needs dispatch.callType`, from the declared `unmetGates` field,
+   emitted for every inactive control and no active one. Words, not an icon and not a tint, so
+   `UX.md` KB-15 holds by construction rather than by a legend.
+2. **The reason moved above the help**, adjacent to what it is about.
+3. **The reason is referenced.** It had no `id` and nothing pointed at it, while the input's
+   `aria-describedby` named the help alone — so a screen reader announced the control `disabled` and
+   then read a description that never mentions the gate. The state was announced and its cause was
+   for sighted readers only. `aria-describedby` now names the reason's id **first**, then the help.
+
+   The id helper is **not exported**, unlike `helpIdOf` and `inputIdOf` beside it, and the
+   repository chose that: exported, it tripped `honesty/derive.test.ts`, which requires every
+   string-returning export in `viz` to have an adapter in `surfaces.ts` or a written exclusion. The
+   guard was right — nothing outside the renderer needs to *name* the reason. `render.test.ts` reads
+   the id off the emitted element and requires `aria-describedby` to point at an id some element
+   carries, which fails on a **dangling** reference; an assertion rebuilt from the helper would not.
+
+The rule's letter is unchanged and its application is narrower than it was: the reason is still text
+in the flow, in its own element, and it is now also on the accessibility tree.
+
+### The two mechanisms considered and refused, and why
+
+- **A `?` tooltip.** A `title` is unreachable by touch and by keyboard, so it would have made the
+  reason invisible to exactly the readers who cannot see the 0.65 opacity either. Refused on
+  accessibility, not on the docstring.
+- **A `<details>` disclosure**, which *is* keyboard-reachable and would have been admissible. Refused
+  on a fact about the mount rather than on principle: `dev/parameterForm.ts` calls
+  `container.replaceChildren()` and rebuilds the whole tree on **every accepted edit**, so an opened
+  reason would close again on the next keystroke, and a reader would have to reopen it to watch a
+  cascade they had just caused. It buys 8.1 % of the page's prose at that price.
+
+### What this does not close
+
+**Two further defects were found in this file and not fixed here**, because the fix is outside the
+lane's ownership and neither is what #17 reported. They are recorded so that finding them again
+counts as confirmation rather than discovery:
+
+1. **No control has an accessible name.** `frame()` emits `<span class="control-label">`, not
+   `<label for>`, and no input carries `aria-label`. Every input on the tab is therefore announced
+   by its type and its description with **no name** — a defect strictly larger than the one this
+   entry closes.
+2. **The dependency graph** #17 also floats — *an expandable section showing which settings unlock
+   which others* — is not built. `unmetGates` and `activeWhen` already carry the edges, so the data
+   exists; whether the tab should draw them is a product call and not this lane's.
+
+## D223 — a report is a statement about a whole day, so it waits for the whole day
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #16, reproduced on the
+deployed viewer and then re-diagnosed, because the issue's own account of the mechanism is wrong in
+a way that would have sent the fix to the wrong file.
+
+### What was reported, and what was actually happening
+
+The issue reads *"when a new shift is started, the Day Report tab still displays metric summaries
+from the previously completed run … these are not cleared until the new run accumulates enough
+data."* The reproduction: run a Free Play day (Chancery House, `nearest-car`, seed 20260804) to the
+end and let it file; press **Run this shift** again with nothing changed; open Day Report at once.
+The chrome reads `06:00 FILLING` and `running · 0 arrived, 0 carried`, the rail reads `carried today
+0`, and the sheet reads `CARRIED 360`, `AVERAGE WAIT 146.7 s` and `attempt 2 at this selection`.
+**One screen, two answers to *how did today go?***
+
+There is no stale report. Three things are true at once and none of them is a cache:
+
+1. `dev/main.ts`'s `runShift` writes `report: undefined` on every run, and `dev/state.ts` initialises
+   the field to `undefined`. `dev/reportPanel.ts` reads `view.state.report` and nothing else — there
+   is no per-selection bank for it to fall back to.
+2. `openTab` is `if (tab === 'report') closeShift();`, so **opening the tab files the sheet**, from
+   the recording, at whatever instant the playhead happens to be at. The simulator runs a day to its
+   end and *then* plays it back, so a complete account exists from the moment **Run this shift**
+   returns.
+3. `Simulation`'s `runId` is `` `${building}-${profile}-${masterSeed}` ``. Re-running one selection
+   produces the **same id and a bit-identical recording**, so the second sheet's figures equal the
+   first's exactly. That is what read as staleness.
+
+So the sheet was a true account **of the recording** and the wrong thing to draw, because every
+other surface on the screen — header clock, footer counts, rail goals — reads the **playhead**. The
+seed-change case the reporter used as a control was not the empty-state path working; it was the
+player already standing on the report tab, where `openTab` never fires and `runShift`'s
+`report: undefined` is left standing.
+
+### The rule, and why it is a third state rather than either existing one
+
+**A sheet that reports a whole day is drawn only when the run it reports has been played out.**
+While the playhead is short of `endedAt`, a filed sheet is replaced by one that says the day is
+still running and names the time it has reached. `reportPanel.ts`'s `runProgressOf` reads the
+playhead off the **same `ViewAt` that `drawHeader` and `drawFooter` are given in the same
+`renderAll`**, which is what makes the two-answers screen unconstructible rather than unlikely.
+
+Neither documented state was right. *Nothing filed yet — press "Run this shift"* is advice for
+something this reader has already done. The filed sheet is the defect. `docs/12` § 2.2 specifies the
+empty case and did not anticipate this one, so the third state extends the handoff rather than
+contradicting it; the empty state itself is untouched and still owns the no-run case.
+
+**It carries no figure, and that is the statistical discipline rather than timidity.** Every cell on
+this grid is a whole-run quantity: `CARRIED`, `DEEPEST QUEUE` and `TOOK THE STAIRS` are observations
+folded at `endedAt`, and `AVERAGE WAIT`, `WORST WAIT` and the energy pair come from `VizSummary`,
+summarised once over the whole run. None can be re-derived at a playhead. A part-day mean is exactly
+the thin sample `awtIsValid` exists to refuse, and printing one to avoid an empty box would be
+`docs/10` R3 with extra steps. The surface that *does* read a shift while it runs is the left rail,
+and the copy points there.
+
+Two consequences, accepted rather than overlooked. Scrubbing back after a day is filed and
+re-opening the tab shows the running sheet again — the screen is at 09:14, so the sheet declines to
+be at 18:00. And with the transport looping, the playhead reaches `endedAt` only in passing: a run on
+repeat has no *finished* instant for a sheet to agree with.
+
+Attempt numbering is unchanged and stays coherent. `shift/report.ts` prints the attempt from
+`week.attempt`, `week.ts`'s `retry` branch keys on `closedDay`, and nothing in this change touches
+either. `reportPanel.test.ts` pins it both ways: the filed sheet still says `attempt 2`, and the
+running sheet carries no meta line at all, because it makes no claim to number.
+
+### What this change did **not** close
+
+`openTab` still calls `closeShift` at any playhead, so **opening the tab on a run you have not
+watched still banks the day** — it increments `week.attempt`, and it can bank a clean shift and clear
+a contract. What it banks is the true outcome of a day that really was simulated in full, so nothing
+false is stored; what is wrong is that a navigation has a state effect the reader did not ask for,
+and the rail's banked count can move while this sheet says the day is still running. The fix is a
+guard at `dev/main.ts`'s `openTab`/`closeShift` seam — file only when the playhead is at `endedAt` —
+and it was out of this lane's file ownership. It is the next thing to do here.
+
+`honesty/surfaces.ts` sweeps `emptyReportView`'s title and lede by name and does **not** yet sweep
+the running sheet's. That is a hole in Phase 9's honesty property of exactly the shape § D186
+corrected, and it is one `seeds.push` pair in a file this lane did not own.
+
+### One stale mechanism claim, corrected in passing
+
+`shift/week.ts`'s `closeDay` docstring said `closeShift`'s guard re-arms because *"a re-run has a new
+[recording id] by construction"*. It does not: `runId` is derived from building, profile and seed, so
+re-running one selection produces the same id. What re-arms the guard is `adopt` clearing
+`filedRunId` on every recording it takes on. The conclusion the docstring draws was right and its
+reason was not, which is the failure mode CLAUDE.md's *"either measure it or say it is unmeasured"*
+paragraph exists for.
+
+---
+
+## D224 — the menu explains the game, and the explanation is checked against the game
+
+**Date: 2026-08-05 · Written after the code, and says so.** GitHub issue #13 — *"New user
+onboarding: no tutorial, welcome screen, or 'how to play' guidance."*
+
+### The issue's repro is wrong, and correcting it makes the job smaller
+
+The issue says a cold load at the root URL *"immediately places the user in Shift Mode on Garden
+Apartments with no context."* It does not. A cold load draws the menu — six destinations, each with
+a line saying what it is (`docs/12` § 4.8). So this is a **missing entry in an existing menu**, not a
+rescue from a running simulation, and nothing about the boot flow moves. The substance of the issue
+stands: there was no *how to play* anywhere in the product, and every word explaining what a
+dispatcher is lived in `docs/` or in a docstring.
+
+### Why the guide is not a seventh screen, and not a button either
+
+Three shapes were available and two of them cost more than they bought.
+
+A seventh `MenuScreen` is the obvious fit — it is exactly what Settings is. It is not built because
+`playthrough/walk.test.ts#modeOf` is an **exhaustive switch over `MenuScreen`** whose own docstring
+says *"a seventh screen has to be given a home instead of defaulting into one"*. Widening
+`MENU_SCREENS` is therefore a compile error in a file this lane did not own, and the correct fix is
+three lines there — recorded below as the thing to do if the guide ever needs its own route.
+
+A **button plus panel state** would have needed a new `MenuIntent`, and `dev/main.ts`'s
+`dispatchMenu` switch is `void`-returning with no `never` arm, so a member nothing handles compiles
+and does nothing. That is the dead control this package has shipped eleven times in code, arriving
+by the one route the type system does not close.
+
+`details` needs neither. The browser owns the open state, `summary` is focusable and operable from
+the keyboard with no handler, it starts closed so it blocks nothing, and the guide is inert to the
+state machine — which is the honest description of a page that only explains. It is the seventh
+entry in the existing list, built from the menu's own row card so it reads as a peer of the six
+above it.
+
+**One consequence, handled in words rather than in CSS.** `.menu-row` sets `display: grid` on the
+`summary`, which removes the disclosure triangle a browser would otherwise draw, and `index.html`
+was outside this lane. So the entry's own subtitle says *"Opens here, and starts nothing"* — KB-15
+forbids a signal carried by shape alone, and a sentence the reader is already reading is cheaper
+than a glyph.
+
+### The copy lives in `menu/screens.ts`, and that is a constraint rather than a preference
+
+A `menu/guide.ts` exporting these sentences would be a new **player-facing text producer** in
+neither a surface adapter nor a stated exclusion, and `honesty/derive.test.ts` is built to fail on
+exactly that: *"a new surface is red, not skipped."* Authored inside `screens.ts` as a
+non-exported constant, the prose leaves through `screenOf`, which the `MENU` adapter already covers,
+and the static R10 sweep reads it like every other literal in the package.
+
+**Named limitation, stated rather than discovered later:** `honesty/surfaces.ts`'s `MENU` adapter
+seeds `view.title`, `view.notices`, `view.issues` and each row's label, detail and `disabledWhy`. It
+does **not** seed `view.guide`, so the guide's sentences reach the static literal sweep and not the
+generated honesty search. That is the same tier `dev/menuPanel.ts`'s own row copy sits at and it is
+weaker than driving them. Closing it is one `seeds.push` loop in a file this lane did not own.
+
+### What the copy is not allowed to say, and what enforces it
+
+**No dispatcher is ranked.** CLAUDE.md forbids declaring one better than another without a paired-t
+interval excluding zero, and a game that says it anyway has taught a player a falsehood they carry
+out of the game — which is the same failure this repository refused its own learned control for,
+three times (§ D145, § D156, and the `lunch-two-way` re-measurement). So all thirteen shipped
+profiles are described by **what they do**: which terms they weight, which constraint they hold,
+where they park. `nearest-car` is called a baseline because `data/dispatcher-profiles.json` gives it
+`role: "baseline"` and because § D106 has it on the Pareto front at six of eight cells — a
+description, never a verdict. The paragraph that would have recommended one says instead that a
+single run cannot answer it, and names Compare, which `docs/12` § 2.3 makes the only surface allowed
+to.
+
+The rule is enforced in `documentation.test.ts`'s own shape rather than by banning the vocabulary,
+because the guide's most important sentence needs the verb: a ranking word is permitted only within
+160 characters of a refusal, the checker is shown to catch an unrefuted comparative, and the
+refusing sentence itself is asserted to still be there. A blanket ban would have been satisfied by
+deleting the paragraph.
+
+**No unmeasured mechanism.** Every statement of mechanism is a statement about what the code does —
+a car does not reverse direction to take a call; a term is normalised before it is weighted — never
+about what that buys. **No figure is graded**: energy sits beside the wait figures with § D106's
+reason stated, and the withheld mean is described as the run declining to be summarised, on the five
+grounds `AWT_INVALID_GROUNDS` declares.
+
+### Every list and every number is derived, because both go stale in silence
+
+Onboarding copy is read once per player, by the reader least able to tell it is out of date. So
+`menu/howToPlay.test.ts` holds it against the product rather than against a literal: the dispatchers
+it names come from the loaded configuration in both directions, the six axes it explains come from
+the free-play screen's own affordances, the destinations it introduces come from the root screen's
+own rows, and the traffic shapes come from the template ids. The goal ceilings, the wake-up
+threshold, the run-length ladder, the seed bound, the count of suppression grounds and the
+replication budget are each asserted against the constant that produces them, and the worked first
+run is required to be a selection `canStart` accepts.
+
+That last one was not decoration, and it found a defect in the product rather than in the copy.
+**The Free Play screen opened on a selection it refused.** `initialMenuState` took `durationS` from
+a fixed index — 15 minutes — while the catalogue's first template, `rise-and-fall`, declares a
+30-minute period, so `freePlayIssues` returned a refusal against the state the menu had just built
+and a new player's first sight of Free Play was a disabled **Start** under an error. The guide's
+worked example was drafted at 15 minutes for exactly the same reason, and the derived check refused
+it before the copy shipped. It is fixed on the base branch as GitHub issue #20: `openingDurationS`
+picks the shortest offered length the selected template's own minimum allows, derived rather than
+indexed, which is § D213's rule applied to a default.
+
+**The worked example is still derived rather than pinned to 30.** It agrees with the new opening
+state today, and it is asserted through `canStart` rather than against it, so a template whose
+period changes moves the sentence instead of stranding it.
+
+The Day report is described as **three** states — nothing filed, still running, filed — because
+§ D223 made it three the day before this landed, and both titles are read out of
+`dev/reportPanel.ts`'s source rather than restated.
+
+### What this does not close
+
+The issue's own strongest claim is that *the purpose of controls like dispatcher weighting and
+parking strategy is opaque*, and those controls are in `dev/dispatcherEditor.ts` and the right rail,
+which this lane did not own. They are in better shape than the issue implies — the editor already
+tooltips each cost term with `terms[].measures` and `serves`, and each flag with the field it
+writes — so what was missing at that surface was the **concept** rather than the per-control text,
+and the guide supplies the concept. A first-visit hint that opened the entry once would need a
+persisted *seen* flag in `persist/` and a read in `dev/main.ts`; the entry is discoverable without
+one, and an auto-opening panel a player did not ask for is the thing the issue's own repro was
+wrong about.
+
+### The document recorder, built here because a question needed it
+
+`docs/16` S9 names four evidence tiers — `static sweep < model walk < document recorder < browser` —
+and this package had the first, the second and, since § D220, the fourth. **The third had never been
+built**, and four modules say so in their own docstrings. So the claim that `renderMenu` puts a
+thing on a page could only ever be a regex over its source, which is how this file's first version
+asserted its own entry.
+
+`dev/menuPanel.test.ts` is that tier: forty lines whose `createElement` returns an object
+remembering its tag, class, text, attributes, children and listeners, and nothing else. It is not
+jsdom and does not become one — no `window`, no layout, no selector engine, no event dispatch — and
+`docs/05`'s *"no Playwright, no Puppeteer, no jsdom"* is unbroken because the object graph is the
+panel's own output rather than a re-implementation of the DOM.
+
+It was built to answer **GitHub issue #20's second half**: *"the Start button is fully styled as
+enabled/clickable and gives no visual feedback on click. Nothing happens."* Driven, the markup is
+right in every respect a document can carry — `disabled` is written, the refusal is rendered inside
+the control, the handler dispatches `start`, and the enabled arm is asserted too so the check cannot
+pass on a Start that is always refused.
+
+**And the reporter was still right, for a reason the tier cannot see.** The refusal renders as
+`.menu-row-detail` (`color: var(--dim)`) inside `.menu-start` (`background: var(--accent)`).
+Measured while this lane was writing the recorder, that pairing was **1.03:1**: the one sentence
+explaining why Start will not start, drawn invisibly on the control it explains, with nowhere else
+for a player to read it. The same span on an ordinary row sits on `var(--card)` at 6.01:1 and was
+always fine, so it was the primary button specifically. The disabled rule is `opacity: 0.55`, which
+dims the block and leaves it the full accent-coloured primary call to action.
+
+**It is fixed, and not by this lane.** § D235 / GitHub issue #26 added
+`.menu-start .menu-row-detail { color: var(--accent-ink) }`, reached independently from the
+Scenarios screen — where the same span is the only thing distinguishing *start the scored week* from
+*sandbox the same week unscored* — and its own comment quotes the same 1.03:1. Two lanes measured
+one pairing from opposite ends and got the same number, which is the strongest thing that can be
+said for either finding. So issue #20's second half is closed by both halves at once: the markup was
+right all along, and the sentence is now legible.
+
+What this lane added is the **pairing** as an assertion rather than the number:
+`dev/menuPanel.test.ts` requires the detail line inside the accent-filled button to be drawn in a
+different colour from the detail line on a card, so a later tidy that deletes the override as
+redundant fails there rather than on a player's screen. It deliberately pins **no contrast value** —
+`render/theme.test.ts` owns the ink ladder, and a test in this lane holding a figure that lane is
+tuning is a test that fails on their fix.
+
+## D225 — a batch that resolved to nothing, and the two sentences it was missing
+
+**Date: 2026-08-05.** Play-testers with no knowledge of this project's rules were given the shipped
+build. Four of their reports land on the Compare tab, and three of the four are the same thing from
+different angles: **the tab answers its own question badly, or not at all.**
+
+| Report | Reproduced | What it actually was |
+|---|---|---|
+| #57 — a bare toolbar over a blank panel | yes | `#batch-output` is genuinely empty at mount: 0 child elements, 0 characters |
+| #58 — dispatchers are raw slugs | yes | both Compare pickers, the Lab picker, and every sentence of the results prose |
+| #60 — the default batch answers none of the three wait metrics and repeats a 90-word paragraph three times | yes | one replication in fifty saturates at Chancery House; the three estimate rows each carried a **byte-identical** 624-character note |
+| #59 — no verdict line, and the resolving rows never say who won | **half** | the half that is real is not the half that was reported |
+
+### #59 is the one worth writing down, because the fix it asked for is forbidden
+
+The report asks for *"a one-line verdict at the top … plus per-row wording that names the direction
+(‘eta used 155–652 kJ less than collective’)"*.
+
+CLAUDE.md § Statistical discipline: **never declare one dispatcher better than another without a
+paired-t confidence interval that excludes zero.** This project has refused its own learned-control
+feature three separate times on that ground (§§ D145, D156, D162). A verdict line that names a
+winner whenever the numbers differ is the literature failure mode the rule exists for, and it was
+not built.
+
+But the report is **half wrong about the product**, and measuring which half is what made the fix
+obvious. Driving the shipped default:
+
+- The rows the tester wanted a winner on are `drive work (proxy)` and `drive work per ride
+  delivered` — both class **`axis`**. R11 forbids naming a winner on those *however* the interval
+  falls, because `nearest-car` sits on the Pareto front at six of eight matrix cells precisely
+  because it carries fewer people. The suggested wording is the one thing that row may never say.
+- The rows that genuinely `resolve` **already name the arm ahead**, in the sentence, and always
+  have: *"— the Minimum estimated wait arm is the one that came out ahead on this row"*. The default
+  batch produced none, so the tester never saw one.
+
+So the complaint decomposes into two real defects and one impossible request:
+
+1. **No roll-up.** Eight metric rows and twelve goal rows with nothing that stitches them together.
+2. **An axis row left its sign as arithmetic homework.** *"differed … by −651.8 kJ to −155.5 kJ"* and
+   stop. To learn which arm drove less you had to notice the interval was negative and work out
+   which arm was the subject of the subtraction — while the rows that resolved to *nothing* were the
+   ones written in plain English. The tab explained its non-answers and left its measurements in
+   sign notation.
+3. ~~Name a winner on an axis row.~~ Refused.
+
+### What was built instead
+
+**`BatchOutcomeSummary` counts and routes.** It reports how many measures separated the two settings
+and *which*, and never which arm — the row does that, under a gate the summary does not re-derive.
+Every field is read off a `BatchComparisonRow.verdict` that `compareMetric` already decided, so the
+object is **strictly weaker than the rows it summarises** and cannot assert an ordering they did not
+license. `report.test.ts` asserts both halves: that it names the measures, and that no arm is ever
+put ahead of another in it. On the shipped default it reads:
+
+> Minimum estimated wait against Conventional collective, over 50 runs on the same passengers. Of 8
+> measures, 3 came back with an interval containing zero, which is no difference this batch can
+> resolve — …; 3 could not be compared at all — …; 2 are energy axes, shown and never ranked — ….
+
+**An axis row states the sign in words and refuses the ranking in the same sentence.** Which figure
+is lower is a *measurement*; calling it the better one is a *claim*, and R11 forbids the second. The
+word withheld is the second one, and the sentence says so rather than leaving the refusal to a note
+a reader can quote apart from it — § D171's shape, applied to R11.
+
+### The remedy, and why the obvious one is wrong for half of it
+
+#60's *"suggests no remedy"* is the sharper half of that report, and the obvious answer is
+**backwards** for the case it was filed against. CLAUDE.md's 50–200 budget makes *run more
+replications* look like the answer to everything. It is the answer to exactly one of the two ways a
+row goes silent:
+
+- **An interval containing zero** — more replications narrow it. Budget 50–200. Correct.
+- **A suppressed row** — suppression is *complete case*: a row reports an estimate only when **every**
+  paired run stands behind one. At Chancery House one run in fifty saturates, so a hundred
+  replications is expected to lose **two**. More replications make it **more** likely, not less. The
+  lever is the load, and the panel already has it — `demand %pop/5 min` exists for this (§ D158).
+
+`remedyFor` emits whichever applies, and both when both do. What it never suggests is **re-rolling
+the seed until the batch separates**, which is choosing the outcome; the sentence that mentions
+seeds says so in as many words, and a test asserts it.
+
+### R3 shown once rather than three times
+
+The three suppressed rows carried a byte-identical 624-character note, and the arm row carried the
+same saturation quote a fourth time. `dev/batchPanel.ts` already had the rule one level down —
+`firstReason`'s *"R3 requires the reason to be shown; it does not require it fifty times, and a wall
+nobody reads is a worse way of hiding a fact than a blank would be."* The note is now drawn on the
+first row that carries it, and every later row with an **exactly equal** note points at that row by
+name. The dedupe is string equality rather than a similarity somebody tuned, so the two energy rows
+— whose arithmetic genuinely differs — keep both notes. `batch/report.ts` is untouched: the model
+still carries the reason on every row, and what changed is what the screen repeats.
+
+### Two things this does not close
+
+- **The goal rows still print slugs.** `scenario/goalReport.ts` builds its sentence as
+  `` `${arm.dispatcherProfileId}: …` ``. `BatchArmResult` now carries `dispatcherProfileName` beside
+  the id, so the fix is that one substitution — but `src/scenario/` was outside this lane's
+  ownership and was left rather than reached into.
+- **The toolbar's own labels.** `duration` carries no unit, and the demand field's placeholder is the
+  word `profile` in a numeric-looking box. Both are in `packages/viz/index.html`, which this lane did
+  not own; the empty state explains both in prose instead.
+
+### One claim in #57 that does **not** reproduce
+
+*"Cancel is present and looks live before anything is running."* It is not live: `setRunning(false)`
+at mount sets `cancel.disabled = true`, asserted in `dev/compareLab.browser.test.ts`. If it reads as
+live that is a CSS matter, not a behavioural one.
+
+## D226 — a stage that could not be cleared, and a rule that fired on a dispatcher's name
+
+**Date: 2026-08-05.** Two rules changed application here. Both changed because a measurement said the
+rule was pointing at the wrong thing, and neither was weakened to make something pass.
+
+### 1. The Lab no longer opens on a setting against itself
+
+`dev/campaignPanel.ts` selected the stage's own `startingProfileId` as the player's setting.
+**All ten shipped stages start on `collective`**, so the only thing a first-time player could do was
+run `collective` against `collective`: a minute of computation on two arms that are the same system,
+mathematically incapable of clearing the stage, reported afterwards as **"stage not cleared"** — the
+same words a genuine failure gets. The one sentence explaining it lived several screens down the
+left briefing column and read as a tautology (*"'collective' runs the same system as 'collective'"*),
+so the natural conclusions were *I did something wrong* or *this is broken*.
+
+The identical-arms run is W3's own liveness control and is **still available** — a reader is
+entitled to run it. Three things changed around it:
+
+- **The opening setting is derived**: of the shipped profiles `admitProfile` admits on this stage,
+  the one moving the **fewest declared dimensions**, ties to the file's order. Admissibility is not
+  optional — a stage names the dimensions it opens, and a default outside them would land the player
+  on a disabled Run button behind a refusal they did not cause.
+- **Fewest-dimensions was added after driving it.** File order alone opens stage 1 on `nearest-car`,
+  which moves three dimensions at once and is the weakest dispatcher this project ships: the first
+  Lab run went from an unwinnable *0 of 2 goals* to a winnable *0 of 2*, which is honest and teaches
+  nothing. The smallest admissible change is the *change one thing* experiment the tab is built
+  around. On stage 1 that is `eta` — `collective` with its one hard constraint dropped — and the
+  first run now reaches *1 of 2* with a real `beat-the-baseline` result behind it.
+- **The control is reported as a control, and it is read rather than assumed.** When both arms
+  resolve to one profile the headline says so instead of *"stage not cleared"*, and `judgeStage`'s
+  verdict is still printed verbatim beneath it, so nothing is softened. Two identical arms see
+  identical passengers, so every paired difference must be exactly zero: a row that excluded zero
+  would mean the arms did not share a trace or a run is not reproducible, and that is now said in
+  those words rather than rendered as a win.
+
+**Two shipped stages have no admissible alternative at all**, found by walking all ten rather than
+assumed: `stage-8-the-headline-address` and `stage-10-the-bed-and-the-visitor` open dimension sets no
+shipped dispatcher sits inside — stage 8's omits `constraints.noDirectionReversal`, which
+`collective` declares and every alternative moves. On those two the weight editor is not one way to
+play, it is the **only** way, and the status line says that instead of telling a player to change a
+setting that cannot be changed. `dev/compareLab.browser.test.ts` asserts this as a disjunction
+rather than by stage id, so an eleventh stage or a fourteenth profile cannot make it stale silently.
+
+### 2. R11's structural check fired on a dispatcher's display name
+
+`checkEnergyWaitBlend`'s structural clause forbids a string the surface marks as the energy axis from
+also carrying a wait quantity in its **value**. Naming the batch's arms the way the rest of the
+product names them put *Minimum estimated wait* into the value of every energy row, and the honesty
+search reported **21 violations across 11 cases** on sentences that aggregate nothing:
+
+> `in 50 runs, Minimum estimated wait's drive work (proxy) differed from Conventional collective's`
+> `by −651.8 kJ to −155.5 kJ.`
+
+This is `ENERGY_QUANTITY`'s own documented narrowing, on the other axis. That pattern's docstring
+records the first half: a bare `\benergy\b` made every sentence naming `energy-aware` an R11
+violation, and *"a rule that fires on a profile's name is not a rule about combining axes."* The wait
+side had the identical hole, and nothing had walked into it only because the batch report named its
+arms by slug and no slug contains a wait word.
+
+So the shipped display names are removed before either pattern is applied. It is a **derivation from
+`data/dispatcher-profiles.json`**, not an allow-list — a fourteenth profile is covered by the file it
+is authored in — and they are stripped longest-first, because *Conventional collective, en-route
+pickup* contains *Conventional collective*.
+
+**What it costs, stated rather than glossed:** a genuine blend leaning on a profile name to supply
+its wait token — *"kJ per second of Minimum estimated wait"* — would now be missed. That is the same
+trade the energy side already took, and it is falsifiable: `faults.ts#energyScore` still injects
+*"drive work in kJ per second of wait saved"* into an energy-axis value with no profile name in it,
+and the clause must still catch it. It does.
+
+### What this lane found and did not fix
+
+`dev/boot.browser.test.ts` **fails on a machine that has a Chromium**, and did so before this branch
+existed — verified by running it alone against an unmodified copy. It derives its origin from
+`server.httpServer.address()`, which reports 5173 while the server listens on the port
+`vite.config.ts` pins with `strictPort: true`, so every case fails with `ERR_CONNECTION_REFUSED` at a
+port nothing is on. It is invisible in normal runs because the tier skips without
+`ELEVATOR_SIM_CHROMIUM`. The one-line fix is `server.resolvedUrls`, which is what
+`dev/compareLab.browser.test.ts` uses; the file was outside this lane's ownership and was left.
+## D227 — a refusal goes stale the same way a mechanism claim does, and it is the more dangerous half
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #66, reproduced and then found to be
+a stronger finding than the report knew.
+
+### What was reported
+
+The traffic editor's **Mean group size** row sits inside `#traffic-rows` with the four working
+sliders, in the same `slider-head` / `slider-value` / `slider-sub` styling, and is not a control —
+the panel has exactly four `input[type=range]`. Under it, in warning colour: *"not a control here —
+writes PatternSpec.batchMean, which no field of SimulationDemandOptions carries … Moving it would
+change this summary line and no passenger."* Its own tooltip, a few pixels away, said the opposite:
+the field is *"written by widening the traffic file this run resolves against."*
+
+The reporter filed it as a copy defect — two explanations of one control contradicting each other in
+class names — and offered three fixes, of which *"make it work"* was the first.
+
+### What was actually true
+
+**The tooltip was right and the refusal was stale.** `authoring/patternSpec.ts`'s
+`trafficProfilesWithPattern` widens the traffic profile the run resolves against, and `dev/state.ts`'s
+`shiftRunConfigOf` has called it on the way to `SimulationConfig.trafficProfiles` since wave 13. That
+is a **named non-test caller**. The refusal described the world as it stood when it was written and
+was never revisited when the thing it refused got built — `trafficProfilesWithPattern`'s own
+docstring even carries the retraction, *"this docstring said it had none, and that was true when it
+was written and false the moment step 3 landed"*, and the row quoting the retracted sentence was left
+saying it.
+
+### The rule
+
+`docs/05-roadmap.md`'s standing requirement is *name the non-test caller*, and the version that
+applies to a control is *name the field it writes*. **It binds in both directions.** A control that
+writes nothing must say so; a control that writes something may not claim it writes nothing.
+
+This repository counts dead seams — behaviour that is configurable, unit-tested and never called —
+and has eleven in code plus two in `data/`. **This is the mirror image and it is deliberately not
+added to that count:** the seam was live, the wiring was correct end to end, and what was dead was
+the documentation of it. It belongs to the family CLAUDE.md's *"a stated mechanism goes stale the
+same way"* paragraph names, and it is the more dangerous half of the pair — a dead seam merely does
+nothing, while a stale refusal actively instructs the reader not to touch the parameter. The
+parameter here is the one CLAUDE.md calls out by name: **passengers arrive in batches, not one at a
+time**, and `data/traffic-profiles.json`'s own comment says batch size *"materially changes loading
+and stop patterns."*
+
+### Why the fix is a run and not a sentence
+
+The refusal's assertion in `trafficEditor.test.ts` was **inverted, not deleted** — and inverting it
+is a strengthening rather than a weakening, because the old test was holding a refusal in place after
+the thing it refused had been built. A sentence can only be pinned by another sentence, so what pins
+it now is the standing requirement itself: at `midtown-office` under `office-standard` over 900 s the
+legs differ when the mean does, both arms carry several hundred legs so the instrument cannot pass by
+going silent, and the served-leg count **falls** as the mean rises — the direction the model
+requires, which a mere *different* would not have caught.
+
+### One deferred question, now decided
+
+`trafficProfilesWithPattern`'s docstring said *"whoever next touches this panel should decide"*
+between widening the file and writing `demand.batchSize`. Decided: **the file**, for this control.
+`demand.batchSize` is a whole `BatchSizeCurve` — `distribution`, `weights` and `mean` — so a single
+mean slider writing one would silently replace the profile's authored distribution shape with
+whatever default the override carried. Widening moves the one number the slider is named after and
+leaves the curve the reference data declares. An editor that offered the shape as well would want the
+override; this one offers a mean, so it writes a mean.
+
+## D228 — the commissioning screen is wired end to end except at the one point where a value crosses
+
+**Date: 2026-08-05 · A finding, not a fix.** Play-tester issues #42, #45, #46, #48 and #49 all land
+on one screen. #45 is closed in `commissioning/` — see § D229. The other four have their root causes
+reproduced here, in files outside this lane's ownership, and are recorded rather than left in a
+report so the diagnosis is not repeated by whoever picks them up.
+
+### #42 — every dropdown on the screen is inert
+
+**Root cause: `dev/menuPanel.ts`'s `affordance`.**
+
+```ts
+const withValue = (value: string): MenuIntent =>
+  row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+    ? { ...row.intent, value }
+    : row.intent;
+```
+
+Only two intent kinds have the chosen option patched in. `menu/screens.ts`'s `commissioningBody`
+builds each select's intent carrying **the value the row already has** — `{ kind:
+'set-commissioning', bankId, dimension: id, value }` at `screens.ts:930`, and `{ kind:
+'set-constraint', constraintId: state.constraintId }` at `:905`. So the change event fires, the
+prepared intent is dispatched unchanged, `dev/main.ts`'s reducer writes the current value back, and
+`drawMenu` re-renders identically. That is precisely the reported symptom: *"the panel visibly
+re-renders — it just re-renders with the old values."*
+
+A no-op by construction, not a race and not a validation refusal. `set-challenge` and `set-calendar`
+carry values through the same path and want checking with it.
+
+### #46 — the panel shows the previous scenario's fabric under the new building's name
+
+**Root cause: `ViewerState.commissioning` is keyed to nothing.** It is a bare `CommissioningChoices`
+array; `commissioning: []` appears exactly once in the tree — `dev/state.ts`'s `initialState` — and
+`withBuilding` does not touch it. `dev/main.ts`'s `commissioningInput` reads
+`state.commissioning.length === 0 ? asBuiltChoices(authored, classes) : state.commissioning`, so once
+the array is non-empty it survives every building change and is drawn under the new building's name
+and budget.
+
+**#42 is what arms it.** The reducer at `main.ts:897` seeds `state.commissioning` from
+`asBuiltChoices` before writing the unchanged value back, so *touching* an inert dropdown latches the
+current building's choices into state permanently. The two issues are one mechanism, which is why
+fixing #42 alone would make #46 worse rather than better: a reader who can finally change a shaft
+count would carry it onto the next building. The choices want a building id beside them, or clearing
+in `withBuilding`.
+
+### #48 — no commit, no cancel, no preview, no brief
+
+Whole-screen composition, `menu/screens.ts`'s `commissioningBody`: it emits the constraint select,
+three selects per bank, and a Back row. There is no commit affordance because `set-commissioning`
+writes `ViewerState` on every change, so there is no staged value for a commit to apply or a cancel
+to discard. The screen's promise — *"choose the fabric before the week opens, then live with it"* —
+is enforced by `scope/permits.ts` forbidding `within-day` for `commissioning`, which is real and
+invisible.
+
+Nothing in `commissioning/` needs to change for this. The refusal machinery, the capital review and
+the as-built diff — `movedChoices`, `movedChoiceText` — already produce everything a preview or a
+staged-commit summary would draw. What is missing is a screen that draws them.
+
+### #49 — machine classes are unexplained, and two claims that do not reproduce
+
+The jargon half is real and is one line in `dev/main.ts`: `optionsFor` maps
+`classes.map((entry) => ({ id: entry.id, name: entry.name }))`, dropping the `detail` field that
+`menuPanel.ts`'s `selectRow` already renders as `` `${name} — ${detail}` `` and that the constraint
+select already uses. A `note` on `CommissionableClass` with no reader would have been a twelfth dead
+seam, so it is **not** added here; the change is `detail:` at the call site, plus a note derived from
+the band, rise and capacity the class already declares.
+
+Two of the issue's claims are **refuted**, and `commissioning.test.ts` now asserts against them:
+
+- *"Every machine class offers the identical speed list (2.50 → 7.00 m/s)."* False, and always was.
+  `speedChoices` has always returned the class's own declared band. The reporter saw only
+  `gearless-traction`'s because the machine-class select could not be moved — issue #42.
+- *"The lowest speed offered is 2.50 m/s, yet three shipped buildings run below it."* False.
+  `hydraulic` offers 0.5–0.75 m/s, including the 0.63 Garden Apartments runs at.
+
+The third claim — that car capacity is not offered — is accurate. It would be a fourth
+`COMMISSIONING_DIMENSION`, which is a compile error at every exhaustive site by design, and a fourth
+row in `commissioningBody`.
+
+## D229 — a ladder that cannot contain the value it is showing will show the wrong one
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #45, whose stated cause is right and
+whose consequence is larger than it reports.
+
+### What was wrong
+
+`commissioning/choices.ts`'s `speedChoices` cut each class's declared band into exactly four equal
+steps. That ladder is what the rated-speed select's **options** are; the row's **value** is the
+bank's as-built speed, from `asBuiltChoices`. A `<select>` whose value matches no option shows its
+first option instead — so on every building whose speed did not land on a cut point, the screen
+printed the bottom of the class band under the sentence *"the shafts, the machines and their speeds
+are what the building already has."*
+
+Measured over the shipped set: **nine of the fourteen banks across eight buildings.** Secure Tower's
+4 m/s and Chancery House's 5 m/s both read `2.50 m/s`, contradicting the header on the same screen.
+Midtown Office agreed only because 2.5 is `geared-traction`'s band maximum, which is the accident the
+reporter noticed and correctly distrusted.
+
+### The rule
+
+**A control that displays a current value must be able to offer that value.** The band is right and
+`docs/16` S7's *not offered rather than offered and refused* is right; what was wrong is a ladder
+whose members were an artefact of an interpolation count.
+
+The step is now the smallest of `{0.05, 0.1, 0.25, 0.5, 1, 2, 5}` that cuts the band into at most ten
+intervals, and the class's **declared `typical`** is always offered, because it is the one speed
+inside the band the reference data names. `gearless-traction`'s 2.5–7.0 therefore goes in halves and
+contains 3, 4 and 5 — the speeds the shipped buildings are actually written at. Round numbers also
+answer the readability half of issue #49: `3.63 m/s` is not a speed anybody specifies, and five of
+them read as an interpolation rather than as a set of settings.
+
+### The residual gap, named rather than left to be discovered
+
+This construction covers every shipped building and **cannot be made airtight from inside this
+function**, because a ladder over a continuum can always miss an arbitrary authored value.
+`buildingEditor.ts`'s `speedChipsOf` — the same computation for the same purpose, one panel over —
+carries the line that closes it: it also adds *the value the document already holds*. `speedChoices`
+is not handed that value, because `dev/main.ts`'s `optionsFor` calls it with the class alone, and an
+optional parameter nothing passes would be a control seam with no caller.
+
+So the guarantee is carried by a test instead. `commissioning.test.ts` asserts, over every bank of
+every building **read off disk** rather than from a name list — § D192's rule, because a hand-written
+list of eight stops covering the ninth the day it lands — that its as-built speed is on the ladder its
+class offers. A building authored off the ladder fails that test rather than misreporting itself, and
+the fix at that point is one argument at the call site.
+
+`speedChoices` had **no direct test** before this. It was exercised only through
+`playthrough/walk.test.ts`'s reconstruction of the options, which builds the same list the screen
+does and never compares it against the value the screen shows — an instrument that reproduced the
+defect faithfully and therefore could not see it.
+
+## D230 — the disclosure selector is a control, and a control that binds nothing is the defect this repository counts
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issue #43, which is two findings in one
+report; issues #24 and #52 are recorded here too, because all three are the same question asked of
+three different surfaces — *does this thing the screen offers actually do anything?*
+
+### #43 — Casual view changed nothing on the building tab
+
+The reporter measured it rather than asserted it: *"Engineer: innerText 2936 chars, 2523 elements /
+Casual: innerText 2936 chars, 2523 elements → byte-for-byte identical."* The cause is flat —
+**nothing in `dev/buildingEditor.ts` read `state.mode` at all**, on the most complex authoring
+surface the product has and the one a reader out of their depth would reach for the selector on.
+
+**This is the standing requirement with the hat on the other way round.** The eleven counted dead
+seams are *behaviour* with no caller. This is a *control* with no reader: the mode selector was
+wired, tested, and honoured elsewhere, and this panel simply never asked. It passes every check this
+repository runs — the panel renders, the selector moves, `mode/parity.ts` is green — because parity
+proves the two modes produce the same **run**, which is exactly what a disclosure control must do,
+and nothing proved they produce a different **screen**.
+
+So the rule generalises: *move the control and require the run to change* is for a control that
+configures a run. **For a disclosure control the analogue is: move it and require the rendering to
+change**, on the surface it claims to simplify. That is now asserted per-surface for this panel in
+`buildingEditor.test.ts`, in the reporter's own terms — the two modes may not be byte-for-byte
+identical.
+
+### #43 — and the captions were schema paths, which is the same finding from the other end
+
+Every caption read `floors[].heightM`, `banks[].cars[]`, or — on **both** occupancy rows —
+`floors[].population = capacity × occupancy`, a sentence true of the pair and descriptive of
+neither.
+
+The paths are there under a real and load-bearing discipline: *name the field it writes*, so a row's
+claim is checkable and cannot drift into decoration. **That discipline is not weakened here.** It
+was simply pointed at the wrong reader, and the selector exists precisely to say which reader is
+looking. Engineer keeps every path unchanged; Casual gets the unit, the range and the consequence.
+Nothing is deleted, and the checkable claim is one mode away rather than absent — which is also what
+makes the fix close both halves of the issue with one change.
+
+The `playerFieldOf` and `specSubOf` helpers are **module-private on purpose**: `honesty/derive`
+requires a `surfaces.ts` adapter for every exported prose producer, and both reach the sweep through
+`specRowsOf`, which the `EDITORS` adapter already covers by name. That is better than an exclusion.
+The residual gap, named rather than left: the adapter seeds `specRowsOf`'s **default** arm, so the
+engineer captions are driven and the casual ones reach only the static sweep. One argument at the
+seeding site closes it.
+
+### #43 § 4 — one stale count and one leaked package name
+
+`MATRIX_EMPTY` read *"core's own semantics for a floor no zone covers, and what four of the five
+shipped buildings declare."* `core` is a source package. And the count was wrong in both halves:
+**eight** buildings ship and **three** of them declare no access zone. The count is dropped rather
+than corrected — it told a player nothing they could act on, and a hand-written tally over `data/` is
+a number that goes stale the next time a building lands, which is how it got wrong in the first
+place.
+
+### #24 — the capital figure never said what a capital unit was
+
+Three questions in the report — what a unit corresponds to, what moves the figure before you commit,
+what happens when a configuration exceeds the allowance — and `commissioning/` knew all three answers
+and printed none. On a screen whose controls did not respond (§ D228, #42), a player could not even
+find the price list by trial and error.
+
+Two constraints shaped the copy. It **says plainly that a unit is not money**, because `choices.ts`
+is explicit that it *"is not currency, it is not a measurement of anything real"* — copy implying a
+real-world cost would be inventing an engineering claim the reference data does not make. And the
+figures are **interpolated from `CAPITAL_UNITS_PER_SHAFT`, `CAPITAL_UNITS_PER_MPS` and
+`CAPITAL_UNITS_PER_RATED_RISE_M`** rather than typed, so the legend cannot drift from the arithmetic
+it describes — *pin a published number to the code that produces it*, at the smallest scale there is.
+
+It rides on the **refusing** branch as well as the two quiet ones. The screen has three notice slots
+and this module owns one; a legend visible only when nothing is wrong would be missing from the exact
+moment a player is asking what happens if they exceed the allowance.
+
+### #52 — the elevation could not draw the shafts its own instruction line tells you to drag
+
+Two defects, and only one of them is in this lane.
+
+**The one that is:** `.elev-shaft` is `flex: 1; min-width: 0` inside a stage pinned at
+`min-width: 400px`, so the bars divided a **fixed** column between them. Four shafts got about 24 px
+each; pressing *add a shaft* four more times took them to about 13 px, the summary line correctly
+said `8 shafts in 1 bank`, and the picture did not change. The grid's own instruction is *"drag a
+shaft's top or bottom edge to restrict it to a band of floors"* — which is how a player creates
+zoning — so a bar too thin to put a pointer on is a documented interaction that is not offered.
+`elevationStageWidthPx` now grows the stage with the shaft count and each bar carries a 14 px floor,
+which `.elevation-body`'s existing `overflow: auto` then carries. Asserted as a monotonicity plus a
+geometric floor rather than as pixel values.
+
+**The one that is not:** the reporter's own measurement, `.elevation clientWidth 335 scrollWidth 412
+overflow-x: visible`, is about `.elevation-head` — a **static sibling** of the scrolling body, with
+`min-width: 400px` and hard-coded column widths, inside a container with no `overflow-x`. So the
+header clips with no scrollbar, and it cannot scroll with the body even now that the body has
+something to scroll. That is `index.html`, reported rather than edited, with the rules named in this
+lane's report. It also means the grid has **two sources of truth for one set of column widths** — the
+static head and the JS-built rows — which is the underlying defect and wants the head built from the
+same constants.
+
+## D237 — one judgement, four sentences: the report may not say two things about one day
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issues #53, #56 and #55, all
+three reproduced against real shipped configurations before anything was changed.
+
+### What was reported
+
+> **A day it could handle.** 3108 journeys of 3217 offered, and 88% of riders away inside a minute.
+>
+> THE SHIFT ASKED FOR — **Shift missed** — *"Streak reset."*
+
+One screen, two answers to *how did today go?* — § D223's defect in words rather than in numbers.
+Two neighbouring sections were reported in the same pass: **WHERE IT WENT WRONG** fires on a shift
+where nothing did, and one of its three rows is a methodology footnote rather than an event; and
+**LEVERS YOU ACTUALLY HAVE** is byte-identical on a flawless day and a collapsed one.
+
+### Reproduced, and the mechanism is simpler than the report
+
+`chancery-house` at 22 %pop/5min for thirty minutes files `saturated: false`, `awtIsValid: true` —
+no refusal anywhere on the sheet — and stacks a landing 43 deep against day 4's bar of 26. It prints
+*"A day it could handle. 440 journeys of 440 offered, and 80% of riders away inside a minute"* over
+**Shift missed**. At 30 %pop/5min the same building prints the same praise over a 41 % minute share
+and two missed bars.
+
+There is no copy bug. `dayReportOf` tested one question twice: `verdict` was *every goal met*, read
+from `readGoals`; `ledeFor` branched on `summary.saturated` **and nothing else**. Those agree only by
+luck, and they disagree on every run that misses a bar without the queues diverging. The reported
+Vertical City run was one; so is every Crown Hotel run at 16 %pop/5min.
+
+### The rule, and why it is a lookup rather than two functions that agree
+
+**Every sentence that states how the day went is looked up under the verdict.** `judgementOf` returns
+the verdict, the banner line, the headline and the diagnosis heading together, through
+`VERDICT_VOICE` — a `Record<'cleared' | 'missed', …>`. There is now no expression in the module that
+produces the cleared headline without having first decided the day cleared, so the disagreement is
+unconstructible rather than merely fixed. The streak line takes the same verdict instead of a second
+`allMet` boolean.
+
+Fixing the copy so the two happen to line up was the other option and is the weaker one: it passes a
+suite that pins strings and fails the day somebody adds a third state. The test that decides this
+holds the recording, the observations, the week and the contract **completely fixed** and moves only
+the goals — the headline must move with the verdict, because it is reached through it. That
+assertion fails against the old code on all three fixture runs.
+
+Saturation did not stop mattering; it moved **inside** each arm, where it is a clause rather than a
+verdict. A saturated day that met every bar is cleared, and its headline says both — and points at
+the cell that refused rather than restating the figure, with no word from `ESTIMATE_CUES` near a
+numeral, because `honesty/properties.ts#checkSuppressedMean` reads that string.
+
+### The two neighbours, which are the same defect one section over
+
+**A section that fires unconditionally says nothing.** *Where it went wrong* is authored in
+`index.html` as a fixed `<h3>`, so a player who had just scored 100 % on every goal was told
+immediately, under a green banner, where their day went wrong — and learns that the heading means
+nothing on the day it would have mattered. The heading is now the fourth string out of the
+judgement (*The tightest moment* when the shift cleared), and the panel writes it. The diagnosis
+rows' **tones** follow the same verdict: a nine-deep landing on a cleared day was drawn in the same
+red as an 892-deep one, and `diagnosisRowsOf`'s own comment already said why that is wrong — *"a row
+with nothing to flag gets the ordinary edge, not a colour that implies a verdict"*.
+
+**The third row was never an event.** *"Every cohort figure above is the peak-5min window"* carried a
+clock time, sat in a timeline and was styled exactly like the two incidents above it, and is
+word-for-word identical on every run. It is genuinely load-bearing, so it moved rather than went:
+`smallPrintFor` now carries it, beside the other statement about what one day may be read to mean.
+The numeral in it stays a **word** for the reason it always was — the honesty search caught the
+sentence printing `25` under a cell reading `AVERAGE WAIT: withheld` on a run whose refused mean
+rounds to 25.
+
+**Four fixed cards are a glossary, not advice.** `LEVERS` was a frozen constant, and the section is
+captioned as advice for *this* day directly under a diagnosis that interpolates real values — so it
+reads as a diagnosis, and a player who acts on it once and then notices it never moves stops
+trusting the section. `leversFor` now matches each card against an **observation**: capacity against
+`saturated`, `unservedCount` and `abandoned`; concentration against **today's own** queue bar where
+the day set one; the forgotten-floor shape against a worst wait past the threshold the WORST WAIT
+cell is already coloured by, on a day whose minute goal was met; and the lobby card against
+`VizFloor.isEntrance` at the deepest queue. A card the run points at leads and opens with the
+observation that pointed there; a card it does not keeps the handoff's sentence exactly. *Ask where
+they're going* is **dropped** when `recording.passengerModel` is already `destination-dispatch` — a
+lever you have pulled is not a lever you have.
+
+**The line none of that crosses.** A clause says *what this day showed*, never *what the lever will
+buy*. Ordering four pieces of advice by which observation fired is not a performance claim, and one
+replication could not support one; the small print now says so under the cards, in the same breath
+as the refusal it belongs to. No pointer reads `meanWaitS`, `wait95S` or `meanTimeToDestinationS` —
+a card that appeared or disappeared on a suppressed figure would be that figure published through
+the back door (`docs/10` R9), and the suite asserts no printed form of any of the three reaches a
+card on the saturated fixture.
+
+### Two magic numbers became one constant each, and one docstring was wrong
+
+`120` was written twice (the WORST WAIT tone, and now the fairness pointer) and `24` twice (the
+DEEPEST QUEUE tone, and the queue pointer where a day sets no queue bar). Both are named. And the
+module docstring said `awtIsValid` *"already has four grounds"*: `core`'s
+`AWT_INVALID_GROUND_SPECS` has had **five** since riders could leave, and the sheet's own gate was
+never wrong — only its description of it. Corrected in both files that repeated it.
+
+### What this did not close
+
+`index.html` authors both section headings as unaddressed siblings of `#report-diagnosis` and
+`#report-levers`, so `headingOf` climbs one element to reach them — the same reach `cardOf` already
+makes for *Tomorrow* and *What this taught*, and for the same reason. **The fix is an id on each
+heading**, in a file this lane did not own. It degrades safely: a markup change that moves the
+`<h3>` leaves the words `index.html` authored rather than throwing inside a render loop.
+
+`honesty/surfaces.ts` does not seed `diagnosisHeading`, and it seeds the diagnosis rows by index, so
+the heading is outside the honesty corpus. That is a hole of exactly the shape § D223 left and
+§ D186 corrected, and it is one `seeds.push` in a file this lane did not own.
+
+## D238 — a delta is two sheets side by side, and it is not a result
+
+**Date: 2026-08-05 · Written after the code.** Play-tester issues #38 and #62, which are the same
+surface at two scales: the report cannot show you what changed, and it will not even show you the
+top of what it has.
+
+### What was reported
+
+Clicking a dispatcher in the right rail re-simulates the whole shift on the same seed instantly,
+which is the game loop working. The second Day report is then a fresh sheet with no reference to the
+first. The reporter swapped `collective` for `capacity-aware` on one seed and had **288 fewer riders
+take the stairs** and made the unluckiest rider **642 s worse** — the exact tradeoff the product
+exists to teach — and had to screenshot both sheets and diff them by hand. The only string on the
+page referring to the earlier run is the grey `attempt 2 at this day`. Meanwhile the rail's *best day
+so far* moved 18 % → 20 %, so the single lesson the app volunteered was *capacity-aware is simply
+better*, which is the one thing it most wants not to teach.
+
+Separately: the report auto-opens when a run plays out, at the offset the reader left the *previous*
+sheet at — two thirds down, on the lever cards, with the verdict, the eight stat tiles and the goal
+list above the fold and nothing indicating they were there. Because `runId` is
+`building-profile-seed`, a re-run of one selection is bit-identical (§ D223), so the visible region
+genuinely is the same between runs and it reads as a sheet that failed to update.
+
+### The rule
+
+**A delta may state what the two sheets printed. It may not order them.** *Took the stairs: 483, was
+771* is not an inferential claim about dispatchers; it is a statement about two runs that already
+happened, of exactly the kind every other number on the sheet is. R2 forbids the **verdict**, and the
+block never renders one: no direction, no colour, no sum, no ordering word. Its note carries the
+refusal in the same visual unit as the rows, and *Take it to Compare* already sits under the small
+print.
+
+**Every value in the block is a string one of the two sheets already published.** There is no
+subtraction anywhere in it, which is not squeamishness about arithmetic — it is what makes R3 hold
+for free. A suppressed cell pairs as the literal word: `withheld → 58.3 s` is the shift layer's own
+refusal, copied, rather than a hole where a difference could not be taken. It also keeps
+`dev/reportPanel.ts`'s standing property true — *a renderer that cannot compute a mean cannot compute
+one wrongly* — which `reportPanel.test.ts` asserts by scanning the source.
+
+**And it names what was run, not only what came out.** The trap this block could set is worse than
+the silence it replaces: six numbers moving, with no word about the seed, invites a reader to credit
+the one thing they touched. So the identity rows pair the building and dispatcher, the seed and span,
+and which day the sheet is of, and a reader can see whether the two runs were even asked the same
+question.
+
+**When nothing moved it says so.** An unchanged selection reproduces bit-identically, so the block
+that would otherwise be empty is where *"the report did not update"* finally gets answered — the
+§ D223 finding, said to a player rather than filed in a decision log.
+
+### Where the earlier sheet comes from, and why that is the right relation
+
+`ViewerState` carries no history and `dev/state.ts` is not this lane's file, so `mountReport` holds
+the previous filed sheet in its own closure. That is not only a constraint: continuity of the
+**drawn** sheet is the relation the issue is about — the earlier run in the delta is the one the
+reader actually read. It is lost on reload, which is honest, because so is their memory of it.
+
+Two things about the rotation were got wrong first and are pinned at the source:
+
+1. It happens **before** the view is built. Rotating after would make every sheet its own predecessor
+   on the next frame — `renderAll` runs sixty times a second — and every delta would read *nothing
+   moved* one frame after appearing.
+2. Only a **filed** identity moves it. Pressing *Run this shift* clears the report, so an unfiled
+   sheet stands between every pair of filed ones; rotating on that hands the next delta an
+   `undefined` predecessor and loses the run the reader just read.
+
+The delta is `null` on both sheets that are not an account of a played-out run. § D223's rule is that
+a sheet reporting a whole day waits for the whole day, and a delta is made of that sheet's figures,
+so it waits too.
+
+### The scroll, and the one clause that makes it work
+
+`sheetIdentityOf` is the same signal: a new filed sheet is owed its own top. The identity is the
+sheet's **words** — title plus meta block — and not `runId`, because `runId` is unchanged by exactly
+the retry the reader is trying to compare; the meta block carries `attempt 2 at this selection`,
+which is what separates them.
+
+The write is deferred until the panel is actually on screen. `index.html` hides a tabpanel with
+`display: none`, where `scrollTop` is not writable, and `main.ts`'s `closeShift` files the sheet and
+moves the tab in one patch — so a write at the instant the identity changed lands on an element with
+no layout and is dropped. The debt is cleared on the **write**, not on the change, so a reader who
+scrolls this sheet keeps their place until a different one arrives.
+
+### What this did not close
+
+`index.html` has no slot for the delta, so the block is built in the panel and inserted after the
+lede — the idiom the *Take it to Compare* box already uses, and for the same reason: the markup is
+the handoff's, and the handoff drew one sheet at a time. A lane that owns `index.html` should give it
+an id and a stylesheet rule.
+
+`honesty/surfaces.ts` does not seed the delta's strings, so the one block on this sheet that names
+two runs at once is outside the honesty corpus — the same hole § D223 named for the running sheet's
+lede, and the one most worth closing next, because a comparison surface is what
+`checkSingleRunComparative` exists for. It is one `seeds.push` group in a file this lane did not own.
+
+The cards in *Levers you actually have* still are not clickable: *"the Building tab will let you feel
+how much it buys"* names a tab and does not take you there (issue #55's closing note). That needs a
+navigation seam in `dev/main.ts`.
+
+
+## D239 — the mood card was reading the one instant whose answer is always calm
+
+### The report, and what it turned out to be
+
+Issue #35: at the end of a Midtown Office shift that the Day report called **"It did not cope"** —
+average wait withheld, worst wait 2 057 s, 771 riders on the stairs, deepest queue 354 — the left
+rail's largest type read
+
+> ◡ **Everyone is getting on with their day.** · *nobody has waited a minute*
+
+with all four band counters at zero, three lines above *served under 60 s **18 %*** in the same
+panel.
+
+Two hypotheses were on the table and they call for different fixes. Either the mood was computed at
+a **stale playhead** — the shape Area B found in the Day report, where a sheet described a day the
+transport had not reached — or it was computed correctly at a playhead whose answer is structurally
+zero. It is the second, and the evidence separates them cleanly:
+
+- `vertical-city` at the shipped rates ends `timed-out` with **84 people still standing**, and
+  `waitBandsAt(recording, endedAt)` correctly reports `[0, 0, 0, 84]`, worst band 3, face `×`. The
+  reading tracks the playhead.
+- `midtown-office` under `collective` over an hour of demand ends `status: 'completed'`,
+  `saturated: true`, `awtIsValid: false`, 1 392 of 1 392 carried, **781 past the 900 s horizon**,
+  **18.0 %** served inside a minute, peak queue **392** at the ground floor — and
+  `waitBandsAt(recording, endedAt)` is `[0, 0, 0, 0]`, worst band 0, face `◡`, headline *"Everyone
+  is getting on with their day."*
+
+So the defect is not a stale anything. **A run that completes runs on until the last passenger is
+delivered, so its final frame has an empty lobby by construction**, and a card keyed on the queue
+there reports the calmest band about the worst possible day. It inverts at the end of every
+completed run and it inverts hardest when the run was worst — because the worse the collapse, the
+larger the crowd that has to drain before the clock stops.
+
+The same instant, in the same rail, does it a second time. `live/honesty.ts`'s **casual** card is
+keyed on `fallingBehindAt`, which needs somebody standing in the fourth band; at `endedAt` nobody
+is, so the casual honesty card read `✓ Comfortably keeping up` over that run too. That one is not
+only a lie, it is § 4's line crossed — *"Basic mode may hide complexity. It may never hide a
+failure"* — because a refused statistic is on § 4's own never-hide list, which `mode/types.ts`'s
+`disclosureClassOf` states as `suppression → must-show`. The casual card was the one **mounted**
+surface where that clause was not kept.
+
+### The decision: a second basis, not a corrected one
+
+`waitBandsAt` gains a third parameter, `WaitBandBasis`, defaulting to the reading it already had:
+
+- `'now'` — everybody **standing** at `t`, from `queueAt`. Unchanged, still the design's card, and
+  `bands.test.ts`'s by-construction agreement with `frameAt(recording, t).totalWaiting` is untouched
+  at both ends of every shipped building. Moving that boundary to fix the terminal instant would
+  have broken the one assertion that catches a banding which drops or double-counts somebody.
+- `'whole-run'` — everybody whose call was **registered** by `t`, banded by the worst wait each of
+  them realised. Non-decreasing in `t`, so a band cannot un-happen as the playhead advances — the
+  same property `observations.ts` gets by deriving `abandoned` from a crossing time rather than from
+  `t - arrivedAt > horizonS`, and for the same reason.
+
+Both walk `recording.legs`, so the two bases count one population and a rider cannot be in the
+retrospective banding and absent from the live one. Asserted on every shipped building: the
+whole-run total equals `observationsAt(…).arrived`, and its worst band dominates the live worst band
+at all eleven sampled instants.
+
+`moodOf` reads `bands.basis` and writes a different sentence for each. That is the load-bearing half
+— two bandings that read identically are one banding with a bug — and the distinction is carried in
+**tense**, which survives a greyscale screenshot and a screen reader where the face's tint does not
+(KB-15). *"The stairwell door is getting a workout"* against *"The stairwell door got a workout"*;
+*"nobody has waited a minute"* against *"across the whole shift, nobody stood half a minute"*. The
+bar's `aria-label` says it in full words: *"Across the whole shift, 1 392 people called a lift, by
+the longest each of them stood: …"*.
+
+The first retrospective headline is the one that needed most care. It replaces the sentence that
+caused the report, and it is a claim about **wait ages over the shift** and nothing else — *"Nobody
+stood for long today"*, not *"the day went well"*. Nobody having waited thirty seconds is genuinely
+all this card measured; the honesty card beside it and the mood drivers under it speak for the rest.
+
+### Where the choice is made, and why it is not in `live/`
+
+`dev/leftRail.ts#shiftIsOver` — `t >= recording.endedAt` — and `basisAt` maps it onto the union.
+`live/` answers whichever question it is asked; *which question a finished shift deserves* is a
+presentation call, which is the split that file's docstring already draws. `shiftIsOver` is exported
+so the test drives the rail's own decision rather than recomputing `t >= endedAt`, which is
+`summaryFigureIds`' argument about itself: a probe that recomputes a decision asserts its own
+arithmetic and would pass with the control disconnected.
+
+`recording.status` is deliberately not consulted. A `timed-out` run is finished too, and it has the
+*more* honest terminal frame — the people it failed are still standing in it — so a rule keyed on
+`status === 'completed'` would hand the retrospective card to the run that needs it least.
+
+The honesty card takes the same basis and the rail draws both on it, because a rail whose face is
+retrospective and whose honesty card is instantaneous is two panels answering two questions with no
+way for a reader to tell which is which. On `'whole-run'` the casual card answers **did it cope**,
+using `meansAreSuppressed` — the run's own gate, not a second opinion about it — and R3 is kept in
+both halves: casual shortens the refusal to one sentence and the verbatim reason is still one
+control away behind *show me the maths*.
+
+### What this did not change
+
+The four stat rows. *standing right now 0* and *longest wait — nobody waiting* are true at the end
+of a completed run and are labelled instantaneous in their own captions and tooltips; they were
+never the sentence being read as a verdict. Left alone rather than relabelled, because a *"run
+over"* badge on a row that already says *right now* is a second answer to a question the caption has
+answered.
+
+`waitBandsAt`'s default is `'now'`, so every caller written before this — `honesty/surfaces.ts`,
+`fallingBehindAt`, `dev/main.ts`'s legend — keeps the reading it had. The defect is still reachable
+and still reproduces: `moodAt(recording, endedAt)` on the Midtown run returns *"Everyone is getting
+on with their day"* today, and `bands.test.ts` asserts that it does, beside the assertion that the
+rail no longer draws it.
+
+### Named limitation
+
+An unfinished shift at a **paused** playhead is still live, correctly. What has no answer here is a
+reader who scrubs backwards after the run ends: the card returns to `'now'` the moment the playhead
+leaves `endedAt`, which is right — they are inspecting an instant — but there is no affordance
+saying *"this is the shift you already finished"*. Stated rather than solved.
+
+---
+
+## D240 — Casual removed the plain-language panel and kept the jargon, and parity could not see it
+
+### What was measured
+
+Issue #71 diffed every rendered text node between the two modes on a completed Chancery House shift
+and found Casual removes **four** strings and adds **two**, identically on the Simulation and Day
+report tabs — all six of them the honesty card. `AWT · WT95`, the seed, the peak-5min window, the
+kilojoule tiles and the 900 s abandonment horizon all stay. Casual is, in the reporter's words,
+*less* informative than Engineer for the audience it names.
+
+Driven here, the finding splits in two, and the second half is the larger.
+
+**One: the disclosure layer's Basic side barely was one.** `itemForFigure` ended
+`basic: BASIC_HIDES.has(figure.id) ? null : advanced` — every figure Basic kept, it kept **verbatim**.
+On a real run: twelve items, two hidden, three differing, **seven byte-identical**, and the seven
+carried the vocabulary the mode exists to remove — *95th-percentile wait*, *door to door*, *rides
+over 60 s*, *the unluckiest rider*, `n = 44 rides`.
+
+**Two: on the Simulation and Day report tabs, nothing mounts those renderings at all.**
+`dev/main.ts`'s only consumer of `disclosureItems` is `drawParity()`, which computes
+`parityRefusal(items)`, writes it to a header element, and then writes `void itemsIn;` — a
+deliberate no-op keeping the import used. So the layer's per-mode work is computed on every
+recording and thrown away. Everything issue #71 lists is drawn by mode-blind code: `AWT · WT95` by
+`dev/main.ts`'s transport status line, the provenance block by `dev/rightRail.ts`, the kilojoule
+tiles by `dev/reportPanel.ts`, the horizon and demand prose by `render/mood.ts`. The mode reaches
+exactly three mounted places — the left rail's honesty card, the settings menu's energy row, and the
+campaign panel's fail states.
+
+That is the standing requirement's own shape (*name the non-test caller*), one level in: the layer
+**has** a non-test caller, and the caller uses it for a check and discards its output. A barrel
+re-export and a `{@link}` tag look exactly like a caller and are not one; so does a call whose
+return value is dropped.
+
+### Why `mode/parity.ts` never said so
+
+Because it structurally cannot. All three of its rules — `hidden-in-basic`, `dropped-text`,
+`de-escalated` — fire when Basic **drops** something Advanced showed. Not one fires when Basic shows
+exactly what Advanced showed. Driven, not reasoned: `mode/disclosure.test.ts` now builds a Basic
+that is a byte-for-byte copy of Advanced and watches `parityViolations` return `[]` and
+`parityRefusal` return `undefined`.
+
+That is the right shape for what parity is for. § 4's clause is *"Basic mode may hide complexity. It
+may never hide a failure"*, and refusing a Basic mode for being **too informative** would be
+refusing the safe direction. It is also, precisely, why the divergence claim needed a home somewhere
+else — and why *"parity.ts exists to prove the two modes differ"* was never what parity.ts proved.
+
+### The decision
+
+**The plain-language layer goes in `mode/disclosure.ts`, where `docs/12` § 2.2 already said it
+lived** — *"`mode/disclosure.ts` already holds the vocabulary that has to move"*. Six figures gain a
+Casual lead sentence; the count changes notation, `n = 44 rides` → `over 44 rides`; nothing else
+moves. Three rules the entries obey:
+
+1. **Never restate a figure.** `Rendering.value` is carried through untouched, the reporting window
+   excepted because § 4 itself replaces that one. A plain retelling of `13.1 s` would be a second
+   copy of a figure, which is a second figure.
+2. **Never simplify a statistical claim into a false one.** *"An interval containing zero means this
+   run cannot tell them apart"* is plain English; *"A is better"* is a different claim. Nothing in
+   the table compares two things at all, and a test sweeps every rendering in both modes for
+   ordering language on both a refused and a quotable run.
+3. **Lead, never replace.** The source sentence follows verbatim and is asserted to — the same rule
+   `SUPPRESSION_LEAD` obeys about a refusal, for the same reason.
+
+The divergence assertion lives in `mode/disclosure.test.ts` and is stated over **every** figure Basic
+keeps rather than over a list of ids, because a list would let a thirteenth figure through
+untranslated in silence — § D152's defect one surface over. `BASIC_HIDES` stays at two members:
+§ 7.2's *"technical only"* column. A third would be Casual hiding a wait figure, and
+`render/runSummary.ts` says why that is worse than showing it — *"a reader who has energy on and the
+waits hidden would be looking at a ranking that puts the worst dispatcher first"*.
+
+### Two rules examined and kept
+
+The brief said the disclosure rule is open to revision. Two were tested against it and neither moved:
+
+- **Should Casual hide WT95?** No. R11's note is explicit that there is no flag which hides AWT or
+  WT95, and the reason is measured: `nearest-car` is on the Pareto front at six of eight matrix
+  cells *because it carries fewer people*. A default mode that shows energy and hides the waits
+  ranks the weakest dispatcher first. Casual gets WT95 with a sentence saying what it is.
+- **Should Casual's rows get their own captions?** It is the right design and it is not shippable
+  from this lane. `honesty/surfaces.ts` seeds `item.label` — one label, both modes — so a
+  per-rendering label would be a new player-facing string the honesty search does not sweep, which
+  is the § D186 hole reopened. Recorded as a gap with its named fix rather than shipped with one.
+
+### What is still open, and it is the majority of the issue
+
+Everything in the second finding. The renderings are better and **nothing draws them**, so a player
+switching to Casual today still sees the four-strings-removed diff the issue measured, plus the
+honesty card's new refusal from § D239. Closing #71 on screen needs, in files this lane does not
+own:
+
+- `dev/main.ts` — mount `itemsIn(items, mode)` instead of dropping it, and route the transport
+  status line's `AWT · WT95` through the same items;
+- `dev/reportPanel.ts` — the Day report's figure tiles and the kJ pair;
+- `dev/rightRail.ts` — the provenance and replay block;
+- `render/mood.ts` — the driver sentences naming the 900 s horizon and the per-5-min demand;
+- `honesty/surfaces.ts` — a `Rendering.label` seed, if Casual is to rename a row rather than only
+  explain it.
+
+Issue #22 (a glossary across Compare, Lab and Parameters) is **not** closed by this and should not
+be folded into it. Its vocabulary — *paired difference*, *Student-t*, *degrees of freedom*,
+*saturated run*, *dead gate*, *authorable* — is produced in `src/batch/`, `src/campaign/`,
+`dev/parameterForm.ts` and `dev/menuPanel.ts`, four lanes wide and none of them here. What this
+change contributes to it is the pattern: a lead sentence that explains the term, carried beside the
+run's own words, never replacing them, and asserted never to become a ranking.
+---
+
+## D241 — sign-in is an emailed link, and the password path is deleted rather than disabled
+
+**Date: 2026-08-05 · Written with the code, and says so.** The product owner chose email
+magic-link over passwords for the leaderboard's accounts. This records what that replaced, the
+security properties it has to hold, and the two things it let us **delete** — because the deletions
+are the part a reader would otherwise assume were oversights.
+
+### 1. What was there, and why almost none of it was thrown away
+
+`accounts/credentials.ts` already had the primitive. `signConfirmation`/`verifyConfirmation` were
+signed, expiring tokens with the email **inside the HMAC**, so a token could not be replayed against
+a different address; `newSessionToken` and `constantTimeEquals` were beside them. A magic link is
+that construction pointed at *login* instead of at *confirmation*, so this change is mostly rewiring
+and deleting. What is genuinely new is one field and one table.
+
+The field is a `jti`. The table is `login_tokens`.
+
+### 2. Single use is server-side state, because a signature cannot express it
+
+This is the one claim that is easy to get wrong by reasoning about cryptography instead of about
+time. **Nothing about an HMAC changes when a token is used.** A signature that verifies now verifies
+an hour from now, and will verify for whoever else has the mail — a forwarded message, a synced
+phone, a shared inbox, a backup.
+
+So `signLoginToken` puts a random `jti` inside the signed payload, the request that issues it writes
+that `jti` into `login_tokens`, and redemption is **one `DELETE` whose `rowCount` is the answer**.
+One statement rather than a `SELECT` then a `DELETE`, because two is a check-then-act and the race
+on this surface is two concurrent redemptions both finding the row and both being handed a session.
+
+`credentials.test.ts` states the negative result out loud — *"verifies a spent token exactly as
+happily as an unspent one"* — rather than leaving it as an absence. A module that only tested the
+things it does get right would have left the reader to infer which half of the guarantee it owns.
+
+### 3. Fifteen minutes, and the reason it is not twenty-four hours
+
+`CONFIRMATION_TTL_MS` was a day. That was right for what it did and would be badly wrong here, and
+the difference is what the token *grants*. A confirmation link grants **one bit** — this address is
+real. A sign-in link grants **a session**, so its blast radius is the whole account, and every extra
+minute is a minute an account key sits in a mailbox.
+
+Fifteen rather than five, on two measured facts rather than a feeling. The container runs at
+`minReplicas: 0`, and a cold `GET /api/challenges` against the live app took **28.7 s**; a player who
+opens the mail after the app has scaled back down pays that again on redemption. Mail delivery is
+seconds until a receiving server greylists, which is common and retried on a timer nobody here
+controls. Five minutes would refuse honest players on a slow path. An hour would buy them nothing
+they would notice.
+
+### 4. Prefetch safety, twice over, because one of the two depends on somebody else behaving
+
+Mail clients prefetch. Scanners, corporate link-rewriting appliances and "safe links" services fetch
+every URL in a message before a human sees it. A `GET` that consumed a token would therefore fail
+for exactly the people whose employer is careful about links — a failure that is invisible in
+testing and unfixable by the person hitting it.
+
+Two independent mechanisms:
+
+1. **The mailed link points at the viewer, not at the API, with the token in the URL fragment.** A
+   fragment is never transmitted, so *fetching* the link cannot carry the token anywhere, let alone
+   spend it. It also keeps the token out of access logs, ingress traces and `Referer`.
+2. **`POST /api/auth/redeem` is a POST with a JSON body.** Nothing that follows links issues one.
+
+`GET /api/auth/redeem` answers **405** with a sentence saying it consumed nothing, rather than
+falling through to the generic 404. That is not politeness: it is the statement that stops the next
+person adding a `GET` alias "for convenience".
+
+### 5. Two deletions that are load-bearing, not tidying
+
+**`postingGate` and `confirmed` are gone.** § D214 § 5 let an unconfirmed account log in and play and
+gated exactly one privilege — posting a score. That gate existed because **a password issues a
+session to somebody who has not proved they can read the address**. A magic link cannot: the session
+in the caller's hand was minted by redeeming a token that was mailed there. Every signed-in account
+has proved it, so the flag would have been true for everyone who could ever observe it and the check
+would have been an authorization gate that cannot fire — which this repository has shipped enough
+times to have a standing rule about. `api.test.ts` asserts the replacement property directly: no
+route issues a session without a mailed token, and `/api/register`, `/api/login` and `/api/confirm`
+all 404.
+
+**The password path is deleted, not deprecated.** `passwordIssues`, `hashPassword`,
+`passwordMatches`, `PasswordHash` and `SCRYPT_PARAMS` are removed, along with `users.salt_hex` and
+`users.hash_hex`. `deadCode.test.ts` would have caught them as uncalled exports and an allowlist
+entry would have been the wrong answer: an unreachable-but-exported login is this repository's worst
+case for its own most-repeated defect.
+
+### 6. There is no migration, and here is what one would have had to do
+
+The claim that no accounts exist was checked rather than assumed: the deployed server has never held
+one, because the shipped viewer could not find its own API (§ D243), so the password form it drew was
+never able to create anything. The schema is applied by `CREATE TABLE IF NOT EXISTS` against an empty
+database.
+
+That is a claim about a specific database and it will stop being true, so `store.ts` writes down what
+a migration would need instead of assuming it away: `salt_hex` and `hash_hex` are `NOT NULL` with no
+default, so an existing `users` table would refuse every insert this code now writes, and the
+migration is `ALTER TABLE users DROP COLUMN salt_hex, DROP COLUMN hash_hex, DROP COLUMN confirmed,
+ADD COLUMN display_name_chosen BOOLEAN NOT NULL DEFAULT TRUE` — `TRUE` for existing rows, because a
+name a person typed at registration is a chosen one. It does **not** go in `Store.open`; that
+module's own rule is that when there is something to migrate, the honest thing is a versioned
+migration table.
+
+### 7. The display name, and the oracle that forced it to be a second request
+
+Registration used to take an address and a name together. A link request cannot, because asking for
+a name **only when the address is new** tells the person filling in the form whether the address is
+new — the account-enumeration oracle the uniform response exists to close, rebuilt in the UI.
+
+So an account is created with `player-<12 hex>` and `display_name_chosen = false`, and
+`POST /api/me/display-name` renames it over a session that already proves the address. The flag is on
+the wire so the viewer prompts exactly once; without it the client would have to recognise a
+generated name by its shape, which is a second place deciding what one looks like.
+
+A taken **name** is reported as taken and a taken **address** is not, and the asymmetry is the same
+one § D214 § 5 drew: a display name is printed on every board, so it is already public.
+
+---
+
+## D242 — the link endpoint is an email-bombing gadget unless it is rate-limited
+
+**Date: 2026-08-05 · Written with the code.** `POST /api/auth/request-link` is unauthenticated, takes
+an address from anybody, and **sends mail to it**. Unlimited, that is not a login form. It is a way
+to make this server deliver mail to a stranger who has never used the product, as fast as it will go
+— and the way an Azure Communication Services quota is spent in an afternoon by somebody who thought
+they were testing.
+
+### 1. Two budgets, because neither stops the other's attack
+
+- **Per address**, three per fifteen minutes. This is the one that decides whether the endpoint can
+  be pointed at a third party. It holds however many machines the sender has.
+- **Per caller**, thirty per fifteen minutes. The per-address budget does not touch this attack at
+  all: a hundred addresses asked for twice each is a hundred people mailed and no address's budget
+  exceeded.
+
+The window is deliberately `LOGIN_TTL_MS`, so the per-address rule reads as a fact rather than as a
+tuned number: an address may have three *unexpired* links outstanding.
+
+### 2. The caller's key cannot be chosen by the caller
+
+`x-forwarded-for` is a request header. Believing it unconditionally does not weaken a per-caller
+budget, it **removes** it, because a sender who varies the header gets a fresh budget per request
+while looking like a hundred people. So `ServeOptions.trustProxy` defaults to **false** and only an
+operator setting `ELEVATOR_SIM_TRUST_PROXY=true` makes the header readable — and then only its
+left-most entry, the address the first trusted hop saw. An unattributable caller shares one bucket
+rather than escaping the budget.
+
+### 3. The order of the gates, and the memory bound
+
+Shape, then both budgets, then the account, then the mail. The budgets are charged **before the
+account is created**, because a limiter that ran after the write would still let unlimited rows and
+unlimited sends through, which is the entire thing it exists to stop. The shape check is first
+because it has no side effect, so a typo costs nobody a mail.
+
+The limiter is keyed by attacker-chosen strings, so it is itself a memory target. Expired windows are
+swept at `MAX_TRACKED_KEYS`, and a limiter still full of live windows after a sweep **refuses** rather
+than growing — choosing a recoverable availability failure over an unrecoverable heap one, and saying
+so where the choice is made.
+
+### 4. What is not claimed
+
+Fixed windows, not sliding. A determined sender gets `2 × maxRequests` across a boundary — six mails
+rather than three — which changes nothing about whether the endpoint is a weapon, and a sliding
+window costs a timestamp list per key on a surface whose whole problem is attacker-chosen keys.
+
+The refusal names a duration and does **not** name which budget was spent, because saying *"this
+address has had too many"* would be the enumeration oracle by a longer route.
+
+---
+
+## D243 — the viewer could not find an API that was answering on its own origin
+
+**Date: 2026-08-05 · Written after the measurement, and the measurement is the point.** Two facts
+about the live deployment, checked rather than reasoned about:
+
+- `GET https://elevsim-app.…azurecontainerapps.io/api/challenges` answers **200**, with real
+  challenge JSON out of Azure PostgreSQL. **The server is deployed and working.**
+- The `index.html` it serves from that same origin contains **no `<meta name="elevator-sim-api">`
+  tag.**
+
+`viz/src/dev/main.ts` builds its API client from that tag and has **no default origin** — § D215 § 4,
+deliberately, because a client falling back to the page's own origin would work in development and
+fail in a build served from a CDN. With no tag the client is `undefined`, so every account,
+leaderboard and challenge screen dead-ends against an API that is running underneath it. That is the
+root cause behind play-tester issues **#21, #28, #29, #30, #32 and #34**, and it would have made
+§ D241's magic-link routes unreachable however carefully they were built.
+
+### 1. The fix belongs to the server, because the fact belongs to the server
+
+A bundle does not know whether an API is beside it. **This process does** — it is serving both. So
+`loadStaticBundle` injects the tag into `index.html` as it reads it, and a bundle served from a CDN
+with no server never passes through that function, never gets a tag, and keeps exactly today's
+behaviour. § D215 § 4's property is preserved rather than traded away.
+
+Hard-coding the origin into `packages/viz/index.html` was rejected for the reason § D215 § 4 gives
+and one more: it would point a local development build at production.
+
+### 2. The value is `"/"`, and it is relative on purpose
+
+The client builds `` `${origin.replace(/\/$/, '')}/api/…` ``, so `"/"` becomes the empty string and
+requests become `/api/challenges` — absolute-path, same-origin, resolved by the browser against
+whatever host actually served the page.
+
+An absolute origin would have to be **kept** correct and has two failure modes this has none of. It
+goes stale the moment a custom domain is put in front — `infra/azure/main.bicep` emits an output
+specifically warning about that — and any mismatch at all, down to `http` versus `https`, turns a
+same-origin call into a cross-origin one that `ELEVATOR_SIM_ALLOW_ORIGIN`'s deliberately restrictive
+default then refuses.
+
+Deriving it per request from the `Host` header would also be configuration-free, and is **rejected**:
+a request with a forged `Host` would produce a page pointing its API at somebody else's server, and a
+shared cache in front turns that from self-inflicted into an attack.
+
+### 3. What the injection is not allowed to move
+
+Only `/index.html`, only at the root, and every other byte of the build is passed through untouched —
+a rewrite reaching a hashed asset would change content whose *name* promises it never changes.
+Caching is unchanged: `index.html` was already `no-cache` because it keeps its name across deploys,
+and a per-deploy rewrite makes that more important rather than less. The injection is idempotent: a
+bundle that already declares a tag keeps its own, because two tags would leave `querySelector`
+picking whichever came first.
+
+### 4. One thing this does not fix, named rather than left to be discovered
+
+The Container App is `minReplicas: 0`, and the `/api/challenges` call above took **28.7 seconds** —
+a full cold start. That is infrastructure and out of this lane, but it shapes what the client must
+do: a sign-in request may hang for around half a minute, and the emailed link may land on an app that
+has scaled back to zero. § D241's fifteen-minute TTL is sized with that in it, and a client that
+assumes a fast response will look broken on the first request after an idle period.
+## D235 — the ink ladder had five rungs and a dark theme has room for four
+
+**Date: 2026-08-05 · Written after the code, and says so.** Three play-tester issues against the
+viewer's colour — #75 (dark), #76 (light) and #26 (the Scenarios menu). Every ratio below was
+recomputed from the shipped token values rather than taken from the reports, and two reported
+figures did not survive that; they are named at the end.
+
+### What reproduced
+
+`--faint`, the handoff's `#4d5a6b`, measured against the five surfaces it is drawn on:
+
+| ground | `--bg` | `--rail` | `--panel` | `--card` | `--raised` |
+|---|---|---|---|---|---|
+| `#4d5a6b` | **2.75** | **2.65** | **2.60** | **2.51** | **2.31** |
+
+WCAG 2.2 AA (1.4.3) asks **4.5:1** for text below 18.66 px bold / 24 px. `--faint` is the ink of
+**sixteen** text rules in `index.html` — the Compare/Lab/Parameters tab labels, the timeline's
+o'clock ticks, `.decision-time`, `.legend-title`, `.eyebrow-note`, `.slider-sub`,
+`.selector-arm-signature`, `.elevation-head`, `.zmatrix th`, `.zcell-free`, `.transport-caption`
+and five inline rules — every one of them between 9 px and 11.5 px. AA Large's 3:1 is available to
+none of them.
+
+A walk of every rendered text node at 1280 × 720 on a live run counted **32** elements in
+`rgb(77, 90, 107)` at 2.60–2.75:1, and **48** more in `--dimmer` `#6d7b8d` at **4.24–4.48:1** —
+which no report mentioned and which also fails, by a hair, at the 10–11 px those elements are set
+in. `--dimmer` on `--raised`, the ground under a selected `.pick`, is **3.77:1**.
+
+### Why the token moved rather than the sixteen rules
+
+`render/tokens.ts` justified `--faint`'s value with a distinction — *"the label gutter is scenery
+and an eyebrow is content, and the artefact draws them two different greys"* — and
+`render/theme.test.ts` used the same sentence to **exempt** `--faint` from its contrast floor, in
+the `SCENERY` group beside the hairlines. The distinction is real and the claim under it was false
+of this implementation twice over: `--faint` is content in sixteen stylesheet rules, and the
+gutter it names on the canvas is the floor id, which is the only mark that says which floor a car
+is standing at. **A token exempted from a floor on a description of itself that had stopped being
+true** is the same defect class this repository closes as a dead seam, wearing a palette's hat.
+
+So the exemption is withdrawn — `--faint` is in `CONTENT_ON_PANEL` now — and the value was raised
+to survive being there.
+
+### The ladder, and why three rungs moved for one issue
+
+Raising `--faint` past 4.5:1 puts it above where `--dimmer` was standing, so the rung above it had
+to move too, and the rung above that to keep a visible step. The result is a **four-rung** ladder
+where there were five, and that is the finding rather than a side effect: **a dark surface set
+running `#0b0e14` to `#16212f` does not hold five legible ink steps.** Below `--faint`'s new value
+there is no colour that clears 4.5:1 on `--raised`.
+
+| token | was | now | worst of the five dark surfaces |
+|---|---|---|---|
+| `--text` | `#e8edf4` | *unchanged* | 13.81 |
+| `--dim` | `#8b98a9` | `#9aa7b8` | 5.54 → **6.65** |
+| `--dimmer` | `#6d7b8d` | `#8b98a9` | 3.77 → **5.54** |
+| `--faint` | `#4d5a6b` | `#7c899a` | 2.31 → **4.57** |
+
+The light mode takes the same treatment against **`--bg`**, which is the darkest light surface and
+therefore the worst ground for dark ink — the mirror of `--raised` being the worst in dark:
+`--dim` `#4a5666` → `#424e5d` (6.24 → 7.08), `--dimmer` `#64707f` → `#515d6c` (4.22 → **5.61**),
+`--faint` `#7e8998` → `#5d6978` (2.97 → **4.67**). `oosOffText` follows `textDim`, because
+`OOS_OFF_TEXT = TEXT_DIM` in dark and `render/theme.test.ts` holds the two modes to the same
+collision set.
+
+`--fainter` did **not** move, and its exemption is now checkable rather than argued: **nothing
+draws it.** No rule in `index.html` names it and no function in `render/` reads `Theme.fainter`. A
+colour that carries no word has no legibility to fail. (It is, on that same evidence, a small dead
+seam — declared in five files and drawn by none. Recorded, not closed.)
+
+### `.tab-secondary` — a tier, not a contrast bug
+
+`--faint` clearing AA does not answer #75's second half, which is the sharper observation:
+*Compare*, *Lab* and *Parameters* were the only tabs styled a rung quieter than their neighbours,
+and **a reader's first reading of "quieter than the tab beside it" is disabled, not available.**
+Three of this product's ten surfaces looked switched off on first load. They carry `--dimmer` now,
+the same ink as every other unselected tab, and say they are a second group by being 11.5 px in
+`.tabs-right` rather than by being harder to read. Size and position are the second signal
+(KB-15); lower contrast is not one.
+
+### What was measured and deliberately not moved
+
+The **band palette and the status hues** stay at § 1.1 S7's values. Measured against `--panel`:
+`--band-3` **4.47:1**, `--over` 4.84, `--accent` 6.44, and in light against `--bg`, `--accent`
+4.26 and `--measured` 4.37. `--band-3` misses AA by 0.03 at `.decision-title`'s 11.5 px. It is not
+moved because the four bands are the one palette three surfaces must agree about — the rail's mood
+bar, the canvas's rider glyphs and the legend between them — the handoff is canonical for them,
+and **none of them is ever the only signal**: `render/riderQueue.ts` gives each band a distinct
+glyph and `decision-title` reads `no car for Level 12` in words. Stated here with the number so
+that finding it again counts as confirmation rather than discovery.
+
+### The two figures that did not reproduce
+
+- **#76's status-colour rows.** The report has `.stat-value`, `.goal-got`, `.decision-title` and
+  the mood chips rendering `rgb(63, 178, 127)` and `rgb(224, 176, 64)` — the *dark* bands — on
+  light surfaces at 1.77–2.48:1. The stylesheet's light block answers those correctly
+  (`--band-0: #1c7a55` is 4.94:1 on `--panel`), so the failure is not the token switch. It is that
+  `src/live/bands.ts` and `src/live/decisions.ts` hold **their own hex copies** of the dark band
+  palette, which `dev/leftRail.ts` writes into inline `style="color:…"` — and an inline style is
+  not reached by a `:root[data-theme]` block. Same symptom, different cause, and a fourth copy of
+  a palette. Not fixed here: those files are outside this lane's ownership. `src/live/timeline.ts`
+  has a fifth copy (`{ bg: '#161e2a', fg: '#6d7b8d' }` per phase) with the same problem.
+- **#26's ratio is exact.** `.menu-row-detail` is `var(--dim)` and `.menu-start` is `var(--accent)`
+  — `#8b98a9` on `#4f9ee8` is **1.03:1**, reproduced to two decimals. In light it is `#4a5666` on
+  `#1c6fc4`, **1.46:1**, which the report did not cover and which is the same defect. Both are
+  fixed by giving the primary variant `--accent-ink`, which is the token that exists for *text on
+  an accent fill and inverts with it rather than with the page*: **6.58:1** dark, **4.77:1** light.
+  `.menu-start`'s own `color: #06121f` literal — a sixth grey nothing declares — goes at the same
+  time.
+
+### What is asserted, so this cannot rot
+
+`render/theme.test.ts` gains two tests beside the existing `FLOOR` bound, which stays where it is:
+
+1. **The ladder against the standard.** The four greys are held to 4.5:1 against **all five**
+   surfaces in **both** modes. The existing bound measures one surface, and the incumbent failure
+   was worse on `--raised` (2.31) than on the `--panel` (2.60) that bound looks at — so a
+   one-surface check would have understated it. Iterating rather than naming a worst surface is
+   deliberate: which surface is worst inverts between the modes.
+2. **The ladder is still a ladder.** Four distinct values, strictly ordered against a fixed ground,
+   each a step of at least 5 % from the rung above. A floor alone would accept four greys that all
+   cleared 4.5:1 and were indistinguishable, which would satisfy #75 by deleting § 1.1 S8's
+   hierarchy.
+
+One existing assertion was **rewritten rather than relaxed**. `canvas.test.ts`'s sky test carried a
+negative control reading `toBeLessThan(6)` over the count of bright hex fills on the dark stage;
+three ink tokens crossing `0x80` turned it red with nothing about the sky changed. A bound that
+moves when an unrelated token moves is measuring the wrong thing, so it now asserts the claim it
+was standing in for: every bright fill on the dark stage is a value the theme itself **declares**,
+and therefore none of them is a sky strip — sky strips are `mixHex` interpolations equal to no
+named token. That is strictly stronger: it fails on one dark sky strip, where the count accepted
+five.
+
+## D236 — a header that clipped, a control that was not there, and a building drawn one shaft at a time
+
+**Date: 2026-08-05 · Written after the code, and says so.** Four play-tester issues about layout —
+#72, #73, #74 and #41 — plus #63, which is a legibility issue about the same surface. Every
+dimension below was measured, on the deployed build for the *before* and on a local `vite` at
+375 / 768 / 1100 / 1180 / 1920 for the *after*. Two reported figures did not survive; they are named
+at the end.
+
+### 1 — The header deleted 141 px of itself, and called it responsive
+
+`header.topbar` is a `display: flex` row with `overflow: hidden` and no `flex-wrap`. At 375 × 812,
+on the deployed build:
+
+```
+header.topbar   scrollWidth 516   clientWidth 375   overflow-x hidden
+document.documentElement.scrollWidth === 375
+```
+
+Past the right edge: `SPAN.clock` (`right=409`), `DIV.topbar-day-name` and `DIV.topbar-day-sub`
+(`right=516`). **`overflow: hidden` on a nowrap flex row does not hide a header, it deletes one** —
+there is no gesture, scroll or tap that reaches a clipped flex item, and the page itself does not
+scroll horizontally. A phone player had no clock, no day and no tenant count.
+
+`flex-wrap: wrap` on `.topbar` and on `.topbar-right` is the whole fix, plus a 767 px block giving
+the three groups a row each. Measured after: **`scrollWidth === clientWidth === 375`, zero
+descendants past the edge**, header 134 px at 375 (three rows), 86 px at 768, 51 px — unchanged —
+at 1100 and above. The clip is kept as a last resort for a single item too wide for a whole line,
+which no shipped string is.
+
+### 2 — `display: none` is not a step-aside — issue #72, and the one to read first
+
+§ S5 says *"below 1180 px the header's secondary text steps aside"*, and `[data-hide-narrow]`
+implements it as `display: none !important`. Four elements carried it. For the **mode select** that
+was not a step-aside but a **functional lockout**:
+
+```
+width   computed display of the <label> wrapping the view <select>
+ 375    none        1024    none
+ 768    none        1100    none        1200    block
+```
+
+`display: none` gives an element a zero-size box, so the `<select>` left the **tab order** as well
+as the screen — and **no other surface in the product changes Casual/Engineer.** Not the main menu,
+not the Settings screen (Reduce motion / energy axis / playback speed / theme), not a link a reader
+can reach from inside the app. Below ~1180 px a reader was locked into whatever `localStorage` last
+held. Two of the four lost the attribute:
+
+- the **mode select and its label** — both, because hiding the label alone takes the control's
+  accessible name and leaves a nameless combobox;
+- the **phase pill**. § S5's sentence steps *secondary text* aside and `FILLING`/`PEAK`/`EASING`/
+  `DRAIN` is not secondary — it is the only statement on the screen of what the building is doing
+  at the playhead, and it is six characters in a pill.
+
+The **spec line** keeps it — it is genuinely the name's subordinate — and so does `#banner`, which
+is reported rather than repaired: `ELEMENT_IDS.header.banner` resolves an element **no module in
+the tree ever writes to**, so it is an empty span either way. That is a `dev/` matter.
+
+Measured after, at 1100 × 800: the select is 201 px wide, `document.activeElement === select` after
+`.focus()`, the phase pill is 49 px and visible, the spec line is correctly gone, and no descendant
+of the header is past the right edge.
+
+**This is a deviation from the artefact**, which marks the phase pill `data-hide-narrow="1"`
+(`design.html` `:43`). Recorded here and in `docs/12` § 4.9. The handoff wins every disagreement
+about what the screen looks like; it does not get to decide that a control is unreachable, because
+its prototype has no second audience to switch between.
+
+### 3 — Two `Math.max(1, …)` guards drew one shaft of six on every phone — issue #73
+
+`dev/main.ts` asks the layout for `gutterRightPx: 280` at **every** canvas width, and adds a 250 px
+metrics panel above 900. `drawStage` floors the canvas at 360 px, which is what a 375 px phone gets:
+
+```
+plot.width = 360 - 24 padding - 72 left gutter - 280 right gutter = -16   -> Math.max(1, ...) -> 1
+capacity   = Math.max(1, floor((1 + 10) / (18 + 10)))                     -> 1
+```
+
+So the stage drew **exactly one shaft of every building on every phone** — one of Garden
+Apartments' two, one of Chancery House's six, one of Vertical City's thirty-five — with three
+quarters of the canvas blank beside it. Both guards are locally correct; between them a caller's
+over-request became a picture that was wrong without being empty. The reporter's *"only shaft A is
+drawn… the missing cars are a rendering decision, not an overflow"* is exactly right.
+
+The clamp belongs in `buildLayout`, on the argument that file already makes about `headerPx`: *"a
+caller asking for a header too short to hold its own rows is asking for the overprint this band
+exists to prevent"*. A caller asking for gutters wider than the canvas is asking for a plot with
+nothing in it, and the layout is the one place that can see both numbers. `MIN_PLOT_SHARE` is 45 %,
+and the overlay yields first, then the right gutter, then the left, each to its own floor rather
+than to zero.
+
+Measured, at the canvas widths the shipped shell produces:
+
+| viewport | canvas | shafts drawn, before → after (2 · 6 · 35 cars) |
+|---|---|---|
+| 375 | 360 | 1 · 1 · 1 → **2 · 6 · 7** |
+| 768 | 740 | 2 · 6 · 13 → 2 · 6 · **16** |
+| 1280 | 606 | 2 · 6 · 8 → 2 · 6 · **12** |
+| 1440 | 766 | 2 · 6 · 14 → 2 · 6 · **17** |
+| 1920 | 1232 | 2 · 6 · 22 → 2 · 6 · **27** |
+| 2560 | 1872 | 2 · 6 · 35 → unchanged |
+
+At 1232 px the shipped request already leaves the plot 49 % of the canvas, so the clamp is **inert
+at desktop widths** and `plot.x` and `plot.width` are unchanged there — asserted, not assumed.
+
+The second lever is the **gap**, not the shaft: at `MIN_SHAFT_WIDTH_PX` the 10 px gap is 36 % of the
+pitch, so a third of the plot is air at exactly the moment there is not enough of it. A bank that
+does not fit at 10 px falls back to 4 px; a bank that fits keeps 10. No shaft is ever narrower than
+the legible minimum, which is asserted rather than described — this buys shafts out of the gaps and
+never out of legibility.
+
+### 4 — The notice that explains a squeezed picture inherited the squeeze
+
+`drawNotices` budgeted the notices row by `layout.plot.width`. With a one-pixel plot, `fitLabel`
+returned **`…`** — the app showed one lift of six and the only thing saying so was three dots. That
+row sits *above* `plot.y` and `layout.overlay` starts *at* `plot.y`, so nothing else is drawn on
+that line; it is budgeted by the canvas now (`Layout.paddingPx` is carried for it, for the reason
+`pitchPx` is carried).
+
+### 5 — *"widen the window"* was advice the reader could not take — issue #41
+
+Vertical City is the campaign's finale, sold on scale, and on a maximised 1080p monitor the stage
+cropped it and told the player to widen a window with nowhere left to go. Meanwhile the `bank`
+select sits six inches below the stage and gives a clean, legible view of one bank in one click,
+and the caption never mentioned it. `RS-05` permits horizontal scroll **or** a bank filter; the
+filter is what this product has.
+
+The caption names it first, and it is the **longest form that fits** rather than one form truncated,
+because the budget takes the sentence's tail and the tail was the half a phone reader cannot act on:
+
+| canvas | drawn |
+|---|---|
+| 1232 | `showing 27 of 35 shafts — pick one bank below, or widen the window` |
+| 504 | `showing 10 of 35 shafts — pick a bank below` |
+| 360 | `7 of 35 shafts — pick a bank` |
+
+The two remaining levers on #41 are **`dev/main.ts`'s** and are reported rather than taken:
+`QUEUE_GUTTER_PX` (280) and `OVERLAY_WIDTH_PX` (250) are fixed regardless of width, and defaulting
+the bank filter to a single bank when a building overflows — the reporter's own preferred fix — is a
+`main.ts` decision.
+
+### 6 — The building had no key, and its `aria-label` had one — issue #63
+
+The stage draws five hues plus a dimmed variant, and **the only legend on the tab keys the rider
+wait bands**, which are a different strip. Nothing said that a car's body colour is its *load* in
+four steps (`render/overlay.ts#loadColour`: ≤ 0.25, > 0.25, ≥ 0.80 — the design-load rule — and
+≥ 1.10), that the arrow beside it is direction, or that the dimming is `outOfServiceCarIds` at
+`globalAlpha 0.32`. The reporter watched a run for several minutes and guessed the brightness meant
+idle-versus-committed; it does not. Meanwhile `describeFrame` narrated all of it in prose, so **a
+screen-reader user was told more about the building than a sighted one.**
+
+A twelve-entry key sits under the wait-band strip, in the handoff's own legend component. It is
+**static markup with no mount**, deliberately: the car states are a fixed vocabulary, and a mount
+would be a seam with nothing on the other end. What keeps it honest is `dev/shellChrome.test.ts`,
+which derives the four car fills from `render/tokens.ts` and the six glyphs from
+`render/canvas.ts#doorGlyph` and the two service constants, and requires each to appear — so a fifth
+door phase reddens the suite on the day it lands rather than the day somebody notices the key is a
+row short. It also refuses a hue the stage does not draw, which is the reporter's other half.
+
+Three tokens came into the shell for it — `--car-heavy`, `--waiting-up`, `--waiting-down` — from the
+same `Palette` the canvas reads. The other three car states already had a shell name (`--band-0`,
+`--accent`, `--band-3`). A key drawn in a colour the canvas does not use would be a fifth copy of
+the palette, which is the defect `render/tokens.ts` exists to close.
+
+**KB-15 throughout**, and one of the pairs was only half there before: the dimming is `globalAlpha`,
+which no swatch can show, so the entry says the word — `out of service, and dimmed` — beside the
+`OOS` badge the canvas already draws at the foot of every shaft. Driving the light theme found a
+fourth thing: `waitingUp` at `#0f7a72` is **4.34:1** on `--bg`, and the `▲` is text at 10.5 px. It
+is `#0d7069` now (4.96:1), and `theme.test.ts` measures the key's marks against **`--bg`**, the
+ground the key is actually drawn on, rather than against the `--panel` where the old value passed.
+
+### What did not reproduce
+
+- **#41's count.** The report has *"showing 13 of 35 shafts"* at 1920 × 1080 and *"the count does
+  not improve at all between 1440 and 1920"*. Measured from `buildLayout` at the canvas widths the
+  shell produces, the shipped figures were **22 of 35** at 1920 and **14 of 35** at 1440 — so the
+  count did improve, and 13 is the number of shafts *hidden* at 1920, not the number drawn. The
+  headline complaint stands and is worse than the report makes it sound at 1440.
+- **#72's default.** The report says the app *"defaults to Engineer"*, from
+  `localStorage["elevator-sim.viewMode"] = "advanced"` *"on a fresh install"*. On a fresh profile
+  that key is **absent** — `Object.keys(localStorage)` is `[]` — the markup's `selected` option is
+  `basic`, and `dev/state.ts`'s `initialState` is `mode: 'basic'`. Nothing writes the key except
+  the select's own `change` handler. The reporter had switched modes earlier in their session. The
+  lockout is real and its consequence is the opposite of the one reported: a reader who tries
+  Engineer once on a wide screen is stuck in it everywhere else.
+- **#74's phase badge.** It is unreachable at 375 px, but by `display: none` (§ 2 above) rather
+  than by the clip — it has a zero-size box, so it never appears in the list of elements past the
+  right edge. Same outcome, two different causes, and they needed two different fixes.
+
+### What is left, and whose it is
+
+Every remaining WCAG AA failure on the Simulation tab after this work and § D235 — **9 elements in
+dark, 28 in light**, against 88 and 48 before — is one of three things, and none of them is in this
+lane's files:
+
+1. `src/live/bands.ts` and `src/live/decisions.ts` hold **hex copies of the dark band palette**,
+   which `dev/leftRail.ts` writes into inline `style="color:…"`. An inline style is not reached by
+   `:root[data-theme]`, so `.stat-value`, `.goal-got`, `.decision-title`, the mood legend and the
+   mood drivers stay dark-band-coloured on a light page: 1.68–3.81:1. **This is the whole of the
+   28.**
+2. `src/live/timeline.ts` holds a sixth copy — `{ bg: '#161e2a', fg: '#6d7b8d' }` per phase — so the
+   timeline's segment labels are 3.15:1 in both modes.
+3. `--band-3` at 4.47:1 on `--panel`, which § D235 measured and deliberately did not move.
+## D231 — a free-play run may not write the week, and the sheet saying so was not enough
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-test issue #64, reproduced from the
+source and then pinned by a test that is red without the fix.
+
+### What was reported, and what was actually happening
+
+A player banks a clean shift on Scenario 1, presses **Free play** to try a silly dispatcher, and
+comes back to a week whose Day-1 history entry is the free-play run's. The reporter's own
+`localStorage` dump is the evidence: `history: [{ arrived: 355, carried: 355, minutePct: 100 }]`
+before, `history: [{ arrived: 523, carried: 523, minutePct: 93 }]` after. **It survives a reload.**
+The Day report sheet on screen at that moment reads *"one run, not part of a week — nothing is
+banked"*.
+
+The mechanism is two lines of `dev/main.ts`'s `closeShift`, forty lines apart:
+
+```ts
+const week = closeDay(state.week, outcome);        // unconditional
+…
+subject: state.playMode === 'free-play' ? { kind: 'single-run' } : { kind: 'week-day' },
+```
+
+So the **sheet's shape** branched on the mode and the **week's arithmetic** did not, and
+`saveSessionNow()` two lines below `closeDay` put the result on disk. This is the same defect as the
+comment already standing in that function — *"three panels, two answers"*, where the sheet said *your
+own building* while the rail counted the shift as banked. That fix corrected what the sheet **said**.
+This corrects what the run **does**, which is the layer the earlier fix stopped one short of.
+
+### The rule
+
+**A run writes `ViewerState.week` only if its play mode owns one.** `advancesTheWeek` is that
+predicate, in `dev/state.ts`, as an exhaustive `switch` over `PLAY_MODES` — so a ninth mode is a
+compile error rather than a silent `false`, or worse a silent `true`, which is the direction that
+loses somebody's week. `scope/types.ts` makes the same argument for the union itself.
+
+`shift-week` and `endless` advance; `free-play` does not. **Endless banking nothing and still
+advancing the week is not a contradiction**: `ENDLESS_CONTRACT_ID` is a sentinel that resolves to no
+contract, so `closeDay` already banks nothing and clears nothing there — what endless *has* is a
+week, with days and 11 %/day growth and a seven-day history, and *"the same week with no assignment:
+it grows"* is the menu row's own promise. A mode that stopped closing days would stop growing the
+building, which is the whole of what **Keep going** is for.
+
+### Why a guard on `closeDay` alone was not the fix
+
+Measured rather than assumed, by reading the other callers. `enterFreePlay` replaces `state.week`
+with a fresh day-one week **the moment Free Play starts** — deliberately, because that is what makes
+a free-play run reproducible from its own selection and postable to a leaderboard. So *any* later
+save would have written that scaffolding over the campaign's banked days, and `closeShift` is not
+`saveSessionNow`'s only caller: **changing a setting saves too.** A player who entered Free Play and
+flipped the theme lost the week without a single run finishing.
+
+So there are two functions and they are both necessary: `closedWeekOf` decides what a closed day
+produces, and `weekForSession` decides what the slot is written with — *whatever the slot already
+has*, when the mode does not own a week. The settings and the Free Play selection still persist,
+because those belong to the player rather than to the week.
+
+### The evidence
+
+`dev/state.progression.test.ts`, built on the issue's own numbers. The central assertion is an
+**identity** check — `expect(closedWeekOf(state, outcome)).toBe(week)` — rather than a deep compare,
+so a `WeekState` that grows an eighth counter cannot quietly start being rebuilt on a free-play
+close. It is watched failing: with the guard removed, *leaves the banked week untouched* and *keeps
+every field the issue watched* go red and the other seven stay green.
+
+## D232 — the game may not play itself, and a navigation is not a progression event
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #39, and the half
+[§ D223](DECISIONS.md) named as *"the next thing to do here"* and could not reach from its own lane.
+
+### Two mechanisms, one symptom
+
+The reporter opened the deployed app cold, read the menu, pressed nothing, and came back to
+`376 carried today`, all four goals ticked, `1 clean days running` and `1/3 banked this scenario`.
+
+1. **`boot()` ends `restoreSession(); applyTheme(); renderAll(); runShift();`**, and the shell opens
+   **on the menu overlay** over a viewer that is already loaded. So the run started under the
+   overlay, `adopt` autoplayed it, `tick` found `playback.state === 'ended'` — `state.tab` opens on
+   `'run'`, so the guard there did not stop it — and `closeShift` banked a clean day. The footer read
+   `running` on a page nobody had touched.
+2. **`openTab` was `if (tab === 'report') closeShift();`** at any playhead, so merely navigating to
+   the sheet filed the day, incremented `week.attempt`, and could clear a contract.
+
+### What was decided, and what was deliberately not
+
+**`playerHasChosen`, latched in `closeMenu`.** Three arms close the overlay — **Start**, **Open the
+doors**, **Keep going** — and each is a mode being entered, so latching in `closeMenu` makes the set
+complete by construction rather than by a list somebody maintains. Until it latches, `adopt` hands
+`autoplay: false` and `closeShift` returns early.
+
+**Boot still runs its shift, and that is a choice against the issue's own suggestion.** Deleting the
+boot run would empty the stage, and § D220's browser tier reads the *bitmap* — *draws the stage*,
+`distinctColours > 8` — as the only thing a caught boot failure cannot fake. A blank canvas would
+make that assertion unable to tell *no run yet* from *dead product*, which is the exact property the
+tier was built for. A deep link would also arrive at an empty page, and a deep link is somebody
+sending a finding to somebody else. So the run is made and drawn, paused at 06:00, and the footer
+says `paused` — which is what a cold load *is*, and is the issue's own "start state until the player
+chooses something".
+
+**The `openTab` guard is § D223's, verbatim: file only when the playhead has reached `endedAt`.** It
+asks `reportPanel.ts`'s exported `runProgressOf` rather than deriving a second answer, because that
+is the predicate deciding whether the sheet may be a whole-day account — two answers to it would let
+the tab bank a day the sheet on it is simultaneously declining to report, which is § D223's
+two-answers screen one layer down.
+
+The arm stays reachable and is not dead: a run that ended while the reader was on another surface
+never met `tick`'s `state.tab === 'run'`, and `Playback` advances off the injected clock rather than
+off the frame loop — so its playhead *is* at `endedAt` when the reader opens the sheet, and the day
+files then.
+
+### What this does not close
+
+A player who chooses **Campaign** lands on the scenarios tab with boot's recording still loaded, and
+if they then open the run tab and play it, it files. That is correct rather than residual: they have
+entered the campaign, the run on screen is that campaign's day 1 on `CONTRACTS[0]`'s building, and
+they watched it. Nothing files unwatched.
+
+## D233 — a finished run may open the sheet, and may not move the page out from under a reader
+
+**Date: 2026-08-05 · Written after the code.** Play-test issue #67.
+
+`closeShift` ended with `if (state.tab !== 'report') state = { ...state, tab: 'report' };`,
+unconditional. At ×60 a 30-minute shift ends about every thirty real seconds, and with the loop chip
+on it never stops — so on the Simulation tab the pane was yanked to the Day report on that cadence.
+Two reported consequences, and the second is the serious one: a click on the **Dispatcher** tab was
+overridden a moment later and had to be made twice, and a reader typing in the **Seed** field had the
+textbox unmounted mid-word with the characters going nowhere, no error, and nothing to undo.
+
+**The auto-open is kept.** It is the design's own behaviour — the day ending opens the sheet — and
+`docs/12`'s standing rule is that the handoff wins disagreements about what the screen does. What the
+handoff never described is a reader who is already somewhere else, so `reportOpensItself` refuses
+exactly the two cases the issue reports and nothing else: **the reader is not on the run**, and **the
+caret is inside an input, a textarea or a select**. A reader watching the run with their hands off
+the keyboard is taken to the report exactly as before.
+
+Being on the report tab already is deliberately **not** a refusal case. It is a no-op the caller
+skips anyway, and answering `true` there keeps the predicate a statement about the destination rather
+than about whether a write would be redundant.
+
+The DOM read is a three-`instanceof` helper beside the decision, which stays pure — the split every
+panel in `dev/` keeps, and the reason this file's other navigation decisions were testable and this
+one was not.
+
+## D234 — four things the product said about itself that were not true, and one it could not show
+
+**Date: 2026-08-05 · Written after the code.** Play-test issues #27, #36, #37 and #69. They arrived
+as four unrelated reports and are one entry because the same rule settles all four: **a surface may
+not make a claim the run underneath it does not keep** — and the fourth adds a corollary the others
+did not need: *a claim nothing on screen can resolve is not kept either.*
+
+### #27 — the tutorial was unwinnable on its own defaults, and said the wrong word about it
+
+**Measured before it was fixed, and the measurement is the reason the obvious repair was refused.**
+Garden Apartments, day 1, `collective`, the building's own demand, the shipped 1 800 s shift, twelve
+seeds:
+
+```
+arrivals: 8, 13, 14, 17, 17, 18, 18, 19, 20, 20, 26, 35     median 18
+```
+
+`WAKE_UP_ARRIVALS` is 20, so **seven of twelve fall below the line at which anything is graded**. At
+3 600 s the same twelve give `20, 24, 28, 32, 36, 38, 40, 42, 45, 48, 49, 51` — every one graded. The
+play-tester's report is exactly this: two days, 18/18 and 15/15 carried, 100 % away inside a minute,
+three em dashes and **"Shift missed. Streak reset."** on the scenario whose own brief says *nothing
+here is hard*.
+
+Two fixes, and the second matters more than the first.
+
+**The shift, not the threshold.** `ScenarioContract` gains an optional `shiftLengthS` and `c1` is the
+only contract that names one. Lowering `WAKE_UP_ARRIVALS` was the obvious alternative and is the
+wrong repair *in this project's own terms*: the bars are a carried **share** and a served-inside-a-
+minute **share**, and grading those over eight legs is the thin sample `awtIsValid` exists to refuse,
+one layer up. Moving `DEFAULT_SHIFT_LENGTH_S` was rejected too — 1 800 s is `rise-and-fall`'s own
+horizon and the horizon every published figure in `docs/05` was measured over. It **seeds** rather
+than pins: the select stays live, and the player may still shorten the day.
+
+**Ungraded is a third state, and it costs nothing.** `DayOutcome.allMet` collapsed *you were asked
+for 87 % and carried 61 %* and *the building never woke up* into one `false`. `goals.ts` already
+models the distinction — `pending` is its own state, because *"a `carryPct` of 100 % over three
+riders is arithmetic, not competence"* — and the week threw it away. Now: `week.ts`'s `wasGraded`
+leaves the streak untouched on an ungraded day, the sheet's verdict is a third value
+(**"Too quiet to grade"**), the streak line says *nothing was lost*, and the lede names the two
+numbers and the remedy. *Unjudged is not passed* is untouched; this is its other half — **unjudged
+is not failed either.**
+
+`wasGraded` is **derived from `DayOutcome.readings` rather than stored beside `allMet`**, and that is
+the decision rather than the implementation: `readings` is already persisted, so a session written by
+an older build answers correctly with no schema change, and no restored day can carry a flag that
+disagrees with the readings under it.
+
+### How #27's third verdict composes with § D237, resolved on the rebase
+
+§ D237 landed while this lane was open, and the two changes meet in one expression. It made the
+verdict, the banner line, the headline and the diagnosis heading reachable **only** through
+`VERDICT_VOICE`, a `Record` keyed by the verdict, so that no expression can produce a cleared
+headline without having decided the day cleared. This lane adds a third verdict.
+
+**The third verdict is a third key in that record, not a branch outside it.** An `if (!graded)`
+alongside the lookup would have reopened § D237's defect through a new door — an ungraded day able
+to reach a cleared or missed headline — and the whole value of the table is that a future edit
+cannot reintroduce the disagreement without deleting the key it would have to go through. Adding
+`ungraded` to `DayReport['verdict']` broke `VERDICT_VOICE` at compile time, which is the behaviour
+its own docstring promised and had never had to demonstrate.
+
+Three things fell out of composing rather than merging:
+
+1. **§ D237 had already found this case and could only fix the words.** `missedLede` carried an
+   `unmet.length === 0` arm printing *"Too quiet to grade …"* — the right sentence under a banner
+   reading **Shift missed**, with the streak resetting underneath. The sentence and the banner
+   disagreed about the same day, which is § D237's own defect surviving inside the arm that had
+   noticed it. That arm is gone; `judgementOf` cannot route an ungraded day to `missedLede` at all.
+2. **`missedLede`'s empty case drops a clause rather than taking a branch.** It is now unreachable,
+   and the guard is a total function's belt. It must never become *reachable and wrong*, and a
+   dropped clause is the only shape with no sentence to be wrong with — a second copy of the
+   ungraded words there is exactly what was just removed.
+3. **`streakLineFor` takes the verdict and is exhaustive over it.** § D237 had already replaced its
+   `allMet` boolean with the verdict so the streak could not reset on a day the banner called
+   cleared; this lane's first draft added a `graded` boolean beside it, which would have been a
+   second answer to a question the verdict already contains. A `switch` with no default makes a
+   fourth verdict a compile error here too.
+
+**The deciding test was widened, not relaxed.** § D237's sweep — *no sentence used to say a day
+cleared may appear on a sheet saying it did not* — now runs over three verdicts × two saturation
+states × three real runs × four goal sets, with the ungraded arm reached by moving **the
+observations** while the recording, the week and the contract are held fixed. The check is pairwise
+across all three buckets, each asserted non-empty first so no arm is vacuous. `report.test.ts`'s
+*does not claim a goal was missed on a day nothing was graded at all* keeps the property it was
+written for — no goal named, no blank — and its `verdict === 'missed'` expectation is now
+`'ungraded'`, because that expectation **was** the bug.
+
+**One residual, named rather than fixed.** `dev/reportPanel.ts` draws `verdictColour` as
+`verdict === 'cleared' ? 'var(--ok)' : 'var(--warn)'`, so an ungraded day is amber — a warning
+colour on a day that is not a warning, which the same file already spells `var(--dim)` in its empty
+state. It is one line in a file outside this lane's ownership.
+
+### #36 — the new building's name over the old building's specs, and a stretched stale canvas
+
+`reportPanel.ts`'s *Take the next assignment* moves `buildingId`, clears the recording, and — unlike
+*Open the doors on tomorrow* beside it — **does not run**. The shell had nothing to describe a
+building with: `drawHeader` read the boot-scope `building`, which is `shiftRunConfigOf`'s and is only
+assigned by `runShift`. So the header drew `Midtown Office · 6 floors · 2 cars · 0.63 m/s · 135
+people` — the name from the state, the geometry from the tutorial — at the campaign's one reward
+moment, telling the player the 1 710-person tower is the size of the building they just left.
+
+`resolvedBuildingOf` is the missing answer, and `viewAt` uses it **exactly when there is no
+recording**. The **shipped** building, not a grown one: nothing has run, so there is no day to have
+grown it to.
+
+The canvas was the same defect in paint. `drawStage` returned before touching the context when there
+was no recording, so the previous frame stayed at the backing size it was painted at — a 360×260
+bitmap of Garden Apartments stretched across a 750×405 box. It now resizes **and then** clears; that
+order matters, because clearing a stale-sized buffer fixes the picture and keeps the blur.
+
+The fix is in `dev/main.ts` rather than in the button, and that is ownership rather than preference:
+the honest empty stage is the better answer anyway, because § D232 has just decided that a run
+nobody asked for should not appear.
+
+### #37 — four cards quoted a figure the building file contradicts
+
+`docs/12` § 4.4's rule is *where a handoff stat line disagrees with the file, **the file wins***, and
+`statLineOf` has generated the stat line from the building since this module was written. That is
+exactly why the drift was visible: the card's prose and the file's numbers sit two lines apart.
+
+| card | prose said | the file says |
+|---|---|---|
+| `c4` | *Forty floors … a transfer level at 20* | 60 expanded floors; two `isTransferFloor` floors, `G` and **31** |
+| `c3` | *Thirty-one floors* | 30 |
+| `c5` | *A hundred and one floors* | 100 |
+| `c1` | *the next four* | seven others |
+
+`c4` is the one that could not be a convention: twenty floors apart, beside a stat line reading
+`60 floors`. All four are corrected at source with the file's own figure. **This is § 4.4 applied to
+the prose for the first time** — it had only ever been applied to the stat line.
+
+**Two halves of #37 are not closed here and are not mine to close.** The section heading
+*"Scenarios — five buildings, any order"*, the intro's *"the other four"* and the footnote *"All five
+ship with the simulator in `data/buildings/`"* — including the repo path leaking to a player — are
+all in `packages/viz/index.html`.
+
+### #69 — the shortcut worked, and nothing on the page could show it
+
+**Driven in the browser tier, and the issue's central claim does not reproduce.** On a paused run,
+with focus on the body:
+
+```
+','          playhead 5.15 %  ->  5.10 %
+'.'                    5.10 %  ->  5.15 %
+#step-back click       5.15 %  ->  5.10 %      (the same distance)
+'['          speed chip ×60 -> ×10
+ArrowRight             5.10 %  ->  5.38 %
+Space while running    Pause -> Play
+```
+
+So `,`/`.`, `[`/`]`, the arrows and Space are all wired, and *"the entire playback layer is
+mouse-only"* is false. **What is true is that the reader could not tell.** One display frame at the
+shipped ×60 is **one simulated second** — 0.06 % of a 1 800 s run, under half a pixel of timeline —
+and every clock the page prints is `hh:mm`. A careful tester pressed the advertised key five times,
+saw nothing anywhere change, and concluded the binding was dead. That is the product's fault and not
+theirs.
+
+The fix is where the promise is made: the timeline slider's `aria-valuetext` becomes `hh:mm:ss`. It
+is a **readout on a control** and `aria-valuetext` exists precisely so a slider announces its own
+units — and the reader the tooltip makes the promise to is the one with no pixels to check it
+against. The header clock stays `hh:mm`; it is a caption on a day, not a readout on a control.
+
+**Driving also found a real defect the issue did not report.** The Space arm called
+`event.preventDefault()` unconditionally, which on a focused `<button>` **cancels that button's own
+activation** — Space over `#step-back` toggled playback and did not step a frame, so the two controls
+the issue is about were fighting for one key and the platform's contract lost.
+`spaceBelongsToFocus` is the guard, keyed on `(tagName, role)` rather than on a constructor: a
+`<div role="button">` owns Space and an `<a>` does not, and both are `HTMLElement`. `role="slider"`
+is deliberately **not** in the set — sliders are driven by arrows everywhere, so a reader who has
+tabbed to the transport bar still gets play/pause from it.
+
+**No `UX.md` row was stale.** `KX-05`'s *"✅ run — one display frame each way, pausing first"* and
+`TP-06`'s *"shares one handler with `KX-05`"* are both **true**, and re-verified by driving rather
+than by reading. What no row covered was Space over a focused button, and there is one now.
+
+`dev/keyboard.browser.test.ts` is the evidence, and it asserts the **playhead**, not a registered
+handler — the issue's whole claim was that a handler existed and did nothing.
+
+### One thing found in passing, and it had hidden itself
+
+`boot.browser.test.ts` read its origin from `httpServer.address().port`, which reported **5173**
+while Vite was serving **5174** — `vite.config.ts` declares `{ port: 5174, strictPort: true }` and
+the suite's `port: 0` override does not survive the merge. Every navigation got
+`ERR_CONNECTION_REFUSED` and the whole tier died in `beforeAll`. It went unseen because the tier
+skips itself where there is no Chromium, which is most machines: **a tier that skips silently can
+also fail silently the first time somebody gives it a browser.** Both files now read `resolvedUrls`,
+which is Vite's own answer to *where am I*, and both pass — including § D220's *draws the stage*,
+which is what confirms § D232's paused first frame still paints.
+
+### Two more the same rule settles, handed over from the Compare/Lab lane
+
+Both were found by an agent that could not reach the files. They are the same defect as #37 in a
+different directory: a surface saying something that is not for the reader in front of it.
+
+**#25 — internal cross-references printed to players.** `GOAL_BLOCKER['everyone-can-get-there']`
+read *"Blocked on W7 … docs/10 § 10.4 … § 5.2's goal table says the opposite"*, verbatim, on the
+Compare and Lab goal rows. A player has no `docs/`, no W7 and no § 5.2. The honest content — *this
+cannot be judged from what a run records, because a recording carries no credential on a leg* — was
+in the middle of it and survives the rewrite unchanged; the claim was never the problem.
+
+**Changed at the constant rather than paraphrased at the render site**, which is the part worth
+recording: `honesty/surfaces.ts` seeds this by *reference* — it iterates `GOAL_BLOCKER` and pushes
+each non-null value — so the string the sweep checks and the string a player reads are the same
+object. A tidier copy at the surface would have left the sweep checking a sentence nobody sees.
+
+`data/scenario-goals.json` pins the same text through `measureScenario`'s `reason`, so the table was
+**regenerated** rather than hand-edited (`regenerate.test-helper.ts`), and the diff is the assurance:
+**ten string replacements and not one moved count.**
+
+**#58's second half — goal rows named their arms by a slug.** `goalReport.ts` printed
+`arm.dispatcherProfileId` — `eta:`, `collective:` — where the rest of the product prints *Minimum
+estimated wait* and *Conventional collective*. `BatchArmResult.dispatcherProfileName` now exists on
+the arm (that lane's work), so the fix is the substitution. `armId` and `dispatcherProfileId` stay on
+the row: a caller keying off them needs them, and only the sentence is read by a person.
+
+**A third piece was offered and is deliberately not built.** Pre-selecting the running dispatcher as
+Compare's baseline needs `dev/main.ts`'s `inherit()` to supply `dispatcherId`, and the batch panel to
+read it. `dev/batchPanel.ts` is outside this lane, so adding the field here would ship a
+`ViewerState` value carried into a mount that cannot consume it — **an unwritable seam, which is this
+repository's signature defect and has shipped eleven times.** Left unbuilt and named, rather than
+half-built and plausible.
+---
+
+## D244 — a demand template is a period, and a period has an hour
+
+**Date: 2026-08-05 · Written after the code, before the viewer half.** Play-tester issues #78, #80,
+#81, #82 and #83 are five reports of one fact: the viewer pins the clock to 06:00, so
+`evening-egress` — an end-of-day down-peak — and `lunch-two-way` are both drawn at dawn, and the
+calendar's `quarter-end` period (*"the whole building leaves at once when the numbers are filed"*)
+already selects `evening-egress` and runs it before breakfast.
+
+**Context, and the structural fact that made this small.** The traffic model was already
+multi-phase: `DemandPhase` carries per-phase intensity *and* optional directional-split endpoints,
+`intensityAt` and `splitAt` are one piecewise-linear evaluator over one knot list, and
+`shift-change` already ships six phases with two interior peaks. Nothing about "a day has parts"
+was missing. What was missing was a **field**: no template said what time it was.
+
+**Decision.** `DemandTemplate.startOfDayMin?: number` in `config/types.ts` and in
+`config/schema.ts`'s `strictObject`, bounded `[0, 1440)`; `ResolvedDemandTemplate.startOfDayS?:
+number` carried through `finish()`, all five `*Template()` builders, `fromRecord` and
+`shiftTemplatePeak`; and `PassengerTrace.startOfDayS?: number` beside `durationS`. Four of the five
+shipped templates author an hour. `constant-iso` does not.
+
+### The three rules that make it safe
+
+**1. `intensityAt`, `splitAt` and `integratedIntensityS` are untouched.** That is the whole
+argument. Those three are the template's entire evaluation surface, every arrival instant is drawn
+against `intensityAt` over `[0, durationS]`, and none of them takes a template's hour into account —
+so a run's passengers, batches, routes, masses, legs and metrics are *bit-for-bit* what they were
+before the field existed. This is what makes byte-identity **provable** rather than hoped for, and
+it is why `sim/oracle.test.ts` stays green by construction: the closed-form Barney/CIBSE comparison
+is a statement about elapsed seconds within a run, and no second moved. That coupling is now written
+into the oracle's own preamble rather than left implicit, because it is exactly the kind of
+dependency that goes stale silently.
+
+**2. Omitted means "no hour", never "midnight".** `constant-iso` declares none: ISO 8100-32's
+constant demand is a rate held long enough to cross-check an analytical baseline, not a time of day,
+and a `0` there would put a two-hour run at 00:00 on any screen that read it. The field is spread-or-
+omitted at every hop — `finish`, the builders, `shiftTemplatePeak`, the trace — so a template
+without an hour carries **no key**, not a key valued `undefined`. `'startOfDayS' in template` and
+`JSON.stringify` disagree about that distinction, and the identity guards read the first.
+
+**3. It is not a tunable.** Deliberately absent from `TRAFFIC_PARAMETERS` and from
+`DemandTemplateOverrides`. An optimizer sampling *what hour it is* would be searching a dimension
+that cannot change a cost — which is precisely the `destination-eta` `rideTime: 0` defect
+([§ D112](DECISIONS.md)) with a different key name, and this repository has already paid for that
+once. It is also why there is no `TRAFFIC_DEFAULTS.startOfDayS`: the hour is data and nothing else,
+so a shape resolved with no record to read is a shape without a clock rather than one at some
+invented default.
+
+A fourth, smaller: **`shiftTemplatePeak` carries the hour unchanged.** A peak shift moves the busy
+part *within* the period, and both endpoints are pinned, so a `rise-and-fall` that started at 08:30
+and peaked ten minutes late is a late morning peak — not a period that started at 08:40. Moving both
+would make the same claim twice.
+
+### The hours, and what each one is worth
+
+CIBSE Guide D and ISO 8100-32 tabulate **design peaks, not clocks**. Guide D gives the up-peak, the
+lunch two-way and the down-peak as design cases with arrival rates in %pop/5 min; it publishes no
+hour of day for any of them. So what is cited here is *that the period exists and how heavy it is*,
+and the hour is derived or assumed. **No citation was invented.**
+
+Every hour is derived by placing the template's **hold** — the part the report is taken on — rather
+than its start, which is why three of the four read as odd numbers. That is the intended reading: an
+odd start is the visible cost of anchoring the peak.
+
+| template | `startOfDayMin` | clock | what is placed, and where | status |
+|---|---|---|---|---|
+| `rise-and-fall` | 510 | 08:30 | hold centre → 08:45; reported peak 08:42:30–08:47:30 | period CITED, hour DERIVED |
+| `constant-iso` | *absent* | — | — | not a time of day |
+| `lunch-two-way` | 735 | 12:15 | period midpoint → 12:30, the mix crossover at the cited 45/45/10 | period and mix CITED, hour DERIVED |
+| `shift-change` | 885 | 14:45 | changeover (the trough) → 15:00 | **NOT CITED — an assumption** |
+| `evening-egress` | 1044 | 17:24 | full flow → 17:30; reported window 17:30–17:35 | period CITED, hour and 17:30 DERIVED/assumed |
+
+`shift-change` is the weak one and is labelled as such in its own `$comment`: no source in this
+project's reference set publishes changeover hours, they vary by industry and by site, and 15:00 is
+simply the boundary of the conventional 07:00–15:00 / 15:00–23:00 pair. It is the first hour a
+site-specific configuration should override.
+
+**The assumption is free today and will not stay free.** Nothing statistical reads the hour — that
+is rule 1 — so an hour that is wrong currently costs a label and nothing else. The moment a phase
+boundary becomes a **measurement** boundary, or a report slices a day at a wall-clock time, these
+four numbers stop being labels and become inputs, and `shift-change`'s 15:00 stops being harmless.
+That is recorded now, in the `$comment`s and here, rather than discovered then.
+
+**A second staleness, named because it is invisible:** each derivation is a function of the
+template's own geometry. Change `durationMin`, or the 5-minute hold, and 08:30 no longer centres the
+hold on 08:45 — and no code will say so. The `$comment`s state the derivation so a reader can redo
+it; nothing mechanises it, because mechanising it would mean the simulator reading the hour, which
+rule 1 forbids.
+
+### What is deliberately not in this stage
+
+The viewer. The clock is pinned at 06:00 in `packages/viz` and this change does not touch it; the
+contract exposed is exactly `trace.startOfDayS` (seconds after local midnight, absent when the
+template has none) and `trace.template.startOfDayS` beside it. Wiring the display is a separate
+piece of work against a stable field.
+
+---
+
+## D245 — two consequences of adding one field, both handled rather than discovered
+
+**Date: 2026-08-05 · Written after the code.** [§ D244](DECISIONS.md) adds `startOfDayMin` to
+`data/traffic-profiles.json`. Two things follow from that which are not optional and not bugs, and
+both are recorded here so the next reader does not have to rediscover them.
+
+### 1. All five leaderboard config boards fork, and that is the mechanism working
+
+`server/leaderboard/submission.ts#configHashOf` digests the **fully resolved inputs a run depended
+on**, and the demand template record is one of them — *as loaded*, not as a curated subset. So
+adding any field to a template record forks every board keyed on that template. All five fork.
+
+**The obvious avoidance is the wrong move and was rejected on purpose.** Keeping the hour outside
+the digested record — a side table, a viewer-only constant, a lookup by template id — would avoid
+the fork and create a **second place a template is defined**, which is the defect class this
+repository counts. `submission.ts` already states the intended reading: *"A `data/` change does not
+corrupt an old board — it starts a new one."* Stored rows stay readable, no honest submission is
+rejected, and the fork costs a board reset rather than a correctness problem. The alternative costs
+a divergence nobody would notice until two definitions disagreed.
+
+Worth stating plainly because it looks paradoxical: **the field is invisible to the simulation and
+still forks the board.** Both are true, and they are answers to different questions.
+`configHashOf` asks *"were these two runs configured from the same inputs?"*, and after this change
+they were not — the input file differs. It does not ask, and must not ask, whether the difference
+could have changed an outcome; a hash that tried to would need to know which fields are inert, which
+is exactly the knowledge that goes stale.
+
+### 2. Fifteen pinned result digests moved, by one key, proved rather than asserted
+
+`traffic/transportIdentity.test.ts` pins `structuralDigestOfResult(runSimulation(...))` for fifteen
+(building, dispatcher) cells. That digest hashes **every key** of the whole result, and a
+`SimulationResult` carries its `PassengerTrace`. So all fifteen moved on the new key alone — the
+same thing that happened to them for `stageActivity.diversions` ([§ D205](DECISIONS.md)).
+
+Two ways to handle it, and the choice matters more than it looks:
+
+- **(a) Exclude the key before hashing.** The file already does this for
+  `conservation.transportHops` and `summary.awtInvalidGround`. Cheap, keeps the pins' provenance —
+  and it is a *weakening*: the digest stops covering a key.
+- **(b) Re-pin, and prove the delta.** § D205's route. Not a weakening — a re-measurement — but a
+  re-pin is exactly what [§ D201](DECISIONS.md) records going wrong, so it is only honest if the
+  width of the delta is established rather than assumed.
+
+**(b) was taken, and the proof is mechanised for all fifteen cells rather than argued for two.**
+`traffic/dayStartIdentity.test.ts` deletes `startOfDayS` from a **current** result and requires the
+digest to equal the superseded value, for every key — so *"the fifteen results moved because the
+record grew an hour"* is a measurement. § D205 made the same claim in prose, with two examples;
+this makes it in a run, with fifteen.
+
+That file carries the superseded table, with the rule attached: if a future change moves the results
+for a real reason, these move together with `BASELINE_STRUCTURAL` and the superseded table is
+**deleted rather than carried**. A superseded pin the current code cannot reproduce is the § D201
+defect, and this table is only legitimate while it can be.
+
+### The guard itself pins nothing, and that is why it is the stronger one
+
+`mixIdentity.test.ts` — the precedent this work followed — compares against digests pinned from an
+earlier tree, because a mix arc genuinely changes a trace when it is used, so *"unchanged"* can only
+mean *"unchanged from what was measured before"*. The hour changes a trace **never**, used or
+unused, so the new guard asks a stricter question that needs no pin: run the same seed against the
+shipped `data/` and against the same `data/` with every `startOfDayMin` stripped, **in the same
+process**, and require the two outputs to be equal *byte for byte* with the hour keys removed. No
+tolerance, no digest, no cross-platform caveat — `toBe` on two strings, at three layers:
+
+1. **the evaluator** — `intensityAt`, `splitAt` and `integratedIntensityS` on a 441-point grid
+   spanning and overhanging each of the five templates;
+2. **the trace** — five buildings × five templates, legs, arrivals, sources and the whole object;
+3. **the run** — the same fifteen cells `transportIdentity` pins, whole-result.
+
+Layer 3 is not implied by layer 2: a trace is an *input* to a run, and a run that read the hour
+anywhere downstream would pass layer 2 and fail layer 3. Fifty tests, all green — and the run is
+what this entry rests on: byte-identity here is a measurement, not an argument from which functions
+read which field.
+
+One existing guard was adjusted rather than re-pinned: `mixIdentity`'s flat-mix control compares a
+`lunch-two-way` trace against a `rise-and-fall` one, and those are now at 12:15 and 08:30. The hour
+joined that test's named exclusion set — beside `template` and `sources`, which it is a copy of —
+and, following the file's own discipline, both values are asserted explicitly below the comparison
+rather than waved away.
+
+---
+
+## D248 — the menu asked for the option that was already showing, and the tests could not see it
+
+**Date: 2026-08-05 · Written after the code, and after the browser drive that measured it.**
+
+`dev/menuPanel.ts` rewrote a dispatched intent to carry the option the player chose for exactly two
+of the six `MenuIntent` members that carry one:
+
+```ts
+row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+  ? { ...row.intent, value }
+  : row.intent
+```
+
+`set-calendar`, `set-commissioning`, `set-constraint` and `set-challenge` fell into the fallback arm
+and were dispatched unrewritten. A select's affordance is built **before** anybody picks anything, so
+its intent has to name the value the row is currently showing — that is what puts the right option in
+the box. Dispatching it back is therefore a **no-op by construction**, and it is the same no-op
+whichever option was picked.
+
+### 1. What it cost, measured rather than reasoned
+
+Driven on the shipped page at 1280×720:
+
+| screen | before | picked | after |
+|---|---|---|---|
+| Scenarios → Calendar | `''` | `vacation` | `''` |
+| Commissioning → `Under` | `retrofit` | `new-build` | `retrofit` |
+| Commissioning → `main — shafts` | `2` | `1` | `2` |
+| Commissioning → `main — machine class` | `hydraulic` | *(any)* | `hydraulic` |
+
+GitHub issues #44 (*"the Calendar dropdown reverts to An ordinary week — none of the five described
+weeks can be selected"*) and #42 (*"every dropdown on the Commissioning screen is inert"*, filed
+**Blocker**), one line apart. After the change, on the same page: the Calendar holds `vacation` and
+the shell's caption names the week; `Under` moves to `new-build`, shafts 2 → 4, machine class
+hydraulic → gearless-traction with the speed ladder following to 2.50 m/s, and the constraint's
+review now refuses two of the choices in words.
+
+### 2. It is **not** a dead seam, and saying so precisely matters
+
+The standing requirement counts eleven dead seams in code plus two in `data/`, and this is not the
+twelfth. Everything downstream was live and correct: `state.calendar` reaches `shiftRunConfigOf`,
+`calendarDayFor` and `calendarPatch`; the shell's arm calls `runShift()`; `state.commissioning`
+reaches `commissionedBuilding`. What was missing was one rewrite in the middle of a live chain.
+
+That distinction changes what the fix has to be. A dead seam is closed by building a caller; a live
+chain with a hole in it is closed by three lines — and by the tests that would have found the hole,
+which are the deliverable.
+
+### 3. The rewrite is now exhaustive, because the expression could not be
+
+`menu/screens.ts#withChosenValue` is a switch over `MenuIntent` with no `default`, returning a
+`MenuIntent`. Under `noImplicitReturns` a seventh member that carries a chosen value cannot be added
+without an arm. The ternary it replaces had a `: row.intent` fallback, which is a **silent default
+over the same union** — which is precisely how four members joined it without anything noticing.
+
+Two smaller decisions inside it. `set-calendar` and `set-constraint` write `periodId` and
+`constraintId` rather than a shared `value`, spelled out rather than reached through a common key,
+because those are ids of two different vocabularies and a generic field would make them look
+interchangeable. And the pass-through arm — fourteen kinds — is a hand-written list, which is the
+shape this repository keeps finding stale, so **nothing trusts it**: see § 4.
+
+### 4. Why the existing tiers were all blind, and which one is at fault
+
+`docs/16` S9 names four tiers — static sweep < model walk < document recorder < browser. Three
+existed and all three were green.
+
+- **The model walk** (`playthrough/walk.test.ts`) presses every option of every select on every
+  screen. It builds the intent it presses with **the same condition the panel used**, and skips any
+  row whose intent is neither `set-free-play` nor `set-setting`. So the four broken transports were
+  the four it asserted nothing about. *A walk that reproduces the transport cannot measure it* — the
+  fixture-shaped failure § D183's disclosure suite already paid for, arriving in a walk.
+- **The scope suite** (`scope/scope.test.ts`) does move `viewer.calendar` and `viewer.commissioning`
+  to the legs, and correctly. Its probes write the `ViewerState` field **directly**. It measures the
+  half of the chain that worked.
+- **The document recorder** (`dev/menuPanel.test.ts`) had never been pointed at a `<select>`.
+
+So the replacement is derived and sits at two tiers. `menu/screens.test.ts` walks `screenOf` over
+every screen under an arm that populates the fabric *and* challenge screens — both had been rendering
+their *nothing loaded* fallbacks, which is how an optional input becomes a coverage hole — takes
+every `select`, `toggle` and `text` row it finds, and requires that choosing a different option
+produces a different intent. Two of its cases go all the way to the legs. `dev/menuPanel.test.ts`
+drives the real element: the panel builds it, the element's own `change` listener runs, and the
+intent the host received is read back. Both were watched failing against the old ternary before
+being trusted.
+
+### 5. The legs case had to move buildings, and the reason is a measurement already on file
+
+`legsOf` on Garden Apartments at 900 s reported the fabric control **dead** when a shaft was added:
+the building produces 20 legs and two hydraulic cars answer every one, so a third car is never
+assigned. `scope/probes.test-helper.ts` had hit this and written it down. The case moved to
+`midtown-office` at 1 800 s rather than lowering the bar — *"one building where nothing you change
+makes any difference"* is `docs/10` § 0's M1, and an instrument that does not know it produces a
+false accusation, which is the most expensive kind of wrong an instrument like this can be.
+
+---
+
+## D249 — the full-screen menu was not a dialog, and the focus was lost on every redraw
+
+**Date: 2026-08-05 · Written after the code.** GitHub issues #33 and #68.
+
+Measured on the shipped page with an overlay covering the viewport: `role` null, `aria-modal` null,
+no accessible name, `body[inert]` false, **7 focusable controls inside the overlay and 624 in the
+document**. Six Tab presses from the first menu row landed on `BODY`, then a link, then a button,
+then a `<select>` — every one of them behind the screen the player was looking at.
+
+#68 is what that costs, and it is why this is not an accessibility nicety. The reporter tabbed out
+of the **Settings** screen — the one whose own note reads *"These change how the simulation is
+drawn, never what it computes"* — reached the seed field behind the overlay, typed `424242`, and
+re-seeded the run. The seed is the one input the whole provenance and replay story rests on
+(invariant 5), and it was overwritten from the screen that promises it cannot change a run.
+
+### 1. The half that was not the Tab key
+
+The obvious reading is *the ring is too short and Tab falls off the end*. Driving it showed
+something worse underneath: `fill` replaces every child of the overlay on **every** redraw, so the
+focused element is destroyed by every state change — and the overlay is appended last to
+`document.body`, so the next Tab from `<body>` walks into the shell rather than into the menu.
+
+So the reporter did not need to tab past the end. Toggling anything put them at `<body>`, and one
+Tab from there was already outside. A trap without focus restoration would have closed nothing.
+
+The restoration needs an identity that survives the redraw, and the element cannot be it. Each
+control now carries `data-menu-control` — the affordance's own `id`, already *"stable, and unique
+within a screen"* by `MenuAffordance`'s contract, so no second naming scheme is introduced — and a
+redraw puts the reader back on the control with the same key. Never while `hidden`: `closeMenu` hides
+the overlay and later draws still run, and without that guard leaving the menu would pull focus into
+a screen nobody can see, which is #68 with the sign flipped.
+
+### 2. The ring is built, not queried
+
+The list of focusable controls is the one the panel just built, in draw order, rather than a
+`querySelectorAll` over the result. Two reasons, and the second decided it: a selector would be a
+second, unasserted answer to *what is focusable in here* that could drift from what was drawn, and
+this package's document tier deliberately has no selector engine — so a trap built on one could not
+be driven under Node, and the only evidence for it would be a browser run that skips on most
+machines.
+
+Disabled buttons are excluded. A ring whose last member cannot be focused is a ring Tab walks
+straight past, so including a refused **Start** would have re-opened the hole at exactly the moment
+the screen is refusing something.
+
+### 3. Two halves are open, and they are open rather than approximated
+
+**`inert`/`aria-hidden` on the shell behind** needs `dev/main.ts`. Without it a pointer still
+reaches past the overlay, and so does anything focusable inside it that the panel did not build — a
+link inside a notice, say. The trap holds the keyboard; it is not the whole of a modal.
+
+**Escape** needs a `MenuIntent` that closes the menu and an arm in the shell's exhaustive switch to
+perform it. Adding the member without the arm would compile — `dispatchMenu` returns `void`, so a
+missing case is not an error — and ship a control nothing performs, which is the defect this package
+has shipped eleven times. Binding Escape to `back` instead was considered and refused: it would work
+on five screens and do nothing on the root, which is exactly where #40's reporter is standing.
+
+### 4. What the document tier can and cannot say about this
+
+The recorder grew four members — `hidden`, `contains`, `focus`, and the document's `activeElement` —
+because `renderMenu` started calling them, which is the rule it has always been grown by. It is
+still not a browser: `focus` moves a variable, and `press` calls the root's own handler rather than
+dispatching through a capture and bubble phase. **So what it proves is that the trap decides
+correctly given where focus is, and not that a browser routes the key there.** The second claim was
+measured separately, in Chromium: twelve Tab presses cycle the root's seven controls and never
+leave, Shift+Tab wraps the other way, toggling *Reduce motion* leaves the reader on
+`settings.playback-speed` where they were, and after **Open the doors** the overlay is hidden with
+focus outside it.
+
+---
+
+## D250 — an empty `SINK_MISSING` is not the claim that four controls are visible
+
+**Date: 2026-08-05 · Written after the measurement.** GitHub issue #70, and a finding about the
+instrument rather than about the setting.
+
+The issue makes two claims. Driven at 1280×720 on the current tip, **one is refuted**: all four
+preferences survive a reload. Tick *Reduce motion*, set *Playback speed* to 8× and *Theme* to light,
+reload, and the slot holds `{"reduceMotion":true,"showEnergyAxis":false,"playbackSpeed":8,"theme":"light"}`
+before and after, with the reloaded screen showing the checkbox ticked, `8` and `light`, and
+`data-theme="light"` on the document. The reporter's evidence was that `localStorage` carries no key
+for any of them, which is true and is not the question: all four live inside `elevator-sim.session`.
+
+The other claim is right for one of its three subjects, and for a reason the report does not give.
+`reduceMotion` pauses playback and suppresses autoplay on the next `adopt`; `playbackSpeed`
+multiplies the transport chip's rate. Neither writes a DOM attribute or a text node — which is what
+the reporter diffed — so their **measurement** is sound and their conclusion is not.
+
+### `showEnergyAxis` reaches a function, and the function reaches no screen
+
+`render/runSummary.ts#summaryFigureIds` honours it. Its only shipped caller is
+`mode/disclosure.ts#disclosureItems`. *Its* only shipped caller is `dev/main.ts#drawParity`, which
+turns the item list into `parityRefusal` — a string that is **empty whenever mode parity holds**,
+which is the shipped state and is separately proved. Measured: with a run on screen, the whole
+shell's rendered text is **byte-identical** with the switch on and off.
+
+The two energy cells a player actually reads are `shift/report.ts#energyFigures`, emitted
+unconditionally, and `DayReportInput` has no field for the preference — so the Day report *cannot*
+honour it. The fix is one required field and one caller, and it is filed rather than reached for,
+because `shift/` and `dev/main.ts` were not this lane's.
+
+### The finding worth more than the setting
+
+`GAPS.md` § 3 carried a row saying this setting *reaches nothing*, and it was retired when the
+setting acquired a sink — `summaryFigureIds` — and left `scope/probes.test-helper.ts`'s
+`SINK_MISSING`. `scope.test.ts` then asserted, in its own words, *"it is empty, because all four
+settings now reach something"*.
+
+Both statements are true and the pair was read as something neither says. **`scope.test.ts`'s
+presentation-control check asks whether a control's declared sink *moves*, and a sink is a function.
+A pure function that no surface calls satisfies it perfectly.** The register measures *is this
+control connected to a decision*, and it was read as *can a player see it work*, which is the same
+gap between *reachable* and *has a non-test caller* that the standing requirement exists for,
+arriving one layer up — in the instrument built to catch it.
+
+Nothing here weakens the check; a sink probe is still much better than nothing, and it is what caught
+the other three. What is recorded is its ceiling: **a sink is evidence about a seam, never about a
+screen**, and the tier that can tell the difference is the one that reads the rendered text. The
+`GAPS.md` row is rewritten to say all of that, and `Settings.showEnergyAxis` now carries what it
+reaches today in its own docstring, because a stated mechanism goes stale exactly the way a
+published number does.
+## D246 — the viewer was stale against its own server, and the password field was the dangerous half
+
+**Date: 2026-08-05 · Written with the code, and says so.** § D241 deleted the password path from the
+server and § D243 gave the shipped page a `<meta name="elevator-sim-api">` so the viewer could
+finally reach it. Between those two landing and this one, the account screen was in the worst state
+it has ever been in: a **live** email-and-password form, now pointed at a server that answers, whose
+`POST /api/login` is a 404. This is the client half, and what it deleted rather than disabled.
+
+### 1. The password field was not a layout problem, and "disabled" would not have fixed it
+
+Play-tester issue **#30** reports the screen in its rendered order — **Sign in**, **Back**, **Create
+an account**, `Email`, `Password` — and files the ordering. The ordering is real and it is the small
+half. The large half is that an `<input type="password">` which is presented as functional, accepts
+input, and is wired to nothing is **a keystroke collector by accident**. People reuse passwords, and
+the player has no way to learn the field goes nowhere until after they have typed into it.
+
+So the field is **gone**: not greyed, not `readonly`, not behind a notice — on the same footing
+§ D241 § 5 deleted `passwordIssues` and `SCRYPT_PARAMS` rather than deprecating them.
+`menu/account.ts` has no `password` on its form, no `MIN_PASSWORD_LENGTH`, no `MAX_PASSWORD_LENGTH`
+and no state in which the word can appear; `client.test.ts` asserts that over **every** state the
+reducers can produce, by `JSON.stringify`, rather than over the type.
+
+And the type is not the mechanism either, because the field lived in a **panel** and the type lived
+in a model. A sweep scoped to `menu/` would have gone green with the password box still on screen.
+So the mechanism is a lexical sweep of every non-test module under `packages/viz/src` — comments
+blanked, because half a dozen modules now *discuss* there being no password — for a string literal
+that **is** the word: `'password'` as an input type, `'Password'` as a label, `'password'` as a form
+key. It has a positive control, because a walk that reads nothing passes every rule.
+
+### 2. The mode toggle was not relabelled, it was removed, and the reason is the enumeration oracle
+
+Issue **#31** is that *Create an account* keeps the **Sign in** button label and prints the sign-in
+error. The obvious fix is to derive the label from the mode. It is the wrong fix, because **there is
+no mode**.
+
+§ D241 § 7: asking for a display name **only when the address is new** tells the person filling in
+the form whether the address is new — the account-enumeration oracle the server closes by answering
+`POST /api/auth/request-link` with identical bytes either way, rebuilt in the interface. One door:
+type an address, a link is emailed, opening it signs you in, and if the address was new the link
+created the account. The name is asked for afterwards, over a session that already proves the
+address, and `displayNameChosen` on the wire is what makes it exactly once — a client that
+recognised the server's generated `player-<12 hex>` **by its shape** would be a second place
+deciding what a generated name looks like, and would stop asking anybody anything the first time
+that generator changed.
+
+`AccountForm` therefore has two fields and never both at once, and `formIssues` takes the **state**
+rather than the form, because which field is live is a fact about the session. That is the split
+that let #31 happen: a caller decided the mode, and the sentence and the button label were decided
+somewhere else.
+
+### 3. What #29 reported is true, and its *diagnosis* is not — the correction is the load-bearing part
+
+Issue **#29** files three sentences of the form *"This build was not compiled against a server"* as
+build jargon aimed at whoever compiled the binary. That is right: it uses *compiled* as a transitive
+verb with a preposition most readers have never seen, it implies the player could obtain a different
+build (there is no download — it is a hosted URL), and *"there is no challenge to fetch"* exposes an
+HTTP verb as game vocabulary.
+
+**It is also false, and not in the way the issue says.** It was never a compile-time fact. § D215 § 4
+reads a `<meta>` tag **at run time** and § D243 has the server inject that tag into the page it is
+already serving — so the *same bytes* are a connected build behind the server and an unconnected one
+behind a CDN. The sentence named the wrong mechanism, confidently, on the first prose most players
+read. A rewrite that only removed the jargon would have kept the untruth.
+
+The second half of #29 is the sharper one and it stands unmodified: *"Everything else on this menu
+works without one"* was printed on a menu where **two of the other five rows** — Leaderboard and
+Account — also do not (issue **#28**). The one sentence written to reassure the player was the one
+sentence that was wrong. All three replacements now name which rows need a server and which do not,
+by name, and none of them claims a build fact.
+
+**The case they describe is still real.** A bundle served from a CDN with no server beside it never
+passes through § D243's injection, gets no tag, and lands here. This is a rewording of a live path,
+not the removal of a dead one.
+
+### 4. Two screens can teach their own subject with the server off, and one of them could not reach the page at all
+
+Issues **#32** and **#34** are the same finding on two screens: an empty state that is *blank* rather
+than *empty*. Four of #32's five questions — what is scored, what *the same seeds* means, how long a
+week runs, how a set is submitted — are properties of the game's design and answerable with no
+server at all. #34's is the same: what a board is, what a row carries, what orders it.
+
+The challenge screen could not answer them for a mechanical reason worth recording. `dev/main.ts`
+handed `menu/screens.ts` an `undefined` challenge input whenever there was no client, so
+`challengeBody` fell through to its own hard-coded fallback and there was **nowhere to put an
+answer**. The fix is one word — the input is always supplied — and the prose then has a channel.
+
+Both explanations are held as non-exported constants in `dev/main.ts` rather than as new exports.
+`honesty/derive.test.ts` requires an adapter for any exported text producer, and this lane does not
+own `honesty/surfaces.ts`; the constants are still read by the R10 static pass, which reaches inside
+function bodies.
+
+What they say is bounded by the same discipline as everything else here. The board explanation ends
+on § D106 generalised — four figures side by side, one orders the rows, none is folded into another
+— and the challenge explanation says outright that ordering a board is a fact about what was posted
+and **never** a claim that one dispatcher beats another, because Compare is the only surface allowed
+to say that and only with a paired-t interval excluding zero. Neither screen gained a composite
+score, and the server's own `note` is still printed verbatim wherever there is a board to print it
+beside.
+
+### 5. Three silent returns, and the one control that now says why it does nothing
+
+Issue **#21**: **Post this run** is drawn as a filled primary action and, clicked with no server,
+produced nothing at all — no toast, no navigation, no error. `submitScore` opened with three bare
+`return`s: no client, no recording, no session. `menu/screens.ts` disables the row and supplies a
+`disabledWhy` for each, which is the right place for the affordance; this is the backstop for every
+route that reaches the handler anyway, and it costs three sentences. They are **three** and not one,
+for `leaderboardBody`'s own reason: *there is no server* is about the deployment, *there is no run*
+is about the screen, and *nobody is signed in* is about the player, and one sentence for all three
+would tell a signed-in player with a finished run to sign in.
+
+The `account-mode` intent is answered the same way. `MenuIntent` still carries it, so the arm exists;
+it now says what happened to the second door instead of silently doing nothing, which is #21's defect
+wearing #31's clothes.
+
+### 6. One export was deleted on the way past, and it is worth naming why
+
+`menu/account.ts#busy` set a boolean and gave a screen no way to say anything while a request ran.
+Once `pending` existed — see § D247 — every caller moved, and what was left was an export with no
+non-test caller. It is deleted rather than kept for symmetry. It had a caller before this change, so
+it is **not** a twelfth dead seam and the running count in `CLAUDE.md` does not move; it is recorded
+because the rule applies to a four-line reducer in `menu/` exactly as it applied to the deck API.
+
+---
+
+## D247 — a cold start is a correct answer that takes half a minute, and a link token is cleared before it is spent
+
+**Date: 2026-08-05 · Written with the code.** Client-side consequences of facts measured elsewhere:
+§ D243 § 4's **28.7 s** cold `GET /api/challenges`, the sharper pair behind `GET /api/wake` —
+**32.2 s** asleep against **0.13 s** warm, a 240× gap that is essentially all time-to-first-byte —
+and § D241 § 4's fragment-borne link token. Every one of them is a case where the obvious
+implementation is wrong in a way that only shows up in the deployment.
+
+The order of the answers matters and is worth stating once. **Waking on intent is the fix; the
+wording is what is left when it does not land in time.** § 5 is the first, §§ 1 and 6 are the
+second, and a reader who implements only the second has built a nicer way to wait rather than a
+shorter one.
+
+### 1. Nothing is cancelled, because the failure it would report is a lie
+
+The Container App runs at `minReplicas: 0`. The first request after a quiet spell takes about half a
+minute **and succeeds**. Two obvious responses are both wrong, in opposite directions.
+
+A client-side deadline — `AbortSignal.timeout(10_000)`, the default nobody argues about — turns that
+into `CLIENT_FAILURES.unreachable`: *"The leaderboard server could not be reached."* That sentence is
+false, and it is the one wording on this surface that tells the player to give up. It would also fire
+**only in production**, because a development server answers instantly.
+
+Saying nothing for thirty seconds is the other failure and it is not much better: it is
+indistinguishable from a hang, and a player who reloads mid-request has spent one of § D242's three
+per-address links on a request that was working.
+
+So `menu/client.ts` sets **no timeout and no `AbortSignal`**, and asserts that about itself
+lexically, over its own source with comments stripped — because the file's docstring explains at
+length the very thing the scan forbids, and because *"we do not time out"* is a claim about every
+future edit rather than about this one. The behavioural half is asserted too: a transport that never
+resolves is still unsettled eight microtask turns later, which is where anything that was going to
+give up on its own would have done it.
+
+The wording escalates instead, on a timer **beside** the request rather than inside the client — the
+client has no screen to write to. `menu/account.ts#pending` is what made that expressible: *busy* and
+*has a sentence* had to be able to hold at the same time, and `withNotice` clears `busy` by
+construction because it is what ends a request. Four seconds is late enough that an awake server
+never shows the escalation and early enough to beat a player's patience.
+
+### 2. The fragment is cleared before the request, not after it
+
+§ D241 § 4 puts the token in the URL **fragment** because a fragment is never transmitted: a mail
+client, a scanner or a corporate link-rewriting appliance that fetches the URL cannot carry the token
+anywhere, let alone spend it, and it stays out of access logs, ingress traces and `Referer`. That
+property is about the **link**. It says nothing about the address bar the player is now looking at,
+which is shoulder-surfable, pasteable into a bug report, and preserved by a reload.
+
+So `dev/main.ts` clears it — and clears it **before** awaiting the redemption, which is the ordering
+that matters and the one a reader would get wrong. With the clear after the response, a reload during
+a 28.7-second cold start re-sends a token the first attempt is in the middle of spending, and the
+second attempt comes back `link-spent`: a correct refusal, generated by this file, shown to a player
+who did nothing but reload a slow page. The redemption is kicked off after boot's `runShift()`, so a
+slow sign-in never delays the thing the page is for, and before `urlWritable`, so nothing else writes
+an address while the token is still in it.
+
+The token is passed to `redeem` and reaches nothing else: no notice, no log, no URL this build
+constructs. `client.test.ts` asserts it is in the **POST body** and not in the request URL, and that
+each of the three refusals — `link-expired`, `link-spent`, `link-invalid` — carries the server's own
+sentence with no part of the token anywhere in the serialised failure.
+
+The three are kept distinct rather than collapsed, because *whether asking again will help* differs
+between them: expired and spent both mean *ask again*, invalid means *that is not one of ours*. The
+`405` on `GET /api/auth/redeem` is kept distinct from all three for the same reason — folding it into
+`link-invalid` would tell a player their link was broken when a scanner had merely looked at it.
+
+### 3. A 429 disables the form, and the client does not say which budget was spent
+
+§ D242 charges two budgets — three per address per fifteen minutes, thirty per caller — and its
+refusal **names a duration and deliberately does not name which budget**, because *"this address has
+had too many"* is the enumeration oracle by a longer route.
+
+The client reads `retryInMs` and nothing else out of that body. `menu/client.ts` carries a refusal's
+whole body and does not parse it — one job, carry rather than interpret — so the read is
+`menu/account.ts#linkRetryInMsOf`, on exactly the footing `challengeNotOpenOf` reads the 409 next
+door. It checks the **code** as well as the field, so a stray `retryInMs` on some unrelated 400
+cannot silently disable the form, and it refuses a duration that is missing, non-numeric, zero,
+negative or `NaN` — a gate held open by `NaN` milliseconds is a form that never comes back.
+
+`canSubmitForm` is false while it is set, so a rate-limited player cannot spend a second request the
+server has already promised to refuse, and the shell lifts the gate on its own when the wait is over.
+`rateLimited` deliberately does **not** set `linkSent`: nothing was sent, and telling somebody to
+check their inbox for a message that does not exist is how a refusal becomes a wait with no end.
+
+### 4. The 202 is shown in the server's words, and that is a rule rather than laziness
+
+`POST /api/auth/request-link` answers **identical bytes** whether or not the account exists, and its
+`detail` is the only place the expiry is put into words. So the client shows it unchanged and refuses
+a 202 that carries no sentence as `unexpected-response` rather than supplying a fallback — a client
+fallback here would be a second answer to *how long have I got*, drifting the first time § D241 § 3's
+fifteen minutes moved. `client.test.ts` asserts the notice contains no *welcome back*, *account
+created* or *already have*: the server went to some trouble to close the oracle on the wire, and
+prose is a perfectly good place to reopen it.
+
+### 5. The wake is fired on intent, and the three things a caller may not do with it
+
+`GET /api/wake` answers from memory with **no store call**, so a 200 means *the process is running*
+and nothing else. The client half is three lines and three prohibitions, and the prohibitions are
+the part worth writing down, because each one is a thing the next person will reasonably want.
+
+**Nothing branches on the answer.** A caller that treated a failure as meaningful would have turned
+a courtesy into a dependency, and — the specific damage — a database outage would start reading as a
+server that is merely asleep. The result is discarded in one place, `wakeServer`, rather than at each
+call site where somebody would eventually be tempted by it.
+
+**Nothing waits for it.** No render awaits it, no screen shows an error for it. It is the one request
+in this file whose latency is invisible by construction.
+
+**It is not fired in a loop.** Once per entry to Account, Leaderboard or Challenge — the three
+screens that talk to a server — with a thirty-second floor so bouncing between **Back** and
+**Account** is not one request per bounce. The floor is far below any scale-to-zero window, so it
+cannot suppress a wake that was needed: a container that went to sleep did so after minutes of
+idleness.
+
+**Intent, not submit**, and the Account screen is why it pays. Typing an address takes several
+seconds; a wake fired when the screen opens is usually finished before the request that matters is
+sent. Waking on submit would be waking at the instant the wait starts, which buys nothing.
+
+**Boot is deliberately not a wake.** `serve.ts` serves everything outside `/api/` from the static
+bundle, so the same container serves the page — a page that loaded came out of a process that is
+already awake. What that also means is that a cold **first page load** is itself around half a minute
+of blank screen, before any app exists to apologise, and no in-app copy can reach it. That is
+infrastructure — serving the viewer from always-on static hosting while the API stays scale-to-zero —
+it is out of this lane, and it is recorded here so the next reader does not assume the page is warm.
+
+### 6. The wait is graded in the product's own vocabulary, and the grading is checked against the bands
+
+This is an app about waiting for lifts, and during a cold start the player is the one waiting. So the
+escalation names the band a **tenant** would be in at the same elapsed time — the four the mood bar
+already uses. It is a joke, and it is also the cheapest teaching device available: a reader learns
+what *breezy* and *checking watch* mean by being in them.
+
+**The joke only works if it is true, and the drafted copy was not.** It put *tapping foot* at 20 s
+and *taking the stairs* at 45 s. `live/bands.ts` says those bands begin at **30 s** and **120 s** —
+so the second was wrong by a factor of nearly three, and both would have taught a reader this
+product's own vocabulary incorrectly on the one surface where they are paying attention to it. The
+shipped ladder is 4 s, 10 s, 30 s, 60 s and 120 s, which are the boundaries themselves.
+
+`WAIT_LADDER` is **not derived** from `WAIT_BANDS`, and that is deliberate: it is chrome about a
+person staring at a browser, not a statistic about a run, and routing it through anything that
+publishes run figures would make it one. What it may not do is misname a band, so `main.test.ts`
+reads the rungs out of `dev/main.ts`'s source and asserts two rules — a rung may only name a band the
+elapsed time has reached, and a rung that names any band must name the one the reader is in. That
+test found a defect in itself on its first run, which is worth admitting: the ladder's own **type
+annotation** spells `afterMs`, so splitting on that token produced a phantom first rung with no
+sentence in it.
+
+Three constraints on the copy, all of them this repository's existing rules pointed at chrome:
+
+- **No progress bar and no percentage.** There is no progress to report — a container is starting and
+  will not say how far — and inventing one is the same class of defect as a figure a run does not
+  support. Asserted over every rung.
+- **The last rung stops blaming the cold start.** At two minutes, *it is just waking up* has stopped
+  being true against a 32.2 s measurement, and a reassurance that has gone stale is the failure
+  § D227 is about. So it says so, and says nothing typed is lost.
+- **The first rung is honest about the cause.** *"The server shuts down when nobody is playing, which
+  is what keeps it free to leave running"* is what is actually happening, said before the jokes.
+
+It is announced as well as shown. A **visually hidden** `role="status"` / `aria-live="polite"` region
+carries the same words — hidden by inline style, because a region hidden with `display:none` is one
+assistive technology does not read, and hidden at all because the words are already on the panel and
+two visible copies is one for a sighted reader to reconcile. One timer **per rung** rather than one
+repeating tick, so a band change is announced exactly once: a polite region rewritten every second is
+a screen reader talking over the player for half a minute. Nothing animates, so there is nothing for
+`settings.reduceMotion` to suppress — a change of words is what a reader who asked for less motion
+still wants.
+## D254 — access zoning was asked about the pickup floor, and a credential does not govern where you may be collected
+
+**Date: 2026-08-05 · Written after the code, and the measurement is the reason it is written at
+all.** `packages/core/src/model/car/estimateCost.ts`'s `infeasibilityOf` had two access-zoning
+checks. Check 4 asked about the request's *destination* and was right. Check 3 asked about the
+request's own `floorId`:
+
+```ts
+if (!isAccessPermitted(snapshot.shaft, request.credentialGroup, request.floorId)) {
+  return 'accessDenied';
+}
+```
+
+For a **hall call**, `request.floorId` is the landing the car is being summoned *to* — the pickup.
+And `isAccessPermitted` (`model/car/types.ts`) ends `return credentialGroup !== undefined &&
+permitted.has(credentialGroup)`, so an **undefined** credential fails against any floor that
+declares `permittedCredentialGroups`. Under `dispatch.callType: 'up-down-buttons'` a landing call
+carries no credential *by construction* — `costRequestFor` drops it — so every car in the bank
+answered `accessDenied` and the call was never collected.
+
+This is recorded as a **modelling error**, not a threshold that was set wrong, and one layer subtler
+than the rule `CLAUDE.md` states. The rule says the three kinds of zoning must never be collapsed
+into one field, and they were not: service, access and operational zoning are three separate
+questions here and always were. What was collapsed is the **pickup floor and the destination floor
+into one access question**.
+
+### Why the pickup is not an access question
+
+A credential governs *where you may go*. It does not govern *where you may be collected*, and there
+is no lift in the world that behaves as this one did.
+
+- Under conventional control the reader is **inside the car** and gates the car-call buttons. The
+  landing buttons are live for anybody standing there. (CIBSE Guide D, § 10, on security and lift
+  control.)
+- Under destination control the landing terminal takes credential and destination **together**, and
+  authorizes the *destination*. (ISO 8100-32.)
+- Where entry to a lift lobby really is restricted, the control is a locked door or a turnstile —
+  building fabric, upstream of the lift, and gating *arrival* at a floor rather than departure from
+  it.
+
+A resident already standing on floor 40 pressing "down" is through whatever control protects floor
+40; the lift has nothing left to authorize. Refusing would also make every restricted floor
+un-evacuable by lift, which no code permits.
+
+The issue report offered a fourth reading — that a restricted *pickup* might model something real
+and deserve its own field. It is not adopted, and the reason is this repository's own rule: no
+shipped building uses `accessZones` for anything but tenancy, so a field for it would be
+configurable, unit-testable and called by nothing. That is the dead seam this project counts, and
+building one to preserve a defect would be the worst version of it.
+
+### What was done
+
+Check 3 is **deleted**, not narrowed, and `accessDenied` is deleted with it from
+`INFEASIBILITY_REASONS`, `INELIGIBILITY_REASONS` and `STRUCTURAL_INELIGIBILITY`.
+
+Narrowing was considered and rejected. The only request whose `floorId` *is* a destination is a car
+call, and `costRequestFor` — the one production builder of a `CostRequest` — sets `kind: 'hall'`
+unconditionally. A branch scoped to car calls would have had **no non-test caller anywhere in the
+tree**: a twelfth dead seam, created deliberately, in the file this repository's standing
+requirement is about. There is one access question in this model and `destinationAccessDenied` is
+its name.
+
+### Why this does not loosen the credential model
+
+Because the credential model was never in `estimateCost`. The runner enforces it **per passenger,
+with the passenger's real credential**, twice:
+
+- `Simulation.#bankCanCarry` — `isAccessPermitted(passenger.credentialGroup,
+  passenger.destinationFloorId)` — stops a rider heading a call their badge cannot complete;
+- `Simulation.#carCanCarry` — the same question at the doorway — stops them boarding a car sent for
+  somebody else.
+
+So a rider whose destination their badge does not reach is refused whether or not any dispatcher
+ever priced their call. Check 4 authorizes a *disclosed* destination one step earlier than that,
+which is the whole of what a destination call type buys, and `#kioskAllows` — the bare
+`destination-entry` kiosk, which has nothing to identify anybody with — is now the only shipped
+producer of a structural access refusal. `sim/simulation.test.ts` asserts the refusal from three
+sides: an unauthorised destination is refused from an unrestricted pickup, from a restricted one,
+and unbadged.
+
+**That argument is not left as an argument, because the failure mode it rules out is worse than the
+defect.** A version of this fix that deleted one check while wrongly believing the other covered the
+case would produce runs that look perfect and quietly walk an unbadged visitor onto floor 45 — the
+defect stranded people loudly, and a hole here would be silent. So it is measured, in
+`sim/accessZoning.test.ts`, over the **record** rather than a summary, because a statistic cannot
+say which floor somebody got out at: five access-zoned buildings × three conventional dispatchers ×
+two seeds, **31 431 legs ridden to their end, 7 047 of them alighting on a restricted floor, and
+zero carrying a credential that floor does not permit.** Both counts carry floors under them, so a
+run that stopped delivering anybody to a restricted floor could not satisfy it vacuously.
+
+### The measurement
+
+60 cells — five shipped buildings × four dispatchers × three seeds — run before and after, on the
+same seeds:
+
+| | cells | outcome |
+|---|---|---|
+| `garden-apartments`, `midtown-office` (no `accessZones`) | 24 | **byte-identical**, every field |
+| `destination-eta` on the three zoned buildings | 9 | **byte-identical**, every field |
+| conventional arms on the three zoned buildings | 27 | **all moved**, every one `timed-out` → `completed` |
+
+Every one of the 27 goes to 100 % delivery. `mixed-use-high-rise`/`collective`/424242 — the cell the
+issue reported — goes from 642 of 725 delivered to **725 of 725**, exactly reproducing the
+controlled isolation the reporter ran by setting `accessZones: []` and changing nothing else.
+`vertical-city` goes 1 855 → 1 976, `secure-tower` 455 → 473.
+
+The 33 unmoved cells are the control, and they are what says this is the access check rather than a
+perturbation of dispatch. The same split appears independently in
+`traffic/transportIdentity.test.ts`: nine of its fifteen pinned identity cells moved and six did not,
+and the six are exactly the two unzoned buildings.
+
+The correctness oracle (`sim/oracle.test.ts`, the closed-form Barney/CIBSE round-trip comparison) is
+unmoved and green.
+
+---
+
+## D255 — nine pinned identity cells re-measured, and the six that held are the evidence
+
+**Date: 2026-08-05 · Written after the measurement.** [§ D254](DECISIONS.md) moves runs rather than
+record keys, which makes this re-pin a different shape from [§ D205](DECISIONS.md)'s and
+[§ D245](DECISIONS.md)'s. Those moved **all fifteen** cells because the result grew a field. This
+moves **nine**, and the six it does not move are the point.
+
+Re-measured together, in one run of one tree, following the instruction
+`dayStartIdentity.test.ts` already carried — *"if a future change moves the results, these move with
+`BASELINE_STRUCTURAL` and the two tables are regenerated together"*:
+
+| table | file | moved |
+|---|---|---|
+| `BASELINE_STRUCTURAL` | `traffic/transportIdentity.test.ts` | 6 of 12 |
+| `MOVED_STRUCTURAL` | `traffic/transportIdentity.test.ts` | 3 of 3 |
+| `BASELINE_HEADLINE` | `traffic/transportIdentity.test.ts` | 9 of 15 |
+| `SUPERSEDED_STRUCTURAL` | `traffic/dayStartIdentity.test.ts` | 9 of 15 |
+
+The nine are `mixed-use-high-rise`, `secure-tower` and `vertical-city` under `nearest-car`, `eta`
+and `collective`. The six that held are `garden-apartments` and `midtown-office` — same digest, same
+eight headline reals to the last place — and they declare no access zones.
+
+**§ D244's one-key claim survives, and was re-checked rather than inherited.** `dayStartIdentity`'s
+whole point is that deleting `startOfDayS` from a current result reproduces the superseded digest
+exactly, for all fifteen. Both tables were regenerated from the same run, so that is still a
+measurement; the byte-for-byte hour-stripped comparison was re-run for all fifteen cells and holds.
+
+Two core censuses moved with them, and one of them is a result rather than a re-pin:
+
+- `sim/doubleDeckSeam.test.ts`'s shuttle-move census. It pinned `[paired, single]` per dispatcher
+  and asserted that **two** of three shipped dispatchers save moves and one draws — adding, in its
+  own comment, *"if a change makes this three, that is a result and it should be read as one."* It
+  is now **three**. The draw was `eta` at 245/245, measured on a `vertical-city` whose shuttle was
+  starved by § D254's refusal; served properly, `eta` saves 23 moves (273 against 296) and every
+  shipped dispatcher is better off paired than single. Re-pinned, still pinned, and read as a
+  result.
+- `config/doubleDeck.test.ts`'s per-deck dwell-sizing bound. It was a flat 5 % on
+  `|projected − boarded|`, calibrated at 700 vs 701 and 339 vs 338 — near-exact agreement on a
+  building that was barely being served. Served properly the lower deck now **fills**, 72 times at
+  this seed, and the projection reads 839 against 794. **The bound was re-pointed at the mechanism
+  rather than widened past it**, and is stricter in the case that matters: the projection may never
+  be *short* by more than 5 % (the direction that under-sizes a stop and which nothing legitimate
+  produces), and any *overshoot* must be within `doubleDeckDeckFullRefusals`. With no refusals that
+  collapses to `projected <= boarded`, which is tighter than the 5 % it replaces.
+
+## D256 — H-ACCESS-1 is REFUTED, and the published record is smaller than the fear and worse than nothing
+
+**Date: 2026-08-05 · Written after the measurement, and nothing here is regenerated.**
+[§ D254](DECISIONS.md) changes what every access-zoned building does under every conventional
+dispatcher, and this repository publishes 993 pinned interval estimates, eight Pareto fronts and six
+coverage rows. The first question was *how much of that was measured on a simulator that could not
+collect people from restricted floors*. It was measured rather than assumed, and the answer has two
+halves that point in opposite directions.
+
+### The reassuring half, and it is the larger one
+
+**Not one interval pin moved. Not one Pareto front moved. Phase 8's verdict is untouched.**
+
+- `benchmark/matrix.test.ts` is **green in full**: all **352** `matrix` pins, including the 132 on
+  `secure-up-peak`, `mixed-use-up-peak` and `vertical-city-up-peak`, and all **8** `PINNED_FRONTS`
+  entries, membership, dominated set, identity classes and verdict counts alike.
+- `benchmark/accessControl.test.ts`'s *"reproduces every pinned estimate, at full precision"* is
+  **green**: all six `access-control` intervals hold, including H-ACCESS-2's difference-of-differences
+  **`+0.982 [+0.584, +1.380]`** — the figure `CLAUDE.md` and seven other places rest the "the saving
+  is entirely in the credential" correction on.
+
+The reason is not luck and is worth stating, because it is what a reader will want to check. **Every
+matrix cell on a zoned building is an *up-peak* cell.** Up-peak traffic is incoming: every pickup is
+the ground lobby, which on all three buildings is the one floor outside every access zone. The
+defective check only ever fired on a *restricted pickup*, so it never fired in these cells.
+
+`benchmark/mixedUseHighRise.ts` says exactly this, and it turns out to have been right for a reason
+it did not know: *"Every pickup must originate somewhere unrestricted, and on this building that
+means the ground lobby… So incoming-only up-peak is the one regime in which a conventional baseline
+can be measured here at all. It is not a convenient choice — it is the only one."* That constraint
+was adopted because conventional arms were unquotable everywhere else — a symptom of the defect —
+and it had the accidental effect of confining every published interval to the regime the defect does
+not touch. **The published intervals were protected by the defect's own symptom.** That is luck, and
+it should be recorded as luck rather than as design.
+
+So `CLAUDE.md`'s headline — *"`nearest-car` is on the Pareto front at six of eight cells"* — stands,
+at the same n, with the same two exceptions, and § D106's argument that energy is an axis and never
+a score is unaffected. `benchmark/matrixFront.test.ts`, which mechanically checks that claim
+wherever it appears in a `.md` or a `.ts`, is green.
+
+### The half that is worse than a moved number
+
+**H-ACCESS-1 is REFUTED, by its own apparatus, and the study now says so itself.**
+
+The hypothesis (`benchmark/accessControl.ts`) reads: *"Under conventional dispatch an
+access-controlled building with down and interfloor traffic is **not servable at all**; under
+credential-aware dispatch it is."* Re-run at its own n = 30, unchanged in any other way:
+
+| row | pinned | measured now |
+|---|---|---|
+| `secure-tower/eta` | 30 of 30 not completed · 18.17 undelivered/run · 33.5 % unserved · **not quotable** | **0 of 30 not completed · 0 undelivered · 0.00 % unserved · quotable** |
+| `secure-tower/destination-entry-bare` | 30 of 30 · 52.23 undelivered · **100 %** unserved · 28.97 kiosk-refused | 30 of 30 · 36.50 undelivered · **61.2 %** unserved · 36.50 kiosk-refused |
+| the other four rows | all zero, quotable | **unchanged** |
+
+`study.coverage.verdict` returns **`'REFUTED'`** where `'CONFIRMED'` is pinned.
+
+This is not a number that moved. It is a **claim that was never true**, stated as fact in
+`CLAUDE.md`, `docs/01`, `docs/05`, `docs/07`, `docs/09`, `docs/10`, `docs/11` and in the docstrings
+of six `benchmark/` modules, and it was measuring a bug in `estimateCost`. Conventional dispatch
+serves every access-zoned building this project ships, at 100 % delivery, on every seed tried — and
+`sim/simulation.test.ts` now asserts the *identity* of the two arms on `secure-tower` under `eta`:
+same status, same legs, same wait to the last significant figure. **What the credential buys there
+is nothing at all**, on 30 of 36 conventional (building, dispatcher, seed) cells measured. The six
+that differ are `energy-aware`, which prices `rideTime` and therefore reacts to the disclosed
+destination — and it differs in *both* directions, so it is not an authorization advantage either.
+
+### What survives of access control, and it is real
+
+The bare-kiosk row above. Under `dispatch.callType: 'destination-entry'` with no panel, the
+passenger types a destination into a terminal that has nothing to identify them with, the group is
+asked *"may an unbadged passenger reach floor 27?"*, and every car answers `destinationAccessDenied`.
+That refuses **61.2 %** of journeys on `secure-tower` and is untouched by § D254 — it is authorization
+of a *destination*, which is the only access question a lift is asked.
+
+It also got **cleaner**. The pinned row had 52.23 undelivered against 28.97 kiosk refusals, so 23
+journeys per run were collateral — riders stranded by a pickup refusal that had nothing to do with
+their credential. The measured row has 36.50 against 36.50: **every undelivered leg is now a
+credential refusal and nothing else.** § T50-D1 built `#kioskAllows` to stop exactly that collateral
+and could only remove the share the call value caused; this removes the rest.
+
+### What is withdrawn, and what is deliberately not regenerated
+
+**Nothing in this commit regenerates a published figure, and that is a decision rather than an
+omission.** `regeneratePins.ts` states the discipline — *"a re-run that disagrees with the file is a
+question, not an answer"* — and the questions H-ACCESS-1's refutation raises are not this lane's to
+answer. The premise *"conventional dispatch cannot serve an access-zoned building"* is load-bearing
+for the **design** of five studies, not merely for their numbers: it is why
+`arms.ts`'s `secure-interfloor-mix` carries `admissibleReplications: 0`, why
+`collectiveAdoption.ts` forces `callType: 'mobile-credential'` on nine of its fifteen rungs, why
+`enRouteDiversion.ts` and `doubleDeck.ts` do the same, and why `matrix.ts` lists
+`secure-interfloor-mix` and `mixed-use-mixed-40-30-30` in `EXCLUDED_CELLS`. Those exclusions may now
+be admissible cells, which would *add* rows to the matrix and pin groups to `published.ts`. That is
+a re-design of the experiment matrix and it needs its own criterion, written before the numbers.
+
+So, withdrawn and named rather than quietly replaced:
+
+1. **H-ACCESS-1's verdict and its two `secure-tower` `PINNED_COVERAGE` rows** — refuted, and the
+   coverage table in `docs/05-roadmap.md` § H-ACCESS-1 and `docs/07-handoff.md` (*"0 of 30
+   replications with a quotable AWT, 18.2 undelivered journeys per run, 33.5 % unserved"*) is
+   withdrawn with them.
+2. **Every prose statement that conventional dispatch cannot serve an access-zoned building at any
+   budget.** It is false. It appears in `CLAUDE.md`, six `docs/`, and the docstrings of
+   `benchmark/{accessControl,destinationLiveness,mixedUseHighRise,collectiveAdoption,enRouteDiversion,doubleDeck,arms}.ts`.
+   `simulation.ts`'s two copies and `estimateCost.ts`'s are corrected in this commit; the rest are
+   named here and not yet rewritten.
+3. **The two `EXCLUDED_CELLS` rationales**, which cite the defect as their mechanism.
+4. **`arms.ts`'s `admissibleReplications: 0`** for `secure-interfloor-mix`, whose stated ground —
+   *"there is no budget at which a conventional arm has a quotable AWT here"* — is no longer true.
+
+The experiments suite is **red at exactly these points and green everywhere else**, and it is left
+red on purpose. `CLAUDE.md`'s working agreement is that a criterion which now fails *is the finding*;
+a suite made green by re-pinning a refuted hypothesis would have destroyed the only evidence that it
+was refuted.
+
+The full list, from `npx vitest run --project experiments` — **12 failures in 7 files, out of 1 300
+tests**, and every one of them asserts some form of *"conventional dispatch cannot serve an
+access-zoned building"*:
+
+| file | n | what it asserts, and why it fails |
+|---|---|---|
+| `benchmark/accessControl.test.ts` | 5 | H-ACCESS-1's verdict and its two `secure-tower` coverage rows. **Refuted**, above. |
+| `benchmark/mixedUseHighRise.test.ts` | 2 | § 1's *"unserved fraction RISES as the load falls"* and *"every baseline without a quotable AWT at every rate"*. Both were the defect's signature. |
+| `benchmark/destinationLiveness.test.ts` | 1 | `eligibility.byReason.accessDenied > 0` on the conventional arm. The reason no longer exists, and the refusals it counted were the defect. |
+| `benchmark/doubleDeck.test.ts` | 1 | *"the building's own mixed scenario is structurally closed to a paired comparison"*, on `vertical-city`. Same mechanism, third building. |
+| `benchmark/saturationCensus.test.ts` | 1 | *"the conventional arms are invalid from replication zero on Secure Tower interfloor-mix"*. |
+| `validation/adversarial.test.ts` | 1 | the `access lockout` fixture. Its conservation claim — *never silently dropped* — is worth keeping; its **fixture** needs to become the bare kiosk, which is the surviving lockout. |
+| `validation/goldenRuns.test.ts` | 1 | the negative control needs *a* golden that times out, and the golden that used to was one of these runs. A fixture question, not a result. |
+
+The bottom two are the cheapest and least contentious to re-point, and they are fixtures rather than
+findings. The top five are the finding.
+
+One failure was fixed rather than left, because it was caused by this commit and not by the
+measurement: `validation/documentation.test.ts` asserts that `estimateCost.ts` still carries the
+*descriptive* sentence *"authorize and optimize in one step"*, which § D60's exclusion depends on
+being present and true. Rewriting the header dropped it. It is restored, on the destination check
+where it now belongs — the guard caught a real thing in the exact direction it was written for.
+
+**One failure is not ours and is recorded so nobody re-derives it.**
+`benchmark/weightSetSelection.test.ts` (Phase 6c) failed on one run at **658 099 ms** against its own
+`TIMEOUT_MS = 600_000`, on a machine at load average 595 with several agents' suites in flight. It
+passed on the run before. It also **cannot** be affected: `SELECTION_BUILDING` is `midtown-office`
+and `DEADBAND_BUILDING` is `garden-apartments`, the two buildings that declare no `accessZones` and
+that this change leaves byte-identical. Phase 6c's NOT ACCEPTED verdict is untouched.
+
+### The consequence for `packages/viz`, which this lane may not edit but measured anyway
+
+The viz suite fails on this branch — **27 tests across 13 files, out of 2 493**. They fall into two
+kinds. Neither is a defect in the viewer, and both are handed over rather than fixed here.
+
+**All but two are a stale *fixture*.** `live/honesty`, `mode/disclosure`, `dev/leftRail`,
+`dev/rightRail`, `frame/overlay`, `live/noMeans`, `render/describeFrame`, `record/document`,
+`campaign/*` and `access/lockedOut` all need a run that is *suppressed*, *saturated* or *locked
+out*, and each of them reaches for an access-zoned building because those reliably were. They no
+longer are. The tests say so themselves — *"really is suppressed, or the rest of this proves
+nothing"* — which is the precondition check doing exactly its job, and `access/lockedOut` is the
+honest one of the group: there are no locked-out landings any more, which is the whole point of
+§ D254. They need a genuinely suppressed fixture, and one is easy: `midtown-office` at its default
+rate is unzoned, untouched by this change, and reports `awtIsValid: false` on every seed measured.
+
+**`campaign/campaign.test.ts` is where this meets issue #86 and should be read with it.** Its stage-5
+case is titled *"the credential is named, and the lesson is that it is not congestion"* — the viewer
+teaching the player the very lesson that was an artefact. The lesson is now wrong in the other
+direction, and what the player should be told is nothing at all, because the stage is clearable on
+the dispatcher the game selected for them.
+
+**Two are a real question, and it is worth stating precisely.** `authoring/authoring.test.ts` asserts
+the standing requirement against the building editor — *"an access zone changes the run"*, *"one more
+floor inside the zone"*. Both now fail, and **the control is not unwired**. The reason is
+`traffic/generator.ts`: `credentialGroupFor` issues each rider a credential drawn from the zones the
+building declares, and `planDemand` *"has already dropped every pair for which no credential works"*.
+So the traffic model only ever generates journeys somebody is entitled to make. While the pickup was
+being checked, adding a zone changed the run by stranding landing calls regardless of credential —
+the control was observable **through the defect**. With the defect gone, a well-formed zone changes
+nothing on the legs, because everybody bound for a restricted floor holds a badge for it.
+
+Measured directly: `midtown-office`, seed 424 242, with a synthetic zone over floors 8–13 permitting
+a group named `nobody-has-this` — 205 of 699 legs are bound for those floors, all 205 alight there,
+and every one of them carries `nobody-has-this`. The run is byte-identical to the unzoned one under
+both `collective` and `destination-eta`.
+
+That is arguably the right model — a card reader constrains where people may go, and this traffic
+model does not generate people attempting journeys they are barred from — but it means the editor's
+access-zone control has no observable effect on a conventional run, and the test for it needs
+something that does: `credentialAssignment: 'none'`, which the generator already supports, or a
+destination call type that must be *told* the credential. Whoever owns that panel should decide
+which, and the standing requirement says they may not simply delete the test.
+
+### The lesson, in the form this repository already keeps
+
+This is the *stated-mechanism* defect (§ D30, § D60) one level deeper. That one found a **claim about
+why** something performed better which no measurement supported. This one found a claim about **what
+the system can do at all** — *"not servable"* — which was true of the code and false of every
+building it describes, and which nine documents repeated because the simulator kept agreeing with
+them. The apparatus and the claim were the same defect, so no amount of re-measuring could separate
+them.
+
+The check that would have caught it is the one `CLAUDE.md` already states for controls, pointed at a
+building instead: **strip the feature and require the run to change for the reason you claim.** The
+issue reporter ran it in one line — set `accessZones: []`, change nothing else, same seed and
+dispatcher — and `mixed-use-high-rise` went from `timed-out` with 642 of 725 delivered to `completed`
+with 725 of 725. A structural refusal that a *configuration* change makes disappear is not a
+property of the fabric.
+---
+
+## D251 — four modules held their own copy of the palette, and an inline style is unreachable
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #76's residue. § D235
+raised the ink ladder and § D236 fixed the layout, and between them the Simulation tab's WCAG AA
+failures went 88 → 9 in dark and 48 → 28 in light. § D236 named what was left and whose it was:
+*"`src/live/bands.ts` and `src/live/decisions.ts` hold hex copies of the dark band palette, which
+`dev/leftRail.ts` writes into inline `style="color:…"` … **This is the whole of the 28**."* This is
+that lane.
+
+### What reproduced, measured rather than inherited
+
+The report and § D236 are both second-hand here, so the walk was re-run rather than trusted: a real
+`vite` serving the shipped `index.html`, a real Chromium at 1280 × 720, the menu left the way a
+player leaves it, a shift run and the playhead dragged to the end, then every element with its own
+visible text — effective background composited up the tree through every translucent layer,
+`font-size` and `font-weight` deciding whether AA asks 4.5:1 or 3:1. Both modes, both disclosure
+modes, driven through the shipped `themeFor('system', matchMedia)` rather than by stamping an
+attribute.
+
+| | dark | light |
+|---|---|---|
+| before | **1** | **26** |
+| after | **0** | **1** |
+
+**Two of the three inherited figures did not reproduce, and the difference matters in opposite
+directions.** Dark is **1**, not 9 — and the one is the timeline label, which § D236 lists
+separately as failing *in both* modes, so the two accounts agree about the cause and disagree about
+the count. Light is **26**, not 28. Both gaps are the walk's reach rather than a disagreement about
+a colour: this one sweeps the Simulation tab at one viewport with the drawer shut, and § D236's
+swept more of the product. Nothing in either list is outside the four files below, which is the
+claim that decides the lane.
+
+The 26 partition exactly by which module held the copy:
+
+| copy | what it painted | ratios |
+|---|---|---|
+| `live/bands.ts` (19) | the mood legend's four labels and four counts, the *served under 60 s* figure, six goal glyphs and values, the stage legend's four discs | 1.68–3.61 |
+| `live/decisions.ts` (6) | `.decision-title` — `A → Lobby`, six rows | 2.48 |
+| `live/timeline.ts` (1) | the phase strip's `DRAIN` label — **and this one fails in dark too** | 3.15 |
+
+### The fourth copy, which no walk could have found
+
+`live/honesty.ts` held `rgba(224,176,64,.07)` and `rgba(63,178,127,.06)` — the **dark** values of
+`--band-1` and `--band-0` — as the honesty card's wash and rule. A wash carries no word, so it never
+appears in a contrast walk, and it would have survived a fix that chased the reported ratios and
+stopped. It is the same defect and it is fixed the same way. **That is the argument for fixing the
+class rather than the twenty-six instances**, and it is why the deliverable is a rule.
+
+### Why the values move to the page rather than the page moving to the values
+
+The candidate fixes were: give each module a light-mode branch; hand the modules a resolved palette
+at mount; or have the modules **name** the tokens the page already declares.
+
+The first two lose to one fact about the medium. `dev/leftRail.ts` and `dev/main.ts` put these
+strings into an *inline* `style` attribute, and an inline style is not reached by
+`:root[data-theme='light']` — no stylesheet block can repaint it, however complete the palette is.
+So any fix that keeps a value in TypeScript needs the modules to learn which mode is live, which
+means a second theme resolver beside `render/theme.ts`, in the directory whose own docstring says it
+holds *no arithmetic over a recording anywhere in it* because a decision made inside a DOM write is
+a decision no test can reach.
+
+Naming the token costs nothing and needs nobody to know the mode: `style.setProperty` takes
+`var(--band-0)` happily, and CSS resolves it against whichever block is live. `dev/leftRail.ts` had
+**already made this move** for every colour that was not a band — its `INK`, `DIM`, `FAINT` and
+`TRACK` are `var(--text)`, `var(--dimmer)`, `var(--faint)`, `var(--edge-strong)`, and its own token
+comment said so. The bands were the exception, and the exception was the bug.
+
+`render/tokens.ts` keeps its literals and is untouched. The canvas cannot take a `var()` — a 2D
+context wants a colour — so the stage reads values and the DOM reads names, which is the split
+`dev/tokens.test.ts` already pins in both directions. **Nothing in `live/` may be handed to a
+canvas**, and nothing is.
+
+### The phase strip needed tokens that did not exist, and they are derived
+
+`live/timeline.ts`'s six pairs had no counterpart in the stylesheet at all, so this half is a
+declaration and not a rename. Two constraints shaped it:
+
+1. **A new *hex* token is not available to this lane.** `dev/tokens.test.ts` requires every hex in
+   `:root` to be answered in the light block, requires the light block to declare nothing
+   `themeFor` does not resolve, and `render/theme.test.ts` requires every hex token to sit in
+   exactly one of its four contrast groups. All three roads run through `render/`, which this lane
+   does not own. A **derived** token — one whose value is `var()` or `color-mix()` over tokens
+   already declared — is invisible to all three, because each derives its set with a hex filter.
+   That is not a loophole found; it is the same reason the filters exist: a derived value has no
+   independent value to check, and the tokens under it are checked already.
+2. **The handoff is canonical for the interface.** So the mapping answers to `design.html`
+   `:988–994` rather than to convenience.
+
+Two of the three hues turn out to be tokens already, at the same value: `AM PEAK`'s `#c69ad8` is
+`--transfer` and `LUNCH`'s `#9fc48a` is `--measured`. Naming them creates no shared colour the page
+did not already have — the handoff itself drew the transport strip and the floor gutter the same
+violet. `PM PEAK`'s `#dbb075` is nobody's token; `--secure` is the nearest hue the palette owns, and
+the meaning it carries — a floor behind a credential — lives on the canvas gutter, which nobody is
+comparing a 26 px transport strip against. **The word in the segment is the signal** — `FILLING`,
+`PEAK`, `EASING`, `DRAIN`, and `recordRun`'s `labelOfPhase` reserves `PEAK` for the segment holding
+the template's peak — so the hue reinforces and never carries (KB-15).
+
+The three quiet plates are surfaces rather than tints, which is what the handoff's own values
+already were: its `STEADY` `#161e2a` is `--raised` and its `QUIET` `#131a24` is `--card`, to within a
+rounding step. `--phase-unknown` sits between them, keeping the handoff's ordering — a band the
+schedule says nothing about is quieter than one holding below peak and louder than one asking for
+nothing.
+
+Two numbers, and they were chosen by measurement rather than by eye: **15 %** of the hue over
+`--raised` for the plate, **70 %** of the hue toward `--text` for the ink. The ink then clears AA on
+its own plate in both modes with room — 6.60–7.15 dark, 6.37–7.72 light — where 20 % put `--dim` at
+4.34–4.44 in dark, under the standard. The neutral segments take `--phase-ink` (`--dim`) and the two
+quiet ones `--phase-ink-quiet` (`--dimmer`), which is the handoff's own rung difference (`#6d7b8d`
+against `#5d6b7d`); **both rungs clear AA on their own plate**, 6.01 and 6.53, so this is a hierarchy
+and not the contrast-as-signal § D235 refused for `.tab-secondary`.
+
+**One value in the old strip was a fossil, and it is the reason the label failed in dark as well.**
+`flat`'s `#6d7b8d` was `--dimmer`'s value *before* § D235 raised it — copied out at some point, and
+therefore not moved when the ladder moved. A copied literal does not follow the token it was copied
+from. `live/decisions.ts` had the same fossil: its `empty` row was `#4d5a6b`, which is `--faint`'s
+pre-§ D235 value, so the *standing by* row was still being drawn in a grey the ladder had abandoned
+for failing 2.31:1.
+
+### What is asserted, so this cannot rot
+
+The four edits fix today's page. `live/palette.test.ts` is what stops the fifth copy, and it is why
+the fix is described as *one source reachable by the theme* rather than as four edits:
+`dev/tokens.test.ts` already guards the stylesheet's half — *no rule below the two blocks paints a
+literal* — and **nothing guarded this half**, which is exactly how a palette can be perfect,
+asserted in both directions, and applied to a tenth of the page.
+
+1. **No colour literal anywhere in `live/`, nor in `dev/leftRail.ts`.** The file set is read off
+   disk rather than listed (§ D213: a hand-written list stops tracking the directory it was built
+   from, and the file somebody adds next week is the one that carries the copy). Comments are
+   stripped, because `live/timeline.ts`'s docstring still tabulates the handoff's six hex pairs
+   while explaining what replaced them, and a check satisfiable by rewording a docstring is not
+   checking the code.
+2. **No dangling token.** Every `var(--x)` named is a property `index.html`'s `:root` declares.
+   This is § D222's `aria-describedby` argument in another medium: an unset custom property makes
+   `color` fall back to `inherit`, so a typo produces a plausible-looking rail rather than an error,
+   and an assertion rebuilt from the same constant would not see it.
+3. **No orphan.** Every `--phase-*` the page declares is one `live/timeline.ts` names — § D213's
+   rule in the direction that rots quietly, and the same shape as `dev/tokens.test.ts`'s orphan
+   check on the light block.
+4. **The `:root` block is read to its end.** See below.
+
+### A brace in a comment silently shortens the palette — found twice, in one sitting
+
+`dev/tokens.test.ts`, `render/theme.test.ts` and the new file all find the block with a **non-greedy**
+`:root { … }` match, which stops at the first closing brace. The comment introducing `--phase-*`
+first read *"six `{ bg, fg }` hex pairs"*; the block those three files thought they were reading then
+ended **inside a comment**, and every token below it stopped existing as far as they were concerned.
+Nothing went red — both incumbent files only ever *look names up*, and a name that is silently absent
+is a check that silently passes. The second occurrence was the comment written to warn about the
+first, which quoted the regex.
+
+Fixed by rewording, and pinned so the next one is loud: the block must contain `--rail-right`, its
+own last declaration, and must contain no brace at all. Recorded here rather than only in the file
+because the two incumbent tests are outside this lane and are the ones with something to lose.
+
+### What is left, and whose it is
+
+**One element still fails, and the fix is a token value in a file this lane does not own.** The stage
+legend's four discs are drawn on `--bg` — the *darkest* light surface — and light `--band-0`
+`#1c7a55` measures **4.43:1** there. § D235 measured that token at 4.94 and deliberately left it,
+but it measured it on `--panel`; `render/theme.test.ts`'s `CONTENT_ON_PANEL` does the same. § D236
+already found and fixed this exact shape once — `waitingUp` at 4.34:1 on `--bg`, moved to `#0d7069`,
+with the note that the key's marks are measured *"against `--bg`, the ground the key is actually
+drawn on"* — and `--band-0` was not swept with it. The other three bands clear it: 4.58, 4.58, 4.93.
+
+Recommended, and **not applied here**: `LIGHT_PALETTE.bandSettling` `#1c7a55` → `#1a7451`, which is
+4.80 on `--bg`, 5.34 on `--panel`, 5.74 on `--raised`, and leaves the ladder's order untouched. The
+mirror is that the four bands belong in a group measured against `--bg` rather than `--panel`, since
+`#legend` is the surface they are actually drawn on. Both are `render/`'s, and § D235's own rule —
+*do not weaken a criterion, raise it* — says the group moves rather than the bound.
+
+---
+
+## D252 — the dependency had one end drawn, and the badge is the other end rather than a graph
+
+**Date: 2026-08-05 · Written after the code, and says so.** Play-tester issue #79, split out of #17.
+§ D222 shipped the *gated* end — an inactive control's label line reads `needs dispatch.callType`,
+so a reader looking at a dead knob can see which switch to move. The mirror was missing: a control
+that **gates** others said nothing, so `selection.policy`, which governs six other rows, looked
+exactly like a control that governs none, and moving it produced a cascade with no warning and no
+account of itself.
+
+### The graph is refused on design grounds, and § D222 already wrote the reason
+
+#17 asked for *an expandable section showing which settings unlock which others*, and § D222 left
+it open as *"a product call and not this lane's"*. The call is: **no.** `controlsFor` emits the
+space's own gate order, so **the tab already places a gated control below its gate** — the layout
+*is* the dependency structure, drawn. A graph would be a second navigation model over information
+the page already carries, and the two would then have to be kept in step. This repository has a
+long record of what happens to two sources of one truth, and § D251 landed four hours earlier for
+exactly that reason.
+
+What the layout cannot say is **how many** controls are waiting below a switch. That is what the
+badge adds, and it is the whole of what it adds: the ids go on `data-unlocks` / `data-holds-open`,
+where a test and a mount read them, and *which* remains the layout's answer. A badge naming six
+dotted ids would be longer than the control it sits beside.
+
+### Derived from the declarations, in one pass, and never listed
+
+`dependantsByGate` inverts the `activeWhen` graph from `space.parameters` — the same declarations
+`unmetGatesOf` reads for the other end. A list of *"controls that gate others"* maintained beside
+the schema would be the § D213 defect with an aggravating factor: the two ends of one edge, in two
+places, with nothing comparing them. `controls.test.ts` builds its expectation the same way, off
+`ORCHARD_PARAMETERS`, so a sixth fictional row with a gate on it moves the test rather than passing
+under it.
+
+A gate id that is not itself a dimension is skipped rather than invented. All ten in the shipped
+dispatcher space *are* dimensions — which is what makes the badge actionable, since the thing it
+counts is always a control on the same tab — but `activeWhen` is a plain record and a schema may
+gate on something the form does not draw.
+
+### Two fields, because one would vanish at the moment it is being read
+
+The obvious model is a single `unlocks: string[]` — the dependants this control is currently
+holding shut. It has a defect the issue names in its first sentence: *a player moving a switch
+cannot see what they just unlocked.* A badge derived from that list alone reads `unlocks 6` before
+the switch is thrown and **disappears** after, at exactly the instant the reader is looking for
+confirmation.
+
+So the model carries both halves and they **partition** the dependants: a declared condition on
+this control is either satisfied at the current point or it is not, so every dependant is in
+`unlocks` or in `holdsOpen`, exactly once. Their total is the dependant count, which does not move
+as the reader edits. Presence of the badge is therefore **structural** — emitted for a control that
+gates something and for no control that gates nothing, whatever the point — while its words follow
+the state:
+
+| state | badge |
+|---|---|
+| holding dependants shut | `unlocks 6` |
+| keeping them all live | `holds 6 open` |
+| both, under different conditions | `unlocks N` — the actionable half; both data attributes carry the whole partition |
+
+The split is per **gate**, not per dependant, and the fictional schema has the case that proves it:
+`orchard.lanternCount` is a conjunction of two gates, and at the defaults the crew of six satisfies
+`{ min: 4 }` while `nightHarvest: false` does not satisfy `['true']`. So `pickersOnShift` reads
+`holds 1 open` and `nightHarvest` reads `unlocks 1`, about the same row. A reverse edge computed
+from *"is the dependant live"* rather than from *"is my own condition satisfied"* would put both in
+the same half and tell a reader that hiring people unlocks lanterns.
+
+### § D222's two constraints, and one measurement that moved a colour
+
+The reason text is untouched — it is still an element in the flow, above the help, referenced first
+by `aria-describedby`. Nothing became a tooltip and nothing became a disclosure. The badge's content
+is **words and a number**, so KB-15 holds by construction: a reader who separates neither hue still
+reads `needs dispatch.callType` on one badge and `unlocks 6` on the other.
+
+`.control-gate` was drawn in `--accent` and is drawn in `--accent-soft`, because the first was
+measured rather than assumed. `--accent` is **4.26:1 on `--bg` in light** — § D235 measured that and
+left it deliberately, since its group carries a no-regression floor of 4 rather than the standard —
+and this badge is 10.5 px text, which AA asks 4.5:1 of. In `--accent` it would have been the only
+sub-AA element on the Parameters tab that is not an inactive control. `--accent-soft` is 7.62 dark
+and 6.66 light against the worst of the five surfaces.
+
+### Measured on the shipped page, in a browser, both themes
+
+Ten gating controls, ten badges, in both modes: `unlocks 6` on `selection.policy`, `3` on
+`dispatch.reassignmentPolicy`, `2` on four more, `1` on four. `auction.rounds` carries **both**
+badges — it is gated by `auction.aggregation` and gates `auction.reserveMarginalDelayS` — which is
+why the two are independent elements rather than a three-state one, and why the lock badge is
+emitted first: what a reader needs first from a dead control is why it is dead.
+
+The standing requirement, pointed at a badge rather than at a slider: **move the control and require
+the screen to change.** Driving `#param-dispatch-callType` from `up-down-buttons` to
+`destination-entry` in a real browser turns `unlocks 2` into `holds 2 open`, with
+`data-holds-open="weights.rideTime dispatch.passengerAssignment"` — the two rows that became live.
+
+Measured after, on the Parameters tab: **the badge adds no contrast failure in either mode** (9.06
+dark, 6.66 light), and the tab's 44 remaining failures in each mode are unchanged and are all text
+inside `.control-disabled` rows, which WCAG 2.2 1.4.3 exempts as inactive user-interface components.
+
+---
+
+## D253 — two counts nothing was checking, and a header that could not travel with its own rows
+
+**Date: 2026-08-05 · Written after the code, and says so.** Two play-tester issues about
+`packages/viz/index.html`, filed separately and closed together because they are the same shape:
+**a fact declared in two places, with nothing comparing them.** #37 is the campaign's size, written
+into prose beside a list generated from the campaign. #52 is a column width, written into a header
+beside rows generated from the same columns.
+
+## 1 — The Scenarios tab said *five* over eight cards, and pointed at a directory
+
+The heading read *"Scenarios — five buildings, any order"*, the intro *"the other four"*, and the
+footnote *"All five ship with the simulator in `data/buildings/`"*. `CONTRACTS` has **eight** — the
+handoff fixed the campaign at the five buildings shipped when it was drawn and three landed
+afterwards (`docs/12` § 4.7) — and `dev/scenariosPanel.ts` draws a card from each, so a player
+counted eight cards under a heading that said five. The cards themselves were corrected at source
+by another lane; these three sentences are static markup, and static markup cannot count.
+
+### Three routes, and why the count is pinned rather than derived or deleted
+
+- **Derive it at runtime**, by giving the three sentences ids and having the mount write the number
+  in. It is the honest shape and it needs `dev/elementMap.ts` and `dev/scenariosPanel.ts`, both
+  outside this lane. **Recorded as the better fix rather than taken** — see the end of this entry.
+- **Delete the count** — *"every building, any order"* — which cannot go stale because it says
+  nothing. Refused: *how many scenarios are there* is the first thing a player wants from the tab,
+  and this is the only sentence that answers it before the cards render.
+- **Type it and pin it.** `dev/scenarioCopy.test.ts` reads the three sentences out of the markup
+  with the number **captured**, and compares each against `CONTRACTS.length` — which is the list the
+  cards under them come from. The day a ninth contract lands, the suite goes red naming the
+  sentence to change.
+
+The defect was never the number. It was that a hand-typed count had nothing checking it, which is
+what `dev/tokens.test.ts` closes for colours and `elementMap.test.ts` closes for ids, on this same
+file, by this same technique. Reading the word out rather than searching for the right one matters
+in both directions: a page that said *five* fails with the word it said, and a page that lost a
+sentence fails because the pattern does not match at all — where a `toContain` on the correct string
+is satisfied by a page containing the wrong one too. The negative control plants #37's own defect
+back and requires the patterns to find it.
+
+Matching the *shape* rather than the bare word is also what lets *"the clean shifts **one** asks
+for"* stand. A blanket ban on number words in the panel would have to be answered by rewording
+ordinary English, which is how a check ends up being edited instead of the thing it checks.
+
+### The path, and the two more found beside it
+
+*"…in `data/buildings/`"* handed a repository directory to somebody playing a game. Sweeping the
+whole markup rather than the panel found **two more**: `data/elevator-specs.json` in two
+machine-class tooltips, and `CLAUDE.md` — this repository's agent instructions — in the batch
+panel's *replications* label. All four are gone, and the sweep is over the page rather than over the
+Scenarios tab, because scoping it to what was reported would have left the two it found. What is
+banned is a path a reader could try to open and the names of this repository's own documents; a bare
+`.json` is not, because the Lab and Parameters tabs legitimately name a *schema* and a *profile*,
+and a rule that banned the characters would be answered by rewording rather than by removing a leak.
+
+## 2 — The elevation's header was a static sibling of the scroller
+
+`.elevation-head` sat **outside** `#elevation-body`, with `min-width: 400px`, inside a container
+with no `overflow-x`. Measured at 1440 × 1100 with eight shafts, before:
+
+| box | client / scroll | `overflow-x` |
+|---|---|---|
+| `.elevation` | 339 / 412 | `visible` |
+| `.editor-grid` | 702 / 774 | `visible` |
+| `.sheet` | **750 / 798** | `auto` |
+| `#elevation-body` | 315 / 446 | `auto` |
+
+Three things follow from that table, and only the first was reported as the headline.
+
+**The SHAFTS column was unreachable.** The body scrolled and the header did not, because the header
+was not in the scroller — so a player who found the gesture watched the rows slide under a header
+that stayed put. Of eight authored shafts, **A and B were on screen and C through H were past the
+right-hand edge**, while the legend directly below listed all eight. The instruction line above it
+reads *"drag a shaft's top or bottom edge to restrict it to a band of floors"*, pointed at the part
+that was not there.
+
+**The reporter's second measurement reproduces exactly, and it is a consequence rather than a
+second bug.** They measured `.sheet` at `741 / 794` and described slider labels degrading to
+*"CUPANCY"* and *"esign capacity per floor"* once anything scrolled it. `.sheet` is the only
+ancestor with `overflow-x: auto`, so the elevation's 73 px of overflow travelled up through
+`.editor-grid` and landed there: **the form's left edge was cut off because the elevation's right
+edge was.** Measured after the fix, `.sheet` is `750 / 750` and `.editor-grid` is `702 / 702`. One
+cause, and closing it closes both.
+
+**And the fix has to be one grid, not two scrollers.** `.elevation-scroll` is the box that scrolls
+and `.elevation-grid` inside it is `min-width: max-content`, so the header and the body are sized
+together and one gesture moves both. Measured after, at 1440 with eight shafts: the scroller is
+`315 / 446`, **`#elevation-body` is `446 / 446`** — it never has anything to scroll sideways, so it
+cannot get its own scrollbar and drift out of register — and at full scroll the header's left edge
+and the first row's left edge are the same number (578), with the eighth bar's right edge at 1016
+inside a viewport edge at 1024.
+
+Two details that are decisions rather than detail:
+
+- **The scroll is on an inner box, not on `.elevation`** — which is what #52 proposed. `.elevation`
+  also holds the legend, the two notes, the add/remove buttons and the paragraph about saving.
+  Scrolling to reach shaft H would have carried all six off the left-hand edge, trading one thing a
+  reader cannot reach for six.
+- **`.elevation-body` declares no `overflow-x` at all.** The proposal was `overflow-x: visible;
+  overflow-y: auto`, and that pair does not mean what it reads as: a box with one axis `visible` and
+  the other not computes the visible one to `auto`. Written out it would have said *do not scroll
+  sideways* and given the body a second horizontal scrollbar the header does not follow — the exact
+  defect being fixed, restored by the fix for it. Confirmed by measurement: the computed
+  `overflow-x` on that element is `auto` either way.
+
+### The defect under the defect: one set of columns, three declarations
+
+Fixing the scroll and stopping would leave the next drift waiting. The four column widths were
+written **three times**: in the `.elev-*` rules, again inline on `.elevation-head`'s five spans, and
+a third time as `dev/buildingEditor.ts`'s `SHAFT_LEFT_PX = 284` — their sum plus the row padding and
+the four gaps, under a docstring that says *"if either moves, both move"* and nothing that makes it
+so. The shaft overlay is absolutely positioned at that offset; a column that widened in the
+stylesheet would have drawn bars over the PEOPLE figures.
+
+Two of the three are one now: the rules and the header both name `--elev-floor-w`, `--elev-sky-w`,
+`--elev-occ-w`, `--elev-people-w`, `--elev-col-gap`, `--elev-row-pad`, `--elev-shaft-gap` and
+`--elev-stage-min`. The third cannot be, from this lane — `elevationStageWidthPx` has to stay pure,
+because it is what § D236's half of #52 is asserted on, and `buildingEditor.ts` is not ours. So the
+duplication that remains is **pinned rather than promised**: `dev/elevationGeometry.test.ts` derives
+`SHAFT_LEFT_PX` from the page's own tokens as `pad + FLOOR + gap + SKY + gap + OCCUPIED + gap +
+PEOPLE + gap`, recovers the inter-bar gap and the right-hand inset from `elevationStageWidthPx` by
+differencing rather than by importing constants that would then be asserted against themselves, and
+requires the header to carry no bare pixel width at all. That is `dev/tokens.test.ts`'s arrangement
+applied to widths instead of to colours, and it is what a duplication that cannot be deleted gets.
+
+### What is left, and whose it is
+
+Both remainders are the same request, in two files this lane does not own:
+
+1. **`dev/buildingEditor.ts` should read the tokens rather than restate them.** `SHAFT_LEFT_PX`,
+   `SHAFT_GAP_PX`, `SHAFT_RIGHT_PX` and `STAGE_MIN_PX` are `index.html`'s numbers copied into
+   TypeScript. A mount can read a custom property off the computed style once and hand the pure
+   function its geometry, which would make the test above unnecessary rather than necessary.
+2. **The Scenarios tab's three counts should be written by the mount.** `dev/elementMap.ts` gains
+   three ids and `dev/scenariosPanel.ts` writes `CONTRACTS.length` into them, at which point the
+   count is derived and `scenarioCopy.test.ts`'s first case becomes a statement about the mount
+   rather than about the markup.
+## D257 — the page waits 32 seconds for a server it does not need, so the page moves and the API does not
+
+**Date: 2026-08-05 · Written with the code, and the measurement came first.** Two figures against
+the live deployment, checked rather than reasoned about:
+
+| | |
+|---|---|
+| Cold first page load, container asleep | **32.2 s** |
+| Warm page load | **0.13 s** |
+
+`packages/server/src/http/serve.ts` serves everything outside `/api/` from the built bundle **in the
+same container**, and `infra/azure/main.bicep` runs that container at `minReplicas: 0`. So a tester
+opening the link cold gets around half a minute of blank browser **before any app exists to
+apologise**. `GET /api/wake` — already merged — fixes the API's cold start and cannot fix this one:
+nothing can call `/api/wake` until the page that would call it has arrived.
+
+### 1. Three options, and the one that is chosen is not free of a cost
+
+| Option | Δ standing cost | What it keeps |
+|---|---|---|
+| **Static Web Apps Free + cross-origin API** ← chosen | **£0** | Scale-to-zero, unchanged |
+| Static Web Apps **Standard** + linked backend | ≈ £9 / month | One browser-visible origin; § D243's reasoning intact |
+| `minReplicas: 1` | ≈ £26 / month (≈ $34) | Everything — not one line of code changes |
+
+The case for Standard is § D243's own and it does not weaken: an absolute origin *"goes stale the
+moment a custom domain is put in front"*, and `static.ts` says outright that *"which origins may
+call this API"* is **"a question with a wrong answer that looks exactly like a working one"**.
+
+What decided it is that **two of the four moving parts move under Standard as well**, which the
+framing this work started from did not account for:
+
+1. **The tag has to be declared at build time either way.** Under Standard the page is still served
+   by the CDN and still never passes through `loadStaticBundle`, so a Standard deployment with no
+   build-time tag dead-ends every social surface exactly as a Free one does. Standard changes the
+   tag's *value* — `"/"` rather than an absolute origin — not whether it must exist.
+2. **The magic-link origin moves either way.** `ELEVATOR_SIM_ORIGIN` is where the mailed link points
+   (§ D241 § 4) and under both options the page is at the static host.
+
+So the free path's marginal cost is two values, not four, and both are written from **one** deploy
+parameter that the server refuses to boot on if they disagree. Against that, Standard adds a
+standing charge to a deployment whose entire design principle is that the app bills nothing at rest.
+
+One argument against Standard is **reasoning and is labelled as such**: a linked backend puts an
+Azure proxy in front of a request that already takes 32 s cold, and Static Web Apps documents a
+response timeout on proxied backends. Under the cross-origin design the browser waits as long as it
+likes and nothing in between can give up first. Nothing here has run a linked backend, and adopting
+Standard would need that measured rather than inherited from this paragraph.
+
+### 2. What is genuinely lost, stated rather than argued away
+
+Same-origin. With one origin a misconfiguration is *impossible*; with two it is possible and made
+loud, which is a weaker guarantee. Three mechanisms have to fail before it is silent again: the
+build refuses to run armed without an origin, the workflow asserts the artifact in both directions,
+and `provision.sh` reads the tag back off the deployed page.
+
+What is **not** lost is the set of browser origins that can call this API. It is exactly one — the
+viewer's — under both options; Standard enforces it with the same-origin policy and this enforces it
+with an allowlist naming one origin. `*` is refused at boot rather than warned about, because the
+API answers session-bearing requests and a verification is a whole simulation, so a wildcard
+publishes both to every page on the web. There is no `Access-Control-Allow-Credentials` anywhere in
+this server: the session is a bearer token in a header, never a cookie.
+
+### 3. What has not been run
+
+**No Azure resource has been created by this lane**, no page has ever been served cross-origin, and
+`provision.sh` has never been executed. `docs/16-static-site-deployment.md` § 9 itemises the verified
+and unverified halves separately, in the voice `infra/README.md` § 0 already uses. The cost figures
+are list prices, not a bill.
+
+---
+
+## D258 — one meta tag, two producers, and the comment that suppressed both
+
+**Date: 2026-08-05 · Written with the code.** § D243 closed the defect behind play-tester issues
+#21, #28, #29, #30, #32 and #34 by having the **server** inject `<meta name="elevator-sim-api">` as
+it reads the build off disk, with the value `"/"`. That fix is exactly right for the deployment it
+was written for and **cannot reach a bundle a CDN serves**, because such a bundle never passes
+through `loadStaticBundle`. § D257 moves the bundle, so a second producer is needed.
+
+### 1. Mutually exclusive by construction, not by convention
+
+| Build | `ELEVATOR_SIM_API_ORIGIN` | The build emits | The server injects |
+|---|---|---|---|
+| `vite dev` | unset | nothing | not involved |
+| the container image | unset | nothing | `"/"` — unchanged |
+| the static host | `https://…` | an absolute tag | never sees it |
+
+`packages/viz/apiOrigin.mjs` is the second producer and **§ D243's path is not touched**: the
+container still serves the page in local development and in the current deployment, and it must keep
+being right for that. `withApiOriginTag` is idempotent, so even a static bundle handed to the
+container keeps its absolute origin rather than acquiring a second, contradictory tag — verified by
+running both bundles through a real socket, not asserted.
+
+The two implementations are deliberate rather than an oversight: `server` may not depend on `viz`,
+and `viz`'s copy must load inside a bundler config `tsc -b` deliberately cannot reach.
+`static.test.ts` therefore **drives both** in one file, including their two origin validators over
+one table of fourteen cases — a shared constant would only have *looked* like that check.
+
+### 2. § D243's objection to an absolute origin is answered, not dodged
+
+It *"goes stale the moment a custom domain is put in front"*. True, and the answer is that the origin
+is a **deploy parameter** and never a committed constant: no file in this repository names a
+hostname, and a custom domain is one variable in two places (`docs/16` § 3.5). Hard-coding it into
+`packages/viz/index.html` stays rejected for § D243 § 1's reason — it would point a local development
+build at production — and `static.test.ts` now asserts that `index.html` declares none.
+
+The second objection — that any mismatch turns a same-origin call into a cross-origin one the
+restrictive CORS default refuses — is answered by making the mismatch impossible to have quietly:
+the same parameter writes the tag and the API's `ELEVATOR_SIM_ALLOW_ORIGIN`, and § D259 is the
+refusal that fires when they drift.
+
+The **CSP moves in the same decision**, which is the part that would otherwise have been discovered
+in a browser. `staticwebapp.config.json` ships `connect-src 'self'` — correct for a page that
+contacts nothing else, and forbidding exactly the request this deployment exists to make. The
+emitter widens it *iff* an origin is declared, and throws when there is no `connect-src 'self'` to
+widen rather than returning the input unchanged.
+
+### 3. The comment that broke it, which is the instructive half
+
+`index.html` gained a comment telling the next reader not to write this tag by hand. Both producers
+detected an existing tag with a regex over the whole document — and such a comment **necessarily
+contains the attribute it is warning about**. The comment matched, both producers concluded the page
+had already been told its origin, and neither emitted anything. **The prose written to prevent a
+dead-ending viewer produced one.**
+
+Two things about it are worth keeping:
+
+- It was **found by a test and not by reasoning** — the assertion that `index.html` declares no
+  origin, written in the same change as the comment, failed on the commit that added it. A fixture
+  would never have contained the comment, which is why these tests run against the real shipped
+  document.
+- The fix is not to reword the comment. Both detectors now strip HTML comments first, which is also
+  what makes them agree with `querySelector` — what the page itself runs, and which has never seen a
+  comment. The literal **stays** in `index.html` on purpose: it is the live case, and deleting
+  either strip reddens the suite against the document that actually ships.
+
+---
+
+## D259 — three values, one fact, and the two the server refuses to hold apart
+
+**Date: 2026-08-05 · Written with the code.** A split deployment needs three configured values to
+agree. They live in three different systems, which is why this is written down rather than left to a
+runbook step.
+
+| # | Value | Where | What it does |
+|---|---|---|---|
+| 1 | the **API's** origin | GitHub variable `ELEVATOR_SIM_API_ORIGIN` | baked into `index.html` and the CSP at build time |
+| 2 | the **site's** origin | `viewerOrigin` → `ELEVATOR_SIM_ORIGIN` | where sign-in links point (§ D241 § 4) |
+| 3 | the **site's** origin, again | the same `viewerOrigin` → `ELEVATOR_SIM_ALLOW_ORIGIN` | who may call the API from a browser |
+
+### 1. Two of them are one parameter, and the server checks anyway
+
+2 and 3 are set from a single Bicep parameter, so they cannot drift. `main.ts` refuses to boot when
+they differ regardless, because a rule enforced on one of two values that must match is not a rule —
+and this repository has a standing entry (§ D219) about configuration that is loaded correctly and
+writable by nothing.
+
+Three refusals, all at boot, all naming the fix:
+
+- **`ELEVATOR_SIM_ALLOW_ORIGIN=*`** — refused outright. Not defaulted-away, refused: it is the value
+  somebody reaches for when CORS is in the way, and it publishes a session-bearing API and a
+  CPU-bound verification route to every page on the web.
+- **The two disagreeing.** Their failure mode apart is the nasty one — the site loads, the page knows
+  where the API is, and `fetch` fails CORS, which surfaces as a `TypeError`, which the client reports
+  as a server that is down. The reader then debugs a server that is fine.
+- **A value that is not an exact origin.** A trailing slash, a path, a query string, an uppercase
+  scheme. `https://api.example/` and `https://api.example` are the same origin to a browser and
+  different strings to the header comparison a CORS check actually performs, so the near-miss is
+  refused where it is cheap.
+
+The startup line now names both origins, because a split deployment and a same-origin one **answer
+identically to every request you can make by hand** and disagree only in a browser.
+
+### 2. The ordering is enforced, and one step cannot be automated
+
+The site's hostname does not exist until its own template has run, so the three are set in an order.
+`infra/azure/swa/provision.sh` enforces it — `AZURE_SWA_NAME` is the arming switch and is set last,
+after `ELEVATOR_SIM_API_ORIGIN`.
+
+It **cannot** set `viewerOrigin`, and the reason is structural: `infra/azure/main.bicep` takes
+`appSecret` and `databaseAdminPassword` as required `@secure()` parameters with no defaults, so
+re-running it means re-supplying both, and this script neither has them nor should ask. So it checks
+the **deployed revision** instead and refuses to arm until the app has been pointed at the site.
+Half-armed is the worst of the three states, so it is the one state the script will not leave you
+in.
+
+### 3. Unset is the shipped state, everywhere
+
+`viewerOrigin` defaults to empty and changes nothing when it is; `ELEVATOR_SIM_ALLOW_ORIGIN` is then
+empty, meaning no page may call this API cross-origin, which is what the current deployment
+effectively has. Every deploying job is gated on `vars.AZURE_SWA_NAME`, and unset is shipped. The
+container path is verified still working by a run — the real `dist-web`, the real `loadStaticBundle`,
+`serve()` on a real socket, `GET /` answering 200 with `content="/"`.
+
+**None of the split path has been deployed.** `docs/16-static-site-deployment.md` § 9 says which
+parts were run and which were only reasoned about, and `infra/README.md` § 0.2 now carries the same
+admission beside *"No mail has ever been sent"* — which this lane makes more load-bearing rather
+than less, since it moves the origin that mail's link is built from.
+
+---
+
+## D260 — eight guards fired because a defect was the fixture, and the replacement is a rate
+
+**Date: 2026-08-05 · Written after the measurement, and the measurement is the reason it is written
+at all.** [§ D254](DECISIONS.md) fixed a real defect in `estimateCost` and turned the `viz` suite red
+at 27 points in 13 files. [§ D256](DECISIONS.md) triaged them and named the shape: *"All but two are
+a stale **fixture** … each of them reaches for an access-zoned building because those reliably
+were."* This is that repair, and the only interesting thing about it is what the guards were doing
+while it was needed.
+
+### The guards were right, and they are the reason this was cheap
+
+Eight of the failures are a case literally titled **"really is suppressed, or the rest of this
+proves nothing"** or **"really is refused, …"**. They are precondition checks, written by somebody
+who understood that a test asserting *"a suppressed run shows no mean"* passes trivially against a
+run that is not suppressed. When the fixture stopped being refused, they said so **first**, in one
+line, before the assertions that depend on them could go quietly green.
+
+That is worth recording because the alternative was available and would have looked like a smaller
+diff: relax the guard, or assert the weaker property. Neither was done, and the guards were
+re-verified rather than assumed — with the fixture pointed at a rate that does **not** saturate, all
+**13** suppression-dependent assertions across seven files go red, including all four preconditions.
+A repair that leaves the guard unable to fail has not repaired anything.
+
+### What the fixture was, and why it was never a good one
+
+`vertical-city` at its **shipped** rate, named in five files as *"the one that saturates hardest at
+the shipped rates"*. It did saturate. It saturated because § D254's pickup check refused every
+landing call raised inside an access zone, so the queue grew because nobody collected it and the
+trend test read that as demand outrunning supply. Served properly the building completes at 100 %
+delivery and quotes its mean.
+
+The rate was also **seed-fragile**, which nobody had measured. Over five seeds at the shipped rate,
+the run refuses its mean on **2 of 5** — the suites had pinned one of the seeds where it did.
+
+### The replacement, measured up to rather than guessed
+
+`fixtures.test-helper.ts` gains two named fixtures. Both state a **demand rate**, which is a
+property of the traffic rather than of a bug, and both were measured before they were chosen.
+
+**`suppressedConfig` — `vertical-city` at 16 %**, over five seeds:
+
+| rate | runs refusing their mean |
+|---|---|
+| 8 %, 9 %, 10 % | **0 of 5** |
+| shipped, 11 %, 12 % | 2 of 5 |
+| 13 %–20 % | **5 of 5** |
+
+**16 rather than 13, and the ragged band is why.** Saturation is a trend test over the reporting
+window, so near its threshold it is a coin toss on the seed — the regime `docs/03` warns about and
+the last place a fixture should sit. 16 % is three points clear of the last rate that ever came back
+quotable. The ground is `saturated` on every seed, which `mode/disclosure.test.ts` depends on more
+than the count: it asserts the ground travels beside the prose, and a fixture that wandered between
+grounds would make that assertion about a different sentence each run.
+
+**`timedOutConfig` — `mixed-use-high-rise` at 80 %.** A different claim, and a much stronger demand:
+the horizon is 900 s of traffic plus 3 600 s of drain, so `vertical-city` at **50 %** still reports
+`completed`. At 80 % this building is `timed-out` on 3 of 3 seeds with 606–732 journeys undelivered.
+It is `chancery-house`'s 30 % on the same footing — a fixture rate, with no figure published from
+the run, and saying so is the difference between a fixture and a claim.
+
+### The one that got better rather than merely fixed
+
+`live/honesty.test.ts`'s *"the live casual card really does go calm on a refused run — the defect,
+reproduced"* carried a comment saying `vertical-city` *"times out with people still standing, so its
+own terminal frame is honest"*, and made the case synthetically for want of a real run of the right
+shape. That sentence described the defect, not the building. `suppressedConfig` is a run that
+**drains** — `completed`, nobody undelivered — and is refused all the same, which is exactly the
+shape the defect needs and which no shipped fixture used to produce. The claim is now made on a run
+the viewer can actually produce **and** on the synthetic recording, which stays because it pins the
+shape without depending on a rate.
+
+### Two that are not `vertical-city`, and one is a third instance of the same lesson
+
+`frame/overlay.test.ts`'s two-bands-at-one-landing identity failed on **`crown-hotel`**, which was
+not on § D256's list and is the one building nobody expected. It declares one access zone —
+`back-of-house` over `B1` — so `B1` held a queue nothing would collect, and the identity was
+satisfied by a backlog rather than by traffic. Its breadth rate goes 10 → 16, which is the fixture
+helper following its own already-written instruction (*"Raising the rate for these three is the
+honest fix"*): at 10 % the witness fails on 3 of 3 seeds, at 16 % it holds on 3 of 3 and the run
+stays quotable on 3 of 3, and at 18 % it saturates on two. `midtown-office` keeps its **shipped**
+rate as the other arm of the saturation pair — an un-manipulated configuration is worth keeping
+where one still works.
+
+---
+
+## D261 — three rationales that cited a deleted mechanism, and a number that survived its own reason
+
+**Date: 2026-08-05 · Written after the measurement.** [§ D256](DECISIONS.md) withdrew four things
+rather than quietly replacing them, and named two of them as prose that *"cite the defect as their
+mechanism"*. A rationale that is false is a stale assertion, which this repository treats as a defect
+in its own right ([§ D30](DECISIONS.md), [§ D60](DECISIONS.md), [§ D227](DECISIONS.md)) — so they are
+corrected here, each against a re-measurement rather than against an argument.
+
+### `arms.ts` § `secure-interfloor-mix` — the instructive one
+
+Its stated ground was *"there is no budget at which a conventional arm has a quotable AWT here …
+every car returns `accessDenied` and the call is permanently unassignable"*. Re-censused over **300
+replications** at `BENCHMARK_SEED`: `nearest-car`, `eta`, `collective` and every credentialled arm
+are **clean across the whole census**. The arms that used to fail from index 0 no longer fail at all.
+
+**And `admissibleReplications` stays `0`.** The field means *the largest budget at which **every** arm
+including the baseline still has a valid AWT*, and one arm still loses it at index 0:
+`destination-entry-bare`, the bare kiosk, which discloses a destination and carries no credential so
+an access-restricted **destination** is refused by every car. That is authorization of a destination,
+which is the only access question a lift is asked, and § D254 left it untouched.
+
+So **the number survives and its reason does not**, and that is the most dangerous shape this
+repository knows: a value that still reproduces, resting on an explanation that has been false since
+the commit before. Nothing would have caught it, because nothing re-derives a *rationale*.
+
+### The two `EXCLUDED_CELLS` — the ground moves from *structural* to *deferred*
+
+`ExcludedCell.mechanism` is documented as *"the measurement that excludes it. Never a tolerance,
+never a preference."* Both of these cited measurements of the defect:
+
+- **`secure-interfloor-mix`** — *"An access-restricted pickup carries no credential under up-down
+  buttons, so the call is permanently unassignable."* Refuted, above.
+- **`mixed-use-mixed-40-30-30`** — *"every `role: "baseline"` profile is 0/30 quotable and the
+  unserved fraction **RISES** as the load falls, which is a structural refusal rather than
+  overload."* Re-measured at n = 30 on the three rates § 1 sweeps — 1.5 %, 0.75 %, 0.2 % — **every**
+  arm including `nearest-car` now has a quotable AWT at every rate, undelivered is 0.0 per run and
+  the unserved fraction is **0.00 % at all three**. There is no rise left to be structural about.
+
+Neither cell is admitted, and that restraint is the decision rather than an omission. Admitting one
+adds a matrix row and a published pin group, which is a re-design of the experiment matrix, and
+§ D256 requires the criterion to be written before the numbers are read. So both are relabelled
+**excluded pending a criterion** — which is honest in a way *"excluded by a measured mechanism"* no
+longer is, and which a reader cannot mistake for a measured refusal.
+
+### The golden that stopped timing out, and the manifest rule it tests
+
+`validation/golden/manifest.json` says in its own header that *"the only edit this file should ever
+need is an added or removed key name"*. `secure-tower-obstructed-doors` needed another kind, and the
+rule is the reason it needed it rather than an exception to it: the golden's `covers` **asserted**
+*"its status is timed-out … because access-locked-out passengers legitimately keep a run alive to its
+drain deadline"*, and that assertion was the defect. The building now completes at 3 %, the always-on
+tier lost its only timed-out golden, and `goldenRuns.test.ts`'s *"honours the stored timeout policy"*
+had nothing to bite on — reporting itself as *"no golden in this tier timed out"*, which is a
+precondition check doing its job.
+
+The timeout is now **demand-driven**, which is the ordinary reason a run does not finish: 40 % of
+population per five minutes over 1 500 s cannot be cleared inside the 900 s drain tail. Measured over
+four seeds before the rate was chosen — `timed-out` on 4 of 4 with **254–269 of ~1 200** journeys
+undelivered, against 32 % where one seed left only 11. `drainGraceS` is untouched at 900, because it
+is one of the four sim knobs this golden exists to record and shortening it would have bought the
+timeout by cutting the tail rather than by loading the building.
+
+### The adversarial lockout, re-pointed at the surviving lockout
+
+`validation/adversarial.test.ts`'s conservation claim — *locked-out passengers are undelivered and
+**named**, never silently dropped* — is unchanged and was never about **which** refusal. Its fixture
+becomes the bare kiosk, which § D256 named as the one lockout § D254 leaves standing. Its
+precondition needed care rather than a search-and-replace: it filtered warnings for the string
+`accessDenied`, and that reason **no longer exists in `core` at all**, so a filter still looking for
+it would match nothing and the precondition would pass by being **vacuous**. It now matches the
+kiosk's own end-of-run sentence and asserts `stageActivity.kioskRefusedLegs > 0` beside it, so
+neither the words nor the count can go quiet alone.
+
+---
+
+## D262 — a published pass-rate table moved on five rows, and the five that held are the evidence
+
+**Date: 2026-08-05 · Written after the regeneration, and the regeneration is published rather than
+performed.** `data/scenario-goals.json` is generated from measured runs, and [§ D254](DECISIONS.md)
+moved what those runs do. `CLAUDE.md`'s rule is that a published number is pinned to the run that
+produced it; the thing that rule forbids is a **silent** regeneration, so what moved is stated here
+and in `docs/10` § M30 rather than left in a diff.
+
+Regenerated with `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`, both seed sets, 50 replications each.
+**48 entries changed across 5 of the 10 scenarios**, and the split is not approximate:
+
+| | scenarios | buildings |
+|---|---|---|
+| moved | 4, 5, 6, 9, 10 | `mixed-use-high-rise`, `secure-tower`, `vertical-city`, `crown-hotel`, `st-jude-hospital` |
+| byte-identical | 1, 2, 3, 7, 8 | `garden-apartments`, `midtown-office` ×3, `chancery-house` |
+
+The five that moved are **exactly the five shipped buildings that declare `accessZones`**, and no
+others. The five that held declare none, and they are the control — the same 5/5 split § D254 found
+on its 60-cell matrix and § D255 found on the fifteen pinned identity cells, arriving independently
+on a third apparatus.
+
+**`deliver-everyone` is now 50/50 on both seed sets on every stage**, from `0/50` on stages 4 and 5,
+`4/50, 9/50` on stage 6 and `19/50, 19/50` on stage 10. That is § D254's headline restated in the
+game's own units: conventional dispatch serves every access-zoned building this project ships.
+
+**One rate moved the other way, and it is the one to read.** Stage 5's `long-waits-under` fell from
+`32/50, 30/50` to **`12/50, 15/50`**. Nothing got worse. The riders stranded on a restricted landing
+were never served, so their waits were never in the sample, and the goal was being measured over the
+survivors; serving them puts the long waits back. It is `CLAUDE.md`'s own arithmetic for abandonment
+— *a configuration that improves its wait by serving fewer people has not improved anything* — seen
+from the other side, and it is the reason a table like this must be regenerated whole rather than
+patched where it looks wrong.
+
+Nine cells changed **bucket**. Eight go the same way: a rate that is now 50/50 on both seed sets is a
+*fact about this configuration* rather than a goal, so stages 4, 6, 9 and 10 hand `deliver-everyone`,
+`no-divergence` and `long-waits-under` back to the briefing. Stage 4's `answer-the-demand` goes the
+other way — `0/50` was a configuration fact and `21/50, 22/50` is a real batch goal — so that stage
+gained a goal a player can actually chase, which is worth more to the product than the four it lost.
+
+**The doc-side copy moved with it, and only because a test made it.** `goalRates.test.ts` parses
+§ M30's markdown table out of `docs/10` and compares every cell and every bold mark against the
+shipped JSON, so regenerating the data turned that guard red until the prose followed. That guard
+exists because this exact table had gone stale once before, on a change to `vertical-city`'s
+escalator, with nothing noticing.
+
+---
+
+## D263 — one record was two periods, so it is two records
+
+**Date: 2026-08-05 · Written after the code.** GitHub issue #84, split out of
+[§ D244](DECISIONS.md) and recorded there because the obvious fix is the wrong one.
+
+`evening-egress` is named *Event egress*, and its `$comment` argued a venue — *a ballroom emptying, a
+cinema turning out, a floor of a conference breaking at once*. `shift/calendar.ts`'s `quarter-end`
+period selected it as an **office end of day**: *"the whole building leaves at once when the numbers
+are filed."* Both readings were live, both had callers, and nothing was wrong with either of them
+until § D244 gave every template a `startOfDayMin` — because a record gets **one** hour, and a
+building closing at 17:30 and a function turning out at 22:30 are not the same number. It got 17:24,
+derived for the office reading, and said so in a record whose every other sentence argued the venue.
+
+### The fix that was rejected, and it is the smaller one
+
+Moving the hour onto the calendar **period**, so `quarter-end` says 17:30 and a venue period says
+22:30. One field, no new record, no data change. It is wrong because it creates a **second place a
+template's clock is defined**, and the record would then carry an hour any caller may override. This
+repository has paid for that shape repeatedly — the band palette held in four modules, `TERM_PHRASES`
+duplicating `data/dispatcher-profiles.json`, two declarations of `DAY_START_S` — and it goes stale
+the same way every time: the two definitions disagree, and the one nobody is reading is the one that
+is right. § D245 refused the same move for the same reason when it declined to keep the hour outside
+the digested record.
+
+### The fix taken: two records, one meaning each
+
+A template is data (invariant 7) and records are cheap.
+
+| record | what it now means | hour | status of the hour |
+|---|---|---|---|
+| `evening-egress` | **the venue only** — a ballroom, a cinema, a conference floor | 1344 = **22:24** | NOT CITED end to end |
+| `office-down-peak` | **the office end of day** — the building emptying | 1035 = **17:15** | period CITED, hour DERIVED |
+
+`evening-egress` keeps its id, its name, its `$comment`'s venue argument and **its geometry, to the
+byte** — 20 minutes, the 60 s step, the 300 s hold, the 0.05 baseline. Only its hour moved, and
+§ D244 rule 1 is that the hour moves nothing. Its callers were already the venue ones and are
+untouched: `data/buildings/crown-hotel.json`'s 120-person ballroom, and
+`packages/server/src/challenge/schedule.ts`'s `crown-hotel` rotation.
+
+`office-down-peak` is new, and `quarter-end` selects it — the one-line change the issue costed.
+
+### The hours, each derived by placing its template's hold
+
+- **22:24** places `evening-egress`'s reported five minutes at **22:30–22:35**: full flow arrives at
+  `durationMin/4 + 60 s` = +6 min. It is § D244's own worked example — *"a ballroom turning out at
+  22:30 is the same shape on a different clock"* — promoted from a limitation to an authored hour now
+  that the office reading has somewhere else to live.
+- **17:15** places `office-down-peak`'s reported five minutes at **17:27:30–17:32:30**, centred on
+  17:30, by the identical derivation `rise-and-fall`'s 08:30 is: the hold sits at +12.5 to +17.5 min
+  of a 30-minute run. The pair reads as one building's day — **opens at 08:30 for a peak at 08:45,
+  closes at 17:15 for a peak at 17:30**.
+
+### What is cited, and the two things that are not
+
+**CITED — that an office evening down-peak is a design case in its own right.** It is one of the four
+office traffic types this project's reference set names beside the morning up-peak, the lunch mixed
+peak and random interfloor traffic (Elevator World, *Fundamentals of Traffic Analysis*, in
+`docs/02-elevator-reference.md`'s source list; CIBSE Guide D treats the same four). That is the whole
+point of not copying the event shape across: a down-peak is not an egress under another name.
+
+**NOT CITED — the down-peak's arrival rate, and no figure was invented for it.** `docs/03` tabulates
+the office **up**-peak at 11–15 %pop/5 min (standard) and 15–17 % (prestige) and names it the
+governing peak; no page in this project's reference set gives a %pop/5 min band for the office
+down-peak. The literature does say the evening flow is the more concentrated of the two, which is
+exactly why quoting an unsourced multiple of the up-peak here would have been the plausible-looking
+reference CLAUDE.md forbids. **And it could not have been authored anyway**, which is stated on the
+record so a reader does not go hunting: a `demandTemplates` record has **no rate field**. The level a
+run is drawn at comes from the building's `arrivalRatePctPop5min` and the declared
+`traffic.demandLevel`; a template carries the *shape* of demand over a period, never how much of it
+there is.
+
+**NOT CITED — the mix, and the record authors none.** The office down-peak's split is the morning
+up-peak's reversed — roughly 5/85/10 against the shipped `office-standard` profile's 85/5/10 — and
+that is a statement of the mechanism (in the morning everyone rides up from the lobby, in the evening
+everyone rides down to it), not a quoted table. It is **not** written as
+`directionalSplitAtStart`/`AtEnd`, for two reasons that are both load-bearing rather than
+convenient. Those fields mean *the mix moves within the run*, which is `lunch-two-way`'s arc and is
+false of a down-peak — a down-peak's mix is a level; and `shift/calendar.ts` **withholds a period's
+own `splitBias` under a mix-declaring template**, so authoring a constant pair would have silently
+disabled `quarter-end`'s outgoing pull and its Friday override while the screen still looked right.
+That is the § D219 shape — a control that binds nothing — reached by adding data rather than by
+adding a panel.
+
+### The geometry is `rise-and-fall`'s, and the price of that is declared rather than latent
+
+30 minutes, a 5-minute hold, a zero baseline, `peak-5min` — inherited unchanged, so the record adds
+**no uncited geometry**, the discipline `lunch-two-way` and `shift-change` were authored under. The
+price is that `office-down-peak` and `rise-and-fall` **draw the same passengers at the same seed**,
+and `traffic/templateAdditionIdentity.test.ts` § *the same passengers* asserts it on the legs at all
+five buildings rather than leaving it to be discovered.
+
+A record that claimed a shape it did not have would be the § D112 defect — `destination-eta`,
+bit-identical to `eta` at 8 of 8 cells while its name promised a mechanism. This one names the shape
+it shares, in its own `$comment` and in a run, and what it adds is the hour and the period's
+identity. **If that identity ever breaks, the `$comment` is what changes, not the test.**
+
+**LIMITATION, and it is the cost of inheriting:** the shape is symmetric and a real office down-peak
+is not. Departures synchronise at the front — the working day ends at one time for most of the
+building — and then trail long into the evening. Expressing that needs a skewed shape this module
+does not have and a skew figure no source here publishes, so it is neither cited nor modelled, and it
+is named on the record rather than implied by a symmetric ramp.
+
+### The smaller dishonesty this also closes
+
+`evening-egress`'s clock note read *"CITED: that an end-of-day down-peak is a design case, and its
+demand level."* That citation was for the **office** reading, on a record arguing the venue. It has
+gone with the office reading to `office-down-peak`, and **nothing was put in its place**:
+`evening-egress`'s clock is now uncited end to end, and says so. That is a record losing a citation
+it was never entitled to, which reads as a regression and is the opposite of one.
+
+---
+
+## D264 — four consequences of splitting one record, all handled rather than discovered
+
+**Date: 2026-08-05 · Written after the code.** [§ D263](DECISIONS.md) adds a record to
+`data/traffic-profiles.json` and repoints one calendar period. Four things follow that are neither
+optional nor bugs, in the shape § D245 used for § D244's field.
+
+### 1. All five leaderboard config boards fork, and that is the mechanism working
+
+`server/leaderboard/submission.ts#configHashOf` digests the **fully resolved inputs a run depended
+on**, and the demand template catalogue is one of them — *as loaded*, not as a curated subset. Adding
+a record changes that file, so every board keyed on a template from it forks. All five fork, exactly
+as they did for § D245's one field.
+
+The avoidance is the same wrong move, refused for the same reason: keeping the new record outside the
+digested file — a viewer-only constant, a lookup by id — would avoid the fork and create a second
+place a template is defined. `submission.ts` already states the intended reading: *"A `data/` change
+does not corrupt an old board — it starts a new one."* Stored rows stay readable, no honest
+submission is rejected, and the fork costs a board reset rather than a correctness problem. **Said
+here rather than left to be discovered when a board looks empty.**
+
+### 2. `quarter-end` runs a 30-minute period where it ran a 20-minute one
+
+`office-down-peak` inherits `rise-and-fall`'s duration, so the period `quarter-end` imposes is 1 800 s
+rather than 1 200 s, and `calendarPatch` refuses a template the shift is too short for. A quarter-end
+shift between 20 and 30 minutes therefore keeps the run's own template now where it took the period's
+before, with the refusal printed in the words it was already printed in.
+
+**That is no more demanding than the shipped default.** 1 800 s is both `DEFAULT_SHIFT_LENGTH_S` and
+`rise-and-fall`'s own period, so a shift too short for `office-down-peak` was already too short to
+measure the template it would fall back to. The one contract that names a length names 3 600 s.
+`calendar.test.ts` drives the refusal at 300 s and 900 s and asserts the period still moves the legs
+through its population.
+
+**The stronger half of that refusal's original argument moved with the record.** At 300 s
+`evening-egress` makes `core` **throw** — a quarter of the run is the quiet before the doors open,
+and the step and the hold do not fit in what is left. `office-down-peak` at 300 s does not throw; it
+merely measures a slice of a ramp. Both are refused, because the rule is a template's *declared
+period* rather than a rule about one shape, and the throwing case is still live for the venue pairing.
+
+### 3. Byte-identity is proved by a run, at three layers
+
+`traffic/templateAdditionIdentity.test.ts`, whose shape is `dayStartIdentity.test.ts`'s: build the
+shipped `data/` and a copy with the new record filtered out, run the same seed against both **in the
+same process**, require equality byte for byte. No pin, no digest, no tolerance — a guard with no
+pinned constant cannot go stale.
+
+- **resolution** — each of the five templates that shipped before resolves to the same object;
+- **the trace** — 5 buildings × 5 templates, compared on `passengers`, `arrivals`, `sources` and then
+  the whole object;
+- **the whole run** — 5 buildings under `collective`, because a trace is an *input* to a run and
+  something downstream could read the catalogue a trace comparison would never see.
+
+**The third layer is the one that is not obvious, and § D245 is why it is there.** *"A sixth element
+in an array `resolveDemandTemplate` never reaches cannot matter"* is exactly the reasoning that was
+false one layer up, where `configHashOf` digests the whole record set. A hash, an index, an ordering
+or a `[0]` is all it takes for the **count** of records in a file to reach a result, and none of them
+announce themselves. All green, at 44 cases. `sim/oracle.test.ts` is green, and by construction: the
+closed-form Barney/CIBSE comparison is a statement about elapsed seconds within a run, and no arrival
+moved. `traffic/transportIdentity.test.ts`'s fifteen pinned digests did not move, and
+`traffic/mixIdentity.test.ts`'s partition still names `lunch-two-way` as the only mix-varying
+template — the new record declares no mix, which is § D263's point 3.
+
+### 4. The how-to-play guide had to learn the sixth shape, because a test made it
+
+`menu/howToPlay.test.ts` § *names every demand template the configuration ships* derives the
+shipped set from the **catalogue** and requires every id's own words to appear in the guide's prose.
+Adding a record therefore turned it red — *"a shipped traffic shape the guide does not name:
+['office-down-peak']"* — which is that test working exactly as intended: a template offered in Free
+Play that the guide has never heard of is one a new player picks blind.
+
+`menu/screens.ts` now names it, and says the **one thing a player needs to tell the pair apart**,
+because two end-of-day shapes in one list is a choice nobody can make from names alone: *an office
+empties on a ramp; a venue steps — the doors open and the whole room is waiting at once.* That is the
+same distinction `evening-egress`'s record has always argued in its own `$comment`, said once in a
+player's words. It is the only edit here outside this change's stated file ownership, and it was
+forced by a failing test rather than chosen.
+
+### Three sentences elsewhere are now stale, and are named rather than edited
+
+All three sit outside this change's file ownership, so they are recorded here for whoever owns them —
+the stale-sentence defect § D227 is about is worse than a dead seam, and the way it survives is by
+nobody writing it down:
+
+- **`docs/17-play-experience-audit.md` § 4.2** — *"Quarter-end — demand up and a sustained evening
+  egress, which is what `evening-egress` was authored for."* The clause after the dash is the exact
+  claim § D263 refutes; the period runs `office-down-peak` now.
+- **`packages/viz/src/scope/probes.test-helper.ts`** — the `viewer.calendar` probe's comment says
+  quarter-end *"names `evening-egress`"*. The probe itself is unaffected (it requires the two arms to
+  differ on the legs, and they do); only the sentence is wrong.
+- **`packages/viz/UX.md` row CL-03** — *"`evening-egress` at 300 s makes `core` throw outright"* is
+  still a true sentence about `evening-egress`, and is no longer what the calendar test drives. See
+  point 2 above.
+
+---
+
+## D265 — access zoning was a gate nobody ever failed, and the share is a number rather than a mechanism
+
+**Date: 2026-08-05 · Written after the code, and the measurement is the reason it is written at
+all.** GitHub issue **#87**, option (a), decided by the product owner.
+
+[§ D254](DECISIONS.md) fixed a real defect — a credential gates where you may **go**, not where you
+may be **collected** — and in fixing it revealed that the gate had nothing to bite on.
+`traffic/generator.ts`'s `credentialGroupFor` issued each rider the credential their own route
+needs, and `planDemand` had already dropped every pair for which no credential works, so **every
+generated trip was authorised by construction**. Measured in § D256: `midtown-office`, seed 424 242,
+a synthetic zone over floors 8–13 permitting a group named `nobody-has-this` — 205 legs bound there,
+all 205 alight, all 205 carrying it.
+
+So `accessZones` was a block of configuration that was loaded, schema-checked, cross-validated with
+four dedicated warning codes, indexed correctly by `Bank`, consulted by `Simulation` in three
+places, and **could not change a result**. That is this repository's signature defect with the
+polarity reversed: not a behaviour with no caller, but a caller with no behaviour to reach.
+
+### What the share is a share *of*, which is the whole modelling decision
+
+`data/traffic-profiles.json` gains one number, `credentialGap.wrongZoneShare` — the share of
+journeys that begin **inside** the building and end inside an access zone the traveller's own floor
+does not already reach, made by somebody who does not hold a credential for it.
+
+**Journeys that begin at an entrance are deliberately excluded**, and that is half the claim. A
+visitor arriving off the street has passed whatever the building puts in front of its lobby — a
+reception desk, a turnstile, a door — and that control is upstream of the lift and outside this
+simulator. § D254 makes the same point about pickup floors, citing CIBSE Guide D § 10: *"where entry
+to a lift lobby really is restricted, the control is a locked door or a turnstile — building fabric,
+upstream of the lift."* Modelling the visitor as unbadged would be modelling a reception desk that
+does not work.
+
+What the **lift** refuses is somebody already inside, on a floor they are entitled to, heading for
+one they are not — a `tenant-alpha` employee on floor 6 going to floor 18 to see a colleague.
+`credentialForRoute` says every such trip is made by `facilities` or `security` staff, because those
+are the only groups permitted in both zones. That is the idealisation, and it is the one the gap
+relaxes.
+
+**Which of the two populations a gap rider is in comes from the building's own zones, never from a
+second number:**
+
+| the traveller starts | they carry | the viewer's cause |
+|---|---|---|
+| inside a zone | that zone's own first group — a real badge, for the wrong place | `credential-not-read` |
+| on an unrestricted floor | nothing | `rider-has-no-credential` |
+
+A rider whose own zone's credential *does* reach the destination is not in the gap at all. So a zone
+that shares a group with its neighbour produces no lockouts between them, which is the data deciding
+the outcome rather than the code — CLAUDE.md invariant 7, and there is no `if (building === …)`
+anywhere in it. Both causes occur across the shipped set: `secure-tower`'s gap riders are all
+badge-holders (every interfloor origin there is inside a zone), `st-jude-hospital`'s are all unbadged
+(its two zones sit under unrestricted wards).
+
+### The number, and it is NOT CITED
+
+**0.25, and no figure was invented for it.** No page in this project's reference set publishes a rate
+of unauthorised journey attempts. Guide D § 10 describes how lift access control is implemented and
+ISO 8100-32 describes how a destination terminal authorises a destination; neither counts how often
+somebody tries a floor they may not have. The security literature publishes tailgating rates, and
+quoting one here would be the plausible-looking reference CLAUDE.md forbids — tailgating is a
+control that **fails open** at a door somebody else opened, a different event with a different
+consequence from a reader that refuses a car call.
+
+What stands in place of a citation is **three bounds, all measured before the value was chosen**:
+
+1. **It must be an exception.** A building where a large share of internal journeys are unauthorised
+   has not implemented access control badly, it has drawn its zone boundaries in the wrong place.
+2. **It must be observable** at the shipped budgets, or the file is asserting a mechanism no run can
+   show — the § D112 defect.
+3. **It must not, on its own, push a shipped building past `DEFAULT_MAX_UNSERVED_FRACTION`** (5 % of
+   window arrivals), because a refused rider is counted unserved and a gap large enough to suppress
+   a building's mean would be reporting a credential as congestion.
+
+The census the value was chosen against — candidates at `wrongZoneShare: 1`, which is every rider
+the gap could ever touch, and refusals at the shipped 0.25 over five seeds, each building at its
+shipped rate:
+
+| building | candidates | refused at 0.25, five seeds |
+|---|---|---|
+| `secure-tower` | 33 of 473 (7.0 %) | 4, 9, 8, 7, 9 — **0.8–2.3 %** of legs, all badge-holders |
+| `mixed-use-high-rise` | 31 of 725 (4.3 %) | 12, 7, 13, 12, 10 — **0.8–1.7 %** |
+| `st-jude-hospital` | 14 of 276 (5.1 %) | 3, 7, 1, 2, 7 — **0.4–2.6 %**, all unbadged |
+| `vertical-city` | 50 of 1 976 (2.5 %) | 8, 15, 15, 11, 3 — **0.2–0.8 %** |
+| `crown-hotel` | 1 of 350 (0.3 %) | 0, 0, 0, 1, 1 |
+| the three that declare no zones | **0** | **0** |
+
+So a quarter of a small population is between two tenths of a percent and two and a half percent of
+a building's whole demand — an exception at the level a reader judges a building by, and half the
+censoring limit at its worst. `crown-hotel` is the honest outlier: one back-of-house floor produces
+nought or one candidate a run, so the gap barely touches it, and
+`traffic/credentialGapIdentity.test.ts` pins it at a seed where it does rather than hiding the zero.
+
+**Two limitations, both named rather than implied.** The refusal is modelled at the **landing**;
+under a conventional up-down-button system the reader is inside the car, so a real wrong-zone rider
+boards, presses a button that does not light, and rides somewhere before walking back — a stop and a
+place in a car this model does not charge the building for, so the cost of the gap is *understated*
+under conventional control. And the share is **constant** across buildings, hours and traffic
+patterns, which a real one is not; varying it needs per-building figures nothing here publishes.
+
+### The draw, and invariant 2
+
+An eleventh named stream, `credential`, appended to `STREAM_NAMES` and to `TRAFFIC_STREAM_NAMES`.
+`traffic/types.ts` had said for two waves that *"a stochastic credential mix would need a named
+stream on `StreamSet`; adding one is a deliberate act"*, and this is that act.
+
+**One draw per passenger, unconditionally, in final trace order** — `passengerMass`'s discipline
+exactly. Drawing only for candidates would make the draw *sequence* a function of `accessZones`, so
+adding one floor to a zone would re-roll every later rider and two arms differing only in their
+zoning would stop being the same crowd. Taken for everybody, gap membership is a property of the
+person and the zones decide whether it costs them anything. On the traffic seed rather than the run
+seed, by the `doorObstruction` test the module already applies to `patience` and `modeChoice`:
+whether somebody is carrying the right badge is a fact about *them*, and seeding it off the machine
+would mean re-rolling a dispatcher silently re-rolled which riders could travel at all.
+
+The compatibility lock in `random/streams.test.ts` gains a row rather than moving one — a new
+*name* gets new parameters and disturbs nothing above it — and the vector was produced by an
+independent BigInt implementation of FNV-1a-64, SplitMix64 and `pcg_setseq_64_xsh_rr_32` that
+reproduces `arrivals`' four pinned draws exactly, which is what makes it evidence rather than a
+transcription of the code under test.
+
+### Byte-identity, proven by a run rather than by an argument
+
+`traffic/credentialGapIdentity.test.ts`, in `dayStartIdentity.test.ts`'s shape. The three shipped
+buildings that declare no `accessZones` — `chancery-house`, `garden-apartments`, `midtown-office`,
+**derived from disk rather than listed** — produce a byte-identical trace *and* a byte-identical
+`runSimulation` result at `wrongZoneShare` 0, at the shipped share, and at 1. The five that do
+declare zones must **differ** at 0 against 1, or the file would pass just as happily against a knob
+nothing reads.
+
+The same 5/3 split arrives independently on three other apparatus, which is what makes it a property
+rather than a coincidence: `transportIdentity.test.ts` moves 9 of its 15 cells and holds 6,
+`dayStartIdentity.test.ts` moves the same 9, and `mixIdentity.test.ts` moves 6 of 10 structural
+digests while **`BASELINE_PASSENGER_COUNTS` and `BASELINE_CONTINUOUS` do not move at all, on any of
+the ten**. That last is the shape of the change stated as a measurement: the gap re-labels people, it
+does not generate different ones. Same passengers, same arrival times, same masses, same routes — a
+different badge in some of their pockets.
+
+The correctness oracle (`sim/oracle.test.ts`) is untouched and green: it runs pure up-peak, where
+every journey begins at an entrance and no journey is in the gap by construction.
+
+---
+
+## D266 — a rider the building will not carry is a fourth outcome, and calling them a third would be the abandonment defect
+
+**Date: 2026-08-05 · Written after the code.** [§ D265](DECISIONS.md) puts riders on landings whom
+no car may legally carry. This is what the runner does with them, and the care is entirely in what
+it refuses to call them.
+
+`Simulation.#admit` asks `isAccessPermitted(credential, destination)` once, at the landing, before
+any car is involved — the same question `#bankCanCarry` and `#carCanCarry` ask, asked early because
+the answer is a fact about the pair `(credential, floor)` that no dispatch decision can change. A
+rider it refuses is **recorded as having arrived**, then turned away, and leaves.
+
+### The three things they are not, and why each would be a lie
+
+- **Delivered** would say somebody got where they were going who did not.
+- **Waiting** would leave them standing for the rest of the run, so their censored wait would run
+  past the 900 s abandonment horizon and `awtIsValid`'s `starved` ground would suppress the mean of
+  **every** access-zoned building. A credential refusal reported as a service failure is precisely
+  the confusion § D254 found the old defect causing, and it is what CLAUDE.md means by *"they must
+  not wait forever pretending to be a dispatcher failure."*
+- **Abandoned** would put them in `RunSummary.abandonment` and into `awtIsValid`'s abandonment
+  ground, so a run declaring no `sim.patience` would report riders giving up, and the rate a reader
+  judges patience by would be measuring access zoning.
+
+So they get their own terminus: `PassengerRecord.refusedAt`, `ConservationAudit.accessRefused`,
+`StageActivity.accessRefusedLegs`, and one end-of-run warning in the run's own words. All three are
+**spread-or-omit at zero**, because `structuralDigestOfResult` hashes every key whatever its value
+and a key present on every run would move every pinned identity digest in the repository to say
+nothing.
+
+### Why this is not the abandonment defect it is shaped like
+
+CLAUDE.md's rule is that abandonment is published **beside** AWT and never folded into it, because
+removing the longest waits improves the mean by construction. A refusal removes a wait that never
+started, so the direction of the bias differs — but the *other* half of the objection applies in
+full: **a building that refuses more people reports a shorter mean for exactly that reason.**
+
+That is `EnergyStatistics.workPerServedLegKJ` beside raw energy ([§ D106](DECISIONS.md)) and
+`conservation.stairsJourneys` beside the served-leg count, one axis over, and it is handled the same
+way — the count is published, with its denominator, and the run says out loud that every per-leg
+figure it reports is taken over the riders who could travel.
+
+**Two things the accounting deliberately does not do.** It does not exempt refused legs from
+`WaitStatistics.unservedCount`: they arrived and were never served, which is literally true, and it
+means a refusal rate large enough to bias the mean is caught by the existing censoring gate. And it
+does not add a **sixth `awtIsValid` ground**, which is the right long-term fix and is the shape
+`abandoned` already has — placed above `censored` so a reader is not sent hunting a backlog that is
+not there. Adding one widens `AwtInvalidGround` and every total `Record` over it, two of which live
+in `packages/viz/src/mode/` and `packages/viz/src/menu/`, which this lane may not edit. **Named as a
+gap rather than left implicit**, with the measured reason it is not urgent: the unserved fraction on
+the worst shipped building is 2.6 %, against a 5 % limit.
+
+`sim/conservation.test.ts` re-derives the refusals from the **record** — a leg carrying `refusedAt`,
+never boarded, never alighted — and requires them to be the journeys the audit counted, before using
+the number in any arithmetic; an audit that miscounted would otherwise agree with itself.
+`fuzz/properties.ts` does the same, independently. `metrics/serialization.ts` admits `refusedAt` so a
+run on an access-zoned building can still be stored and replayed (invariant 5).
+
+### The same refusal, one layer up, where it would have drawn a lie
+
+A refused rider never boards and never gets a car, so on `VizLeg`'s existing fields they are
+**indistinguishable from somebody standing on a landing for the rest of the run** — the reading this
+section refuses in `core`, arriving in the viewer. Left alone, `frame/overlay.ts`'s `isWaitingAt`
+would have kept them in the queue at every instant, and every surface that folds it — the landing
+queues, `Frame.totalWaiting`, the mood card, the left rail — would have drawn a credential refusal as
+congestion.
+
+So `VizLeg` carries `refusedAt` (absent on every leg of the three unzoned buildings, so a recording
+of one is byte-identical to one written before the field existed), `isWaitingAt` reads it, and
+`recordRun.ts`'s fold emits **no landing event at all** for a refused leg rather than a matched
+`+1`/`−1` pair: `refusedAt` equals `arrivedAt`, the fold's tie-break sorts boardings before arrivals
+at one instant, and a matched pair would therefore net to `+1` and leave them in the queue anyway.
+They are in no wait sample either, which is right — they never waited. `access/lockedOut.ts` is where
+they are named instead.
+
+---
+
+## D267 — the lessons come back through the model, and two of them changed stages
+
+**Date: 2026-08-05 · Written after the measurement.** GitHub issue **#88**, option (1), decided by
+the product owner: the scenario lessons return through § D265 rather than being rewritten.
+
+### `deliver-everyone` is a goal again on four stages, and withheld on a fifth
+
+`data/scenario-goals.json` regenerated with `ELEVATOR_SIM_REGENERATE_GOAL_RATES=1`, both seed sets,
+50 replications each. **Ten entries changed across five scenarios — 4, 5, 6, 9 and 10 — and they are
+exactly the five that run on a building declaring `accessZones`.** Stages 1, 2, 3, 7 and 8 are
+byte-identical. It is the same 5/5 split § D254 found on its 60-cell matrix, § D255 on the fifteen
+identity cells and § D262 on this very table, arriving a fourth time on a fourth apparatus.
+
+| stage | `deliver-everyone` before | after | disposition |
+|---|---|---|---|
+| 4 two banks | 50/50, 50/50 | **36/50, 34/50** | configuration fact → **batch goal** |
+| 5 credentials | 50/50, 50/50 | **5/50, 11/50** | configuration fact → **batch goal** |
+| 6 the tall one | 50/50, 50/50 | **40/50, 46/50** | configuration fact → **batch goal** |
+| 9 both ways at once | 50/50, 50/50 | 47/50, **50/50** | configuration fact → **withheld** |
+| 10 the bed and the visitor | 50/50, 50/50 | **41/50, 41/50** | configuration fact → **batch goal** |
+
+Stage 9 is the one to read. `crown-hotel` declares a single back-of-house zone over `B1`, so its gap
+population is nought or one rider a run — variable on the tuning seeds and constant-pass on the
+holdout, which R12 refuses outright: *a classification that does not survive a disjoint seed set is
+not one to ship a level on.* So four stages get the goal back and the fifth does not, and the
+difference is the building's own zoning rather than anybody's judgement.
+
+Three other cells moved with them: stage 4's `answer-the-demand` `21/50, 22/50 → 19/50, 20/50`, and
+stage 5's `no-divergence` `46/50, 48/50 → 45/50, 46/50` and `long-waits-under` `12/50, 15/50 →
+14/50, 12/50`. § M30's census is now **17 batch goals, 29 configuration facts, 4 unjudgeable**, and
+`docs/10`'s printed copy of the table moved with the JSON because `goalRates.test.ts` parses the
+markdown and refuses to let the two drift.
+
+### Stage 5's brief was teaching the defect, and now teaches the model
+
+It read: *"a call from a restricted floor is not slow — it is unanswerable … Change what the call
+carries, and watch the locked-out landings clear."* Every clause of that was § D254's defect. It now
+says what is true: a few riders each run are heading for a floor their badge does not open, they are
+turned away where they stand, and **no dispatcher setting reaches them** — a reader that can see the
+wrong badge still says no. `campaign/failStates.ts`'s player-facing sentence is corrected the same
+way, and its lever text says the fix is a credential or the building's access zoning.
+
+`access/lockedOut.ts`'s § 10.4 table had the same stale row — *"the fix: a dispatcher that reads
+credentials"* — and it is corrected in place. What a credential-carrying call type actually changes
+is **where the refusal is made**: a terminal that reads the badge declines at the panel, a landing
+button does not. `LockedOutInput.carriesCredential` selects on exactly that and is now documented as
+selecting on exactly that, and on nothing stronger. **A named gap goes with it:**
+`describeLockedOut`'s wording for that row — *"this dispatcher does not read `tenant-alpha-staff`"* —
+is literally true under `up-down-buttons` and its implicature is not, and correcting it means editing
+`packages/viz/src/render/lockedOutRender.test.ts`, which pins both branches and which this lane may
+not edit.
+
+The module's **predicate** is widened, and that is not cosmetic. It was *"registered a call at a
+restricted floor"*, which was right while the access question was about the pickup; it is now
+*"standing at a restricted floor, **or bound for one**"*. Censused on `secure-tower` at 900 s, the
+share of a run's refusals the old predicate could not see runs from a quarter to **all of them** — a
+journey that starts inside a zone and transfers at the lobby is refused on its second leg, standing
+somewhere unrestricted, and at seed 20 260 729 that is every one of them. The cost is stated rather
+than discovered: on a run that ends with people still in the system, a leg merely stranded by
+congestion whose destination happens to be restricted now counts too. On a run that completes there
+is no such leg.
+
+### Two stages swapped cases, and the swap is § D254's rather than § D265's
+
+`campaign.test.ts` carried two complementary cases: *a measured clear* (stage 4, so the campaign is
+demonstrably winnable) and *a move along the front* (stage 5, so `beat-the-baseline`'s "and nothing
+resolved against it" clause is falsifiable). Swept over all twelve shipped profiles at each stage's
+own seeds:
+
+| stage | profiles that clear | closest miss |
+|---|---|---|
+| 4 two banks | **none** | `zoned-uppeak`, 2 metrics for and 1 against |
+| 5 credentials | **several** | — |
+| 6 the tall one | **none** | `zoned-uppeak`, 1 for and 4 against |
+
+So the clear moved to stage 5 and the front moved to stage 4, and both are asserted as **searches
+with a stated floor** rather than pinned profile ids: which profile clears is a measurement that will
+move again, and a test naming one gets re-pinned without anybody re-reading the claim. Stage 6's case
+is **inverted rather than deleted** — it now pins the negative and requires that everything which
+resolves ahead also resolves behind, so the day a profile does clear it, the case fails and the
+published *"three stages clear from the dropdown"* count gets re-read.
+
+**This was already true before § D265** — all three cases were among the ten failures issue #88
+handed this lane, and they fail at `wrongZoneShare: 0` too. § D254 is what moved them, by changing
+what every conventional arm on an access-zoned building does. **Stage 6 is still playable** by the
+mechanism § D161 documents for the four stages that never cleared from the dropdown: an edited weight
+vector. That is stage 2's apparatus and it is not re-run here.
+
+---
+
+## D268 — what the share cost in published numbers, and the one figure that moved
+
+**Date: 2026-08-05 · Written after the runs.** [§ D265](DECISIONS.md) changes what five of eight
+shipped buildings do, and CLAUDE.md's rule is that a published number is pinned to the run that
+produced it. This is the accounting.
+
+### What moved, and what did not
+
+| table | moved | held |
+|---|---|---|
+| `traffic/transportIdentity.test.ts` — three tables | 9 of 15 | **6** — `garden-apartments`, `midtown-office` |
+| `traffic/dayStartIdentity.test.ts` `SUPERSEDED_STRUCTURAL` | 9 of 15 | the same 6 |
+| `traffic/mixIdentity.test.ts` structural digests | 6 of 10 | 4, and **every** passenger count and continuous field |
+| `sim/doubleDeckSeam.test.ts` shuttle-move census | 3 of 3 | the finding: all three dispatchers still save moves paired |
+| `data/scenario-goals.json` | 10 entries, 5 scenarios | 5 scenarios, byte-identical |
+| `benchmark/published.ts` `destination-dispatch` | **4 of 12** | the 8 `midtown-*` pins |
+| `benchmark/matrix.test.ts` — 352 pins, 8 Pareto fronts | **none** | all of it |
+| `benchmark/accessControl.ts` — 6 intervals | **none** | all of it |
+
+**The matrix is untouched, and the reason is the one § D256 already found and called luck.** Every
+matrix cell on a zoned building is an *up-peak* cell, and up-peak traffic is incoming: every journey
+starts at the ground lobby. § D265's gap applies only to journeys that begin **inside** the building,
+so it cannot reach a single one of them. That is the second time the same accident has protected the
+same 132 pins, and it is recorded as an accident again rather than as design — a study that added an
+interfloor share to any zoned cell would move them.
+
+**The one interval that moved is `destination-dispatch`'s `secure-interfloor-mix`, and it moved
+across zero**: ΔAWT was `−0.043 [−0.098, +0.013]` and is now `−0.056 [−0.112, −0.0006]`. The interval
+excludes zero by six ten-thousandths of a second. **It is not a result**, and saying so is the point:
+the cell's own `admissibleReplications` is `0` ([§ D261](DECISIONS.md)), the effect is a twentieth of
+a second on a building whose AWT is tens of seconds, and an interval that clears zero at the fourth
+decimal after a population change is exactly the shape CLAUDE.md's opening warning is about. It is
+re-pinned because the code produces it, and it is reported as a number rather than as a finding.
+
+### What is left red, and it is one case in a block § D256 already refuted
+
+`benchmark/mixedUseHighRise.test.ts` § 1 — *"the building's own scenario admits no paired comparison,
+and the reason is structural"* — had two of its three cases failing before this lane, because its
+premise is H-ACCESS-1's and H-ACCESS-1 is REFUTED. The third case bundled two claims and § D265
+separated them: *"serves the same traffic completely"* is still true at every rate
+(`meanUndelivered` 0, `notCompleted` 0, unserved fraction 2.1–2.6 % against a 5 % limit), and *"every
+replication quotes an AWT"* is not, at the two thin rates, on **every** arm including the
+conventional ones. The ground is an **empty reporting window**: at 0.2 % of population per five
+minutes the window holds a handful of people, and removing the ~2 % the gap turns away empties it on
+4 of the 30 draws. That is a statement about the operating point rather than about access control, so
+the case now asserts the completeness claim its title makes at every rate and the quotability claim
+at the one rate a 30-replication batch is thick enough to support.
+
+The block's other two cases are left red exactly as § D256 left them: the verdict they assert is
+`STRUCTURAL` and the study measures `SERVABLE`, and re-pinning a refuted hypothesis would destroy the
+only evidence that it was refuted.
+
+### Four consequences of adding one field, all handled rather than discovered
+
+§ D245's shape, and § D264's, a third time. The compiler found every one of them:
+
+1. **`SimulationDemandOptions`** gains `credentialGap`, so `runner/experiment.ts`'s `DemandParsers`
+   — a mapped type over `Required<SimulationDemandOptions>` — stopped compiling until it had a
+   parser, and `runner/crn.ts`'s trace key stopped compiling until it carried the field. The key
+   matters: two cells differing in the share are two different crowds, so pairing them would compare
+   populations rather than dispatchers.
+2. **`reports/persistence.ts`**'s hand-written projection, which § D264 already records as the shape
+   that drops a reachable override silently. `0` is the control arm, and a stored control that lost
+   the field would replay at the shipped share.
+3. **`metrics/serialization.ts`**'s `passengerRecordSchema` is a `strictObject`, so a stored run on
+   an access-zoned building failed to re-parse until `refusedAt` was admitted. **And it exposed a
+   pre-existing instance of the same defect**: `abandonedAt` is emitted by the recorder and is *not*
+   in that schema, so a run declaring `sim.patience` cannot be stored and replayed today. Filed
+   rather than fixed here — no shipped configuration declares patience, so no published figure is in
+   question, and it wants a round-trip test of its own.
+4. **`tuning/space/collect.test.ts`**'s declared-row count, 129 → 130. `default: null`, so
+   `SPACE.parameters.length` does not move: the number lives in `data/traffic-profiles.json` with its
+   reasoning attached, and a second copy in the parameter table would be the second source of truth
+   this repository has paid for repeatedly.
+
+### One check this lane may not close, and it needs one line
+
+`packages/viz/src/controls/controls.test.ts` § *points at every discovered schema, and names the rows
+inside them that cannot be searched* holds a sorted list of the fifteen `default: null` parameter
+ids. It is sixteen now, and the missing entry is `'traffic.credentialGap.wrongZoneShare'`, sorted
+between `'traffic.batchSize.weight'` and `'traffic.dayVariation.maxDemandFactor'`. `controls/` is
+outside this lane's file ownership, so the line is **named here rather than added** — the guard is
+doing exactly what it was written to do, and what it is asking for is a decision that a new
+unsearchable row was intended.
+
+---
+
+## D277 — the vocabulary is a module, and the first thing it found was a copy of itself
+
+**Date: 2026-08-06 · Written with the code.** Issue #22 asks for a glossary across Compare, Lab and
+Parameters. The obvious build is six explanations where the six sets of words appear. That is
+rejected, and the product owner's decision comment says why in one line: *it is how you get four
+definitions of paired difference that drift apart.* This repository already carries the defect
+twice — the band palette held as its own copy in **four** modules (§ D251), and
+`live/decisions.ts#TERM_PHRASES` duplicating by hand the `terms[].measures` and `serves` prose
+`data/dispatcher-profiles.json` already authors. Neither was wrong on the day it was written.
+
+**§ D251's fourth copy is the one this lane should be read against.** Three of the four were found
+by a contrast walk, because they painted words and a word has a ratio. The fourth — `live/honesty.ts`
+holding `rgba(224,176,64,.07)`, the dark value of `--band-1`, as the honesty card's wash — carries
+no word, so no walk could reach it, *"and it would have survived a fix that chased the reported
+ratios and stopped."* That is the argument for mechanising a duplication check rather than fixing
+the instances somebody happened to see, and it is exactly what clause 3 below is: the sweep that
+found this lane's own copy found it in a module no reader had complained about.
+
+So the lane's first deliverable is **the single source, not the copy**: `mode/glossary.ts`, one
+entry per term, consumed by every surface that says the word.
+
+### Why `mode/`, and why `glossaryFor` derives rather than declares
+
+`docs/12` § 2.2 already put the vocabulary here — *"`mode/disclosure.ts` already holds the
+vocabulary that has to move"* — and § D240 built the first half of it against that sentence.
+`disclosure.ts` explains a **figure** in the Casual view of one run; this explains a **word**, on
+any surface, in either view.
+
+No surface declares which terms it uses. `glossaryFor` reads the surface's **own emitted text** and
+returns the terms that text contains. A hand-written list per surface would be § D152's shape one
+layer down — derived-looking only because today's sentences happen to fit it — and it would rot
+silently the first time somebody reworded a sentence. Derived, a rewording changes what attaches,
+and a term nothing says any more is caught rather than kept.
+
+### The anti-drift property, asserted four ways
+
+*"There is a single source"* is a property, not an intention, so `mode/glossary.test.ts` asserts it
+rather than trusting it. Each clause catches a different way it could be true today and false in a
+month:
+
+1. **Defined once.** No two entries share an id, a term, an explanation or a trigger phrase — and
+   no phrase may be a *prefix* of another, because `appearsAs` matches at a leading word boundary
+   and not a trailing one, so a prefix would attach two terms to one word.
+2. **Read, not copied.** Every wired surface's entries are asserted `toBe` — the same objects as
+   `GLOSSARY_TERMS`', by reference. `toEqual` would pass the defect this suite exists to catch,
+   because equal strings are exactly what two copies look like on the day they are written. This is
+   `honesty/surfaces.ts`' own reason for seeding `GOAL_BLOCKER` by reference: *"the string the
+   sweep checks and the string a player reads are the same object."*
+3. **Not duplicated in the tree.** No explanation appears as a literal in any module but
+   `mode/glossary.ts`, swept with `honesty/derive.test-helper.ts#deriveProseLiterals`.
+4. **Attached to something real.** Every term names a phrase the shipped source actually prints. A
+   term for a word nothing says is a ghost, and `derive.test.ts` already records why a list of
+   ghosts is worse than no list.
+
+### What clause 3 found on its first run, and it was in this lane's own work
+
+`wt95`'s explanation was a **byte-for-byte copy** of `mode/disclosure.ts`'s
+`CASUAL_LEAD_BY_FIGURE[WT95_ID]`. Written by hand, from the same source, into the module built to
+stop exactly that — which is the argument for mechanising the check rather than against it.
+
+Closed by making `disclosure.ts` a **consumer**: `WT95_ID` and `TTD_ID` now read `glossaryPlain`,
+and the second copy is gone rather than reworded. The line between what moved and what stayed is
+not arbitrary, and the instructive case is the one that did **not** move. `long-waits` stayed:
+the glossary owns *long-wait threshold*, which is the **line**, and the disclosure entry is about
+the **share of rides that crossed it**. Two related sentences about two different quantities are
+not a duplication, and collapsing them to make a count look tidier would have lost the figure's
+own meaning. `demand`, `awt` and `service-level` stayed for the same reason one level up — nothing
+on Compare or Lab draws a paired demand bar or names the single worst wait, so there is no second
+surface for them to drift against.
+
+### Two rules carried from § D240, and one bug the boundary rule hid
+
+**Explain the term beside the run's own words, never in place of them.** The glossary arrives as
+its own field; not one `sentence` or `note` is rewritten. Asserted by looking for an explanation
+inside a surface's own sentence and finding none. `goalLabel` is deliberately **unchanged** and
+still returns the raw kebab-case kind — `no-divergence`, `long-waits-under (≤ 10 %)` — because that
+id is what the campaign file, the published table and every other surface call the goal, and
+swapping it for prose here would leave a reader unable to match the row to anything else.
+
+**The wording may never become a ranking.** Swept with `mode/disclosure.test.ts`'s own banned
+pattern rather than a second list. It refused one entry: *dead gate* read *"a control that silently
+does nothing is worse than one that says why it cannot"*. The comparison is between two designs
+rather than two dispatchers, so the rule was arguably not aimed at it — and exempting it was the
+other option and is the one that erodes. `campaign/words.ts` records that *"a rule with one
+carve-out is a rule with a place to hide"*. Reworded, at no cost to what it says.
+
+The sweep is scoped to `plain` and not to `term`, because `term` is a **surface's** wording quoted
+back rather than this module's — `beat-the-baseline` is a goal id, not a claim. That scope is only
+honest while `term` cannot be anything the product does not already print, which is what clause 4
+above makes true. The two assertions are load-bearing together and neither is on its own.
+
+**And the boundary rule hid a real bug.** `appearsAs` was matched as `\b` + phrase
+unconditionally. `\b` matches between a word character and a non-word one, so `\b%` requires a
+letter or digit immediately before the `%` — and the string this vocabulary has to match is
+`95 % interval`, with a space. The `confidence-interval` term therefore attached **nowhere**, in
+the corpus as well as in the test, and would have shipped explaining a word it could never reach:
+a definition that is correct, wired, tested in isolation and connected to nothing, which is this
+repository's own dead-seam shape arriving inside a glossary. A phrase opening on a non-word
+character now gets no leading boundary, because the character is the boundary.
+
+---
+
+## D278 — the glossary is driven through the honesty search, because that is what the search is for
+
+**Date: 2026-08-06 · Written with the code.** `honesty/derive.test.ts` partitions every derived
+text producer into *driven by an adapter* or *excluded with a reason*, and an unclassified one is
+red. `mode/glossary.ts` exports two producers, so it had to be one or the other.
+
+**It is driven.** An exclusion would have had to argue that prose written to explain a confidence
+interval is not the kind of prose R1, R2, R10, R11 and R13 are about, and there is no version of
+that argument that survives being written down: this is player-facing copy about **what a number
+means**, which is the closest thing to the search's own subject the package contains. The module
+was authored knowing it would be swept, and the wording that came out of it is different for that.
+
+Every rule the sweep applies is one this table could plausibly break, which is why the choice is
+not ceremonial:
+
+- **R10** — the natural way to explain an interval is *"there is a 95 % chance"*, which is the
+  Budescu misreading the rule exists for. `probabilityWordIn` runs over every `plain` **and** every
+  `term`; `certain` is on that list as well as `likely`, and both ends of the scale had to be
+  written around.
+- **R11** — the natural way to explain kilojoules is to call a small number good. § D106's
+  measurement is why that is wrong rather than merely imprecise: `nearest-car` sits on the Pareto
+  front at six of eight matrix cells **because it carries fewer people**. The entry says drive work
+  is an estimate of work done, that it sits beside the waits and is never folded into them, and
+  that a small figure is a measurement of the driving and not an achievement. It is asserted
+  against `properties.ts`' own three patterns — an energy quantity *and* a wait quantity *and* a
+  scoring word in one string is a folded axis — in the test rather than only in the search, so the
+  rule fails at the unit rather than 4 650 simulations later.
+- **R2** — the whole risk of a plain-language layer is that *"this run cannot tell them apart"*
+  drifts into *"A is better"*.
+
+### Provenance is `authored`, and that is a decision rather than a default
+
+Not `schema`. `schema` is the one provenance `isResultBearing` returns `false` for, and it exists
+for a narrow thing: `core`'s own description of its own dial, re-printed by the Parameters tab
+unaltered, with no run behind it for a probability word to translate. This text is this package's
+own writing about results. Marking it `schema` would have been an exemption dressed as a category —
+and it would have exempted precisely the sentences most able to break R10.
+
+`term` seeds as `label` and `plain` as `prose`. The split is not cosmetic: R13's frequency clause
+skips labels, and `95th-percentile wait` is a name rather than a restatement of anything.
+
+### The adapter renders twice, and the second rendering is the liveness half
+
+1. **The whole table**, on every case — so no entry can hide behind never having been selected.
+2. **What `glossaryFor` actually selected** from the shipped batch report's own sentences, which is
+   the call the Compare tab makes.
+
+Without the second, a selector that matched nothing would leave every assertion true over a corpus
+with no evidence the vocabulary is ever attached to anything — wave 8's fifth false-negative shape,
+a harness reporting no failures for every case. It is the same instrument that caught the `\b%`
+bug in § D277, one layer out.
+
+`BATCH_REPORT` and `CAMPAIGN` deliberately do **not** seed their surfaces' new `glossary` fields.
+Those fields hold these same objects by reference, so seeding them again would put one sentence
+into the corpus under two surface ids and make the search look broader than it is.
+
+### What is wired, and what is named rather than claimed
+
+Wired this pass, all of them pure functions whose reports now carry a derived `glossary`:
+`batch/report.ts#batchReport`, `scenario/goalReport.ts#goalReport`, `campaign/judge.ts#judgeStage`,
+`campaign/brief.ts#briefingFor`, `campaign/dimensions.ts#admitProfile`, and
+`mode/disclosure.ts`'s two Casual leads.
+
+**The DOM mounts were not**, and they were stated here rather than left to be discovered. The
+vocabulary reaches a screen only when a panel draws the field, and three panels did not:
+`dev/batchPanel.ts`, `dev/campaignPanel.ts` and `dev/parameterForm.ts`. That is § D240's own second
+finding repeating one lane over — *the renderings are better and nothing draws them* — and it was
+recorded as an open gap with its named fix, not as coverage. Two of the six terms in issue #22's
+own list, *dead gate* and *authorable*, are produced **only** in files this lane did not own
+(`dev/parameterForm.ts`, `controls/editedProfile.ts`), so they were defined here and drawn nowhere
+until that routing landed. They were held to clause 4 of § D277 like every other entry: both are
+asserted to be phrases the shipped source really prints, so the definitions could not quietly become
+ghosts while they waited.
+
+**That routing has now landed and this paragraph is past tense because of it — [§ D272](DECISIONS.md).**
+All three panels draw the vocabulary, and `dev/parameterForm.ts` calls `glossaryFor` on the status
+line it builds, which is what makes *dead gate* and *authorable* readable by a player for the first
+time. The paragraph is corrected rather than deleted: a stated gap goes stale exactly the way a
+stated refusal does, and leaving this one standing would have told the next reader that two
+definitions are unreachable when they are not.
+
+## D273 — a ramp is a shape and a day is a sequence, so the phases became data
+
+**Date: 2026-08-06 · Written after the code, before the viewer half.** The core half of *make the
+day the unit of play*.
+
+`traffic/demandTemplate.ts` opened with a defence: *"Shape is code, numbers are data. A ramp is a
+ramp."* Every number a template used came from `data/traffic-profiles.json`, and the **shape** —
+ramp, hold, trough, step — was a builder in the module, selected by a five-way `if (record.id ===
+…)` at the bottom of `fromRecord`. That defence is right for a ramp and wrong for a schedule.
+
+A day's phase list is not a shape. It is a *sequence* of them — an up-peak, a lull, a lunch, a lull,
+a down-peak — and a sixth `if (record.id === 'office-day')` per day profile is exactly the
+`if (phase === 'evening')` CLAUDE.md invariant 7 forbids. A second day profile would be a seventh
+arm, a third a eighth, and none of them would be a new *cost term* or a new mechanism: they would be
+a list of numbers wearing a function's clothes.
+
+### The structural fact that made this small, verified rather than assumed
+
+**The traffic model was already multi-phase.** `DemandPhase` carries per-phase intensity endpoints
+*and* optional per-phase directional-split endpoints; `intensityAt` and `splitAt` are **one**
+piecewise-linear evaluator over **one** knot list; and `shift-change` already ships six phases with
+two interior peaks. Nothing about "a day has parts" was missing.
+
+So a day profile needs **no new evaluator — it is a longer phase list**, and that claim is not left
+as an argument. `traffic/phaseListIdentity.test.ts` § *a phase list reproducing rise-and-fall is
+rise-and-fall* authors `rise-and-fall`'s own knots as a record, resolves it, and requires:
+
+- the resolved `durationS`, **every phase**, `peakIntensity`, `intensityIntegralS` and
+  `meanDirectionalSplit` to be equal — everything the evaluator reads;
+- `intensityAt` and `integratedIntensityS` to agree at 441 sampled instants including overhang;
+- the **trace** to be byte-identical at all five buildings, on `passengers`, `arrivals`, `sources`
+  and then the whole object.
+
+That is composition identity, and it is what proves the new path is the same evaluator being *fed*
+rather than a second one beside it.
+
+### The change
+
+`DemandTemplate.phases?: readonly DemandPhaseRecord[]` — `{ startMin, endMin, startIntensity,
+endIntensity, startSplit?, endSplit?, $comment? }`, minutes beside `durationMin` and
+`startOfDayMin`. `fromRecord` takes a record that declares it **before the id switch**, and that
+ordering is the feature: a record selects the phase-list path by *having* phases, so nothing
+compares its id and a day profile is a record rather than a branch. The five shape builders'
+branches are untouched, and `phaseListIdentity.test.ts` § *adding office-day moves nothing that
+shipped before it* holds all six shipped ids to that at three layers — resolution, trace and whole
+run.
+
+`phaseListTemplate` is the new builder and it adds no geometry of its own: it validates, freezes,
+and hands the list to the same `finish` the five shapes use, which derives `peakIntensity`,
+`intensityIntegralS` and `meanDirectionalSplit` exactly as before.
+
+**The report window is the whole period, and that is a modelling answer rather than a gap.**
+`lunch-two-way` and `shift-change` already report over the whole run, for the reason
+`benchmark/arms.ts` gives about a mixed pattern: *"this is a pattern rather than a peak, and a 300 s
+window of it is a sample of the pattern rather than the thing itself."* A day is that argument at
+its strongest — five minutes cut out of a day reports one of its periods and calls it the day. So a
+phase-list record authors no window and no discards, and the schema refuses `discardFirstMin` /
+`discardLastMin` on one by name. `SimulationConfig.reportWindow` still narrows the *run's* window,
+which is where "show me the morning" belongs.
+
+### One bug this found, and it was in the oldest line in the resolver
+
+`isResolved` tested `'phases' in value`, which was a correct discriminator for exactly as long as a
+record could not have phases. The moment one could, **every day profile handed in as a record would
+have been waved through as already-resolved** — returned untouched, its minutes read as seconds, its
+`peakIntensity` and `intensityIntegralS` never derived, and its phase list never validated. It is
+now `'durationS' in value`, the one field the two shapes cannot share: a `DemandTemplate` is a
+`strictObject` carrying `durationMin`, and a `ResolvedDemandTemplate` is built in seconds. Found by
+`phaseListIdentity.test.ts` refusing to see a malformed list refused — which is the test working
+before the feature it guards had a caller.
+
+---
+
+## D274 — the closed union was already the fallback list, so the call sites widened instead
+
+**Date: 2026-08-06 · Written after the code.** The type-level consequence of
+[§ D273](DECISIONS.md), decided rather than discovered.
+
+`DEMAND_TEMPLATE_IDS` looks like *the templates this project ships*. It has not been that for some
+time: `resolveDemandTemplate` looks an id up in the loaded `demandTemplates` **first** and falls
+back to the union only when no record answers. So the union's runtime role was already the narrower
+one — **the shapes this module can build with no record to read** — and the equality between it and
+the catalogue was a coincidence of the data rather than a property of the code.
+
+§ D273 ends the coincidence. A record can author its own phases and answer to an id no compiled-in
+union can contain, and `office-day` is the first one that does.
+
+**Decision: the union stays exactly what it is, the fallback list, and every call site widens to
+`string` validated against the records it actually loaded.** The alternative — adding `'office-day'`
+to `DEMAND_TEMPLATE_IDS` — is the move that had to be refused, because it would put a *record's* id
+in the *shape* list and make the next day profile a code change again, which is the whole thing
+§ D273 removed.
+
+Widened: `DemandTemplateSpec`, `TrafficConfig.template`, `SimulationConfig.demandTemplate`,
+`experiments`' `TrafficArmSpec.demandTemplate` and its parser, and the stored
+`StoredRunConfig.demandTemplate` and its parser. `DemandTemplateId` itself is unchanged and still
+exported; every widening is a widening, so nothing that assigned one stopped compiling.
+
+### Three places where the check got *better*, not weaker
+
+1. **The CLI.** `--template` was checked at *parse* time against a `choices` list derived from
+   `DEMAND_TEMPLATE_IDS`, and the authority is the `demandTemplates` records the run loads — which
+   `--data <dir>` can change. The static list was already wrong for a custom data directory. It is
+   now `requireDemandTemplate`, the same `pick` every other data-derived flag uses: *available,
+   nearest match, run `elevator-sim list`*.
+2. **The CLI again, and this one was a live defect.** `planRun` spread
+   `...(isDemandTemplateId(template) ? { demandTemplate: template } : {})` — so a `--template` value
+   the predicate rejected was **silently dropped**, the run went ahead on `rise-and-fall`, and the
+   reproduce line printed the flag back. A mistyped template was a different experiment reported as
+   the one you asked for. It now throws a usage error.
+3. **The stored-record parser.** `expectEnum(value, path, DEMAND_TEMPLATE_IDS)` asks *"is this one
+   of the shapes this build compiles?"* of a file that may have been measured against a `data/`
+   directory not on this disk. The id is echoed as written and the check that it *resolves* happens
+   at replay, where a catalogue exists and `resolveDemandTemplate` throws by name.
+
+### Four keys the stored-template parser was dropping, and one it rejected outright
+
+`parseDemandTemplate`'s key list was written when a resolved template had nine fields. It has since
+grown `startOfDayS` ([§ D244](DECISIONS.md)), `meanDirectionalSplit` ([§ D169](DECISIONS.md)) and
+now `authoredPhaseList`, and its phases grew `startSplit`/`endSplit`. So a stored **resolved**
+`lunch-two-way` round-tripped with its mix arc silently deleted — which replays a *different crowd*,
+the invariant-5 failure the comments beside `demandOptionsOf` are about — and a stored resolved
+`rise-and-fall` was rejected outright, because `rejectUnknownKeys` had never heard of the hour. All
+five are carried now. That is a pre-existing defect fixed in passing rather than a consequence of
+this change, and it is recorded here because the next reader will otherwise assume it arrived with
+the widening.
+
+### Two tests that asserted the coincidence, and what they assert now
+
+`traffic/mixIdentity.test.ts` and `traffic/templateAdditionIdentity.test.ts` both held
+`shipped.sort() === [...DEMAND_TEMPLATE_IDS].sort()` — the equality that has just stopped being a
+property. Both now assert **containment** plus the *named* remainder: every id the module can build
+without a record has one, and the records that no shape backs are listed by name and required to
+carry `phases`. That is strictly more than the equality said, because it also says *which* records
+are which.
+
+`mixIdentity`'s partition needed a second fix that is easy to miss: it computed *which templates vary
+the mix* by filtering on `directionalSplitAtStart`, which is the **period-endpoint** form. A phase
+list declares its mix knot by knot, so the filter would have called `office-day` flat while it swings
+from 85/5/10 to 5/85/10 — the partition going stale in exactly the way that test exists to catch. It
+now looks in both places, and the answer is two.
+
+### One declared surface stays narrow on purpose
+
+`TRAFFIC_PARAMETERS`' `traffic.template` row declares `values: [...DEMAND_TEMPLATE_IDS]`, so it is
+now **narrower than the shipped catalogue** and a generic optimizer sampling it will never offer
+`office-day`. That is the right answer rather than a gap, and it is written into the row so the next
+reader does not close it: which traffic pattern a building faces is a **scenario axis**, not a knob
+to search — CLAUDE.md § Tuning discipline says *tune per traffic pattern*, which means holding this
+fixed and searching the weights inside it. Reading the values from `data/` at module load would also
+make an invariant-8 declaration a function of a file the type system cannot see, which is a worse
+trade than the one it buys. A study that wants a day profile names it on the traffic arm, where the
+catalogue is loaded.
+
+---
+
+## D275 — two knobs a schedule cannot absorb, refused by name rather than applied to something plausible
+
+**Date: 2026-08-06 · Written after the code.** Both refusals are shaped on the existing
+`constant-iso` one, which is the precedent this repository already keeps: *a template that cannot
+take a knob says so by name instead of doing something that looks like it worked.*
+
+### 1. `templateOverrides.durationS` — and this **is** issue #81
+
+On a shape builder `durationS` *refits the geometry*: a 900 s `rise-and-fall` is a 900 s run with a
+proportionally shorter ramp and the same 300 s hold, which is a shorter version of the same thing. On
+an authored phase list there is no geometry to refit. Applying it would rescale a ten-hour schedule
+into whatever was asked for — **a fifteen-minute day with a five-minute lunch, reported as a day**.
+
+Refused, with `durationS` getting its own sentence because it is the one that looks like it should
+work; the other nine overrides are refused as a group, because a phase list has no ramp to hold, no
+trough to raise, no step to lengthen and no discard to take.
+
+**Selecting which *part* of a day to run is a different question and must become a different
+field** — `windowStartS` / `windowEndS` — and never a reinterpretation of `durationS`. The reason is
+not aesthetic: `durationS` travels in **every leaderboard submission** and in every stored
+`RunConfig`, so giving it a second meaning would silently change what a stored score was measured
+over. Every board would still verify, and every old row would now be a claim about a different run.
+
+**That field is named here and deliberately not built.** Nothing in the viewer can select a part of
+a day yet — that half belongs to another lane — and a `windowStartS` with no shipped writer is
+precisely `patternSwitching` ([§ D219](DECISIONS.md)) again: authored, loaded, resolved, and writable
+by nothing. The refusal is what ships; the field ships with the surface that needs it. Recorded as an
+unbuilt thing rather than as a built dead one.
+
+**One consequence, stated because it is a real cost.** `mixAmplitude` is refused too, so the flat-mix
+negative control [§ D162](DECISIONS.md) condition 5 requires cannot be run against `office-day` as an
+override. Damping an authored arc towards its own period mean is well defined and was not built,
+because building it now would add a mechanism with no study asking for it. A study that wants the
+control authors a second record with the flat knots — which is what "the shape is data" makes cheap,
+and is the honest form of that control anyway, since it puts the comparison in the file rather than in
+a flag.
+
+### 2. `dayVariation.peakShiftS` — and the collapsed limit is the *smaller* half of the reason
+
+`maxPeakShiftS` computes its bound from the **outermost** interior knot, on the reasoning that the
+run's two endpoints are pinned and a shift is *when the busy part happens*. On a day the first
+boundary is minutes from the start — the trickle before the doors open — so the limit collapses to
+those minutes and almost every declared shift is refused with a message naming a phase boundary the
+author never thought of as the peak.
+
+That alone would be an argument for a better limit. The reason it is a refusal instead is what a
+shift *inside* the collapsed limit would do: it moves **every** interior knot by one amount, so the
+lunch and the evening peak slide together with the morning one. That is not a late peak, it is a late
+clock — and [§ D244](DECISIONS.md) rule 4 already settled that a period's hour is not what a peak
+shift moves. A day with three busy parts has no single peak to shift, in the same way `constant-iso`
+has none.
+
+Refused in the same shape as `constant-iso`'s, and **before** the limit is consulted, so the message
+is about the template's structure rather than about a number.
+
+### What reads the marker, and why it is `true`-or-absent
+
+`ResolvedDemandTemplate.authoredPhaseList?: true`. Omitted — never `false` — on all six shape
+templates, following the `startOfDayS` discipline for a sharper reason: this key sits inside every
+`PassengerTrace` and therefore inside every `SimulationResult`, so a `false` on the shipped shapes
+would move `traffic/transportIdentity.test.ts`'s fifteen pinned digests to record that a template is
+*not* something. They did not move.
+
+---
+
+## D276 — the day is a sequence of cited peaks separated by derived interpolations, and it says so phase by phase
+
+**Date: 2026-08-06 · Written after the code.** `office-day` — one record proving
+[§ D273](DECISIONS.md)'s path, and the only construction defensible against Guide D.
+
+CIBSE Guide D and this project's reference set tabulate **design peaks, not days**. There is no page
+anywhere in it that gives an office's demand as a function of the hour. So a day profile that claimed
+to be cited would be inventing a source, and the honest construction is the one the record's own
+`$comment` states in the CITED / DERIVED / NOT CITED / LIMITATION idiom § D263 used: **a sequence of
+cited peaks separated by derived interpolations**, with each of the seventeen phases saying in its
+own `$comment` which of the two it is.
+
+### The record
+
+`office-day`, 08:00–18:00, `durationMin: 600`, `startOfDayMin: 480`, `recommended: false`,
+seventeen phases, reported over the whole of itself.
+
+| what | intensity | mix | status |
+|---|---|---|---|
+| 08:00–08:30 opening trickle | 0.05 | 85/5/10 | level NOT CITED, inherited from `evening-egress`'s baseline |
+| 08:30–09:00 **morning up-peak** | ramp → 1 → ramp | 85/5/10 | period CITED, geometry and hour `rise-and-fall`'s |
+| 09:00–11:45 mid-morning | 0.25 | relaxes to 45/45/10 | DERIVED interpolation |
+| 11:45–12:15 lunch lead-in | 0.25 | 45/45/10 → 0/90/10 | DERIVED interpolation |
+| 12:15–12:45 **lunch two-way** | ramp → 1 → ramp | the cited arc, exactly | mix CITED, hour `lunch-two-way`'s |
+| 12:45–16:15 afternoon | 0.25 | back to 45/45/10 | DERIVED interpolation |
+| 16:15–17:15 evening lead-in | 0.25 | 45/45/10 → 5/85/10 | DERIVED interpolation |
+| 17:15–17:45 **evening down-peak** | ramp → 1 → ramp | 5/85/10 | period CITED, geometry and hour `office-down-peak`'s |
+| 17:45–18:00 closing trickle | 0.05 | 5/85/10 | as the opening |
+
+### Citation accounting
+
+**CITED.** That the three periods are office design cases in their own right — Guide D names the
+morning up-peak, the lunchtime two-way peak and the evening down-peak, and `docs/03` tabulates the
+standard-office up-peak at 11–15 %pop/5 min as the governing one. And the lunch **mix**, 45/45/10
+(Guide D 2010 carried into 2020; the BCO *Guide to Specification 2014* pairs the same split with a
+13 %/5 min lunchtime two-way demand).
+
+**DERIVED, and inherited rather than invented.** The three peaks' geometry is `rise-and-fall`'s own —
+12.5-minute ramp, 5-minute hold, 12.5-minute ramp — so the record adds no uncited peak duration, the
+discipline `lunch-two-way`, `shift-change` and `office-down-peak` were all authored under. And **all
+three placements are the shipped records' own**, so the day invents no hour: the morning hold lands
+at 08:42:30–08:47:30 and the lunch runs 12:15–12:45, exactly where § D244 put `rise-and-fall`'s 08:30
+and `lunch-two-way`'s 12:15; the evening ramp begins at 17:15 and holds at 17:27:30–17:32:30, exactly
+where § D263 put `office-down-peak`. 08:00 is then a *consequence* — half an hour of trickle before an
+up-peak that begins at 08:30 — rather than a chosen round number.
+
+**DERIVED, and reproduced rather than asserted.** The lunch mix knots. Over 12:15–12:45 the arc is
+`lunch-two-way`'s, linear from 0/90/10 to 90/0/10, and the two interior knots — 0.375/0.525/0.1 and
+0.525/0.375/0.1 — are that same line evaluated at +12.5 and +17.5 minutes. So the day **contains** the
+cited period rather than approximating it, and `phaseListIdentity.test.ts` asserts it against
+`lunch-two-way` itself on a 301-point grid, plus the crossover at 12:30. § D263's rule applies: if
+that identity ever breaks, the `$comment` is what changes, not the test.
+
+**DERIVED, from a conservation argument rather than a table.** The balanced 45/45/10 between the
+peaks. An office at steady occupancy neither fills nor empties, so incoming must equal outgoing; the
+interfloor share is held at the cited 10 % throughout, which is the assumption `lunch-two-way` already
+makes about its own arc. The morning mix is `office-standard`'s own 85/5/10 taken from the same file,
+and the evening mix is its reverse — a statement of the mechanism, in the words § D263 used for
+exactly this, and not a quoted table.
+
+**NOT CITED, and no figure was invented.** The inter-peak intensity of 0.25: no page in this
+reference set gives a %pop/5 min band for office inter-peak or interfloor traffic, and 0.25 is chosen
+to sit clearly below the peaks and clearly above the trickle, the way `shift-change`'s
+`troughFraction` of 0.35 is chosen. The 0.05 trickle, inherited from `evening-egress`'s
+`baselineFraction`. And the evening peak's **height**, taken equal to the morning's: the literature
+says the evening flow is the more concentrated of the two, and § D263 refused to quote an unsourced
+multiple of the up-peak for exactly that reason. It could not have been authored as a rate in any
+case — a `demandTemplates` record has **no rate field**; the level comes from the building's
+`arrivalRatePctPop5min` and the declared `traffic.demandLevel`.
+
+**LIMITATION, four, all structural.**
+
+1. `recommended` is **false** and must stay false. One day is one long run whose waiting times are
+   serially correlated exactly as `constant-iso`'s are, so *"reported over the whole day"* is a
+   description and not a licence to build a confidence interval across days. See `docs/03`
+   § The independence condition.
+2. The peaks are **symmetric ramps and a real office day is not** — departures synchronise at the
+   front and trail long into the evening. § D263 named the same limitation for `office-down-peak`; the
+   day inherits it three times over, and expressing it needs a skewed shape this module does not have
+   and a skew figure no source here publishes.
+3. The day is **unsliced** — see § D275.
+4. `dayVariation.peakShiftS` is refused — see § D275.
+
+### What it does when it is run, and the two things that says
+
+`elevator-sim run --building midtown-office --dispatcher collective --template office-day --seed 42`
+generates **7 283 legs over 600 minutes** and delivers every one of them, in under two seconds. Its
+**AWT is SUPPRESSED**, on the abandonment-horizon ground: 897 of 7 283 arrivals waited past 900 s.
+
+**And it is a day rather than a longer replication, which is the thing § D156 said the shipped
+templates could not be.** Measured on the trace of **that same run** — `midtown-office`, seed 42, the
+7 283 legs above — as the share of legs beginning at a lobby floor in each ten-minute window:
+
+| window | legs | from the lobby |
+|---|---|---|
+| 08:40–08:50, the up-peak | 367 | **86.4 %** |
+| 10:25–10:35, mid-morning | 109 | 58.7 % |
+| 12:15–12:25, lunch outbound | 200 | **12.5 %** |
+| 12:35–12:45, lunch returning | 215 | 74.0 % |
+| 17:25–17:35, the down-peak | 430 | **7.2 %** |
+
+One template, one run, one seed: the building fills, settles, empties to lunch, refills, and empties
+again. § D156 found the shipped templates flat in the mix at *+1.83 σ* and called it structural
+because `DemandPhase` carried a scalar; this is what the phase list is *for*, and the lunch pair
+straddling the cited 45/45/10 crossover is that arc arriving in the legs.
+
+**The mid-morning row is the one to read carefully, and it is quoted rather than explained.** It is
+the flat 45/45/10 stretch, and it measures 58.7 % here and **43.5 %** on the disjoint seed
+20 260 805 — either side of the authored balance on ~110 legs, which is a ten-minute window of a
+quiet period and about what its own scatter allows. Whether the residual is sampling noise or a
+systematic lift from the building's own geometry is **unmeasured**, and no mechanism is claimed for
+it: the four peak rows are the ones this table is evidence for, and each of them is far outside any
+reading of that scatter.
+
+Both halves of the suppression above are the apparatus working. The record is a statement about
+**demand**, and `midtown-office` under `collective` at typical demand does not have the capacity for
+its own peaks —
+which is not something this record introduced, because `rise-and-fall` on the same pair is already
+suppressed for saturation over its own 300 s window. The day makes it *visible over ten hours* rather
+than over five minutes. At `--rate 3` the same day reports **AWT 17.97 s, WT95 48.43 s**, all 1 824
+legs delivered; on `garden-apartments` at typical it reports **AWT 12.98 s**. So the record produces
+reportable runs where the bank can serve it and suppresses honestly where it cannot, which is exactly
+what every other template does.
+
+### Two consequences named rather than discovered
+
+**All leaderboard config boards fork.** `server/leaderboard/submission.ts#configHashOf` digests the
+fully resolved inputs a run depended on, and the demand template catalogue is one of them — *as
+loaded*, not as a curated subset. Adding a record changes that file, so every board keyed on a
+template from it forks, exactly as it did for § D245's one field and § D264's one record. The
+avoidance is the same wrong move refused for the same reason: keeping the record outside the digested
+file would create a second place a template is defined. `submission.ts` already states the intended
+reading — *"A `data/` change does not corrupt an old board — it starts a new one."*
+
+**The non-test caller.** `cli/src/commands/run.ts#planRun` resolves `--template` against the loaded
+catalogue and hands the id to `SimulationConfig.demandTemplate`, so `elevator-sim run --template
+office-day` builds the phase list and runs it; `elevator-sim watch` reaches the same `planRun`; and
+`elevator-sim list` prints the record beside the other six from the same file. `packages/experiments`'
+`TrafficArmSpec.demandTemplate` accepts it as an axis. That is the § D273 path exercised from a
+shipped entry point rather than from a test, which is the check `patternSwitching`
+([§ D219](DECISIONS.md)) failed.
+
+### The viewer cannot start it, and a test says so — which is the finding, not a defect in this change
+
+`packages/viz/src/menu/menu.test.ts` § *every shipped template can be run at some offered length* is
+**red on `office-day`**, and it is right to be: `FREE_PLAY_DURATIONS_S` offers 5, 15, 30, 60 and 120
+minutes, and a ten-hour day fits inside none of them. Its own comment states the rule it is
+enforcing — *"a template that ships and fits inside none of the offered run lengths would be listed
+in the menu and unstartable at every one of them."*
+
+This is the same thing § D264 point 4 records happening to `menu/howToPlay.test.ts` when
+`office-down-peak` landed: a catalogue-derived guard turning red is that guard working. It is left
+red **and named here** rather than fixed, because both fixes are outside this change's file
+ownership and one of them is a design decision rather than a constant:
+
+- **A longer offered length** (`packages/viz/src/menu/types.ts`) makes the day startable and makes
+  Free Play offer a ten-hour run, which is a product decision about what a session is.
+- **A part-of-day window** — § D275's unbuilt `windowStartS`/`windowEndS`, plus the control that
+  writes it — makes the day startable at any offered length by running a *slice* of it, which is
+  what "make the day the unit of play" actually asks for.
+
+The second is the one this work was built towards, and the red test is the strongest available
+argument for sequencing it: the day exists, it runs from the CLI, and the only thing between it and a
+player is a way to say *which part*. `menu/howToPlay.test.ts` § *names every demand template the
+configuration ships* is **green** — the guide's prose already contains both words of `office-day` —
+so the guide will need a sentence distinguishing it when the viewer half lands, and does not fail
+today.
+
+---
+
+## D269 — a working copy follows the thing it was read from, and a choice set keyed by bank id does not follow at all
+
+**Date: 2026-08-06 · Written after the code.** Play-tester issues **#46** and **#65**, which are two
+reports of one missing rule: `withBuilding` re-seeded exactly one of the three things that are *about
+the building*, and nothing said why the other two were different.
+
+### What was reported
+
+**#46:** the commissioning screen showed the previous scenario's shafts under the new building's
+name. **#65:** the traffic editor said **edited — not saved** about a document nobody had edited, and
+the dispatcher card in the right rail left the dispatcher editor describing a profile nobody was
+running.
+
+### Three fields, three answers, and only one of them had been given
+
+`withBuilding` took `buildingSpec` across under a **pristine guard** — re-seed only while the copy
+still equals the building it was read from — with the argument written out: leaving it alone shows a
+panel describing a building nobody is looking at, and re-seeding unconditionally throws away five
+minutes of dragging an elevation. That argument is right, and it was applied to one field.
+
+`patternSpec` is the same kind of thing and needed the same answer. `trafficEditor.ts#sourcePatternOf`
+resolves `editingPatternId: 'building'` through `state.buildingId`, so an untouched copy of Garden
+Apartments' profile was compared against Vertical City's the instant the building moved, and the
+editor's dirty flag fired on a document nobody had touched. **That is a stale refusal's mirror
+image** — CLAUDE.md's rule that a control which writes nothing must say so, run backwards: a claim
+that work is at risk when none is, which trains a reader to ignore the one flag that means
+something. The condition is `editingPatternId === 'building'` and nothing else: a reader editing a
+*named* profile is editing a document that has nothing to do with which building is running, and
+re-seeding there would throw their work away on a control that was not about it.
+
+`commissioning` is **not** the same kind of thing, and that is the decision rather than an
+inconsistency. `CommissioningChoices` is a `BankChoice` per **bank id**, and a bank id is a fact
+about one building. Carried over, `commissionedBuilding` applies the choices by name to whatever bank
+happens to share an id and drops the rest, and `reviewCommissioning` sums capital over hardware that
+is not there. So there is no pristine guard on this half: a working copy can be dirty *against its
+source* because it is a document being edited; a choice set cannot, because the ids it is keyed by
+stop existing. It is **cleared**, and empty is *as built* and byte-identical to the authored
+building — the one value that means *nothing has been decided about this building*, which is exactly
+true the instant a different one arrives.
+
+Cleared only when the building actually **moves**. The coach select fires `change` for a re-pick of
+the building already running, and discarding a fabric there would be the inert-control failure with
+the sign flipped: the control moves, and then it moves back on its own.
+
+### The interlock, which is why this had to land with § D248 rather than after it
+
+With the transport fixed, the `set-commissioning` arm seeds `state.commissioning` from
+`asBuiltChoices` before writing back — so **touching** a dropdown latches a choice set onto the
+state. Before § D248 the field was usually empty and the staleness was invisible; after it, one pick
+on Garden Apartments follows the player to every building they visit. The clearing is what makes the
+repaired dropdowns safe, and shipping the two apart would have made #42's fix the cause of #46's
+worst case.
+
+### The rail wrote three fields directly, and one of them was the building
+
+`dev/rightRail.ts`'s dispatcher card was `context.update({ dispatcherId: entry.id })` — the id and
+nothing else — so picking **collective** from the list left `editingDispatcherId` and
+`dispatcherSpec` on whatever profile had been opened before: a cost-function line, an advice
+sentence and a weight grid describing a dispatcher nobody is running, under a card marked
+*selected*, and `runThisDispatcherStateOf` offering *use this one* about the profile already
+driving. `withDispatcher` is `withBuilding`'s rule on that card, pristine guard included.
+
+The **building** card beside it was worse and is the more instructive of the two: it wrote
+`{ buildingId: id }` and bypassed `withBuilding` entirely, so the week never followed the building
+into or out of its scenario, neither working copy moved, and — once the paragraph above landed — the
+fabric was not cleared either. `dev/main.ts`'s coach select has called `withBuilding` since it was
+written; this card is the other writer of the same field and did not. **One field, two writers, one
+of which knew about a rule the other had never heard of.**
+
+Both now go through the transition function, passed as a whole state to `MountContext.update` — a
+`ViewerState` **is** a `Partial<ViewerState>`, so it merges to exactly what the transition returned.
+No `replace` member was added: writing a state directly is the one thing that seam's docstring
+forbids a panel.
+
+### What is asserted, and why the state assertions are not enough on their own
+
+Both clearing assertions were watched failing against the old reducer before being trusted. But a
+test that only checks `commissioning` is `[]` is a test about a field, and this repository has
+shipped eleven behaviours that were configured, unit-tested and read by nothing. So the fabric and
+the dispatcher pick are each **compared on the legs** — `midtown-office` at 1 800 s, for
+`probes.test-helper.ts`'s measured reason that Garden Apartments produces 20 legs and two hydraulic
+cars answer every one, so a third car is never assigned and a live control reads dead.
+
+---
+
+## D270 — the menu had three ways out and all three were a choice, so Escape had nothing to press
+
+**Date: 2026-08-06 · Written after the code.** GitHub issues **#40**, **#33**, **#68**, **#28** and
+**#23** — five reports that turn out to be one missing intent and three lines of wiring.
+
+### The root was a one-way door, and that is why § D249 could not finish
+
+Every way out of the overlay was a mode being entered: **Start**, **Open the doors**, **Keep going**.
+That is a complete set of *choices* and an empty set of *changes of mind*. A player who pressed
+**Menu** over a running shift to check a setting had to start something to get back to the shift they
+were already watching.
+
+§ D249 § 3 hit the same wall from the other side and said so: Escape could not be bound to `back`,
+because *"it would work on five screens and do nothing on the root, which is exactly where #40's
+reporter is standing"*. So both issues need the same thing — a `close` intent — and it lands **with
+its arm**, because `dispatchMenu` returns `void` and has no `never` arm: a member nothing handles
+compiles and ships a dead control, which is the defect this package has shipped eleven times.
+
+The row is **Resume**, disabled and explained when there is no shift behind the menu. The reducer
+returns the state unchanged: hiding the overlay is the shell's, and a reducer that also navigated
+would be deciding *which screen the menu re-opens on*, which is `reopen`'s answer and not this one's
+to give twice.
+
+`closeMenu` latches `playerHasChosen` on this path too, and that is deliberate rather than an
+oversight in the new arm. The flag gates autoplay on the next `adopt`; a player who pressed
+**Resume** has left the menu on purpose, and a run they then re-roll should play. Resume itself
+starts nothing, so the shift on screen stays where the playhead left it.
+
+### `inert` on the shell: the shell names its own elements and the panel writes them
+
+The trap § D249 built holds the **keyboard**, and only over the controls the panel itself built. It
+holds no pointer, and nothing focusable inside the overlay that came from elsewhere. Measured before
+either half: **7 focusable controls inside the overlay and 624 in the document.**
+
+§ D249 § 3 filed the rest as *needs `dev/main.ts`*, on the ground that the shell's own elements are
+not the panel's to disable. They still are not — but they are the shell's to **name**, and
+`MenuPanelHost.shell` is that naming. `menuPanel.ts` then writes `inert` and `aria-hidden` from one
+value with one writer: the overlay's own `hidden`. A `document.body` traversal inside the panel would
+have been the panel deciding what the shell **is**, which is a second answer that can drift; a
+boolean threaded through the host would have been a second source that can disagree — in the
+direction that leaves the page permanently unclickable, which looks completely normal.
+
+The shell's own list is derived from `document.body.children` minus the two things it appended
+there, so an element added to `index.html` is covered on the day it lands. Both exemptions are the
+shell's own: the overlay cannot cover itself, and the wait live region announces **the menu's** own
+requests — a sign-in link taking half a minute (§ D243 § 4) — so hiding it while the menu is up would
+silence the one region the menu speaks through.
+
+`closeMenu` now redraws, which is what takes the covering back off. Setting `hidden` without drawing
+would hide the menu and leave the page underneath it out of the accessibility tree and unclickable.
+
+### Two one-liners that were waiting on this file rather than on a decision
+
+**#28:** `hasServer: () => client !== undefined`. `menu/screens.ts` cannot tell — the origin comes
+from a `<meta>` tag read at run time, so the same bytes are a connected build behind a server and an
+unconnected one behind a CDN — and it correctly says nothing when nobody has answered. The field
+stays optional, and the reason **changed rather than went away**: it was optional because the shell
+was another lane's; it is optional now because *absence has a meaning of its own*, and a required
+member would force a caller with no `<meta>` lookup to guess.
+
+**#23:** Start selected no tab, so reaching Free Play from the Day report hid the menu and left
+`panel-run` hidden — the reporter pressed *Start*, the screen went back to a sheet about the
+**previous** run, and the shift they had just configured played on a canvas nobody could see. The
+fix is `tab: 'run'`, and it is in `menu/enterFreePlay.ts` rather than in the shell's arm for that
+module's founding reason: a decision written inside a click handler needs a document and a click to
+reach, so it cannot be tested and it drifts. Asserted from a state on `report`, because asserting it
+from one already on `run` would pass against a function that writes nothing.
+
+### One test moved, and it is not a weakening
+
+The trap's *"the handler is reacting to keys that are not Tab"* guard probed with `Escape`, which
+now has a meaning. The probe moved to an ordinary letter; the guard is unchanged and still says *the
+handler owns two keys and no others*. The document recorder grew `removeAttribute`, which is the only
+rule it has ever been grown by — `inert` has to come **off**, and a recorder that could only add
+attributes would report the covering as permanent.
+
+---
+
+## D271 — a walk that reproduces the transport cannot measure it, and this one contained a copy of the defect
+
+**Date: 2026-08-06 · Written after the code.** `playthrough/walk.test.ts`, and nothing was red before
+or after.
+
+### The defect, which is the most instructive thing in this wave
+
+§ D248 § 4 diagnosed why three tiers of evidence were all green while every Commissioning dropdown
+and the Calendar were inert on the shipped page. The model walk *presses every option of every select
+on every screen*, and it said nothing about any of them, because it built the intent it pressed with
+**the same expression the panel used**:
+
+```ts
+row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+  ? { ...row.intent, value: option.id }
+  : row.intent
+```
+
+and then `continue`d past every row that fell into the fallback. Two copies of one condition can only
+ever agree. **The four broken transports were exactly the four this walk asserted nothing about**,
+and its own reach was the shape of the defect.
+
+§ D248 fixed the panel and added `menu/screens.test.ts`. The copy in the walk survived, because
+nothing was failing.
+
+### What replaced it, and why the skip condition is now a different question
+
+The case presses `menu/screens.ts#withChosenValue` — the shipped transport, exhaustive over
+`MenuIntent` with no `default`. What it skips is `REDUCER_OWNS`, which is a fact about
+**`applyIntent`** (*which intents does the reducer answer?*) rather than a restatement of the panel's
+condition. The three it omits write `ViewerState` rather than `MenuState`, and `applyIntent` returns
+the state unchanged for them by design, in an arm that says so.
+
+`set-challenge` is in the owned set and was not in the old expression: the reducer has always
+answered it, and the old ternary dropped it for no reason anybody had stated.
+
+A second case covers the half the first structurally cannot reach — for the three intents the shell
+owns, *the screen reflects it* is not a question this tier can ask, so what is asked is whether the
+**dispatched intent names the option that was picked**. A third requires the graph to reach selects
+on both sides of the split, without which either could pass vacuously.
+
+The rewrite was watched failing against a re-introduced fallback arm.
+
+### The rule, stated generally
+
+**A test may not build its subject the way its subject builds itself.** § D183's disclosure suite paid
+for this once with a fixture; this is the same failure in a walk, and the tell is the same: the test
+and the code contain the same expression, so the test can only confirm the code, never contradict
+it. Where a decision is exported — and in this package they nearly all are, for § D214 § 2's reason —
+the test presses the export.
+
+---
+
+## D272 — the layer was computed on every recording and dropped, and mounting it found an R13 violation on a line that had shipped for months
+
+**Date: 2026-08-06 · Written after the code, and two of the three findings came from printing what a
+function returns rather than from reasoning about it.** GitHub issues **#71**, **#70**, **#41**,
+**#38**, **#48** and **#59**.
+
+### #71 — `void itemsIn;`
+
+§ D240 § 2 measured it: `dev/main.ts`'s only consumer of `disclosureItems` was `drawParity`, which
+computed `parityRefusal(items)` and then wrote `void itemsIn;`, a deliberate no-op keeping the import
+used. The layer had a non-test caller that used it for a check and discarded its output — **the
+standing requirement's own shape one level in: a call whose return value is dropped looks exactly
+like a caller and is not one.**
+
+`transportStatusOf` mounts them. The transport's `AWT · WT95` was built from `recording.summary`
+directly, which made it mode-blind *and* made it a second copy of the R9 suppression that
+`mode/disclosure.ts` already owns; both go together, because the renderings this now reads are the
+ones `drawParity` checks — so the line on screen and the parity claim about it can no longer be about
+two different lists.
+
+Written on `adopt` and on a mode change rather than in `renderAll`. `#status` is also where four
+transient messages land, each of which restores itself after its own moment, and a writer inside
+`renderAll` would clobber whichever was on screen the next time any state moved. Those are the two
+moments the derived text can change.
+
+**Seeding it into the honesty corpus failed six generated cases immediately**, in both modes:
+`AWT 13.1 s · WT95 27.4 s` is an estimate with no count beside it — R13 clause one, *"`n = 5` is not a
+caveat on `11.3 s`; it is part of what `11.3 s` means"*. The finding is about the **shipped strip**,
+not about the new function, and it had been invisible for exactly the reason the whole issue is:
+nothing on that line went through the layer that classifies a figure as an estimate. The count was on
+the `Rendering` all along.
+
+**Two more, found by printing the output.** The first routing dropped the refusal: on a run whose
+mean is refused it produced `average wait suppressed (n = 201 rides)` and nothing about why, where
+the old strip read `AWT suppressed — <reason>`. That is R3 with the refusal deleted, on the surface a
+reader glances at without opening a panel — a **worse** line than the one being replaced. Appending
+the reason per figure was the second draft, and it printed a 300-character sentence twice, because
+`awt` and `wt95` are refused by one `awtIsValid` call and carry the same words. The reasons are
+deduplicated and said after the figures.
+
+`render/mood.ts`'s two jargon-carrying drivers and `rightRail.ts`'s measured plate rows take a Casual
+lead under § D240's three rules — restate no figure, make no claim the source does not, let the
+source sentence follow verbatim. R10's static sweep refused the first draft's *"after a **certain**
+wait"*: `certain` is a probability word, and the rule is right to be blunt about it in a sentence
+sitting beside a count of people who gave up.
+
+### #70 — a setting with a sink and no screen
+
+§ D250 measured the whole chain: `summaryFigureIds` honoured `showEnergyAxis`, its only caller was
+`disclosureItems`, whose only caller was `drawParity`, which turned the items into `parityRefusal` —
+**empty whenever parity holds**, which is the shipped state. With a run on screen the shell's text
+was byte-identical with the switch on and off. Its own words: *"the fix is one required field and one
+caller"*.
+
+`DayReportInput.showEnergyAxis` is the field. It takes the **pair or neither** — § D106:
+`workPerServedLegKJ` without `workKJ` is a per-leg efficiency with nothing to read it against, which
+is the score this project refuses. `undefined` is *show it*, which is `DEFAULT_RUN_SUMMARY_OPTIONS`'
+rule verbatim: a caller with no player is describing a run, and one that silently dropped an axis
+because a menu defaults it off would be the honesty search measuring a surface the product does not
+show.
+
+The shell re-**shapes** the filed sheet rather than only redrawing it, because a `ShapedDayReport`
+already holds its figure list. `dayReportOf` is pure and re-running it is free; `closeShift` is what
+banks a day and is deliberately not re-entered, so the input it was shaped from is held beside it.
+
+### #41 — two numbers that were the same at every width and every building
+
+`QUEUE_GUTTER_PX` (280) and `OVERLAY_WIDTH_PX` (250) went to `buildLayout` unchanged whatever was
+drawn, so 530 px of canvas was scenery whether the building had two shafts or thirty-five. Measured:
+**Vertical City drew 27 of 35 at 1920** — `RS-05`'s notice doing its job, and eight shafts of a
+building whose whole subject is its shafts off the picture on the largest screen anybody has.
+
+The obvious fix computes the plot width a shaft count needs. It would need `MIN_SHAFT_WIDTH_PX` and
+the shaft gap, both private to `render/layout.ts`, and a copy of either is a second answer to *how
+wide is a legible shaft*. So nothing computes a fit: `stageLayoutFor` walks a ladder of requests and
+**asks the layout** — `hiddenShaftCount` is that file's own measurement of this question, already
+carried for the notice. The rungs yield in `fitGutters`' own order and for its stated reason, and the
+last rung asks for **nothing**, which hands the layout its documented default rather than a floor
+copied from it.
+
+### #38 — a card that named a tab and did not go there
+
+*"…and the Building tab will let you feel how much it buys."* The lever cards are the one place on
+the sheet that tell a reader to do something, and they were the one place with nothing to press,
+while the Compare block under the small print has been a navigation since it landed.
+
+`LEVER_SURFACES` maps the two cards that are a **fabric** change onto the Building tab. The other two
+are deliberately absent: *Weight fairness up* and *Ask where they're going* are both a different
+dispatcher, and a card that navigated to the dispatcher editor with a lever named would be this sheet
+recommending a dispatch strategy off one replication — R2, and CLAUDE.md's paired-t rule. Asserted in
+both directions on one run, so the restraint cannot pass by there being no navigable card at all.
+
+A navigable card is a `<button type="button">`; a card with no surface stays the `<div>` it was,
+because an element that looks pressable and does nothing is the inert control this repository counts.
+
+The derived scanner flagged `LEVER_SURFACES` as an unclassified prose producer — its ids are
+hyphenated. It is named in the `REPORT_PANEL` adapter's `covers` rather than excluded: the cards'
+words are genuinely driven there already, and an exclusion would have claimed otherwise.
+
+### #48 — a design phase that could not be finished
+
+Every dropdown on the commissioning screen already wrote `ViewerState.commissioning` on the pick, so
+the fabric was live and the screen still had no way to say *I am done*. A design phase you cannot
+leave deliberately is one whose result arrives by accident, on whichever run happens next.
+
+`commit-commissioning` and `reset-commissioning` land with their arms, for § D270's reason. Commit
+closes the menu, selects the simulation and runs; reset writes `[]` and only redraws, because a
+player still on the screen has not said they are finished and re-running would spend a simulation on
+a fabric they are mid-decision on. Reset is offered only once something has moved — a cancel that is
+always available where nothing has changed is a control whose press changes nothing.
+
+The preview is `CommissioningReview.moved` through `movedChoiceText`, the diff that module already
+computes. It says what the hardware **would be** and nothing about what it would buy: the screen has
+simulated nothing, so a ranking there would be the confident nonsense the statistical discipline
+exists to prevent. The capital figure is not restated — a limit shown twice starts reading like the
+thing being optimised, which is `commissioning/types.ts`'s own argument.
+
+**The R2 sweep is scoped to the preview line, and that is a finding rather than a concession.** Over
+the whole screen it went red on the capital legend's *"more shafts, **faster** cars and a
+taller-rated class each commit more"* (§ D230). That sentence interpolates `CAPITAL_UNITS_PER_MPS`
+and says what a choice **costs**, which is the one comparison this screen is allowed to make. A check
+that can only pass by deleting a true sentence is the wrong check.
+
+### #59's remainder — one slug is left, and it stays
+
+Swept the Compare surface: after § D236 renamed the goal rows' arms, the only slug left is the rows'
+own labels, which are `goalLabel(spec)` and therefore `GoalKind` — kebab-case, seven of them.
+
+**It stays, because it is a key rather than a sentence.** `data/scenario-goals.json` names goals by
+these ids and `docs/10` § 10.4 quotes them; renaming it on the surface would break the one link a
+reader has between a row and its definition — the same argument `goalReport.ts` already makes for
+keeping `armId` and `dispatcherProfileId` on the row. So the honest requirement is not *no slugs*, it
+is **no unexplained slug**, and `batchPanel.test.ts` requires all seven to reach a `mode/glossary.ts`
+definition in both of `goalLabel`'s forms, derived from `GOAL_KINDS` so an eighth cannot arrive
+unexplained.
+
+### The three panels § D278 filed as an open gap now draw the vocabulary
+
+§ D278's closing section named the gap precisely — *"the vocabulary reaches a screen only when a
+panel draws the field, and three panels do not yet"* — and it is closed here. `dev/batchPanel.ts`
+draws `BatchReport.glossary` and `GoalReport.glossary`; `dev/campaignPanel.ts` draws
+`StageBriefing`'s, `StageReport`'s and `ProfileAdmission`'s. Both put the block **last**, under the
+sentences that used the words: a reader who already knows what a paired difference is should not
+scroll past the definition to reach the result.
+
+`dev/parameterForm.ts` is the one that mattered. It has no report object, so `draw` calls
+`glossaryFor` on the status line it has just built — pure, and reading nothing but the string it is
+handed. `formStatusLine` and `controls/editedProfile.ts` are the **only** producers of *dead gate*
+and *authorable* in the tree, so both terms were defined, both were held to § D277's *attached to
+something real* clause, and neither could be read by anybody. § D278 said as much and expected the
+routing; this is it.
+
+Two properties are asserted rather than promised. **The plain language leads and never replaces** —
+no existing row is touched, and the definitions go beneath the sentence that used the word. And the
+terms are **deduplicated by `id` rather than by object identity**: the producers return
+`GLOSSARY_TERMS` entries by reference, so identity holds today and would fail silently the day one of
+them maps over the table.
+
+`admissionNode` now returns its terms beside its node rather than gaining a sibling that would call
+`admitProfile` again — two calls are two answers to *is this profile admissible*, and they would
+disagree the day the space moves.
+
+---
+
+## D282 — the ten-hour day is offered because it ships, and this is the smaller of the two fixes § D276 named
+
+**Date: 2026-08-06 · Written after the code.** The red test § D276 left named, closed.
+
+### What was red, and why leaving it red was right until now
+
+`packages/viz/src/menu/menu.test.ts` § *every shipped template can be run at some offered length*
+failed on `office-day`. That guard is derived from `data/` rather than written about a template, and
+its own comment states what it enforces: *"a template that ships and fits inside none of the offered
+run lengths would be listed in the menu and unstartable at every one of them."* `office-day` declares
+`durationMin: 600`; `FREE_PLAY_DURATIONS_S` offered 5, 15, 30, 60 and 120 minutes.
+
+A catalogue-derived guard turning red is that guard working — the same thing § D264 point 4 records
+happening to `menu/howToPlay.test.ts` when `office-down-peak` landed. § D276 left it red and named
+because both fixes were outside that change's ownership.
+
+### Which of the two fixes this is, and which it is not
+
+§ D276 names two and prefers the second:
+
+- **a longer offered length**, which makes Free Play offer a ten-hour run;
+- **a part-of-day window** — § D275's unbuilt `windowStartS`/`windowEndS` plus the control that
+  writes it — which makes the day startable at *any* length by running a slice of it, and which is
+  what *make the day the unit of play* actually asks for.
+
+This is the first. The second is the right feature and it is **unbuilt**: § D275 refused the two
+knobs it needs by name, and building it reaches `core` and `data/`. Choosing the smaller fix is not
+a judgement that it is the better one — it is the observation that a record which ships and cannot be
+started from any surface is a worse state than a long session, and that the precedent for exactly
+this problem already exists. § D213 § 8, when `constant-iso` landed: *"`FREE_PLAY_DURATIONS_S` and
+`ACCEPTED_DURATIONS_S` gain 7 200 s so the template is playable at all."* Same problem, same move,
+one record later.
+
+**It does not close the window question**, and the constant says so in its own docstring: when the
+slice control lands, this entry stops being the only way to reach `office-day` and may well be
+dropped.
+
+### The second guard that fired, and it fired correctly
+
+`menu/howToPlay.test.ts` then went red: the guide's *Run length* sentence lists the offered lengths
+and is checked against `FREE_PLAY_DURATIONS_S` itself, so a constant that moves and a sentence that
+does not is caught rather than shipped. That is the § D213 shape the whole file is written against —
+a hand-maintained list that stopped tracking the data it was built from — and it worked. The sentence
+now reads *six* and names 600, with a clause saying **why** the longest is there, because a run
+length an order of magnitude past the others is the kind of number a reader assumes is a mistake
+unless something says otherwise.
+## D279 — ten permanently-red tests, classified by measurement, and not one of them needed deleting
+
+**Date: 2026-08-06 · Written after the measurement, and every classification below is a run rather
+than a reading.** [§ D256](DECISIONS.md) left twelve tests red on purpose, on the argument that
+*"a suite made green by re-pinning a refuted hypothesis would have destroyed the only evidence that
+it was refuted."* [§ D260](DECISIONS.md)–[§ D262](DECISIONS.md) repaired the two it called fixtures.
+This is the other ten.
+
+**The argument does not hold, and the reason is what a red suite costs rather than what it
+preserves.** The evidence of refutation belongs in § D256 and in the study's own report, and it is
+in both. What a permanently red suite destroys is the ability to tell a new failure from an expected
+one — at which point the next real regression is waved through by a reader who has learned that
+these ten are always red. A test suite that cannot go green has stopped being an instrument.
+
+**And several of the ten had stopped being merely stale and become false.** They asserted, as
+passing criteria for a *future* tree, that the unserved fraction RISES as the load falls, that every
+baseline is unquotable at every rate, that the conventional arms are invalid from replication zero.
+Each of those is now a measured falsehood sitting in a file that describes itself as a measurement.
+
+### The classification, and what each one cost
+
+Every row was decided by re-running the study at its own budget, its own seed and its own operating
+point. Nothing was decided by argument, and no assertion was weakened to make a test pass.
+
+| # | file · case | class | what was done |
+|---|---|---|---|
+| 1 | `accessControl` · *conventional dispatch cannot serve it at all* | **refuted** | inverted to an **equality**: the two arms are bit-identical on **150 of 150** secure-tower replications |
+| 2 | `accessControl` · *the two identical where there are no access zones* | **still true**, one line refuted | null half kept and strengthened; `verdict` `CONFIRMED` → `REFUTED`, asserted with its reason |
+| 3 | `accessControl` · *prints the kiosk column at the value pinned* | **measured under the defect** | `29.0` → **`34.1`**, and derived from the pin rather than transcribed a fourth time |
+| 4 | `accessControl` · *reproduces every pinned estimate* | **measured under the defect** | 4 of 6 figures re-pinned, 2 reproduce bit-identically — [§ D280](DECISIONS.md) |
+| 5 | `accessControl` · *reproduces every pinned coverage row* | **measured under the defect** | 3 of 6 rows re-pinned, 3 hold — [§ D280](DECISIONS.md), [§ D281](DECISIONS.md) |
+| 6 | `destinationLiveness` · *removes every access refusal on the zoned building* | **refuted** | inverted to an **empty filter on every arm**, with a leg-count control that is not empty |
+| 7 | `doubleDeck` · *the mixed scenario is structurally closed* | **refuted** | inverted to `SERVABLE`; nobody undelivered on any arm at any rate |
+| 8 | `mixedUseHighRise` · *every baseline unquotable at every rate* | **refuted** | inverted to quotable at the thickest rate, and identical to the credential arms at all three |
+| 9 | `mixedUseHighRise` · *the unserved fraction RISES as the load falls* | **refuted** | inverted to **flat** — 2.55 → 2.13 → 2.32 %, neither rising nor falling |
+| 10 | `saturationCensus` · *conventional arms invalid from replication zero* | **half refuted, half re-measured** | the kiosk still binds at 0; every other arm now fails **together at 3**, and § D261's own correction was itself stale |
+
+**Six refuted, three re-pinned, one that was two claims wearing one title — and nothing deleted.**
+That is worth stating because deletion was authorised and would have been easier. Every one of the
+ten had a true, non-vacuous statement available *at the same operating point, on the same seed, at
+the same budget*, so in every case the honest repair was to turn the assertion round rather than to
+remove it. A study that has to move to a new operating point to say something true is a study whose
+result has been chosen; none of these had to.
+
+### The three inversions worth reading, because a bare negation would have been weaker
+
+**H-ACCESS-1's is an equality.** *"The conventional arm no longer fails"* is a weaker claim than
+the one it replaced and is satisfied by a great many broken simulators. What is asserted instead is
+that `eta` and `destination-eta-unpriced` are **the same run** on the building whose five access
+zones were supposed to separate them — 0 of 150 replications differing on any of seven identity
+metrics, the same equality that holds on Midtown Office, which declares no access zones at all.
+`CoverageResult` gained `secureDifferingReplications` to carry it, and the report prints the two
+identity counts side by side: **one zero is a null on an unzoned building; two zeros are the
+statement that the credential moves nothing anywhere under conventional dispatch.**
+
+**Mixed-Use High-Rise's is an identity across arms.** At all three rates the three
+`role: "baseline"` profiles and the two credential-aware arms return identical counts, field for
+field. That is stronger than *"some baseline is quotable somewhere"* and it says the thing § 1 had
+backwards: what costs the two thin rates their aggregate AWT is the reporting window, and it lands
+on the credentialled arms exactly as hard.
+
+**The census's is an equality across arms too, and it replaces a bound.** Over 300 replications at
+`BENCHMARK_SEED` every arm but the kiosk — `nearest-car`, `eta`, `destination-eta`, all five
+`rideTime` arms, `eta-deferred` — loses its AWT at **replication index 3**, the same draw in every
+cell. A per-arm bound would be satisfied by eight arms failing at eight different draws, which is
+what a dispatch effect looks like; one shared index under common random numbers is what says it is
+the **traffic**. So the arms are asserted against each other and the index is printed rather than
+hard-coded.
+
+### The ground is now two different grounds, and that is a better finding than the one it replaced
+
+`accessControl.test.ts` has always argued that *"the two failing arms fail for different reasons and
+the unserved fraction cannot tell them apart."* It was right about the shape and wrong about the
+reasons, which were the § D254 defect. Measured on the same 30 replications, the grounds are
+different **in kind**:
+
+| arm | replications without a quotable AWT | ground |
+|---|---|---|
+| `eta`, `destination-eta-unpriced` | 11 of 30 | **censored** — 3 to 5 of a 50-to-75-person window unserved, over the 5 % limit |
+| `destination-entry-bare` | 30 of 30 | **saturated** — the queue rises 0.8 to 1.8 persons/min, 12 to 25× its own scatter |
+
+The censoring is [§ D265](DECISIONS.md)'s credential gap: riders who begin inside the building
+holding the badge their own floor implies rather than the one their destination needs. No `callType`
+reaches them, which is why both arms carry it identically.
+
+**`11 of 30` is a knife-edge and is recorded as one.** The per-replication unserved fraction
+straddles the limit — 0.036, 0.046, 0.033, 0.096, 0.067, 0.065, 0.064, 0.054, 0.054, 0.031 over the
+first ten draws — so the *count* belongs to this seed while the *equality of the two arms* belongs
+to the model. Only the second is asserted as a property; the first is asserted as a pin. That is
+§ D260's ragged-band warning applied to a fixture this lane did not choose and cannot move.
+
+### What is now open, and is deliberately left open
+
+Three studies asserted that a building's own mixed-directional scenario was structurally closed to a
+paired comparison — Secure Tower, Mixed-Use High-Rise, Vertical City. All three were one defect, and
+all three regimes are now **servable**. That means each could carry an operating point it does not
+have, which would add points, budgets and pin groups. § D256's rule is that such a re-design needs a
+criterion written before the numbers are read, and the numbers have now been read. **So none is
+admitted here**, and each census is re-pointed to say the regime is *open* rather than deleted — the
+same restraint [§ D261](DECISIONS.md) showed with the two `EXCLUDED_CELLS`.
+
+`mixedUseHighRise.ts` § 2 is left standing with its own refutation attached rather than rewritten
+away, because the irony is the lesson: *"incoming-only up-peak is the one regime in which a
+conventional baseline can be measured here at all — not a convenient choice, the only one"* was
+adopted **because** of the defect's symptom, and it had the accidental effect of confining every
+published interval to the regime the defect does not touch. § D256 called that luck. It is why the
+matrix survived, and it should stay legible as luck.
+
+### One measurement did not survive the lane that made it, and it is the same lesson one turn later
+
+§ D261 corrected `arms.ts`'s `secure-interfloor-mix` rationale to *"nearest-car, eta, collective and
+every credentialled arm are clean across the whole census"*. That was measured, and it was measured
+**before § D265 landed**. It is now false: every arm fails at index 3. The correction has been
+corrected, against a re-run rather than against a citation.
+
+**This is § D30's stale-mechanism shape arriving inside a document written to fix a stale
+mechanism.** Nothing re-derives a rationale, so nothing caught it — exactly as § D261 said of the
+number whose reason had gone. The only defence is the one this repository already states: a claim
+about *why* is either measured or labelled unmeasured, and *"re-censused on «date»"* is now written
+into the rationale itself so the next reader knows what the sentence is a snapshot of.
+
+---
+
+## D280 — seven published figures re-pinned, and the four that held are the evidence
+
+**Date: 2026-08-06 · Written after the regeneration, and the regeneration is published rather than
+performed.** `CLAUDE.md`'s rule is that a published number is pinned to the run that produced it, and
+what that rule forbids is a **silent** regeneration. So the movement is stated here rather than left
+in a diff, in the form [§ D262](DECISIONS.md) used for `data/scenario-goals.json`.
+
+All figures from `runAccessControlStudy({})` at its own declared budget: seed 20 260 726, n = 150
+per building for the intervals, `coverageReplications = 30` for the counts, Secure Tower and Midtown
+Office at the `arms.ts` interfloor-mix operating points. No operating point was invented; it is the
+published one, re-run.
+
+### The intervals — H-ACCESS-2
+
+| key | pinned | measured now |
+|---|---|---|
+| `secure-tower/absolute` | `−0.580 [−0.764, −0.396]` | **`−0.542 [−0.718, −0.366]`** |
+| `secure-tower/relative` | `−0.011 [−0.015, −0.008]` | **`−0.011 [−0.014, −0.007]`** |
+| `difference-of-differences/absolute` | `+0.982 [+0.584, +1.380]` | **`+1.020 [+0.625, +1.414]`** |
+| `difference-of-differences/relative` | `+0.017 [+0.010, +0.024]` | **`+0.018 [+0.011, +0.025]`** |
+| `midtown-office/absolute` | `−1.562 [−1.916, −1.208]` | **unchanged, to the last digit** |
+| `midtown-office/relative` | `−0.029 [−0.035, −0.022]` | **unchanged, to the last digit** |
+
+**The two that held are the control, and they are the reason this is a building effect rather than a
+perturbation.** Midtown Office declares no `accessZones`; Secure Tower declares five. That is the
+same split § D254 found on its 60-cell matrix, § D255 on the fifteen identity cells and § D262 on
+the goal table, arriving independently on a fourth apparatus.
+
+**H-ACCESS-2's verdict does not move.** `REFUTED`, in both forms, on the positive side, at the same
+n. The difference-of-differences got very slightly *larger*, so nothing about the refutation is
+closer to its boundary than it was.
+
+### The counts — H-ACCESS-1
+
+| key | pinned | measured now |
+|---|---|---|
+| `secure-tower/eta` | 0 of 30 quotable · 30/30 not completed · 18.167 undelivered · 33.53 % unserved | **19 of 30 quotable · 0/30 not completed · 0.0 undelivered · 4.13 % unserved** |
+| `secure-tower/destination-entry-bare` | 0 of 30 · 52.233 undelivered · 100 % unserved · 28.967 kiosk-refused | **0 of 30 · 34.067 undelivered · 61.21 % unserved · 34.067 kiosk-refused** |
+| `secure-tower/destination-eta-unpriced` | 30 of 30 · 0 · 0.00 % | **19 of 30 · 0.0 · 4.13 %** — *equal to `secure-tower/eta` in every field* |
+| the three `midtown-office` rows | all zeros, quotable | **unchanged** |
+
+The kiosk row **got cleaner again**: 34.067 undelivered against 34.067 kiosk refusals, so every
+undelivered leg is a credential refusal and nothing else. § D256 recorded the same identity at
+36.50/36.50; the level moved with § D265's traffic and the identity held through both.
+
+### The one thing this lane could not finish, and it is named rather than worked around
+
+**`+0.982 [+0.584, +1.380]` is quoted in eight places outside `packages/experiments/`** —
+`CLAUDE.md`, `docs/01-architecture.md`, `docs/05-roadmap.md`, `docs/07-handoff.md`,
+`docs/08-review-findings.md`, `docs/09-destination-dispatch-contract.md`, and twice in this file's
+own history. Every one of them is now quoting a run the code no longer produces, which is the exact
+defect `published.ts` exists to prevent, one layer out from where it can see.
+
+They are **not corrected here**, because this lane does not own those files. The two sites inside
+`benchmark/` are corrected, `published.test.ts`'s partition is green, and this entry is the handover.
+A reader who finds `+0.982` in a document should read it as superseded by the table above.
+
+**The sentence beside the figure needs more care than the figure does.** Six of those eight say some
+form of *"it buys less where access is controlled, and the saving is entirely in the credential
+(H-ACCESS-1)"*. The first clause is the measurement and it stands. **The second clause is now false**
+— H-ACCESS-1 is refuted and the credential buys nothing at all under conventional dispatch, so the
+saving is not in the credential either. Where it *is* is unmeasured. `accessControl.test.ts` now says
+so in its own docstring; `documentation.test.ts`'s three-way guard on the *mechanism* claim is
+unaffected and green, because it asserts a refutation marker rather than a destination for the
+saving. **A lane that owns `docs/` should either measure where the saving comes from or write that it
+is unmeasured** — this repository's own rule for a sentence about *why*.
+
+---
+
+## D281 — a withdrawn table is not a drifted table, and the guard could not tell them apart
+
+**Date: 2026-08-06 · Written after the code, and the code is four lines of vocabulary and one
+assertion.** [§ D280](DECISIONS.md)'s re-pin turned `validation/documentation.test.ts` red at a place
+nothing in [§ D256](DECISIONS.md)'s list predicted, and the failure is more interesting than the fix.
+
+`documentation.test.ts` § *docs/05-roadmap.md § H-ACCESS-1* exists because a categorical figure went
+stale while three guards watched — the `C35` fix moved a coverage row from `27.6 | 51.7 %` to
+`52.2 | 100.0 %` and no layer could see it. It asserts that every row of the roadmap's H-ACCESS-1
+table is renderable from `accessControl.ts`'s `PINNED_COVERAGE`.
+
+**But § D256 withdrew that table.** The roadmap says so in its own heading — *"~~CONFIRMED,
+categorically, with no interval.~~ WITHDRAWN"* — and keeps the rows underneath as the record of what
+the study reported while it was measuring the § D254 defect, which is what this repository does with
+a superseded figure rather than deleting it. So the guard was holding a **withdrawn** table to
+**live** pins, and it was green only because the pins had not moved since the withdrawal.
+
+### Why that is a defect in the guard rather than in either document
+
+The guard cannot distinguish two situations it must treat differently:
+
+- a document **preserving** a withdrawn figure under a withdrawal marker, which is required; and
+- a document that has silently **drifted** off the live pins, which is the thing it was built to
+  catch.
+
+Both look like *"a row the live pins cannot render."* Given only one vocabulary, the guard has to be
+pointed at whichever of the two it is unable to fail — and pointing it at the permissive one is how
+`51.7 %` survived the `C35` fix in the first place.
+
+### The fix, and why it is not a weakening
+
+`accessControl.ts` gains `WITHDRAWN_COVERAGE` — the three Secure Tower rows as they stood when
+§ D256 withdrew them — and `withdrawnCoverageForms()` beside `derivedCoverageForms()`. **Two sets,
+deliberately not one.** A single merged set would let any stale row pass anywhere, which is the
+allowlist this layer exists not to be; two sets let a caller declare *which* it accepts and be held
+to that.
+
+The roadmap guard now asserts three things where it asserted one:
+
+1. every row renders from the **withdrawn** vocabulary;
+2. the heading still carries `WITHDRAWN` — checked **before** the numbers, because the rows are
+   legal only *because* the table is withdrawn, and a document that dropped the marker would be
+   asserting a defect as a measurement;
+3. the two rows that moved are **not** renderable from the live pins — which is what says the re-pin
+   took, and what stops the two vocabularies from collapsing into one permissive set.
+
+So the guard still fails on drift (a fourth set of numbers is in neither vocabulary), on silent
+un-withdrawal, and on a re-pin that did not happen. What it no longer does is require a struck-
+through historical table to track a live run — which no edit inside this lane's ownership could have
+delivered, and which is not what the document is for.
+
+**`WITHDRAWN_COVERAGE` is a record and not a pin, and its docstring says so.** Nothing re-derives it
+from a run, because no run produces it any more, so it may never be quoted as a measurement. The one
+place a value's provenance is *"a defect used to produce this"* is a place that has to be labelled,
+or the next reader will treat it as a second opinion.
+
+### The clause that is deliberately not asserted
+
+`secure-tower/destination-eta-unpriced` withdrew as `30 of 30 | 0.0 | 0.00 %`, which is also how
+Midtown Office's **live** credential row renders. Exact disjointness between the two vocabularies
+would therefore fail, and it would fail for no reason: two different rows that happen to be all
+zeros are not a drift. So disjointness is asserted only over the two rows this study **reports** as
+moved, and the exception is written down rather than absorbed into a looser rule.
+
+
+---
+
+## D283 — the figure moved and the sentence beside it went false, and only one of those was a transcription
+
+**Date: 2026-08-06 · Written after the edits, and every number in it is quoted from a run this lane
+did not perform.** [§ D280](DECISIONS.md) re-pinned H-ACCESS-2 and handed over what it could not
+reach: eight documents quoting `+0.982 [+0.584, +1.380]`, and six of them attaching a destination for
+the saving that H-ACCESS-1 had already lost. This is that handover discharged for the files a `docs/`
+lane owns.
+
+### The two corrections are not the same kind of correction
+
+**The figure is arithmetic.** `+0.982 [+0.584, +1.380]` → **`+1.020 [+0.625, +1.414]`**, and with it
+Secure Tower's own row `−0.580 [−0.764, −0.396]` → **`−0.542 [−0.718, −0.366]`**, because a document
+that moved only the difference-of-differences would publish a table whose three rows no longer
+subtract. Midtown's `−1.562 [−1.916, −1.208]` is unchanged to the last digit and is the control.
+Every site now names the run: `runAccessControlStudy({})`, seed 20 260 726, n = 150 per building,
+held in `benchmark/published.ts` under `difference-of-differences/absolute`.
+
+**The sentence is not.** Six sites ended *"and the saving is entirely in the credential
+(H-ACCESS-1)"*. H-ACCESS-1 is **REFUTED** ([§ D256](DECISIONS.md), [§ D279](DECISIONS.md)) — `eta`
+and `destination-eta-unpriced` are bit-identical on 150 of 150 `secure-tower` replications across all
+seven identity metrics — so the credential buys nothing and the saving is not in it. **Every site now
+says the destination is unmeasured, and not one offers a replacement.** That restraint is the whole
+of the correction: a second plausible mechanism would have satisfied every reader and every test, and
+would have been § D30 again with new wording. What survives is the negative — the same-step mechanism
+is not what produces the saving — which is what the seven corrected sites already rest on.
+
+| site | figure | destination |
+|---|---|---|
+| `CLAUDE.md` | re-pinned, run named | withdrawn, unmeasured, new paragraph |
+| `docs/01-architecture.md` | re-pinned, run named | withdrawn; the coverage clause it rested on withdrawn with it |
+| `docs/05-roadmap.md` | full H-ACCESS-2 table re-pinned | withdrawn in a ⚠️ box beside the table |
+| `docs/07-handoff.md` | re-pinned, run named | withdrawn; coverage bullet struck through |
+| `docs/08-review-findings.md` | both occurrences re-pinned | withdrawn |
+| `docs/09-destination-dispatch-contract.md` | outcome row re-pinned | withdrawn in the row and inline at § 4.3 |
+
+### Three sites moved that were not on § D280's list, and they were found rather than looked for
+
+1. **`docs/05-roadmap.md` § D100 part 1** — the mixed-use table and *"the unserved fraction rises as
+   the load falls … every car answers `accessDenied`"*, asserted as live fact in a document that now
+   says two sections later that `accessDenied` no longer exists. § D279 rows 8 and 9 had already
+   re-measured it: quotable at the thickest rate, and **flat** at 2.55 → 2.13 → 2.32 %. Marked
+   withdrawn rather than regenerated, § D256's rule.
+2. **`docs/05-roadmap.md`'s H-ACCESS-1 prose** — *"it does not perform"* — which sits **outside** the
+   withdrawal blockquote and outside § D281's guarded table, so nothing covered it.
+3. **`docs/07-handoff.md`'s `kiosk-refused` row** — *"both unserved … 0.0 against 29.0 refusals per
+   run"*. The kiosk column moved to **34.1** (§ D279 row 3, § D280) and the conventional arm is not
+   unserved at all, so the sentence was wrong twice. What the column *buys* is unchanged, and is now
+   the only thing separating the two arms.
+
+### What the guard could not see, and the vocabulary it was missing
+
+`validation/documentation.test.ts` was **green throughout**, and § D280 said why: it *"asserts a
+refutation marker rather than a destination for the saving."* Every one of the six sites carried the
+word *refuted* — truthfully, about H-ACCESS-2 — a few characters from a destination H-ACCESS-1 had
+already lost. Three assertions watched that happen and none of them could fail.
+
+**This is § D281's shape one entry later: one vocabulary where two were needed.** That guard could
+not tell a *withdrawn* table from a *drifted* one; this one could not tell a refuted **claim** from a
+refuted **answer**. Both are fixed the same way — by naming the second thing rather than by loosening
+the first.
+
+So a fourth assertion lands, and its marker set is **deliberately narrower** than the existing one:
+`withdraw\w*|unmeasured` and **not** `refut\w*`, because accepting `refut\w*` would reproduce exactly
+the blindness being closed. Watched failing, in both directions:
+
+- a bare re-assertion of the destination in `CLAUDE.md` with the withdrawal vocabulary stripped —
+  *"nearest 11 472 characters"*;
+- the correction deleted from `docs/08-review-findings.md` — the derived carrier set comes back five
+  long against six.
+
+**And the count is now mechanised, which is the part that had never been done.** This claim has been
+hand-counted three times — § D60's seven mechanism sites, § D280's eight figure sites, § D280's six
+destination sites — and not one of those counts was executable, which is why every audit of it found
+a number nobody could check. `proseFiles()` derives `CLAUDE.md` plus every `docs/*.md` from disk and
+the carrier set is asserted by deep equality, so a **new** site fails as loudly as a deleted one. A
+hand list cannot see a document nobody thought to add to it; that is § D192's lesson, applied to
+prose.
+
+**The 400-character window is inherited and is a floor rather than a target.** A withdrawal marker in
+the *preceding paragraph* still satisfies it — measured, not assumed: the first negative attempt in
+this lane passed for that reason and had to be made harder. That tolerance is the existing guard's
+and is left alone rather than tightened on a lane that would be choosing it to fit its own prose.
+
+---
+
+## D284 — the seventh site, and it is a live sentence rather than a stale one
+
+**Date: 2026-08-06 · Written after a grep that was run for one reason and answered a different
+question.** § D280 named eight documents quoting the moved figure and six quoting the withdrawn
+destination. Both counts are short, and what they miss is worse than what they contain.
+
+### Four sites carry the withdrawn destination and are not in any count
+
+| site | what it says | owned by this lane |
+|---|---|---|
+| `packages/experiments/src/benchmark/accessControl.ts` § `reasons.REFUTED` | *"the saving the roadmap attributes to the same-step mechanism is entirely in the credential (H-ACCESS-1)"* | **no** |
+| `packages/core/src/sim/destinationDispatch.test.ts` | *"H-ACCESS-2 is refuted (§ D60) and the saving is in the credential"* | **no** |
+| `TEST_MATRIX.md` | the figure at `+0.982`, and H-ACCESS-1 ticked ✅ *"cannot serve … 33.5 % unserved"* | **no** |
+| `T9-FINDINGS.md`, `MULTI_AGENT_PLAN.md` | the figure as history; *"H-ACCESS-1 confirmed categorically"* | **no** |
+
+**The first is the serious one, because it is not documentation.** `reasons.REFUTED` is the string
+the study *prints* with its own verdict, and the module's docstring twenty lines away already says
+the opposite — § D279 rewrote the docstring and left the emitted reason. So `accessControl.ts` states
+both the correction and the thing it corrects, and the one a reader sees at the end of a run is the
+wrong one. It is `benchmark/`, not `validation/`, and this lane may not edit it.
+
+### And the site that is not a document at all
+
+`packages/viz/src/access/dispatcherCredentials.ts`'s pre-run warning tells the **player**, live:
+
+> *"a call from any of those floors reaches every car as an unbadged request, every car refuses it on
+> access grounds, and the call is permanently unassignable."*
+
+That is § D254's deleted defect, described to a user as current behaviour, in a string
+`dev/editor.ts`, `dev/rightRail.ts` and the honesty search all consume. Its docstring's *withdrawn*
+figures were corrected here; **the sentence itself was not**, and the reason is that the honest fix is
+a product decision rather than a wording one. What still refuses a rider is enforced by the runner
+against the **destination** and by § D265's credential gap — neither of which any choice of
+dispatcher changes — so the truthful message for a conventional profile may be **no message at all**,
+which would empty the check of the purpose `docs/10` § 10.3 gives it. § D256's rule is that a
+re-design of that kind needs a criterion written before the numbers, so the gap is **named in the
+module's own docstring** on the precedent `lockedOut.ts` set in the same directory, and no second
+plausible sentence is put in it.
+
+**The lesson is the one this repository keeps relearning, and the count is the evidence.** Three
+audits of this claim produced three different totals, all by hand, none reproducible — and the
+sites they missed are the two that are not prose: a printed verdict string and a player-facing
+warning. § D283's derived scan closes that for `CLAUDE.md` and `docs/`. **It does not reach `.ts`,
+and the four sites above are the measure of what that leaves open.**
+---
+
+## D285 — a part of a day is a new field, and the day is drawn before it is cut
+
+**Date: 2026-08-06 · Written after the code.** `windowStartS`/`windowEndS` — the field
+[§ D275](DECISIONS.md) named, argued for, and deliberately did not build.
+
+§ D275 refused `templateOverrides.durationS` on an authored phase list and said why in one sentence:
+rescaling a ten-hour schedule into fifteen minutes gives *a fifteen-minute day with a five-minute
+lunch, reported as a day*. It then named the field that would answer the question properly and left
+it unbuilt on an explicit ground — *"a `windowStartS` with no shipped writer is precisely
+`patternSwitching` ([§ D219](DECISIONS.md)) again: authored, loaded, resolved, and writable by
+nothing."* [§ D286](DECISIONS.md) is the writer. This is the field.
+
+### It is a new field and never a second meaning for `durationS`, and the reason is arithmetic
+
+`durationS` travels in `StoredRunConfig`, in `SubmittedRun`, and into
+`server/leaderboard/submission.ts#configHashOf`. Giving it a second meaning would leave **every
+board still verifying and every stored row a claim about a different run** — the worst available
+failure, because nothing would go red. So `durationS` keeps meaning *how long the run's demand was*,
+which is true of a windowed run exactly as it is of any other, and the window says *where in the
+period that length was cut from*.
+
+### The ordering that is the whole design: draw the day, then cut it
+
+`generateTrace` does not pass the window to the sampler. It generates the template's **whole**
+period — same streams, same draws, same order as a run declaring no window — and `sliceToWindow`
+then keeps the batches inside the window and re-bases them by exactly `windowStartS`. Bounding the
+sampler instead would have been shorter and would have drawn a **different day for every window**.
+
+Two things follow, and they are why the extra work was done:
+
+1. **Common random numbers survive a window change** (CLAUDE.md invariant 2). Two windows of one
+   seed are two parts of one day, so a morning-versus-evening comparison is *paired on the day*
+   rather than being two unrelated experiments. Under a bounded sampler that pairing does not exist
+   and the 5–20× the CRN design buys is spent on nothing.
+2. **The passengers of a window are the day's passengers** — the same records, with the same ids,
+   masses, destinations, credentials and planned legs. Measured: `office-day` at `midtown-office`
+   seed 42 draws 7 283 legs, and the 08:30–09:00 window is 714 of them, beginning at `p61`. Nothing
+   is renumbered, and `traffic/windowIdentity.test.ts` asserts the ids and every field of every kept
+   record against the day's own.
+
+The ids being **non-contiguous** is the property rather than an oversight. A window that renumbered
+would look identical on every other check and would have stopped being a view of the day.
+
+### What a windowed template becomes, and the one thing that does not move
+
+`windowTemplate` re-bases: `durationS` is the window's length, the phases are clipped and shifted so
+`t = 0` is the window's start, `startOfDayS` becomes the *window's* hour, and `peakIntensity`,
+`intensityIntegralS` and `meanDirectionalSplit` are re-derived over the window by `finish` — the
+same rule `shiftTemplatePeak` follows, so a template cannot disagree with itself. The lunch window's
+mean mix comes back as the cited 45/45/10 rather than the day's, which is the honest reading: it
+**is** a different period.
+
+So every downstream reader — the kernel's deadline, `traceReportWindow`, the phase strip, the
+oracle's `[0, durationS]` assumptions — sees an ordinary period that begins at zero, and **nothing
+had to learn what a window is.** `ResolvedDemandTemplate.window` is what records that this period
+was cut out of a longer one, and it carries `periodS` so a trace can say *half an hour of a ten-hour
+day* without re-resolving the record.
+
+**The report window becomes the whole of the cut**, on § D273's argument at one more step: a phase
+list is reported over the whole of itself because five minutes cut out of a day reports one of its
+periods and calls it the day — and five minutes cut out of a *lunch peak* reports one instant of it
+and calls it the period. A run wanting a narrower measurement still has
+`SimulationConfig.reportWindow`, which narrows the report and never the run.
+
+### The whole is not a part
+
+Declaring `[0, durationS)` returns the template **by reference**, so *"the full day"* and *"no
+window"* are one selection spelled two ways and produce the same object rather than two that differ
+in whether a key is present. That matters because `structuralDigestOfResult` hashes a key's
+*presence*: a full-period window carrying a `window` key would fork every board it touched to record
+that a run is not a slice.
+
+### Byte-identity, confirmed by a run rather than by an argument
+
+The `core` suite is **2 410 green, the baseline exactly** — every pinned digest in
+`transportIdentity.test.ts`, every case in `dayStartIdentity.test.ts`, and `sim/oracle.test.ts`'s
+closed-form Barney/CIBSE comparison, all unmoved. `sliceToWindow` returns its argument when no
+window is declared, so that is the guarantee stated as one line of code rather than hoped for.
+`traffic/windowIdentity.test.ts` adds the three layers `dayStartIdentity` established: the key is
+absent on all six shipped templates, the whole period is the same object at all five buildings, and
+a whole run is byte-identical end to end.
+
+### Two refusals kept and one message corrected
+
+`templateOverrides.durationS` is **still refused** on a phase list, and `dayVariation.peakShiftS`
+still is too. This field does not relax either — it *answers* the first, and the message now names
+it: *"Choosing which part of a day to run is windowStartS/windowEndS and not this one."* A window
+that would nest is refused as well, because a second window measured against the first one's length
+stops naming a part of the day.
+
+### It is not a tunable, and could not honestly be declared as one
+
+Absent from `TRAFFIC_PARAMETERS`, joining `startOfDayS` there for § D244 rule 3's reason and one
+more. A tunable declares a **range**, and the only true range is `[0, the selected template's own
+durationS)` — 1 800 s for `rise-and-fall` and 36 000 s for `office-day`. `activeWhen` selects on a
+value, not on a length read out of `data/`, so any range written there would be wrong for five of
+the seven shipped records, and a declared schema that disagrees with the resolver is worse than none.
+
+---
+
+## D286 — one control, replacing two, with its options derived from the records' own hours
+
+**Date: 2026-08-06 · Written after the code.** Play-tester issues #78, #80, #81, #82 and #83, and
+the writer § D275 said the field could not ship without.
+
+Five issues, one cause: **the product's unit is a day and its only run-shape control was a length.**
+The campaign called it *shift length* and offered four narrative options; Free play called it *Run
+length* and offered five numeric ones; they wrote the same field (#82). The labels understated the
+run by up to 1.9×, because a length names the demand schedule and says nothing about the drain
+(#80). And a longer length **rescaled** the demand curve rather than showing more of the day, so the
+peak was five minutes at every setting and the rush hour moved (#81) — a scenario control presented
+as a time budget, which is § D177's inert control with the sign flipped: the control moves, the run
+changes, and it changes something other than what the label says.
+
+None of that was fixable by relabelling. So the control is now **which part of the day you run**, in
+both modes, with one option set:
+
+```text
+Morning rush — 08:30–09:00
+Lunch — 12:15–12:45
+Evening — 17:15–17:45
+Office working day — 08:00–18:00
+```
+
+### Nothing in that list is written down, and the three things that could have been are each derived
+
+**The intervals** come from the loaded templates' own hours. `rise-and-fall` declares 08:30 and a
+thirty-minute period and `office-day` declares 08:00, so the morning is `[30 min, 60 min)` of the
+day; likewise `lunch-two-way`'s 12:15 and `office-down-peak`'s 17:15. § D276's claim that the day
+**contains** those three cited periods is what makes that a derivation rather than a coincidence,
+and `traffic/windowIdentity.test.ts` asserts each part's clock **and length** against the record it
+comes from, so a record that moved either turns it red.
+
+**Which candidates survive** is decided by the day's own phase list. A template's hour offers a part
+when it lands on the day's phase **boundaries** and the day reaches full intensity inside it. That is
+what excludes `shift-change`: its 14:45 is 405 minutes into this day, inside the flat 315–495
+stretch, and an office day has no shift change — a derivation that admitted it would print a
+two-peak label over a level. `evening-egress`'s 22:24 is outside the day altogether. **Both
+exclusions are structural facts about the record rather than two ids the code knows to skip**, which
+is the difference between this and the hand-written list § D213 paid for five times.
+
+**The names** come from the hour, and *"rush"* is warranted rather than decorative: a part exists
+only where the day reaches its own peak intensity, so every named part is the busiest the building
+gets. The one option that is not a peak — the whole period — is named by the template instead.
+
+### The ladder is gone, and a bound replaced it
+
+`FREE_PLAY_DURATIONS_S` is deleted; `LONGEST_OFFERED_RUN_S = 7200` stands in its place. The 36 000 s
+§ D282 added is **dropped**, exactly as that entry said it would be — *"when the slice control lands,
+this entry stops being the only way to reach `office-day` and may well be dropped"* — which also
+closes the half-applied state it left: the client offered a ten-hour run that the server's own
+`ACCEPTED_DURATIONS_S` would have refused on post.
+
+The bound survives because without it the guard § D282 left standing becomes a tautology. Every
+template can be run over the whole of itself, so *"can be run at some offered part"* would pass for
+anything. Two hours is `constant-iso`'s own `durationMin`, the longest period any shipped record asks
+to be run over in one piece, and `office-day`'s 600 minutes clears the guard **only through a
+window** — which is the fix § D276 named and § D282 could not build. `menu.test.ts` now asserts both
+halves: every shipped template has a part inside the bound *and* the reducer accepts it, and the day
+offers its three cited periods and a whole self that does not fit.
+
+### Two fields, one control, and why the option id carries both
+
+`FreePlaySelection` gains `windowStartS: number | null` beside the `durationS` it already had, and
+`ViewerState` gains the same pair. `null` is *the whole period* — a real selection rather than a
+missing one, following `arrivalRatePctPop5min`'s precedent in the same interface.
+
+`applyIntent` is a pure reducer with no catalogue, so the option's id carries the whole selection:
+`1800:1800`, or `null:36000`. One control writing two fields is unusual and is the honest shape here,
+because they are one choice — a patch that set a length without its window would leave a run covering
+a period nobody named.
+
+`shiftRunConfigOf` then branches: `durationS` **or** a window, never both. That is not tidiness. On a
+phase-list template `core` refuses the override outright (§ D275), so passing both would throw on the
+one template that has parts to select.
+
+### The standing requirement, applied before the panel was written
+
+`scope/probes.test-helper.ts` gains `viewer.windowStartS` and `free-play.windowStartS`, each driving
+**two parts of one day at the same length and the same seed** — the morning against the lunch, and
+the morning against the evening. Holding the length still is what makes the probe about the window:
+a pair that also differed in length would pass on the length and prove nothing about the part.
+
+It is also the probe that would have caught the mistake this feature could most easily have made. Had
+the window been folded into `durationS`, the two arms would have been *identical* and the control
+inert — `patternSwitching` again, one wave later.
+
+### The scope is `between-days`, and the reason is not administrative
+
+Picking a different part of the day mid-week is choosing which exam to sit after seeing the
+questions. So both keys are declared `between-games` in `scope/surface.ts` beside the fields they
+name, and taking a scenario assignment resets the part along with the week.
+
+---
+
+## D287 — the clock the run is actually at, and a label that names the tail without predicting it
+
+**Date: 2026-08-06 · Written after the code.** Issues #80 and #83, which are one defect seen from
+two ends.
+
+### The clock: 06:00 in four places, and none of them the run's
+
+`DAY_START_S = 6 * 3600` was the answer everywhere a time appeared — the header clock, its empty
+state, the transport strip and the Day report's own header. So `lunch-two-way` was drawn at
+breakfast and *Event egress* at dawn, and issue #83 makes the sharp point about what that costs: a
+player who picks *"CIBSE Guide D lunch two-way"* and sees a morning concludes **that the traffic
+pattern does not matter much**, which is the opposite of what the product is trying to teach. A
+template named for a time of day that runs at a different time of day is worse than no template.
+
+§ D244 gave every shipped template but one its own hour and closed with *"the viewer. The clock is
+pinned at 06:00 in `packages/viz` and this change does not touch it."* § D285 gives a *part* of a day
+its own. This is where the viewer finally reads them: `dev/main.ts` captures `trace.startOfDayS` from
+the run and passes it to all four surfaces, and `DAY_START_S` survives as the **fallback** for the
+two cases that genuinely have no hour — `constant-iso`, which declares none on purpose, and a
+recording restored from a file, whose hour `VizRecording` does not carry.
+
+**Captured from the run, not re-derived from `state`**, and that is § D234's lesson at the one seam
+it would have recurred on: `state` is what the player has *selected* and the recording is what they
+are *watching*, and the two differ the moment a control moves before the next run. Reading the
+selection would have put the next run's clock on the last run's sheet.
+
+**One consequence of § D244 stops being free here, and it is worth naming.** That entry recorded
+that nothing statistical read the hour, so a wrong hour cost a label and nothing else — and that it
+would stop being free *"the moment a phase boundary becomes a measurement boundary, or a report
+slices a day at a wall-clock time."* Both have now happened. The hour is an input to the part list,
+to every option label, and to four surfaces a player reads. `shift-change`'s 15:00 — the one hour
+§ D244 marked NOT CITED — is still the first a site-specific configuration should override, and it
+is now visible rather than latent.
+
+### The label: state the demand window, name the tail, predict nothing
+
+Issue #80 measured *"Short shift — 15 min"* simulating 28 minutes, and every option overrunning its
+label by 1.5–1.9×. The obvious fix — print the end time — is the wrong one, and it is wrong for the
+reason the issue itself supplies: the tail is where the backlog clears and where `TOOK THE STAIRS`
+accumulates. **How long a building takes to clear is a run *outcome*, not a prediction**; it depends
+on the dispatcher, the building and the seed, and it is the thing being judged. `sim.drainGraceS`
+bounds it at an hour, which is a deadline rather than an estimate.
+
+So every option says:
+
+```text
+30 min of demand — 08:30 to 09:00, then however long it takes to clear
+```
+
+and the guide says the same thing once, in the sentence that used to list the ladder: *the demand
+schedule stops at the time on the label and the run keeps going until the building has cleared, which
+is the part worth watching and is an outcome rather than a prediction.* The Day report's own
+selection line moves from *"15 min selected"* to *"15 min of demand"*, one line under a clock range
+that now shows the real span of the run, drain included — so the two numbers a reader used to
+conflate are labelled.
+
+### Both strings are swept rather than excused
+
+`menu/partsOfDay.ts#partsOfDay` is added to the `MENU` adapter's `covers` and its labels and details
+are seeded into the honesty sweep — a label naming a clock the run did not use is R1's defect with a
+friendly face, and it is exactly what these two issues report. `derive.test.ts`'s exclusion of
+`dev/state.ts#SHIFT_LENGTHS` is deleted rather than re-pointed, because the table is gone; what
+replaced it is player-facing and is **driven**, not excused.
+
+---
+
+## D288 — the board cannot see which part of the day a run was, and that is said rather than left
+
+**Date: 2026-08-06 · Written after the code.** The named gap in [§ D286](DECISIONS.md), and the
+answer to whether the `between-days` control can become a `presentation` one without re-pinning what
+a stored score means.
+
+### The gap, and it is sharper than a mislabelled row
+
+`RunSubmission` is six fields — building, dispatcher, template, rate, `durationS` and seed — and the
+window is in none of them. The obvious reading is that a morning and an evening are both thirty
+minutes and would share a board. True, and **not the worst of it**, because the board does not store
+a number the client sends: it **re-simulates the seed for itself** (§ D214 § 3). A client-side figure
+is only ever a *claim*.
+
+So what a posted window actually produces is this. The server replays `office-day` at
+`durationS: 1800`, which reaches `core` as `templateOverrides.durationS` on an authored phase list
+and is **refused by name** (§ D275) — the submission comes back a 422, and `menu/client.ts`'s own
+docstring says what that reads as: *"a 422 that means 'your score did not replay' and must not read
+as an accusation."* A player who did nothing wrong is told their score did not reproduce.
+
+On a shape template it is quieter and no better. The replay rescales the geometry instead of cutting
+it and returns a different, entirely legitimate answer. **Neither number is wrong.** They are answers
+about two different runs, and nothing in the exchange could say so — which is the failure that leaves
+nothing red, and the one this repository counts.
+
+The fix is one field on `RunSubmission`, one line in `configHashOf`, and the replay honouring it.
+All three are in `packages/server`, outside this lane's ownership, so what ships is the refusal
+rather than the field, in the shape this repository already keeps for a knob a surface cannot honour:
+`constant-iso`'s refusal, and § D275's two. A windowed run **starts**; it is **not postable**, and
+the reason on screen names the replay rather than the row — *"the board would replay this seed over
+the whole period and get a different, equally correct answer."*
+
+### The transition, and how far it is actually achieved
+
+The owner's instinct is that once a day is simulated *continuously*, *which part of the day* stops
+being a run parameter and becomes a **view onto one run** — `presentation`, at which point the scope
+question dissolves. The requirement set for this work was that the transition must not re-pin what a
+stored score means.
+
+**Achieved, on the axis that matters, and approximated on one that cannot be:**
+
+- **The selection survives verbatim.** `(templateId, windowStartS, windowEndS)` names the same
+  interval of the same schedule whether the engine runs the slice or runs the day and shows the
+  slice. Nothing about the field's units, shape or storage would change. `durationS`, the seed and
+  the config hash are untouched by the transition, because the window never entered any of them.
+- **The demand is identical.** This is what § D285's draw-then-cut ordering buys, and it is the whole
+  reason the sampler was not bounded. The riders in an 08:30–09:00 window *are* the day's 08:30–09:00
+  riders, record for record and id for id, so the window names the same crowd on both sides of the
+  change. Had the sampler been bounded, moving the window from generation to presentation would have
+  silently changed **who turns up**, and every stored score would have become a claim about a
+  different crowd.
+- **The results cannot be identical, and no arrangement of this field makes them so.** A continuously
+  simulated day carries queued riders and moving cars across 08:30; a windowed run starts with an
+  empty building and parked cars. That is a real modelling difference and it belongs to the
+  transition rather than to the window. It is stated in `windowIdentity.test.ts`'s preamble as
+  something deliberately **not** asserted, so a later reader does not mistake the demand identity for
+  a stronger claim than it is.
+
+So: **clean on the record, clean on the demand, and honestly approximate on the numbers.** A board
+measured today under a window would have to be re-opened after the transition — not because the field
+was designed wrong, but because the run genuinely starts from a different state. That is a smaller
+and more explicable cost than the one § D275 was protecting against, where every old row would have
+kept verifying while meaning something else.
+
+### One consequence worth naming before it is discovered
+
+A window makes it easy to compare morning against evening, and CLAUDE.md's ranking rule binds that
+comparison exactly as it binds any other: a paired-t interval excluding zero, and Holm–Bonferroni if
+more than one window from one day is reported. The pairing is available — § D285's ordering is what
+makes two windows of a seed two parts of one day — which means the comparison is *cheap enough to do
+carelessly*. Nothing in this change reports one, and nothing in it should be read as licence to.
+
+---
+
+## D289 — a hashed-name heuristic read `-profiles.json` as a content hash, and froze it for a year
+
+**Status: the defect is closed in two places, and one of them is the request rather than the
+response.** Found by deploying `b6d31c8` and *opening the page*, not by any test.
+
+The live viewer answered `could not load data/` with no run available at all:
+
+```text
+Invalid config in traffic-profiles.json: 1 problem
+  traffic-profiles.json
+    - credentialGap: Invalid input
+```
+
+### What it was
+
+`server/src/http/static.ts` decided `cache-control` per asset from the **file name**:
+
+```ts
+const HASHED = /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/u;   // Vite's `index-Cd4tbeUP.js`
+immutable: HASHED.test(entry.name)
+```
+
+`traffic-profiles.json` ends `-profiles.json`. **`profiles` is exactly eight characters of
+`[A-Za-z0-9_-]`**, so the pattern meant for content hashes matched an ordinary English word, and the
+file shipped `public, max-age=31536000, immutable`. `dispatcher-profiles.json` too. Classified
+against every shipped name, those two are the only ones — `elevator-specs.json` (`specs`, five),
+`scenario-goals.json` (`goals`, five), `campaign.json` and `__buildings.json` (no hyphen) all fall
+the right way, which is exactly why nobody noticed.
+
+The consequence is not a stale file, it is a **broken product for everyone who had visited before**.
+The JS bundle is content-hashed, so it arrives fresh at a new URL every deploy; the data documents
+keep their names, so a poisoned browser keeps them for a year and — this is what `immutable` means —
+**does not revalidate**. A reload re-reads the cache. So the deploy carrying `credentialGap`
+(§ D265/D266) and the `office-day` template (§ D285) landed as a **new bundle reading a year-old
+payload**: the schema required a block the cached file predates, `parseTrafficProfiles` refused it,
+and the viewer had nothing to run.
+
+Measured on the live origin, one URL in one browser, one request each:
+
+| | demand templates | `credentialGap` |
+|---|---|---|
+| default cache mode | **6** | absent |
+| `{cache: 'reload'}` | **7** | present |
+
+### Why the header alone is the wrong half
+
+**A response header only reaches clients that have not been poisoned yet.** The bad entries are
+already in browsers this repository will never see again, with a year to run and an instruction not
+to ask. So the fix is also on the request: `dev/data.ts`'s `fetchJson` now sends
+`{cache: 'no-cache'}` — revalidate always, never serve a stored copy unchecked. Verified against a
+genuinely poisoned cache rather than against the spec: the same tab that answered 6-and-absent on the
+default mode answered **7-and-present** under `no-cache`.
+
+Not `'reload'`, which skips the cache entirely. `no-cache` revalidates, so a server offering `ETag`
+or `Last-Modified` answers 304 with no body. **Ours offers neither**, so this currently costs a full
+re-download of about 210 kB per cold load. That is stated rather than fixed here, and it is worth
+revisiting.
+
+### The rule that replaced the heuristic
+
+Immutability now requires the asset to be **under `/assets/`** — Vite's `build.assetsDir`, where
+every content-addressed output goes and nothing else does — **and** to match the hash shape. Both,
+because the failure is violently asymmetric: answering `false` wrongly costs one conditional request
+per deploy, and answering `true` wrongly costs a year with no way for the page to recover itself.
+
+**The static-hosting lane already had this right.** `packages/viz/staticwebapp.config.json` routes
+`/assets/*` to `immutable` and `/*.json` to `no-cache` — by route, never by name. The two lanes
+disagreed and the deployed one was the wrong one, which is worth more than the fix: the same decision
+was expressed twice, in two idioms, and only the idiom that could not misread a word survived contact
+with a real file name.
+
+### Why the tests did not catch it
+
+`static.test.ts` asserted `no-cache` on `/index.html` and `/__buildings.json` — **the two data files
+the broken rule happened to get right** — and said nothing about the four beside them. The fixture
+directory contained only those two, so the misread names were never in the bundle under test. An
+enumeration of examples, standing in for a property.
+
+Both ends are now pinned. The server test builds its fixture from the **whole** list and asserts
+none of it is cacheable, plus the two misread names individually. The new
+`viz/src/dev/data.test.ts` drives `loadBrowserResources` *and* `loadCampaign` against a stubbed
+`fetch` and asserts the exact set of six paths and that every one revalidates — so a seventh document
+cannot be added without the server's list being told. It also pins the trap itself: `-profiles.json`
+**is** misread by the Vite pattern, asserted in that direction, so a rename cannot quietly make the
+directory rule non-load-bearing while its docstring still explains why it is.
+
+Writing that test found the second bug in the same breath: the six are fetched by **two** loaders,
+deliberately split so a batch worker does not pay for the campaign, and the first draft drove only
+one — leaving `campaign.json` and `scenario-goals.json` unpinned.
+
+### The standing requirement, pointed at a header
+
+CLAUDE.md's rule is *move the control and require the run to change*. A cache header is a control
+whose effect is invisible on the machine that sets it: every check available locally — the file is
+correct, the schema is correct, the parser accepts it, `curl` returns the right bytes — passed while
+the product was broken for everyone who had been there before. **The only instrument that saw it was
+a browser with history.** A deployment is not verified by fetching from it; it is verified by loading
+it the way a returning player does.
+
+---
+
+## D290 — the saved session goes to version 3, and an older one is read rather than called damaged
+
+**Status: shipped.** The envelope version moves 2 → 3, `SESSION_SCHEMA_VERSIONS_READ` becomes
+`[1, 2, 3]`, and a version 1 or 2 session restores with `freePlay.windowStartS: null`.
+
+### What was wrong
+
+`windowStartS` was added to `SessionSnapshot.freePlay` in `9c8f667` (§ D285/§ D286) and
+`SESSION_SCHEMA_VERSION` did not move. It has changed exactly once in its life, in `f3fd2b4`, long
+before.
+
+So a real saved week — well-formed JSON, correct envelope version, one key short — did not read as
+*older*. It read as **malformed**, because the version gate passed it through to the shape check,
+and the player was told:
+
+> Your saved week was **damaged** and could not be read, so it has been cleared.
+
+That sentence is false. Nothing was damaged; the game changed shape. And `windowStartS` shipped for
+the first time in the deploy that carried it, so it was told to **every player who had a week**, not
+to a subset.
+
+### The rule already existed, in one direction only
+
+`validate.ts`'s extra-key branch says it outright — a session carrying a key this build does not
+know is refused with *"the envelope version should have changed when that field landed"*. The same
+rule in the missing-key direction was unenforced, so adding a field was silently cheaper than
+removing one. Both directions are the same rule, and `types.ts` now says so where the constant is
+declared: **if a field enters or leaves `SessionSnapshot`, the version moves in the same commit.**
+
+### Why version 3 is *read* and not refused
+
+`types.ts` predicted this case and got the conclusion wrong, and the prediction is kept rather than
+deleted. It said *"the day the two sections stop being independent — a version 3 that changes the
+week's shape — the older direction goes back to being a refusal, because then it really would be
+inventing."* Version 3 does change the week's own shape. It still does not invent.
+
+`null` means *no window — run the whole period* (§ D286). A build with no window concept ran the
+whole period on every run it ever performed. So `null` is not a default filling a hole, it is the
+**measured** state of a session written before the field existed — the identical argument version 2
+already makes about restoring an empty library, moved one level inward.
+
+The restated rule is the useful part: **a shape change refuses the older direction when the new
+field's absence does not determine its value.** Not whether the field sits inside `session` or
+beside it. A version 4 adding, say, a per-day dispatcher choice would have no honest reading of a
+session that never made one, and would refuse.
+
+### What is asserted, and how it was shown to be worth asserting
+
+`library.test.ts` gains a version-2 block — the version that actually broke — asserting the week
+restores whole, that the restored selection differs from a live one in **exactly one key** whose
+value is `null`, that the next save upgrades to 3, and that a version-2 envelope which is *genuinely*
+malformed is still refused by name. That last one matters: the bump must not have traded a false
+"damaged" for a silent partial restore, which is the outcome `SessionRestore` exists to prevent.
+
+The existing version-1 fixture was **vacuous** and is now not. It built `freePlay` from the live
+`menuState()`, so it already carried `windowStartS` and was a version-3 selection wearing a
+version-1 number; `expect(freePlay).toEqual(menuState().freePlay)` compared a value with itself. It
+now strips the key — by `Omit`, so a rename fails to compile rather than silently stripping nothing
+— and a non-vacuity case asserts the fixture really lacks it while the live build really has it.
+
+Verified by neutering `withWindowStart` and re-running: **4 tests fail**, including the version-1
+case that passed before this change. A green run on both shapes is not evidence, and this session
+had already produced two of those.
+
+### The instrument, again
+
+Every local check passed while this was broken, exactly as in § D289. The failing path needs a
+browser holding a session written by an earlier build — which no test fixture, no `curl` and no
+fresh profile has. It was found by opening the deployed page and reading the notice, and the
+notice was only readable because § D289's cache defect had already been fixed enough for the app
+to boot at all.

@@ -95,7 +95,33 @@ export interface BrowserResources {
 async function fetchJson(path: string): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(path);
+    /*
+     * `cache: 'no-cache'` — always revalidate, never serve a stored copy unchecked.
+     *
+     * These six paths are fixed: the name does not change when the bytes do, so a stored copy is
+     * never superseded by a new one arriving under a new URL the way a hashed asset is. The
+     * server now says `no-cache` for exactly that reason — but **a header fixes only the clients
+     * that have not been poisoned yet**, and it is the wrong half of the repair on its own.
+     *
+     * It shipped poisoned. `server/http/static.ts` classified `traffic-profiles.json` as
+     * content-hashed on its name — `-profiles.json` is a hyphen and eight characters of
+     * `[A-Za-z0-9_-]`, which is Vite's shape — and served it `max-age=31536000, immutable`. Every
+     * browser that loaded the viewer holds that file for a year and *will not revalidate it*,
+     * which is what `immutable` means; a reload re-reads the cache and only a hard refresh
+     * escapes. So the deploy carrying `credentialGap` and `office-day` reached returning players
+     * as a new bundle reading a year-old payload, `parseTrafficProfiles` refused it for a missing
+     * block, and the viewer showed "could not load data/" with no run available at all.
+     *
+     * Measured on the live origin, one URL in one browser: the default mode answered with six
+     * demand templates and no `credentialGap`, this one answered with seven and the block
+     * present. That is the recovery, and it is why this is a request option rather than only a
+     * response header — the poisoned entries are already out there and cannot be recalled.
+     *
+     * Not `'reload'`, which would skip the cache entirely and re-download on every load. This
+     * revalidates, so a server that offers `ETag` or `Last-Modified` can answer 304 with no body;
+     * ours does not yet, which is a cost of about 210 kB per cold load and worth revisiting.
+     */
+    response = await fetch(path, { cache: 'no-cache' });
   } catch (cause) {
     throw new Error(`could not fetch ${path}: ${describe(cause)}`, { cause });
   }

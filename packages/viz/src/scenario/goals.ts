@@ -97,11 +97,28 @@ export const GOAL_BLOCKER: Readonly<Record<GoalKind, string | null>> = {
   'nobody-abandoned': null,
   'answer-the-demand': null,
   'long-waits-under': null,
+  /*
+   * **Player words, no repository paths** — § D234, issue #25.
+   *
+   * This read *"Blocked on W7 … docs/10 § 10.4 … § 5.2's goal table says the opposite"* — three
+   * internal cross-references and a work-item id, printed verbatim on the Compare and Lab tabs. A
+   * player has no `docs/`, no W7 and no § 5.2; what they have is a goal row that suddenly reads
+   * like a bug tracker, and the honest content underneath it — *this cannot be judged from what a
+   * run records* — buried in the middle.
+   *
+   * **Changed here rather than paraphrased at the surface.** `honesty/surfaces.ts` seeds this
+   * constant *by reference* (it iterates `GOAL_BLOCKER` and pushes each non-null value), so the
+   * string the sweep checks and the string a player reads are the same object. A second, tidier
+   * copy at the render site would have been the classic two-answers defect: the sweep would go on
+   * checking a sentence nobody sees.
+   *
+   * The claim itself is unchanged and is still the one that matches the code, which is the half
+   * that had to survive the rewrite: the recording carries no credential on a leg.
+   */
   'everyone-can-get-there':
-    'Blocked on W7. The recording carries no credential on a leg, so it cannot tell a call ' +
-    'nobody answered from a call nobody was allowed to answer — docs/10 § 10.4, which is the ' +
-    'statement that matches the code. § 5.2’s goal table says the opposite and is wrong ' +
-    'about it.',
+    'Not judgeable from what a run records. A recording carries no credential on a leg, so it ' +
+    'cannot tell a call nobody answered from a call nobody was allowed to answer — and scoring ' +
+    'the second as though it were the first is exactly the wrong number this goal exists to catch.',
   'beat-the-baseline': null,
 };
 

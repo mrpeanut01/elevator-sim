@@ -78,6 +78,7 @@
  * | `origins` | which entrance an incoming batch arrives at |
  * | `destinations` | each passenger's destination floor |
  * | `passengerMass` | one body mass per passenger, in final trace order |
+ * | `credential` | one draw per passenger, in final trace order: are they carrying the badge for where they are going? |
  * | `doorObstruction` | **never** |
  * | `policyNoise` | **never** |
  *
@@ -125,6 +126,7 @@ import {
   resolveDemandTemplate,
   shiftTemplatePeak,
   splitAt,
+  windowTemplate,
 } from './demandTemplate.js';
 import {
   batchesPerSecond,
@@ -324,6 +326,8 @@ interface ResolvedOptions {
   readonly demandLevel: DemandLevel;
   readonly interfloorWeighting: InterfloorWeighting;
   readonly credentialAssignment: CredentialAssignment;
+  /** Resolved share for {@link credentialForRouteWithGap}. See {@link resolveCredentialGap}. */
+  readonly credentialGapShare: number;
   readonly batchSharesDestination: boolean;
   readonly maxLegs: number;
   /** `undefined` means every floor keeps its own profile's split. */
@@ -351,6 +355,9 @@ function resolveOptions(config: DemandConfig): ResolvedOptions {
     demandLevel: config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
     interfloorWeighting: config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
     credentialAssignment: config.credentialAssignment ?? TRAFFIC_DEFAULTS.credentialAssignment,
+    // No `??` of this module's own, for `passengerMass`'s reason: unset means *the data decides*,
+    // and the only honest resolution is the block `data/traffic-profiles.json` authored.
+    credentialGapShare: resolveCredentialGap(config),
     batchSharesDestination: config.batchSharesDestination ?? TRAFFIC_DEFAULTS.batchSharesDestination,
     maxLegs,
     directionalSplit: normalizeSplit(config.directionalSplit),
@@ -396,6 +403,25 @@ function resolvePassengerMass(config: DemandConfig): PassengerMassConfig {
     );
   }
   return override;
+}
+
+/**
+ * The share of wrong-zone journeys this run draws at: the override, or the reference data.
+ *
+ * `resolvePassengerMass`'s shape and its reason, exactly. Unset means *the data decides* — the
+ * shipped number is a declared assumption with its reasoning attached in
+ * `data/traffic-profiles.json`, and a default invented here would be a second source of truth for
+ * it. Runtime-checked because `TrafficConfig` crosses a package boundary and a JSON round trip can
+ * hand over something the compiler never saw; a share outside `[0, 1]` is not a share.
+ */
+function resolveCredentialGap(config: DemandConfig): number {
+  const share = config.credentialGap?.wrongZoneShare ?? config.profiles.credentialGap?.wrongZoneShare;
+  if (typeof share !== 'number' || !Number.isFinite(share) || share < 0 || share > 1) {
+    throw new TrafficError(
+      `credentialGap.wrongZoneShare must be a finite share in [0, 1]; received ${String(share)}. data/traffic-profiles.json declares it, and the schema requires it — an absent block reads exactly like zero and would make every accessZones declaration inert (issue #87).`,
+    );
+  }
+  return share;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -950,12 +976,15 @@ function permittedGroupsByFloor(
  * common case and the correct answer for an unbadged visitor. `null` means the journey is
  * impossible for any occupant and must not be generated at all.
  *
- * Deterministic, and consuming no random draw. A *stochastic* credential mix would need a
- * seventh named stream on `StreamSet`; adding one is a deliberate act (see
- * `random/streams.ts`), not something this module should do implicitly. The rule — first
- * group, in declared zone order, that covers the whole route — has a pleasing consequence in
- * Secure Tower: interfloor trips between two tenant zones come out as `facilities` or
- * `security` staff, which is who actually makes them.
+ * Deterministic, and consuming no random draw: this is the **authorised** answer, and the one
+ * stochastic thing about a credential — whether the traveller actually holds it — is
+ * {@link credentialForRouteWithGap}'s, on its own named stream.
+ *
+ * The rule — first group, in declared zone order, that covers the whole route — has a pleasing
+ * consequence in Secure Tower: interfloor trips between two tenant zones come out as `facilities`
+ * or `security` staff, which is who actually makes them. It is also exactly the idealisation the
+ * gap exists to relax: a `tenant-alpha` employee on floor 6 heading for floor 18 is a person, and
+ * this function says they must have been a caretaker.
  */
 function credentialForRoute(
   route: readonly string[],
@@ -970,6 +999,76 @@ function credentialForRoute(
     if (reachesAll) return candidate;
   }
   return null;
+}
+
+/**
+ * **The credential gap** — the credential a traveller actually carries, which is not always the
+ * one their journey needs.
+ *
+ * `credentialForRoute` above answers *what would authorise this trip*, and until this function
+ * existed the generator handed every rider exactly that. The consequence, found only once
+ * [§ D254](../../../../DECISIONS.md) removed the defect that was hiding it, is that **access
+ * zoning could not change a run**: a gate that only ever sees authorised traffic never bites, and
+ * every `accessZones` block in `data/buildings/` was configuration nothing could act on (GitHub
+ * issue #87, § D265).
+ *
+ * ## Who is in the gap, and who deliberately is not
+ *
+ * Only journeys that **begin inside the building**. A journey from an entrance has already passed
+ * whatever the building puts in front of its lobby — a reception desk, a turnstile, a door — and
+ * that control is upstream of the lift and outside this simulator, which is § D254's own reading
+ * of where a credential is checked. A visitor arriving off the street is met and badged, so
+ * modelling them as unbadged would be modelling a reception desk that does not work.
+ *
+ * What the lift really refuses is somebody already inside, on a floor they are entitled to,
+ * heading for one they are not. **Which of the two populations they are is decided by the
+ * building's own zones and by where they start, never by a second number:**
+ *
+ * | the traveller starts | they carry | the viewer's cause |
+ * |---|---|---|
+ * | inside a zone | that zone's own first group — a real badge, for the wrong place | `credential-not-read` |
+ * | on an unrestricted floor | nothing | `rider-has-no-credential` |
+ *
+ * A rider whose own zone's credential *does* reach the destination is not in the gap at all —
+ * they are authorised, and the draw costs them nothing. So a zone that shares a group with its
+ * neighbour produces no lockouts between them, which is the building's data deciding the outcome
+ * rather than this module.
+ *
+ * ## The draw
+ *
+ * One uniform per passenger from the `credential` stream, taken **unconditionally, in final trace
+ * order**, exactly as `passengerMass` is. Taking it only for candidates would make the draw
+ * sequence a function of `accessZones`, so adding one floor to a zone would re-roll every later
+ * rider and two arms differing only in their zoning would stop being the same crowd. See
+ * `random/streams.ts` § `credential`.
+ */
+function credentialForRouteWithGap(
+  route: readonly string[],
+  permitted: ReadonlyMap<string, readonly CredentialGroup[]>,
+  authorised: CredentialGroup | undefined,
+  originIsEntrance: boolean,
+  gapDraw: number,
+  share: number,
+): CredentialGroup | undefined {
+  // Nothing on the route is restricted, or the route starts outside the building: no gap to be in.
+  if (authorised === undefined || originIsEntrance) return authorised;
+  if (gapDraw >= share) return authorised;
+
+  const origin = route[0];
+  const ownGroups = origin === undefined ? [] : (permitted.get(origin) ?? []);
+  // The badge their own floor implies. `undefined` when they start somewhere unrestricted, which
+  // is the second row of the table above and not a special case.
+  const carried = ownGroups[0];
+  // Their own zone already reaches the destination, so the draw changes nothing: this is somebody
+  // moving within what their badge opens, and the building's zoning is what says so.
+  const restricted = route.filter((floorId) => permitted.has(floorId));
+  if (
+    carried !== undefined &&
+    restricted.every((floorId) => (permitted.get(floorId) ?? []).includes(carried))
+  ) {
+    return authorised;
+  }
+  return carried;
 }
 
 /** Why an origin-destination pair was rejected, or `ok`. */
@@ -1141,8 +1240,19 @@ interface RawBatch {
  * `StreamSet` on the same seed reproduces it exactly. That is what lets Phase 3 hand the
  * identical trace to every dispatcher under comparison.
  *
+ * ## A window is cut *after* the day is drawn, and that ordering is the feature (§ D285)
+ *
+ * `windowStartS`/`windowEndS` do not reach the sampler. The whole period is generated first — same
+ * streams, same draws, same order as a run that declares no window — and {@link sliceToWindow} then
+ * keeps the batches inside the window and re-bases them. So the crowd at 08:30–09:00 is *the same
+ * records*, ids included, whether the run covers half an hour or the whole day, which is what keeps
+ * common random numbers intact across a window change (CLAUDE.md invariant 2) and what would let
+ * the window move from *which run to make* to *what to look at* without renaming the crowd it
+ * selects. Bounding the sampler instead would have been cheaper and would have drawn a different
+ * day for every window.
+ *
  * @throws TrafficError for an unsupported arrival process or batch distribution, an unknown
- *   traffic profile, or a journey no chain of banks can route.
+ *   traffic profile, a journey no chain of banks can route, or a window outside the period.
  */
 export function generateTrace(config: TrafficConfig): PassengerTrace {
   const { building, streams } = config;
@@ -1283,12 +1393,25 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
 
   const planner = RoutePlanner.forBuilding(building);
   const permitted = permittedGroupsByFloor(building.accessZones);
+  const entranceIds = new Set(building.floors.filter((floor) => floor.isEntrance === true).map((floor) => floor.id));
   // `planDemand` has already dropped every pair for which no credential works, so `null` is
   // unreachable here; treat it as an unbadged visitor rather than crashing a whole trace.
-  const credentialGroupFor = (route: readonly string[]): CredentialGroup | undefined =>
-    options.credentialAssignment === 'none'
-      ? undefined
-      : (credentialForRoute(route, permitted) ?? undefined);
+  const credentialGroupFor = (
+    route: readonly string[],
+    originFloorId: string,
+    gapDraw: number,
+  ): CredentialGroup | undefined => {
+    if (options.credentialAssignment === 'none') return undefined;
+    const authorised = credentialForRoute(route, permitted) ?? undefined;
+    return credentialForRouteWithGap(
+      route,
+      permitted,
+      authorised,
+      entranceIds.has(originFloorId),
+      gapDraw,
+      options.credentialGapShare,
+    );
+  };
 
   const arrivals: ArrivalEvent[] = [];
   const passengers: GeneratedPassenger[] = [];
@@ -1364,7 +1487,11 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
         // Mass is drawn here, in final trace order, so the mass column is a function of the
         // sorted trace rather than of the order the sources happened to be sampled in.
         massKg: drawMass(streams.passengerMass, massConfig),
-        credentialGroup: credentialGroupFor(route),
+        // Drawn here, unconditionally and in final trace order, for the reason the mass above is:
+        // gap membership is then a property of the person rather than of the building's zoning,
+        // so two arms that differ only in an access zone are still the same crowd. See
+        // {@link credentialForRouteWithGap}.
+        credentialGroup: credentialGroupFor(route, batch.originFloor.id, streams.credential.nextFloat()),
         category: pick.category,
         demandFloorId: pick.demandFloorId,
         profileId: pick.profileId,
@@ -1386,11 +1513,16 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     );
   }
 
-  return Object.freeze({
+  const whole: PassengerTrace = Object.freeze({
     seed: streams.masterSeed.toString(),
     buildingId: building.id,
     template,
     durationS: template.durationS,
+    // The run's clock, beside its length — spread-or-omit, so a trace under a template with no hour
+    // (`constant-iso`) is the object it was before templates could carry one. Copied from the
+    // template at the same point `durationS` is, so the two cannot go out of step; nothing between
+    // here and the metrics reads it. `DECISIONS.md` § D244.
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
     reportWindowStartS: template.reportWindowStartS,
     reportWindowEndS: template.reportWindowEndS,
     arrivals: Object.freeze(arrivals),
@@ -1407,6 +1539,83 @@ export function generateTrace(config: TrafficConfig): PassengerTrace {
     // Every diagnostic worth raising is raised while planning: sampling adds no new ones,
     // because a trace that samples something the plan did not allow for is a bug, not a warning.
     warnings: plan.warnings,
+  });
+
+  return sliceToWindow(whole, config.windowStartS, config.windowEndS);
+}
+
+/**
+ * The part of a trace inside `[windowStartS, windowEndS)`, re-based so the window starts at zero.
+ *
+ * `DECISIONS.md` § D285. **Returns the trace itself when no window is declared**, which is the
+ * byte-identity guarantee stated as one line of code: a run that asks for no part of a day is the
+ * run this function did not exist for, and `traffic/windowIdentity.test.ts` holds the whole object
+ * to `toBe` rather than to a digest.
+ *
+ * ## The passengers are the day's passengers
+ *
+ * Nothing is re-drawn and nothing is renumbered. A kept passenger arrives with the id, journey,
+ * batch, mass, destination, credential and category it had in the whole day; only its
+ * `arrivalTimeS` moves, by exactly `windowStartS`. **The ids are therefore not contiguous** — a
+ * 08:30 window of `office-day` starts somewhere around `p400` — and that is the property rather
+ * than an oversight: it is what makes *"the morning of this day"* one crowd whichever length of run
+ * asked for it, so two windows of a seed are paired on the same day and a comparison between them
+ * keeps the power common random numbers buy.
+ *
+ * ## Two fields that keep describing the whole period, said rather than discovered
+ *
+ * `sources` and `peakPassengersPerSecond` are the **day's plan**, unchanged, because the trace was
+ * genuinely drawn from it — they are attribution, and rewriting them would claim the window had its
+ * own plan. `expectedPassengers` *is* re-derived, over the window's own integral, because it is the
+ * analytic figure `generator.test.ts` checks the realised count against and a day's expectation
+ * beside half an hour of arrivals would be a mismatch reported as a defect.
+ */
+function sliceToWindow(
+  trace: PassengerTrace,
+  windowStartS: number | undefined,
+  windowEndS: number | undefined,
+): PassengerTrace {
+  if (windowStartS === undefined && windowEndS === undefined) return trace;
+  if (windowStartS === undefined || windowEndS === undefined) {
+    throw new TrafficError(
+      `A demand window needs both ends: windowStartS is ${String(windowStartS)} and windowEndS is ${String(windowEndS)}. One alone would leave the other end of the run to a default nobody declared, which is how a run comes to cover a period its record never named.`,
+    );
+  }
+  const template = windowTemplate(trace.template, windowStartS, windowEndS);
+  // Reference equality, not a value comparison: `windowTemplate` returns its argument when the
+  // window is the whole period, because the whole is not a part. So "the full day" and "no window"
+  // land on the same early return and produce the same object.
+  if (template === trace.template) return trace;
+
+  const arrivals: ArrivalEvent[] = [];
+  const passengers: GeneratedPassenger[] = [];
+  for (const batch of trace.arrivals) {
+    if (batch.timeS < windowStartS || batch.timeS >= windowEndS) continue;
+    const timeS = batch.timeS - windowStartS;
+    const members = batch.passengers.map((passenger) =>
+      // Spread rather than rebuilt, so every key keeps its position and its presence — a passenger
+      // that used no transport hop still carries no `transportHops` key. Overwriting an existing
+      // key leaves it where it was, which is what keeps a windowed record comparable field for
+      // field with the day's own.
+      Object.freeze({ ...passenger, arrivalTimeS: timeS, inReportWindow: true }),
+    );
+    passengers.push(...members);
+    arrivals.push(Object.freeze({ ...batch, timeS, passengers: Object.freeze(members) }));
+  }
+
+  return Object.freeze({
+    ...trace,
+    template,
+    durationS: template.durationS,
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
+    reportWindowStartS: template.reportWindowStartS,
+    reportWindowEndS: template.reportWindowEndS,
+    arrivals: Object.freeze(arrivals),
+    passengers: Object.freeze(passengers),
+    passengerCount: passengers.length,
+    // Every kept arrival is inside the window, and the window is the whole of what is reported.
+    passengersInReportWindow: passengers.length,
+    expectedPassengers: expectedPassengersOver(template, trace.peakPassengersPerSecond),
   });
 }
 

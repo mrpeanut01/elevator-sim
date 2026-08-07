@@ -251,11 +251,31 @@ describe('stage 2: eligibility is a hard filter, never a cost', () => {
       'serviceZone',
     );
 
+    // **Access zoning is asked about the destination, never about the pickup (§ D254).** This
+    // assertion used to be a bare `up-down-buttons` call at restricted floor 9 expecting
+    // `accessDenied` — which is how every landing call in every access-zoned building came to be
+    // refused, since a conventional landing call carries no credential at all. A call *from*
+    // floor 9 is now eligible; a call *to* floor 9 without the badge is not.
     const secured = makeCar('S', '0', clockAt(0), securedShaft()).snapshot(0);
     const upstairs = call('9', 'up');
     expect(
       filterEligible([secured], upstairs, requestFor(upstairs), DEFAULT_CONFIG)[0]?.reason,
-    ).toBe('accessDenied');
+    ).toBe(undefined);
+
+    const credentialled = configOf({ dispatch: { callType: 'mobile-credential' } });
+    const toRestricted: DispatchCall = {
+      ...call('5', 'up'),
+      destinationFloorId: '9',
+      credentialGroup: 'staff',
+    };
+    expect(
+      filterEligible(
+        [secured],
+        toRestricted,
+        requestFor(toRestricted, credentialled),
+        credentialled,
+      )[0]?.reason,
+    ).toBe('destinationAccessDenied');
 
     const parked = makeCar('P', '0');
     parked.setMode('out-of-service');

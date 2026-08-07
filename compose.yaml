@@ -1,0 +1,123 @@
+# Dev/test: the same image production runs, on the same architecture, against a real PostgreSQL.
+#
+#   docker compose up -d --build     # http://localhost:8787
+#   docker compose logs -f app
+#   docker compose down              # add -v to discard the database too
+#
+# ## Why this is amd64 on an Apple Silicon machine, measured rather than assumed
+#
+# `platform: linux/amd64` is the point of this file rather than an incidental setting. Azure
+# Container Apps runs amd64, and a dev stack on arm64 would exercise a different binary from the one
+# that deploys — the class of difference that only ever shows up in production, and one this
+# repository has already lost a wave to (§ D196/§ D201).
+#
+# Docker warns that an emulated image "may have slow performance or fail". Both halves were measured
+# on this image, re-simulating `midtown-office` / `rise-and-fall` for 1 800 s, five runs after a
+# warm-up:
+#
+#   | image                    | ms per simulation | AWT              |
+#   |--------------------------|-------------------|------------------|
+#   | amd64 (emulated, = prod) | 239.7             | 733.5578102771   |
+#   | arm64 (native)           | 144.8             | 733.5578102771   |
+#
+# **1.66× slower, and bit-identical to ten decimal places** on AWT, WT95 and TTD alike — a direct
+# confirmation of § D202's finding that this simulator is bit-portable across architectures.
+#
+# So the "may fail" half does not apply here: the production image has **no native addons at all**
+# (`pg`, `@azure/communication-email` and `@azure/identity` are pure JavaScript), and that is where
+# emulation failures come from. The "slow performance" half is real and costs 95 ms on an operation
+# the server performs when verifying a leaderboard submission. The suite does not run in this
+# container — `npm test` runs natively on the host — so nothing in the development loop pays it
+# except a human waiting a sixth of a second longer.
+#
+# If you ever want the native build anyway: `docker compose build --build-arg '' && ...` is not the
+# way — change both `platform:` keys below to `linux/arm64`. Do that for speed on a branch, not for
+# anything whose numbers you intend to trust.
+#
+# ## What differs from production, deliberately
+#
+# `NODE_ENV` is set to `development` **explicitly**, overriding the `production` the image itself
+# declares, so `bootstrap` selects the outbox mailer and confirmation links land in a file inside
+# the container instead of being emailed. That is the supported development path, not a shortcut:
+# the outbox exists so the registration flow can be driven end to end with no domain, no credential
+# and no network.
+#
+# The override has to be written down because the image defaults the other way, and the first
+# version of this file left it out — the container refused to start, correctly, saying the dev
+# mailer writes confirmation links to a file in the clear. That refusal is `bootstrap.ts`'s and it
+# was right; production configures a real mailer through `infra/azure/main.bicep`.
+#
+# The database password below is a development credential in a file that is committed, which is
+# exactly what it looks like. Nothing it protects leaves this machine, and the production password
+# is generated at deploy time and never written down — see `infra/README.md` § 3.
+#
+# ## This stack is same-origin, and the split-origin deployment is NOT reproduced here
+#
+# What runs here is one container serving the page and the API together — the shipped deployment,
+# and the case `ELEVATOR_SIM_ALLOW_ORIGIN`'s absence below is correct for. Since § D257 there is a
+# second, optional shape where the page is on a CDN and the API is not, and **this file does not
+# build it**. That is stated rather than left to be discovered, because the cross-origin path is
+# the one thing in that lane no browser has ever exercised (`docs/16-static-site-deployment.md`
+# § 9).
+#
+# To drive it locally you would need two origins, not two ports — `localhost:5174` and
+# `localhost:8787` are already cross-origin to a browser, which is enough:
+#
+#   1. build the viewer with the API's origin baked in, and serve it separately:
+#        ELEVATOR_SIM_API_ORIGIN=http://localhost:8787 npm run build:web -w @elevator-sim/viz
+#        npx vite preview --port 5174 --outDir dist-web   # from packages/viz
+#   2. add to the `app` service below, both of them, because the server refuses one without
+#      the other matching:
+#        ELEVATOR_SIM_ORIGIN: http://localhost:5174
+#        ELEVATOR_SIM_ALLOW_ORIGIN: http://localhost:5174
+#
+# **Written from the code, not from a run.** Nobody has done this; if you do, the interesting part
+# is the preflight on `POST /api/auth/request-link`, which carries a JSON content type and an
+# `Authorization` header and is therefore the one request CORS has a real opinion about.
+
+name: elevator-sim
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: elevator_sim
+    ports:
+      # Exposed so you can psql into it while the stack is up. Bound to loopback only.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `app` waits on this rather than on the container merely existing. PostgreSQL accepts
+      # connections a second or two after the process starts, and a server that raced it would fail
+      # its first query and look like a bug in the store.
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d elevator_sim']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
+    ports:
+      - '8787:8787'
+    environment:
+      # Overrides the image's own `production`. Without this the server refuses to start, because
+      # the only mailer available here is the one that writes confirmation links to a file.
+      NODE_ENV: development
+      ELEVATOR_SIM_DB: postgres://postgres:devpass@db:5432/elevator_sim
+      # 32-character floor, and this one says what it is. `requireSecret` refuses anything shorter;
+      # it has no default precisely so a value like this cannot reach production by being forgotten.
+      ELEVATOR_SIM_SECRET: development-only-signing-secret-not-for-production
+      ELEVATOR_SIM_ORIGIN: http://localhost:8787
+      ELEVATOR_SIM_OUTBOX: /tmp/outbox.jsonl
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -206,6 +206,7 @@ interface LegState {
     boardedAt: SimTime | undefined;
     alightedAt: SimTime | undefined;
     abandonedAt: SimTime | undefined;
+    refusedAt: SimTime | undefined;
     carId: string | undefined;
     bankId: string | undefined;
     assignedCarId: string | undefined;
@@ -250,6 +251,7 @@ export class MetricsRecorder {
   #releasedCount = 0;
   #alightedCount = 0;
   #abandonedCount = 0;
+  #accessRefusedCount = 0;
   #finishedAt: SimTime | undefined;
 
   constructor(options: MetricsRecorderOptions) {
@@ -331,6 +333,14 @@ export class MetricsRecorder {
     return this.#abandonedCount;
   }
 
+  /**
+   * Legs the building turned away for want of a credential. `0` on every building that declares
+   * no `accessZones`. See {@link recordAccessRefusal}.
+   */
+  get accessRefusedCount(): number {
+    return this.#accessRefusedCount;
+  }
+
   /** Latest simulated time handed to any method. `finish` must not precede it. */
   get lastEventAt(): SimTime {
     return this.#lastEventAt;
@@ -392,6 +402,7 @@ export class MetricsRecorder {
         boardedAt: undefined,
         alightedAt: undefined,
         abandonedAt: undefined,
+        refusedAt: undefined,
         carId: undefined,
         bankId: undefined,
         assignedCarId: undefined,
@@ -553,6 +564,53 @@ export class MetricsRecorder {
       this.#releasedCount += 1;
     }
     this.#abandonedCount += 1;
+    this.#observe(at);
+  }
+
+  /**
+   * Record the building **turning a passenger away for want of a credential**
+   * (`DECISIONS.md` § D266).
+   *
+   * The fourth way a wait can end, and it is filed apart from the other three for the reason
+   * {@link recordAbandonment} is filed apart from *"a leg that never boarded"*: they produce the
+   * same silence and they are different facts.
+   *
+   * - Not **boarded** — no car carried them.
+   * - Not **censored** — nothing was ever going to serve them, and the run did not run out of time.
+   * - Not **abandoned** — nobody gave up. Filing it there would put a credential refusal into
+   *   `RunSummary.abandonment` and into `awtIsValid`'s abandonment ground, so a run that declares
+   *   no `sim.patience` would report riders leaving, and the rate a reader is asked to judge
+   *   patience by would be measuring access zoning instead.
+   *
+   * @throws MetricsError if the leg never arrived, has already boarded, has already abandoned, has
+   *   already been refused, or is refused before it arrived.
+   */
+  recordAccessRefusal(passenger: RecordablePassenger | string, at: SimTime): void {
+    this.#assertOpen('recordAccessRefusal');
+    const id = typeof passenger === 'string' ? passenger : passenger.id;
+    const leg = this.#require(id, 'refuse');
+    if (leg.record.boardedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" boarded at t=${leg.record.boardedAt} and cannot be refused at t=${at}: a rider the readers turned away did not get into the car.`,
+      );
+    }
+    if (leg.record.abandonedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" abandoned at t=${leg.record.abandonedAt} and cannot be refused at t=${at}: a rider who had already left the landing was not standing there to be turned away.`,
+      );
+    }
+    if (leg.record.refusedAt !== undefined) {
+      throw new MetricsError(
+        `Leg "${id}" was refused at t=${leg.record.refusedAt} and cannot be refused again at t=${at}.`,
+      );
+    }
+    if (!Number.isFinite(at) || at < leg.record.arrivedAt) {
+      throw new MetricsError(
+        `Leg "${id}" cannot be refused at t=${at}: it arrived at t=${leg.record.arrivedAt}.`,
+      );
+    }
+    leg.record.refusedAt = at;
+    this.#accessRefusedCount += 1;
     this.#observe(at);
   }
 
@@ -851,6 +909,9 @@ function freezeLeg(leg: LegState): PassengerRecord {
     // below follow: a run that declared no patience writes the record it wrote before this
     // field existed.
     ...(source.abandonedAt === undefined ? {} : { abandonedAt: source.abandonedAt }),
+    // Omitted on every leg the building did not turn away, by the same rule: a building that
+    // declares no access zones writes the record it wrote before this field existed.
+    ...(source.refusedAt === undefined ? {} : { refusedAt: source.refusedAt }),
     ...(source.carId === undefined ? {} : { carId: source.carId }),
     ...(source.bankId === undefined ? {} : { bankId: source.bankId }),
     // Omitted, not `undefined`, so a conventional run's record is byte-identical to one written

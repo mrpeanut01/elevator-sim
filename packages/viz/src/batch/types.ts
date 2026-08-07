@@ -284,6 +284,21 @@ export interface BatchReplication {
 export interface BatchArmResult {
   readonly armId: string;
   readonly dispatcherProfileId: string;
+  /**
+   * The resolved profile's **display name** — `data/dispatcher-profiles.json`'s own `name` field.
+   *
+   * Carried beside the id rather than derived at the reader, because the reader is on the other
+   * side of a `postMessage` and the only thing that has the profile object is the worker that ran
+   * it. Without it `batch/report.ts` could name an arm only by its slug, and every sentence on the
+   * Compare tab read *"the difference in average wait between eta and collective"* — two ids that
+   * appear nowhere else in the product, against a rail that lists the same two dispatchers as
+   * *Minimum estimated wait* and *Conventional collective*. There is one source for the pairing and
+   * it is the file; this field is that source arriving where the sentence is written.
+   *
+   * An **edited** arm carries `controls/editedProfile.ts`'s own name, which embeds the base's id —
+   * so a report of an edit against its base still tells the two apart.
+   */
+  readonly dispatcherProfileName: string;
   readonly replications: readonly BatchReplication[];
 }
 

@@ -55,6 +55,15 @@ const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const SKIP_DIRS: ReadonlySet<string> = new Set([
   'node_modules',
   'dist',
+  // The viewer's web bundle, for `dist/`'s reason and one of its own. Build output is not authored
+  // prose — but more than that, this directory exists only if somebody has run
+  // `npm run build:web`, so walking it made the suite pass or fail on local state rather than on
+  // the tree. It did exactly that once: `publicDir` copied `data/buildings/README.md` into the
+  // bundle, and its `../../docs/…` links resolved from `data/buildings/` and not from the copy.
+  // The copy is fixed at source — `vite.config.ts` now emits named files instead of the directory
+  // — and this entry is the second half, so a future stray document cannot make a green suite
+  // depend on whether you happened to build the viewer first.
+  'dist-web',
   '.git',
   'coverage',
   '.vite',
@@ -68,6 +77,17 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
   // documents is already checked by this same test when its own branch runs it, so skipping is
   // not a coverage loss — it is the difference between auditing a tree and auditing the disk.
   '.worktrees',
+  // **The same defect, at a path the entry above does not name.** Agent worktrees are created
+  // under `.claude/worktrees/`, so `'.worktrees'` never matched them and the walk went straight in.
+  // It failed exactly as predicted above, one directory over: this branch went red because a
+  // *running* agent's half-written `DECISIONS.md` cited `§ D285` and `§ D286` before it had written
+  // those headings. Nothing on this branch was wrong, and the tree it was auditing was not this one.
+  //
+  // Worth stating rather than just patching: a skip list keyed on literal names cannot see that
+  // two directories are the same *kind* of thing. This entry is the second name for one purpose —
+  // *a checkout that is not this one* — and if a third location appears, the fix is to match the
+  // purpose rather than to add a third string.
+  '.claude',
 ]);
 
 function markdownFiles(dir: string, acc: string[] = []): string[] {

@@ -169,6 +169,7 @@ export interface ScopeProbe {
 }
 
 const card = (hasMaths: boolean): HonestyCard => ({
+  basis: 'now',
   glyph: '✓',
   title: 'title',
   plain: 'plain',
@@ -396,6 +397,38 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   'viewer.shiftLengthS': {
     states: [(s) => ({ ...s, shiftLengthS: 900 }), (s) => ({ ...s, shiftLengthS: 1800 })],
   },
+  'viewer.windowStartS': {
+    /*
+     * Two parts of one day — § D286, and the standing requirement pointed at the control that
+     * replaced the campaign's *shift length*.
+     *
+     * `office-day` because it is the only shipped record with parts to select, and the morning
+     * against the lunch because they are the two the record's own `$comment` argues are different
+     * problems: 85/5/10 into the building at 08:30 against the cited 45/45/10 arc at 12:15. Both
+     * arms are **the same length and the same seed**, so a difference in the legs can only be the
+     * window — which is the whole claim. A pair that differed in length as well would pass on the
+     * length and prove nothing about the part.
+     *
+     * It is also the one probe that would have caught the mistake this feature could most easily
+     * have made: had the window been folded into `durationS`, the two arms would be identical.
+     */
+    states: [
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+        shiftLengthS: 1800,
+        windowStartS: 30 * 60,
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+        shiftLengthS: 1800,
+        windowStartS: 255 * 60,
+      }),
+    ],
+  },
   'viewer.freePlay': {
     states: [
       (s) => ({ ...s, freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 3 } }),
@@ -577,6 +610,27 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
   },
   'free-play.durationS': {
     states: [(s) => ({ ...s, shiftLengthS: 300 }), (s) => ({ ...s, shiftLengthS: 1800 })],
+  },
+  'free-play.windowStartS': {
+    // The menu's name for `viewer.windowStartS`, and the same pair — see that probe for why the two
+    // arms hold the length and the seed still. The menu writes this field through `enterFreePlay`,
+    // so the two entries are one control observed at two layers rather than two controls.
+    states: [
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+        shiftLengthS: 1800,
+        windowStartS: 30 * 60,
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+        shiftLengthS: 1800,
+        windowStartS: 555 * 60,
+      }),
+    ],
   },
   'free-play.seed': {
     states: [(s) => ({ ...s, seed: 1n }), (s) => ({ ...s, seed: 999n })],

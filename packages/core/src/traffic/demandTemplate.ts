@@ -20,7 +20,7 @@
  * and the last 5 of cool-down. It is supported for cross-checking a single run against the
  * analytical baseline. It is **not** a basis for comparing two dispatchers.
  *
- * ## Shape is code, numbers are data
+ * ## Shape is code, numbers are data — and a schedule is neither
  *
  * A ramp is a ramp — that is the code here. Every quantity (`durationMin`, the reported
  * window, the discards, the endpoint mixes) comes from `data/traffic-profiles.json →
@@ -28,6 +28,21 @@
  * declared in `TRAFFIC_PARAMETERS`. There is no `if (template === 'rise-and-fall') { rate = 0.7 }`
  * anywhere: all three templates are the same piecewise-linear evaluator over different phase
  * lists.
+ *
+ * **That defence is right for a ramp and wrong for a schedule, and § D273 is where the line moved.**
+ * A day's phase list is not a shape; it is a *sequence* of them — an up-peak, a lull, a lunch, a
+ * lull, a down-peak — and a sixth `if (record.id === 'office-day')` per day profile is exactly the
+ * `if (phase === 'evening')` invariant 7 forbids. So {@link fromRecord} takes a record that declares
+ * `phases` **before** it looks at `id` at all, and that record's phases are the data. One new code
+ * path, and no per-profile code ever again.
+ *
+ * Nothing about the evaluator changed to allow it, and that is the whole argument. `DemandPhase`
+ * already carried per-phase intensity endpoints *and* optional per-phase mix endpoints;
+ * {@link intensityAt} and {@link splitAt} are already one piecewise-linear evaluator over one knot
+ * list; and `shift-change` already ships six phases with two interior peaks. A day profile is a
+ * **longer phase list**, and `traffic/phaseListIdentity.test.ts` proves that by *running* it: a
+ * record reproducing `rise-and-fall`'s knots draws the same passengers, at all five buildings, byte
+ * for byte.
  *
  * ## The third template, and the one thing it adds
  *
@@ -42,8 +57,42 @@
  * every floor on its own traffic profile's split, which is what every published figure in this
  * repository was measured under, and `traffic/mixIdentity.test.ts` holds the two shipped templates
  * to that byte for byte.
+ *
+ * ## The hour, and why it moves nothing (`DECISIONS.md` § D244)
+ *
+ * A template may also declare **when it is**: `ResolvedDemandTemplate.startOfDayS`, resolved from
+ * `data/traffic-profiles.json → demandTemplates[].startOfDayMin`. Five of the six shipped
+ * templates declare one; `constant-iso` declares none, because ISO's constant demand is a rate held
+ * to cross-check an analytical baseline and not a time of day.
+ *
+ * **A record gets exactly one hour, and that is what forced the sixth record** (`DECISIONS.md`
+ * § D263). `evening-egress` was a ballroom emptying *and* the calendar's office end-of-day, so its
+ * one hour could only be true of one of them. It is now the venue case at 22:24, and
+ * `office-down-peak` is the office case at 17:15. Two records, one meaning each — rather than an
+ * hour on the record that any caller could override, which would be a second place a template's
+ * clock is defined.
+ *
+ * **{@link intensityAt}, {@link splitAt} and {@link integratedIntensityS} do not read it, and that
+ * is the property the whole feature rests on.** Every arrival instant is drawn against `intensityAt`
+ * over `[0, durationS]`, so a run's passengers, batches, routes, masses and metrics are exactly what
+ * they were before the field existed — at every seed, in every building, under every template.
+ * `traffic/dayStartIdentity.test.ts` proves that with a run rather than with this paragraph: the
+ * shipped records are compared, leg for leg and byte for byte, against the same records with the
+ * hour stripped. It is also what keeps `sim/oracle.test.ts` green by construction, since the
+ * closed-form Barney/CIBSE comparison is a statement about the same unmoved arrivals.
+ *
+ * So the hour is a **label on the period**, in the way `id` and `name` are, and it is deliberately
+ * absent from `TRAFFIC_PARAMETERS`: an optimizer sampling *what hour it is* would be searching a
+ * dimension that cannot change a cost. That is the `destination-eta` `rideTime: 0` defect (§ D112)
+ * with a different key name, and this is the note that stops it recurring.
+ *
+ * The invisibility is what makes it free **today**. It stops being free the moment anything
+ * statistical reads it — a phase boundary that becomes a measurement boundary, a report that slices
+ * a day at 12:00 — and at that moment the authored hours below stop being labels and become inputs.
+ * See each template's `$comment` for what is cited and what is assumed.
  */
 
+import { demandPhaseIssues, type DemandPhaseIssue } from '../config/demandPhases.js';
 import type { DemandTemplate, DirectionalSplit } from '../config/types.js';
 
 import {
@@ -57,6 +106,30 @@ import {
 } from './types.js';
 
 const SECONDS_PER_MINUTE = 60;
+
+/** Seconds in a day. The half-open upper bound on {@link requireTimeOfDay}. */
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * A time of day in `[0, 86400)`, or `undefined` passed straight through.
+ *
+ * Half-open at the top for the reason `config/schema.ts` gives about `startOfDayMin`: 86 400 is the
+ * next midnight, which is 0, and two records meaning the same instant must not compare unequal.
+ *
+ * Validated here as well as in the schema, and that is not belt-and-braces. `resolveDemandTemplate`
+ * accepts a hand-built `ResolvedDemandTemplate` and every `*Template()` builder is exported, so a
+ * caller can reach these shapes without passing through `config/`; the schema guards the *data*
+ * path only.
+ */
+function requireTimeOfDay(value: number | undefined, label: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value < 0 || value >= SECONDS_PER_DAY) {
+    throw new TrafficError(
+      `Demand template ${label} must be seconds after local midnight in [0, ${SECONDS_PER_DAY}); received ${value}. It is when the run begins, not how long it lasts.`,
+    );
+  }
+  return value;
+}
 
 function requirePositive(value: number, label: string): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -155,22 +228,38 @@ function finish(
     'peakIntensity' | 'intensityIntegralS' | 'meanDirectionalSplit'
   >,
 ): ResolvedDemandTemplate {
+  // Destructured out rather than carried in the spread, so that a template with no hour has **no
+  // key** rather than one whose value is `undefined`. `JSON.stringify` erases the difference and
+  // `'startOfDayS' in template` does not, and the second is what the identity guards read.
+  //
+  // `authoredPhaseList` is destructured for the same reason and one more: it is absent on all five
+  // shipped templates, so every one of them serializes exactly as it did before § D273 and not one
+  // pinned digest moves. A `false` here would move fifteen of them for a key that means "no".
+  //
+  // `window` joins them since § D285, and for exactly the same reason: it is absent on every run
+  // that covers a whole period, which is every run this repository has ever published.
+  const { startOfDayS, authoredPhaseList, window, ...rest } = parts;
+  const hourS = requireTimeOfDay(startOfDayS, 'startOfDayS');
   let peak = 0;
   let integral = 0;
-  for (const phase of parts.phases) {
+  for (const phase of rest.phases) {
     peak = Math.max(peak, phase.startIntensity, phase.endIntensity);
     integral += phaseIntegral(phase);
   }
-  requireCoherentMix(parts.phases);
-  const meanDirectionalSplit = meanSplitOf(parts.phases, parts.durationS);
+  requireCoherentMix(rest.phases);
+  const meanDirectionalSplit = meanSplitOf(rest.phases, rest.durationS);
   return Object.freeze({
-    ...parts,
-    phases: Object.freeze(parts.phases.map((phase) => Object.freeze({ ...phase }))),
+    ...rest,
+    phases: Object.freeze(rest.phases.map((phase) => Object.freeze({ ...phase }))),
     peakIntensity: peak,
     intensityIntegralS: integral,
     // Omitted, not undefined-valued, when no phase declares a mix: a template from a run that does
     // not use the feature must serialize as the object it was before the feature existed.
     ...(meanDirectionalSplit === undefined ? {} : { meanDirectionalSplit }),
+    // The same rule, for the same reason. `constant-iso` has no hour and must carry no key.
+    ...(hourS === undefined ? {} : { startOfDayS: hourS }),
+    ...(authoredPhaseList === true ? { authoredPhaseList: true as const } : {}),
+    ...(window === undefined ? {} : { window: Object.freeze({ ...window }) }),
   });
 }
 
@@ -227,6 +316,28 @@ export function requirePeakShiftFits(
   }
   if (magnitudeS === 0) return;
 
+  /*
+   * § D275, and it is refused **before** the limit is consulted rather than after.
+   *
+   * `maxPeakShiftS` takes its bound from the outermost interior knot, which is the right answer for
+   * a shape with one busy part and the wrong question for a schedule. A day's first boundary is
+   * minutes from the start — the trickle before the doors open — so the limit collapses to those
+   * minutes and almost every declared shift is refused with a message naming a phase boundary the
+   * author never thought of as the peak. Worse, a shift *inside* that collapsed limit would be
+   * accepted and would move **every** knot in the day by the same amount: the lunch and the evening
+   * peak would slide together with the morning one, which is not a late peak, it is a late clock —
+   * and § D244 rule 4 already settled that a period's hour is not what a peak shift moves.
+   *
+   * Shaped on the `constant-iso` refusal below, deliberately: a template that has no peak to move
+   * and a template whose peaks cannot move together are both cases of a knob meaning nothing here,
+   * and both say so by name rather than doing something plausible.
+   */
+  if (template.authoredPhaseList === true) {
+    throw new TrafficError(
+      `dayVariation.peakShiftS is not supported on demand template "${template.id}": its phases are authored as a schedule, so it has several busy parts rather than one peak, and a single shift would slide all of them together — a whole day an hour late rather than a peak an hour late. Its interior boundaries also begin minutes into the period, so the shift a shape template could absorb is not the shift this one could. Move the periods in the record, or select a template built from a shape.`,
+    );
+  }
+
   const limit = maxPeakShiftS(template);
   if (limit <= 0) {
     throw new TrafficError(
@@ -259,6 +370,12 @@ export function requirePeakShiftFits(
  * part of a `lunch-two-way` arc. That is what a late lunch is. It is recomputed by {@link finish}
  * from the shifted phases rather than carried over, so the template cannot disagree with itself.
  *
+ * **`startOfDayS` is carried unchanged, and that is the modelled answer rather than an omission.**
+ * The two endpoints are pinned, so the run still begins when it began; what moved is the busy part
+ * *within* the period. A `rise-and-fall` that starts at 08:30 and peaks ten minutes late is a late
+ * morning peak, not a period that started at 08:40 — and a shift that also moved the hour would be
+ * making the same claim twice.
+ *
  * @throws TrafficError for a template with no interior phase boundary, or a shift larger than
  *   {@link maxPeakShiftS}.
  */
@@ -287,6 +404,139 @@ export function shiftTemplatePeak(
     })),
     reportWindowStartS: move(template.reportWindowStartS),
     reportWindowEndS: move(template.reportWindowEndS),
+    // Spread-or-omit rather than `startOfDayS: template.startOfDayS`, so a shifted `constant-iso`
+    // — which has no hour — does not acquire an `undefined`-valued key the original lacked.
+    ...(template.startOfDayS === undefined ? {} : { startOfDayS: template.startOfDayS }),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Cutting a part out of a period (§ D285)
+ * -------------------------------------------------------------------------- */
+
+/** Where a linear segment sits at `timeS`, given its two endpoints. `0` for a degenerate span. */
+function lerp(startS: number, endS: number, startValue: number, endValue: number, timeS: number): number {
+  const span = endS - startS;
+  if (span <= 0) return startValue;
+  return startValue + ((endValue - startValue) * (timeS - startS)) / span;
+}
+
+/** {@link lerp} applied to all three shares. Not normalized here — {@link finish} does that. */
+function splitBetween(phase: DemandPhase, timeS: number): DirectionalSplit | undefined {
+  const { startSplit, endSplit } = phase;
+  if (startSplit === undefined || endSplit === undefined) return undefined;
+  return {
+    incoming: lerp(phase.startS, phase.endS, startSplit.incoming, endSplit.incoming, timeS),
+    outgoing: lerp(phase.startS, phase.endS, startSplit.outgoing, endSplit.outgoing, timeS),
+    interfloor: lerp(phase.startS, phase.endS, startSplit.interfloor, endSplit.interfloor, timeS),
+  };
+}
+
+/**
+ * The same template cut to `[startS, endS)` of its own period, re-based so the cut begins at zero.
+ *
+ * `DECISIONS.md` § D285, and the field [§ D275](DECISIONS.md) named. This is what makes a ten-hour
+ * `office-day` runnable at half an hour **without rescaling it**: the geometry is left exactly as
+ * authored and a part of it is selected, so 12:15–12:45 is the cited lunch peak at its cited length
+ * rather than a lunch squeezed into a proportion of a shorter day.
+ *
+ * ## What moves, and what deliberately does not
+ *
+ * Everything is re-based to the window's own clock — {@link ResolvedDemandTemplate.durationS} is the
+ * window's length, the phases are clipped and shifted, `startOfDayS` becomes the *window's* hour —
+ * so every downstream reader sees an ordinary period that begins at zero. The kernel's deadline, the
+ * report window, the phase strip and the oracle's `[0, durationS]` assumptions all keep working
+ * without learning what a window is. {@link ResolvedDemandTemplate.window} is what records that this
+ * period was cut out of a longer one, and it carries the length of the longer one so a trace can say
+ * *half an hour of a ten-hour day* without re-resolving the record.
+ *
+ * `peakIntensity`, `intensityIntegralS` and `meanDirectionalSplit` are re-derived by {@link finish}
+ * over the window rather than carried across, so the template cannot disagree with itself — the same
+ * rule {@link shiftTemplatePeak} follows. A morning window's mean mix is the morning's, not the
+ * day's, and that is the honest reading: it *is* a different period.
+ *
+ * **The report window becomes the whole of the cut.** § D273's argument about a phase list applies
+ * with more force to a part of one: five minutes taken out of a lunch peak reports one instant of it
+ * and calls it the period. A run that wants a narrower measurement still has
+ * `SimulationConfig.reportWindow`, which is where *"show me the busiest five minutes of it"* belongs.
+ *
+ * **Declaring the whole period is not a window, and returns the template untouched.** A window names
+ * a *part*, and the whole is not one; so *"the full day"* and *"no window"* are the same selection
+ * spelled two ways, and they produce the same run byte for byte rather than two runs differing in
+ * whether a key is present. `traffic/windowIdentity.test.ts` asserts it.
+ *
+ * @throws TrafficError for a window outside the period, an empty or inverted one, or a second window
+ *   on a template that already carries one.
+ */
+export function windowTemplate(
+  template: ResolvedDemandTemplate,
+  startS: number,
+  endS: number,
+): ResolvedDemandTemplate {
+  if (template.window !== undefined) {
+    throw new TrafficError(
+      `Demand template "${template.id}" is already a [${template.window.startS}, ${template.window.endS}) window of a ${template.window.periodS} s period, so it cannot be windowed again: the second window would be measured against the first one's length and "which part of the day" would stop naming a part of the day. Window the period once, from the record.`,
+    );
+  }
+  requireNonNegative(startS, 'windowStartS');
+  requireNonNegative(endS, 'windowEndS');
+  if (endS <= startS) {
+    throw new TrafficError(
+      `windowStartS (${startS} s) must be below windowEndS (${endS} s) on demand template "${template.id}": the window is the part of the period the run covers, and a part with no length is a run with no demand rather than a short one.`,
+    );
+  }
+  if (endS > template.durationS) {
+    throw new TrafficError(
+      `Window [${startS}, ${endS}) s does not fit inside demand template "${template.id}", whose period is ${template.durationS} s. A window selects part of the period the record authors; it cannot extend one. Widen the record, or select a window inside it.`,
+    );
+  }
+  // The whole is not a part. Returning the template untouched is what makes "the full day" and "no
+  // window" the same run rather than two runs that differ in a key.
+  if (startS === 0 && endS === template.durationS) return template;
+
+  const durationS = endS - startS;
+  const phases: DemandPhase[] = [];
+  for (const phase of template.phases) {
+    const from = Math.max(phase.startS, startS);
+    const to = Math.min(phase.endS, endS);
+    // Half-open, so a window landing exactly on a boundary takes the phase that starts there and
+    // not the one that ends there — the same rule `inReportWindow` and `poissonBatch` follow.
+    if (to <= from) continue;
+    const startSplit = splitBetween(phase, from);
+    const endSplit = splitBetween(phase, to);
+    phases.push({
+      startS: from - startS,
+      endS: to - startS,
+      startIntensity: lerp(phase.startS, phase.endS, phase.startIntensity, phase.endIntensity, from),
+      endIntensity: lerp(phase.startS, phase.endS, phase.startIntensity, phase.endIntensity, to),
+      // Spread-or-omit: a window of a template whose phases declare no mix must declare none either,
+      // or the run would acquire a `meanDirectionalSplit` its period never had and change path.
+      ...(startSplit === undefined || endSplit === undefined ? {} : { startSplit, endSplit }),
+    });
+  }
+  if (phases.length === 0) {
+    throw new TrafficError(
+      `Window [${startS}, ${endS}) s of demand template "${template.id}" covers none of its phases, which should be impossible for a window inside its ${template.durationS} s period. The phase list is not contiguous.`,
+    );
+  }
+
+  return finish({
+    id: template.id,
+    name: template.name,
+    recommended: template.recommended,
+    durationS,
+    phases,
+    // The whole of the cut. See the docstring: a part is reported over the whole of itself.
+    reportWindowStartS: 0,
+    reportWindowEndS: durationS,
+    // The window's hour, not the record's — this is the half of § D244 that stops being free. The
+    // hour is now an *input* to a label a player reads, and wrapped modulo a day so a window taken
+    // from a period that runs past midnight cannot print a 25th hour.
+    ...(template.startOfDayS === undefined
+      ? {}
+      : { startOfDayS: (template.startOfDayS + startS) % SECONDS_PER_DAY }),
+    ...(template.authoredPhaseList === true ? { authoredPhaseList: true as const } : {}),
+    window: { startS, endS, periodS: template.durationS },
   });
 }
 
@@ -294,7 +544,10 @@ export function shiftTemplatePeak(
  * Rise and fall (CIBSE Guide D) — the recommended template
  * -------------------------------------------------------------------------- */
 
-/** Overrides for {@link riseAndFallTemplate}. Every one is declared in `TRAFFIC_PARAMETERS`. */
+/**
+ * Overrides for {@link riseAndFallTemplate}. Every **geometric** one is declared in
+ * `TRAFFIC_PARAMETERS`; {@link RiseAndFallOptions.startOfDayS} deliberately is not — see its note.
+ */
 export interface RiseAndFallOptions {
   /** Length of one replication, seconds. Default 1800 (30 min). */
   readonly durationS?: number | undefined;
@@ -302,6 +555,14 @@ export interface RiseAndFallOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity at both ends, as a fraction of peak. Default 0 — the CIBSE shape. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight, `[0, 86400)`. Omitted means no hour.
+   *
+   * The one field here that is **not** a tunable and not in `TRAFFIC_PARAMETERS`: it is invisible
+   * to {@link intensityAt}, so it cannot move a cost, and a declared knob that cannot move a cost
+   * is a search dimension nobody can spend. See {@link ResolvedDemandTemplate.startOfDayS}.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -359,6 +620,7 @@ export function riseAndFallTemplate(options: RiseAndFallOptions = {}): ResolvedD
     phases,
     reportWindowStartS: holdStartS,
     reportWindowEndS: holdEndS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -374,6 +636,16 @@ export interface ConstantDemandOptions {
   readonly discardFirstS?: number | undefined;
   /** Cool-down discarded at the end, seconds. Default 300 (5 min). */
   readonly discardLastS?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight. See {@link RiseAndFallOptions.startOfDayS}.
+   *
+   * **The shipped `constant-iso` record declares none, and that is the point of the field being
+   * optional.** ISO 8100-32's constant demand is a rate held long enough to cross-check an
+   * analytical baseline; it is not an hour of the day, and inventing one for it would put a clock
+   * on the page next to a run that has no claim to one. The parameter exists so a caller building
+   * a *different* constant period can say when it is — not so the shipped one can be given a time.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -412,6 +684,7 @@ export function constantDemandTemplate(options: ConstantDemandOptions = {}): Res
     phases: [{ startS: 0, endS: durationS, startIntensity: 1, endIntensity: 1 }],
     reportWindowStartS: discardFirstS,
     reportWindowEndS: durationS - discardLastS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -462,7 +735,11 @@ export const LUNCH_TWO_WAY_SPLIT_AT_END: DirectionalSplit = Object.freeze({
   interfloor: 0.1,
 });
 
-/** Overrides for {@link lunchTwoWayTemplate}. Every one is declared in `TRAFFIC_PARAMETERS`. */
+/**
+ * Overrides for {@link lunchTwoWayTemplate}. Every **geometric and mix** one is declared in
+ * `TRAFFIC_PARAMETERS`; {@link LunchTwoWayOptions.startOfDayS} deliberately is not — see
+ * {@link RiseAndFallOptions.startOfDayS}.
+ */
 export interface LunchTwoWayOptions {
   /** Length of the period, seconds. Default 1800, inherited from the rise-and-fall run length. */
   readonly durationS?: number | undefined;
@@ -476,6 +753,12 @@ export interface LunchTwoWayOptions {
   readonly endSplit?: DirectionalSplit | undefined;
   /** How much of the arc to keep, `[0, 1]`. Default 1; 0 is the flat-mix control. */
   readonly mixAmplitude?: number | undefined;
+  /**
+   * When the period begins, seconds after local midnight. See
+   * {@link RiseAndFallOptions.startOfDayS}. The arc's crossover — the instant the mix is 45/45/10 —
+   * lands at the period's midpoint, so the hour and the crossover move together.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -587,6 +870,7 @@ export function lunchTwoWayTemplate(options: LunchTwoWayOptions = {}): ResolvedD
     // point of the arc and calls it the period.
     reportWindowStartS: 0,
     reportWindowEndS: durationS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -601,6 +885,12 @@ export interface ShiftChangeOptions {
   readonly peakWindowS?: number | undefined;
   /** Intensity between the two peaks, as a fraction of peak. Must lie in `(0, 1)` — see below. */
   readonly troughFraction?: number | undefined;
+  /**
+   * When the period begins, seconds after local midnight. See
+   * {@link RiseAndFallOptions.startOfDayS}. The changeover instant — the trough between the two
+   * peaks — is the period's midpoint, so it is the point an authored hour is derived from.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -672,6 +962,7 @@ export function shiftChangeTemplate(options: ShiftChangeOptions = {}): ResolvedD
     phases,
     reportWindowStartS: 0,
     reportWindowEndS: durationS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 
@@ -688,6 +979,13 @@ export interface EveningEgressOptions {
   readonly holdS?: number | undefined;
   /** Intensity before the doors open, as a fraction of peak. */
   readonly baselineFraction?: number | undefined;
+  /**
+   * When the run begins, seconds after local midnight. See {@link RiseAndFallOptions.startOfDayS}.
+   *
+   * The run *begins* on the quiet trickle, so this is not the hour the doors open: full flow is
+   * reached at `durationS / 4 + stepS`, which is the instant an authored hour is derived from.
+   */
+  readonly startOfDayS?: number | undefined;
   readonly id?: string | undefined;
   readonly name?: string | undefined;
 }
@@ -746,6 +1044,124 @@ export function eveningEgressTemplate(options: EveningEgressOptions = {}): Resol
     phases,
     reportWindowStartS: stepEndS,
     reportWindowEndS: holdEndS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * Authored phase list — the day schedule, whose shape is its own data (§ D273)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Turn the first broken rule into a `TrafficError` naming the phase and the field.
+ *
+ * The count of the rest goes in the message rather than the detail of them: a phase list that has
+ * a gap usually has one mistake and several consequences, and the first one in list order is the
+ * one to fix. Reporting all eleven of a shifted list's complaints would bury it.
+ */
+function throwOnPhaseIssues(id: string, issues: readonly DemandPhaseIssue[]): void {
+  const first = issues[0];
+  if (first === undefined) return;
+  const where = first.index < 0 ? 'phases' : `phases[${first.index}].${first.field}`;
+  const rest =
+    issues.length > 1
+      ? ` (${issues.length - 1} further issue${issues.length > 2 ? 's' : ''} in the same list.)`
+      : '';
+  throw new TrafficError(
+    `Demand template "${id}" authors a phase list this module cannot evaluate — ${where}: ${first.message}.${rest}`,
+  );
+}
+
+/** Everything {@link phaseListTemplate} needs. Seconds, and the phases already converted. */
+export interface PhaseListOptions {
+  /** Length of the period, seconds. The last phase must end exactly here. */
+  readonly durationS: number;
+  /** The authored knots, contiguous and covering `[0, durationS]`. */
+  readonly phases: readonly DemandPhase[];
+  readonly id: string;
+  readonly name: string;
+  /**
+   * Whether this template supports confidence intervals across replications.
+   *
+   * Carried from the record rather than assumed, and a day profile's honest answer is **`false`**:
+   * a replication of a whole day is one long run whose waiting times are serially correlated in
+   * exactly the way `constant-iso`'s are, so *"reported over the whole day"* is a description and
+   * not a licence to build an interval across days. See docs/03 § The independence condition.
+   */
+  readonly recommended: boolean;
+  /** Seconds after local midnight at which the period begins. Omitted means no hour (§ D244). */
+  readonly startOfDayS?: number | undefined;
+}
+
+/**
+ * A template whose phases were **authored**, not computed. `DECISIONS.md` § D273.
+ *
+ * The one builder here that adds no geometry of its own: it validates the list, freezes it and
+ * hands it to {@link finish}, which derives `peakIntensity`, `intensityIntegralS` and
+ * `meanDirectionalSplit` exactly as it does for the five shapes. That is the point — the evaluator
+ * is not extended, it is *fed*, and `traffic/phaseListIdentity.test.ts` measures the difference by
+ * running a phase list that reproduces `rise-and-fall`'s knots against `rise-and-fall` itself.
+ *
+ * ## The report window is the whole period, and that is a modelling answer
+ *
+ * `lunch-two-way` and `shift-change` already report over the whole run, for the reason
+ * `benchmark/arms.ts` states about a mixed pattern: *"this is a pattern rather than a peak, and a
+ * 300 s window of it is a sample of the pattern rather than the thing itself"*. A day is that
+ * argument at its strongest — a five-minute window cut out of a day reports one of its periods and
+ * calls it the day — so a phase-list template has no window field to author and no discards to
+ * declare.
+ *
+ * Narrowing still happens at the **run** level, where it belongs, and the two forms are different
+ * questions: `SimulationConfig.reportWindow: 'peak-5min'` *derives* the busiest five minutes it can
+ * find (on `office-day` at `midtown-office` that lands mid-morning, not on the up-peak, because the
+ * queue is still draining), while an explicit `ReportWindow` **names** an interval — which is the
+ * one that answers *"report me the lunch"*. Neither is a way of running a shorter day; that is
+ * `windowStartS`/`windowEndS`, which does not exist yet (§ D275).
+ *
+ * @throws TrafficError for a list that is empty, non-contiguous, descending, short of or past
+ *   `durationS`, stepped at a boundary without a ramp, or that declares a mix on some phases only.
+ */
+export function phaseListTemplate(options: PhaseListOptions): ResolvedDemandTemplate {
+  const durationS = requirePositive(options.durationS, 'durationS');
+  throwOnPhaseIssues(
+    options.id,
+    demandPhaseIssues(
+      options.phases.map((phase) => ({
+        start: phase.startS,
+        end: phase.endS,
+        startIntensity: phase.startIntensity,
+        endIntensity: phase.endIntensity,
+        ...(phase.startSplit === undefined ? {} : { startSplit: phase.startSplit }),
+        ...(phase.endSplit === undefined ? {} : { endSplit: phase.endSplit }),
+      })),
+      durationS,
+      's',
+    ),
+  );
+
+  return finish({
+    id: options.id,
+    name: options.name,
+    recommended: options.recommended,
+    durationS,
+    // Normalized here rather than trusted, the way every other builder normalizes its splits: an
+    // author writing 85/5/10 and an author writing 0.85/0.05/0.1 must resolve to the same template.
+    phases: options.phases.map((phase) => ({
+      startS: phase.startS,
+      endS: phase.endS,
+      startIntensity: phase.startIntensity,
+      endIntensity: phase.endIntensity,
+      ...(phase.startSplit === undefined
+        ? {}
+        : { startSplit: normalizedSplit(phase.startSplit, 'startSplit') }),
+      ...(phase.endSplit === undefined
+        ? {}
+        : { endSplit: normalizedSplit(phase.endSplit, 'endSplit') }),
+    })),
+    reportWindowStartS: 0,
+    reportWindowEndS: durationS,
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
+    authoredPhaseList: true,
   });
 }
 
@@ -753,12 +1169,37 @@ export function eveningEgressTemplate(options: EveningEgressOptions = {}): Resol
  * Resolution from config
  * -------------------------------------------------------------------------- */
 
+/**
+ * A resolved template, told apart from an authored record by the **unit its duration is in**.
+ *
+ * It used to test `'phases' in value`, and § D273 made that wrong in the most dangerous possible
+ * way: a record that authors its own phases has the key too, so every day profile handed in as a
+ * record would have been waved through as *already resolved* — returned untouched, its minutes read
+ * as seconds, its `peakIntensity` and `intensityIntegralS` never derived, and its phase list never
+ * validated. It was caught by `phaseListIdentity.test.ts` refusing to see a malformed list refused.
+ *
+ * `durationS` is the discriminator because it is the one field the two shapes cannot share:
+ * `DemandTemplate` is a `strictObject` carrying `durationMin`, and `ResolvedDemandTemplate` is
+ * built in seconds and always has `durationS`. Neither can acquire the other's without the schema
+ * or the builders changing.
+ */
 function isResolved(value: unknown): value is ResolvedDemandTemplate {
-  return typeof value === 'object' && value !== null && 'phases' in value;
+  return typeof value === 'object' && value !== null && 'durationS' in value;
 }
 
-/** A template already resolved passes through; anything else is built from its numbers. */
-export type DemandTemplateSpec = DemandTemplateId | DemandTemplate | ResolvedDemandTemplate;
+/**
+ * A template already resolved passes through; anything else is built from its numbers.
+ *
+ * **The id is `string`, not {@link DemandTemplateId}, and § D274 is why.** `resolveDemandTemplate`
+ * has always looked the id up in the loaded `demandTemplates` **first** and only fallen back to the
+ * closed union when no record answered, so the union's runtime role was already the narrower one:
+ * *the shapes this module can build with no record to read*. Since § D273 a record can carry its own
+ * phases, so the set of ids a shipped configuration answers to is the set of ids in
+ * `data/traffic-profiles.json` — a thing the type system cannot see and the loaded catalogue can.
+ * The union stays exactly what it always was, the fallback list, and every call site validates a
+ * string against the records it actually loaded.
+ */
+export type DemandTemplateSpec = string | DemandTemplate | ResolvedDemandTemplate;
 
 /**
  * Build a runtime template from a `data/traffic-profiles.json → demandTemplates` record, from
@@ -788,8 +1229,16 @@ export function resolveDemandTemplate(
 ): ResolvedDemandTemplate {
   if (typeof spec !== 'string') {
     if (isResolved(spec)) {
+      // The phase-list refusal takes precedence when the marker is set, so a caller who hand-built
+      // a schedule and reached for `durationS` is told what a schedule is, rather than the generic
+      // "it already carries its geometry" — the same sentence they would get from a record.
+      if (spec.authoredPhaseList === true) requireNoPhaseListOverrides(overrides, spec.id);
       requireNoOverrides(overrides, `the already-resolved template "${spec.id}"`);
       requireCoherentMix(spec.phases);
+      // The resolved path returns the object untouched, so this is the only place a hand-built
+      // template's hour is checked at all — the same reasoning `requireCoherentMix` is applied here
+      // for. An hour outside the day would otherwise surface on a clock three layers away.
+      requireTimeOfDay(spec.startOfDayS, 'startOfDayS');
       if ((spec.meanDirectionalSplit === undefined) !== (spec.phases[0]?.startSplit === undefined)) {
         throw new TrafficError(
           `The already-resolved template "${spec.id}" disagrees with itself about whether it varies the directional mix: meanDirectionalSplit is ${spec.meanDirectionalSplit === undefined ? 'absent' : 'present'} while its first phase ${spec.phases[0]?.startSplit === undefined ? 'declares no mix' : 'declares one'}. The generator branches on meanDirectionalSplit, so the disagreement would resolve silently in its favour.`,
@@ -808,8 +1257,10 @@ export function resolveDemandTemplate(
   if (spec === 'lunch-two-way') return lunchTwoWay(overrides);
   if (spec === 'shift-change') return shiftChange(overrides);
   if (spec === 'evening-egress') return eveningEgress(overrides);
+  // Same shape as `rise-and-fall`, and the id is what differs. See {@link officeDownPeak}.
+  if (spec === 'office-down-peak') return officeDownPeak(overrides);
   throw new TrafficError(
-    `Unknown demand template "${spec}". Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Declare it in data/traffic-profiles.json and add its shape in traffic/demandTemplate.ts.`,
+    `Unknown demand template "${spec}". With no record to read, the shapes this module can build are: ${DEMAND_TEMPLATE_IDS.join(', ')}. Declare it in data/traffic-profiles.json — a record that authors its own "phases" needs no shape here at all (DECISIONS.md § D273); only a record that selects one of the shapes above by id does.`,
   );
 }
 
@@ -825,12 +1276,59 @@ function requireNoOverrides(overrides: DemandTemplateOverrides | undefined, what
   }
 }
 
-/** The rise-and-fall shape, with `overrides` beating the record value and then the default. */
+/**
+ * Refuse every geometry override against an authored phase list, `durationS` **by name**. § D275.
+ *
+ * `requireNoOverrides` is the precedent and this is the same refusal one level earlier, for a
+ * record rather than for an already-resolved template. The reason is the same: a knob that reaches
+ * a template it cannot move is a control that silently does nothing, which docs/14 § 5 criterion 2
+ * exists to catch. Nine of the ten overrides do not even name a quantity a phase list has — there
+ * is no ramp to hold, no trough to raise, no step to lengthen, no discard to take — so they are
+ * refused as a group.
+ *
+ * **`durationS` gets its own sentence because it is the one that looks like it should work, and
+ * GitHub issue #81 is what it does instead.** On a shape builder `durationS` *refits the geometry*:
+ * a 900 s `rise-and-fall` is a 900 s run with a proportionally shorter ramp and the same 300 s hold,
+ * which is a shorter version of the same thing. On a day it would be a sixteen-hour schedule
+ * squeezed into a quarter of an hour — a fifteen-minute day with a five-minute lunch, reported as a
+ * day. Selecting *which part of a day to run* is a different question and wants a different field
+ * (`windowStartS`/`windowEndS`, deliberately not built here — see § D275): it must never be a
+ * reinterpretation of `durationS`, because `durationS` travels in every leaderboard submission and
+ * giving it a second meaning would silently change what a stored score was measured over.
+ */
+function requireNoPhaseListOverrides(
+  overrides: DemandTemplateOverrides | undefined,
+  id: string,
+): void {
+  const set = Object.entries(overrides ?? {})
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+  if (set.length === 0) return;
+  if (set.includes('durationS')) {
+    throw new TrafficError(
+      `templateOverrides.durationS cannot be applied to demand template "${id}": its phases are authored, not computed, so there is no geometry to refit and a new duration would rescale a whole day's schedule into whatever length was asked for — a fifteen-minute day with a five-minute lunch, reported as a day. Choosing which *part* of a day to run is windowStartS/windowEndS and not this one (§ D285), because durationS travels in every stored result and must keep meaning "how long the run was". Run the period the record declares, window it to a part of itself, or select a shorter template.`,
+    );
+  }
+  throw new TrafficError(
+    `templateOverrides (${set.join(', ')}) cannot be applied to demand template "${id}": it authors its phases outright, so it has no ramp to hold, no trough to raise, no step to lengthen and no discard to take. Every geometric number it has is already in the record; edit the record, or select a template built from a shape.`,
+  );
+}
+
+/**
+ * The rise-and-fall shape, with `overrides` beating the record value and then the default.
+ *
+ * `recordStartOfDayS` has **no `TRAFFIC_DEFAULTS` fallback and no override**, unlike every other
+ * argument here, and both absences are deliberate. There is no default because the hour is data and
+ * nothing else: a template selected by id with no record to read is a shape without a clock, and a
+ * number invented here would put one on it. There is no override because the hour is not a tunable
+ * — see {@link RiseAndFallOptions.startOfDayS}.
+ */
 function riseAndFall(
   overrides: DemandTemplateOverrides | undefined,
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return riseAndFallTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.riseAndFallDurationS,
@@ -838,6 +1336,7 @@ function riseAndFall(
     baselineFraction: overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.baselineFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -849,6 +1348,7 @@ function constant(
   recordDiscardLastS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return constantDemandTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.constantDurationS,
@@ -858,6 +1358,10 @@ function constant(
       overrides?.discardLastS ?? recordDiscardLastS ?? TRAFFIC_DEFAULTS.constantDiscardLastS,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    // Threaded even though the shipped record declares no hour: the resolver must not be the reason
+    // a template has none. `constant-iso` has no hour because ISO's constant demand is not a time of
+    // day, and that has to be visible in `data/` rather than enforced by a missing argument here.
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -869,6 +1373,7 @@ function lunchTwoWay(
   recordEndSplit?: DirectionalSplit,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return lunchTwoWayTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.lunchTwoWayDurationS,
@@ -879,6 +1384,7 @@ function lunchTwoWay(
     ...(recordEndSplit === undefined ? {} : { endSplit: recordEndSplit }),
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -888,6 +1394,7 @@ function shiftChange(
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return shiftChangeTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.shiftChangeDurationS,
@@ -898,7 +1405,49 @@ function shiftChange(
     troughFraction: overrides?.troughFraction ?? TRAFFIC_DEFAULTS.shiftChangeTroughFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
+}
+
+/**
+ * **The office end-of-day down-peak — the rise-and-fall shape under its own id and its own hour.**
+ *
+ * Delegates to {@link riseAndFall} rather than authoring a ramp of its own, and that is the honest
+ * arrangement rather than a shortcut: an office empties on the same ramp-hold-ramp profile it fills
+ * on, and the record's own `$comment` inherits `rise-and-fall`'s geometry precisely so that it adds
+ * no duration no source supports — the discipline `lunch-two-way` and `shift-change` were authored
+ * under.
+ *
+ * **So a run of this template draws the same passengers as a run of `rise-and-fall` at the same
+ * seed, and that is declared rather than latent.** `traffic/templateAdditionIdentity.test.ts`
+ * asserts it on the legs. What the record adds is the **hour** (17:15, placing the reported peak at
+ * 17:30) and the period's identity; § D244 rule 1 is that the hour moves nothing, so there is no
+ * mechanism here being claimed and not delivered. A record that claimed a shape it did not have
+ * would be the § D112 defect — this one names the shape it shares.
+ *
+ * **Why it is a separate id at all**, when the geometry is identical: `DECISIONS.md` § D263. A
+ * template gets exactly one `startOfDayMin`, `evening-egress` was serving both a ballroom and an
+ * office end-of-day, and 17:24 and 22:24 are not the same number. Two records, one meaning each.
+ *
+ * Note that the `traffic.riseAndFall.*` overrides reach this shape too, since they are the
+ * parameters of the shape rather than of the id — the same sharing `shift-change` makes of
+ * `peakWindowS`, and for the same reason: a second name for one quantity is how a search space grows
+ * a dimension nobody meant to add.
+ */
+function officeDownPeak(
+  overrides: DemandTemplateOverrides | undefined,
+  recordDurationS?: number,
+  id?: string,
+  name?: string,
+  recordStartOfDayS?: number,
+): ResolvedDemandTemplate {
+  return riseAndFall(
+    overrides,
+    recordDurationS,
+    id ?? 'office-down-peak',
+    name ?? 'Office down-peak template',
+    recordStartOfDayS,
+  );
 }
 
 /** The event-egress shape, with `overrides` beating the record value and then the default. */
@@ -907,6 +1456,7 @@ function eveningEgress(
   recordDurationS?: number,
   id?: string,
   name?: string,
+  recordStartOfDayS?: number,
 ): ResolvedDemandTemplate {
   return eveningEgressTemplate({
     durationS: overrides?.durationS ?? recordDurationS ?? TRAFFIC_DEFAULTS.eveningEgressDurationS,
@@ -916,6 +1466,7 @@ function eveningEgress(
       overrides?.baselineFraction ?? TRAFFIC_DEFAULTS.eveningEgressBaselineFraction,
     ...(id === undefined ? {} : { id }),
     ...(name === undefined ? {} : { name }),
+    ...(recordStartOfDayS === undefined ? {} : { startOfDayS: recordStartOfDayS }),
   });
 }
 
@@ -926,9 +1477,60 @@ function fromRecord(
   // Validated even when an override replaces it: a record with a nonsense duration is a data
   // error, and an override that happens to be present must not hide it.
   const durationS = requirePositive(record.durationMin, 'durationMin') * SECONDS_PER_MINUTE;
+  // Human units in the reference file, SI in the code — `startOfDayMin` beside `durationMin`, the
+  // same conversion, at the same point. Conditional rather than `?? 0`, because a record with no
+  // hour must produce a template with no key rather than one that claims to start at midnight.
+  const startOfDayS =
+    record.startOfDayMin === undefined
+      ? undefined
+      : requireTimeOfDay(record.startOfDayMin * SECONDS_PER_MINUTE, 'startOfDayMin');
+
+  /*
+   * § D273. **Before the id switch, and that ordering is the feature.** A record that authors its
+   * own phases selects the phase-list path by *having* them; nothing here compares its id, so a day
+   * profile is a record and never a branch. The five shipped templates author none and fall through
+   * to exactly the code they always ran.
+   */
+  if (record.phases !== undefined) {
+    requireNoPhaseListOverrides(overrides, record.id);
+    // Checked once here **in minutes** before conversion, and again in seconds inside the builder.
+    // Not belt-and-braces: `startMin` is what a `data/` author wrote, and being told that
+    // `phases[7].startS` is 27300 when the file says `455` is a message about the wrong document.
+    // Conversion is an exact multiply by 60, so a list that passes here passes there.
+    throwOnPhaseIssues(
+      record.id,
+      demandPhaseIssues(
+        record.phases.map((phase) => ({
+          start: phase.startMin,
+          end: phase.endMin,
+          startIntensity: phase.startIntensity,
+          endIntensity: phase.endIntensity,
+          ...(phase.startSplit === undefined ? {} : { startSplit: phase.startSplit }),
+          ...(phase.endSplit === undefined ? {} : { endSplit: phase.endSplit }),
+        })),
+        record.durationMin,
+        'min',
+      ),
+    );
+    return phaseListTemplate({
+      durationS,
+      phases: record.phases.map((phase) => ({
+        startS: phase.startMin * SECONDS_PER_MINUTE,
+        endS: phase.endMin * SECONDS_PER_MINUTE,
+        startIntensity: phase.startIntensity,
+        endIntensity: phase.endIntensity,
+        ...(phase.startSplit === undefined ? {} : { startSplit: phase.startSplit }),
+        ...(phase.endSplit === undefined ? {} : { endSplit: phase.endSplit }),
+      })),
+      id: record.id,
+      name: record.name,
+      recommended: record.recommended,
+      ...(startOfDayS === undefined ? {} : { startOfDayS }),
+    });
+  }
 
   if (record.id === 'rise-and-fall') {
-    return riseAndFall(overrides, durationS, record.id, record.name);
+    return riseAndFall(overrides, durationS, record.id, record.name, startOfDayS);
   }
   if (record.id === 'constant-iso') {
     return constant(
@@ -938,6 +1540,7 @@ function fromRecord(
       (record.discardLastMin ?? 0) * SECONDS_PER_MINUTE,
       record.id,
       record.name,
+      startOfDayS,
     );
   }
   if (record.id === 'lunch-two-way') {
@@ -948,16 +1551,20 @@ function fromRecord(
       record.directionalSplitAtEnd,
       record.id,
       record.name,
+      startOfDayS,
     );
   }
   if (record.id === 'shift-change') {
-    return shiftChange(overrides, durationS, record.id, record.name);
+    return shiftChange(overrides, durationS, record.id, record.name, startOfDayS);
   }
   if (record.id === 'evening-egress') {
-    return eveningEgress(overrides, durationS, record.id, record.name);
+    return eveningEgress(overrides, durationS, record.id, record.name, startOfDayS);
+  }
+  if (record.id === 'office-down-peak') {
+    return officeDownPeak(overrides, durationS, record.id, record.name, startOfDayS);
   }
   throw new TrafficError(
-    `Demand template "${record.id}" has no shape in this module. Supported: ${DEMAND_TEMPLATE_IDS.join(', ')}. Adding one is a new shape in traffic/demandTemplate.ts, not a new branch at a call site.`,
+    `Demand template "${record.id}" declares no "phases" and names no shape this module knows. Either author its phases in the record — which needs no code at all (DECISIONS.md § D273) — or give it one of: ${DEMAND_TEMPLATE_IDS.join(', ')}. A genuinely new *shape* is a new builder in traffic/demandTemplate.ts; a new *schedule* is not, and never a new branch at a call site.`,
   );
 }
 
@@ -970,6 +1577,11 @@ function fromRecord(
  *
  * Times outside `[0, durationS]` return 0: nothing arrives before the run starts or after it
  * ends. Pure, and cheap enough to call once per proposed arrival.
+ *
+ * **`timeS` is seconds since the start of the run, never seconds since midnight**, and this
+ * function does not read {@link ResolvedDemandTemplate.startOfDayS} at all. That is what makes the
+ * hour provably invisible to every trace — see the module note, and `dayStartIdentity.test.ts` for
+ * the run that holds it.
  */
 export function intensityAt(template: ResolvedDemandTemplate, timeS: number): number {
   if (!Number.isFinite(timeS) || timeS < 0 || timeS > template.durationS) return 0;

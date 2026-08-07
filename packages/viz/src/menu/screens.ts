@@ -42,10 +42,12 @@ import {
   canStart,
   freePlayIssues,
   navigate,
+  partsFor,
   updateChallenge,
   updateFreePlay,
   updateSettings,
 } from './menu.js';
+import { partIdOf } from './partsOfDay.js';
 import { CALENDAR_PERIODS, CALENDAR_PERIOD_IDS } from '../shift/calendar.js';
 import {
   CONSTRAINTS,
@@ -54,10 +56,10 @@ import {
   type CommissioningChoices,
 } from '../commissioning/types.js';
 import { refusalsBeside, type CommissioningReview } from '../commissioning/refusals.js';
+import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
 import {
-  FREE_PLAY_DURATIONS_S,
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
   type CatalogueEntry,
@@ -86,6 +88,30 @@ export type MenuIntent =
   | { readonly kind: 'back' }
   /** Re-open the menu over a running game. `docs/16` § 5 clause 5: nothing could, before. */
   | { readonly kind: 'reopen' }
+  /**
+   * Leave the menu without choosing anything — GitHub issues #40, #33 and #68.
+   *
+   * ## Why this is not `back`
+   *
+   * `back` pops a screen and the root has nothing to pop, so a player who pressed **Menu** over a
+   * running shift and then changed their mind had no way out that was not *start something*: the
+   * root offered six navigations and no exit. That is the one-way door #40 reports, and it is also
+   * the whole of Escape's problem. § D249 § 3 considered binding Escape to `back` and refused it —
+   * *"it would work on five screens and do nothing on the root, which is exactly where #40's
+   * reporter is standing"* — so the key means **close**, on every screen, and that needs a member
+   * of its own.
+   *
+   * ## And it is a member rather than a call, for this union's founding reason
+   *
+   * `dispatchMenu` returns `void` and has no `never` arm, so a member nothing handles compiles and
+   * ships a dead control — the defect this package has shipped eleven times. Adding the intent and
+   * its arm is one change for exactly that reason: the shell does not compile until something
+   * performs it, and `menu/screens.test.ts` requires the row to be reachable.
+   *
+   * It carries nothing. *What was running* is the shell's and stays the shell's: this says only
+   * that the player is done with the menu, and `dev/main.ts#closeMenu` is what that means.
+   */
+  | { readonly kind: 'close' }
   /*
    * A **field and a value**, never a prepared patch and never a closure.
    *
@@ -108,8 +134,21 @@ export type MenuIntent =
   | { readonly kind: 'start-endless' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   | { readonly kind: 'account-form'; readonly patch: Record<string, string> }
+  /**
+   * Send the form. **One member for two questions**, because there are two and they never overlap.
+   *
+   * Signed out it asks for a link; signed in and still unnamed (`account.ts#namingStage`) it saves
+   * the display name. A second member would have needed the panel to decide which question is being
+   * asked, and *which field is live is a fact about the session* — the split that let issue #31's
+   * screen print a sign-in error under a registration form.
+   *
+   * There is no `account-mode` beside it any more. § D241 § 7 collapsed sign-in and register into
+   * one request, because asking for a display name **only when the address is new** tells the person
+   * filling in the form whether the address is new — the account-enumeration oracle the server's
+   * identical-bytes 202 exists to close. A member whose control no longer exists is a member nothing
+   * dispatches, so it is deleted rather than left with an arm explaining itself.
+   */
   | { readonly kind: 'account-submit' }
-  | { readonly kind: 'account-mode'; readonly register: boolean }
   | { readonly kind: 'sign-out' }
   /** Post the run on screen to the leaderboard. The member with no handler until this wave. */
   | { readonly kind: 'submit-score' }
@@ -134,8 +173,136 @@ export type MenuIntent =
     }
   /** Choose which capital constraint the week is commissioned under. */
   | { readonly kind: 'set-constraint'; readonly constraintId: string }
+  /**
+   * Take the fabric on screen into the week — GitHub issue #48.
+   *
+   * ## Why a screen whose controls already worked still needed this
+   *
+   * `set-commissioning` writes `ViewerState.commissioning` on every pick, so the choices were
+   * *already* live. What the screen had no way to say was **I am done**: no commit, no cancel, and
+   * nothing that took the player anywhere afterwards. A design phase you cannot leave deliberately
+   * is a design phase whose result arrives by accident, on whichever run happens next.
+   *
+   * So this is the moment the fabric stops being a draft, and it is also the only moment the screen
+   * has to refuse: `CommissioningReview.admissible` is false whenever anything is over budget or out
+   * of the constraint's scope, and a commit is where that refusal belongs — beside the verb, not
+   * scattered over three selects that are each individually fine.
+   *
+   * It carries nothing. *Which choices* is `ViewerState.commissioning`, which the shell already
+   * holds; putting them on the intent would be a second copy that could disagree with the screen
+   * the player is looking at.
+   */
+  | { readonly kind: 'commit-commissioning' }
+  /**
+   * Put the fabric back to what the building already has — issue #48's other half.
+   *
+   * **Not an undo stack.** It resets to *as built*, which is `ViewerState.commissioning`'s empty
+   * value and is byte-identical to the authored building: one step, no history, and the same value
+   * `withBuilding` writes when the building changes (§ D269). A per-pick undo would be a second
+   * model of the choices beside the one the reducer holds.
+   *
+   * It is offered **only when something has moved**, because a cancel that is always available on a
+   * screen where nothing has changed is a control whose press changes nothing — `docs/16` S7, and
+   * the defect this repository counts.
+   */
+  | { readonly kind: 'reset-commissioning' }
   /** Post the whole seed set. Never a partial one — see `challengeSubmissionOf`. */
   | { readonly kind: 'post-challenge' };
+
+/* -------------------------------------------------------------------------- *
+ * Choosing an option — the transport, and the one line that broke three screens
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The intent a control dispatches **once the player has chosen** — {@link MenuAffordance.intent}
+ * rewritten to carry the option they picked instead of the one already showing.
+ *
+ * ## Why an affordance's own intent is not the one to dispatch
+ *
+ * A `select` is built before anybody picks anything, so its intent has to be built out of the value
+ * the row is *currently* showing — that is what puts the right option in the box. Dispatching that
+ * same intent on `change` therefore writes back the value that was already there: **a no-op by
+ * construction**, and a control the player can move that changes nothing.
+ *
+ * `dev/menuPanel.ts` did that rewrite itself, in one expression, for exactly two of the six intents
+ * that carry a chosen value:
+ *
+ * ```ts
+ * row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+ *   ? { ...row.intent, value }
+ *   : row.intent
+ * ```
+ *
+ * The other four were dispatched unrewritten. That is GitHub issue #44 (the Calendar dropdown
+ * "reverts to An ordinary week" — measured: `''` before the pick and `''` after it), issue #42
+ * (**every** Commissioning dropdown inert — measured: `main — shafts` at 2, picked 1, back at 2),
+ * and it was latent on `set-challenge` and `set-constraint` besides. Nothing downstream of the
+ * transport was broken: `state.calendar` reaches `shiftRunConfigOf`, `calendarDayFor` and
+ * `calendarPatch`, and the shell's arm calls `runShift()`. **One line in the middle of a live chain
+ * is not a dead seam — it is a live chain with a rewrite missing from it.**
+ *
+ * ## Why this is a function here rather than an expression there
+ *
+ * Two reasons, and the second is the load-bearing one.
+ *
+ * It is a **decision** — *where does the chosen value go on this intent* — and a decision written
+ * inside a render call needs a document and a click to reach, which is § D214 § 2's founding
+ * argument for this whole directory and the reason `menu.ts` and this file are separate from the
+ * panel at all.
+ *
+ * And it is **exhaustive over {@link MenuIntent}**, which the expression it replaces could not be. A
+ * seventh intent carrying a chosen value cannot be added without an arm here, because the switch has
+ * no `default` and this function returns a `MenuIntent`: `noImplicitReturns` refuses it. The
+ * expression's `: row.intent` fallback was a silent default over the same union, which is why four
+ * members could join it without anything noticing.
+ *
+ * The pass-through list below is still hand-written, and that is the shape of list this repository
+ * keeps finding stale — so it is not what the tests trust. `menu/screens.test.ts` derives every
+ * `select`, `toggle` and `text` row from `screenOf` over the whole graph and requires that choosing
+ * a *different* option produces a *different* intent. A new row filed into the pass-through arm
+ * fails there, on the screen it was added to.
+ */
+export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
+  switch (intent.kind) {
+    case 'set-free-play':
+      return { ...intent, value };
+    case 'set-setting':
+      return { ...intent, value };
+    case 'set-challenge':
+      return { ...intent, value };
+    case 'set-commissioning':
+      return { ...intent, value };
+    // The two whose value field is named after what it is rather than `value`. Spelled out rather
+    // than reached through a shared key, because `periodId` and `constraintId` are the ids of two
+    // different vocabularies and a generic `value` would have made them look interchangeable.
+    case 'set-calendar':
+      return { ...intent, periodId: value };
+    case 'set-constraint':
+      return { ...intent, constraintId: value };
+    /*
+     * Everything a button presses. None of these is built from a value a player picks, so the
+     * chosen string has nowhere to go and the intent travels as it was authored — a `navigate` that
+     * quietly acquired the label of whatever row was beside it would be worse than an inert one.
+     */
+    case 'navigate':
+    case 'back':
+    case 'reopen':
+    case 'close':
+    case 'start':
+    case 'open-campaign':
+    case 'start-endless':
+    case 'open-board':
+    case 'account-form':
+    case 'account-submit':
+    case 'sign-out':
+    case 'submit-score':
+    case 'run-challenge':
+    case 'post-challenge':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
+      return intent;
+  }
+}
 
 /* -------------------------------------------------------------------------- *
  * Affordances
@@ -175,6 +342,36 @@ export interface MenuScreenView {
   /** Everything wrong with the current selection, in words a player can act on. */
   readonly issues: readonly string[];
   readonly rows: readonly MenuAffordance[];
+  /**
+   * The how-to-play guide, on the root screen and `undefined` on every other.
+   *
+   * Carried on the view rather than authored in the panel for this module's founding reason: what
+   * the product *says it is* is a decision, and a decision written inside a render call needs a
+   * document and a click to reach. Here it is a value, so `menu/howToPlay.test.ts` can hold every
+   * sentence of it against the configuration it describes — the dispatchers `data/` ships, the
+   * axes {@link freePlayBody} offers, and the bars `shift/goals.ts` computes.
+   *
+   * It is **not** a {@link MenuAffordance}, and that is deliberate rather than an omission. An
+   * affordance carries a {@link MenuIntent}, every intent is performed by the shell's switch, and
+   * a row whose intent nothing performs is the dead control this directory keeps finding. The
+   * guide asks nothing of the shell: the panel discloses it in place.
+   */
+  readonly guide: MenuGuide | undefined;
+}
+
+/** One headed run of paragraphs in {@link MenuGuide}. */
+export interface GuideSection {
+  readonly heading: string;
+  readonly body: readonly string[];
+}
+
+/** The whole of the how-to-play guide: the entry a player presses, and what is under it. */
+export interface MenuGuide {
+  /** The label on the menu entry itself. */
+  readonly title: string;
+  /** The line under the label, before anything is opened. */
+  readonly summary: string;
+  readonly sections: readonly GuideSection[];
 }
 
 /** What `screenOf` needs from the shell to answer for every screen. */
@@ -228,6 +425,35 @@ export interface MenuViewInput {
    * to `advanced`, so a caller that does not care gets the whole settings screen.
    */
   readonly viewMode?: 'basic' | 'advanced' | undefined;
+  /**
+   * Whether this player is signed in and still owes the boards a name — `account.ts#namingStage`.
+   *
+   * Supplied rather than derived, for the reason every other supplied field here is: deciding it
+   * needs an `AccountState`, and this module does not depend on the account layer to draw a menu.
+   * `docs/16` S5's one-derivation-two-consumers rule — the panel asks `namingStage` once and both
+   * the rows and the form are built from that one answer.
+   *
+   * § D241 § 7 is why it is a *stage* rather than a mode. There is one door: type an address, get a
+   * link. The name is asked for **afterwards**, over a session that already proves the address —
+   * asking for it beforehand, only when the address is new, would be the enumeration oracle.
+   */
+  readonly naming?: boolean | undefined;
+  /**
+   * Whether this deployment has a server behind it, or `undefined` for *nobody has said*.
+   *
+   * GitHub issue #28: three of the six root rows are the whole competitive offer, and in a bundle
+   * served with no server beside it all three dead-end — *"the main menu gives no hint of this. The
+   * rows are styled exactly like the working ones and carry confident subtitles."* The signal has to
+   * be on the root, because that is where the player chooses, and the root is the one screen that
+   * knows nothing about any of them.
+   *
+   * **`undefined` makes no claim**, and that is deliberate rather than a default. A menu that
+   * asserted *needs a server* on a build that has one would be a worse lie than the silence it
+   * replaced, and this module cannot tell: the origin comes from a `<meta>` tag `dev/main.ts` reads
+   * at run time (§ D215 § 4, § D243). So the shell says or nothing is said, and the shell saying it
+   * is one line — see `dev/menuPanel.ts`'s {@link MenuPanelHost.hasServer}.
+   */
+  readonly hasServer?: boolean | undefined;
 }
 
 /** What the shell knows about this week's challenge, and how far the player has got with it. */
@@ -313,6 +539,12 @@ export function screenOf(input: MenuViewInput): MenuScreenView {
     notices: view.notices,
     issues: view.issues,
     rows: screen === 'main' ? view.rows : Object.freeze([...view.rows, BACK]),
+    /*
+     * The root only. A guide repeated under every screen would be six copies of one explanation
+     * competing with the screen the player already chose, and the one place a player who does not
+     * yet know what any of it means is standing is the screen they land on.
+     */
+    guide: screen === 'main' ? HOW_TO_PLAY : undefined,
   });
 }
 
@@ -327,7 +559,7 @@ const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
 function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
   switch (screen) {
     case 'main':
-      return { ...empty, rows: mainRows() };
+      return { ...empty, rows: mainRows(input.hasServer, input.hasRun) };
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
@@ -349,13 +581,68 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
     case 'commissioning':
       return commissioningBody(input);
     case 'account':
-      return { ...empty, rows: accountRows(input) };
+      return accountBody(input);
   }
 }
 
 /* ------------------------------------------------------------------- main */
 
-function mainRows(): readonly MenuAffordance[] {
+/**
+ * What the three social rows say when there is no server behind them — GitHub issue #28.
+ *
+ * Appended to the row's own subtitle rather than replacing it, and the rows stay **enabled**. All
+ * three screens now teach their subject with the server off — the challenge screen explains what a
+ * challenge is and what the same seeds buys, the leaderboard explains what a board is and draws an
+ * example of one — so disabling them would hide the only thing they can still do. #28 offers three
+ * remedies (hide, disable with the reason, or ship a read-only demo); this is the third with the
+ * second's honesty, which is the combination that keeps the teaching and ends the dead end.
+ */
+const NEEDS_A_SERVER = ' · needs a server, and this one has none';
+
+/**
+ * The way out — GitHub issue #40, and the row Escape presses.
+ *
+ * The root is the one screen with no `back`, so before this it offered six navigations and no exit:
+ * a player who pressed **Menu** over a running shift to check a setting had to *start something* to
+ * get back to the shift they were already watching. Every existing way out of the overlay is a mode
+ * being entered — Start, Open the doors, Keep going — which is a complete set of *choices* and an
+ * empty set of *changes of mind*.
+ *
+ * **Disabled and explained when there is nothing behind the menu**, which is `docs/16` S7's rule and
+ * not a courtesy: a *Resume* that closed the overlay onto an empty shell would be a button that
+ * takes the screen away and gives nothing back. The shell runs a shift on boot, so this is the cold
+ * state a `hasRun: false` caller describes rather than a state a player normally reaches — and
+ * saying so is cheaper than the one time they do.
+ *
+ * It is first because it is the only row that does not commit the player to anything, and last is
+ * where a reader looks for *cancel*. This overlay has no cancel: leaving it changes nothing, which
+ * is what the detail says.
+ */
+function resumeRow(hasRun: boolean): MenuAffordance {
+  return {
+    id: 'main.resume',
+    label: 'Resume',
+    detail: 'Back to the shift on screen — nothing here is changed by leaving',
+    kind: 'commit',
+    // Closing an overlay moves no leg. `presentation` is the honest scope and it is what lets this
+    // row appear under every play mode, which a way out has to.
+    scope: 'presentation',
+    enabled: hasRun,
+    ...(hasRun
+      ? {}
+      : {
+          disabledWhy:
+            'There is no shift on screen to go back to yet. Pick a scenario or a free-play ' +
+            'selection below and the menu closes onto it.',
+        }),
+    intent: { kind: 'close' },
+  };
+}
+
+function mainRows(hasServer: boolean | undefined, hasRun: boolean): readonly MenuAffordance[] {
+  // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
+  // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
+  const note = hasServer === false ? NEEDS_A_SERVER : '';
   const to = (
     id: string,
     label: string,
@@ -370,6 +657,8 @@ function mainRows(): readonly MenuAffordance[] {
     enabled: true,
     intent: { kind: 'navigate', to: target },
   });
+  const social = (id: string, label: string, detail: string, target: MenuScreen): MenuAffordance =>
+    to(id, label, `${detail}${note}`, target);
   return Object.freeze([
     /*
      * **Scenarios**, not *Campaign* — `docs/17` § 5 clause 2's residue, settled by the handoff's own
@@ -386,17 +675,254 @@ function mainRows(): readonly MenuAffordance[] {
      */
     to('main.campaign', 'Scenarios', 'A week on one building — it grows, and the bar rises', 'campaign'),
     to('main.free-play', 'Free play', 'Any building, any dispatcher, any traffic', 'free-play'),
-    to(
+    social(
       'main.challenge',
       'This week’s challenge',
       'Everyone on the same seeds — the dispatcher is what varies',
       'challenge',
     ),
-    to('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
-    to('main.account', 'Account', 'Sign in to post a score', 'account'),
+    social('main.leaderboard', 'Leaderboard', 'Verified scores, by configuration', 'leaderboard'),
+    // *Sign in to post a score* and no password — the second half is the thing a player decides on,
+    // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
+    social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
+    resumeRow(hasRun),
   ]);
 }
+
+/* ----------------------------------------------------------- how to play */
+
+/**
+ * What the game is, before it asks anybody to run it — GitHub issue #13.
+ *
+ * ## Why it is here and not in a module of its own
+ *
+ * Because of what `honesty/derive.test.ts` does with a new exported text producer: it derives the
+ * set from the source tree and fails on one that is in neither a surface adapter nor a stated
+ * exclusion. A `menu/guide.ts` exporting these sentences would be exactly that — a new surface,
+ * unchecked, and red. Authored here they travel out through `screenOf`, which the `MENU` adapter
+ * already covers, and they are held against the configuration they describe by
+ * `menu/howToPlay.test.ts` beside this file.
+ *
+ * ## The three sentences this copy is not allowed to write, and it does not
+ *
+ * 1. **No dispatcher is ranked.** CLAUDE.md: *never declare one dispatcher better than another
+ *    without a paired-t confidence interval that excludes zero*. So every dispatcher below is
+ *    described by **what it does** — which terms it weights, which constraint it holds, where it
+ *    parks — and the paragraph that would have said which to pick says instead that one run cannot
+ *    answer it and names the surface that can. `nearest-car` is called a baseline because
+ *    `data/dispatcher-profiles.json` gives it `role: "baseline"`, and because it sits on the
+ *    Pareto front at six of eight matrix cells ([§ D106](../../../../DECISIONS.md)); *baseline* is
+ *    a description here, never a verdict.
+ * 2. **No unmeasured mechanism.** No sentence explains *why* one configuration performs better
+ *    than another, because this repository has measured exactly one such sentence and found it
+ *    false — and `packages/experiments/src/validation/documentation.test.ts` is what stops it
+ *    coming back. Statements of mechanism below are statements about **what the code does** (a
+ *    car does not reverse direction; a term is normalised before it is weighted), never about what
+ *    that buys.
+ * 3. **No figure is graded.** Energy is an axis and never a score (§ D106), and the withheld mean
+ *    is described as the run declining to be summarised rather than as a penalty.
+ *
+ * Every number quoted below — the goal ceilings, the wake-up threshold, the run lengths, the seed
+ * bounds — is asserted against the code that produces it in `howToPlay.test.ts`, because a
+ * published number that nothing re-derives is how three of them went stale in this repository
+ * already.
+ */
+const HOW_TO_PLAY: MenuGuide = Object.freeze({
+  title: 'How to play',
+  /*
+   * It says that it opens **in words**, and that is not decoration.
+   *
+   * The panel draws this entry with the menu's own row card, which sets `display: grid` on the
+   * `summary` and therefore takes away the disclosure triangle a browser would otherwise draw. The
+   * six rows above it navigate; this one expands. Saying so in the line the reader is already
+   * reading is cheaper than a glyph and survives KB-15, which forbids a signal carried by shape or
+   * colour alone.
+   */
+  summary:
+    'Opens here, and starts nothing: what the game is, what a shift is, and what each control does.',
+  sections: Object.freeze([
+    Object.freeze({
+      heading: 'What you are actually doing',
+      body: Object.freeze([
+        'A building has more people wanting to move than it has cars to move them. Every time ' +
+          'somebody presses a button at a landing, something has to decide which car goes, and ' +
+          'in what order it goes there. That decision is called dispatching, and it is the thing ' +
+          'this simulator is about.',
+        'You do not drive the cars. You choose the rule that answers the calls, point a stretch ' +
+          'of real traffic at it, and read what happened to the people who turned up.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The three ways in',
+      body: Object.freeze([
+        'Scenarios is a week on one building. Each day the tenants grow, something is booked ' +
+          'against the day, and the bars you are read against harden. A day that meets every bar ' +
+          'is a clean shift, and clean shifts bank toward clearing the scenario. Every scenario ' +
+          'is open from the start — they teach, they do not gate.',
+        'Free play is one run on day one: the building as it ships, with no tenant growth and ' +
+          'nothing scheduled against it. You set all six axes yourself, and Start opens a fresh ' +
+          'week — no streak, no banked shifts and no history carried in from a scenario. That is ' +
+          'also what makes it the run a leaderboard can replay.',
+        'This week’s challenge fixes the building, the traffic, the run length and the seeds — ' +
+          'the server issues them — and leaves the dispatcher as the one thing that varies. A ' +
+          'set is scored over all of its seeds. A partial set is not a smaller score; it is a ' +
+          'different question.',
+        'Leaderboard, Account and Settings are not modes. A board is one configuration across ' +
+          'seeds, ordered on one named metric, so picking a different dispatcher moves you to a ' +
+          'different board rather than up an existing one. An account is what lets a score be ' +
+          'posted. Settings change how a run is drawn and never what it computes.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'What a shift is',
+      body: Object.freeze([
+        'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
+          'against three goals: carry a share of the people who turned up, get a share of riders ' +
+          'away inside a minute, and — alternating by day — either hold the deepest landing ' +
+          'queue under a number, or let nobody wait past the 15-minute horizon.',
+        'The bars harden as the week goes on, and then they stop. Away-inside-a-minute tops out ' +
+          'at 84 %, carried tops out at 96 %, and the queue bar bottoms out at 12 people. There ' +
+          'is no losing here. There is a line you are trying to bend upward.',
+        'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
+          'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
+          'rather than competence. Every goal is read from counts — never from an average — so a ' +
+          'day cannot be graded on a figure the run itself declines to publish.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The six things Free play lets you set',
+      body: Object.freeze([
+        'Building — which tower you are running. Each one ships with its own floors, its ' +
+          'population, its banks and the machines in them, and the menu prints those counts ' +
+          'beside the name. The building decides how far a car has to travel, how many people it ' +
+          'can be asked to carry, and which floors each bank is allowed to serve at all.',
+        'Dispatcher — the rule that answers a call, and the axis this whole simulator exists to ' +
+          'study. Every one of them is a set of weights rather than a program; the next section ' +
+          'takes them one at a time.',
+        'Traffic shape — which demand template the run is drawn from. The shipped set is a rise ' +
+          'and fall, a lunch two-way peak, an office down peak, a shift change, an evening ' +
+          'egress, and a constant ISO load. Each template declares its own period, and each is ' +
+          'marked either recommended — its shape supports a confidence interval across ' +
+          'replications — or cross-checking, which is there to test a result against a ' +
+          'differently shaped day.',
+        'The office down peak and the evening egress are the end of a day twice over, and the ' +
+          'difference is the leading edge. An office empties on a ramp: the working day ends, the ' +
+          'landings fill over a few minutes, and the flow tails off. A venue steps — the doors ' +
+          'open and the whole room is waiting at once, which is the case a ballroom or a cinema ' +
+          'poses and no other shape here produces.',
+        'Arrival rate — how much demand, as a share of the building’s population arriving every ' +
+          'five minutes. Left at this building’s own profile it uses whatever the building ' +
+          'declares, which is the choice that does not pin a number the reference data is free ' +
+          'to change. The ladder spans the shipped buildings’ operating points, so a rate that ' +
+          'is comfortable in one building will swamp another — and a run whose queue never ' +
+          'settles has its average wait withheld rather than reported.',
+        'Part of the day — which stretch of the traffic shape you run, and the same control the ' +
+          'campaign uses. A shape that is one period offers that period; the working day offers ' +
+          'each of its busy parts and the whole of itself, so the morning rush, the lunch two-way ' +
+          'and the evening down-peak are three different problems rather than three lengths of ' +
+          'one. Every option says how much demand it schedules and between which clock times.',
+        'What no option says is when the run ends. The demand schedule stops at the time on the ' +
+          'label and the run keeps going until the building has cleared, which is the part worth ' +
+          'watching and is an outcome rather than a prediction — how long a backlog takes to drain ' +
+          'is what the dispatcher is being judged on.',
+        'Seed — 1 to 20 digits naming the passengers. With the building and the traffic held ' +
+          'still, the same seed produces the same arrivals, the same decisions and the same ' +
+          'numbers every time. That is what lets a leaderboard verify a posted score by replaying ' +
+          'it, and what lets two dispatchers meet identical traffic instead of different luck. A ' +
+          'seed names a run rather than measuring one: changing it changes who turns up, not how ' +
+          'hard the configuration is.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'The dispatchers, and what each one does',
+      body: Object.freeze([
+        'A dispatcher here is data rather than code: a set of weights over one shared library of ' +
+          'cost terms. A term measures something about sending a particular car — the new ' +
+          'passenger’s wait, their ride time, the delay added to the people already aboard, the ' +
+          'delay added to other assigned calls, a reversal of direction, how full the car is, ' +
+          'stops added, metres travelled, how long the oldest call has stood, how far a car ' +
+          'strays from its zone, and the queue already standing at the pickup floor. Every term ' +
+          'is normalised to a common scale before it is weighted, so a weight means the same ' +
+          'kind of thing wherever it appears.',
+        'Three carry the role baseline, which means a reference every study holds fixed. Nearest ' +
+          'car weights the metres a car would travel and nothing else. Minimum estimated wait ' +
+          'weights the new passenger’s wait and nothing else. Conventional collective weights ' +
+          'that same wait and adds the constraint a collective controller actually has: a car ' +
+          'does not reverse direction to take a call, it answers in passing.',
+        'Conventional collective, en-route pickup is that controller allowed to stop for a ' +
+          'landing it passes, carrying a weight that prices what the extra stop costs the people ' +
+          'already aboard.',
+        'Energy aware spreads its weight across wait, stops added and metres travelled, holds ' +
+          'doors adaptively, and leaves an idle car where it stands. Fairness first splits its ' +
+          'weight between wait and the longest-standing call, and keeps a call reassignable for ' +
+          'as long as it can. Capacity aware weights how full the car is and how many people are ' +
+          'already waiting at the floor, and splits a heavy landing across two cars rather than ' +
+          'serving it twice with one.',
+        'Predictive balanced carries ten weighted terms at once, waits a moment before committing ' +
+          'each assignment, and parks idle cars where it forecasts the next calls.',
+        'Contract-net auction, sealed bid and Contract-net auction, multi-round let every car ' +
+          'price the call from its own estimate and let the group allocate from the bids. The ' +
+          'sealed-bid arm runs a single round; the multi-round arm runs three and lets a ' +
+          'provisional winner hand the contract back on its own reserve price.',
+        'Operational zoning, up-peak splits the bank into one contiguous band per in-service car, ' +
+          'prices how far a car strays from its band, and parks each car in the middle of its own.',
+        'Destination disclosure, credential-aware and Destination dispatch, landing panel both ' +
+          'know where the passenger is going before the car is chosen rather than after. The ' +
+          'first discloses the destination to the dispatcher and leaves boarding alone; the ' +
+          'second assigns the passenger to a named car at the landing.',
+        'Which one to run is not a question this screen answers, and it is not a question one run ' +
+          'answers either. Saying that one dispatcher beat another needs the same passengers fed ' +
+          'to both, 50 to 200 times over, and a paired interval that excludes zero — the Compare ' +
+          'tab is the one surface in this product allowed to say it. Nothing is hidden from you ' +
+          'for scoring badly: a profile that does not beat a baseline is a result about that ' +
+          'profile, and finding that out is what Free play is for.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'What the numbers will and will not say',
+      body: Object.freeze([
+        /*
+         * Three states, because § D223 made it three the day before this landed. Saying *two* here
+         * would have been the shape of staleness this whole section is written against, so the
+         * pair of titles is pinned to `dev/reportPanel.ts` in `howToPlay.test.ts`.
+         */
+        'The Day report is a statement about a whole day, so it waits for one. Before anything has ' +
+          'run it says nothing has been filed. While the playhead is short of the end of the run ' +
+          'it says the day is still running and names the clock time you are watching, because a ' +
+          'finished day’s figures beside a clock reading half past nine would be two answers to ' +
+          'one question. Play the day through and the sheet fills in. The surface that reads a ' +
+          'shift while it runs is the left rail.',
+        'Average wait is withheld rather than printed whenever the run cannot support one, on ' +
+          'five grounds: an empty measurement window, a queue still growing when the run ends, ' +
+          'too many arrivals never served, a wait past the 15-minute abandonment horizon, and ' +
+          'more than 2 % of riders giving up. The reason is printed where the figure would have ' +
+          'been. A withheld mean is the run declining to be summarised by one number — not a ' +
+          'fault, and not a low score.',
+        'Energy sits beside the wait figures and is never folded into them. A dispatcher that ' +
+          'drives less carries fewer people, so a configuration that spends less by serving ' +
+          'fewer people has not saved anything; the work per served leg is printed next to the ' +
+          'raw figure for that reason.',
+        'Riders who give up, and riders who take the stairs, are published beside the average ' +
+          'wait rather than inside it. They are the longest waits in the sample, so dropping ' +
+          'them moves the average down by construction.',
+      ]),
+    }),
+    Object.freeze({
+      heading: 'A first run',
+      body: Object.freeze([
+        'Open Free play and set the building to Garden Apartments, the dispatcher to Conventional ' +
+          'collective, the arrival rate to this building’s own profile and the run to 30 minutes. ' +
+          'Watch one call appear at a landing, one car answer it, and one wait end — those three ' +
+          'things are what every dispatcher here is made of.',
+        'Then move one axis and run it again, keeping the seed. With the building and the traffic ' +
+          'held still the same seed brings the same passengers, so what moved in the numbers is ' +
+          'what you moved. That is how the feel of it is learned. It is not how a difference is ' +
+          'demonstrated, which is the Compare tab’s job and takes a great many more runs.',
+      ]),
+    }),
+  ]),
+});
 
 /* -------------------------------------------------------------- free play */
 
@@ -407,12 +933,25 @@ const RATE_OPTIONS: readonly CatalogueEntry[] = Object.freeze(
   })),
 );
 
-const DURATION_OPTIONS: readonly CatalogueEntry[] = Object.freeze(
-  FREE_PLAY_DURATIONS_S.map((seconds) => ({
-    id: String(seconds),
-    name: `${String(Math.round(seconds / 60))} minutes`,
-  })),
-);
+/**
+ * The parts of the selected template's period, as menu rows. § D286.
+ *
+ * Derived per render from the catalogue rather than held in a module constant, because the option
+ * list depends on *which template is selected* — a `lunch-two-way` has no morning in it — and a
+ * constant could not. That dependency is the whole reason this replaced a fixed ladder: a length
+ * was offered identically under every template and meant something different under each.
+ */
+function partOptions(catalogue: MenuCatalogue, demandTemplateId: string): readonly CatalogueEntry[] {
+  return Object.freeze(
+    partsFor(catalogue, demandTemplateId).map((part) => ({
+      id: part.id,
+      name: part.label,
+      // The sentence issue #80 asked for: what is simulated, and that the tail is a tail. No end
+      // time — the drain is an outcome of the run, not a prediction the menu may make.
+      detail: part.detail,
+    })),
+  );
+}
 
 function freePlayBody(input: MenuViewInput): Body {
   const selection = input.state.freePlay;
@@ -461,7 +1000,16 @@ function freePlayBody(input: MenuViewInput): Body {
       String(selection.arrivalRatePctPop5min),
       RATE_OPTIONS,
     ),
-    select('free-play.duration', 'Run length', 'durationS', String(selection.durationS), DURATION_OPTIONS),
+    select(
+      'free-play.part',
+      // One name, in both modes. The campaign called this *shift length* and offered four narrative
+      // options; Free play called it *Run length* and offered five numeric ones; they wrote the same
+      // field (issue #82). This is that control, named for what it actually chooses.
+      'Part of the day',
+      'windowStartS',
+      partIdOf(selection.windowStartS, selection.durationS),
+      partOptions(input.catalogue, selection.demandTemplateId),
+    ),
     {
       id: 'free-play.seed',
       label: 'Seed',
@@ -680,19 +1228,29 @@ function challengeBody(input: MenuViewInput): Body {
       rows: Object.freeze([
         {
           id: 'challenge.leaderboard',
+          /*
+           * The subtitle no longer presupposes its own distinction — GitHub issue #32: *"a sentence
+           * that presupposes the reader already understands a distinction between challenge boards
+           * and non-challenge boards that has never been introduced."* It now says what is through
+           * the door rather than what is not.
+           */
           label: 'Open the leaderboard',
-          detail: 'The boards that do not need this week’s challenge',
+          detail: 'What a posted run looks like, and what orders one board against another',
           kind: 'navigate' as const,
           scope: 'presentation' as const,
           enabled: true,
           intent: { kind: 'navigate' as const, to: 'leaderboard' as const },
         },
       ]),
-      notices: Object.freeze([
-        challenge?.notice ??
-          'This build was not compiled against a server, so there is no challenge to fetch. ' +
-            'Everything else on this menu works without one.',
-      ]),
+      /*
+       * The shell's sentence, carried. It is the shell's rather than this module's because *which*
+       * challenge is current is the server's answer (§ D218 § 3) and *whether there is a server at
+       * all* is read from a `<meta>` tag at run time — neither is knowable here. The fallback below
+       * is for a caller that supplied a challenge input and no words, and it answers issue #32's
+       * four server-independent questions rather than apologising: what is scored, what the same
+       * seeds buys, when a week ends, and how a set is submitted.
+       */
+      notices: Object.freeze([challenge?.notice ?? CHALLENGE_WITHOUT_ONE]),
       issues: Object.freeze([]),
     };
   }
@@ -779,6 +1337,30 @@ function challengeBody(input: MenuViewInput): Body {
     issues: Object.freeze(challenge?.notice === undefined ? [] : [challenge.notice]),
   };
 }
+
+/**
+ * What a challenge is, for a screen that has none — GitHub issue #32's four other questions.
+ *
+ * *"Four of them have nothing to do with the missing server. What the scoring metric is, what
+ * 'everyone on the same seeds' means, how long a challenge week runs, and how a finished run gets
+ * submitted are all properties of the game design, not of this week's data."* So they are answered
+ * here, where the answer does not depend on anything being fetched.
+ *
+ * The comparability claim is the one to keep honest. Common random numbers make two runs comparable
+ * **as runs**; they do not license the sentence *this dispatcher is better*, which needs 50–200
+ * replications and a paired interval that excludes zero. Compare is the only surface allowed to say
+ * it, and this paragraph says so rather than implying otherwise by omission.
+ */
+const CHALLENGE_WITHOUT_ONE =
+  'There is no challenge loaded. Here is what one is. Everybody gets the same building, the same ' +
+  'run length and the same numbered seeds — a seed generates the same passengers arriving at the ' +
+  'same moments, so the only thing that differs between two players is the dispatcher they chose. ' +
+  'A set is scored over all of its seeds rather than a lucky single run, and it is submitted whole ' +
+  'or not at all: a partial set is a different question, not a smaller score. A challenge opens ' +
+  'and closes on the server’s clock, and its board stays readable afterwards. Ordering that board ' +
+  'on one metric is a fact about what was posted and never a claim that one dispatcher beats ' +
+  'another — Compare is the only screen allowed to say that, and only with an interval that ' +
+  'excludes zero.';
 
 /**
  * The four the server declares, and no fifth.
@@ -949,11 +1531,103 @@ function commissioningBody(input: MenuViewInput): Body {
     .filter((refusal) => refusal.bankId === null)
     .map((refusal) => refusal.message);
 
+  /*
+   * **The two verbs the screen did not have** — issue #48.
+   *
+   * Every dropdown above already wrote `ViewerState.commissioning` on the pick (§ D248), so the
+   * fabric was live and the screen still had no way to say *I am done* or *put it back*. Commit
+   * last, cancel above it: the order is *the thing you came to do, then the way out of it*, which
+   * is the order every other screen in this file puts its commit in.
+   */
+  const moved = state.review.moved.length > 0;
+  rows.push({
+    id: 'commissioning.reset',
+    label: 'Put it back as built',
+    detail: moved
+      ? `Undo all ${String(state.review.moved.length)} ${
+          state.review.moved.length === 1 ? 'change' : 'changes'
+        } and return to the building as it stands.`
+      : 'The fabric is what the building already has.',
+    kind: 'commit',
+    scope: 'between-games',
+    // Offered only when something has moved. A cancel that is always available on a screen where
+    // nothing has changed is a control whose press changes nothing — `docs/16` S7.
+    enabled: moved,
+    ...(moved
+      ? {}
+      : { disabledWhy: 'Nothing has been changed yet, so there is nothing to put back.' }),
+    intent: { kind: 'reset-commissioning' },
+  });
+  rows.push({
+    id: 'commissioning.commit',
+    label: 'Commission it',
+    detail: 'Take this fabric into the week. Nothing here moves again once the doors do.',
+    kind: 'commit',
+    scope: 'between-games',
+    enabled: state.review.admissible,
+    /*
+     * The refusal beside the **verb**, and it is a different sentence from the ones beside the
+     * controls. Each select's own `disabledWhy` says what is wrong with that dimension; this says
+     * why the configuration as a whole may not open a week, which is a claim no single select can
+     * make. `refusals` is the review's, joined and not rewritten — a refusal is pinned by the run
+     * that produced it, never by a second sentence about it.
+     */
+    ...(state.review.admissible
+      ? {}
+      : {
+          disabledWhy: state.review.refusals.map((refusal) => refusal.message).join(' '),
+        }),
+    intent: { kind: 'commit-commissioning' },
+  });
+
   return {
     rows: Object.freeze(rows),
-    notices: Object.freeze([COMMISSIONING_NOTE, state.buildingName, state.review.sentence]),
+    notices: Object.freeze([
+      // The brief first: *what am I choosing* before *what the number is not*. A player who does
+      // not yet know what a machine class is cannot act on a sentence about capital units.
+      COMMISSIONING_BRIEF,
+      COMMISSIONING_NOTE,
+      state.buildingName,
+      state.review.sentence,
+      ...previewLines(state.review),
+    ]),
     issues: Object.freeze(whole),
   };
+}
+
+/**
+ * What this configuration would be, before it is committed — issue #48's preview.
+ *
+ * ## Every word of it is `commissioning/`'s own
+ *
+ * `CommissioningReview.moved` is the diff `movedChoices` computed, and `movedChoiceText` is the
+ * sentence that module already writes for one moved dimension. Nothing is re-derived here: a
+ * preview that recomputed *what changed* would be a second answer to a question `refusals.ts` has
+ * already answered, and the two would disagree on the day a fourth dimension lands.
+ *
+ * ## What it may not say, and does not
+ *
+ * **What the change will buy.** Every line is a statement of *what the hardware would be* — `2 → 4`
+ * shafts, `hydraulic → gearless-traction` — and not one of them says faster, better or worth it.
+ * That is `docs/10` R2 and CLAUDE.md's paired-t rule at the same time: this screen has run nothing,
+ * so it has measured nothing, and a preview that ranked two fabrics off no replications would be
+ * the confident nonsense this project exists to avoid. The capital figure is not restated either —
+ * it appears in `review.sentence` above, in exactly one place, because a limit shown twice starts
+ * reading like a score.
+ *
+ * Empty when nothing has moved, which is the honest answer rather than *"no changes"*: the notice
+ * slot is not a place to say that a section has nothing in it.
+ */
+function previewLines(review: CommissioningReview): readonly string[] {
+  if (review.moved.length === 0) return [];
+  const changes = review.moved
+    .map((moved) => `${moved.bankId} ${DIMENSION_LABELS[moved.dimension]} ${movedChoiceText(moved)}`)
+    .join('; ');
+  return [
+    `What you would be commissioning, against what the building has now: ${changes}. This says ` +
+      'what the hardware would be, and nothing about what it would buy — nothing has been ' +
+      'simulated yet.',
+  ];
 }
 
 /**
@@ -967,6 +1641,36 @@ const COMMISSIONING_NOTE =
   'Choose the fabric before the week opens, then live with it — nothing here moves once the doors ' +
   'do. The capital figure is a limit on what you may build, not a score: it is never compared ' +
   'between players, never shown beside a wait, and never enters a verdict.';
+
+/**
+ * What this screen is *for* — GitHub issue #48's design brief.
+ *
+ * ## Why one more paragraph on a screen that already had a note
+ *
+ * {@link COMMISSIONING_NOTE} says what the capital figure is **not**, which is the sentence this
+ * module could not do without. What no sentence said is what a player is being asked to *decide*:
+ * #24 reported three questions this screen knew the answers to and printed none of, and this is the
+ * fourth — *what am I choosing between, and when does it stop being changeable?*
+ *
+ * ## The three things it may not say, and does not
+ *
+ * 1. **No ranking, and no recommendation.** It names the three dimensions and the constraint; it
+ *    does not say which choice is better, because nothing has been simulated and one replication
+ *    could not settle it anyway (CLAUDE.md's paired-t rule, and `docs/10` R2).
+ * 2. **No unmeasured mechanism.** Every clause is a fact about **what the code does** — the fabric
+ *    is fixed for the week, the constraint decides what may move — never about what a choice buys.
+ *    The one sentence that would need a measurement is the one about geometry beating dispatch, and
+ *    it is absent for exactly that reason.
+ * 3. **No second copy of the capital rule.** The limit is stated once, in the note above. Said
+ *    twice it starts reading like the thing being optimised, which is `commissioning/types.ts`'s
+ *    whole argument about a currency that quietly becomes a score.
+ */
+const COMMISSIONING_BRIEF =
+  'Three things per bank: how many shafts it has, which machine class goes in them, and what ' +
+  'speed those are rated for. What you may move is the constraint’s to decide — retrofit freezes ' +
+  'the fabric entirely, refurbishment keeps the shafts you have, and a new build opens all three. ' +
+  'Change what you want, then commission it: from that point the week runs on this building, and ' +
+  'the only thing left to move is how the cars are dispatched.';
 
 /* ------------------------------------------------------------- leaderboard */
 
@@ -1026,35 +1730,96 @@ function leaderboardBody(input: MenuViewInput): Body {
  */
 const LEADERBOARD_NOTE =
   'Each board is one configuration across seeds, ranked on the named metric alone. A different ' +
-  'dispatcher is a different board rather than a better score.';
+  'dispatcher is a different board rather than a better score. A configuration is the building, ' +
+  'the dispatcher, the traffic template, the arrival rate and the run length together; a seed is ' +
+  'the number the passengers are generated from, so the same seed brings the same people at the ' +
+  'same moments.';
 
 /* ------------------------------------------------------------------ account */
 
-function accountRows(input: MenuViewInput): readonly MenuAffordance[] {
-  if (input.canPost) {
-    return Object.freeze([
+/**
+ * One door, and — once through it — one question.
+ *
+ * ## Three states, and the middle one is the reason this stopped being a row list
+ *
+ * **Signed out**: the address, and a button that says what pressing it does. *Sign in* was the
+ * label and it named a mechanism that no longer exists; **Email me a link** names the thing that
+ * actually happens, which matters most on the one screen where a player is deciding whether to hand
+ * over an address at all (§ D241).
+ *
+ * **Signed in and unnamed** — `account.ts#namingStage`, and § D241 § 7's whole design. The name is
+ * asked for *after* the link is redeemed rather than beside the address, because asking for it only
+ * when the address is new would tell the person filling in the form whether the address is new.
+ * Redeeming proves the address, so by this point the question costs nothing.
+ *
+ * **Signed in and named**: nothing left to ask.
+ *
+ * ## And the name is asked for, never demanded
+ *
+ * `postingRefusal` deliberately does not refuse an unnamed player — `player-a1b2c3…` on a board is
+ * ugly and honest, and a run that could not be posted until a form was filled in would be a gate.
+ * So **Sign out** stays offered beside the naming prompt: a player who does not want to be named can
+ * simply not answer, and nothing is withheld from them for it.
+ */
+function accountBody(input: MenuViewInput): Body {
+  const signOut: MenuAffordance = {
+    id: 'account.sign-out',
+    label: 'Sign out',
+    kind: 'commit',
+    scope: 'presentation',
+    enabled: true,
+    intent: { kind: 'sign-out' },
+  };
+
+  if (input.naming === true) {
+    return {
+      ...empty,
+      rows: Object.freeze([
+        {
+          id: 'account.submit',
+          label: 'Save this name',
+          detail: 'It is what appears on a board beside your figures',
+          kind: 'commit' as const,
+          scope: 'presentation' as const,
+          enabled: true,
+          intent: { kind: 'account-submit' as const },
+        },
+        signOut,
+      ]),
+      notices: Object.freeze([NAMING_NOTE]),
+    };
+  }
+
+  if (input.canPost) return { ...empty, rows: Object.freeze([signOut]) };
+
+  return {
+    ...empty,
+    rows: Object.freeze([
       {
-        id: 'account.sign-out',
-        label: 'Sign out',
+        id: 'account.submit',
+        label: 'Email me a link',
+        detail: 'Opening it signs you in. If the address is new, it creates the account.',
         kind: 'commit' as const,
         scope: 'presentation' as const,
         enabled: true,
-        intent: { kind: 'sign-out' as const },
+        ...(input.postingRefusal === undefined ? {} : { disabledWhy: input.postingRefusal }),
+        intent: { kind: 'account-submit' as const },
       },
-    ]);
-  }
-  return Object.freeze([
-    {
-      id: 'account.submit',
-      label: 'Sign in',
-      kind: 'commit' as const,
-      scope: 'presentation' as const,
-      enabled: true,
-      ...(input.postingRefusal === undefined ? {} : { disabledWhy: input.postingRefusal }),
-      intent: { kind: 'account-submit' as const },
-    },
-  ]);
+    ]),
+  };
 }
+
+/**
+ * Why the name is being asked for now and not earlier, said on the screen that asks.
+ *
+ * A form that appears *after* somebody thought they were finished reads as a bait-and-switch unless
+ * it says why it waited. It waited because asking earlier would have leaked whether the address was
+ * already known — which is the whole of § D241 § 7 — and because it is genuinely optional.
+ */
+const NAMING_NOTE =
+  'You are signed in. The boards need a name to put beside your figures, and this is the first ' +
+  'moment it can be asked for without telling anyone whether your address was already known. Skip ' +
+  'it if you would rather: a generated name works everywhere, and nothing is withheld for it.';
 
 /* -------------------------------------------------------------------------- *
  * Applying an intent — the pure half
@@ -1089,23 +1854,29 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
     case 'set-calendar':
     case 'set-commissioning':
     case 'set-constraint':
+    case 'commit-commissioning':
+    case 'reset-commissioning':
       // The shell's, because each writes `ViewerState` rather than `MenuState` — the fabric and the
       // calendar are facts about the run, not about which screen is showing.
       return state;
     case 'reopen':
+    case 'close':
     case 'start':
     case 'open-campaign':
     case 'start-endless':
     case 'open-board':
     case 'account-form':
     case 'account-submit':
-    case 'account-mode':
     case 'sign-out':
     case 'submit-score':
     case 'run-challenge':
     case 'post-challenge':
       // Not the menu's to answer. Returned unchanged rather than thrown: a render path that threw
       // on an intent it did not own would turn a mis-wired button into a blank screen.
+      //
+      // `close` is here rather than beside `back` on purpose. Hiding the overlay is the shell's,
+      // and a reducer that also navigated would decide *which screen the menu re-opens on* — which
+      // is `reopen`'s answer (the root) and not this one's to give twice.
       return state;
   }
 }
@@ -1122,7 +1893,21 @@ function freePlayPatch(field: keyof FreePlaySelection, value: string): Partial<F
       // `"null"` is *this building's own profile*, which is a distinct selection and has to survive
       // as one — resolving it to a number here would pin a rate `data/` is free to change.
       return { arrivalRatePctPop5min: value === 'null' ? null : Number(value) };
+    case 'windowStartS': {
+      // One control writing two fields, because it is one selection: *which part of the day* is a
+      // start and a length, and a patch that set one without the other would leave a run covering a
+      // period nobody named. The option's id carries both, because `applyIntent` is a pure reducer
+      // with no catalogue to look a part up in — see `DayPart.id`.
+      const [startText, durationText] = value.split(':');
+      return {
+        windowStartS: startText === 'null' || startText === undefined ? null : Number(startText),
+        durationS: Number(durationText ?? '0'),
+      };
+    }
     case 'durationS':
+      // Not written by any control. `windowStartS` above writes both halves of the selection, and
+      // this arm exists so the exhaustive switch still covers the key rather than being narrowed to
+      // the fields that happen to have a row today.
       return { durationS: Number(value) };
     case 'seed':
       // Not parsed. A seed is an identity rather than a quantity, and `freePlayIssues` is what says

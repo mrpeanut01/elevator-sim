@@ -59,9 +59,11 @@
  *   estimate ({@link ConvergenceReport}), because 10 replications and 200 are different claims.
  */
 
+import type { PatienceConfig } from '@elevator-sim/core';
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
   DemandTemplateId,
@@ -123,6 +125,15 @@ export interface StoredDemandOptions {
   readonly entranceWeights?: Readonly<Record<string, number>> | undefined;
   readonly interfloorWeighting?: InterfloorWeighting | undefined;
   readonly credentialAssignment?: CredentialAssignment | undefined;
+  /**
+   * The share of in-building journeys made by somebody whose badge does not open where they are
+   * going. `DECISIONS.md` § D265.
+   *
+   * Stored for the reason `mixAmplitude` below is: `0` is the control arm, and a stored control
+   * that lost this field would rebuild at the shipped share — the control carrying its treatment's
+   * population, which is worse than losing the run.
+   */
+  readonly credentialGap?: CredentialGapOverride | undefined;
   readonly maxLegs?: number | undefined;
   readonly peakWindowS?: number | undefined;
   readonly baselineFraction?: number | undefined;
@@ -203,6 +214,15 @@ export interface StoredSimOptions {
   readonly doorObstructionProbability?: number | undefined;
   readonly maxEvents?: number | undefined;
   readonly onTimeout?: TimeoutPolicy | undefined;
+  /**
+   * How long riders will stand before giving up, when the run declared it.
+   *
+   * Carried for invariant 5's reason and no other: patience changes *who is served*, so a replay
+   * without it is a different run. It was omitted here while the recorder was already emitting
+   * `abandonedAt`, so a patience run failed to parse — and once that was fixed, failed to
+   * reproduce, which is the same violation one layer down and the more expensive half to find.
+   */
+  readonly patience?: PatienceConfig | undefined;
 }
 
 /**
@@ -295,8 +315,19 @@ export interface StoredRunConfig {
    * have moved on, and re-deriving it would mean loading `data/` to read a label.
    */
   readonly trafficProfileId: string;
-  /** `'rise-and-fall'`/`'constant-iso'`, or the fully resolved template when one was supplied. */
-  readonly demandTemplate: DemandTemplateId | ResolvedDemandTemplate;
+  /**
+   * The id of the `demandTemplates` record the run selected, or the fully resolved template when
+   * one was supplied.
+   *
+   * `string` rather than `DemandTemplateId` since `DECISIONS.md` § D274. A record may author its own
+   * phases (§ D273) and therefore answer to an id no closed union can contain, and a stored result
+   * has no catalogue to check one against — the file it was measured from may not even be on disk
+   * when the record is read back. So the id is stored and echoed as written, and the check that it
+   * *resolves* happens where a catalogue exists: at replay, in `resolveDemandTemplate`, which throws
+   * by name. Validating against a compiled-in list here would have rejected an honest record for
+   * naming a template this build had never heard of.
+   */
+  readonly demandTemplate: string | ResolvedDemandTemplate;
   /** Demand horizon in seconds, when the run overrode the template's own duration. */
   readonly durationS?: number | undefined;
   readonly demand?: StoredDemandOptions | undefined;

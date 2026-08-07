@@ -13,6 +13,8 @@ import {
   DATA_DIR,
   PANEL_DISPATCHER_ID,
   breadthConfig,
+  suppressedConfig,
+  timedOutConfig,
 } from '../fixtures.test-helper.js';
 import { frameAt } from '../frame/frameAt.js';
 import { overlayAt, queueAt } from '../frame/overlay.js';
@@ -59,7 +61,12 @@ describe.each(BUILDING_IDS)('%s — the frame description', (buildingId) => {
 
 describe('the description carries the two facts a picture must not hide', () => {
   it('reports a suppressed mean as not reported, never as a number', () => {
-    const { recording } = recordRun(breadthConfig(config, 'vertical-city'));
+    /*
+     * `suppressedConfig` rather than `breadthConfig(config, 'vertical-city')` — `DECISIONS.md`
+     * § D260. The building was refused at its shipped rate by § D254's pickup access check, not by
+     * its traffic; served properly it completes at 100 % delivery. The rate is now stated.
+     */
+    const { recording } = recordRun(suppressedConfig(config));
     expect(recording.summary.awtIsValid).toBe(false);
     const t = recording.endedAt / 2;
     const text = describeFrame({
@@ -96,8 +103,16 @@ describe('the description carries the two facts a picture must not hide', () => 
   }, 300_000);
 
   it('reports a run that did not deliver everybody as such', () => {
-    const { recording } = recordRun(breadthConfig(config, 'mixed-use-high-rise'));
+    /*
+     * `timedOutConfig` — the same building, at a rate that genuinely outruns it. `DECISIONS.md`
+     * § D260: `mixed-use-high-rise` at its shipped rate used to end with people still in the system
+     * because § D254's pickup access check never collected the landings inside its access zones. It
+     * now completes at 100 % delivery, so the undelivered count this test prints has to come from
+     * demand instead — 80 % of population per five minutes, which the drain tail cannot clear.
+     */
+    const { recording } = recordRun(timedOutConfig(config));
     expect(recording.status).not.toBe('completed');
+    expect(recording.summary.undelivered).toBeGreaterThan(0);
     const text = describeFrame({ recording, frame: frameAt(recording, recording.endedAt) });
     expect(text).toContain(`Run status ${recording.status}`);
     expect(text).toContain(`${String(recording.summary.undelivered)} passengers undelivered`);

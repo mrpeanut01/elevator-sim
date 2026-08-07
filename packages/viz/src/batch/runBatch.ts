@@ -203,6 +203,8 @@ export function runBatch(
      * of the thing that actually ran.
      */
     dispatcherProfileId: configs[index]?.dispatcherProfile.id ?? arm.dispatcherProfileId,
+    /* The same object's own display name, for the same reason — see `BatchArmResult`. */
+    dispatcherProfileName: configs[index]?.dispatcherProfile.name ?? arm.dispatcherProfileId,
     replications: armReplications[index] ?? [],
   }));
 

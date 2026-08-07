@@ -113,6 +113,11 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
   it('does not reach loader.ts, the one module that imports node:', async () => {
     expect(graph.modules).not.toContain('loader.ts');
     expect(graph.modules).toEqual([
+      // § D273. `schema.ts` reaches it: an authored phase list has to keep by declaration what the
+      // five shape builders keep by construction, and the rules live in one module so that the
+      // schema and the resolver cannot drift. It imports a *type* from `types.ts` and nothing
+      // else, which is what keeps this list free of `node:`.
+      'demandPhases.ts',
       'expandFloors.ts',
       'parse.ts',
       'resolveCar.ts',

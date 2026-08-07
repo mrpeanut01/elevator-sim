@@ -26,7 +26,7 @@ import {
 } from './menu.js';
 import {
   DEFAULT_SETTINGS,
-  FREE_PLAY_DURATIONS_S,
+  LONGEST_OFFERED_RUN_S,
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
   ROOT_SCREEN,
@@ -43,7 +43,26 @@ const CATALOGUE: MenuCatalogue = Object.freeze({
     { id: 'beta', name: 'Beta' },
   ]),
   dispatchers: Object.freeze([{ id: 'collective', name: 'Conventional collective' }]),
-  demandTemplates: Object.freeze([{ id: 'rise-and-fall', name: 'Rise and fall' }]),
+  demandTemplates: Object.freeze([
+    {
+      id: 'rise-and-fall',
+      name: 'Rise and fall',
+      minimumDurationS: 1800,
+      // One part, its own period. A shape template has no parts to select — § D286 — and the
+      // fixture says so rather than leaving the reducer with nothing to accept.
+      parts: Object.freeze([
+        {
+          id: 'null:1800',
+          name: 'Rise and fall',
+          label: 'Rise and fall — 08:30–09:00',
+          detail: '30 min of demand — 08:30 to 09:00, then however long it takes to clear',
+          windowStartS: null,
+          durationS: 1800,
+          startOfDayS: 8 * 3600 + 30 * 60,
+        },
+      ]),
+    },
+  ]),
 });
 
 /* -------------------------------------------------------------------------- *
@@ -157,6 +176,9 @@ describe('the free-play selection', () => {
     const broken = updateFreePlay(initialMenuState(CATALOGUE), {
       buildingId: 'nowhere',
       dispatcherProfileId: 'nobody',
+      // A length no offered part has, which since § D286 is refused as a *part* rather than as a
+      // length: `windowStartS` and `durationS` are one selection, so the issue names the field the
+      // control writes rather than half of what it wrote.
       durationS: 7,
       seed: 'abc',
     });
@@ -164,8 +186,8 @@ describe('the free-play selection', () => {
     expect(issues.map((issue) => issue.field).sort()).toEqual([
       'buildingId',
       'dispatcherProfileId',
-      'durationS',
       'seed',
+      'windowStartS',
     ]);
     // A player who fixes one and is then told about the next has been made to guess how many
     // there are.
@@ -196,49 +218,133 @@ describe('the free-play selection', () => {
     }
   });
 
-  it('refuses a template whose own period is longer than the run, and says both numbers', () => {
-    // The kernel throws *"leaves no measurement window"* for `constant-iso` under two hours. That
-    // is correct and it is said in a place a player cannot act on, so the menu refuses the
-    // combination first — with the template's minimum and the player's choice both in the sentence.
+  it('refuses a part that belongs to a different template, and names what is offered', () => {
+    /*
+     * The rule that replaced *"a template whose own period is longer than the run"* — § D286. It
+     * subsumes it: `constant-iso`'s only offered part is its own two hours, so the fifteen-minute
+     * run that used to be refused for leaving no measurement window is one a player cannot select.
+     * What remains reachable is changing the template while a part of the old one is still held,
+     * which is refused here rather than at `windowTemplate`, in a sentence naming the alternatives.
+     */
     const withIso: MenuCatalogue = {
       ...CATALOGUE,
       demandTemplates: [
-        { id: 'rise-and-fall', name: 'Rise and fall' },
-        { id: 'constant-iso', name: 'Constant (ISO)', minimumDurationS: 7200 },
+        ...CATALOGUE.demandTemplates,
+        {
+          id: 'constant-iso',
+          name: 'Constant (ISO)',
+          minimumDurationS: 7200,
+          parts: [
+            {
+              id: 'null:7200',
+              name: 'Constant (ISO)',
+              label: 'Constant (ISO) — 120 min',
+              detail: '120 min of demand, then however long it takes to clear',
+              windowStartS: null,
+              durationS: 7200,
+              startOfDayS: null,
+            },
+          ],
+        },
       ],
     };
-    const short = updateFreePlay(initialMenuState(withIso), {
-      demandTemplateId: 'constant-iso',
-      durationS: 900,
-    });
-    const [issue] = freePlayIssues(short.freePlay, withIso);
-    expect(issue?.field).toBe('durationS');
+    // The template moves and the part does not, which is the state a select can produce.
+    const stale = updateFreePlay(initialMenuState(withIso), { demandTemplateId: 'constant-iso' });
+    const [issue] = freePlayIssues(stale.freePlay, withIso);
+    expect(issue?.field).toBe('windowStartS');
     expect(issue?.message).toContain('Constant (ISO)');
-    expect(issue?.message).toContain('120 minutes');
-    expect(issue?.message).toContain('15-minute');
+    expect(issue?.message, 'the refusal does not say what is offered instead').toContain(
+      'Constant (ISO) — 120 min',
+    );
 
-    // ...and it is accepted at a length that reaches the period.
-    const long = updateFreePlay(short, { durationS: 7200 });
-    expect(freePlayIssues(long.freePlay, withIso)).toEqual([]);
+    // ...and it is accepted at the part that template does offer.
+    const fixed = updateFreePlay(stale, { durationS: 7200, windowStartS: null });
+    expect(freePlayIssues(fixed.freePlay, withIso)).toEqual([]);
   });
 
-  it('every shipped template can be run at some offered length', async () => {
-    // Both directions again, and derived from `data/`. A template that ships and fits inside none
-    // of the offered run lengths would be listed in the menu and unstartable at every one of them.
+  it('every shipped template can be run at some offered part', async () => {
+    /*
+     * The guard § D282 could only satisfy by offering a ten-hour run, satisfied the way § D276 said
+     * it should be: **through a window**. Derived from `data/` in both directions — a template that
+     * ships and fits inside no offered part is listed in the menu and unstartable at every one.
+     *
+     * The bound is what keeps it a real claim rather than a tautology. Every template offers the
+     * whole of its own period, so *"has a part"* alone would pass for anything; requiring one part
+     * to fit inside `LONGEST_OFFERED_RUN_S` is what `office-day`'s 600 minutes fails on the whole
+     * and clears on its morning, its lunch and its evening.
+     */
     const config = await loadConfig(DATA_DIR);
     const catalogue = catalogueOf(config as unknown as CatalogueSource);
     for (const template of catalogue.demandTemplates) {
-      const workable = FREE_PLAY_DURATIONS_S.filter(
-        (durationS) => durationS >= (template.minimumDurationS ?? 0),
+      const workable = (template.parts ?? []).filter(
+        (part) => part.durationS <= LONGEST_OFFERED_RUN_S,
       );
       expect(workable.length, template.id).toBeGreaterThan(0);
+      // ...and startable, not merely short enough: the reducer has to accept it too.
+      const state = updateFreePlay(initialMenuState(catalogue), {
+        demandTemplateId: template.id,
+        durationS: workable[0]?.durationS ?? 0,
+        windowStartS: workable[0]?.windowStartS ?? null,
+      });
+      expect(freePlayIssues(state.freePlay, catalogue), template.id).toEqual([]);
     }
   });
 
-  it('accepts every offered duration and rate', () => {
-    for (const durationS of FREE_PLAY_DURATIONS_S) {
-      const state = updateFreePlay(initialMenuState(CATALOGUE), { durationS });
-      expect(freePlayIssues(state.freePlay, CATALOGUE), String(durationS)).toEqual([]);
+  it('reaches the ten-hour day only through a window, which is what the guard above is for', async () => {
+    // The negative half, stated on the record that forced the change. Without it the case above
+    // would still pass if a future edit put a ten-hour rung back and dropped the parts.
+    const config = await loadConfig(DATA_DIR);
+    const catalogue = catalogueOf(config as unknown as CatalogueSource);
+    const day = catalogue.demandTemplates.find((entry) => entry.id === 'office-day');
+    expect(day, 'office-day no longer ships').toBeDefined();
+
+    const whole = (day?.parts ?? []).filter((part) => part.windowStartS === null);
+    expect(whole, 'the day should offer its whole self, and exactly once').toHaveLength(1);
+    expect(whole[0]?.durationS).toBe(600 * 60);
+    expect(
+      whole[0]?.durationS ?? 0,
+      'the whole day fits inside a single run, so the window is not what makes it startable',
+    ).toBeGreaterThan(LONGEST_OFFERED_RUN_S);
+
+    // The three cited periods § D276 authored, each named for its own hour and each startable.
+    const parts = (day?.parts ?? []).filter((part) => part.windowStartS !== null);
+    expect(parts.map((part) => part.label)).toEqual([
+      'Morning rush — 08:30–09:00',
+      'Lunch — 12:15–12:45',
+      'Evening — 17:15–17:45',
+    ]);
+    for (const part of parts) {
+      expect(part.durationS, part.label).toBeLessThanOrEqual(LONGEST_OFFERED_RUN_S);
+      // Issue #80: the label states the demand window and names the tail, and predicts no end.
+      expect(part.detail).toBe(
+        `30 min of demand — ${part.label.slice(part.label.indexOf('— ') + 2).replace('–', ' to ')}, then however long it takes to clear`,
+      );
+    }
+  });
+
+  it('opens on a Free play selection the menu would actually let you start', async () => {
+    /*
+     * The test above proves every template *has* a workable length. It did not prove the opening
+     * state *picks* one, and it did not: `durationS` was a fixed index into the ladder, 15 minutes,
+     * while the first shipped template declares a 30-minute period. So the menu refused the state
+     * it had just built, and a new player's first sight of Free play was a disabled Start under a
+     * refusal — the screen GitHub issue #13 is about.
+     *
+     * Against the real `data/` load rather than `CATALOGUE`, because the defect was a disagreement
+     * between two shipped numbers and a fixture can be authored not to have it.
+     */
+    const config = await loadConfig(DATA_DIR);
+    const catalogue = catalogueOf(config as unknown as CatalogueSource);
+    expect(freePlayIssues(initialMenuState(catalogue).freePlay, catalogue)).toEqual([]);
+  });
+
+  it('accepts every offered part and rate', () => {
+    for (const part of CATALOGUE.demandTemplates[0]?.parts ?? []) {
+      const state = updateFreePlay(initialMenuState(CATALOGUE), {
+        durationS: part.durationS,
+        windowStartS: part.windowStartS,
+      });
+      expect(freePlayIssues(state.freePlay, CATALOGUE), part.id).toEqual([]);
     }
     for (const rate of FREE_PLAY_RATES) {
       const state = updateFreePlay(initialMenuState(CATALOGUE), { arrivalRatePctPop5min: rate });

@@ -19,36 +19,59 @@
  *
  * ---
  *
- * # H-ACCESS-1 — coverage. Categorical, and it has no confidence interval on purpose.
+ * # H-ACCESS-1 — coverage. **REFUTED by this module's own apparatus** (§ D256, § D279).
  *
- * > Under conventional dispatch an access-controlled building with down and interfloor traffic is
- * > **not servable at all**; under credential-aware dispatch it is. On a building with no access
+ * The hypothesis this module was built to test read:
+ *
+ * > ~~Under conventional dispatch an access-controlled building with down and interfloor traffic is
+ * > **not servable at all**; under credential-aware dispatch it is.~~ On a building with no access
  * > zones the two are **identical**.
+ *
+ * **The first clause is false and the second is true.** `DECISIONS.md` § D254 deleted a modelling
+ * error — `estimateCost` asked the access question about a hall call's *pickup* floor, and a
+ * credential governs where you may go rather than where you may be collected — and with it gone the
+ * conventional arm serves Secure Tower. § D256 withdrew the verdict. This module measures the
+ * refutation rather than asserting it, and the strongest form is an **equality**: at n = 150 under
+ * common random numbers the conventional arm and the credential arm are **bit-identical on Secure
+ * Tower** — 0 of 150 replications differ on any of {@link IDENTITY_METRICS} — exactly as they are on
+ * the building with no access zones. What the credential buys under conventional dispatch is
+ * *nothing*, on both buildings, and {@link CoverageResult.secureDifferingReplications} is the count
+ * that says so. See {@link WITHDRAWN_COVERAGE} for what the study used to report.
  *
  * An outcome that is categorical does not get an interval. `CLAUDE.md` § Statistical discipline
  * forbids quoting a mean for a system whose queues grow without bound, and `arms.ts`'s rule — a cell
- * has no interval unless *every* arm in it returns a valid one — is what forces the shape: the
- * conventional arm is absent from Secure Tower's interval table rather than present with a
- * suppressed mean. So H-ACCESS-1 is reported as **counts**: replications with no quotable AWT,
- * undelivered journeys per run, unserved fraction, and **legs the kiosk itself refused**, per arm
- * per building, plus a bit-identity check of the credential arm against the conventional arm on the
- * building with no access zones.
+ * has no interval unless *every* arm in it returns a valid one — is what forces the shape. So
+ * H-ACCESS-1 is still reported as **counts**: replications with no quotable AWT, undelivered
+ * journeys per run, unserved fraction, and **legs the kiosk itself refused**, per arm per building,
+ * plus a bit-identity check of the credential arm against the conventional arm on **both**
+ * buildings.
  *
- * The mechanism is in `simulation.ts`'s own words: an access-restricted pickup carries no credential
- * under `up-down-buttons`, so every car returns `accessDenied` and the call is permanently
- * unassignable. The failure is **structural rather than load-driven**, which is why lowering the
- * arrival rate does not rescue it and why no operating point exists at which the two arms could be
- * compared with an interval.
+ * ## What survives, and it is one arm rather than a building
+ *
+ * The **bare kiosk**. Under `dispatch.callType: 'destination-entry'` with no panel the passenger
+ * types a destination into a terminal that has nothing to identify them with, every car is asked
+ * *"may an unbadged passenger reach floor 27?"*, and every car answers `destinationAccessDenied`.
+ * That is authorization of a *destination*, which is the only access question a lift is asked, and
+ * § D254 left it untouched. It refuses 61.2 % of journeys on Secure Tower and it is the reason
+ * `arms.ts` keeps `admissibleReplications: 0` on this cell (§ D261).
  *
  * ## The fourth count, and why an unserved fraction needed it
  *
- * The two failing arms on Secure Tower fail for **different reasons** and the first three counts
- * cannot tell them apart — `33.5 %` and `100 %` unserved are the same *kind* of number. The
- * conventional arm's passengers are refused at the **pickup**: `up-down-buttons` carries no
- * credential, so a zoned *origin* is unassignable. The bare kiosk's are refused at the
- * **interface**, one at a time, before any car is asked. `kiosk-refused/run` separates them —
- * **0.0 for the conventional arm and 29.0 for the bare kiosk**, at the same operating point on the
- * same 30 replications — which is § D137's *who rather than a rate* arriving as a column.
+ * The two arms that lose their AWT on Secure Tower lose it for **different reasons** and the first
+ * three counts cannot tell them apart — `4.13 %` and `61.21 %` unserved are the same *kind* of
+ * number. Measured on the same 30 replications, the two grounds are different in kind and not
+ * merely in size:
+ *
+ * - conventional **and** credential are **censored** — 3 to 5 of a 50-to-75-person reporting window
+ *   never served, above the 5 % censoring limit, on 11 of 30 replications. The share is § D265's
+ *   credential gap: riders who begin inside the building holding the badge their own floor implies
+ *   rather than the one their destination needs, which no `callType` reaches;
+ * - the bare kiosk is **saturated** — the queue rises 0.8 to 1.8 persons per minute, 12 to 25× the
+ *   queue's own scatter, on 30 of 30.
+ *
+ * `kiosk-refused/run` is what separates them at the level of *who* — **0.0 for the conventional and
+ * credential arms and 34.1 for the bare kiosk**, at the same operating point on the same 30
+ * replications — which is § D137's *who rather than a rate* arriving as a column.
  *
  * The counter has been on `StageActivity` since § D137 and was read by nothing here, which
  * § D137 item 2 and § D149 item 2 both record as debt. It reaches this module through
@@ -151,12 +174,13 @@ export const BARE_KIOSK_ARM = 'destination-entry-bare';
  *
  * Leaving E pointed at the shipped profile after that change would have silently redefined the
  * study: `Δ` would have become the *marginal* effect from 0.5 to 1.0 rather than the effect of
- * pricing the destination at all. Measured, that is exactly what happens: the published
- * difference-of-differences `+0.982 [+0.584, +1.380]` falls to a mean of `+0.208` with an interval
- * still excluding zero on the positive side — the same sign, the same REFUTED verdict, and a fifth
- * of the magnitude, with nothing but a pin regeneration to mark the change of meaning. So E is
- * bound to the *configuration* rather than to whatever `data/` currently ships, and the pins are
- * unchanged.
+ * pricing the destination at all. Measured on the tree of the time, that is exactly what happens:
+ * the then-published difference-of-differences fell to a mean of `+0.208` with an interval still
+ * excluding zero on the positive side — the same sign, the same REFUTED verdict, and a fifth of the
+ * magnitude, with nothing but a pin regeneration to mark the change of meaning. So E is bound to
+ * the *configuration* rather than to whatever `data/` currently ships. **The counterfactual is not
+ * re-derived by anything and is quoted as history**; the study's own figure is
+ * `+1.020 [+0.625, +1.414]` (§ D279), and it is `published.ts` that holds it.
  *
  * H-ACCESS-1 gains from the same binding for a second reason: its claim is about the **`callType`**,
  * and an arm that differed from the conventional baseline in a weight as well as a call type would
@@ -211,12 +235,16 @@ export interface CoverageRow {
    *
    * **This is the column {@link meanUnservedFraction} cannot be**, and it is why this row exists
    * in two shapes rather than one. An unserved fraction says a leg was not carried; it does not
-   * say *why*, and on this building the two arms that fail it fail it for opposite reasons. The
-   * conventional arm's legs are refused at the **pickup** — `up-down-buttons` carries no
-   * credential, so a zoned *origin* is unassignable — and the bare kiosk's are refused at the
-   * **interface**, before any car is asked about them. Read off the unserved fraction alone,
-   * `33.5 %` and `100 %` are the same kind of number. Read beside this column they are not: this
-   * one is **0 for the conventional arm at every replication** and non-zero only for the kiosk.
+   * say *why*, and on this building the arms that fail it fail it for different reasons. **The
+   * sentence that used to stand here was the defect § D254 removed** — it said the conventional
+   * arm's legs are refused at the *pickup* for want of a credential on a zoned origin, and that is
+   * no longer true of any shipped configuration. What is true now, measured on the same 30
+   * replications: the conventional and credential arms lose their AWT to **censoring** — a handful
+   * of § D265 credential-gap riders in a thin reporting window — and the bare kiosk loses it to
+   * **saturation**, because a destination no badge can reach is refused by every car and the queue
+   * diverges. Read off the unserved fraction alone, `4.13 %` and `61.21 %` are the same kind of
+   * number. Read beside this column they are not: this one is **0 for both credentialled arms at
+   * every replication** and non-zero only for the kiosk.
    *
    * DECISIONS.md § D137 item 2 and § D149 item 2 record the counter's *absence* here as the
    * ninth-dead-seam shape one notch down. This field is that debt discharged, and
@@ -236,7 +264,29 @@ export interface CoverageResult {
    */
   readonly midtownNullIsIdentical: boolean;
   readonly midtownDifferingReplications: number;
-  /** The verdict, in one word, derived from the rows rather than written by hand. */
+  /**
+   * The same question on the **access-zoned** building, and since § D254 it has the same answer.
+   *
+   * This field exists because a refutation stated as a failed conjunct is weak evidence: `verdict`
+   * goes `REFUTED` the moment any one clause of the hypothesis stops holding, and a reader cannot
+   * tell from that whether the credential now buys *less* or buys *nothing*. Measured, it buys
+   * nothing — 0 of 150 replications differ on any of {@link IDENTITY_METRICS} — and the refutation
+   * therefore rests on an equality that was measured rather than on a conjunct that failed.
+   *
+   * It is also the assertion that cannot pass vacuously: the same comparison on Midtown is the
+   * control, and the bare-kiosk arm on this very building is the positive one, since it differs
+   * from both.
+   */
+  readonly secureNullIsIdentical: boolean;
+  readonly secureDifferingReplications: number;
+  /**
+   * The verdict, in one word, derived from the rows rather than written by hand.
+   *
+   * **It has read `REFUTED` since § D254 and that is the finding, not a failure.** The value is
+   * left derived rather than hard-coded precisely so that a future change which made conventional
+   * dispatch fail on an access-zoned building again would move it back without anybody editing a
+   * string — the apparatus that refuted the hypothesis is the apparatus that would un-refute it.
+   */
   readonly verdict: 'CONFIRMED' | 'REFUTED';
   readonly verdictReason: string;
 }
@@ -283,29 +333,37 @@ export interface PinnedCoverage {
 /**
  * Every H-ACCESS-1 row this repository publishes, keyed `building/arm`.
  *
- * Produced by `runAccessControlStudy({})` on 2026-07-28, on the tree carrying § T50-D1: this
- * module's own study at its own declared budget — seed {@link BENCHMARK_SEED} (20 260 726),
- * `coverageReplications = 30`, Secure Tower and Midtown Office at the `arms.ts` interfloor-mix
- * operating points. No operating point was invented to produce it; it is the published one, re-run.
+ * Produced by `runAccessControlStudy({})` on **2026-08-06**, on the tree carrying § D254 and
+ * § D265: this module's own study at its own declared budget — seed {@link BENCHMARK_SEED}
+ * (20 260 726), `coverageReplications = 30`, Secure Tower and Midtown Office at the `arms.ts`
+ * interfloor-mix operating points. No operating point was invented to produce it; it is the
+ * published one, re-run.
+ *
+ * **Three of the six rows moved and three did not, and the split is the evidence** (§ D279). The
+ * three that held are Midtown Office's, which declares no `accessZones` — the same control § D254
+ * found on its 60-cell matrix, § D255 on the fifteen identity cells and § D262 on the goal table.
+ * The three that moved are Secure Tower's, and {@link WITHDRAWN_COVERAGE} holds what they said
+ * before, because a superseded figure is named as history here rather than deleted.
  *
  * The Midtown rows are pinned even though every field is zero, for the same reason `downPeakFigures`
- * pins its zero `rideTime` rows: **there the zero is the finding.** It is the null half of
+ * pins its zero `rideTime` rows: **there the zero is the finding.** It is the surviving half of
  * H-ACCESS-1 — a building with no access zones does not move under any of the three call types —
  * and a null nobody pinned is a null that can quietly stop being one.
  *
- * **{@link PinnedCoverage.meanKioskRefusedLegs} was added on 2026-07-28 by a re-run of the same
- * entry point at the same budget, and the other five fields reproduced to the last digit** — all
- * six rows, `Object.is`-equal. That is stated because it is the evidence that the new column is a
- * column of the *same* study rather than a new measurement wearing its name: nothing about the
- * runs changed, only what the runner was asked to carry back from them.
+ * **`secure-tower/eta` and `secure-tower/destination-eta-unpriced` are now field-for-field equal**,
+ * which is H-ACCESS-1's refutation in the pin table rather than in prose. `withoutQuotableAwt: 11`
+ * is a knife-edge and is recorded as one: the per-replication unserved fraction straddles the 5 %
+ * censoring limit (0.031 to 0.096 over the first ten draws), so the *count* is a property of this
+ * seed while the *equality of the two arms* is a property of the model. Only the second is asserted
+ * as a property; the first is asserted as a pin.
  */
 export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.freeze({
   'secure-tower/eta': Object.freeze({
     replications: 30,
-    notCompleted: 30,
-    withoutQuotableAwt: 30,
-    meanUndelivered: 18.166666666666668,
-    meanUnservedFraction: 0.3353422721842136,
+    notCompleted: 0,
+    withoutQuotableAwt: 11,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0.04129578880791078,
     meanKioskRefusedLegs: 0,
     quotable: false,
   }),
@@ -313,19 +371,19 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     replications: 30,
     notCompleted: 30,
     withoutQuotableAwt: 30,
-    meanUndelivered: 52.233333333333334,
-    meanUnservedFraction: 1,
-    meanKioskRefusedLegs: 28.966666666666665,
+    meanUndelivered: 34.06666666666667,
+    meanUnservedFraction: 0.6121195194056891,
+    meanKioskRefusedLegs: 34.06666666666667,
     quotable: false,
   }),
   'secure-tower/destination-eta-unpriced': Object.freeze({
     replications: 30,
     notCompleted: 0,
-    withoutQuotableAwt: 0,
+    withoutQuotableAwt: 11,
     meanUndelivered: 0,
-    meanUnservedFraction: 0,
+    meanUnservedFraction: 0.04129578880791078,
     meanKioskRefusedLegs: 0,
-    quotable: true,
+    quotable: false,
   }),
   'midtown-office/eta': Object.freeze({
     replications: 30,
@@ -346,6 +404,58 @@ export const PINNED_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.
     quotable: true,
   }),
   'midtown-office/destination-eta-unpriced': Object.freeze({
+    replications: 30,
+    notCompleted: 0,
+    withoutQuotableAwt: 0,
+    meanUndelivered: 0,
+    meanUnservedFraction: 0,
+    meanKioskRefusedLegs: 0,
+    quotable: true,
+  }),
+});
+
+/**
+ * The three Secure Tower rows **§ D256 withdrew**, kept because a document still carries them.
+ *
+ * These are what {@link PINNED_COVERAGE} held until § D279 re-pinned it: measured on 2026-07-28 on
+ * the tree carrying § T50-D1, and measuring a defect. `estimateCost` asked the access question
+ * about a hall call's *pickup* floor, so every landing call raised inside an access zone was
+ * refused by every car, and *"0 of 30 quotable, 18.2 undelivered per run, 33.5 % unserved"* is what
+ * that looks like from outside. § D254 deleted the check; § D256 withdrew the verdict and the
+ * table.
+ *
+ * **This is a record, not a pin, and the difference is the whole reason it exists.** Nothing
+ * re-derives these from a run — no run produces them any more — so they may never be quoted as a
+ * measurement. They are here so that {@link withdrawnCoverageForms} can tell a document that
+ * *preserves* a withdrawn figure under a withdrawal marker (which this repository requires: see the
+ * *"used to read"* clause `accessControl.test.ts` asserts) from a document that has silently
+ * drifted off the live pins. Without the distinction those two look identical to a guard, and the
+ * guard would have to be pointed at whichever one it could not fail — which is how `51.7 %`
+ * survived the `C35` fix in the first place.
+ *
+ * `docs/05-roadmap.md` § H-ACCESS-1 is the one document that carries them, struck through, and
+ * `validation/documentation.test.ts` holds it to that.
+ */
+export const WITHDRAWN_COVERAGE: Readonly<Record<string, PinnedCoverage>> = Object.freeze({
+  'secure-tower/eta': Object.freeze({
+    replications: 30,
+    notCompleted: 30,
+    withoutQuotableAwt: 30,
+    meanUndelivered: 18.166666666666668,
+    meanUnservedFraction: 0.3353422721842136,
+    meanKioskRefusedLegs: 0,
+    quotable: false,
+  }),
+  'secure-tower/destination-entry-bare': Object.freeze({
+    replications: 30,
+    notCompleted: 30,
+    withoutQuotableAwt: 30,
+    meanUndelivered: 52.233333333333334,
+    meanUnservedFraction: 1,
+    meanKioskRefusedLegs: 28.966666666666665,
+    quotable: false,
+  }),
+  'secure-tower/destination-eta-unpriced': Object.freeze({
     replications: 30,
     notCompleted: 0,
     withoutQuotableAwt: 0,
@@ -401,10 +511,13 @@ export function publishedCoverageRow(pin: PinnedCoverage, places = 1, kiosk = fa
 /**
  * Every rendering of every pinned coverage row, at every precision this repository prints at.
  *
- * Both 1 dp and 2 dp for the unserved percentage: `docs/05-roadmap.md` writes `33.5 %` and the same
- * table's credential row writes `0.00 %`, and a vocabulary that assumed one would reject the other
- * as undeclared. The undelivered mean is 1 dp everywhere, which is what `formatAccessControlStudy`
- * prints, so it is not varied — a second precision nobody uses would only widen what passes.
+ * Both 1 dp and 2 dp for the unserved percentage: `accessControl.test.ts`'s H-ACCESS-1 table writes
+ * `4.1 %` and its Midtown credential row writes `0.00 %`, and a vocabulary that assumed one would
+ * reject the other as undeclared. (Before § D279 the 1 dp citation was `docs/05-roadmap.md`'s
+ * `33.5 %`, which is now a **withdrawn** figure and lives in {@link WITHDRAWN_COVERAGE}; the reason
+ * for two precisions is unchanged and only its example moved.) The undelivered mean is 1 dp
+ * everywhere, which is what `formatAccessControlStudy` prints, so it is not varied — a second
+ * precision nobody uses would only widen what passes.
  *
  * **Two widths, for the same reason and under the same rule.** Since the kiosk column landed, the
  * three-column form is what `docs/05-roadmap.md` prints and the four-column form is what
@@ -415,8 +528,27 @@ export function publishedCoverageRow(pin: PinnedCoverage, places = 1, kiosk = fa
  * lesson applied to the column it said was missing.
  */
 export function derivedCoverageForms(): ReadonlySet<string> {
+  return renderCoverageVocabulary(PINNED_COVERAGE);
+}
+
+/**
+ * The same vocabulary for {@link WITHDRAWN_COVERAGE} — every rendering of a row § D256 withdrew.
+ *
+ * Deliberately a **separate** function rather than extra members of {@link derivedCoverageForms}.
+ * A single set would let any stale row pass anywhere, which is the allowlist this layer exists not
+ * to be; two sets let a caller say *which* it will accept and be held to that. The only caller is
+ * the `docs/05-roadmap.md` guard, whose table is struck through, and which asserts the withdrawal
+ * marker beside the rows so that neither can go quiet alone.
+ */
+export function withdrawnCoverageForms(): ReadonlySet<string> {
+  return renderCoverageVocabulary(WITHDRAWN_COVERAGE);
+}
+
+function renderCoverageVocabulary(
+  pins: Readonly<Record<string, PinnedCoverage>>,
+): ReadonlySet<string> {
   const forms = new Set<string>();
-  for (const pin of Object.values(PINNED_COVERAGE)) {
+  for (const pin of Object.values(pins)) {
     for (const places of [1, 2]) {
       forms.add(publishedCoverageRow(pin, places));
       forms.add(publishedCoverageRow(pin, places, true));
@@ -626,6 +758,28 @@ function coverageRow(
   });
 }
 
+/**
+ * Replications on which the conventional and credential arms of one experiment differ on any of
+ * {@link IDENTITY_METRICS}.
+ *
+ * One function for both buildings, because the two questions became the same question. Until
+ * § D254 this was Midtown's alone — the null half of a hypothesis whose *other* half was that
+ * Secure Tower would differ enormously. It does not differ at all, and running the identical
+ * comparison on both is what makes that statement comparable rather than assertable.
+ */
+function differingReplications(experiment: ExperimentResult, replications: number): number {
+  let differing = 0;
+  for (let index = 0; index < replications; index += 1) {
+    const same = IDENTITY_METRICS.every((metric) => {
+      const a = samplesOf(experiment, DISCLOSURE_BASELINE, metric)[index];
+      const b = samplesOf(experiment, CREDENTIAL_ARM, metric)[index];
+      return a === b || (Number.isNaN(a as number) && Number.isNaN(b as number));
+    });
+    if (!same) differing += 1;
+  }
+  return differing;
+}
+
 function coverageOf(
   secure: ExperimentResult,
   midtown: ExperimentResult,
@@ -636,15 +790,12 @@ function coverageOf(
     ...COVERAGE_ARMS.map((armId) => coverageRow(midtown, armId, 'midtown-office', replications)),
   ];
 
-  let differing = 0;
-  for (let index = 0; index < replications; index += 1) {
-    const same = IDENTITY_METRICS.every((metric) => {
-      const a = samplesOf(midtown, DISCLOSURE_BASELINE, metric)[index];
-      const b = samplesOf(midtown, CREDENTIAL_ARM, metric)[index];
-      return a === b || (Number.isNaN(a as number) && Number.isNaN(b as number));
-    });
-    if (!same) differing += 1;
-  }
+  const differing = differingReplications(midtown, replications);
+  /* The same question on the zoned building, over **every** replication the study ran rather than
+     over the coverage slice: the equality is what carries H-ACCESS-1's refutation, so it is
+     measured at the study's full budget and not at the categorical one. */
+  const secureReplications = cellOf(secure, DISCLOSURE_BASELINE).replications.length;
+  const secureDiffering = differingReplications(secure, secureReplications);
 
   const conventionalOnSecure = rows.find(
     (row) => row.building === 'secure-tower' && row.armId === DISCLOSURE_BASELINE,
@@ -661,10 +812,16 @@ function coverageOf(
     rows: Object.freeze(rows),
     midtownNullIsIdentical: differing === 0,
     midtownDifferingReplications: differing,
+    secureNullIsIdentical: secureDiffering === 0,
+    secureDifferingReplications: secureDiffering,
     verdict: confirmed ? 'CONFIRMED' : 'REFUTED',
     verdictReason: confirmed
       ? `conventional dispatch leaves ${conventionalOnSecure.meanUndelivered.toFixed(1)} journeys per run undelivered on the access-controlled building and has no quotable AWT on ${conventionalOnSecure.withoutQuotableAwt} of ${conventionalOnSecure.replications} replications, while the credential arm completes every one with none undelivered — and the two are bit-identical on the building with no access zones`
-      : `at least one leg of the claim failed: conventional unquotable=${String(!conventionalOnSecure.quotable)}, credential serves=${String(credentialServes)}, Midtown differing replications=${differing}`,
+      : /* The refuting reason names the **equality** rather than the failed conjunct, because that
+           is what a reader has to be able to check. "conventional unquotable=false" says only that
+           a clause stopped holding; "the two arms are bit-identical on the zoned building too" says
+           what replaced it. */
+        `conventional dispatch leaves ${conventionalOnSecure.meanUndelivered.toFixed(1)} journeys per run undelivered on the access-controlled building, so it is not un-servable there; the credential arm is bit-identical to it on ${secureReplications - secureDiffering} of ${secureReplications} replications of secure-tower and on ${replications - differing} of ${replications} of midtown-office, so the credential buys nothing under conventional dispatch on either building (conventional unquotable=${String(!conventionalOnSecure.quotable)}, credential serves=${String(credentialServes)})`,
   });
 }
 
@@ -725,8 +882,21 @@ function optimizationOf(
   const reasons: Readonly<Record<typeof verdict, string>> = {
     CONFIRMED:
       'both the absolute and the baseline-relative difference-of-differences exclude zero on the negative side: pricing the destination really does buy more where access is controlled',
+    /*
+     * The measurement stands; the attribution does not, and it used to be printed here.
+     *
+     * This sentence ended *"the saving … is entirely in the credential (H-ACCESS-1)"* — the claim
+     * § D256 withdrew and § D279 refuted, emitted **with the study's own verdict**, so a reader met
+     * the correction in the docstring twenty lines above and the thing it corrects at the end of
+     * their run. § D283 corrected six documents and could not reach this one, because it is code.
+     *
+     * What is measured is unchanged and is the whole of the first clause. Where the saving comes
+     * from is now **unmeasured**, and says so rather than naming a second plausible mechanism —
+     * CLAUDE.md's rule is *either measure it or say it is unmeasured*, and a replacement guess is
+     * the same defect with a new sentence.
+     */
     REFUTED:
-      'both the absolute and the baseline-relative difference-of-differences exclude zero on the POSITIVE side: given the credential, pricing the destination buys LESS on the access-controlled building, not more — the saving the roadmap attributes to the same-step mechanism is entirely in the credential (H-ACCESS-1)',
+      'both the absolute and the baseline-relative difference-of-differences exclude zero on the POSITIVE side: given the credential, pricing the destination buys LESS on the access-controlled building, not more. Where that saving does come from is UNMEASURED — the credential explanation this study used to print was H-ACCESS-1, which is refuted and withdrawn (DECISIONS.md § D256, § D279)',
     INDISTINGUISHABLE:
       'at least one form of the difference-of-differences contains zero, so the interaction is below the resolution limit of this budget on this building set — which is itself a result about the roadmap’s mechanism claim rather than a failure to measure',
     DISAGREEMENT:
@@ -788,6 +958,13 @@ export function formatAccessControlStudy(study: AccessControlStudy): string {
   lines.push(
     `  Midtown null: credential arm differs from conventional on ` +
       `${study.coverage.midtownDifferingReplications} of ${study.coverageReplications} replications`,
+  );
+  /* Printed beside the Midtown line rather than instead of it: the pair is the finding. One zero
+     alone is a null on an unzoned building; two zeros are the statement that the credential moves
+     nothing anywhere under conventional dispatch, which is what refutes H-ACCESS-1. */
+  lines.push(
+    `  Secure null: credential arm differs from conventional on ` +
+      `${study.coverage.secureDifferingReplications} of ${study.replications} replications`,
   );
   lines.push(`  VERDICT ${study.coverage.verdict} — ${study.coverage.verdictReason}`);
 

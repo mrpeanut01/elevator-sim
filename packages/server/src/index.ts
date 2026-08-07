@@ -19,11 +19,13 @@ export {
 } from './leaderboard/submission.js';
 
 export {
+  SIGN_IN_FRAGMENT_KEY,
   UnsafeConfigurationError,
   assertChallengesAreRunnable,
   bootstrap,
   challengeFactsResolver,
   factsResolver,
+  signInUrlFor,
   type BootstrapOptions,
   type Server,
 } from './bootstrap.js';
@@ -73,21 +75,22 @@ export {
 } from './challenge/board.js';
 
 export {
-  CONFIRMATION_TTL_MS,
+  LOGIN_TTL_MS,
   MissingSecretError,
-  SCRYPT_PARAMS,
   constantTimeEquals,
-  hashPassword,
   newSessionToken,
-  passwordIssues,
-  passwordMatches,
   requireSecret,
-  signConfirmation,
-  verifyConfirmation,
-  type PasswordHash,
+  signLoginToken,
+  verifyLoginToken,
+  type LoginClaims,
+  type LoginToken,
+  type TokenFailure,
 } from './accounts/credentials.js';
 
-export { OutboxMailer, confirmationMessage, type Mailer, type Message } from './mail/mailer.js';
+export { FixedWindowLimiter, MAX_TRACKED_KEYS, type RateLimitRule } from './accounts/rateLimit.js';
+
+export { OutboxMailer, signInMessage, type Mailer, type Message } from './mail/mailer.js';
+export { AcsMailer, MailerConfigurationError, acsMailerFrom, type AcsMailerOptions } from './mail/acsMailer.js';
 
 export {
   BOARD_METRICS,
@@ -97,13 +100,26 @@ export {
   type BoardMetric,
   type ChallengeEntryRow,
   type EntryRow,
+  type LoginTokenRow,
   type SessionRow,
   type StoreOptions,
   type UserRow,
 } from './store/store.js';
 
+export { PgSql, type Sql, type SqlResult } from './store/sql.js';
+
 export { createApi, type Api, type ApiDeps, type ApiRequest, type ApiResponse } from './http/api.js';
-export { MAX_BODY_BYTES, bearerOf, serve, type ServeOptions } from './http/serve.js';
+export { MAX_BODY_BYTES, bearerOf, clientIpOf, serve, type ServeOptions } from './http/serve.js';
+export {
+  API_ORIGIN_META_NAME,
+  SAME_ORIGIN_API,
+  assetFor,
+  cacheControlFor,
+  loadStaticBundle,
+  withApiOriginTag,
+  type StaticAsset,
+  type StaticBundle,
+} from './http/static.js';
 export { main } from './main.js';
 
 export {

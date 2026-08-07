@@ -59,12 +59,20 @@ export function fakeReplication(
   };
 }
 
+/**
+ * One arm, with a display name that is **not** its id.
+ *
+ * Deliberately different from the slug: the report names an arm by
+ * {@link BatchArmResult.dispatcherProfileName}, and a fixture whose name equalled its id would let
+ * a regression back to slugs pass every assertion in `report.test.ts`.
+ */
 export function fakeArm(
   armId: string,
   dispatcherProfileId: string,
   replications: readonly BatchReplication[],
+  dispatcherProfileName = `Fixture ${dispatcherProfileId}`,
 ): BatchArmResult {
-  return { armId, dispatcherProfileId, replications };
+  return { armId, dispatcherProfileId, dispatcherProfileName, replications };
 }
 
 /**
@@ -119,8 +127,13 @@ export function fakeResult(
     durationS: 900,
     arrivalRatePctPop5min: null,
     arms: [
-      fakeArm('baseline', 'collective', build(0, 0)),
-      fakeArm('candidate', 'eta', build(delta, spread)),
+      /*
+       * The shipped display names for these two ids, so the assertions below are about the name
+       * the product actually prints. Neither contains its own slug, which is what makes a
+       * regression to `eta`/`collective` visible rather than accidentally passing.
+       */
+      fakeArm('baseline', 'collective', build(0, 0), 'Conventional collective'),
+      fakeArm('candidate', 'eta', build(delta, spread), 'Minimum estimated wait'),
     ],
     crn: aligned
       ? { traceKey: 'k', checkedComparisons: n, mismatches: [], aligned: true }

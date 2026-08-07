@@ -34,6 +34,24 @@
  * - **clauses 5 and 7** — the missing stylesheet and the missing way back are DOM facts, and are
  *   asserted by reading `index.html` in `dev/surfaces.test.ts`. A model walk cannot see them, and
  *   claiming otherwise is exactly what S9 forbids.
+ *
+ * ## What it did **not** catch, and why — the correction this file has already needed once
+ *
+ * GitHub issues #42 and #44: four of the six intents that carry a chosen value were dispatched
+ * unrewritten, so every Commissioning dropdown and the Calendar were inert on the shipped page. This
+ * walk presses every option of every select on every screen and said nothing about any of them.
+ *
+ * The reason is the one worth carrying forward. The select case **built the intent it pressed with
+ * the same expression the panel used** — `row.intent.kind === 'set-free-play' || row.intent.kind ===
+ * 'set-setting' ? { ...row.intent, value } : row.intent` — and skipped every row that fell into the
+ * fallback. Two copies of one condition can only ever agree, so the four broken transports were
+ * precisely the four this file asserted nothing about (§ D248 § 4). *A walk that reproduces the
+ * transport cannot measure it*, which is § D183's fixture-shaped failure arriving in a walk.
+ *
+ * It now presses `menu/screens.ts#withChosenValue` — the shipped transport, exhaustive over
+ * `MenuIntent` — and what it skips is decided by {@link REDUCER_OWNS}, a fact about `applyIntent`
+ * rather than a restatement of the panel. Watched failing against the old expression before being
+ * trusted.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -43,6 +61,7 @@ import { initialMenuState } from '../menu/menu.js';
 import {
   applyIntent,
   screenOf,
+  withChosenValue,
   type MenuAffordance,
   type MenuScreenView,
   type CommissioningScreenInput,
@@ -137,6 +156,20 @@ function commissioningArm(): CommissioningScreenInput {
     },
   };
 }
+
+/**
+ * The intent kinds `applyIntent` actually answers, so *the screen reflects it* is a fair question.
+ *
+ * **Derived from the reducer, not from the panel.** The three it omits — `set-calendar`,
+ * `set-commissioning`, `set-constraint` — write `ViewerState` rather than `MenuState` and
+ * `applyIntent` returns the state unchanged for them by design, which its own arm says in words. The
+ * expression this replaces named `set-free-play` and `set-setting` and was a copy of the *panel's*
+ * broken condition, which is why it skipped the four transports that were broken (§ D248 § 4).
+ *
+ * `set-challenge` is in here and was not in the old list: the reducer has always answered it, and
+ * the old expression dropped it for no reason anybody had stated.
+ */
+const REDUCER_OWNS = new Set(['set-free-play', 'set-setting', 'set-challenge']);
 
 const viewAt = (state: MenuState, arm: (typeof ARMS)[number]): MenuScreenView =>
   screenOf({ ...arm.input, state });
@@ -252,18 +285,36 @@ describe('every affordance is usable', () => {
      * The § D177 shape at navigation scale: press the control, require the model to move. A select
      * whose options were decorative — chosen, carried, and dropped — is the defect § D215 § 8 found
      * in this exact screen, where three of six axes reached nothing.
+     *
+     * ## This case used to contain a copy of the defect it exists to catch
+     *
+     * It built the intent it pressed with **the same expression the panel used**:
+     *
+     * ```ts
+     * row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
+     *   ? { ...row.intent, value: option.id }
+     *   : row.intent
+     * ```
+     *
+     * and then `continue`d past any row that fell into the fallback. So the four transports that
+     * were broken — `set-calendar`, `set-commissioning`, `set-constraint`, `set-challenge` — were
+     * exactly the four this walk asserted nothing about (§ D248 § 4). **A walk that reproduces the
+     * transport cannot measure it**: both copies agreed, and agreeing is all a duplicate can do.
+     *
+     * The transport is now `menu/screens.ts#withChosenValue` — the shipped one, which is a switch
+     * over `MenuIntent` with no `default`, so a seventh intent carrying a chosen value cannot join
+     * it in silence. Nothing is skipped by the *kind* of intent any more; what decides whether the
+     * screen is checked is whether `applyIntent` is the thing that answers this intent at all, which
+     * is a fact about the reducer rather than a restatement of the panel's condition.
      */
     for (const arm of ARMS) {
       for (const screen of MENU_SCREENS) {
         for (const row of viewAt(stateAt(screen), arm).rows) {
           if (row.kind !== 'select') continue;
           for (const option of row.options ?? []) {
-            const intent =
-              row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
-                ? { ...row.intent, value: option.id }
-                : row.intent;
+            const intent = withChosenValue(row.intent, option.id);
+            if (!REDUCER_OWNS.has(intent.kind)) continue;
             const next = applyIntent(stateAt(screen), intent);
-            if (intent.kind !== 'set-free-play' && intent.kind !== 'set-setting') continue;
             const after = viewAt(next, arm).rows.find((candidate) => candidate.id === row.id);
             expect(
               after?.value,
@@ -273,6 +324,58 @@ describe('every affordance is usable', () => {
         }
       }
     }
+  });
+
+  it('rewrites every select’s intent to the option chosen, including the ones the shell owns', () => {
+    /*
+     * The half the case above structurally cannot reach, and the half that was broken.
+     *
+     * `set-calendar`, `set-commissioning` and `set-constraint` write `ViewerState` rather than
+     * `MenuState`, so `applyIntent` returns the state unchanged by design and *the screen reflects
+     * it* is not a question this tier can ask. What it can ask — and what the four broken transports
+     * failed — is whether the **intent dispatched names the option the player picked** rather than
+     * the one the row was already showing.
+     *
+     * `menu/screens.test.ts` owns the deep version of this, including two cases that go all the way
+     * to the legs. This is the walk's own coverage of the same property, stated over the graph so
+     * that a row added to any screen is covered on the day it lands rather than when somebody
+     * remembers that file.
+     */
+    for (const arm of ARMS) {
+      for (const screen of MENU_SCREENS) {
+        for (const row of viewAt(stateAt(screen), arm).rows) {
+          if (row.kind !== 'select') continue;
+          for (const option of row.options ?? []) {
+            if (option.id === row.value) continue;
+            expect(
+              withChosenValue(row.intent, option.id),
+              `${screen}/${row.id} (${arm}) dispatches the value already showing when ` +
+                `"${option.id}" is chosen — a no-op by construction`,
+            ).not.toEqual(row.intent);
+          }
+        }
+      }
+    }
+  });
+
+  it('is not vacuous — the walk really reaches intents on both sides of that split', () => {
+    /*
+     * Without this, the pair above could pass over a graph in which every select carried a
+     * `set-free-play`, which is precisely the coverage the old duplicated ternary had: it skipped
+     * the four kinds that were broken, so its own reach was the shape of the defect.
+     */
+    const kinds = new Set(
+      everyRow()
+        .filter(({ row }) => row.kind === 'select')
+        .map(({ row }) => row.intent.kind),
+    );
+    expect([...kinds].some((kind) => REDUCER_OWNS.has(kind)), 'no select reaches the reducer').toBe(
+      true,
+    );
+    expect(
+      [...kinds].some((kind) => !REDUCER_OWNS.has(kind)),
+      'no select on this graph is one the shell owns, so the repaired transports are unwalked',
+    ).toBe(true);
   });
 
   it('toggles both ways', () => {

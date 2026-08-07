@@ -1,39 +1,76 @@
-# Compute offload — Phase A deployment runbook
+# Deploying the simulator to Azure
 
-Self-hosted Azure runners for the Linux leg of CI. This directory is the implementation of
-[`docs/15-compute-offload-contract.md`](../docs/15-compute-offload-contract.md) § 2; the contract is
-what the work is judged against, and it wins any disagreement with this file.
+One Container App serving the viewer and the API from a single origin, a PostgreSQL flexible server
+behind it, and Communication Services for the one mail this product sends.
+
+> **There is now a second, optional lane.** The page can be served from a CDN instead of from this
+> container, which removes a **32.2 s** cold first load — see
+> [`docs/16-static-site-deployment.md`](../docs/16-static-site-deployment.md) and
+> `infra/azure/swa/`. **It is not switched on**, nothing in it has ever been deployed, and this
+> document describes the deployment that exists. The one thing it adds here is the `viewerOrigin`
+> parameter in § 3.5, which is empty by default and changes nothing when it is.
 
 ---
 
-## 0. Read this first: nothing here is switched on
+## 0. Read this first: what has and has not been verified
 
-**Merging this changes nothing about how CI runs.** The Linux leg's runner label is
+**Deployed 2026-08-05** to `Rene Family` / `elevator-sim` / **eastus2**, serving at
+`https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io`.
 
-```yaml
-runner: ${{ vars.CI_LINUX_RUNNER_LABEL || 'ubuntu-latest' }}
-```
+Redeployed the same day at `cb50cee-amd64`, which is the first deploy carrying the play-test wave — and the first from a workstation rather than CI, which is how the `linux/arm64` trap in § 0.1 was found.
 
-and with the repository variable unset — which is the shipped state — that resolves to
-`ubuntu-latest`. No job asks for a self-hosted runner, so no job queues for one. The macOS leg is a
-literal `macos-latest` and cannot be retargeted at all.
+That sentence replaces an earlier one saying this had never been deployed. It is worth keeping the
+distinction sharp, because the last `infra/` in this repository published a figure that did not
+reproduce from its own template, and what let that survive review was that its untested parts read
+exactly like its tested ones. **One thing on this page is still in that category and it is named in
+§ 0.2.**
 
-That claim is not left as an assertion. `infra/checks/workflowMatrix.test.mjs` evaluates the
-expression under an empty variable set and requires `ubuntu-latest`, evaluates it under a populated
-one and requires the variable's value, and then mutates the shipped `ci.yml` nine ways — deleting
-the macOS leg, making it configurable, removing the fallback, pointing the default at a self-hosted
-label, flipping `fail-fast`, adding a Node axis, collapsing both legs onto one platform, moving the
-guard job onto the fleet it guards — and requires the guard to reject every one. It runs as the
-`matrix shape` job in `.github/workflows/ci.yml`, on a GitHub-hosted runner, with no `npm ci`.
+### 0.1 What the first deployment cost, in findings
 
-Run it yourself:
+Four failures, none of which the `az bicep build` that "compiled clean" could have caught. They are
+recorded because each one is a class, not an incident:
 
-```sh
-node --test 'infra/checks/*.test.mjs'
-```
+| Failure | What it actually was |
+|---|---|
+| `RoleDefinitionDoesNotExist` | The Communication and Email Service Owner role id was wrong in its last segment. A built-in role id is a fact to look up — both are now confirmed with `az role definition list`, and the command sits in the comment beside each |
+| `ParameterOutOfRange` on `Version`, allowed list `[]` | **PostgreSQL flexible server is restricted in East US on this subscription.** An empty list of allowed versions is what a blocked region looks like; the capability API says so outright. Hence `eastus2` |
+| `did not issue a challenge` from `az acr login` | The registry name was derived from the subscription id, so tearing the group down and redeploying recreated the *same* name. ARM said `Succeeded`, DNS resolved, and the data plane answered `GET /v2/` with a bare 404 instead of a 401 challenge. Registry names are now discovered, or created fresh and random |
+| `ActivationFailed` with **no logs and no replica** | The image was built on an Apple Silicon Mac, so it was `linux/arm64`; Container Apps runs `linux/amd64`. The revision takes 100 % of traffic, fails to activate, and there is no replica to log — `az containerapp logs show` answers *"Could not find a replica for this app"* and `runningStateDetails` is `null`, so the platform never says why. Diagnosed by comparing `docker image inspect --format '{{.Os}}/{{.Architecture}}'` against the image already deployed. **Always `docker build --platform linux/amd64`.** The previous images came from CI, which is x86, which is why this had never been seen |
+| `ResourceNotFound` on resources the template creates | ARM racing its own creates on a first pass. The resources existed on completion and a re-run converged — which is why the script is safe to re-run and says so |
 
-It is **not** part of `npm test`: `vitest.config.ts` scopes its projects to `packages/*`, and this
-lane does not own that file. The `matrix shape` job is the non-test caller.
+### 0.2 Still not verified
+
+**No mail has ever been sent.** `AcsMailer` is unit-tested for *selection* — which credential it
+picks and what it refuses — and has never reached Azure. `linkedDomains` on the Communication
+Service is the line most likely to be wrong, and its failure mode is a deployment that succeeds and
+a send that fails at run time. Registering an account is the test; § 4 has it.
+
+Also unverified: **scaling past one replica**. The store is PostgreSQL so concurrent replicas are
+sound in principle, but nothing has run two.
+
+**And the whole of the static-hosting lane.** `viewerOrigin` (§ 3.5) has never been set on a real
+deployment, no Static Web App has been created, and **no page has ever been served cross-origin** —
+so the CORS round trip, the preflight and a real sign-in against two origins are unit-tested and
+have never met a browser. `docs/16-static-site-deployment.md` § 9 itemises that lane's verified and
+unverified halves separately; it is longer than this paragraph because the lane is entirely
+unrun.
+
+**Verified, by running it:**
+
+| Claim | How |
+|---|---|
+| The image builds | `docker build` on `node:26-slim`, 488 MB |
+| The container boots in production mode | `NODE_ENV=production` against a real PostgreSQL 17 container |
+| The production `pg` driver works | It created all five tables and wrote a challenge row. The test suite uses PGlite, so this is the only thing that has exercised `PgSql` |
+| The dialect port is right | `bigint` for every `_ms` column — the row written holds `1785715200000`, which `integer` could not — `double precision` for metrics, `boolean` for `confirmed`, and the unique index on `lower(display_name)` |
+| The viewer builds and runs | `npm run build:web`, served by the server, driven in a browser: all 8 buildings and 5 traffic profiles load, and a 30-minute shift simulates |
+| Viewer and API share one origin | `/` serves HTML, `/api/*` serves JSON, `/no/such/page` is a 404 and **not** a rewrite to `index.html` |
+| The template compiles | `az bicep build`, clean, no warnings — and § 0.1 is the list of things that passed this and still failed |
+| **The deployed app serves** | Live over TLS: `/` returns HTML, `/api/*` JSON, `http://` 301s to `https://`, `/no/such/page` is a 404. The viewer renders and its console is clean |
+| **Azure PostgreSQL is reached and written** | `/api/challenges` issues a challenge, which is an insert followed by a read, against the flexible server |
+| **Nothing crosses a region** | Registry, identity, logs, environment, app and database are all `eastus2`. Communication Services is `global`, which is inherent to it and not on any request path |
+
+**The cost figures in § 5 remain derived from published list prices, not from a bill.**
 
 ---
 
@@ -41,317 +78,237 @@ lane does not own that file. The `matrix shape` job is the non-test caller.
 
 | Resource | Why |
 |---|---|
-| VM scale set, `Standard_D8ds_v5`, Ubuntu 24.04, **x86-64** | Contract § 0.2. An ARM pool would be a *third pin environment*, not a cheaper Linux one — § D201 found the § D196 pin set exactly inverted between Linux and darwin/arm64. `ci.yml` also fails the leg at runtime if `uname -m` is not `x86_64`. |
-| Ephemeral OS disk on local NVMe | Contract § 2: one job per runner. There is nothing durable to reuse. |
-| User-assigned managed identity | Reads the GitHub credential from Key Vault at boot; reimages its own instance afterwards. Scoped to those two things and nothing else. |
-| Key Vault (created **empty**) | Holds the GitHub credential. This template never writes a secret and the repository never holds one. |
-| VNet + NSG, no inbound rules | The runner dials out. Debugging is `az vmss run-command`, not SSH. |
-| Consumption budget (optional) | Alerts. **It does not cap** — see § 6. |
+| Container App, 0.5 vCPU / 1 GiB, **scale-to-zero** | The viewer and the API in one process, one origin. `minReplicas: 0` is what makes it cheap |
+| Container Apps environment + Log Analytics | Where the app runs, and where its logs go |
+| PostgreSQL flexible server, `Standard_B1ms`, 32 GiB | Accounts and leaderboard entries. **Cannot scale to zero** — see § 5 |
+| Communication Services + Email + `AzureManagedDomain` | Confirmation mail, from the free `azurecomm.net` subdomain |
+| User-assigned managed identity | Sends mail with **no credential**: it holds the *Communication and Email Service Owner* role, and revocation is deleting the assignment |
 
-**The ephemerality mechanism.** `cloud-init.yaml` registers the runner with `--ephemeral`, runs
-exactly one job, and then POSTs a **reimage** for its own instance. Reimage restores the platform
-image from local NVMe and re-runs cloud-init, so the next job gets a genuinely clean tree — not a
-restarted process on the same filesystem, which would leave `node_modules`, `dist/` and the npm
-cache behind. A stale `dist/` produced 5 spurious failures during the § D201 investigation and
-`ci.yml` already has a comment about it; this is the same defect closed structurally.
-
-The reimage is unconditional. A *failed* job leaves exactly the dirty tree the next one must not
-inherit.
+**What is not here.** No container registry: the app cannot deploy until an image exists to pull, so
+the registry has to be created and filled before this template runs. The *grant* is here — the
+template assigns `AcrPull` on it to the app's identity. No custom domain either: connecting one to a
+Communication Service is a DNS-verified manual step a template cannot perform.
 
 ---
 
 ## 2. Prerequisites
 
-- An Azure subscription you can create resource groups in, and `Owner` or
-  `User Access Administrator` on it (the template creates two role assignments).
+- An Azure subscription you can create resource groups in, and `Owner` or `User Access
+  Administrator` on it (the template creates a role assignment).
 - `az` ≥ 2.60 with the Bicep CLI (`az bicep install`).
-- `gh` CLI, authenticated, with admin on the repository.
-- An SSH public key. It is a public key, but pass it at deploy time rather than committing it.
+- Somewhere to push a container image.
 
 ---
 
 ## 3. Deploy
 
 ```sh
-# 1. Group. One group, so teardown is one command.
-az group create --name elevator-sim-ci --location eastus
+az group create --name elevator-sim --location eastus
+```
 
-# 2. Parameters. The example file has no secrets in it; your filled-in copy is gitignored.
+Build and push the image. Any registry works; ACR is the one that needs no extra credential
+handling, because the identity can pull with `AcrPull`:
+
+```sh
+az acr create --resource-group elevator-sim --name elevsimacr --sku Basic --admin-enabled false
+az acr login --name elevsimacr
+docker build -t elevsimacr.azurecr.io/elevator-sim:$(git rev-parse --short HEAD) .
+docker push elevsimacr.azurecr.io/elevator-sim:$(git rev-parse --short HEAD)
+```
+
+Then the parameters. **The two secrets are passed on the command line rather than written into a
+file**, so neither ever rests on disk:
+
+```sh
 cp infra/azure/main.parameters.example.json infra/azure/main.parameters.json
-$EDITOR infra/azure/main.parameters.json     # githubRepositoryUrl, adminSshPublicKey
+$EDITOR infra/azure/main.parameters.json     # containerImage, containerRegistryServer
+```
 
-# 3. What-if first. Read it. This is the only preview you get.
+**What-if first. Read it.** This is the only preview there is, and given § 0 it is the closest thing
+to evidence this template has:
+
+```sh
 az deployment group what-if \
-  --resource-group elevator-sim-ci \
+  --resource-group elevator-sim \
   --template-file infra/azure/main.bicep \
-  --parameters @infra/azure/main.parameters.json
+  --parameters @infra/azure/main.parameters.json \
+  --parameters appSecret="$(openssl rand -base64 48)" \
+               databaseAdminPassword="$(openssl rand -base64 24)"
+```
 
-# 4. Deploy.
+Deploy. Generate each secret **once** and keep it — regenerating `appSecret` on a later deployment
+invalidates every confirmation link already in flight:
+
+```sh
+APP_SECRET="$(openssl rand -base64 48)"
+DB_PASSWORD="$(openssl rand -base64 24)"
+
 az deployment group create \
-  --resource-group elevator-sim-ci \
+  --resource-group elevator-sim \
+  --name app \
   --template-file infra/azure/main.bicep \
-  --parameters @infra/azure/main.parameters.json
+  --parameters @infra/azure/main.parameters.json \
+  --parameters appSecret="$APP_SECRET" databaseAdminPassword="$DB_PASSWORD"
 ```
 
-### The GitHub credential
+**The registry grant is part of the template, not a step here.** Passing `containerRegistryServer`
+makes it assign `AcrPull` on that registry to the app's identity, and the Container App explicitly
+depends on the assignment — so the app is never created before it can pull. The registry has to be
+in this resource group for that to resolve.
 
-The runners need a repository-admin credential to mint their own short-lived registration tokens.
-Create a **fine-grained personal access token**, scoped to this one repository, with
-**`Administration: Read and write`** (the permission the `actions/runners/registration-token`
-endpoint requires) and a 90-day expiry. Then:
+### 3.5 `viewerOrigin`, and what it moves
 
-```sh
-VAULT=$(az deployment group show -g elevator-sim-ci -n main --query properties.outputs.keyVaultName.value -o tsv)
-SECRET=$(az deployment group show -g elevator-sim-ci -n main --query properties.outputs.githubCredentialSecretName.value -o tsv)
+Empty is the default and the shipped state: the container serves the page and the API from one
+origin, sign-in links point at this app, and `ELEVATOR_SIM_ALLOW_ORIGIN` is empty, meaning **no page
+may call this API cross-origin**. That is what has been deployed and what § 0 describes.
 
-# Read from stdin so the token is not in your shell history.
-az keyvault secret set --vault-name "$VAULT" --name "$SECRET" --file /dev/stdin
-```
+Set it — to a static host's origin, no trailing slash — and two environment variables move together:
 
-**Why Key Vault rather than the scale set's `customData`.** `customData` is stored on the scale set
-model and is readable by anyone with `Reader` on the resource group. Via Key Vault the credential
-exists on the VM only as a shell variable, for the seconds between the fetch and the exchange for a
-registration token, and is `unset` immediately after. Nothing writes it to disk.
+| | Becomes | Because |
+|---|---|---|
+| `ELEVATOR_SIM_ORIGIN` | the site's origin | A sign-in link resolves to a *page* (§ D241 § 4), and the page is now over there |
+| `ELEVATOR_SIM_ALLOW_ORIGIN` | the site's origin | The page's `fetch` is now cross-origin |
 
-**Why a PAT rather than a GitHub App.** A GitHub App is the better credential — no expiry to
-babysit, installation tokens live an hour, revocation is one click. It is not what ships here
-because minting an installation token requires signing an RS256 JWT at boot, which is another
-moving part in a shell script whose failure mode is a silently unregistered runner. The App is the
-upgrade; the PAT is one `curl`. If you rotate the PAT, no redeployment is needed — the VMs read the
-vault on every boot.
+One parameter for both, so they cannot drift — and `main.ts` refuses to start if they somehow do.
+**`*` is refused outright**: the API answers session-bearing requests and a verification is a whole
+simulation, so a wildcard publishes both to every page on the web.
 
-**Why OIDC is named here but not used.** OIDC federated credentials are the right answer for the
-*other* direction — a workflow that deploys or manages this Azure estate should authenticate with a
-federated credential on a Microsoft Entra app (`subject: repo:OWNER/elevator-sim:ref:refs/heads/main`)
-rather than a stored `AZURE_CREDENTIALS`, because there is then no long-lived client secret in the
-repository, tokens are minted per run and bound to an audience and a subject, and revocation is
-deleting the federated credential rather than rotating something you hope nobody copied. **Phase A
-ships no such workflow.** You deploy from your own machine with `az login`, so there is no secret in
-this repository because there is no automation here to hold one. Add the federated credential when
-you automate the deployment, not before.
+A **third** value has to agree and does not live here: the static site must be *built* with
+`ELEVATOR_SIM_API_ORIGIN` set to this app's `apiOrigin` output. It is a GitHub variable rather than
+an ARM parameter, and `docs/16-static-site-deployment.md` § 3 is the order all three are set in — an
+order, because the site's hostname does not exist until its own template has run.
+
+**None of this has been deployed.** See § 0.2.
 
 ---
 
-## 4. Turn it on
+## 4. Verify
 
 ```sh
-LABEL=$(az deployment group show -g elevator-sim-ci -n main --query properties.outputs.ciLinuxRunnerLabel.value -o tsv)
-gh variable set CI_LINUX_RUNNER_LABEL --body "$LABEL"
+az deployment group show -g elevator-sim -n app --query properties.outputs.appUrl.value -o tsv
 ```
 
-Turn it off — instantly, and this is also the rollback:
+Open it. The menu should render, and Free play should list eight buildings — if the buildings are
+missing, `__buildings.json` did not make it into the image, which means the Vite build was skipped.
 
 ```sh
-gh variable delete CI_LINUX_RUNNER_LABEL
+# The API answers, and the database is reachable: this route reads and writes.
+curl -s "$(az deployment group show -g elevator-sim -n app --query properties.outputs.appUrl.value -o tsv)/api/challenges" | head -c 200
+
+# Logs. The startup line says "viewer and API" when the bundle loaded, and "API" when it did not.
+az containerapp logs show -g elevator-sim -n elevsim-app --tail 50
 ```
 
-The next workflow run falls back to `ubuntu-latest`. Nothing else changes: the job is still named
-`suite (linux)`, so a required status check keeps its name across the switch in both directions.
+**Then test the one path nothing has ever exercised**: register an account and confirm that mail
+arrives. Per § 0 item 2, this is the most likely thing to be broken, and the failure surfaces as a
+registration that returns 500 with `Azure Communication Services did not accept the message` in the
+logs.
 
 ---
 
-## 5. Verify the runner is live
+## 5. Cost
 
-```sh
-# The VMs exist and are running.
-az vmss list-instances -g elevator-sim-ci -n elevsimci-vmss -o table
+> Derived from Azure's published pay-as-you-go list prices for **East US**, at the **shipped
+> parameter defaults**. Not a quote. Verify against the Azure pricing calculator for your
+> subscription and agreement.
 
-# GitHub can see them, idle, with the right labels.
-gh api repos/OWNER/elevator-sim/actions/runners \
-  --jq '.runners[] | {name, status, busy, labels: [.labels[].name]}'
+**The app scales to zero. The database does not, and that is the whole bill.** Saying only the
+first half is precisely the overstatement that got the previous `infra/` withdrawn.
 
-# What a specific instance is doing. There is no inbound SSH; this goes through the VM agent.
-az vmss run-command invoke -g elevator-sim-ci -n elevsimci-vmss --instance-id 0 \
-  --command-id RunShellScript --scripts "journalctl -u gh-runner -n 80 --no-pager"
-```
+| Line item | Rate | At rest |
+|---|---|---|
+| PostgreSQL `Standard_B1ms`, 730 h | ≈ $0.018 / h | **≈ $13.14 / month** |
+| PostgreSQL storage, 32 GiB | ≈ $0.115 / GiB | **≈ $3.68 / month** |
+| Container App at `minReplicas: 0` | consumption | **$0** |
+| Log Analytics | first 5 GiB free | ≈ $0 |
+| ACS email | $0.25 / 1 000 messages | ≈ $0 |
 
-Expect `status: online`, `busy: false`, and labels including `self-hosted`, `linux`, `x64` and
-`elevator-sim-linux-x64`. A runner that appears and disappears every couple of minutes is normal —
-that is the ephemeral cycle. A runner that never appears is almost always the Key Vault secret
-(check the journal for a 403 from `vault.azure.net`, which usually means the role assignment had
-not propagated on first boot; the systemd unit retries every 30 s).
+**Floor: ≈ $17 / month**, and it is all database. Add ≈ $5 for an ACR Basic registry if you use one.
 
-Then run CI once and read the **"Record the environment the pins are being judged against"** step.
-It prints the runner label, the runner *name*, `uname -m` and the kernel. § D201's standing rule is
-that a run is a machine as well as a commit, and on a self-hosted leg that block is the only thing
-that says which machine.
+### Active compute, and why it is usually free
 
-### What must not move
+Container Apps bills $0.000024 per vCPU-second and $0.000003 per GiB-second, and the free grant is
+180 000 vCPU-seconds and 360 000 GiB-seconds a month. At the shipped `0.5` vCPU and `1` GiB, one
+replica-hour costs 1 800 vCPU-seconds and 3 600 GiB-seconds — so **the first ~100 replica-hours each
+month are free**, and a simulator nobody is using bills nothing above the database floor.
 
-Contract criterion 4: **no pinned estimate and no identity digest moves.** Phase A changes where the
-suite runs, not what it computes, and § D202 established that every discrete decision this simulator
-makes is bit-portable across architectures. If a pin moves on the first self-hosted run, that is a
-**finding about the runner** — report it and stop. It is not a value to edit. § D196/§ D201 cost
-this repository a wave over precisely that mistake.
+### The ceiling, derived from the parameters
 
-The first thing to check in that case is `imageVersion`, which defaults to `latest`.
-
----
-
-## 6. Cost
-
-> **These are estimates derived from Azure's published pay-as-you-go list prices, not a quote.**
-> Verify against the Azure pricing calculator for your subscription, region and agreement before
-> deploying. Spot prices are variable by definition and the figure below is a planning number, not
-> a rate you are promised.
-
-**Assumptions:** region **East US**; SKU **`Standard_D8ds_v5`** (8 vCPU, 32 GiB, x86-64); Linux, no
-OS licence; ephemeral OS disk on the local resource disk, so **no managed disk charge**;
-`egressMode: instancePublicIp`; `runnerCount: 2`; `useSpot: true`.
-
-| Line item | Rate |
-|---|---|
-| `D8ds_v5`, Linux, pay-as-you-go | ≈ **$0.452** / hour |
-| `D8ds_v5`, Linux, Spot (planning figure, ≈70 % off) | ≈ **$0.14** / hour |
-| Standard public IP, per live instance | ≈ $0.005 / hour (≈ $3.65 / month) |
-| NAT Gateway — *only* if `egressMode: natGateway` | ≈ $0.045 / hour (≈ **$32.85 / month, standing**) + $0.045 / GB |
-| Key Vault, standard | $0.03 per 10 000 operations |
-| Ephemeral OS disk | $0 |
-| Egress bandwidth | first 100 GB / month free, then ≈ $0.087 / GB |
-
-### The declared ceiling
-
-Contract criterion 7 requires a ceiling declared before the first fan-out. **A budget alert is not a
-ceiling** — Azure budgets notify and do not stop spend. The actual ceiling is `runnerCount`, because
-that is the only thing that bounds the burn rate:
+`maxReplicas` is the only thing bounding compute, exactly as `runnerCount` was in the withdrawn
+template — the difference is that here the floor really is zero:
 
 ```
-ceiling ≈ runnerCount × 730 h × (VM hourly rate + $0.005)   [+ $32.85 if egressMode = natGateway]
+compute ceiling ≈ maxReplicas × 730 h × (1800 × $0.000024 + 3600 × $0.000003) − free grant
+                ≈ maxReplicas × 730 × $0.0540 − $5.40
+total ceiling   ≈ compute ceiling + $16.82   (the database floor above)
 ```
-
-At the shipped defaults, with both VMs pinned busy every hour of a 730-hour month:
 
 | Configuration | Absolute ceiling / month |
 |---|---|
-| **2 × `D8ds_v5`, Spot, instance IPs (the default)** | **≈ $212** |
-| 2 × `D8ds_v5`, Regular, instance IPs | ≈ $667 |
-| 2 × `D8ds_v5`, Spot, NAT Gateway | ≈ $245 |
+| **`maxReplicas: 2` (the default), both pinned busy every hour** | **≈ $90** |
+| `maxReplicas: 1` | ≈ $51 |
+| `maxReplicas: 10` | ≈ $407 |
 
-**Declared ceiling: $250 / month** at the shipped defaults. That is also the default
-`monthlyBudgetAmount`, so the alert and the ceiling are the same number rather than two numbers that
-drift apart.
+**Declared ceiling: $90 / month at the shipped defaults.** Expected: **≈ $17**, because reaching the
+ceiling means two replicas saturated continuously for a month.
 
-### Expected cost at a stated utilisation
+That expected figure **reproduces from this template**: `minReplicas` is `0` in `main.bicep`, so the
+app bills only while serving, and the $17 is the database — which is a resource in the same file at
+a SKU named in the same file. That is the criterion `docs/15` § 4 says the compute-offload contract
+should have had and did not.
 
-**Utilisation assumed: 120 Linux CI jobs per month** (≈ 4 a day — a busy wave is more, a quiet week
-much less), each **≈ 15 minutes of suite plus ≈ 2 minutes of provisioning and reimage** ≈ 0.28
-runner-hours, so **≈ 34 runner-hours per month**.
+### There is no budget alert here, deliberately
 
-| Configuration | Expected / month |
-|---|---|
-| **Spot + instance IPs (the default)** | **≈ $5** |
-| Regular + instance IPs | ≈ $16 |
-| Spot + NAT Gateway | ≈ $43 |
-
-**The 15-minute figure is an extrapolation, not a measurement.** The suite takes ~35 minutes on
-`ubuntu-latest` (`review.yml`'s header) and the contract § 1 puts it at roughly one CPU-hour at
-5–6× parallelism; 8 vCPU should land somewhere in 12–18 minutes, and nothing here has measured it
-because nothing has been provisioned. **The first real run replaces this number.** Until it does,
-the cost figure is an estimate with a decimal point on it.
-
-### Why the default is not the NAT Gateway
-
-At this utilisation the NAT Gateway is **about 80 % of the bill** — $38 standing and metered against
-$5 of compute — and it buys one stable, allowlistable egress IP that nothing in this repository has
-asked for. That is why `egressMode` defaults to `instancePublicIp`, which bills only while an
-instance exists. Switch to `natGateway` if your organisation requires egress from a known address;
-it is one parameter, and it roughly ten-times the bill.
-
-### The Spot trade-off
-
-Spot instances cost roughly 60–90 % less and can be evicted with 30 seconds' notice. **An eviction
-surfaces in GitHub as a failed job that is not a test failure** — the log says the runner received a
-shutdown signal — and a red leg that does not mean what a red leg means is exactly the ambiguity
-this repository is worst served by. Against that: at CI utilisation it is a handful of re-runs a
-month against a 3× bill, `maxPrice: -1` means you never pay above the pay-as-you-go rate, and the
-`suite` job's `fail-fast: false` means an evicted Linux leg does not take the macOS leg with it.
-
-Set `useSpot: false` when a red leg has to be unambiguous — during a pin investigation, or for the
-Phase B measurement fan-out where an evicted shard is a lost replication block. Phase B is a
-separate lane and is out of scope here.
+An Azure budget notifies and does not cap, and the previous template's § 6 said so correctly in one
+paragraph and then contradicted it in the next by presenting the alert as a ceiling. `maxReplicas`
+and the database SKU are the ceiling. Add a budget if you want the email — just do not mistake it
+for a limit.
 
 ---
 
-## 7. Tear it down
-
-**Delete the repository variable first.** Deleting the infrastructure while `CI_LINUX_RUNNER_LABEL`
-is still set leaves every Linux job queueing for a runner that no longer exists — and job queue time
-is *not* bounded by `timeout-minutes`, so they sit for up to 24 hours before failing.
+## 6. Tear it down
 
 ```sh
-gh variable delete CI_LINUX_RUNNER_LABEL     # CI is back on ubuntu-latest from the next run
-az group delete --name elevator-sim-ci --yes --no-wait
+az group delete --name elevator-sim --yes --no-wait
 ```
 
-The Key Vault is soft-deleted for 7 days. If you want to redeploy with the same name inside that
-window, purge it:
-
-```sh
-az keyvault purge --name <vault-name> --location eastus
-```
-
-Then revoke the fine-grained PAT in GitHub settings, and delete any offline runners left in
-**Settings → Actions → Runners**.
+One group, one command, and the role assignment goes with it. Nothing outside the group is touched.
 
 ---
 
-## 8. Known limitations
+## 7. Known limitations
 
-Stated rather than discovered later.
+Stated rather than discovered later. § 0's *"none of this has been deployed"* is the first one and
+is not repeated here.
 
-1. **None of this has been deployed.** The template compiles clean under `az bicep build` (v0.46.1)
-   and the cloud-config parses, and that is the whole of the evidence. No VM has booted, no runner
-   has registered, and no job has run on one. Everything in § 5 and § 6 is a prediction. This is the
-   most important limitation on the page.
-2. **Queue time is unbounded.** GitHub does not let a workflow time out while *waiting* for a
-   runner; `timeout-minutes` starts when the job does. If the pool is down and the variable is set,
-   jobs queue for up to 24 hours. The mitigation is § 4's one-line rollback.
-3. **`imageVersion` defaults to `latest`.** Canonical rolling a new 24.04 image is an uncontrolled
-   change to the machine the Linux pins are judged on — which is precisely what contract § 0.2 is
-   about. Pinning it is one parameter, and is the first thing to do if a pin ever splits the matrix
-   after this pool goes live.
-4. **The runner binary is resolved at boot** (`runnerVersion: latest`) and installed with
-   `--disableupdate`, so it is stable *within* a job and not *between* jobs. Pin `runnerVersion` if
-   that matters.
-5. **No demand-driven autoscaling.** Capacity is fixed at `runnerCount`. Cost is bounded by that
-   number, not by demand, and a burst of concurrent PRs queues rather than scaling out.
-6. **Every job pays 60–120 s of re-provisioning**, because reimage restores the platform image and
-   cloud-init runs again. A pre-baked image (Azure Image Builder) would remove it; that is future
-   work, not Phase A.
-7. **Uniform orchestration.** Chosen because per-instance self-reimage is the well-trodden path
-   there. Flexible is Azure's forward direction and a later migration.
-8. **The workflow guard models GitHub's `||`, it does not execute it.** The evaluator in
-   `infra/checks/workflowMatrix.mjs` is deliberately tiny and throws on any expression shape it does
-   not fully understand, so a rewrite cannot pass by being unrecognised — but it is a model, and the
-   authority on GitHub expressions is GitHub.
-
----
-
-## 9. The fork pull request problem
-
-**Read this before setting the variable if this repository is public.**
-
-`ci.yml` triggers on `pull_request`. A pull request from a fork therefore runs *that fork's code* on
-your VM, inside your subscription, with your managed identity attached to the metadata endpoint.
-GitHub's own documentation recommends against self-hosted runners on public repositories for exactly
-this reason.
-
-What is already in the design's favour, and what is not:
-
-- **In its favour.** The VM is destroyed after every job, so nothing a malicious job leaves behind
-  survives to the next one. The `runner` user has no `sudo`. The managed identity's only grants are
-  *read one Key Vault secret* and *reimage this one scale set* — it cannot reach any other resource
-  in the subscription. `suite` runs with `permissions: contents: read`.
-- **Not in its favour.** A job that can reach the metadata endpoint can read that Key Vault secret,
-  which is a repository-admin credential. That is the real exposure, and the mitigations above
-  narrow it rather than close it.
-
-**Before you turn this on for a public repository**, set
-*Settings → Actions → General → Fork pull request workflows from outside collaborators* to
-**"Require approval for all external contributors"**. That is the control that matters, it is a
-repository setting rather than anything in this directory, and nothing here can assert that you have
-set it.
-
-The stronger fix, if forks ever become routine, is to stop putting the GitHub credential within
-reach of a job at all — a just-in-time runner registration minted by a controller outside the VM,
-rather than by the VM itself. That is a different design, not a parameter.
+1. **The database firewall permits all Azure services.** `allow-azure-services` is the
+   `0.0.0.0`-`0.0.0.0` rule, which means any Azure-hosted resource — including in other
+   subscriptions — can *reach* the server, leaving the password as the only control. Container Apps
+   egress from a shared address pool, so a narrower rule is not available without VNet integration
+   and a private endpoint. That is the right fix, and it roughly doubles the standing cost.
+2. **The database password is a template parameter**, so it appears in the deployment history.
+   `az deployment group delete` removes that record; Key Vault references are the better answer and
+   are not what this ships.
+3. **No custom domain and no rate limiting at the edge.** The app's own per-account submission
+   cooldown is in memory (`chargeCooldown`), so it bounds one replica rather than the deployment —
+   at `maxReplicas: 2` a determined client gets two.
+4. **No backup of anything but the database**, whose retention is the 7-day service floor.
+5. **`AzureManagedDomain` is rate-limited** and its `azurecomm.net` sender is likelier to be
+   filtered than a verified custom domain. It is the right choice for proving the flow and the wrong
+   one for real users.
+6. **Scaling past one replica has never been tested.** The store is PostgreSQL so concurrent
+   replicas are sound in principle, but nothing has run two.
+7. **No CI deploys this.** Deployment is `az` from your own machine with `az login`, so there is no
+   stored credential in this repository because there is no automation to hold one. When that
+   changes, the right credential is a federated one on a Microsoft Entra app
+   (`subject: repo:OWNER/elevator-sim:ref:refs/heads/main`) rather than a stored secret — add it
+   when you automate the deployment, not before. *(The **viewer's** deployment is automated:
+   `.github/workflows/deploy-viz.yml` federates into a user-assigned managed identity and stores no
+   secret. It is inert until armed, and it deploys the page only — never this app or this
+   database.)*
+8. **A cold first page load takes 32.2 seconds**, measured on the live deployment against 0.13 s
+   warm. `minReplicas: 0` is what makes this deployment cheap and it is also what makes the first
+   visitor wait, because `serve.ts` serves the page out of the container that is asleep.
+   `GET /api/wake` does not help: the page is the thing being waited on. Two fixes, and neither is
+   free of a trade — `minReplicas: 1` costs roughly $34/month, and moving the page to a CDN costs
+   nothing and splits the origin (`docs/16-static-site-deployment.md` § 2).

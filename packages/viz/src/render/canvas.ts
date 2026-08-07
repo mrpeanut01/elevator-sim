@@ -1282,7 +1282,17 @@ function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
   let cursor = layout.plot.x;
-  const rightEdge = layout.plot.x + layout.plot.width;
+  /*
+   * The whole canvas, not the plot — § D236.
+   *
+   * This row sits above `layout.plot.y`, and `layout.overlay` starts *at* `plot.y`, so nothing is
+   * drawn to the right of here on this line. Budgeting it by the plot meant the sentence that
+   * explains a squeezed picture inherited the squeeze: at a 360 px canvas the plot was one pixel
+   * wide and `fitLabel` returned `…` — the app showed one lift of six and the only thing saying
+   * so was three dots. The gutters are not exempt from being written across when the alternative
+   * is silence.
+   */
+  const rightEdge = layout.width - layout.paddingPx;
 
   if (input.filteredBankId !== undefined) {
     /*
@@ -1304,11 +1314,31 @@ function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
 
   if (layout.hiddenShaftCount > 0) {
     // RS-05: never silently truncated. The CLI's `watch` says "showing N of M" and so does this.
+    //
+    // § D236 — the advice names the remedy the reader **has**. It read *"widen the window"*, and
+    // on the building the whole campaign builds to that is false at every desktop size: Vertical
+    // City needs a 2 560 px viewport before the caption clears, so on a maximised 1080p monitor
+    // the app cropped its flagship scenario and told the player to widen a window with nowhere
+    // left to go. The `bank` select under the stage gives a clean, legible view of one bank in
+    // one click, and the caption never mentioned it. Named first, because it is the one that
+    // works; `RS-05` permits horizontal scroll **or** a bank filter, and this is the filter.
     ctx.fillStyle = theme.warning;
-    const text = fitLabel(
-      `showing ${String(layout.columns.length)} of ${String(layout.columns.length + layout.hiddenShaftCount)} shafts — widen the window`,
-      rightEdge - cursor,
-    );
+    const shown = String(layout.columns.length);
+    const all = String(layout.columns.length + layout.hiddenShaftCount);
+    /*
+     * Longest form that fits, rather than one form truncated — and the order matters. On a phone
+     * the budget takes the sentence's *tail*, and the tail is `widen the window`, which is the
+     * half a phone reader cannot act on at all. So the short form drops that clause and keeps the
+     * bank, and the fallback below keeps the count, which is the one thing that must survive:
+     * `RS-05` is about never truncating in silence, and a count is not silence.
+     */
+    const text =
+      [
+        `showing ${shown} of ${all} shafts — pick one bank below, or widen the window`,
+        `showing ${shown} of ${all} shafts — pick a bank below`,
+        `${shown} of ${all} shafts — pick a bank`,
+      ].find((candidate) => candidate.length * CHAR_ADVANCE_PX <= rightEdge - cursor) ??
+      fitLabel(`${shown} of ${all} shafts`, rightEdge - cursor);
     ctx.fillText(text, cursor, layout.header.noticeY);
     cursor += CHAR_ADVANCE_PX * (text.length + 2);
   }

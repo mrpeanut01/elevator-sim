@@ -22,8 +22,18 @@
  *
  * ## Accessibility, decided here rather than left to the mount
  *
+ * - **Every input has an accessible name.** The control's name is a `<label for>` bound to the
+ *   input's already-unique id, and the continuous renderer's second input — the number box beside
+ *   the slider — is pointed at that same element with `aria-labelledby`. It was a `<span>`, which
+ *   names nothing: every input on the tab announced its type, its state and its description while
+ *   never saying *which parameter*, a defect strictly larger than the § D222 one above it, since
+ *   that one left the name of the gate unspoken and this one left the name of the control unspoken.
  * - Every control's prose is a real element with an id, referenced by `aria-describedby`. A
  *   `title` attribute is not reachable by keyboard and the descriptions run to 1 167 characters.
+ * - **So is the reason**, since § D222 — and it is named *first* in `aria-describedby`, because a
+ *   reader who cannot act on the control should hear why before hearing the description. Before
+ *   that fix `aria-describedby` pointed at the help alone, so a screen reader said *disabled* and
+ *   never said *why*: the state was announced and its cause was on screen for sighted readers only.
  * - An inactive control is `disabled` **and** carries its reason as text (`UX.md` KB-15: never
  *   colour, and here never a visual state, as the only signal). `aria-disabled` goes with it so a
  *   screen reader reads the state and the reason together.
@@ -71,6 +81,34 @@ export const inputIdOf = (id: string): string => `param-${id.replace(/\./g, '-')
 
 /** The DOM id of a control's description, which `aria-describedby` points at. */
 export const helpIdOf = (id: string): string => `${inputIdOf(id)}-help`;
+
+/**
+ * The DOM id of a control's inactive reason, which `aria-describedby` points at when there is one.
+ *
+ * Exists because there was no id: the reason was drawn as an anonymous `<p>` and referenced by
+ * nothing, so a screen reader announced the control `disabled` and had no route to the sentence
+ * saying which gate to move. See § D222.
+ *
+ * **Not exported, unlike its two siblings above**, and the difference is not an oversight. Nothing
+ * outside this file needs to *name* the reason — the mount instantiates whatever tree it is given,
+ * and `render.test.ts` asserts the wiring by reading the id off the emitted element and requiring
+ * `aria-describedby` to point at it, which is the stronger claim: it fails on a **dangling**
+ * reference, and an assertion written against this function's return value would not.
+ */
+const reasonIdOf = (id: string): string => `${inputIdOf(id)}-inactive`;
+
+/**
+ * The DOM id of a control's name element, so a second input can be pointed at the same words.
+ *
+ * Only the continuous renderer needs it: a slider is *two* inputs for one parameter, and `for`
+ * names exactly one. The number box is labelled by reference rather than by a copy of
+ * `control.label`, so the two inputs cannot come to disagree about what parameter they are.
+ *
+ * Private for {@link reasonIdOf}'s reason: `render.test.ts` reads the id off the emitted label and
+ * requires the reference to resolve, which fails on a dangling idref where an assertion against
+ * this function's return value would not.
+ */
+const labelIdOf = (id: string): string => `${inputIdOf(id)}-label`;
 
 function node(
   tag: string,
@@ -125,7 +163,7 @@ export function valueAtSliderPosition(control: SliderControl, position: number):
 }
 
 /* -------------------------------------------------------------------------- *
- * The shared frame — label, help, unit, reset, reason
+ * The shared frame — label, lock badge, help, unit, reset, reason
  * -------------------------------------------------------------------------- */
 
 /** The `disabled` / `aria-disabled` pair, or nothing. One place, so the two cannot disagree. */
@@ -134,16 +172,136 @@ function disabledAttrs(control: Control): Readonly<Record<string, string>> {
 }
 
 /**
- * The wrapper every kind shares: name, unit, the input, the reset, the prose, and the reason.
+ * The badge on the label line: which gates this control is waiting on, in three or four words.
  *
- * The reason element is emitted **only** when there is one, and when there is one it is emitted
- * as text in the flow — not as a tooltip, not as a colour. docs/10 R3's shape: the thing that is
+ * Emitted **only** when the control is inactive, and it is the *summary* of the reason rather than
+ * a second opinion about it — the ids come off `ControlCommon.unmetGates`, the declared field, so
+ * the badge and {@link frame}'s sentence cannot drift into disagreeing about which gate is the
+ * problem. It does not reword `inactiveReason` and it does not replace it.
+ *
+ * KB-15 by construction: the badge is **words**, not a colour and not an icon that needs a legend.
+ * A reader who cannot see `.control-lock`'s tint still reads *needs dispatch.callType*, and the
+ * gate id is the thing they can act on — it is the label of another control on the same tab.
+ *
+ * The `unmetGates.length === 0` branch is unreachable through `controlsFor`, which populates the
+ * field whenever it withholds `enabled`. It is written anyway rather than asserted away: a
+ * `Control` is a plain interface any caller can build, and the failure mode of the alternative is
+ * a badge reading `needs ` with nothing after it.
+ */
+function lockBadge(control: Control): ControlNode | undefined {
+  if (control.enabled) return undefined;
+  const gates = control.unmetGates;
+  return node(
+    'span',
+    { class: 'control-lock', ...(gates.length === 0 ? {} : { 'data-unmet-gates': gates.join(' ') }) },
+    [],
+    gates.length === 0 ? 'not in effect' : `needs ${gates.join(' and ')}`,
+  );
+}
+
+/**
+ * The badge on the label line for a control that **gates** others — issue #79, § D252.
+ *
+ * ## The direction the form could not state
+ *
+ * § D222 shipped the gated end: an inactive control says `needs dispatch.callType`, so a reader
+ * looking at a dead knob can see which switch to move. The mirror was missing. A reader looking at
+ * `selection.policy` — which governs six other controls — was told nothing, so moving it produced a
+ * cascade with no warning and no account of itself. This is that account.
+ *
+ * ## Why a count and not a graph, and why not the ids
+ *
+ * The tab **already orders a gated control below its gate** (`controlsFor`'s gate order), so the
+ * layout encodes which controls a switch governs; what it cannot say is *how many* to look for. A
+ * dependency graph would be a second navigation model over information the page already carries,
+ * and the two would then have to be kept in step — so the badge answers the question the layout
+ * leaves open and adds no second model. The ids go on `data-unlocks` / `data-holds-open`, which is
+ * where a test and the mount read them; a badge naming six of them would be longer than the label
+ * it sits beside.
+ *
+ * ## Why the words move and the badge does not
+ *
+ * Presence is **structural** — the badge is emitted for a control that gates something and for no
+ * control that gates nothing, whatever the current point, because {@link ControlCommon.unlocks} and
+ * {@link ControlCommon.holdsOpen} partition the dependants exactly. A badge that read `unlocks 6`
+ * and then disappeared when the reader threw the switch would vanish at the one moment they are
+ * watching to see what they just did, which is the complaint the issue opens with.
+ *
+ * So the words say which side of the gate the dependants are on: `unlocks 6` while it is holding
+ * them shut, `holds 6 open` once it is not. When it is doing both — a categorical gate with six
+ * dependants under different conditions — the badge names the actionable half, and the two data
+ * attributes carry the whole partition.
+ *
+ * KB-15, by construction and not by a legend: the content is **words and a number**. `.control-gate`
+ * has a tint, and the tint is the second signal.
+ */
+function gateBadge(control: Control): ControlNode | undefined {
+  const shut = control.unlocks;
+  const open = control.holdsOpen;
+  if (shut.length === 0 && open.length === 0) return undefined;
+  const attrs: Record<string, string> = { class: 'control-gate' };
+  if (shut.length > 0) attrs['data-unlocks'] = shut.join(' ');
+  if (open.length > 0) attrs['data-holds-open'] = open.join(' ');
+  const text =
+    shut.length > 0
+      ? `unlocks ${String(shut.length)}`
+      : `holds ${String(open.length)} open`;
+  return node('span', attrs, [], text);
+}
+
+/**
+ * The wrapper every kind shares: name, the lock badge, the gate badge, unit, the input, the reset,
+ * the reason, and the prose.
+ *
+ * The reason element is emitted **only** when there is one, and when there is one it is emitted as
+ * **text in the flow** — not as a tooltip, not as a colour. docs/10 R3's shape: the thing that is
  * suppressed is replaced by why, never by a blank.
+ *
+ * ## What § D222 changed, and what it deliberately did not
+ *
+ * That rule was challenged by a play-tester — *the Parameters tab is a wall of fine print, move the
+ * reason into a `?` tooltip* — and it was re-decided **on a measurement rather than on the quote
+ * above**. On the shipped dispatcher space, 20 of 58 controls are inactive at the defaults, and
+ * their reasons total 1 797 characters against 20 464 characters of `control-help`: the reason is
+ * **8.1 % of the prose on the tab**. Hiding all of it would shorten the page by a twelfth and cost
+ * every touch and keyboard reader the sentence. The wall is the *description*, which is a different
+ * element and not what R3 governs. So the rule stands, and it now stands measured.
+ *
+ * What the tester was right about is **adjacency**, which no rule ever asked for and nothing
+ * supplied. The reason used to be emitted last, *below* `control-help` — and on the twenty inactive
+ * rows that description is a median of 318 and a maximum of 727 characters, so the explanation for a
+ * dead control sat a paragraph away from it. Two changes, neither of them a hiding place:
+ *
+ * 1. The reason is emitted **above** the help, so it is adjacent to the control it is about.
+ * 2. {@link lockBadge} puts the unmet gate ids **on the label line**, where the control's state is
+ *    read, with the full sentence still below.
+ *
+ * The reason keeps its own element, its own text and now its own id — it did not become a `title`,
+ * a `<details>` or a hover state. A `title` is unreachable by touch and by keyboard; a disclosure
+ * would have collapsed on every keystroke, because `dev/parameterForm.ts` redraws the whole form on
+ * each accepted edit and a fresh tree has no open state to restore.
  */
 function frame(control: Control, input: ControlNode): ControlNode {
   const children: ControlNode[] = [
-    node('span', { class: 'control-label' }, [], control.label),
+    // A `<label for>`, not a `<span>`. As a span this was the control's name on screen and nothing
+    // at all to an accessibility tree: every input on the tab had a type, a state and a description
+    // and **no accessible name**, so a screen reader could say *slider, disabled,* and then read 300
+    // characters about a parameter it had never named. `for` also buys click-to-focus, which the
+    // span never gave a pointer either. `.control-label`'s CSS is keyed on the class, not the tag.
+    node(
+      'label',
+      { class: 'control-label', id: labelIdOf(control.id), for: inputIdOf(control.id) },
+      [],
+      control.label,
+    ),
   ];
+  const badge = lockBadge(control);
+  if (badge !== undefined) children.push(badge);
+  // After the lock badge, because a control can carry both — `auction.rounds` is gated by
+  // `auction.aggregation` and gates `auction.reserveMarginalDelayS` — and what a reader needs
+  // first from a dead control is why it is dead.
+  const gate = gateBadge(control);
+  if (gate !== undefined) children.push(gate);
   if (control.unit !== undefined) {
     children.push(node('span', { class: 'control-unit' }, [], control.unit));
   }
@@ -162,12 +320,19 @@ function frame(control: Control, input: ControlNode): ControlNode {
       'reset',
     ),
   );
-  children.push(node('p', { class: 'control-help', id: helpIdOf(control.id) }, [], control.help));
+  // The reason before the help: it is the shorter sentence and the one a reader looking at a dead
+  // control is looking for. See this function's docstring for the measurement that reordered them.
   if (control.inactiveReason !== undefined) {
     children.push(
-      node('p', { class: 'control-inactive' }, [], `not in effect: it ${control.inactiveReason}`),
+      node(
+        'p',
+        { class: 'control-inactive', id: reasonIdOf(control.id) },
+        [],
+        `not in effect: it ${control.inactiveReason}`,
+      ),
     );
   }
+  children.push(node('p', { class: 'control-help', id: helpIdOf(control.id) }, [], control.help));
   return node(
     'div',
     {
@@ -180,13 +345,24 @@ function frame(control: Control, input: ControlNode): ControlNode {
   );
 }
 
-/** The attributes every input carries, whatever its kind. */
+/**
+ * The attributes every input carries, whatever its kind.
+ *
+ * `aria-describedby` names the reason **and** the help when there is a reason, reason first. It
+ * used to name the help alone, which meant a screen reader announced the control `disabled` — from
+ * {@link disabledAttrs} — and then read a description that never mentions the gate, so the state
+ * arrived without its cause. The order is the same adjacency argument {@link frame} makes visually:
+ * the reason is one clause and the description runs to 727 characters on the rows that have one.
+ */
 function inputAttrs(control: Control): Readonly<Record<string, string>> {
   return {
     id: inputIdOf(control.id),
     name: control.id,
     'data-parameter': control.id,
-    'aria-describedby': helpIdOf(control.id),
+    'aria-describedby':
+      control.inactiveReason === undefined
+        ? helpIdOf(control.id)
+        : `${reasonIdOf(control.id)} ${helpIdOf(control.id)}`,
     ...disabledAttrs(control),
   };
 }
@@ -208,10 +384,18 @@ export function renderSlider(control: SliderControl): ControlNode {
     'data-min': String(control.min),
     'data-max': String(control.max),
   });
-  // The number input carries the id-free copy: two inputs cannot share one `id`, and the range is
-  // the one the label points at because it is the one a pointer reaches for.
+  /*
+   * The number input carries its own id: two inputs cannot share one, and the range is the one
+   * `frame`'s `<label for>` points at because it is the one a pointer reaches for.
+   *
+   * That sentence used to be written here and was not true — there was no label to point at
+   * anything, only a `<span>`. Now that there is one, the number box would be the single input on
+   * the tab still left nameless, so it is labelled **by reference** to the same element rather than
+   * by a second copy of `control.label`.
+   */
   const number = node('input', {
     ...inputAttrs(control),
+    'aria-labelledby': labelIdOf(control.id),
     id: `${inputIdOf(control.id)}-number`,
     type: 'number',
     min: String(control.min),

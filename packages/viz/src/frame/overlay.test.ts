@@ -7,8 +7,8 @@
  *    `Frame.totalWaiting` is sampled from the fold. They come from different structures built by
  *    different code paths, so equality is evidence rather than tautology — and this is the check
  *    that would have caught a `describeLegs` that dropped or duplicated a leg.
- * 2. **A saturated run gets no mean.** Not asserted on a stub with `saturated: true` bolted on,
- *    but on `midtown-office` and `vertical-city`, which saturate at the shipped traffic rates.
+ * 2. **A saturated run gets no mean.** Not asserted on a stub with `saturated: true` bolted on, but
+ *    on `midtown-office` at the shipped traffic rate and on `suppressedConfig`'s stated one.
  * 3. **A non-saturated run does.** The negative control. Suppression that fires everywhere is
  *    indistinguishable from a module that never computes anything, and this repository has
  *    shipped that shape before.
@@ -21,7 +21,10 @@ import {
   BUILDING_IDS,
   DATA_DIR,
   PANEL_DISPATCHER_ID,
+  SUPPRESSED_BUILDING_ID,
+  SUPPRESSED_DEMAND_PCT,
   breadthConfig,
+  suppressedConfig,
 } from '../fixtures.test-helper.js';
 import { frameAt } from './frameAt.js';
 import { recordRun } from '../record/recordRun.js';
@@ -40,12 +43,15 @@ import {
 
 let config: LoadedConfig;
 const recordings = new Map<string, VizRecording>();
+/** The refused run — see the `statistical honesty` block, and `DECISIONS.md` § D260. */
+let suppressedRecording: VizRecording;
 
 beforeAll(async () => {
   config = await loadConfig(DATA_DIR);
   for (const id of BUILDING_IDS) {
     recordings.set(id, recordRun(breadthConfig(config, id)).recording);
   }
+  suppressedRecording = recordRun(suppressedConfig(config)).recording;
 }, 600_000);
 
 function recordingOf(id: string): VizRecording {
@@ -119,12 +125,32 @@ describe.each(BUILDING_IDS)('%s — the overlay agrees with the frame', (buildin
 });
 
 describe('statistical honesty — a saturated run gets no mean', () => {
-  // Measured, not assumed: at the shipped traffic rates over 900 s, these two saturate and the
-  // other three do not. The probe that established it is in the delivery report.
-  it.each(['midtown-office', 'vertical-city'])(
+  /*
+   * Measured, not assumed. **One of these two is now a rate rather than a building** —
+   * `DECISIONS.md` § D260.
+   *
+   * This read *"at the shipped traffic rates over 900 s, these two saturate"* and named
+   * `midtown-office` and `vertical-city`. It was true of both and true for two different reasons:
+   * `midtown-office` declares no access zone and saturates on its own traffic, which it still does;
+   * `vertical-city` was refused by § D254's pickup access check, which stranded every landing call
+   * raised inside a zone so the queue was never collected. Served properly it completes at 100 %
+   * delivery and quotes its mean.
+   *
+   * So `midtown-office` stays exactly as it was — an un-manipulated shipped configuration is worth
+   * keeping as one of the two arms — and the second arm states its rate.
+   */
+  const SATURATED_ARMS: readonly [string, () => VizRecording][] = [
+    ['midtown-office at its own shipped rate', () => recordingOf('midtown-office')],
+    [
+      `${SUPPRESSED_BUILDING_ID} at a stated ${String(SUPPRESSED_DEMAND_PCT)}%`,
+      () => suppressedRecording,
+    ],
+  ];
+
+  it.each(SATURATED_ARMS)(
     '%s saturates, so every estimate is suppressed and every observation survives',
-    (buildingId) => {
-      const recording = recordingOf(buildingId);
+    (_label, recordingFor) => {
+      const recording = recordingFor();
       expect(recording.summary.saturated).toBe(true);
       expect(recording.summary.awtIsValid).toBe(false);
 
@@ -268,6 +294,10 @@ describe('landing assignments — RV-T3', () => {
           leg.originFloorId === assignment.floorId &&
           leg.direction === assignment.direction &&
           leg.arrivedAt <= t &&
+          // `DECISIONS.md` § D266, as in the acceptance identity below: a rider the building turned
+          // away is not on the landing, and recomputing the predicate here rather than importing it
+          // is what keeps this the independent side of the comparison.
+          (leg.refusedAt === undefined || leg.refusedAt > t) &&
           (leg.boardedAt === undefined || leg.boardedAt > t),
       );
       expect(assignment.waiting).toBe(waitingHere.length);
@@ -466,6 +496,10 @@ describe('queueAt — the acceptance identity', () => {
             (leg) =>
               leg.originFloorId === queue.floorId &&
               leg.arrivedAt <= t &&
+              // `DECISIONS.md` § D266: a rider the building turned away for want of a credential is
+              // not standing there. Recomputed here rather than borrowed from `isWaitingAt`, which
+              // is the module under test — this is the independent side of the comparison.
+              (leg.refusedAt === undefined || leg.refusedAt > t) &&
               (leg.boardedAt === undefined || leg.boardedAt > t),
           );
           expect(queue.total, `${buildingId} ${queue.floorId} @ ${String(t)}`).toBe(here.length);

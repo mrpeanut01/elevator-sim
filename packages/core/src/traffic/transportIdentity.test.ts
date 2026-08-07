@@ -90,23 +90,80 @@ import {
  * to `3bd0fa8bc0a8…`. `headlineDrift` below is the standing check on the same question in units an
  * engineer can read, and it is empty for all fifteen. So these buildings still run exactly as they
  * did; the record describing the run is one key wider.
+ *
+ * ## And re-pinned again for `startOfDayS`, with the delta proved for all fifteen rather than two
+ *
+ * `DECISIONS.md` § D244 gave four of the five demand templates shipping at the time a time of day —
+ * five of six since § D263 split `evening-egress` into a venue record and an office one. The hour is
+ * invisible to `intensityAt`, `splitAt` and `integratedIntensityS`, so **no arrival, leg, stop or
+ * statistic moved** — but `PassengerTrace` is part of a `SimulationResult` and
+ * `structuralDigestOfResult` hashes every key, so all fifteen digests below moved on the key alone,
+ * exactly as they did for `stageActivity.diversions`.
+ *
+ * The claim is again checked rather than asserted, and this time mechanically and for every cell:
+ * `traffic/dayStartIdentity.test.ts` deletes `startOfDayS` from a **current** result and requires
+ * the digest to equal the superseded value, for all fifteen keys, in the same run that requires the
+ * whole result — byte for byte, not by digest — to equal one produced against `data/` with every
+ * `startOfDayMin` stripped out. So the delta here is one key wide, and that is a measurement.
+ * `headlineDrift` is empty for all fifteen, as before.
+ *
+ * ## And re-pinned a third time for § D254 — nine of fifteen, and the six that held are the point
+ *
+ * The two re-pins above moved **all fifteen** digests because the *record* grew a key. This one is
+ * the opposite shape: the runs themselves moved, and only some of them. Access zoning was being
+ * applied to a hall call's **pickup** floor, so on every building that declares `accessZones` a
+ * conventional landing call — which carries no credential by construction — was refused by every
+ * car in the bank, and the building was unserviceable. § D254 asks the credential question about
+ * the destination instead.
+ *
+ * So the nine cells on `mixed-use-high-rise`, `secure-tower` and `vertical-city` moved, and every
+ * one of them moved in the same direction: `timed-out` to `completed`, with every passenger
+ * delivered. `mixed-use-high-rise|collective`, for instance, goes from 642 of 725 delivered to 725
+ * of 725, and its longest wait from 1 096.7 s to 123.6 s.
+ *
+ * **The six cells on `garden-apartments` and `midtown-office` did not move by one bit** — same
+ * digest, same eight headline reals to the last place. Those two buildings declare no access
+ * zones, and that is the controlled half of this re-pin: it is what says the change is the access
+ * check and not a perturbation of the dispatcher. `mixed-use-high-rise|nearest-car`'s own
+ * `onTimeout: 'report'` allowance above is now unnecessary for the reason it was granted — that
+ * arm delivers everybody — and is kept because the flag is what the pins were taken under.
+ *
+ * ## And a fourth time for § D265 — the same nine, and the same six that held
+ *
+ * The credential gap gives a declared share of in-building journeys the badge their own floor
+ * implies rather than the one their destination needs, so the building turns them away and they do
+ * not travel. That is § D254's partition arrived at from the opposite direction: nine cells moved,
+ * and they are exactly the three buildings that declare `accessZones`, under all three conventional
+ * dispatchers.
+ *
+ * Every one of the nine still reports `completed` with **`undelivered: 0`** — the lifts strand
+ * nobody, which is § D254's finding and it is untouched. What moved is that 4 of 396 journeys on
+ * `secure-tower`, 11 of 757 on `mixed-use-high-rise` and 13 of 1 956 on `vertical-city` are counted
+ * in `conservation.accessRefused` rather than in `delivered`, and the run's figures move with the
+ * population that actually rode.
+ *
+ * **The six cells on `garden-apartments` and `midtown-office` did not move by one bit** — same
+ * digest, same eight headline reals to the last place, `midtown-office` still refusing its mean on
+ * the same `saturated` ground. That is the control, and it is the run this lane's byte-identity
+ * claim rests on rather than an argument about which code paths are reachable.
  */
 const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
-    '63a070bcc4e255ff0034744cb11f633e5c8b4fb55f1bb87efd4f5fce11ef4706',
-  'garden-apartments|eta': '515017af532ab0927f67718044c9d1b822c448bc4bb3e53ebeb93301fd05e444',
-  'garden-apartments|collective': '954516d3e35e14e306852fb30a53d1e091f01c7f08c387a11be2d8213c0bfb1d',
-  'midtown-office|nearest-car': '726a75c4127cefaaa755de5be9f76445230d3cb109c60e9d7bc1090d80c16add',
-  'midtown-office|eta': '7a26950af349e3f7573bfc0a63ff11efac034fbbfdf617a822dbc4500c9b852c',
-  'midtown-office|collective': '1387235946badd1db220427c45e166a6aa4b1c6bc241696fad602e9000f13b71',
+    'a721ea412cb91990a2cc85f2d4aa48f45b1ce516b771d52b5969f359ed0f4458',
+  'garden-apartments|eta': 'ddc08973567c2379f201cfc290986d80d34368cda0289d0c86bd3719e618b94d',
+  'garden-apartments|collective':
+    'ccfe134d70b873a0fa6a8007a63216402ead003b670026939263d20d8062b3bc',
+  'midtown-office|nearest-car': 'b1330d5f6ff9c942a9474bddac18947a83c64db3fb3ec548abb26c09e100aed8',
+  'midtown-office|eta': 'eddb3f97da5dbd23457c3b2fe2ee95c9476f354d44c09ef0bfa1fda44c0ec412',
+  'midtown-office|collective': '434a08434d9d1c1e2197e9e0efe7926680b5ea9e11614ed5f556b6281d48d6ba',
   'mixed-use-high-rise|nearest-car':
-    'faa196eed76f6dce35c66cb5fcd558013434444d5edef6592b3c7ba2545a8160',
-  'mixed-use-high-rise|eta': 'de9175e1234aa8b59147d4d9a7a1cbf50377eb3e8589c590af1f8a5b25b77dae',
+    'dd497989b07c8a45f8458ca586d27537cd66ad9442e6800f043f5ceca548ad4a',
+  'mixed-use-high-rise|eta': 'c76524aefd38f871c0a1be23c6ca07cb7e27ae9e1b1108e7bf74fcf849442f54',
   'mixed-use-high-rise|collective':
-    '475da70ec7d63c70e6c295613a5bcf5c84f6aa2b6b75bc12fe9b4ec3bb4c9029',
-  'secure-tower|nearest-car': 'b9e84186667c2d36b66ad5f0780cd8c5182a54ac50e55c0a042160de5127b133',
-  'secure-tower|eta': '80355745cc6cf5f44b0f76c644ec79ef2777ce4308418cc11ef1a6570bc80e28',
-  'secure-tower|collective': '6cc88ec607ffddaac4d923aa177794147d7a7bfd19a59cac99c83644ca8d590e',
+    '1bb075b1d5b3d055ee8f1ed4d60f2877e83c9de6dda4efaf1b664b552c2158f0',
+  'secure-tower|nearest-car': 'f591700fd7b205af757ce7d38dce4b5f555d99322488af6879c7348bf9549661',
+  'secure-tower|eta': '75e35ec8db83190c85be04371ed05a3e0e2bb58d32105bcdc9c5ea1037f61d4d',
+  'secure-tower|collective': '6536ff4ffada1dfb8d5d0012241713ae6ade194d27626a2eff084093c9b10bcd',
 };
 
 /**
@@ -116,11 +173,16 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * Pinned rather than omitted. The moved figure is the finding, and a guard that simply stopped
  * looking at the building the change was made for would be the fourth entry in this repository's
  * list of tests that cannot fail.
+ *
+ * These three re-pinned alongside the twelve above for `startOfDayS`, on the same one key and with
+ * the same delta proof — see {@link BASELINE_STRUCTURAL}. `vertical-city` runs `rise-and-fall`,
+ * which now declares 08:30; its escalator routing is untouched and its `transportHops` count below
+ * is unchanged.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': '7be18e22844a6e82588f3949b302b21610a0fd5ce299734f8ff682f36f780055',
-  'vertical-city|eta': 'db9695ba7c6e35976101fda19bf1a337b496afc4a8f683f9106b258f2be0be02',
-  'vertical-city|collective': '611deab45802ff9cbef16f611a07b0ccfcbe4844b454af95f37b8aeddb8a3078',
+  'vertical-city|nearest-car': 'd826af3bd806d84e72b4bf3c934e47c35e3211460a7a8a67218567e8110d0fc8',
+  'vertical-city|eta': 'a6c3d0704c13cdc2e91fc4d3f29b13b333d2ae05088cb2d6f3d7c854f3eb4edf',
+  'vertical-city|collective': '7603c8b397ccd88b141748625640d847985f0134b2c1c2ae604448b7dd498756',
 };
 
 /**
@@ -166,15 +228,15 @@ const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>
   'midtown-office|nearest-car': { waitMeanS: 1625.3073142849905, waitP95S: 2778.5301723158727, rideMeanS: 101.4917970264325, ttdMeanS: 1726.7991113114228, workKJ: 1485.6773233378524, workPerLegKJ: 7.541509255522094, handlingPct: 4.035087719298246, longestWaitS: 2906.760720955624 },
   'midtown-office|eta': { waitMeanS: 803.5837920145476, waitP95S: 1451.3328596031365, rideMeanS: 103.1891892481786, ttdMeanS: 906.772981262727, workKJ: 2143.0568396923136, workPerLegKJ: 10.87846111518941, handlingPct: 4.7953216374269, longestWaitS: 1482.5906698639715 },
   'midtown-office|collective': { waitMeanS: 791.9363372638369, waitP95S: 1415.12165477437, rideMeanS: 100.09924603990174, ttdMeanS: 892.0355833037382, workKJ: 2285.0767835145743, workPerLegKJ: 11.599374535606977, handlingPct: 4.619883040935672, longestWaitS: 1436.744534680982 },
-  'mixed-use-high-rise|nearest-car': { waitMeanS: 214.79895769937508, waitP95S: 817.0781674975711, rideMeanS: 85.44825863703696, ttdMeanS: 361.4013442351988, workKJ: 23504.058602911486, workPerLegKJ: 106.35320634801577, handlingPct: 7.732864674868189, longestWaitS: 1962.5880445794123 },
-  'mixed-use-high-rise|eta': { waitMeanS: 142.68115763876253, waitP95S: 678.3951693817187, rideMeanS: 87.32512167858219, ttdMeanS: 273.12609344906105, workKJ: 24407.92515308621, workPerLegKJ: 110.44310024020909, handlingPct: 7.996485061511424, longestWaitS: 1221.4802668737561 },
-  'mixed-use-high-rise|collective': { waitMeanS: 65.38810805406801, waitP95S: 348.45548910819133, rideMeanS: 85.25698304659325, ttdMeanS: 177.7481384380594, workKJ: 33565.92654763983, workPerLegKJ: 152.57239339836286, handlingPct: 9.92970123022847, longestWaitS: 1096.7338414201085 },
-  'secure-tower|nearest-car': { waitMeanS: 72.4930266924905, waitP95S: 220.07902498224018, rideMeanS: 104.8894473507938, ttdMeanS: 177.38247404328436, workKJ: 4096.166816972333, workPerLegKJ: 35.00997279463533, handlingPct: 6.552419354838709, longestWaitS: 1076.1934052835004 },
-  'secure-tower|eta': { waitMeanS: 45.207463696766915, waitP95S: 159.40554814190463, rideMeanS: 90.30623461546863, ttdMeanS: 137.13810845064097, workKJ: 7239.030602709389, workPerLegKJ: 58.85390733910073, handlingPct: 10.383064516129032, longestWaitS: 1039.9714662955998 },
-  'secure-tower|collective': { waitMeanS: 45.207463696766915, waitP95S: 159.40554814190463, rideMeanS: 90.30623461546863, ttdMeanS: 137.13810845064097, workKJ: 7239.030602709389, workPerLegKJ: 58.85390733910073, handlingPct: 10.383064516129032, longestWaitS: 1039.9714662955998 },
-  'vertical-city|nearest-car': { waitMeanS: 134.4278217079031, waitP95S: 313.52651799960944, rideMeanS: 86.43287051347059, ttdMeanS: 351.612126023367, workKJ: 47832.64322089375, workPerLegKJ: 59.12564056970797, handlingPct: 10.92694904849601, longestWaitS: 1523.5322558070939 },
-  'vertical-city|eta': { waitMeanS: 45.0333047611517, waitP95S: 86.67601262739815, rideMeanS: 81.49757654126381, ttdMeanS: 209.91356423350703, workKJ: 68339.09132618485, workPerLegKJ: 80.39893097198217, handlingPct: 11.49989768774299, longestWaitS: 1287.7649265606756 },
-  'vertical-city|collective': { waitMeanS: 38.905844782544634, waitP95S: 86.9190792748077, rideMeanS: 77.2260836021643, ttdMeanS: 193.0443670458902, workKJ: 69517.1657090653, workPerLegKJ: 83.25409066953928, handlingPct: 11.888684264374874, longestWaitS: 1162.7707143022799 },
+  'mixed-use-high-rise|nearest-car': { waitMeanS: 145.55932170547212, waitP95S: 382.66480657762986, rideMeanS: 87.71659701524483, ttdMeanS: 306.6194441822547, workKJ: 20187.25418119246, workPerLegKJ: 75.32557530295693, handlingPct: 8.743409490333919, longestWaitS: 403.9571933061047 },
+  'mixed-use-high-rise|eta': { waitMeanS: 18.677243897186987, waitP95S: 47.866201988667136, rideMeanS: 88.45922413158152, ttdMeanS: 133.67971334875568, workKJ: 27869.788231567258, workPerLegKJ: 108.02243500607464, handlingPct: 9.182776801405975, longestWaitS: 64.81390615945668 },
+  'mixed-use-high-rise|collective': { waitMeanS: 22.263212841048855, waitP95S: 64.98740058634255, rideMeanS: 80.88911937790147, ttdMeanS: 128.49625251724177, workKJ: 33817.25292375409, workPerLegKJ: 132.61667813236897, handlingPct: 9.358523725834798, longestWaitS: 97.59904714023628 },
+  'secure-tower|nearest-car': { waitMeanS: 117.50578060891134, waitP95S: 236.49202767237338, rideMeanS: 99.05396066082899, ttdMeanS: 224.9833335727993, workKJ: 3692.412283657347, workPerLegKJ: 27.351202101165534, handlingPct: 6.754032258064516, longestWaitS: 261.24994780096097 },
+  'secure-tower|eta': { waitMeanS: 33.18829302490414, waitP95S: 86.37592396911488, rideMeanS: 100.83803786988547, ttdMeanS: 139.19270979268728, workKJ: 6256.948630612125, workPerLegKJ: 46.347767634163894, handlingPct: 10.483870967741936, longestWaitS: 91.88634249324991 },
+  'secure-tower|collective': { waitMeanS: 28.077489232750207, waitP95S: 103.06062675292485, rideMeanS: 95.86154920637641, ttdMeanS: 127.06784142193546, workKJ: 6714.034768258036, workPerLegKJ: 49.73359087598545, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
+  'vertical-city|nearest-car': { waitMeanS: 130.27227643894926, waitP95S: 471.71911859523584, rideMeanS: 88.91265803083918, ttdMeanS: 363.86439856015835, workKJ: 50275.4997554894, workPerLegKJ: 59.287145938077124, handlingPct: 11.561285041948025, longestWaitS: 633.3074402713851 },
+  'vertical-city|eta': { waitMeanS: 24.230893718009746, waitP95S: 79.35783649899052, rideMeanS: 83.20450610244768, ttdMeanS: 183.33988863148602, workKJ: 70222.50025428712, workPerLegKJ: 80.90149798881005, handlingPct: 12.70718232044199, longestWaitS: 120.89955123787024 },
+  'vertical-city|collective': { waitMeanS: 30.197768922726834, waitP95S: 80.35426825330633, rideMeanS: 78.80324849119535, ttdMeanS: 181.76770543213865, workKJ: 81058.35428299439, workPerLegKJ: 91.38484135625072, handlingPct: 12.216083486801718, longestWaitS: 408.60979568160394 },
 };
 
 /** The eight reported figures, and where each lives in a summary. */

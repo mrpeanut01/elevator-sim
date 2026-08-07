@@ -24,7 +24,6 @@
 import {
   CREDENTIAL_ASSIGNMENTS,
   DEMAND_LEVELS,
-  DEMAND_TEMPLATE_IDS,
   INTERFLOOR_WEIGHTINGS,
   PATIENCE_DISTRIBUTIONS,
 } from '@elevator-sim/core';
@@ -32,9 +31,9 @@ import {
 import type {
   BatchSizeCurve,
   CredentialAssignment,
+  CredentialGapOverride,
   DayVariationConfig,
   DemandLevel,
-  DemandTemplateId,
   DirectionalSplit,
   DispatchPolicyOptions,
   DoorCrowdingConfig,
@@ -191,6 +190,19 @@ function parsePassengerMass(value: unknown, path: string): PassengerMassOverride
   };
 }
 
+/**
+ * A credential-gap block as a spec author writes it. `DECISIONS.md` § D265.
+ *
+ * One required field, and `rejectUnknown` beside it for `parsePassengerMass`'s reason: a spec is
+ * the one door where a misspelt key could arrive and be silently ignored, which would run the arm
+ * at the shipped share while the author believed they had set it.
+ */
+function parseCredentialGap(value: unknown, path: string): CredentialGapOverride {
+  const record = asRecord(value, path);
+  rejectUnknown(record, ['wrongZoneShare'], path);
+  return { wrongZoneShare: asFiniteNumber(record['wrongZoneShare'], `${path}.wrongZoneShare`) };
+}
+
 /** A day-variation block as a spec author writes it. Both bounds required. docs/14 § 2.3. */
 function parseDayVariation(value: unknown, path: string): DayVariationConfig {
   const record = asRecord(value, path);
@@ -247,6 +259,7 @@ const DEMAND_PARSERS: DemandParsers = {
     asMember<InterfloorWeighting>(value, INTERFLOOR_WEIGHTINGS, path),
   credentialAssignment: (value, path) =>
     asMember<CredentialAssignment>(value, CREDENTIAL_ASSIGNMENTS, path),
+  credentialGap: parseCredentialGap,
   maxLegs: asFiniteNumber,
   peakWindowS: asFiniteNumber,
   baselineFraction: asFiniteNumber,
@@ -290,14 +303,13 @@ function parseTrafficArm(value: unknown, path: string): TrafficArmSpec {
   rejectUnknown(record, ['id', 'demandTemplate', 'durationS', 'reportWindow', 'demand'], path);
   return {
     id: asString(record['id'], `${path}.id`),
+    // A string, not a member of `DEMAND_TEMPLATE_IDS`. `DECISIONS.md` § D274: since § D273 a
+    // `demandTemplates` record may author its own phases and answer to an id no compiled-in union
+    // contains, and the catalogue an experiment runs against is the one it loads. An unknown id is
+    // refused by `resolveDemandTemplate`, by name, with the shapes it can build listed — which is a
+    // better message than this one gave and is checked against the data the run actually uses.
     ...(present(record, 'demandTemplate')
-      ? {
-          demandTemplate: asMember<DemandTemplateId>(
-            record['demandTemplate'],
-            DEMAND_TEMPLATE_IDS,
-            `${path}.demandTemplate`,
-          ),
-        }
+      ? { demandTemplate: asString(record['demandTemplate'], `${path}.demandTemplate`) }
       : {}),
     ...(present(record, 'durationS')
       ? { durationS: asFiniteNumber(record['durationS'], `${path}.durationS`) }

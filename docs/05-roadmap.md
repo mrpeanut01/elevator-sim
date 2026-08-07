@@ -761,11 +761,21 @@ mixed 40/30/30 traffic the building's `$comment` describes, every profile in
 | 0.75 % | 0/30 quotable, 22.7 undelivered, **31.7 % unserved** | 30/30, 0 undelivered |
 | 0.2 % | 0/30 quotable, 6.4 undelivered, **36.6 % unserved** | 30/30, 0 undelivered |
 
-**The unserved fraction rises as the load falls**, which is the signature of a *structural* refusal
+> **⚠️ The table above and the paragraph below are withdrawn — they are H-ACCESS-1's mechanism, and
+> they are refuted on this building too** ([§ D256](../DECISIONS.md), [§ D279](../DECISIONS.md)
+> rows 8 and 9). Both were the [§ D254](../DECISIONS.md) pickup-access defect. Re-measured at the
+> same rates and the same budget, the baselines are **quotable at the thickest rate** and identical
+> to the credential arms field-for-field at all three, and the unserved fraction is **flat rather
+> than rising** — 2.55 → 2.13 → 2.32 %. The regime is *open*, not structurally closed. The rows are
+> kept rather than regenerated for the reason § D256 gives: they are the record of what the study
+> reported while it was measuring the defect. `benchmark/mixedUseHighRise.test.ts` carries the live
+> assertions.
+
+~~**The unserved fraction rises as the load falls**, which is the signature of a *structural* refusal
 and not of overload: an access-restricted pickup carries no credential under `up-down-buttons`,
 every car answers `accessDenied`, and lowering the rate strips out only the share that *can* be
 served. It is § H-ACCESS-1's mechanism reproduced on a second building. No baseline has a quotable
-mean there, so no paired-t interval exists — reported as counts, never as an interval.
+mean there, so no paired-t interval exists — reported as counts, never as an interval.~~
 
 **The candidate reason already on record was checked and does not bite.** § D99 flagged that this
 building reports its achieved *interval* `unmeasurable` by design — a shuttle holds doors 39.8 s
@@ -897,7 +907,31 @@ optimization and true as a claim about the credential.** The prior was stated in
 `benchmark/accessControl.ts` before the result, so it could not be adopted afterwards, and every
 replication run was an attempt to make the refutation fail.
 
-**H-ACCESS-1 — coverage. CONFIRMED, categorically, with no interval.** Secure Tower at
+> ## ⚠️ H-ACCESS-1 IS WITHDRAWN — REFUTED 2026-08-05, [§ D256](../DECISIONS.md)
+>
+> **Everything in this subsection measured a defect in `Car.estimateCost`, not a property of
+> conventional dispatch.** Access zoning was applied to a hall call's **pickup** floor; a
+> conventional landing call carries no credential by construction, so every car refused every
+> landing raised inside an access zone and the building could not be operated at all
+> ([§ D254](../DECISIONS.md)).
+>
+> Re-run at the same n = 30, the same seed and the same arms, with only that check corrected, the
+> conventional row reads **30 of 30 quotable · 0.0 undelivered · 0.00 % unserved**, and
+> `study.coverage.verdict` returns **`REFUTED`**. Conventional dispatch serves every access-zoned
+> building this project ships, at 100 % delivery. On `secure-tower` under `eta` the credential arm
+> is now **byte-identical** to the conventional one.
+>
+> What survives is the **bare-kiosk** row, and it is the genuine article — a destination call type
+> with nothing to identify the passenger, refused `destinationAccessDenied` — at **61.2 %** unserved.
+> It also got cleaner: 36.5 undelivered against 36.5 kiosk refusals, so every stranded leg is now a
+> credential refusal and none is collateral, where the pinned row had 23 per run of collateral.
+>
+> The table below is **left standing and not regenerated**, because § D256's point is that these
+> numbers existed. The pins in `PINNED_COVERAGE` are withdrawn rather than replaced: what should
+> take their place is a question about the design of the experiment, not about its arithmetic.
+
+**H-ACCESS-1 — coverage. ~~CONFIRMED, categorically, with no interval.~~ WITHDRAWN — see above.**
+Secure Tower at
 interfloor-mix, 30 replications — `benchmark/accessControl.ts`'s own coverage budget, seed
 20 260 726, re-run 2026-07-28 on the tree carrying the `C35` fix and pinned in that module's
 `PINNED_COVERAGE`:
@@ -919,30 +953,60 @@ interfloor-mix, 30 replications — `benchmark/accessControl.ts`'s own coverage 
 > the correct observation that a categorical has no standard error — read as a licence to hold
 > nothing. Both halves now carry a pin.
 
-Conventional dispatch does not perform *worse* on this building — **it does not perform.** An
+> **⚠️ The paragraph below is withdrawn with the table above, and is kept because it is the clearest
+> statement of what the defect looked like from inside.** Every clause of it was
+> [§ D254](../DECISIONS.md)'s pickup-access check, including the `accessDenied` reason, which no
+> longer exists in `INFEASIBILITY_REASONS`. Re-measured, `eta` and `destination-eta-unpriced` are
+> **bit-identical on 150 of 150** `secure-tower` replications across all seven identity metrics
+> ([§ D279](../DECISIONS.md)), the arms are quotable, and the regime is *open* rather than
+> structurally closed. **The one half that survives is the last sentence** — the Midtown null — which
+> was never about the defect and which now holds on the access-zoned building too.
+
+~~Conventional dispatch does not perform *worse* on this building — **it does not perform.** An
 access-restricted pickup carries no credential under `up-down-buttons`, so every car answers
 `accessDenied` and the call is permanently unassignable; `destinationLiveness.ts` counts that one
 level down at **307 of 331 decisions with every candidate refused**, all 921 verdicts
 `accessDenied`, against 0 under the credential. The failure is **structural rather than
 load-driven**, so no arrival rate rescues it and no operating point exists at which the two arms
-could be given a paired interval. That is why this is reported as counts and gets no confidence
-interval — a categorical outcome does not have one. The null half holds exactly: on Midtown Office,
-which declares no `accessZones`, the credential arm is bit-identical to the conventional one on all
-30 replications.
+could be given a paired interval.~~ That is why this *was* reported as counts and got no confidence
+interval — a categorical outcome does not have one. The null half holds exactly, and holds twice
+over: on Midtown Office, which declares no `accessZones`, the credential arm is bit-identical to the
+conventional one on all 30 replications, **and on Secure Tower, which declares five, it is now
+bit-identical too**.
 
 **H-ACCESS-2 — optimization. REFUTED.** With `Δ = TTD(credential + destination priced) −
 TTD(credential alone)` per building, n = 150 under CRN:
 
 | building | Δ absolute | Δ relative to its own baseline |
 |---|---|---|
-| Secure Tower (5 access zones) | **−0.580 [−0.764, −0.396] s** | −0.011 [−0.015, −0.008] |
+| Secure Tower (5 access zones) | **−0.542 [−0.718, −0.366] s** | −0.011 [−0.014, −0.007] |
 | Midtown Office (no access zones) | **−1.562 [−1.916, −1.208] s** | −0.029 [−0.035, −0.022] |
-| **Δ_secure − Δ_midtown** | **+0.982 [+0.584, +1.380] s** | **+0.017 [+0.010, +0.024]** |
+| **Δ_secure − Δ_midtown** | **+1.020 [+0.625, +1.414] s** | **+0.018 [+0.011, +0.025]** |
+
+**The run.** `runAccessControlStudy({})` at its own declared budget — seed 20 260 726, n = 150 per
+building, the `arms.ts` interfloor-mix operating points — held in `benchmark/published.ts` under the
+`access-control` group and re-pinned by [§ D280](../DECISIONS.md) after
+[§ D254](../DECISIONS.md). **Two of the six figures moved and Midtown's two did not**, to the last
+digit, which is what says this is a building effect rather than a perturbation: Secure Tower declares
+five access zones and Midtown declares none. The superseded Secure Tower and
+difference-of-differences rows read **−0.580 [−0.764, −0.396] s** and
+**+0.982 [+0.584, +1.380] s**; verdict, sign and magnitude are unchanged, and the
+difference-of-differences got very slightly *larger*.
 
 Both buildings gain, both gains exclude zero, and the difference-of-differences excludes zero **on
 the positive side in both forms**. Given the credential, pricing the destination buys *less* where
-access is controlled, not more. **The saving is real and it is entirely in the credential**, which
-is a claim about **authorization** rather than about **optimization**.
+access is controlled, not more. **The roadmap's stated mechanism is not what produces the saving.**
+
+> **⚠️ Where the saving *is* was also stated here, and it is now withdrawn.** This paragraph used to
+> end *"the saving is real and it is entirely in the credential, which is a claim about
+> **authorization** rather than about **optimization**"*. That was H-ACCESS-1, and H-ACCESS-1 is
+> **REFUTED** ([§ D256](../DECISIONS.md), [§ D279](../DECISIONS.md)): under conventional dispatch the
+> credential arm and the conventional arm are bit-identical on **150 of 150** Secure Tower
+> replications, so the credential buys nothing and the saving is not in it either. **Where it comes
+> from is unmeasured.** Only the negative is measured, and this section deliberately does not put a
+> second plausible mechanism in the gap — that would be the defect this whole subsection exists to
+> record, wearing a new sentence. `benchmark/accessControl.test.ts` says the same thing in its own
+> docstring, which is the version a run re-derives.
 
 > **A single-building interval cannot answer this and must not be quoted as if it could.** Secure
 > Tower alone gives −0.580 s with an interval clear of zero, and read alone that looks exactly like
@@ -958,10 +1022,15 @@ is a claim about **authorization** rather than about **optimization**.
 > resolved "credential alone" by the **shipped `destination-eta` id** — correct only while that
 > profile happened to weight `rideTime` at zero. When [§ D112](../DECISIONS.md) authored the weight
 > at 0.5, that binding would have silently redefined `Δ` as *the marginal effect of going from 0.5 to
-> 1.0* rather than *the effect of pricing the destination at all*. Measured both ways: the published
-> `+0.982 [+0.584, +1.380]` falls to a mean of **+0.208**, interval still excluding zero on the
+> 1.0* rather than *the effect of pricing the destination at all*. Measured both ways on the tree of
+> the time: the then-published `+0.982 [+0.584, +1.380]` falls to a mean of **+0.208**, interval
+> still excluding zero on the
 > positive side — **same sign, same REFUTED verdict, a fifth of the magnitude**, and the only thing
-> marking the change would have been a pin regeneration. Bound to the *configuration*
+> marking the change would have been a pin regeneration. **Both halves of that comparison are
+> history and neither is re-derived by anything**: the study's live figure is the
+> `+1.020 [+0.625, +1.414]` above, and the counterfactual was never re-run after
+> [§ D254](../DECISIONS.md) — `benchmark/accessControl.ts` says so at `CREDENTIAL_ARM`. Bound to the
+> *configuration*
 > (`destination-eta-unpriced`) instead, the six access-control pins do not move at all. **An arm
 > resolved by a shipped id is an arm that can be redefined by editing `data/`.**
 

@@ -37,6 +37,9 @@ const SELECTION: FreePlaySelection = Object.freeze({
   // 1 800 s and not 900: rise-and-fall declares a thirty-minute period, and freePlayIssues
   // refuses the combination in words rather than letting the kernel throw at Start.
   durationS: 1800,
+  // `null` — the whole of `rise-and-fall`'s period, which is the only part a shape template has.
+  // § D286.
+  windowStartS: null,
   seed: '20260804',
 });
 
@@ -139,5 +142,21 @@ describe('the run is the run the menu described', () => {
   it('is not vacuously postable — the state it was entered from is not', () => {
     // Without this, the assertion above would pass on a predicate that accepted everything.
     expect(runIdentityIssues(deepInAWeek(), RESOURCES, 'ranked').length).toBeGreaterThan(0);
+  });
+
+  it('lands the shell on the simulation — GitHub issue #23', () => {
+    /*
+     * `closeMenu` hides the overlay and selects nothing, so Start left the player on whatever tab
+     * the shell happened to be on. Reaching Free Play from the Day report therefore hid the menu and
+     * left `panel-run` hidden: the reporter pressed *Start*, the screen went back to a sheet about
+     * the **previous** run, and the shift they had just configured played on a canvas nobody could
+     * see.
+     *
+     * Entered from `report` on purpose. Asserting it from a state already on `run` would pass on a
+     * function that writes nothing at all, which is the vacuity every check in this file is written
+     * against.
+     */
+    const onTheSheet: ViewerState = { ...deepInAWeek(), tab: 'report' };
+    expect(enterFreePlay(onTheSheet, RESOURCES, SELECTION, CATALOGUE)?.tab).toBe('run');
   });
 });

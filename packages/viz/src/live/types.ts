@@ -72,7 +72,29 @@ export interface WaitBandDefinition {
   readonly face: string;
 }
 
-/** One band's share of the people standing right now. */
+/**
+ * What a banding is *of* — and the reason the mood card needs two answers rather than one.
+ *
+ * `'now'` bands **the people standing at `atS`**. It is the live instrument: it moves with the
+ * playhead, it is what the design specifies, and while a shift is running it is right.
+ *
+ * `'whole-run'` bands **every rider who called by `atS`, by the worst wait each of them realised**.
+ * It exists because the live reading inverts at exactly one instant and always in the flattering
+ * direction: a run that *completes* runs until the last passenger is delivered, so its final frame
+ * has an empty lobby **by construction**, and a card keyed on the queue then reports the calmest
+ * band about the worst possible day. Measured, not argued — `midtown-office` under `collective`
+ * over an hour of demand ends `saturated`, with 781 of 1 392 riders past the 900 s horizon and
+ * 18.0 % served inside a minute, and the live banding at `endedAt` is four zeroes. See
+ * [`DECISIONS.md` § D239](../../../../DECISIONS.md).
+ *
+ * Neither is derived from the other and neither replaces the other. The rail draws `'now'` while
+ * the playhead is inside the run and `'whole-run'` once it has reached the end, and the copy
+ * `bands.ts` chooses says which it is, because two bandings that read identically are one banding
+ * with a bug.
+ */
+export type WaitBandBasis = 'now' | 'whole-run';
+
+/** One band's share — of the people standing at `atS`, or of the whole run. See {@link WaitBandBasis}. */
 export interface WaitBandCount {
   readonly band: WaitBandDefinition;
   /** People in this band at the playhead. An observation. */
@@ -86,23 +108,38 @@ export interface WaitBandCount {
   readonly pct: number;
 }
 
-/** The stacked bar and its legend, at one instant. */
+/** The stacked bar and its legend — at one instant, or over the run. See {@link WaitBandBasis}. */
 export interface WaitBands {
   readonly atS: SimTime;
-  /** People standing at a landing right now. Equals `frameAt(recording, t).totalWaiting`. */
+  /** Which question this banding answers. Never inferred by a reader — the copy states it. */
+  readonly basis: WaitBandBasis;
+  /**
+   * How many people this banding is over.
+   *
+   * On `'now'`: people standing at a landing right now, and it equals
+   * `frameAt(recording, t).totalWaiting` by construction. On `'whole-run'`: everybody whose call
+   * had been registered by `atS`, whether they are still standing or long since carried.
+   */
   readonly total: number;
   /** One entry per band, in {@link WAIT_BANDS} order. Always four, including the empty ones. */
   readonly counts: readonly WaitBandCount[];
-  /** The worst band with anybody in it, or the first band when nobody is waiting. */
+  /** The worst band with anybody in it, or the first band when the banding is empty. */
   readonly worst: WaitBandDefinition;
   /** Index of {@link worst} in {@link WAIT_BANDS}. The design indexes its copy arrays by it. */
   readonly worstIndex: number;
-  /** The longest wait currently on the board, seconds. `undefined` when nobody is waiting. */
+  /**
+   * The longest wait this banding knows about, seconds. `undefined` when it is over nobody.
+   *
+   * On `'now'` that is the worst wait currently on the board; on `'whole-run'` it is the longest
+   * wait anybody realised, which is the figure that does not go away when the lobby empties.
+   */
   readonly longestCurrentWaitS: number | undefined;
 }
 
 /** The mood card's face, headline and sub-line — design `:57–64`, `:2281–2299`. */
 export interface Mood {
+  /** The banding this mood was read off. The headline and sub-line are written per basis. */
+  readonly basis: WaitBandBasis;
   readonly bandId: WaitBandId;
   readonly index: number;
   /** `◡ ◠ ⌄ ×`. A shape per level, so the card survives a greyscale screenshot (KB-15). */
@@ -262,6 +299,11 @@ export interface DecisionRow {
 export type DisclosureMode = 'casual' | 'engineer';
 
 export interface HonestyCard {
+  /**
+   * Which question the **casual** card answered: *is it coping* (`'now'`) or *did it cope*
+   * (`'whole-run'`). The engineer card reads a verdict about the whole run on either.
+   */
+  readonly basis: WaitBandBasis;
   /** `⚠` or `✓`. */
   readonly glyph: string;
   readonly title: string;
@@ -276,6 +318,12 @@ export interface HonestyCard {
   readonly warning: boolean;
   /** `meansAreSuppressed(recording)`, copied so a caller need not ask twice. */
   readonly suppressed: boolean;
-  /** The observation the casual copy is keyed on. See `honesty.ts`. */
+  /**
+   * The live observation *is the building falling behind at `atS`*, always reported.
+   *
+   * It is what the casual copy is keyed on **while `basis` is `'now'`** and it is not what a
+   * closed shift's copy is keyed on — a drained lobby makes it false whatever the shift was like.
+   * See `honesty.ts`.
+   */
   readonly fallingBehind: boolean;
 }

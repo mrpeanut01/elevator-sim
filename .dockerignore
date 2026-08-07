@@ -1,0 +1,45 @@
+# What must never enter the build context.
+#
+# The first two entries are the ones that matter. `node_modules/` would copy a macOS-resolved
+# dependency tree into a Linux image and shadow the `npm ci` the Dockerfile runs — the classic way
+# an image works locally and fails on the platform it was built for. `.git/` is the repository's
+# whole history, which is both large and none of the image's business.
+
+node_modules/
+**/node_modules/
+.git/
+.gitignore
+
+# Build output. Everything the image needs is compiled inside it, from source, so a stale local
+# `dist/` must not be able to travel in and be served instead. § D201's investigation lost five
+# runs to a stale `dist/`; this is the same defect closed one layer out.
+dist/
+**/dist/
+dist-web/
+**/dist-web/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Tests, coverage and tooling — none of it runs in the image.
+coverage/
+**/coverage/
+.worktrees/
+.claude/
+.github/
+
+# Local configuration and secrets. Nothing here is committed, and nothing here may be baked into a
+# layer: an image is not a secret store, and a layer is readable by anyone who can pull it.
+.env
+.env.*
+*.local
+.outbox.jsonl
+
+# Editor and OS noise.
+.DS_Store
+.vscode/
+.idea/
+
+# Documentation. The image serves a simulator, not the repository.
+docs/
+*.md
+!packages/*/README.md

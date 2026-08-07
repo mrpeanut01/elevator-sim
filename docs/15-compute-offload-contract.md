@@ -4,48 +4,42 @@
 
 | Phase | State |
 |---|---|
-| A — self-hosted CI runners | **built, inert, and deliberately not provisioned** (2026-07-31, project owner) — see [`infra/README.md`](../infra/README.md) |
+| A — self-hosted CI runners | **withdrawn (2026-08-05, project owner). Requirement, runbook and code all removed** — see below |
 | B — measurement fan-out | designed, not started |
 
-> **Provisioning was declined, and the reason is a finding rather than a change of mind.** § 6's
-> expected cost of ~$5/month assumes **34 runner-hours**, i.e. billing only while a job executes.
-> The template does not do that: `main.bicep` sets `capacity: runnerCount` with **no autoscale
-> resource**, `orchestrationMode: 'Uniform'`, and ephemerality is per-job **reimage rather than
-> deallocation** — the runbook's own verification step confirms the instances sit *"idle"* and
-> running. Two VMs therefore bill 730 hours each, so **≈ $212/month is the expected bill, not the
-> ceiling**, and the $250 figure is a budget *alert* — § 6 says correctly in one paragraph that
-> Azure budgets notify and do not stop spend, then contradicts it in the next.
+> **Phase A is withdrawn, and the withdrawal is recorded rather than the section quietly deleted.**
+> It was built as Bicep under `infra/azure/`, held inert behind an unset `CI_LINUX_RUNNER_LABEL`
+> repository variable, and **never provisioned** — no VM ever booted and no job ever ran on one.
+> The whole of it is now gone from the tree: the template, the cloud-init, the runbook, the
+> `infra/checks/` workflow guard, and the `matrix shape` job that ran it. `ci.yml`'s Linux leg is
+> the literal `ubuntu-latest` again, so there is no variable that can retarget a leg.
 >
-> **This is a published number that does not reproduce from the code that produced it**, which is
-> the defect class this repository has a standing rule about. It is not a reason the design is
-> wrong — inertness, the two-OS matrix guard and the x86-64 constraint were all proven by mutation —
-> but it is a reason not to run it yet.
->
-> **What would make it worth turning on:** `runnerCount: 0` at rest with a manual scale either side
-> of a wave (one parameter, one command), deploy-per-wave with the teardown in `infra/README.md`
-> § 7, or Actions Runner Controller on AKS scaling from zero on queue depth — the only one of the
-> three that genuinely delivers per-job billing.
+> **The finding that preceded the withdrawal stands, because it is the reusable part.** The
+> runbook's expected cost of ~$5/month assumed **34 runner-hours** — billing only while a job
+> executes. The template did not do that: `capacity: runnerCount` with **no autoscale resource**,
+> `orchestrationMode: 'Uniform'`, and per-job **reimage rather than deallocation**, so two VMs
+> billed 730 hours each. **≈ $212/month was the expected bill, not the ceiling**, and the $250
+> figure was a budget *alert*, which notifies and does not cap. That is a published number that did
+> not reproduce from the code that produced it — the defect class this repository has a standing
+> rule about — and it is why the pool was never turned on.
 >
 > **A criterion this contract should have had, and did not:** criterion 7 requires a *ceiling*
 > declared before the first fan-out. It should also require the **expected** figure to be
-> reproducible from the template, because the ceiling was right and the expectation was not.
+> reproducible from the template, because the ceiling was right and the expectation was not. That
+> requirement now applies to Phase B, which has not been built.
+>
+> **Nothing here rules out self-hosted CI later.** It rules out *this* design, whose billing model
+> was fixed capacity wearing the language of per-job ephemerality. Per-job billing needs scale-from-
+> zero on queue depth, which is a different architecture and would need its own contract.
+>
+> **`infra/` exists again and is a different thing.** It now holds the deployment of the *product* —
+> a Container App serving the viewer and the API, a PostgreSQL server and Communication Services —
+> and has nothing to do with CI or with this document. It is called out here because a reader who
+> remembers the withdrawal will otherwise find the directory back and reasonably assume the decision
+> was reversed. It was not. The one thing it inherits is the lesson: its cost model is derived from
+> parameters in its own template, and it scales to zero at rest rather than claiming to.
 
-**What "built, inert, unprovisioned" means, said precisely, because two of those three words are the
-kind that get rounded up.** The infrastructure exists as code (`infra/azure/`, Bicep, compiles clean
-and has never been deployed) and `ci.yml`'s Linux leg can be moved to it by setting one repository
-variable. **With that variable unset — the shipped state — CI does exactly what it did before**, on
-`ubuntu-latest`, and criterion 3 below is mechanised against the workflow file itself
-(`infra/checks/`, run by the `matrix shape` job): the inert default is *evaluated*, in both
-directions, and nine mutations of the shipped `ci.yml` are each required to be rejected.
-
-Of the criteria in § 4, Phase A can meet exactly two. **3 is met and mechanised. 7's ceiling is
-declared** — $250/month at the shipped defaults, derived in `infra/README.md` § 6 from public list
-prices, with the honest note that an Azure budget alerts and does not cap, so the real ceiling is
-the instance count. **4 cannot be checked until a runner exists**, and is the first thing to check
-when one does: a pin that moves on the first self-hosted run is a finding about the runner, not a
-value to edit. 1, 2, 5 and 6 are Phase B's.
-
-This document covers moving compute off one laptop. It exists because the constraint is **not**
+This document covers moving measurement compute off one laptop. It exists because the constraint is **not**
 "more cores make things faster" — that part is uninteresting and mostly true. The constraint is that
 this repository's statistical guarantees are **same-machine claims**, and a fleet that ignores that
 would run faster and answer worse.
@@ -97,8 +91,12 @@ Ranked honestly, because the weakest case is the one that sounds most appealing.
 |---|---|
 | **Higher replication budgets** — n = 200 → 800 halves a paired interval | **Highest.** The only place compute can change a *published verdict*. Phase 6c is refused partly on resolution: `−0.213 [−0.440, +0.014]` at n = 200 |
 | **Routine pin regeneration** — currently a wave-scale event (~1 900 s) | High. Removes the § D196 staleness pressure structurally rather than by vigilance |
-| **Lane verification decoupled from integration verification** | High, and immediate. This is what broke on 2026-07-31 at load 166 |
-| Faster unit suite | **Lowest.** Already ~5–6× parallel at roughly one CPU-hour; more cores gives a useful but modest wall-clock cut |
+| ~~Lane verification decoupled from integration verification~~ | Was Phase A's, and **is not on offer any more.** This is what broke on 2026-07-31 at load 166, and it remains unaddressed rather than solved |
+| ~~Faster unit suite~~ | Was Phase A's, and the **lowest**-value row on this table anyway. Already ~5–6× parallel at roughly one CPU-hour |
+
+**Two of those four rows died with Phase A**, and the two that survive are both Phase B's. That is
+worth stating rather than leaving to inference: withdrawing Phase A did not just remove an
+implementation, it removed the only part of this document that was going to make CI faster.
 
 **What it does not buy.** None of this repository's actual blockers this wave were CPU-bound. A
 pre-registered criterion that was factually wrong, an authoring surface that did not exist, a
@@ -109,20 +107,25 @@ of this project is reporting confident nonsense; a fleet is an amplifier in both
 
 ---
 
-## 2. Phase A — self-hosted CI runners
+## 2. Phase A — self-hosted CI runners — **WITHDRAWN**
 
-**Contract.** The Linux leg of the existing matrix runs on self-hosted runners sized for this
-workload; the macOS leg stays GitHub-hosted, because the matrix's whole purpose is comparing two
-platforms and Azure has no macOS.
+**The contract that stood here is withdrawn**, and the implementation it judged has been removed
+from the tree. See the note under the status table for what was built, what was never run, and the
+cost finding that ended it.
 
-- **x86-64 Linux**, matching `ubuntu-latest`, per § 0.2.
-- Node pinned to the floor `package.json` declares, as `ci.yml` already does. **No Node axis** —
-  § D201 eliminated Node as the variable on both sides, and re-introducing it would widen the matrix
-  without a question to answer.
-- `fail-fast: false` preserved. Cancelling one leg for being slow makes *"does this pin hold on both
-  platforms?"* unanswerable, which is the comparison the matrix exists for.
-- Ephemeral runners — one job per runner, torn down after. A reused runner is a shared mutable
-  environment, and this repository has already lost a wave to a second writer on its tree.
+Two properties it asserted are **not** Phase A's and survive it, because they are properties of
+`ci.yml` itself and remain enforced by the file:
+
+- **The matrix compares two operating systems**, `fail-fast: false`, with no Node axis — § D201
+  eliminated Node as the variable on both sides.
+- **The Linux leg is x86-64, or the run says so.** The architecture check is still in `ci.yml`. Its
+  subject is now GitHub changing what `ubuntu-latest` means rather than an operator pointing a leg
+  at an ARM pool, which is a smaller threat and still not this repository's decision to make.
+
+What is gone with the phase is the *mechanised* guard on those properties: `infra/checks/` evaluated
+the runner-label expression and rejected nine mutations of `ci.yml`, and it was deleted with the
+switch it existed to prove inert. **Both properties are therefore now conventions in a file rather
+than assertions in a test.** Say that plainly rather than counting the guard as still standing.
 
 ## 3. Phase B — measurement fan-out
 
@@ -143,16 +146,26 @@ of arms.
 
 Each is a run, not an argument.
 
+**Numbering is deliberately not compacted.** Criteria 3 and 4 belonged to the withdrawn Phase A.
+They are struck through rather than deleted and the remaining five keep their original numbers, so
+that a criterion cannot be quietly dropped by renumbering the list around it — and so that anything
+elsewhere citing "criterion 5" still points at the criterion it meant.
+
 1. **A sharded run reproduces the single-machine run.** Structural digest **exactly**; continuous
    summaries within § D202's declared tolerance. Same seeds, same cells, same arms, any shard count
    — including a shard count of 1, which must be byte-identical to not sharding at all.
 2. **Arms cannot be split.** A test that *attempts* to distribute a comparison's arms across shards
    fails loudly at the type or the entry point. Asserted by trying it, not by reading the code.
-3. **The two-OS matrix still compares two operating systems.** A self-hosted Linux runner must not
-   silently become the only leg, and a test or workflow assertion says so.
-4. **No pinned estimate moves and no identity digest moves** — Phase A changes where the suite runs,
-   not what it computes. Any movement is a **finding about the runner**, reported and stopped on,
-   never a value to edit. § D196/§ D201 cost this repository a wave over precisely that.
+3. ~~**The two-OS matrix still compares two operating systems.** A self-hosted Linux runner must not
+   silently become the only leg, and a test or workflow assertion says so.~~ **Withdrawn with
+   Phase A.** No leg is retargetable any more, so the threat it guarded does not exist; the
+   two-OS matrix itself remains in `ci.yml`, now as a convention rather than an assertion (§ 2).
+4. ~~**No pinned estimate moves and no identity digest moves** — Phase A changes where the suite
+   runs, not what it computes. Any movement is a **finding about the runner**, reported and stopped
+   on, never a value to edit.~~ **Withdrawn with Phase A**, which never ran, so this was never
+   tested. **The rule behind it is not withdrawn** and Phase B inherits it directly: a pin that
+   moves when only the machine changed is a finding about the machine. § D196/§ D201 cost this
+   repository a wave over precisely that.
 5. **The resolution limit is re-measured at the new budget, never inherited.** Raising n lowers the
    smallest detectable effect. § D156 refused two cells that *cleared* Holm–Bonferroni because the
    effect was a third to a half of what the apparatus could resolve there — that judgement is

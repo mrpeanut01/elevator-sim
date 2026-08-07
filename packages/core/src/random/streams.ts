@@ -95,6 +95,24 @@ export const STREAM_NAMES = [
    * draw either. What it does move is the demand the trace is generated at, deliberately.
    */
   'dayVariation',
+  /**
+   * Whether a rider carries the credential their destination needs, or only their own zone's
+   * (`traffic/generator.ts` § *The credential gap*). Appended for `batchSize`'s reason: the
+   * spelling decides the parameters and the position decides nothing.
+   *
+   * Drawn **once per generated passenger, in final trace order**, on every run — the same
+   * discipline `passengerMass` follows, and for the same reason. A draw taken only for the riders
+   * a zone happens to cover would make the draw *sequence* a function of the building's
+   * `accessZones`, so adding one floor to a zone would re-roll every later rider and two arms that
+   * differ only in their zoning would stop being the same crowd. Taken for everybody, gap
+   * membership is a property of the person: the zones decide whether it costs them anything.
+   *
+   * Its value is consulted only where a destination is access-restricted, so a building that
+   * declares no `accessZones` materializes this stream, consumes from it, and produces a
+   * byte-identical trace — the independence guarantee at the head of this module doing exactly
+   * what it is for.
+   */
+  'credential',
 ] as const;
 
 export type StreamName = (typeof STREAM_NAMES)[number];
@@ -205,6 +223,11 @@ export function deriveStreamSeed(masterSeed: number | bigint, streamName: string
  *   they walked in with. Seeding it off the run seed would mean re-rolling the machine silently
  *   changed *which people left the lift system*, so two arms would be measured over different
  *   populations — the very thing docs/14 § 5 criterion 4 exists to keep visible.
+ * - **`credential`** — whether somebody is carrying the badge for where they are going is a fact
+ *   about *them*, decided before they reach the lobby. Off the traffic seed it would be the
+ *   machine deciding who was authorized, and re-rolling a dispatcher would silently re-roll which
+ *   riders could travel at all — two arms measured over different populations, which is the same
+ *   fault `modeChoice` is here to avoid.
  * - **`dayVariation`** — *which Tuesday this is* is the most purely crowd-side fact on the list:
  *   it scales how many people walk in and moves when they do it, and it touches no car. Off the
  *   traffic seed it would be the machine deciding how busy the day was, and re-rolling a
@@ -227,6 +250,7 @@ const TRAFFIC_STREAM_NAMES: ReadonlySet<string> = new Set([
   'patience',
   'modeChoice',
   'dayVariation',
+  'credential',
 ]);
 
 /** Optional second seed, for separating demand from machine. See {@link StreamSet}. */
@@ -325,6 +349,14 @@ export class StreamSet {
    * the type does not.
    */
   readonly dayVariation: Rng;
+  /**
+   * Whether a rider holds the credential their destination needs. One draw per generated
+   * passenger, in trace order, on every run.
+   *
+   * Materialized here for {@link batchSize}'s reason — a name in {@link STREAM_NAMES} without a
+   * property beside it is a source the architecture declares and the type does not.
+   */
+  readonly credential: Rng;
 
   readonly #streams = new Map<string, Pcg32>();
 
@@ -343,6 +375,7 @@ export class StreamSet {
     this.patience = this.#derive('patience');
     this.modeChoice = this.#derive('modeChoice');
     this.dayVariation = this.#derive('dayVariation');
+    this.credential = this.#derive('credential');
   }
 
   /** Typed accessor for the required streams. Returns the same instance as the property. */

@@ -268,10 +268,18 @@ const PLAIN: Readonly<Record<FailState, string>> = {
   stranded:
     'Stranded means the run ended with people still in the system: they arrived, they called, and ' +
     'no car ever carried them.',
+  /*
+   * **Corrected by § D265, and the old sentence is worth recording.** It read *"…the credential
+   * the rider holds is not one the dispatcher can read, or the rider holds none at all"*, which
+   * put the blame on the dispatcher and implied a dial. Since § D254 the runner asks the access
+   * question with the rider's own credential under every call type, so a badge that does not open
+   * the destination is refused by all twelve shipped dispatchers and reading it changes nothing.
+   * What is left is a statement about the rider and the building, which is what this now says.
+   */
   'locked-out':
-    'Locked out means a call was registered that no car may legally answer. It is not congestion: ' +
-    'the credential the rider holds is not one the dispatcher can read, or the rider holds none ' +
-    'at all.',
+    'Locked out means somebody called for a floor their credential does not open. It is not ' +
+    'congestion and it is not the dispatcher: the badge they hold is for somewhere else, or they ' +
+    'hold none at all, and no car in the building may legally carry them either way.',
 };
 
 export interface FailStateReportInput {

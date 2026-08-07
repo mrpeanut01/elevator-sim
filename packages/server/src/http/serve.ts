@@ -3,13 +3,15 @@
  *
  * It is deliberately thin and deliberately dull, because it is the one piece the tests do not
  * drive through the API: `api.test.ts` calls `handle()` directly with no port bound, which is only
- * a fair test if this file contains no decisions. So it contains four — a body-size cap, a JSON
- * parse, a bearer-token read and a CORS answer — and each is stated here rather than left implicit.
+ * a fair test if this file contains no decisions. So it contains five — a body-size cap, a JSON
+ * parse, a bearer-token read, a CORS answer and **who the caller is** — and each is stated here
+ * rather than left implicit.
  */
 
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
 
 import type { Api, ApiRequest } from './api.js';
+import { assetFor, cacheControlFor, type StaticBundle } from './static.js';
 
 /**
  * The largest request body the server will read.
@@ -24,12 +26,43 @@ export interface ServeOptions {
   readonly api: Api;
   readonly port: number;
   /**
-   * Origins allowed to call this API from a browser, or `'*'`.
+   * The one origin allowed to call this API from a browser, or `'null'` for none.
    *
    * Explicit and required. A default of `'*'` is how a CORS policy becomes "no policy" without
-   * anybody deciding it should be.
+   * anybody deciding it should be — and since § D257 `'*'` is not merely undefaulted but
+   * unreachable: `main.ts`'s `allowOriginFrom` refuses it at boot, so no environment can produce
+   * it. This field is still a plain string and this function still writes whatever it is handed
+   * into the header, because the decision belongs at the place that reads the environment and the
+   * tests hand it values directly.
+   *
+   * Singular on purpose. A list would need `Vary: Origin` and a per-request match against the
+   * request's own `Origin` header, which is a second place deciding who may call — and the only
+   * deployment this product has is one viewer, at one origin.
    */
   readonly allowOrigin: string;
+  /**
+   * The built viewer, served from this same origin. Omitted, the server is the JSON API alone.
+   *
+   * Optional because the API is useful without it — the tests drive `handle()` directly and never
+   * bind a port — and because a missing bundle must be a deployment's decision rather than a
+   * startup crash for anyone running the API on its own.
+   */
+  readonly static?: StaticBundle | undefined;
+  /**
+   * Whether `x-forwarded-for` may be believed. **Default `false`.**
+   *
+   * § D242's per-caller budget is only a budget if the key cannot be chosen by the caller, and
+   * `x-forwarded-for` is a request header — anyone can send one, with anything in it. Trusting it
+   * unconditionally does not merely weaken the limit, it *removes* it, because a sender who varies
+   * the header gets a fresh budget per request while looking like a hundred different people.
+   *
+   * So it is believed only when an operator says there is a proxy in front, and even then only its
+   * **left-most** entry, which is the address the first trusted hop saw. Behind Azure Container
+   * Apps' ingress that is the real client; with no proxy the socket address is, and the default
+   * being the socket address means an operator who has not thought about it gets the answer that
+   * cannot be forged rather than the one that is convenient.
+   */
+  readonly trustProxy?: boolean | undefined;
 }
 
 export function serve(options: ServeOptions): NodeServer {
@@ -58,6 +91,30 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
   }
 
   const url = new URL(incoming.url ?? '/', 'http://localhost');
+
+  // The viewer, before the API and only outside `/api/`. The prefix is the whole routing rule:
+  // every route `api.ts` answers begins with it, so nothing here can shadow an endpoint, and a
+  // future endpoint cannot be shadowed by someone adding a file to the bundle.
+  //
+  // A non-API path with no matching asset falls through to the API's own 404 rather than being
+  // rewritten to `index.html` — see `assetFor` on why there is deliberately no catch-all.
+  if (options.static !== undefined && !url.pathname.startsWith('/api/')) {
+    if (incoming.method === 'GET' || incoming.method === 'HEAD') {
+      const asset = assetFor(options.static, url.pathname);
+      if (asset !== undefined) {
+        response.writeHead(200, {
+          'content-type': asset.contentType,
+          'cache-control': cacheControlFor(asset),
+          // Same reason as the API's: the browser must not re-decide what it was handed.
+          'x-content-type-options': 'nosniff',
+        });
+        // A HEAD carries the headers and no body, which is what makes it a HEAD.
+        response.end(incoming.method === 'HEAD' ? undefined : asset.body);
+        return;
+      }
+    }
+  }
+
   let body: unknown;
   try {
     body = await readJson(incoming);
@@ -78,6 +135,7 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     query: new Map(url.searchParams),
     body,
     token: bearerOf(incoming.headers.authorization),
+    clientIp: clientIpOf(incoming, options.trustProxy ?? false),
   };
 
   let result;
@@ -121,4 +179,25 @@ export function bearerOf(header: string | undefined): string | undefined {
   if (header === undefined) return undefined;
   const match = /^Bearer\s+(\S+)$/u.exec(header.trim());
   return match?.[1];
+}
+
+/**
+ * Who is calling, for § D242's per-caller budget.
+ *
+ * The socket address unless {@link ServeOptions.trustProxy} says otherwise, and then the
+ * **left-most** `x-forwarded-for` entry — the address the first trusted hop saw. Right-most would be
+ * the proxy itself, which is one bucket for the whole internet; taking an arbitrary middle entry is
+ * taking whatever the caller wrote there.
+ *
+ * `undefined` rather than a placeholder when there is nothing to say, so the decision about what an
+ * unattributable caller costs is made once, in the route that charges, and not twice.
+ */
+export function clientIpOf(incoming: IncomingMessage, trustProxy: boolean): string | undefined {
+  if (trustProxy) {
+    const header = incoming.headers['x-forwarded-for'];
+    const raw = Array.isArray(header) ? header[0] : header;
+    const first = raw?.split(',')[0]?.trim();
+    if (first !== undefined && first.length > 0) return first;
+  }
+  return incoming.socket.remoteAddress ?? undefined;
 }

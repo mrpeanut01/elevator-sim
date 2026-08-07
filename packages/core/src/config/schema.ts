@@ -12,6 +12,7 @@
 
 import { z } from 'zod';
 
+import { demandPhaseIssues } from './demandPhases.js';
 import {
   AGGREGATIONS,
   ASSIGNMENT_MODES,
@@ -511,6 +512,38 @@ export const trafficProfilesSchema = z
         discardLastMin: nonNegative.optional(),
         directionalSplitAtStart: directionalSplitSchema.optional(),
         directionalSplitAtEnd: directionalSplitSchema.optional(),
+        // The authored phase list. § D273. Declared here because this is a `strictObject`: a
+        // `data/` author cannot give a template a schedule without the schema admitting one, and
+        // the structural rules below are what the five shape builders used to guarantee by
+        // construction. `.min(1)` is repeated in `demandPhaseIssues` rather than trusted from
+        // here, because the resolver is reachable without the schema.
+        phases: z
+          .array(
+            z.strictObject({
+              $comment: comment,
+              startMin: nonNegative,
+              endMin: nonNegative,
+              startIntensity: fraction,
+              endIntensity: fraction,
+              startSplit: directionalSplitSchema.optional(),
+              endSplit: directionalSplitSchema.optional(),
+            }),
+          )
+          .optional(),
+        // The template's hour, minutes after local midnight. Declared here because this is a
+        // `strictObject`: a `data/` author cannot give a template a clock without the schema
+        // admitting one, which is the property that keeps the field from being a second, unvalidated
+        // place a template is defined. Half-open at 1440 rather than closed — 1440 is 00:00 of the
+        // next day, which is 0, and admitting both spellings of one instant is how two records that
+        // mean the same thing compare unequal.
+        startOfDayMin: z
+          .number()
+          .min(0, 'startOfDayMin is minutes after local midnight and cannot be negative')
+          .lt(
+            1440,
+            'startOfDayMin must be below 1440: it is minutes after local midnight, and 1440 is the next midnight, which is 0',
+          )
+          .optional(),
       }),
     ),
     passengerMass: z
@@ -528,6 +561,18 @@ export const trafficProfilesSchema = z
       .refine((mass) => mass.maxKg === undefined || mass.maxKg > mass.meanKg, {
         message: 'expected maxKg > meanKg',
       }),
+    // Required, not optional, and that is the decision rather than an oversight. This is the one
+    // number in the file that says how often access zoning actually costs somebody a journey, and
+    // an absent block would mean "somebody has not decided" while reading exactly like "zero" —
+    // which is the value that makes every `accessZones` declaration in `data/buildings/` inert
+    // (issue #87). Authoring it is cheap; discovering it was missing is not.
+    credentialGap: z.strictObject({
+      $comment: comment,
+      wrongZoneShare: z
+        .number()
+        .min(0, 'wrongZoneShare is a share of journeys and cannot be negative')
+        .max(1, 'wrongZoneShare is a share of journeys and cannot exceed 1'),
+    }),
   })
   .superRefine((profiles, ctx) => {
     checkUniqueIds(profiles.profiles, 'profiles', ctx);
@@ -555,6 +600,49 @@ export const trafficProfilesSchema = z
           message:
             'directionalSplitAtStart and directionalSplitAtEnd are declared together or not at all; one alone gives the run a mix arc with an unauthored endpoint',
         });
+      }
+      // § D273. An authored phase list has to keep by declaration what the five shape builders
+      // keep by construction; `config/demandPhases.ts` is the one place those rules are written,
+      // and the resolver runs the same function against the same list in seconds.
+      const { phases } = template;
+      if (phases !== undefined) {
+        if (template.directionalSplitAtStart !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['demandTemplates', index, 'directionalSplitAtStart'],
+            message:
+              'a template authors its mix as a phase list or as the period endpoints, never both: directionalSplitAtStart/AtEnd describe one arc across the whole period, and phases[].startSplit/endSplit describe the mix knot by knot. Two declarations of one quantity is how the one nobody is reading becomes the one that is right',
+          });
+        }
+        if (template.discardFirstMin !== undefined || template.discardLastMin !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['demandTemplates', index, 'discardFirstMin'],
+            message:
+              'discardFirstMin and discardLastMin belong to the ISO constant shape, which discards a warm-up because one long run has no other way to reach steady state. A phase list authors its own quiet periods as phases and is reported over the whole of what it authored, so a discard here would be a field nothing reads',
+          });
+        }
+        for (const issue of demandPhaseIssues(
+          phases.map((phase) => ({
+            start: phase.startMin,
+            end: phase.endMin,
+            startIntensity: phase.startIntensity,
+            endIntensity: phase.endIntensity,
+            ...(phase.startSplit === undefined ? {} : { startSplit: phase.startSplit }),
+            ...(phase.endSplit === undefined ? {} : { endSplit: phase.endSplit }),
+          })),
+          template.durationMin,
+          'min',
+        )) {
+          ctx.addIssue({
+            code: 'custom',
+            path:
+              issue.index < 0
+                ? ['demandTemplates', index, 'phases']
+                : ['demandTemplates', index, 'phases', issue.index, issue.field],
+            message: issue.message,
+          });
+        }
       }
     });
   });

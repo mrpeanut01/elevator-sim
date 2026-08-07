@@ -211,6 +211,18 @@ function shellTokensOf(palette: Palette): Readonly<Record<string, string>> {
     '--band-1': palette.bandWaiting,
     '--band-2': palette.bandLong,
     '--band-3': palette.bandAbandoned,
+    /*
+     * Three **stage** colours the shell now needs, and § D236 is why: the stage key in
+     * `index.html` draws a swatch per car state and per direction, and a key drawn in a different
+     * colour from the thing it keys is a fifth copy of the palette — the defect this whole file
+     * exists to close, wearing a legend's hat.
+     *
+     * The other three car states already have a shell name: `carLight` is `--band-0`, `carMid`
+     * *is* `--accent`, and `carOverload` is `--band-3`. These are the ones that did not.
+     */
+    '--car-heavy': palette.carHeavy,
+    '--waiting-up': palette.waitingUp,
+    '--waiting-down': palette.waitingDown,
     '--over': palette.over,
     '--transfer': palette.floorLabelTransfer,
     '--entrance': palette.floorLabelEntrance,

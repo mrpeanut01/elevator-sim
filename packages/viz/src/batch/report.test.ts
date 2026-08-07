@@ -41,9 +41,17 @@ function everyString(report: BatchReport): readonly string[] {
   if (report.budgetNote !== null) out.push(report.budgetNote);
   for (const arm of report.arms) out.push(arm.sentence, ...arm.reasons);
   for (const comparison of report.comparisons) {
+    out.push(comparison.summary.sentence);
+    if (comparison.summary.remedy !== null) out.push(comparison.summary.remedy);
     for (const row of comparison.rows) out.push(row.sentence, row.note);
   }
   return out;
+}
+
+function summaryOf(report: BatchReport) {
+  const summary = report.comparisons[0]?.summary;
+  if (summary === undefined) throw new Error('no comparison');
+  return summary;
 }
 
 function rowFor(report: BatchReport, metric: string): BatchComparisonRow {
@@ -206,7 +214,10 @@ describe('the verdicts', () => {
     expect(awt.estimate?.method).toBe('t');
     expect(awt.estimate?.upper).toBeLessThan(0);
     expect(awt.sentence).toContain('lower');
-    expect(awt.sentence).toContain('eta');
+    // The **name**, not the slug — see `the arms are named the way the rest of the product names
+    // them` below for why this changed.
+    expect(awt.sentence).toContain('Minimum estimated wait');
+    expect(awt.sentence).toContain('came out ahead');
     expect(awt.note).toContain('The interval is on the difference itself');
   });
 
@@ -250,6 +261,32 @@ describe('the verdicts', () => {
       expect(row.estimate?.upper, metric).toBeLessThan(0);
       expect(row.sentence, metric).not.toContain('came out ahead');
       expect(row.note, metric).toContain('never a score');
+    }
+  });
+
+  it('R11: the axis row states which figure is lower, and refuses the ranking in the same breath', () => {
+    /*
+     * Reported by a play-tester: *"To learn that `eta` used less energy, you must notice the
+     * interval is negative and work out which arm is the subject of the subtraction."* Stating the
+     * sign is a measurement and R11 does not forbid it — what R11 forbids is calling the lower
+     * figure the better one, because the arm that drives least is often the arm that carried
+     * fewest people. Both halves are asserted, because fixing the first by dropping the second is
+     * the change this test exists to fail on.
+     */
+    for (const metric of ['energyKJ', 'energyPerServedLegKJ'] as const) {
+      const row = rowFor(batchReport(fakeResult({ delta: -3 })), metric);
+      expect(row.sentence, metric).toContain("Minimum estimated wait's figure is the lower");
+      expect(row.sentence, metric).toContain('not a win');
+      expect(row.sentence, metric).toContain('no arm is named ahead on it');
+      expect(row.favours, metric).toBeNull();
+    }
+  });
+
+  it('R11: an axis row whose interval contains zero says that instead of inventing a direction', () => {
+    for (const metric of ['energyKJ', 'energyPerServedLegKJ'] as const) {
+      const row = rowFor(batchReport(fakeResult({ delta: 0 })), metric);
+      expect(row.sentence, metric).toContain('includes zero');
+      expect(row.sentence, metric).not.toContain('is the lower');
     }
   });
 
@@ -297,6 +334,144 @@ describe('the verdicts', () => {
     expect(awt.verdict).toBe('unresolved');
     expect(awt.estimate).toBeNull();
     expect(awt.sentence).toContain('no measurable spread');
+  });
+});
+
+describe('the arms are named the way the rest of the product names them', () => {
+  /*
+   * A play-tester could not find the dispatcher they were running in either picker: Compare and
+   * Lab listed `eta`, `collective`, `zoned-uppeak` — slugs that appear on no other screen — while
+   * the rail beside them said *Minimum estimated wait* and *Conventional collective*. The results
+   * prose then inherited the slugs, so even a reader who guessed right at setup had to hold the
+   * mapping in their head for eight rows.
+   *
+   * The name is `data/dispatcher-profiles.json`'s own `name`, carried on the arm by `runBatch` —
+   * one source, not a second table in a renderer.
+   */
+  it('prints the display name in the comparison prose, never the slug alone', () => {
+    const report = batchReport(fakeResult({ delta: -3 }));
+    for (const row of report.comparisons[0]?.rows ?? []) {
+      const mentions = /Minimum estimated wait|Conventional collective/.test(row.sentence);
+      /*
+       * The display names are removed **first**, because *Conventional collective* contains the
+       * word `collective` and a naive search for the slug matches its own replacement. What is
+       * left is a slug standing on its own, which is what the reader could not resolve.
+       */
+      const withoutNames = row.sentence
+        .replaceAll('Minimum estimated wait', '·')
+        .replaceAll('Conventional collective', '·');
+      expect(/\b(?:eta|collective)\b/.test(withoutNames), `${row.metric}: ${row.sentence}`).toBe(false);
+      if (['awtS', 'wt95S', 'ttdMeanS'].includes(row.metric)) continue; // suppressed rows name no arm
+      expect(mentions, `${row.metric}: ${row.sentence}`).toBe(true);
+    }
+  });
+
+  it('establishes the pairing once, on the arm row, in the picker’s own form', () => {
+    // `Name (slug)` — the form the building picker already uses, so the reader can map the row
+    // back to the dropdown they set. Once, not on all eight comparison rows.
+    const report = batchReport(fakeResult({ delta: -3 }));
+    expect(report.arms[0]?.sentence).toContain('Conventional collective (collective)');
+    expect(report.arms[1]?.sentence).toContain('Minimum estimated wait (eta)');
+    expect(report.comparisons[0]?.baselineProfileName).toBe('Conventional collective');
+    expect(report.comparisons[0]?.candidateProfileName).toBe('Minimum estimated wait');
+  });
+});
+
+describe('the summary — it counts and routes, and it never names a winner', () => {
+  it('routes every row into exactly one bucket, and the buckets are the verdicts', () => {
+    const report = batchReport(fakeResult({ delta: -3 }));
+    const summary = summaryOf(report);
+    const counted =
+      summary.resolved.length +
+      summary.unresolved.length +
+      summary.suppressed.length +
+      summary.unmeasured.length +
+      summary.shown.length +
+      summary.underBudget.length;
+    expect(counted).toBe(report.comparisons[0]?.rows.length);
+    // …and every bucket agrees with the row it came from, so the summary cannot drift from them.
+    for (const metric of summary.resolved) expect(rowFor(report, metric).verdict).toBe('resolved');
+    for (const metric of summary.shown) expect(rowFor(report, metric).verdict).toBe('shown');
+  });
+
+  it('names the measures that separated the two and leaves the arm to the row', () => {
+    /*
+     * **The clause this whole object exists to not have.** CLAUDE.md: never declare one dispatcher
+     * better than another without a paired-t interval that excludes zero. A row that has one says
+     * so itself, under `compareMetric`'s gate; a summary line that repeated the winner would be a
+     * second place deciding it, and a summary line that named one where no row resolved would be
+     * the failure mode this project has refused its own feature over three times.
+     */
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3 })));
+    expect(summary.sentence).toContain('separated the two');
+    expect(summary.sentence).toContain('average wait');
+    expect(summary.sentence).toContain('names the arm ahead');
+    // The summary itself orders nothing: no arm is put ahead of the other in it.
+    expect(summary.sentence).not.toContain('came out ahead');
+    expect(summary.sentence).not.toMatch(/\b(?:better|worse|beat|won|wins|winner)\b/i);
+  });
+
+  it('says plainly, in the summary, when nothing separated the two', () => {
+    // The tie: two bit-identical arms. Every interval contains zero and the reader is told that
+    // in words rather than left to reconcile eight rows.
+    const summary = summaryOf(batchReport(fakeResult({ delta: 0 })));
+    expect(summary.resolved).toEqual([]);
+    expect(summary.sentence).toContain('interval containing zero');
+    expect(summary.sentence).toContain('no difference this batch can resolve');
+  });
+
+  it('never claims an ordering the rows did not license', () => {
+    // Below the budget every row is `under-budget`, and the summary says so rather than promoting
+    // it. R2's lower bound, read through the rows rather than restated here.
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3, replications: 8 })));
+    expect(summary.resolved).toEqual([]);
+    expect(summary.underBudget.length).toBeGreaterThan(0);
+    expect(summary.sentence).toContain('too few paired runs to order the two');
+  });
+});
+
+describe('the remedy — and the obvious one is wrong for half of it', () => {
+  it('does not offer more replications for a suppressed row, because they make it worse', () => {
+    /*
+     * The measured reason, and the one a naive remedy gets backwards. Suppression is
+     * complete-case: one bad pair in fifty empties the row, so a hundred replications is expected
+     * to lose *two*. The lever is the demand control, which is the reason that control exists
+     * (§ D158).
+     */
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3, invalidOn: [17] })));
+    expect(summary.remedy).not.toBeNull();
+    expect(summary.remedy).toContain('more replications make this more common rather than less');
+    expect(summary.remedy).toContain('demand %pop/5 min');
+  });
+
+  it('does offer more replications for an interval that contains zero, and names the budget', () => {
+    const summary = summaryOf(batchReport(fakeResult({ delta: 0 })));
+    expect(summary.remedy).toContain('50');
+    expect(summary.remedy).toContain('200');
+    expect(summary.remedy).toContain('is not a tie');
+  });
+
+  it('never suggests re-rolling the seed until the batch cooperates', () => {
+    // Choosing the outcome. A remedy that taught it would undo the rest of this surface, so the
+    // sentence that mentions seeds says the opposite in as many words.
+    for (const report of [
+      batchReport(fakeResult({ delta: 0 })),
+      batchReport(fakeResult({ delta: -3, invalidOn: [17] })),
+      batchReport(fakeResult({ delta: -3, replications: 200 })),
+    ]) {
+      const { remedy } = summaryOf(report);
+      if (remedy === null) continue;
+      expect(remedy).not.toMatch(/try (?:a|another) (?:different )?seed/i);
+    }
+    expect(summaryOf(batchReport(fakeResult({ delta: 0 }))).remedy).toContain('chooses the answer');
+  });
+
+  it('is null when every row spoke', () => {
+    // Nothing to remedy — and a remedy printed anyway is noise that trains a reader to skip it.
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3 })));
+    expect(summary.suppressed).toEqual([]);
+    expect(summary.unresolved).toEqual([]);
+    expect(summary.remedy).toBeNull();
   });
 });
 

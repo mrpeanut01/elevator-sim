@@ -134,6 +134,20 @@ control, the run does not change, and the screen looks right. The rule that caug
 below — *move the control and require the run to change, compared on the legs* — applied before the
 panel was written rather than after ([§ D219](DECISIONS.md)).
 
+**And the newest one is the same defect with its polarity reversed, which is why it is not in the
+count.** `accessZones` was loaded, schema-checked, cross-validated with four dedicated warning
+codes, indexed correctly by `Bank` and consulted by `Simulation` in three places — and **could not
+change a result**, because `traffic/generator.ts` issued every rider the credential their own route
+needs, so every generated trip was authorised by construction and the gate never bit. Not a
+behaviour with no caller: a caller with no behaviour to reach. It is closed by giving a declared
+share of journeys that begin *inside* the building the badge their own floor implies rather than the
+one their destination needs ([§ D265](DECISIONS.md)); the share is **an uncited assumption with its
+reasoning attached in `data/traffic-profiles.json`**, not a citation, and the rider it turns away is
+a **fourth outcome** — neither delivered, nor waiting, nor abandoned — published beside AWT on
+exactly the footing `workPerServedLegKJ` sits beside raw energy ([§ D266](DECISIONS.md)). It was
+found only because [§ D254](DECISIONS.md) removed the defect that had been hiding it, which is the
+lesson: a feature can be observable **through a bug** and inert without one.
+
 **The eleventh is the most recent and the most instructive, and it is the one to read first.** The
 whole deck API on `model/bank.ts` — `isDoubleDeck`, `deckAt`, `deckAssignmentFor`, `pairedFloorOf`,
 `servesFloorPair` — had **no non-test caller anywhere in the tree**. Every reference outside its own
@@ -159,13 +173,39 @@ data; it does not make data exempt. See [§ D112](DECISIONS.md) and [§ D114](DE
 **A stated mechanism goes stale the same way, and the correction is now pinned.** Seven places
 in this repository asserted, as fact, that destination dispatch does better under access control
 *because* authorization and optimization happen in the same step. Measured at n = 150 per building
-under common random numbers, the difference-of-differences is `+0.982 s [+0.584, +1.380]` — it buys
-*less* where access is controlled, and the saving is entirely in the credential. All seven are
-corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it three
+under common random numbers, the difference-of-differences is `+1.020 s [+0.625, +1.414]` — it buys
+*less* where access is controlled. The run is `runAccessControlStudy({})` at seed 20 260 726, held in
+`benchmark/published.ts` under `difference-of-differences/absolute` and re-pinned by
+[§ D280](DECISIONS.md); the superseded `+0.982 [+0.584, +1.380]` was measured on the tree carrying
+[§ D254](DECISIONS.md)'s pickup-access defect. All seven are
+corrected, and `packages/experiments/src/validation/documentation.test.ts` now asserts it four
 ways: the claim may not appear without a refutation within 400 characters of it, the correction may
-not be silently deleted, and `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
-and true — is asserted in **both** directions. If you write a sentence about *why* something
+not be silently deleted, `model/car/estimateCost.ts`'s exclusion — its sentence is *descriptive*
+and true — is asserted in **both** directions, and no site may re-state the withdrawn destination for
+the saving. If you write a sentence about *why* something
 performs better, either measure it or say it is unmeasured.
+
+**And the second half of that correction was itself a stated mechanism, which is why it is now
+withdrawn rather than replaced.** Six of those sites went on to say *"and the saving is entirely in
+the credential (H-ACCESS-1)"*. H-ACCESS-1 is **REFUTED** ([§ D256](DECISIONS.md),
+[§ D279](DECISIONS.md)): under conventional dispatch `eta` and `destination-eta-unpriced` are
+bit-identical on **150 of 150** `secure-tower` replications across all seven identity metrics, so the
+credential buys nothing there and the saving is not in it either. What stays measured is the
+**negative** — the same-step mechanism is not what produces the saving. **Where the saving does come
+from is unmeasured, and no replacement mechanism may be offered in its place**, because a second
+plausible sentence would be this defect again with new wording.
+
+**A stated *refusal* goes stale the same way, and it is the more dangerous half.** The traffic
+editor drew *mean group size* as a refusal — *"no field of `SimulationDemandOptions` carries it …
+moving it would change this summary line and no passenger"* — for every wave after
+`trafficProfilesWithPattern` made it live, which `shiftRunConfigOf` has called since wave 13. **It is
+not a twelfth dead seam:** the seam was live and correctly wired end to end, and what was dead was
+the sentence describing it. That is worse than a dead seam rather than better — a dead seam merely
+does nothing, while a stale refusal tells the reader not to touch the control, and this one guarded
+the parameter this file names outright (*passengers arrive in batches, not one at a time*). So the
+standing requirement binds **both ways**: a control that writes nothing must say so, and a control
+that writes something may not claim it writes nothing. A refusal is pinned by a run, never by
+another sentence. See [§ D227](DECISIONS.md).
 
 **A published number goes stale the same way.** Three figures in this repository did not reproduce
 from the code that was supposed to produce them — one measured before a seam was wired and never

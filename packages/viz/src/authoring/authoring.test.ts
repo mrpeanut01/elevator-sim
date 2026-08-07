@@ -1025,12 +1025,15 @@ describe('the building spec', () => {
 
 describe('the building editor is not decoration', () => {
   const eta = PROFILES.profiles.find((p) => p.id === 'eta') as DispatcherProfile;
-  const runWith = (spec: BuildingSpec): string => {
+  const runWith = (spec: BuildingSpec, durationS?: number): string => {
     const building = resolveBuilding(
       parseBuilding(buildingFromSpec(spec, { specs: SPECS }) as unknown),
       SPECS,
     );
-    const recording = recordRun(configFor(eta, { building }), { recordDecisions: false }).recording;
+    const recording = recordRun(
+      configFor(eta, { building, ...(durationS === undefined ? {} : { durationS }) }),
+      { recordDecisions: false },
+    ).recording;
     /*
      * The legs, not the counts. Pinning one shaft to a band does not change how many people turn
      * up — it changes **which car answers them**, and a fingerprint of four counts cannot see that.
@@ -1125,12 +1128,64 @@ describe('the building editor is not decoration', () => {
 
   /* ---- access zoning: the credential half, and only that ------------------ */
 
+  /**
+   * **These two used to fail on purpose. Issue #87 is closed and they now pass — for a reason, and
+   * the reason is not that anything here was relaxed.**
+   *
+   * They asked the standing requirement's question — *move the control and require the run to
+   * change* — and got an honest **no**. § D254 deleted the access check on the *pickup* floor (a
+   * credential governs where you may go, not where you may be collected), and with the defect gone
+   * `traffic/generator.ts` issued every rider a credential drawn from the building's own zones, so
+   * every generated trip was authorised by construction and a gate that only ever sees authorised
+   * traffic could never bite. Adding a zone changed nothing on the legs, and § D256 measured it:
+   * `midtown-office`, seed 424 242, a synthetic zone over floors 8–13 permitting a group named
+   * `nobody-has-this` — 205 legs bound there, **all 205 alight**.
+   *
+   * [§ D265](../../../../DECISIONS.md) answers it: a declared share of journeys that begin
+   * **inside** the building and end inside a zone the traveller's own floor does not reach are made
+   * by somebody carrying their own zone's badge, or none at all. The building turns them away, and
+   * the assertions below are the ones that were always here.
+   *
+   * ## Why the duration moved and the assertions did not
+   *
+   * The population these cases now observe is a **share of a share**: 10 % of this profile's demand
+   * is interfloor, and only the part of that going from outside the zone into it is a candidate. At
+   * `configFor`'s 600 s this building generates ~114 legs and ~20 interfloor journeys, and the
+   * expected number of refusals is **about one** — censused over five seeds at 600 s it is
+   * `0, 1, 1, 0, 0`, so the shipped seed produces none and the case would have been a coin toss.
+   *
+   * At {@link ACCESS_DURATION_S} the same five seeds give `3, 5, 3, 1, 2` for `ZONED` against
+   * `4, 3, 4, 2, 1` for the one-floor-wider zone — a difference at every one of them. Lengthening
+   * the run is the honest fix and asserting something weaker was the dishonest one: *the
+   * fingerprint moved*, or *the zone parses*, would have converted a real question into a tick.
+   * It is `frame/overlay.test.ts`'s rate raise (§ D260) applied to a duration.
+   *
+   * ## What is *not* new, so nobody re-derives it
+   *
+   * The third case — *the credential control changes the run* — passed throughout, on a different
+   * mechanism: two zones under **different** groups leave `credentialForRoute` with no credential
+   * for the interfloor pairs between them, and `planDemand` drops those pairs outright. The fourth
+   * — *a group added beside one that already works is a no-op* — also passed throughout, and it
+   * still does: gap membership is a per-passenger draw that does not consult the group list, so
+   * widening `tenant` to `tenant, facilities` leaves every rider's badge and every leg identical.
+   */
+
+  /**
+   * 1 800 s rather than `configFor`'s 600 for the access-zone cases, and only for those.
+   *
+   * A demand *duration* rather than a demand rate, because the quantity that is too small here is
+   * the **count of interfloor journeys**, and raising the arrival rate on a ten-floor building with
+   * three cars would saturate it long before it produced many more of them.
+   */
+  const ACCESS_DURATION_S = 1800;
+
   const ZONED: BuildingSpec = {
     ...spec,
     accessZones: [{ id: 'zone-1', floors: [6, 7, 8, 9, 10], credentialGroups: ['tenant'] }],
   };
+  const runAccess = (of: BuildingSpec): string => runWith(of, ACCESS_DURATION_S);
   const partsOf = (of: BuildingSpec): readonly [readonly string[], unknown] =>
-    JSON.parse(runWith(of)) as [readonly string[], unknown];
+    JSON.parse(runAccess(of)) as [readonly string[], unknown];
 
   it('an access zone changes the run, and leaves every shaft serving exactly what it did', () => {
     /*
@@ -1146,16 +1201,16 @@ describe('the building editor is not decoration', () => {
      */
     expect(partsOf(ZONED)[0]).toStrictEqual(partsOf(spec)[0]);
     expect(JSON.stringify(partsOf(ZONED)[1])).not.toBe(JSON.stringify(partsOf(spec)[1]));
-  });
+  }, 120_000);
 
   it('the floor multi-select changes the run — one more floor inside the zone', () => {
     const wider: BuildingSpec = { ...ZONED, accessZones: withZoneFloor(ZONED, 'zone-1', 5) };
     expect(zoneFloorsOf(wider, wider.accessZones[0] as never)).toStrictEqual([5, 6, 7, 8, 9, 10]);
-    expect(runWith(wider)).not.toBe(runWith(ZONED));
+    expect(runAccess(wider)).not.toBe(runAccess(ZONED));
     // And clicking the same floor again is the inverse edit, back to the run we started from.
     const back: BuildingSpec = { ...wider, accessZones: withZoneFloor(wider, 'zone-1', 5) };
-    expect(runWith(back)).toBe(runWith(ZONED));
-  }, 60_000);
+    expect(runAccess(back)).toBe(runAccess(ZONED));
+  }, 120_000);
 
   it('the credential control changes the run — the same floors under a different group', () => {
     /*
@@ -1183,8 +1238,8 @@ describe('the building editor is not decoration', () => {
     };
     expect(credentialGroupsOf(split)).toStrictEqual(['alpha', 'bravo']);
     expect(partsOf(split)[0]).toStrictEqual(partsOf(shared)[0]);
-    expect(runWith(split)).not.toBe(runWith(shared));
-  }, 60_000);
+    expect(runAccess(split)).not.toBe(runAccess(shared));
+  }, 120_000);
 
   it('a group added beside one that already works is a no-op, and that is the mechanism, not a bug', () => {
     /*
@@ -1198,11 +1253,16 @@ describe('the building editor is not decoration', () => {
      * whose effect is on the *set*, so an edit that does not change the set changes nothing — and a
      * test that expected otherwise would have been pinning a wish. The coverage matrix is where the
      * reader sees which columns a floor is open to, which is the fact this edit does move.
+     *
+     * **§ D265 does not disturb it, and that is worth pinning rather than assuming.** The credential
+     * gap is a per-passenger draw taken in trace order and compared against a share; it never
+     * consults the group list, so who is in the gap is the same set of people under `tenant` as
+     * under `tenant, facilities`, and the badge they carry is their own floor's either way.
      */
     const wider: BuildingSpec = { ...ZONED, accessZones: withZoneGroup(ZONED, 'zone-1', 'facilities') };
     expect(credentialGroupsOf(wider)).toStrictEqual(['tenant', 'facilities']);
-    expect(runWith(wider)).toBe(runWith(ZONED));
-  }, 60_000);
+    expect(runAccess(wider)).toBe(runAccess(ZONED));
+  }, 120_000);
 
   /* ---- sky lobbies: the escalator, and only that -------------------------- */
 

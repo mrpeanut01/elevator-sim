@@ -38,6 +38,7 @@
  * |---|---|---|
  * | mood face | the worst band's tint | the face glyph `◡ ◠ ⌄ ×`, and the headline sentence |
  * | mood bar | the four band colours | the 2×2 legend names each band and states its count, and the bar's `aria-label` says the same in words |
+ * | mood card's **basis** | nothing — it is never a colour | the headline's tense and the sub-line's *across the whole shift*, both in the `aria-label` too |
  * | *longest wait* | band amber / band red | the figure itself — `142 s` is the state |
  * | *served under N s* | band green / amber / red | the percentage, and `—` when there is no denominator |
  * | goal rows | met green / missed amber / pending grey | `GOAL_GLYPHS`' `✓ ○ ·`, plus the value or `—` |
@@ -60,9 +61,11 @@ import type {
   HonestyCard,
   LiveObservations,
   Mood,
+  WaitBandBasis,
   WaitBandId,
   WaitBands,
 } from '../live/types.js';
+import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
@@ -96,11 +99,17 @@ export interface LeftRailElements {
 /* -------------------------------------------------------------------------- *
  * Tokens
  *
- * Band colours come from `live/bands.ts`, which is the single source of the
- * palette requirement S7 names. Everything else is a CSS custom property by
- * name rather than by value: the stylesheet already declares the token set and
- * a hex literal here would be the second copy of it. `style.setProperty` takes
- * `var(--x)` happily, so there is no cost to spelling it this way.
+ * Every colour this file writes is a CSS custom property **by name rather than
+ * by value**: the stylesheet already declares the token set and a hex literal
+ * here would be the second copy of it. `style.setProperty` takes `var(--x)`
+ * happily, so there is no cost to spelling it this way.
+ *
+ * That was true of the four below and, until § D251, false of the band colours
+ * beside them — `live/bands.ts` held its own hexes, this file put them into
+ * inline styles, and an inline style is not reached by a `:root[data-theme]`
+ * block. The rule and the practice agree now: `live/` names tokens too, so
+ * `BAND_COLORS[0]` *is* `var(--band-0)` and the rail draws the page's green
+ * rather than a copy of the dark one.
  * -------------------------------------------------------------------------- */
 
 const INK = 'var(--text)';
@@ -110,7 +119,7 @@ const FAINT = 'var(--faint)';
 const TRACK = 'var(--edge-strong)';
 const BANKED = 'var(--accent-soft)';
 
-/** `WAIT_BANDS[0].color`, so the *good* green is the band palette's and not a fourth copy. */
+/** `WAIT_BANDS[0].color` — `var(--band-0)`, so the *good* green is the page's and not a copy. */
 const GOOD = BAND_COLORS[0] ?? INK;
 const CAUTION = BAND_COLORS[1] ?? INK;
 const HOT = BAND_COLORS[3] ?? INK;
@@ -178,6 +187,7 @@ export function moodViewOf(bands: WaitBands, mood: Mood): MoodView {
     bands.counts.map((entry) => entry.count),
     bands.total,
   );
+  const live = bands.basis === 'now';
   return {
     face: mood.face,
     headline: mood.headline,
@@ -195,14 +205,28 @@ export function moodViewOf(bands: WaitBands, mood: Mood): MoodView {
       count: entry.count,
       color: entry.band.color,
     })),
-    barLabel:
-      bands.total === 0
-        ? 'Nobody is waiting.'
-        : `${String(bands.total)} waiting: ` +
-          bands.counts.map((entry) => `${String(entry.count)} ${entry.band.label}`).join(', ') +
-          '.',
+    /*
+     * KB-15's second signal for the bar, and — since the card grew a second basis — the one place
+     * the basis is stated in full words rather than implied by a tense. A screen-reader user gets
+     * *"Across the whole shift, 1392 people called a lift: …"* and never has to infer from a face
+     * glyph which of two questions the bar is answering.
+     */
+    barLabel: barLabelOf(bands, live),
     anybodyWaiting: bands.total > 0,
   };
+}
+
+function barLabelOf(bands: WaitBands, live: boolean): string {
+  const partition = bands.counts
+    .map((entry) => `${String(entry.count)} ${entry.band.label}`)
+    .join(', ');
+  if (live) {
+    return bands.total === 0 ? 'Nobody is waiting.' : `${String(bands.total)} waiting: ${partition}.`;
+  }
+  return bands.total === 0
+    ? 'The shift is over and nobody called a lift.'
+    : `Across the whole shift, ${String(bands.total)} people called a lift, ` +
+        `by the longest each of them stood: ${partition}.`;
 }
 
 /** The card before the first run: no face, no claim, and no zeros pretending to be observations. */
@@ -623,6 +647,7 @@ export function mathsDisclosureOf(
  */
 export function idleHonestyCard(): HonestyCard {
   return {
+    basis: 'now',
     glyph: '·',
     title: 'Nothing measured yet',
     plain:
@@ -779,7 +804,7 @@ export function mountLeftRail(elements: LeftRailElements, context: MountContext)
       const t = view.simTimeS;
       const mode = disclosureOf(state.mode);
 
-      drawMood(doc, elements.mood, surfaces, recording, t);
+      drawMood(doc, elements.mood, surfaces, recording, t, state.mode);
       drawStats(doc, surfaces, recording, t);
       drawShift(doc, elements.shift, surfaces, view);
       drawHonesty(elements.honesty, recording, t, mode, state.showMaths);
@@ -808,12 +833,13 @@ function drawMood(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  viewMode: ViewMode,
 ): void {
   const view =
     recording === undefined
       ? idleMoodView()
       : (() => {
-          const bands = waitBandsAt(recording, t);
+          const bands = waitBandsAt(recording, t, basisAt(recording, t));
           return moodViewOf(bands, moodOf(bands));
         })();
 
@@ -843,7 +869,43 @@ function drawMood(
     ),
   );
 
-  drawDrivers(doc, surfaces, recording, t);
+  drawDrivers(doc, surfaces, recording, t, viewMode);
+}
+
+/**
+ * Whether the playhead has reached the end of the shift — **the decision**, with one home.
+ *
+ * Exported for the reason `render/runSummary.ts#summaryFigureIds` gives about itself: a probe that
+ * recomputed `t >= endedAt` would assert its own arithmetic and say nothing about the rail, so the
+ * question *"is this rail about to draw a finished shift?"* is answerable by calling the function
+ * the rail itself calls. It is also the only decision on this rail that two surfaces share, and two
+ * copies of it is how the mood card and the honesty card would come to disagree about which shift a
+ * reader is looking at.
+ *
+ * `>=` rather than `===` because `simTimeS` is a float the transport advances by a frame's worth at
+ * a time; it lands *on* `endedAt` only because `ViewAt.simTimeS` is clamped into the recording, and
+ * a comparison that leaned on that clamp would be a comparison leaning on somebody else's rounding.
+ *
+ * `recording.status` is deliberately **not** consulted. A `timed-out` run is finished too — and it
+ * has the more honest terminal frame, because the people it failed are still standing in it — so a
+ * rule keyed on `status === 'completed'` would hand the retrospective card to the run that needs it
+ * least, which is the inversion this whole change is about.
+ */
+export function shiftIsOver(recording: VizRecording, t: SimTime): boolean {
+  return t >= recording.endedAt;
+}
+
+/**
+ * Which question the mood card and the honesty card answer at this playhead.
+ *
+ * The live one while the shift is running, the retrospective one once {@link shiftIsOver}.
+ * **The rail is the right place for this and `live/` is not**: `live/` answers whichever question
+ * it is asked, and *which question a finished shift deserves* is a presentation call — exactly the
+ * split this file's docstring describes, and the reason both `waitBandsAt` and `honestyAt` take the
+ * basis rather than sniffing the recording for themselves.
+ */
+function basisAt(recording: VizRecording, t: SimTime): WaitBandBasis {
+  return shiftIsOver(recording, t) ? 'whole-run' : 'now';
 }
 
 function drawDrivers(
@@ -851,12 +913,16 @@ function drawDrivers(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  mode: ViewMode,
 ): void {
   if (recording === undefined) {
     surfaces.drivers('idle', () => []);
     return;
   }
-  const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t));
+  // The reader's own mode — issue #71. The two driver sentences that carry vocabulary (the
+  // abandonment horizon, and the per-5-minute rates) lead with a plain-language sentence in Casual
+  // and are unchanged in Engineer.
+  const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t), mode);
   const rows = moodDriverRowsOf(mood);
   surfaces.drivers(
     `${String(mood.provisional)}|${rows.map((driver) => driver.text).join('|')}`,
@@ -1036,7 +1102,15 @@ function drawHonesty(
   mode: DisclosureMode,
   showMaths: boolean,
 ): void {
-  const card = recording === undefined ? idleHonestyCard() : honestyAt(recording, t, mode);
+  /*
+   * The same basis the mood card above it is drawn on, and it has to be the same one: a rail whose
+   * face is retrospective and whose honesty card is instantaneous is two panels answering two
+   * questions with no way for a reader to tell which is which.
+   */
+  const card =
+    recording === undefined
+      ? idleHonestyCard()
+      : honestyAt(recording, t, mode, basisAt(recording, t));
   setStyle(ui.card, 'background', card.bg);
   setStyle(ui.card, 'border-color', card.edge);
   setText(ui.glyph, card.glyph);

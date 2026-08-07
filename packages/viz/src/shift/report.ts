@@ -12,20 +12,31 @@
  *   `summary.meanWaitS` — and by the word **withheld** whenever the run's own `awtIsValid` is
  *   false or the run saturated.
  * - Its **where it went wrong** rows are hard-coded at `08:30` and `17:20`, on a run whose clock
- *   the design invented. They are replaced by three rows derived from the run: the instant the
- *   deepest queue stood, the demand phase that instant fell in, and the reporting window every
- *   cohort figure above was computed over. **A clock time the run did not have is never printed.**
+ *   the design invented. They are replaced by two rows derived from the run: the instant the
+ *   deepest queue stood, and the demand phase that instant fell in. **A clock time the run did not
+ *   have is never printed** — and neither is a row that is not an event: the reporting window's
+ *   scope note used to sit there, timestamped like an incident, and is now in the small print
+ *   ({@link smallPrintFor}, issue #56).
+ *
+ * ## One judgement, and every sentence that states it
+ *
+ * The sheet says *how did today go?* in four places — the headline, the pass/fail banner, the
+ * diagnosis heading and the streak line. All four are reached through {@link judgementOf}, keyed by
+ * a single `verdict`, because two of them used to be computed independently and **disagreed on
+ * shipped runs**: *"A day it could handle"* over *"Shift missed"*, issue #53. See
+ * {@link ShiftJudgement} for the run that produced it and why this is a lookup rather than copy that
+ * happens to line up.
  *
  * ## The suppression gate, stated once
  *
  * `AVERAGE WAIT` is the only figure on this sheet that a saturated run may not publish, and it is
- * gated on `summary.awtIsValid && !summary.saturated` — both, not either. `awtIsValid` already has
- * four grounds (an empty window, censoring above the unserved limit, a leg past the 900 s
- * abandonment horizon, and the trend test) and `saturated` is carried separately; requiring both is
- * `docs/12` § 4.2's own wording and it is the conservative direction. Everything else on the sheet
- * is an **observation** — a count, or a ratio of counts — and is therefore printed on a saturated
- * day, which is the day a reader most needs it. That split is `docs/10` R9: one gate, for exactly
- * the figures the flag speaks for, widened to nothing.
+ * gated on `summary.awtIsValid && !summary.saturated` — both, not either. `awtIsValid` has **five**
+ * grounds (`core`'s `AWT_INVALID_GROUND_SPECS`: the trend test, an empty window, abandonment above
+ * 2 %, censoring above the unserved limit, and a leg past the 900 s horizon) and `saturated` is
+ * carried separately; requiring both is `docs/12` § 4.2's own wording and it is the conservative
+ * direction. Everything else on the sheet is an **observation** — a count, or a ratio of counts —
+ * and is therefore printed on a saturated day, which is the day a reader most needs it. That split
+ * is `docs/10` R9: one gate, for exactly the figures the flag speaks for, widened to nothing.
  *
  * ## Energy: two figures, no colour, no total
  *
@@ -91,11 +102,14 @@ import type { VizRecording, VizSummary } from '../contract/types.js';
 import { eventFor } from './events.js';
 import { readGoals } from './goals.js';
 import { growthFactor } from './growth.js';
-import { ENDLESS_CONTRACT_ID } from './week.js';
+import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
   DAY_START_S,
+  WAKE_UP_ARRIVALS,
   weekdayOf,
   type DayReport,
+  type FigureTone,
+  type GoalReading,
   type Observations,
   type ReportDiagnosis,
   type ReportFigure,
@@ -113,7 +127,7 @@ import {
  *
  * A constant because three places have to agree on it: the figure, the honesty guard in
  * `report.test.ts`, and whatever renders it. The handoff already reserved this exact word for the
- * saturated case; the implementation widens it to all four of `awtIsValid`'s grounds.
+ * saturated case; the implementation widens it to every one of `awtIsValid`'s grounds.
  */
 export const WITHHELD = 'withheld';
 
@@ -156,8 +170,38 @@ export type ReportSubject =
  * The half of the sheet that is true of **any** run — derived from {@link DayReport} by removing
  * the week-shaped fields rather than restated, so a field added to `DayReport` cannot silently miss
  * the single-run sheet.
+ *
+ * {@link ReportCore.diagnosisHeading} is added here rather than on `types.ts`'s `DayReport` because
+ * `shift/types.ts` is not this lane's file. It is on the *shaped* sheet, which is what every caller
+ * in the tree already holds — `ViewerState.report` is a `ShapedDayReport` — so nothing reads a sheet
+ * that lacks it.
  */
-export type ReportCore = Omit<DayReport, WeekShapedField>;
+export type ReportCore = Omit<DayReport, WeekShapedField> & ShapedOnlyFields;
+
+/**
+ * What a *shaped* sheet carries that `types.ts`'s {@link DayReport} does not.
+ *
+ * Declared once and mixed into both shapes, so the two cannot drift — the same discipline
+ * {@link ReportCore} applies in the other direction by deriving from `DayReport` rather than
+ * restating it. It lives here rather than on `DayReport` because `shift/types.ts` is not this lane's
+ * file; nothing is lost by that, because every consumer in the tree holds a {@link ShapedDayReport}
+ * (`ViewerState.report` is one) and no caller reads a bare `DayReport` off this module.
+ */
+interface ShapedOnlyFields {
+  /**
+   * The heading the diagnosis list hangs under — **a third string out of the one judgement**.
+   *
+   * *Where it went wrong* fired on a shift where nothing did (issue #56): the section is authored in
+   * `index.html` as a fixed `<h3>`, so a player who had just met every goal was told, immediately
+   * under a green **Shift cleared**, where their day had gone wrong. A heading that is true of every
+   * run is a heading a reader learns to skip, and it is the day it *isn't* true that they needed it.
+   *
+   * It comes out of {@link judgementOf} beside {@link DayReport.verdict} and
+   * {@link DayReport.verdictLine} for the reason the lede does: three sentences about one day,
+   * looked up under one key, cannot say three different things about it.
+   */
+  readonly diagnosisHeading: string;
+}
 
 /**
  * The five statements that need a week to be true — and `taught` is the one worth arguing.
@@ -170,7 +214,7 @@ export type ReportCore = Omit<DayReport, WeekShapedField>;
 type WeekShapedField = 'streakLine' | 'contractLine' | 'cleared' | 'forecast' | 'taught' | 'nextDayName';
 
 /** A day of a week: types.ts's {@link DayReport} exactly, plus the discriminator. */
-export interface WeekDayReport extends DayReport {
+export interface WeekDayReport extends DayReport, ShapedOnlyFields {
   readonly of: 'week-day';
 }
 
@@ -214,6 +258,38 @@ export interface DayReportInput {
   readonly dispatcherName?: string | undefined;
   /** The simulated second the shift clock calls 06:00. See {@link DAY_START_S}. */
   readonly dayStartS?: SimTime | undefined;
+  /**
+   * Whether to draw the energy pair — `Settings.showEnergyAxis`, arriving where it can be seen.
+   *
+   * ## The defect this closes, which was a control with no pixel
+   *
+   * GitHub issue #70, and § D250 is the measurement. `render/runSummary.ts#summaryFigureIds`
+   * honoured the setting; its only shipped caller was `mode/disclosure.ts#disclosureItems`, whose
+   * only shipped caller was `dev/main.ts#drawParity`, which turned the item list into
+   * `parityRefusal` — **empty whenever parity holds**, which is the shipped state. Measured with a
+   * run on screen: the whole shell's rendered text was **byte-identical** with the switch on and
+   * off. The two energy cells a player actually reads are {@link energyFigures}', and this input had
+   * no field for the preference, so the Day report *could not* honour it. § D250's own words: *"the
+   * fix is one required field and one caller"*. This is the field.
+   *
+   * ## Why it is optional here and required nowhere
+   *
+   * `undefined` is **show it**, which is what every caller that has no player gets — the acceptance
+   * suites, the honesty sweep, `scenario/`. That is `DEFAULT_RUN_SUMMARY_OPTIONS`' rule and its
+   * argument transfers verbatim: `DEFAULT_SETTINGS.showEnergyAxis` is `false` and this default is
+   * *show*, because a run description that silently dropped an axis because a menu somewhere
+   * defaults it off would be the honesty search measuring a surface the product does not show.
+   *
+   * ## What it may not become
+   *
+   * A **suppression**. § D106: energy is an axis, never a score, and it is drawn *beside* AWT and
+   * WT95 rather than folded into a grade. Withholding it takes the whole pair or neither — never
+   * one of the two, and never the ratio without the raw figure — because `workPerServedLegKJ`
+   * without `workKJ` is a per-leg efficiency with nothing to read it against, which is precisely
+   * the score this project refuses. {@link energyFigures} emits the pair; this decides whether the
+   * pair is emitted.
+   */
+  readonly showEnergyAxis?: boolean | undefined;
 }
 
 /**
@@ -302,7 +378,10 @@ function selectionLines(selection: SingleRunSelection): readonly string[] {
       ? 'the building’s own rate'
       : `${selection.arrivalRatePctPop5min.toFixed(1)} %pop/5min`;
   return [
-    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min selected`,
+    // *"min of demand"* rather than *"min selected"* — issue #80. The number is the demand
+    // schedule and never the run: the clock range on the line above is the run, drain included, and
+    // the two used to be read as one because nothing said which was which.
+    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min of demand`,
     'one run, not part of a week — nothing is banked',
   ];
 }
@@ -344,7 +423,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   const dayStartS = input.dayStartS ?? DAY_START_S;
   const dispatcherName = input.dispatcherName ?? recording.dispatcherProfileId;
   const readings = readGoals(input.goals, observations);
-  const allMet = readings.length > 0 && readings.every((reading) => reading.state === 'met');
+  const judgement = judgementOf(readings, summary, observations);
 
   const core: ReportCore = {
     /*
@@ -363,14 +442,15 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         ? `${weekdayOf(week.dayIdx)} — day ${String(week.day)}`
         : `One run — ${recording.buildingName}`,
     metaLines: metaLinesFor(input, dispatcherName, dayStartS),
-    lede: ledeFor(summary, observations),
-    figures: figuresFor(summary, observations, dayStartS),
-    verdict: allMet ? 'cleared' : 'missed',
-    verdictLine: allMet ? 'Shift cleared' : 'Shift missed',
+    lede: judgement.lede,
+    figures: figuresFor(summary, observations, dayStartS, input.showEnergyAxis ?? true),
+    verdict: judgement.verdict,
+    verdictLine: judgement.verdictLine,
+    diagnosisHeading: judgement.diagnosisHeading,
     goals: readings,
-    diagnosis: diagnosisFor(recording, observations, dayStartS),
-    levers: LEVERS,
-    smallPrint: smallPrintFor(dispatcherName),
+    diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
+    levers: leversFor(recording, observations, summary, readings),
+    smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
   };
 
   if (subject.kind === 'single-run') {
@@ -381,7 +461,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   return {
     ...core,
     of: 'week-day',
-    streakLine: streakLineFor(allMet, week.streak),
+    streakLine: streakLineFor(judgement.verdict, week.streak),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
     forecast: forecastFor(week.day, nextIdx),
@@ -391,18 +471,238 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
 }
 
 /* -------------------------------------------------------------------------- *
- * The lede
+ * The judgement — one verdict, and every sentence that states it
  * -------------------------------------------------------------------------- */
 
+/** `types.ts`'s own verdict, named so the lookup below can be keyed exhaustively on it. */
+type ShiftVerdict = DayReport['verdict'];
+
 /**
- * The design's two branches, with its third clause removed rather than reworded.
+ * What this day was, and the three sentences that say so.
  *
- * The healthy branch ends *"and the queue no deeper at close than at mid-morning"*. That is a
- * claim about two instants the recording does not summarise, and printing it unverified would be
- * the caption-that-does-not-describe-the-picture failure this whole handoff keeps naming. What is
- * left is three counts, all of them observations.
+ * ## The defect this type exists to make unconstructible — issue #53
+ *
+ * The sheet drew a headline and a banner from **two independent tests**. `verdict` was
+ * *every goal met*; the lede branched on `summary.saturated` alone. Those disagree on any run that
+ * misses a goal without saturating, which is not an exotic state — Chancery House at 22 %pop/5min
+ * for thirty minutes files `awtIsValid: true`, `saturated: false`, a landing that stacked 43 deep
+ * against a bar of 26, and therefore:
+ *
+ * > **A day it could handle.** 440 journeys of 440 offered, and 80% of riders away inside a minute.
+ * >
+ * > THE SHIFT ASKED FOR — **Shift missed**
+ *
+ * One screen, two answers to *how did today go?* — the same failure § D223 closed in numbers, in
+ * words. A player who reads only the headline learns the opposite of the truth; a player who reads
+ * the sheet learns it contradicts itself, and the feedback loop breaks exactly on the runs where
+ * feedback matters most.
+ *
+ * ## Why this is a lookup and not two functions that agree
+ *
+ * The fix is **not** copy that happens to line up. {@link VERDICT_VOICE} is keyed by the verdict, so
+ * the headline, the banner and the diagnosis heading are all reached *through* it: there is no
+ * expression anywhere in this module that produces the cleared headline without first having
+ * decided the day cleared. A future edit cannot reintroduce the disagreement without deleting the
+ * key it would have to go through.
+ *
+ * Saturation did not stop mattering — it moved **inside** each arm, where it is a clause rather than
+ * a verdict. A saturated day that met every goal is still cleared, and its headline says both.
  */
-function ledeFor(summary: VizSummary, observations: Observations): string {
+interface ShiftJudgement {
+  readonly verdict: ShiftVerdict;
+  readonly verdictLine: string;
+  readonly lede: string;
+  readonly diagnosisHeading: string;
+}
+
+/**
+ * The one place a verdict becomes words.
+ *
+ * `Record<ShiftVerdict, …>` rather than an `if`, so a third verdict is a compile error at this table
+ * rather than a silently un-worded sheet — and so the three strings for one verdict sit on one line
+ * of source, where a reader can see that they agree.
+ *
+ * **That compile error has now fired once, which is the point of it.** § D234 made *ungraded* a
+ * verdict of its own (issue #27), and adding the member to `DayReport['verdict']` broke this table
+ * until the key existed. The alternative — an `if (!graded)` branch outside the lookup — is exactly
+ * the defect § D237 closed, arriving through a new door: a day could then reach a cleared or missed
+ * headline without having been decided cleared or missed.
+ *
+ * **The three sentence sets are disjoint by construction.** No arm of {@link missedLede} says *too
+ * quiet to grade* any more — it cannot be reached on an ungraded day at all — and
+ * {@link ungradedLede} names no goal and makes no claim about how the day went.
+ */
+const VERDICT_VOICE: Readonly<
+  Record<
+    ShiftVerdict,
+    {
+      readonly line: string;
+      /** `index.html` heads the diagnosis list; this is what that heading says. Issue #56. */
+      readonly heading: string;
+      readonly lede: (
+        summary: VizSummary,
+        observations: Observations,
+        readings: readonly GoalReading[],
+      ) => string;
+    }
+  >
+> = Object.freeze({
+  cleared: Object.freeze({
+    line: 'Shift cleared',
+    // Not *where it went wrong*: on a day that met every bar, the deepest queue is the closest it
+    // came, and calling it a fault teaches a reader that the heading means nothing.
+    heading: 'The tightest moment',
+    lede: clearedLede,
+  }),
+  missed: Object.freeze({
+    line: 'Shift missed',
+    heading: 'Where it went wrong',
+    lede: missedLede,
+  }),
+  ungraded: Object.freeze({
+    line: 'Too quiet to grade',
+    /*
+     * Neither of the other two headings, and for the reason that made this a third verdict at all.
+     * *Where it went wrong* asserts something went wrong; *the tightest moment* implies a bar was
+     * approached. Nothing was read, so the rows underneath are observations about a morning rather
+     * than evidence for or against anything — which is what this heading says instead.
+     */
+    heading: 'What the morning did',
+    lede: ungradedLede,
+  }),
+});
+
+/**
+ * Read the day: the verdict, and every sentence that states it.
+ *
+ * The verdict itself is unchanged — *every goal met*, read from {@link readGoals} against the same
+ * observations the left rail reads, so the sheet and the rail cannot disagree either. What changed
+ * is that nothing else on the sheet decides the same question a second time.
+ *
+ * **Three answers rather than two, since § D234.** *Missed* used to mean two different days: one
+ * that was asked for 87 % and carried 61 %, and one whose building never woke up. A play-tester
+ * carried 18 of 18 people with 100 % away inside a minute and a 36 s worst wait, and read
+ * *"Shift missed. Streak reset."* across the top of it — twice, on the tutorial, which is where a
+ * new player decides whether the feedback on this screen is worth believing.
+ *
+ * `wasGraded` is `week.ts`'s predicate and not a second copy of it: this verdict and `closeDay`'s
+ * streak arithmetic have to turn on the same test, or the sheet says *the streak is untouched*
+ * about a week that lost one. *Unjudged is not passed* is untouched — an ungraded day is still not
+ * clean, banks nothing and clears nothing. What it no longer does is **cost** anything.
+ */
+function judgementOf(
+  readings: readonly GoalReading[],
+  summary: VizSummary,
+  observations: Observations,
+): ShiftJudgement {
+  /*
+   * `wasGraded` is asked first, and that ordering is load-bearing rather than tidy. It already
+   * requires a non-empty list, so a day with **no goals** cannot reach `cleared` through `every`'s
+   * vacuous truth — it lands on `ungraded`, which is what a day nobody set a bar for is. The old
+   * two-way expression guarded that with its own `readings.length > 0`; the guard now lives in the
+   * predicate the week reads, where there is one of it.
+   */
+  const verdict: ShiftVerdict = !wasGraded(readings)
+    ? 'ungraded'
+    : readings.every((reading) => reading.state === 'met')
+      ? 'cleared'
+      : 'missed';
+  const voice = VERDICT_VOICE[verdict];
+  return {
+    verdict,
+    verdictLine: voice.line,
+    diagnosisHeading: voice.heading,
+    lede: voice.lede(summary, observations, readings),
+  };
+}
+
+/** `440 journeys of 440 offered, and 80% of riders away inside a minute` — three counts, no estimate. */
+function countsClause(observations: Observations): string {
+  return (
+    `${String(observations.carried)} journeys of ${String(observations.arrived)} offered, and ` +
+    `${String(observations.minutePct)}% of riders away inside a minute`
+  );
+}
+
+/**
+ * The design's healthy branch, with its third clause removed rather than reworded.
+ *
+ * The design ends *"and the queue no deeper at close than at mid-morning"*. That is a claim about
+ * two instants the recording does not summarise, and printing it unverified would be the
+ * caption-that-does-not-describe-the-picture failure this whole handoff keeps naming.
+ *
+ * The saturated arm is not a contradiction of the verdict and is not allowed to read like one: the
+ * goals were met, and the queues still never settled, so the sheet says both and points at the cell
+ * that refused. No word from `ESTIMATE_CUES` appears near a number here — *the wait figure above*
+ * rather than *the mean* — because the honesty search reads this string on a run whose mean is
+ * refused (`honesty/properties.ts#checkSuppressedMean`).
+ */
+function clearedLede(summary: VizSummary, observations: Observations): string {
+  if (summary.saturated) {
+    return (
+      `Every goal met, on a day the queues never settled. ${countsClause(observations)}. The ` +
+      'backlog was still growing when the window closed, so the wait figure above is withheld ' +
+      'rather than published, and the cell says on which ground.'
+    );
+  }
+  return `A day it could handle. ${countsClause(observations)}.`;
+}
+
+/**
+ * The day nobody looked at — § D234, issue #27.
+ *
+ * ## Why this is a voice of its own and not a branch inside {@link missedLede}
+ *
+ * It was one, and it had the words right and the verdict wrong: the sheet said *too quiet to grade*
+ * under a banner reading **Shift missed**, and `closeDay` reset the streak underneath. So the
+ * sentence and the banner disagreed about the same day — § D237's own defect, surviving inside the
+ * one arm that had already noticed the problem.
+ *
+ * ## What it may say, and what it deliberately may not
+ *
+ * **Two counts and a remedy, and no goal.** The arrivals and the threshold are both observations
+ * this sheet already carries, so neither is a new claim; naming a goal would be false, because none
+ * was read. The remedy is on it because the rule *"nothing is graded before the building wakes up"*
+ * lived on the **Simulation tab**, in a coach hint the reader left two clicks ago — and the control
+ * that fixes it is offered as a convenience about how long you want to sit and watch, when it is in
+ * fact the entry condition.
+ *
+ * *"The streak is untouched"* is a statement about what `closeDay` did rather than a consolation:
+ * `wasGraded` is the predicate on both sides, so the sentence is true exactly when the arithmetic
+ * is.
+ *
+ * The two unread parameters are in the signature because {@link VERDICT_VOICE} types all three
+ * ledes alike, and that uniformity is what keeps the table a lookup instead of three special cases
+ * — which is the property § D237 bought and this arm must not spend.
+ */
+function ungradedLede(
+  _summary: VizSummary,
+  observations: Observations,
+  _readings: readonly GoalReading[],
+): string {
+  return (
+    `Too quiet to grade. ${String(observations.arrived)} people called and the goals need ` +
+    `${String(WAKE_UP_ARRIVALS)}, so nothing on this sheet was judged — the day is not a miss, ` +
+    'and the streak is untouched. Run a longer shift and the same building will have something ' +
+    'to be graded on.'
+  );
+}
+
+/**
+ * The two ways a **judged** day fails to clear, and neither of them opens with praise.
+ *
+ * The ungraded case is no longer here and can no longer arrive: since § D234 a day carrying a
+ * `pending` reading is `ungraded`, so this function only ever sees a day where every goal was read
+ * and at least one was not met. `unmet` is therefore never empty. The guard below is a total
+ * function's belt rather than a reachable branch, and it **drops the clause instead of inventing a
+ * sentence** — so the missed arm can never print the ungraded voice, which is the disjointness
+ * § D237 asks of this table.
+ */
+function missedLede(
+  summary: VizSummary,
+  observations: Observations,
+  readings: readonly GoalReading[],
+): string {
   if (summary.saturated) {
     return (
       `It did not cope. ${String(observations.arrived)} people asked for a lift and ` +
@@ -411,11 +711,28 @@ function ledeFor(summary: VizSummary, observations: Observations): string {
       'a bad day — and it is fixable with the levers below.'
     );
   }
+  const unmet = readings.filter((reading) => reading.state === 'missed');
+  /*
+   * The empty case **drops the clause** rather than taking a branch of its own — § D234.
+   *
+   * It used to be an `if` returning *"Too quiet to grade …"*, and that was this arm answering a
+   * question it does not own: an ungraded day now has its own verdict, its own banner and its own
+   * lede, and a second copy of the sentence here would let the missed banner sit over the ungraded
+   * words again. `judgementOf` cannot route an ungraded day here at all, so this is unreachable;
+   * what it must never do is become *reachable and wrong*, and a dropped clause is the only shape
+   * with no sentence to be wrong with.
+   */
+  const clause = unmet.length === 0 ? '' : ` — and ${listOf(unmet.map((reading) => `“${reading.goal.label}”`))} still went unmet`;
   return (
-    `A day it could handle. ${String(observations.carried)} journeys of ` +
-    `${String(observations.arrived)} offered, and ${String(observations.minutePct)}% of riders ` +
-    'away inside a minute.'
+    `Short of what the shift asked for. ${countsClause(observations)}${clause}. The banner below ` +
+    'is counting the same thing this sentence is.'
   );
+}
+
+/** `a`, `a and b`, `a, b and c`. An Oxford-comma-free join, so a two-item list is not `a, b`. */
+function listOf(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -426,6 +743,7 @@ function figuresFor(
   summary: VizSummary,
   observations: Observations,
   dayStartS: SimTime,
+  showEnergyAxis: boolean,
 ): readonly ReportFigure[] {
   return [
     {
@@ -452,7 +770,7 @@ function figuresFor(
       label: 'DEEPEST QUEUE',
       value: String(observations.peakQueue),
       note: deepestQueueNote(observations, dayStartS),
-      tone: observations.peakQueue > 24 ? 'hot' : 'plain',
+      tone: observations.peakQueue > DEEP_QUEUE ? 'hot' : 'plain',
       axisOnly: false,
     },
     {
@@ -463,7 +781,13 @@ function figuresFor(
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
-    ...energyFigures(summary),
+    /*
+     * The pair, or neither — issue #70, and § D106 is why it cannot be one of the two. A reader who
+     * has `workPerServedLegKJ` and not `workKJ` has a per-leg efficiency with nothing to read it
+     * against, which is the score this project refuses; a reader who has neither has one fewer axis
+     * and no false claim.
+     */
+    ...(showEnergyAxis ? energyFigures(summary) : []),
   ];
 }
 
@@ -526,10 +850,21 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
     note: longestWaitIsCensored
       ? 'a rider who never boarded — this is a lower bound, not their wait'
       : 'one rider, and they remember it',
-    tone: longestWaitS > 120 ? 'bad' : 'plain',
+    tone: longestWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
   };
 }
+
+/**
+ * The wait, in seconds, above which this sheet already calls the longest one out of line.
+ *
+ * Named because it is now read twice — here, and by the *Weight fairness up* lever, which points at
+ * a day whose worst wait is far out of line with its own away-inside-a-minute share. Two bare `120`s
+ * would be two thresholds that agree today, which is the shape of defect this module keeps closing.
+ * It is a **display** threshold and grades nothing: WORST WAIT is a maximum, not an estimate, and is
+ * printed on every run whatever this constant says.
+ */
+const LONG_WORST_WAIT_S = 120;
 
 /** *floor 12 at 08:37*, or the honest absence of one. Never a clock time the run did not have. */
 function deepestQueueNote(observations: Observations, dayStartS: SimTime): string {
@@ -572,26 +907,47 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
 }
 
 /* -------------------------------------------------------------------------- *
- * Where it went wrong
+ * Where it went wrong — two rows, both of them events
  * -------------------------------------------------------------------------- */
 
 /**
- * Three rows, every one of them derived from this run.
+ * The two moments this run actually had, and nothing else.
  *
  * The mockup's `08:30` and `17:20` are gone. What replaces them is the instant the deepest queue
- * actually stood, the demand phase that instant actually fell in, and the window the figures above
- * were actually computed over — and where the run does not have one of those, the row says so
- * rather than borrowing a plausible time from an office day this simulator never ran (§ 4.1).
+ * actually stood and the demand phase that instant actually fell in — and where the run does not
+ * have one of those, the row says so rather than borrowing a plausible time from an office day this
+ * simulator never ran (§ 4.1).
+ *
+ * ## The third row was never an event — issue #56
+ *
+ * A `report-window` row sat here, timestamped and styled exactly like the two above it, saying
+ * *"Every cohort figure above is the peak-5min window"*. It is a **methodology footnote**: it is
+ * word-for-word identical on a flawless day and a collapsed one, only the timestamps move, and
+ * nothing happened at the clock time it carried. Somebody skimming read it as a third thing that
+ * went wrong at 06:12; somebody reading carefully had to work out that it was not. It is genuinely
+ * load-bearing information, so it was moved rather than dropped — {@link smallPrintFor} now carries
+ * it, beside the other caveat about what one day can be read to mean.
+ *
+ * ## The tones follow the verdict, because a colour is a claim
+ *
+ * `diagnosisRowsOf` in `dev/reportPanel.ts` says it: *a row with nothing to flag gets the ordinary
+ * edge, not a colour that implies a verdict*. The queue row was unconditionally `bad`, so a nine-deep
+ * landing on a day that met every bar was drawn in the same red as an 892-deep one that did not.
+ * The verdict is the same value the heading and the headline come from, so the section cannot flag
+ * a fault on a sheet whose banner says there was none.
  */
 function diagnosisFor(
   recording: VizRecording,
   observations: Observations,
   dayStartS: SimTime,
+  verdict: ShiftVerdict,
 ): readonly ReportDiagnosis[] {
   const at = observations.peakQueueAtS;
   const floorId = observations.peakQueueFloorId;
   const phase = at === null ? undefined : recording.demandPhases.find((p) => at >= p.startS && at < p.endS);
-  const reportWindow = recording.summary.reportWindow;
+  const missed = verdict === 'missed';
+  const queueTone: FigureTone = missed ? 'bad' : 'plain';
+  const phaseTone: FigureTone = missed ? 'caution' : 'plain';
 
   const queueRow: ReportDiagnosis =
     at === null || floorId === null
@@ -609,7 +965,7 @@ function diagnosisFor(
           why:
             'Every car was committed elsewhere when the calls landed together. Batch arrivals are ' +
             'the normal case, not the unlucky one — people travel in groups.',
-          tone: 'bad',
+          tone: queueTone,
         };
 
   const phaseRow: ReportDiagnosis =
@@ -636,30 +992,10 @@ function diagnosisFor(
             'Round-trip time is what limits you inside a peak, not car speed. A stop costs about ' +
             '10 s of door and transfer time however fast the motor is, so the way out of a peak is ' +
             'fewer stops per trip rather than a quicker one.',
-          tone: 'caution',
+          tone: phaseTone,
         };
 
-  const windowRow: ReportDiagnosis = {
-    id: 'report-window',
-    when: clockOf(reportWindow.startS, dayStartS),
-    what: `Every cohort figure above is the ${reportWindow.id} window, ${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}`,
-    why:
-      /*
-       * The number is a **word** and not a numeral, and that is not a style choice. The honesty
-       * search found this sentence printing `25` three rows under a cell reading
-       * `AVERAGE WAIT: withheld`, on a run whose own refused `meanWaitS` rounds to 25 — a quoted
-       * counter-example that a reader cannot tell from a figure, in the same voice as the sheet's
-       * real ones. A carve-out for *numerals inside quotation marks* would have a hiding place in
-       * it, so the numeral goes instead.
-       */
-      '“Riders waited twenty-five seconds on average” is false without “during the busiest five ' +
-      'minutes”. ' +
-      'The counts — carried, took the stairs, the deepest queue — are over the whole shift; the ' +
-      'means and the longest wait are over that window and nothing else.',
-    tone: 'plain',
-  };
-
-  return [queueRow, phaseRow, windowRow];
+  return [queueRow, phaseRow];
 }
 
 /** ` at 12.4 %pop/5min`, or nothing when the record carried no population to divide by. */
@@ -672,7 +1008,7 @@ function rateClause(ratePctPop5min: number | null): string {
  * -------------------------------------------------------------------------- */
 
 /**
- * The four levers, verbatim from `design.html` :332–340.
+ * The four levers, verbatim from `design.html` :332–340 — the **glossary**, before this run is read.
  *
  * Kept word for word because every one of them is *true of this simulator*: a car is a `CarConfig`,
  * zoning is a bank's `servesFloors`, fairness is a weight in `data/dispatcher-profiles.json`, and
@@ -680,6 +1016,9 @@ function rateClause(ratePctPop5min: number | null): string {
  * have needed re-sourcing — a claim that destination dispatch does better *because* authorization
  * and optimization happen in one step — is not among them; see CLAUDE.md on the seven places that
  * claim was corrected.
+ *
+ * {@link leversFor} is what a reader is shown. This array is its input, and the order here is the
+ * order a run that points nowhere gets.
  */
 const LEVERS: readonly ReportLever[] = Object.freeze([
   Object.freeze({
@@ -704,12 +1043,185 @@ const LEVERS: readonly ReportLever[] = Object.freeze([
   }),
 ]);
 
-/** The design's streak sentences (`design.html` :3499), unchanged. */
-function streakLineFor(allMet: boolean, streak: number): string {
-  if (!allMet) {
-    return 'Streak reset. The building keeps growing either way — nothing here is a game over.';
+/**
+ * The levers this run points at, first — and the one it does not have, absent.
+ *
+ * ## What was wrong — issue #55
+ *
+ * All four cards were a frozen constant, byte-identical on a flawless day and a collapsed one. The
+ * section is captioned as advice for *this* day and sits directly under a diagnosis that
+ * interpolates real values, so it reads as a diagnosis and is a glossary: a player acts on it the
+ * first time, notices on the second run that it never moved, and stops trusting the section.
+ *
+ * ## What this does, and the line it does not cross
+ *
+ * Each card is matched against an **observation** — a count, or a count against the bar today's own
+ * goals set. A card the run points at leads, and its body opens with the observation that pointed
+ * there. A card the run does not point at keeps the handoff's sentence exactly and moves below.
+ *
+ * The clause says *what this day showed*, never *what the lever will buy*. That distinction is the
+ * whole of CLAUDE.md's statistical discipline on this surface: ordering four pieces of advice by
+ * which observation fired is not a performance claim, and one replication cannot support one.
+ * {@link smallPrintFor} says so in the reader's own words, under the cards.
+ *
+ * ## A lever you have already pulled is not a lever you have
+ *
+ * *Ask where they're going* is dropped outright when `recording.passengerModel` is already
+ * `destination-dispatch`. `core` computes that field from the resolved dispatch stage and the
+ * viewer never re-derives it (`VizRecording.passengerModel` — *"the one field a renderer branches
+ * on"*), so this is the run's own answer rather than a guess from the profile id.
+ */
+function leversFor(
+  recording: VizRecording,
+  observations: Observations,
+  summary: VizSummary,
+  readings: readonly GoalReading[],
+): readonly ReportLever[] {
+  const pointers = leverPointersFor(recording, observations, summary, readings);
+  const available = LEVERS.filter(
+    (lever) =>
+      !(lever.id === 'ask-destination' && recording.passengerModel === 'destination-dispatch'),
+  );
+  // Stable within each half, so a run that points at nothing gets the handoff's own order back.
+  const pointed = available.filter((lever) => pointers.has(lever.id));
+  const rest = available.filter((lever) => !pointers.has(lever.id));
+  return [...pointed, ...rest].map((lever) => {
+    const because = pointers.get(lever.id);
+    return because === undefined
+      ? lever
+      : { ...lever, body: `Today points here: ${because}. ${lever.body}` };
+  });
+}
+
+/**
+ * Which levers this run points at, and the observation that points there.
+ *
+ * Every entry is a **count** or a count read against a bar the day itself stated. Nothing here reads
+ * `meanWaitS`, `wait95S` or `meanTimeToDestinationS`: those are the three quantities `awtIsValid`
+ * speaks for, and a card that appeared or disappeared on a suppressed figure would be that figure
+ * published through the back door (`docs/10` R9).
+ *
+ * The map is built in the order the cards are declared in, so ties keep the handoff's ordering.
+ */
+function leverPointersFor(
+  recording: VizRecording,
+  observations: Observations,
+  summary: VizSummary,
+  readings: readonly GoalReading[],
+): ReadonlyMap<string, string> {
+  const pointers = new Map<string, string>();
+  const missedGoal = (reads: ShiftGoal['reads']): boolean =>
+    readings.some((reading) => reading.goal.reads === reads && reading.state === 'missed');
+
+  /*
+   * Add a car — the group ran out of capacity. Three counts, any of which is that fact: a backlog
+   * still growing at the horizon, legs that never boarded, and riders who left. None is an estimate.
+   */
+  const outrun: string[] = [];
+  if (summary.saturated) outrun.push('the backlog was still growing when the window closed');
+  if (summary.unservedCount > 0) {
+    outrun.push(`${String(summary.unservedCount)} legs never boarded at all`);
   }
-  return streak === 1 ? 'First clean day. Streak started.' : `${String(streak)} clean days in a row.`;
+  if (observations.abandoned > 0) {
+    outrun.push(`${String(observations.abandoned)} riders gave up and took the stairs`);
+  }
+  if (outrun.length > 0) pointers.set('add-a-car', listOf(outrun));
+
+  /*
+   * Zone the tower — the pile-up sat on one landing rather than spreading over the tower. The bar is
+   * **today's own** queue goal where the day set one (even days do; odd days grade abandonment
+   * instead), so this is the run measured against what the run was asked for rather than against a
+   * number invented here. Where there is no queue goal, the sheet's own DEEPEST QUEUE tone bar
+   * stands in — the same threshold the cell above is already coloured by.
+   */
+  const floorId = observations.peakQueueFloorId;
+  const deep = missedGoal('peakQueue') || observations.peakQueue > DEEP_QUEUE;
+  if (floorId !== null && deep) {
+    pointers.set(
+      'zone-the-tower',
+      `floor ${floorId} stood ${String(observations.peakQueue)} deep at its worst`,
+    );
+  }
+
+  /*
+   * Weight fairness up — the forgotten-floor shape, and it is a shape rather than a level: most
+   * riders away quickly *and* somebody left standing far longer than the rest. The card's own
+   * sentence is that trade in as many words (*your worst wait falls; your average may not*), so it
+   * is the card a day of that shape points at. A day where nobody was away quickly is an
+   * out-of-capacity day, and the first card above already has it.
+   */
+  const { longestWaitS, longestWaitIsCensored } = summary.serviceLevel;
+  if (
+    longestWaitS !== null &&
+    longestWaitS > LONG_WORST_WAIT_S &&
+    !missedGoal('minutePct') &&
+    observations.servedLegs > 0
+  ) {
+    const bound = longestWaitIsCensored ? 'at least ' : '';
+    pointers.set(
+      'weight-fairness',
+      `${String(observations.minutePct)}% of riders were away inside a minute and one still ` +
+        `waited ${bound}${longestWaitS.toFixed(0)} s`,
+    );
+  }
+
+  /*
+   * Ask where they're going — the card's own sentence says destination dispatch pools riders *in
+   * the lobby*, so the observation that points at it is a pile-up that stood on an entrance floor.
+   * `VizFloor.isEntrance` is the building's own answer; nothing here infers a lobby from a floor id.
+   *
+   * Deliberately **not** keyed on stops per trip, which is what the card actually claims to cut: no
+   * figure on this recording reports it, and pointing at the card with an observation that does not
+   * measure the thing named would be the caption-that-does-not-describe-the-picture failure again.
+   */
+  const entrance =
+    floorId === null
+      ? undefined
+      : recording.floors.find((floor) => floor.id === floorId && floor.isEntrance);
+  if (entrance !== undefined && deep) {
+    pointers.set(
+      'ask-destination',
+      `the deepest queue of the day stood at ${entrance.label ?? entrance.id}, an entrance floor`,
+    );
+  }
+
+  return pointers;
+}
+
+/** The queue depth above which DEEPEST QUEUE is already drawn hot. Read twice; see {@link LONG_WORST_WAIT_S}. */
+const DEEP_QUEUE = 24;
+
+/**
+ * The design's streak sentences (`design.html` :3499), with a third for the day nobody judged.
+ *
+ * Takes the {@link ShiftJudgement}'s verdict rather than a second `allMet` boolean, so the streak
+ * cannot reset on a day the banner above it calls cleared — § D237 — and, since § D234, so the
+ * ungraded arm is reached through the **same** value the banner is. A `graded` boolean beside the
+ * verdict would have been a second answer to a question the verdict already contains, which is the
+ * shape both decisions exist to refuse.
+ *
+ * The ungraded sentence is § D234's, and it is a statement about the week rather than a kindness:
+ * *"Streak reset"* names something taken away, and the play-tester had nothing to take — two
+ * perfect-but-ungraded days, each announced as a loss. `closeDay` now leaves the streak alone on
+ * an ungraded day, keyed on the same `wasGraded` this verdict is, so the sheet and the arithmetic
+ * move together or neither does.
+ *
+ * Exhaustive over the verdict rather than an `if` chain with a fallthrough: a fourth verdict must be
+ * a compile error here, for {@link VERDICT_VOICE}'s reason.
+ */
+function streakLineFor(verdict: ShiftVerdict, streak: number): string {
+  switch (verdict) {
+    case 'missed':
+      return 'Streak reset. The building keeps growing either way — nothing here is a game over.';
+    case 'ungraded':
+      return streak > 0
+        ? `Nothing was graded, so your streak of ${String(streak)} stands. The building keeps growing either way.`
+        : 'Nothing was graded, so nothing was lost. The building keeps growing either way — nothing here is a game over.';
+    case 'cleared':
+      return streak === 1
+        ? 'First clean day. Streak started.'
+        : `${String(streak)} clean days in a row.`;
+  }
 }
 
 function contractLineFor(contract: ScenarioContract | undefined, week: WeekState): string {
@@ -776,13 +1288,38 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
  * better than another without a paired-t confidence interval that excludes zero"* and its 50–200
  * replication budget, said to somebody who has just watched one day and wants to conclude something
  * from it. Not paraphrased, not shortened, and not made conditional on the day having gone badly.
+ *
+ * ## Two clauses were added under it, and both were homeless before
+ *
+ * **The reporting window.** It used to be the third row of *Where it went wrong*, timestamped and
+ * styled like an incident, which it never was (issue #56). It belongs with the other statement about
+ * what a reader may conclude, so it is here — and the numeral stays a **word**, for the reason
+ * `diagnosisFor` used to carry: the honesty search found the sentence printing `25` three rows under
+ * a cell reading `AVERAGE WAIT: withheld`, on a run whose own refused `meanWaitS` rounds to 25, and
+ * a carve-out for *numerals inside quotation marks* would be a rule with a hiding place in it.
+ *
+ * **The levers.** {@link leversFor} now orders the cards by which observation this run fired, which
+ * is a statement about the day and would be read as a statement about the levers if nothing said
+ * otherwise. This is what says otherwise, in the same breath as the refusal it belongs to.
  */
-function smallPrintFor(dispatcherName: string): string {
+function smallPrintFor(
+  dispatcherName: string,
+  summary: VizSummary,
+  dayStartS: SimTime,
+): string {
+  const { reportWindow } = summary;
   return (
     'This is one replication of one day on one seed. It cannot tell you that ' +
     `${dispatcherName.toLowerCase()} is better than anything — that needs 50 or more paired runs ` +
     'against the same passengers, and a confidence interval that excludes zero. What it can tell ' +
-    'you is what happened today, and today is where the queue was.'
+    'you is what happened today, and today is where the queue was. ' +
+    `Every cohort figure above is the ${reportWindow.id} window, ` +
+    `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
+    'seconds on average” is false without “during the busiest five minutes”. The counts — carried, ' +
+    'took the stairs, the deepest queue — are over the whole shift; the means and the longest wait ' +
+    'are over that window and nothing else. ' +
+    'The levers above are ordered by what today showed, never by what any of them is worth: which ' +
+    'one helps this building is the question that needs the paired runs, not the one day.'
   );
 }
 

@@ -21,14 +21,22 @@
  */
 
 import { el, fill, setText } from './dom.js';
-import { canSubmitForm, formIssues, postingRefusal, type AccountState } from '../menu/account.js';
+import {
+  canSubmitForm,
+  formIssues,
+  namingStage,
+  postingRefusal,
+  type AccountState,
+} from '../menu/account.js';
 import type { BoardPage } from '../menu/client.js';
 
 import {
   screenOf,
+  withChosenValue,
   type ChallengeScreenInput,
   type CommissioningScreenInput,
   type MenuAffordance,
+  type MenuGuide,
   type MenuIntent,
 } from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
@@ -82,11 +90,52 @@ export interface MenuPanelHost {
   commissioning(): CommissioningScreenInput | undefined;
   /** Which calendar period is over the week, or `''`. */
   calendarPeriodId(): string;
+  /**
+   * The page **behind** the overlay, so it can be taken out of the page while the overlay is up.
+   *
+   * Handed over rather than found, and the distinction is § D249 § 3's. The shell's elements are not
+   * this file's to disable — but they are the shell's to *name*, and once named the writing belongs
+   * beside the focus trap, because *is the overlay covering the page?* has exactly one answer and it
+   * is `root.hidden`. A `document.body` traversal here would make this file decide what the shell
+   * **is**, which is a second answer that can drift from `dev/main.ts`'s.
+   *
+   * Required, not optional. A modal whose page behind it stays live is issue #68 — a seed typed into
+   * a field the player could not see — and a host that forgot to say would be that, silently. The
+   * one legitimate answer for *nothing behind me* is an empty array, which says it.
+   */
+  shell(): readonly HTMLElement[];
+  /**
+   * Whether this deployment has a server behind it — GitHub issue #28's signal on the root menu.
+   *
+   * Only the shell can answer it: the origin comes from a `<meta>` tag read at run time (§ D215 § 4,
+   * § D243), so the same bytes are a connected build behind a server and an unconnected one behind a
+   * CDN. **`dev/main.ts` now answers it** — `hasServer: () => client !== undefined`, the same fact
+   * the `open-board` and `account-submit` arms already branch on, so there is no second answer to
+   * *is there a server*.
+   *
+   * It stays **optional**, and the reason changed rather than went away. It was optional because the
+   * shell was another lane's; it is optional now because *absence has a meaning of its own* —
+   * `MenuViewInput.hasServer`'s `undefined` is **nobody has said**, which is what a caller with no
+   * `<meta>` lookup (a test, a future embedder) honestly is. A required member would force such a
+   * caller to guess, and a menu that asserted *needs a server* on a build that has one is a worse
+   * claim than the silence it replaced.
+   */
+  hasServer?: (() => boolean) | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
  * Rendering
  * -------------------------------------------------------------------------- */
+
+/**
+ * Put one control in the overlay's focus ring, under a key that survives the redraw.
+ *
+ * Threaded through every row builder rather than recovered afterwards with a selector, because the
+ * builders are the only things that know **which** element of a row a Tab actually lands on: a
+ * `select` row is a `<label>` around a `<select>`, and the label is not focusable. Returns its
+ * argument so a builder can keep writing to the control on the same line it registers it.
+ */
+type KeepControl = <T extends HTMLElement>(control: T, key: string) => T;
 
 /**
  * Draw the current screen. **Decides nothing.**
@@ -96,12 +145,41 @@ export interface MenuPanelHost {
  * {@link MenuPanelHost.dispatch}. The split is `dev/surfaces.ts`'s and `controls/render.ts`'s, and
  * the reason is `docs/16` § 5: three of the eight clauses the product failed were decisions taken
  * inside a click handler, where nothing could reach them.
+ *
+ * ## It also makes the overlay behave like the dialog it looks like — issues #33 and #68
+ *
+ * The one thing here that is not *turn a row into an element*: {@link asModal}. The overlay covers
+ * the whole viewport and was not a dialog in any sense a browser or a screen reader could see — no
+ * `role`, no `aria-modal`, no accessible name, and nothing keeping Tab inside it. Measured before
+ * the change: **7 focusable controls inside the overlay and 624 in the document**, and six Tab
+ * presses from the first menu row put focus on a link, then a button, then a `<select>` **behind**
+ * the screen the player was looking at. Issue #68 is what that costs: the reporter tabbed blind out
+ * of the *Settings* screen — the one that promises *"nothing here changes a run"* — into the seed
+ * field, typed `424242`, and re-seeded the simulation with no visible feedback until they left.
+ *
+ * The panel owns this because the panel is the only thing that knows what is *in* the overlay.
+ *
+ * **The two halves § D249 § 3 left open are now closed, and neither moved here by itself.**
+ * `inert` and `aria-hidden` on the shell behind are written by {@link coverShell} over the elements
+ * {@link MenuPanelHost.shell} hands over — the shell still names its own, this file only writes
+ * what `root.hidden` says. And **Escape** dispatches {@link MenuIntent} `close`, a member added
+ * together with the arm in `dev/main.ts` that performs it, because a member nothing handles compiles
+ * and ships a dead control: `dispatchMenu` returns `void` and has no `never` arm. Binding Escape to
+ * `back` instead is still refused, for § D249's reason — it would work on five screens and do
+ * nothing on the root.
  */
 export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
   const doc = host.doc;
   const account = host.account();
   const board = host.leaderboard();
   const run = host.runState();
+  /*
+   * Asked once and handed to both halves — `docs/16` S5. The rows need it to offer *Save this name*
+   * instead of nothing, and the form needs it to ask for a name instead of an address; two calls
+   * would be two answers to *which question is being asked*, which is the split that let issue #31's
+   * screen print a sign-in error under a registration form.
+   */
+  const naming = namingStage(account);
   const view = screenOf({
     state: host.state(),
     catalogue: host.catalogue,
@@ -114,7 +192,25 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     challenge: host.challenge(),
     commissioning: host.commissioning(),
     calendarPeriodId: host.calendarPeriodId(),
+    naming,
+    ...(host.hasServer === undefined ? {} : { hasServer: host.hasServer() }),
   });
+
+  /*
+   * Which control the reader was on, read **before** the fill that destroys it.
+   *
+   * `fill` replaces every child, so the focused element is gone by the time the new tree exists —
+   * which is why focus fell out of this overlay on every state change, not only when somebody
+   * tabbed past the end. See {@link restoreFocus}.
+   */
+  const wasOn = focusedControlKey(doc, root);
+
+  const controls: HTMLElement[] = [];
+  const keep: KeepControl = (control, key) => {
+    control.setAttribute(CONTROL_KEY, key);
+    controls.push(control);
+    return control;
+  };
 
   const children: Node[] = [];
   const heading = el(doc, 'h1', { className: 'menu-title' });
@@ -123,23 +219,226 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   for (const notice of view.notices) children.push(noticeLine(doc, notice));
 
+  /*
+   * **The account screen puts its form above its buttons, and that ordering is the fix** — GitHub
+   * issue #30(a). It read: *Sign in* (primary, filled), *Back*, *Create an account*, then the two
+   * live inputs. *"The player reads a call to action, then two navigation buttons, and only then
+   * discovers there was a form. Tab order matches the visual order, so a keyboard user hits the
+   * submit button first as well."*
+   *
+   * So on this one screen the fields come first and the rows — submit, then Back — come last, which
+   * is #30's own suggested ordering. It is done here rather than by moving the submit into the form,
+   * because the submit is a {@link MenuAffordance} that `menu/screens.ts` decides the label and the
+   * refusal of, and a button built inside a click-handler-adjacent form is the decision-in-a-render
+   * this whole split exists to stop.
+   *
+   * The **notice goes above the form**, which is #30(b): *"the screen only admits it cannot work
+   * after you submit."* `dev/main.ts` seeds `AccountState.notice` on mount when there is no server,
+   * so the sentence is now the first thing under the heading rather than an apology appended after
+   * a click.
+   */
+  const accountFirst = view.screen === 'account';
+  const accountBlocks: Node[] = [];
+  if (accountFirst && account.notice !== undefined) {
+    accountBlocks.push(noticeLine(doc, account.notice));
+  }
+  if (accountFirst && (account.user === undefined || naming)) {
+    accountBlocks.push(accountForm(doc, host, account, naming, keep));
+  }
+  children.push(...accountBlocks);
+
   const list = el(doc, 'div', { className: 'menu-list' });
-  for (const row of view.rows) list.append(affordance(doc, host, row));
+  for (const row of view.rows) list.append(affordance(doc, host, row, keep));
+  // The seventh entry on the root, and it is an entry rather than a row: see the comment on
+  // `MenuScreenView.guide` for why the guide carries no intent and asks nothing of the shell.
+  if (view.guide !== undefined) list.append(guideEntry(doc, view.guide, keep));
   children.push(list);
 
   if (view.issues.length > 0) children.push(issueList(doc, view.issues));
 
-  // The two screens with content an affordance cannot express: a credential form, and a table of
-  // somebody else's runs. Both are drawn below the rows the model does own.
-  if (view.screen === 'account' && account.user === undefined) {
-    children.push(accountForm(doc, host, account));
-  }
-  if (view.screen === 'account' && account.notice !== undefined) {
-    children.push(noticeLine(doc, account.notice));
-  }
+  // The one screen with content an affordance cannot express: a table of somebody else's runs.
   if (view.screen === 'leaderboard') children.push(boardTable(doc, board));
 
   fill(root, ...children);
+  asModal(doc, root, view.title, controls, host.dispatch);
+  // `HTMLElement.hidden` is `boolean | string` since `hidden="until-found"` — and every string it
+  // can hold is a *hidden* state, so truthiness is the whole of the question rather than a coercion
+  // papering over one.
+  coverShell(host.shell(), Boolean(root.hidden));
+  restoreFocus(doc, root, controls, wasOn);
+}
+
+/**
+ * Take the shell behind the overlay out of the page while the overlay is up — issues #33 and #68.
+ *
+ * ## Why this is the belt to the trap's braces
+ *
+ * {@link asModal} holds the **keyboard**, and only over the controls this file built. It does not
+ * hold a pointer, and it does not hold something focusable inside the overlay that came from
+ * somewhere else — a link inside a notice, say. Measured before either half existed: 7 focusable
+ * controls inside the overlay and **624 in the document**, and issue #68's reporter reached the seed
+ * field behind the menu from the one screen whose own note promises *"nothing here changes a run"*,
+ * typed `424242`, and re-seeded the run.
+ *
+ * `inert` is what removes a subtree from focus, from hit-testing and from the accessibility tree in
+ * one attribute. `aria-hidden` goes with it because `inert` is the newer of the two and a reader on
+ * an assistive technology that has not implemented it would otherwise still be walked through the
+ * shell — belt and braces, and the pair is cheap.
+ *
+ * ## Why the shell is handed over rather than found
+ *
+ * § D249 § 3 filed this as *needs `dev/main.ts`*, on the ground that the shell's own elements are
+ * not this file's to disable. They still are not: {@link MenuPanelHost.shell} is the shell naming
+ * them, and this function only writes what the overlay's own `hidden` says. A `document.body`
+ * traversal here would be this file deciding what the shell **is**, which is the same class of
+ * second answer the trap refuses a `querySelectorAll` for.
+ *
+ * ## Why it is keyed on `root.hidden` rather than on a flag
+ *
+ * One source. `dev/main.ts#closeMenu` and the `reopen` arm both write `hidden` and then draw, so
+ * the covering and the overlay can never disagree — which a second boolean threaded through the
+ * host could, in exactly the direction that leaves the page permanently inert.
+ */
+function coverShell(shell: readonly HTMLElement[], menuHidden: boolean): void {
+  for (const element of shell) {
+    if (menuHidden) {
+      element.removeAttribute('inert');
+      element.removeAttribute('aria-hidden');
+      continue;
+    }
+    element.setAttribute('inert', '');
+    element.setAttribute('aria-hidden', 'true');
+  }
+}
+
+/* -------------------------------------------------------------------------- *
+ * The overlay is a modal — issues #33 and #68
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The attribute that names a control across a redraw.
+ *
+ * An attribute rather than a `WeakMap` keyed on the node, because the node the reader was standing
+ * on does not survive the redraw and is precisely what has to be found again. The value is the
+ * affordance's own `id` — already *"stable, and unique within a screen"* by {@link MenuAffordance}'s
+ * contract — so no second naming scheme is introduced.
+ */
+const CONTROL_KEY = 'data-menu-control';
+
+/** Overlays whose Tab handler is already attached. One listener per root, ever. */
+const WIRED = new WeakSet<HTMLElement>();
+
+/** The controls of the **current** draw, so the handler reads the live list rather than a stale one. */
+const CONTROLS = new WeakMap<HTMLElement, readonly HTMLElement[]>();
+
+/**
+ * Where Escape sends its intent, refreshed on every draw for {@link CONTROLS}' own reason.
+ *
+ * The listener is attached once per root, ever, so capturing a `dispatch` in its closure would pin
+ * the first draw's host forever — the same staleness the control list is a `WeakMap` to avoid, on a
+ * value whose being stale would be silent rather than visible.
+ */
+const DISPATCH = new WeakMap<HTMLElement, (intent: MenuIntent) => void>();
+
+/**
+ * Make the overlay a dialog, and keep Tab inside it.
+ *
+ * ## The three attributes
+ *
+ * `role="dialog"` and `aria-modal="true"` are what tell an assistive technology that the rest of
+ * the page is not currently available; `aria-label` gives the dialog the name it had none of — the
+ * screen's own title, so *Settings* and *Leaderboard* are told apart by something other than their
+ * contents. All three were absent, measured.
+ *
+ * ## The trap, and what it is honestly not
+ *
+ * The list of controls is **the one this file just built**, in draw order, rather than a
+ * `querySelectorAll` over the result. Two reasons, and the second is the one that mattered: a
+ * selector would be a second, unasserted answer to *what is focusable in here* that could drift
+ * from what was drawn, and this package's document tier deliberately has no selector engine
+ * (`menuPanel.test.ts` refuses to grow one), so a trap built on one could not be driven under Node.
+ *
+ * It holds Tab and Shift+Tab at the two ends of that list. It is **not** the whole of a modal: a
+ * reader who reaches something focusable inside the overlay that the panel did not build — a link
+ * inside a notice, say — is not caught, and neither is a pointer. `inert` on the shell behind is
+ * the belt to this braces and it needs `dev/main.ts`, which this lane does not own.
+ */
+function asModal(
+  doc: Document,
+  root: HTMLElement,
+  label: string,
+  controls: readonly HTMLElement[],
+  dispatch: (intent: MenuIntent) => void,
+): void {
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-modal', 'true');
+  root.setAttribute('aria-label', label);
+
+  CONTROLS.set(root, controls);
+  DISPATCH.set(root, dispatch);
+  if (WIRED.has(root)) return;
+  WIRED.add(root);
+  root.addEventListener('keydown', (event: KeyboardEvent) => {
+    /*
+     * **Escape closes, on every screen** — issues #33 and #68, and § D249 § 3's refused
+     * alternative. Binding it to `back` was considered and rejected there: it would work on the
+     * five screens with a history and do nothing on the root, *"which is exactly where #40's
+     * reporter is standing"*. So the key means the same thing everywhere, and what it means is the
+     * `close` intent — which is a member of {@link MenuIntent} rather than a `root.hidden = true`
+     * here, because hiding the overlay is one of two things `dev/main.ts#closeMenu` does and a
+     * second writer of the first would leave the second undone.
+     */
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      DISPATCH.get(root)?.({ kind: 'close' });
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const list = CONTROLS.get(root) ?? [];
+    if (list.length === 0) return;
+    const at = list.indexOf(doc.activeElement as HTMLElement);
+    const backwards = event.shiftKey;
+    if (at !== (backwards ? 0 : list.length - 1)) return;
+    event.preventDefault();
+    list[backwards ? list.length - 1 : 0]?.focus();
+  });
+}
+
+/** The key of the control the reader is standing on, or `undefined` if they are outside the menu. */
+function focusedControlKey(doc: Document, root: HTMLElement): string | undefined {
+  const active = doc.activeElement;
+  if (active === null || active === undefined || !root.contains(active)) return undefined;
+  return active.getAttribute(CONTROL_KEY) ?? undefined;
+}
+
+/**
+ * Put the reader back where they were, or bring them in if they were not here.
+ *
+ * ## Why this is not a nicety
+ *
+ * `fill` replaces every child on every redraw, so **every** state change dropped focus to `<body>`
+ * — and the overlay sits last in the document, so the next Tab from `<body>` walks into the shell
+ * *behind* the menu rather than into the menu. That is how issue #68's reporter reached the seed
+ * field: not by tabbing past the end of a short list, but by tabbing forward from nowhere.
+ *
+ * So the two branches are one rule with two causes. The reader was on a control and it no longer
+ * exists: find the one with the same key, because a control keeps its identity across a redraw even
+ * though its element does not. The reader was not in the overlay at all and the overlay is up:
+ * bring them to the first control, which is what opening a modal is supposed to do.
+ *
+ * **Never while hidden.** `dev/main.ts#closeMenu` sets `hidden` and later draws still run, so
+ * without this guard leaving the menu would immediately steal focus back into it.
+ */
+function restoreFocus(
+  doc: Document,
+  root: HTMLElement,
+  controls: readonly HTMLElement[],
+  wasOn: string | undefined,
+): void {
+  if (root.hidden || controls.length === 0) return;
+  if (wasOn === undefined && root.contains(doc.activeElement)) return;
+  const again = controls.find((control) => control.getAttribute(CONTROL_KEY) === wasOn);
+  (again ?? controls[0])?.focus();
 }
 
 /* -------------------------------------------------------------------------- *
@@ -149,29 +448,43 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 /**
  * Turn one {@link MenuAffordance} into an element.
  *
- * The `select` and `toggle` arms rebuild their intent from the chosen option — which is why
- * {@link MenuIntent} `set-free-play` and `set-setting` carry a **field and a value** rather than a
- * prepared patch. A prepared patch would have been the answer to a question nobody had asked yet,
+ * The `select`, `toggle` and `text` arms rebuild their intent from what the player chose — which is
+ * why {@link MenuIntent} `set-free-play` and `set-setting` carry a **field and a value** rather than
+ * a prepared patch. A prepared patch would have been the answer to a question nobody had asked yet,
  * since the affordance is built before anybody picks anything.
+ *
+ * **The rewrite is `menu/screens.ts#withChosenValue` and is not written here.** It used to be, as a
+ * ternary naming two of the six intents that carry a chosen value, and the other four therefore
+ * dispatched the value that was already showing — issues #44 and #42, and latent on `set-challenge`
+ * and `set-constraint`. A conditional over a union with a fallback arm is a silent default; that
+ * function is an exhaustive switch, so the seventh such intent cannot be added without an arm. See
+ * its docstring for the whole of the argument.
  */
-function affordance(doc: Document, host: MenuPanelHost, row: MenuAffordance): HTMLElement {
-  const withValue = (value: string): MenuIntent =>
-    row.intent.kind === 'set-free-play' || row.intent.kind === 'set-setting'
-      ? { ...row.intent, value }
-      : row.intent;
+function affordance(
+  doc: Document,
+  host: MenuPanelHost,
+  row: MenuAffordance,
+  keep: KeepControl,
+): HTMLElement {
+  const withValue = (value: string): MenuIntent => withChosenValue(row.intent, value);
 
+  /*
+   * The **control** is kept, never the row wrapper. A `select` row is a `<label>` around a
+   * `<select>`, and it is the `<select>` a Tab lands on; keeping the label would build a focus ring
+   * that never matches `document.activeElement` and a trap that never fires.
+   */
   if (row.kind === 'select') {
-    return selectRow(doc, row.label, row.value ?? '', row.options ?? [], (id) => {
+    return selectRow(doc, row.label, row.value ?? '', row.options ?? [], keep, row.id, (id) => {
       host.dispatch(withValue(id));
     });
   }
   if (row.kind === 'toggle') {
-    return toggleRow(doc, row.label, row.value === 'on', (value) => {
+    return toggleRow(doc, row.label, row.value === 'on', keep, row.id, (value) => {
       host.dispatch(withValue(value ? 'on' : 'off'));
     });
   }
   if (row.kind === 'text') {
-    return textRow(doc, row.label, 'text', row.value ?? '', (value) => {
+    return textRow(doc, row.label, 'text', row.value ?? '', keep, row.id, (value) => {
       host.dispatch(withValue(value));
     });
   }
@@ -196,7 +509,69 @@ function affordance(doc: Document, host: MenuPanelHost, row: MenuAffordance): HT
   button.addEventListener('click', () => {
     host.dispatch(row.intent);
   });
+  // A disabled button is not focusable, so it is not in the ring. Putting it there would build a
+  // trap whose last member cannot be reached, and Tab would walk straight past it into the shell.
+  if (row.enabled) keep(button, row.id);
   return button;
+}
+
+/* -------------------------------------------------------------------------- *
+ * How to play — an entry that discloses rather than navigates
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The guide, as a native disclosure in the menu list — GitHub issue #13.
+ *
+ * ## Three shapes were available and this is the one that costs nothing to be wrong about
+ *
+ * A seventh **screen** would have been the obvious fit — it is what Settings is — and it is not
+ * built, for a reason outside this file: `MENU_SCREENS` is walked by an exhaustive switch in
+ * `playthrough/walk.test.ts`, which this lane does not own, so widening the union here breaks a
+ * build somewhere else. A **button plus panel state** would have needed a {@link MenuIntent} the
+ * shell's own switch performs, and an intent nothing performs is the dead control this package has
+ * shipped eleven times.
+ *
+ * `details` needs neither. The browser owns the open/closed state, it starts closed so it blocks
+ * nothing, `summary` is focusable and operable from the keyboard without a handler, and the whole
+ * thing is inert to the state machine — which is the honest description of a page that only
+ * explains.
+ *
+ * ## Every class here already has a rule
+ *
+ * `dev/surfaces.test.ts` derives the class names this file emits from its own source and requires
+ * a rule for each in `index.html`, which this lane also does not own. So the entry is built from
+ * the vocabulary the menu already ships: the row card, the row name, the row detail line, and the
+ * note paragraph. Nothing new is introduced, and the entry therefore looks like the six above it
+ * because it is made of the same parts.
+ */
+function guideEntry(doc: Document, guide: MenuGuide, keep: KeepControl): HTMLElement {
+  const block = el(doc, 'details', {});
+
+  // Structured exactly as `affordance` builds a navigate row, so the closed entry is visually the
+  // seventh member of the list rather than a different kind of thing that happens to sit under it.
+  // Kept in the focus ring because `summary` is focusable without a `tabindex`, so a trap that did
+  // not know about it would end one control short of where Tab actually goes.
+  const summary = keep(el(doc, 'summary', { className: 'menu-row' }), 'guide');
+  const name = el(doc, 'span', { className: 'menu-row-name' });
+  setText(name, guide.title);
+  const lead = el(doc, 'span', { className: 'menu-row-detail' });
+  setText(lead, guide.summary);
+  fill(summary, name, lead);
+
+  const body = el(doc, 'div', {});
+  for (const section of guide.sections) {
+    const heading = el(doc, 'p', { className: 'menu-row-name' });
+    setText(heading, section.heading);
+    body.append(heading);
+    for (const paragraph of section.body) {
+      const line = el(doc, 'p', { className: 'menu-note' });
+      setText(line, paragraph);
+      body.append(line);
+    }
+  }
+
+  fill(block, summary, body);
+  return block;
 }
 
 function issueList(doc: Document, issues: readonly string[]): HTMLElement {
@@ -210,48 +585,79 @@ function issueList(doc: Document, issues: readonly string[]): HTMLElement {
 }
 
 /* -------------------------------------------------------------------------- *
- * Account — the credential form, which is not an affordance
+ * Account — one field at a time, and never a credential
  * -------------------------------------------------------------------------- */
 
 /**
- * Sign in, or create an account.
+ * The single question this screen is asking right now.
  *
- * Two things this screen must get right, both about what it does *not* say. The refusal for a wrong
- * password and the refusal for an unknown address are the same sentence, because the server
- * deliberately makes them identical and a client that split them would put the account-enumeration
- * oracle back. And an **unconfirmed** account is shown as playable — the notice says what is still
- * gated rather than presenting the account as broken.
+ * ## What was deleted here, and why deleting was the fix rather than disabling
+ *
+ * This function drew a mode toggle, an address, a conditional display name **and a live
+ * `<input type="password">`**. § D241 replaced the credential with a mailed link and deleted the
+ * password path from the server and the model; issue #30 is what a *half*-deleted one costs, and
+ * the reporter put it exactly right: *"a password field that is presented as functional, accepts
+ * input, and is wired to nothing is a keystroke collector by accident, and the player has no way to
+ * know that before typing."* Disabling it would have kept the box on the page. It is gone, and
+ * `menu/client.test.ts` sweeps every shipped module under `packages/viz/src` for the literal so it
+ * cannot come back through some other file.
+ *
+ * The mode toggle went with it (issue #31). There is no sign-in/register split to toggle: asking
+ * for a display name **only when the address is new** tells the person filling in the form whether
+ * the address is new, which is the account-enumeration oracle the server's identical-bytes 202
+ * exists to close (§ D241 § 7).
+ *
+ * ## One field, chosen by the session rather than by this function
+ *
+ * Signed out, the question is the address. Signed in and unnamed, it is the name — and
+ * `account.ts#namingStage` decides which, because *which field is live is a fact about the session*.
+ * That is also why `formIssues` now takes the **state**: handing it a bare form made the caller
+ * decide, which is the split that let issue #31's screen print a sign-in error under a registration
+ * form.
+ *
+ * **Its fields are in the focus ring, and that is the point of the ring.** Issue #33 names this
+ * screen for the reason: *"Account is a form. Tabbing from the last field is the single most
+ * ordinary keyboard action on that screen, and it can drop the player onto controls behind a screen
+ * they cannot see."*
  */
-function accountForm(doc: Document, host: MenuPanelHost, state: AccountState): HTMLElement {
+function accountForm(
+  doc: Document,
+  host: MenuPanelHost,
+  state: AccountState,
+  naming: boolean,
+  keep: KeepControl,
+): HTMLElement {
   const wrap = el(doc, 'div', { className: 'menu-account' });
-  const registering = state.form.mode === 'register';
 
-  const toggle = el(doc, 'button', { className: 'menu-account-mode', attrs: { type: 'button' } });
-  setText(toggle, registering ? 'I already have an account' : 'Create an account');
-  toggle.addEventListener('click', () => {
-    host.dispatch({ kind: 'account-mode', register: !registering });
-  });
-  wrap.append(toggle);
-
-  const field = (label: string, type: 'text' | 'email' | 'password', key: string, value: string): void => {
+  const field = (label: string, type: 'text' | 'email', key: string, value: string): void => {
     wrap.append(
-      textRow(doc, label, type, value, (next) => {
+      textRow(doc, label, type, value, keep, `account.${key}`, (next) => {
         host.dispatch({ kind: 'account-form', patch: { [key]: next } });
       }),
     );
   };
-  field('Email', 'email', 'email', state.form.email);
-  if (registering) field('Display name', 'text', 'displayName', state.form.displayName);
-  field('Password', 'password', 'password', state.form.password);
+  if (naming) field('Display name', 'text', 'displayName', state.form.displayName);
+  else field('Email', 'email', 'email', state.form.email);
 
-  // Shown, not merely counted. `formIssues` reports all of them at once so a player is not made to
-  // guess how many there are — and only once they have typed something, so an untouched form is not
-  // a wall of complaints.
-  const issues = formIssues(state.form);
-  if (issues.length > 0 && state.form.password.length + state.form.email.length > 0) {
+  /*
+   * Shown, not merely counted. `formIssues` reports all of them at once so a player is not made to
+   * guess how many there are — and only once they have typed something, so an untouched form is not
+   * a wall of complaints. `canSubmitForm` is the same predicate one layer up and is the shell's
+   * gate; it is asked here only so this screen never shows a clean form the shell would refuse.
+   */
+  const issues = formIssues(state);
+  const typed = naming ? state.form.displayName.length : state.form.email.length;
+  if (issues.length > 0 && typed > 0) {
     wrap.append(issueList(doc, issues.map((issue) => issue.message)));
   }
-  void canSubmitForm;
+  if (!canSubmitForm(state) && state.retryInMs !== undefined) {
+    // The 429 gate, said where the form is. § D242 charges its budgets per address and per caller,
+    // so a form that stayed live after a refusal would spend a second request on somebody who did
+    // nothing wrong — and the server has already said it will refuse it.
+    wrap.append(
+      noticeLine(doc, 'That request was refused for now. Wait for the time named above before asking again.'),
+    );
+  }
   return wrap;
 }
 
@@ -272,7 +678,11 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
   if (view.notice !== undefined) wrap.append(noticeLine(doc, view.notice));
 
   const page = view.page;
-  if (page === undefined) return wrap;
+  if (page === undefined) {
+    // Nothing to read, so the screen shows the **shape** of what would be read — issue #34.
+    if (view.boards.length === 0) wrap.append(exampleBoard(doc));
+    return wrap;
+  }
 
   const note = el(doc, 'p', { className: 'menu-note' });
   setText(note, page.note);
@@ -282,6 +692,9 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
     const empty = el(doc, 'p', {});
     setText(empty, 'Nothing has been posted to this board yet.');
     wrap.append(empty);
+    // A board that exists and is empty is still a board whose shape is worth showing — and it is
+    // the one case where the reader is about to be the first row on it.
+    wrap.append(exampleBoard(doc));
     return wrap;
   }
 
@@ -309,6 +722,81 @@ function boardTable(doc: Document, view: LeaderboardView): HTMLElement {
   return wrap;
 }
 
+/**
+ * What a board looks like, drawn when there is none — GitHub issue #34.
+ *
+ * *"An empty leaderboard should still teach me the shape of the thing: what the columns are, what
+ * 'a board' is, how boards are chosen, and where I would appear. Empty is not the same as blank."*
+ * The reporter had just finished a run they were pleased with and found *"nowhere to put it and
+ * nobody to measure it against — and, more importantly, no picture of what measuring it against
+ * someone would even look like."*
+ *
+ * ## The three rules this example has to keep, and it keeps all three
+ *
+ * **It says it is an example, in words, above itself.** A greyed row is a visual signal, and KB-15
+ * forbids one carried by shape or colour alone; more to the point, a plausible-looking figure that
+ * a reader might take for a measurement is exactly the thing this repository refuses to ship. The
+ * two rows are named *Somebody else* and *You, if you post this run*, which cannot be mistaken for
+ * accounts, and the second is where the reader is being told they would appear.
+ *
+ * **All four metrics, never a fifth and never a total.** § D106: one metric orders the rows, the
+ * other three sit beside it, and none is folded into a score. A composite here would teach the one
+ * thing the whole product refuses to say.
+ *
+ * **The seed is on the row.** It is what makes a row checkable — invariant 5 — and a teaching
+ * example that hid it would teach the wrong shape.
+ *
+ * Built from the vocabulary the real table already uses, so what a reader learns here is what they
+ * will meet: `dev/surfaces.test.ts` derives this file's class names from its own source and requires
+ * a rule for each in `index.html`, which this lane does not own, and no class is invented.
+ */
+function exampleBoard(doc: Document): HTMLElement {
+  const wrap = el(doc, 'div', {});
+  const lead = el(doc, 'p', { className: 'menu-note' });
+  setText(
+    lead,
+    'An example of a board, so the shape is legible before there is one. These are not real ' +
+      'runs and nobody posted them.',
+  );
+  wrap.append(lead);
+
+  const table = el(doc, 'ol', { className: 'menu-board' });
+  const rows: readonly { readonly who: string; readonly figures: string; readonly seed: string }[] = [
+    {
+      who: 'Somebody else',
+      figures: 'AWT 24.6 s · WT95 51.2 s · TTD 63.4 s · over-long 8.1 %',
+      seed: 'seed 20260101 · one run',
+    },
+    {
+      who: 'You, if you post this run',
+      figures: 'AWT — · WT95 — · TTD — · over-long —',
+      seed: 'seed — · one run',
+    },
+  ];
+  for (const row of rows) {
+    const item = el(doc, 'li', { className: 'menu-board-row' });
+    const name = el(doc, 'span', { className: 'menu-board-name' });
+    setText(name, row.who);
+    const figures = el(doc, 'span', { className: 'menu-board-figures' });
+    setText(figures, row.figures);
+    const seed = el(doc, 'span', { className: 'menu-board-seed' });
+    setText(seed, row.seed);
+    fill(item, name, figures, seed);
+    table.append(item);
+  }
+  wrap.append(table);
+
+  const rule = el(doc, 'p', { className: 'menu-note' });
+  setText(
+    rule,
+    'One of the four figures orders the board and the other three sit beside it — they are never ' +
+      'added together, because a run that spends less by carrying fewer people has not done better. ' +
+      'The seed is printed so any row can be replayed and checked.',
+  );
+  wrap.append(rule);
+  return wrap;
+}
+
 function noticeLine(doc: Document, text: string): HTMLElement {
   const line = el(doc, 'p', { className: 'menu-notice' });
   setText(line, text);
@@ -324,12 +812,14 @@ function selectRow(
   label: string,
   value: string,
   options: readonly { readonly id: string; readonly name: string; readonly detail?: string | undefined }[],
+  keep: KeepControl,
+  key: string,
   onChange: (id: string) => void,
 ): HTMLElement {
   const row = el(doc, 'label', { className: 'menu-select' });
   const text = el(doc, 'span', {});
   setText(text, label);
-  const select = el(doc, 'select', {});
+  const select = keep(el(doc, 'select', {}), key);
   for (const option of options) {
     const node = el(doc, 'option', { attrs: { value: option.id } });
     setText(node, option.detail === undefined ? option.name : `${option.name} — ${option.detail}`);
@@ -347,22 +837,30 @@ function selectRow(
 /**
  * A labelled text input.
  *
- * `type` is a parameter so the password field is a real `password` input — a browser that shows a
- * passphrase in clear text on a shared screen is the one failure this screen can cause on its own.
+ * `type` carries the two the product still collects — a name and an address. It used to carry a
+ * third, and that third is the whole of GitHub issue #30: a live credential box wired to a path
+ * § D241 had deleted. The union is now the enumeration of what may be asked for, so a fourth kind
+ * of field is a deliberate edit here rather than a string somebody passed.
+ *
+ * `email` is not decoration either: it gets the right keyboard on a phone and the browser's own
+ * autofill, on the one field a player is least willing to retype.
+ *
  * The value is set as a property and not an attribute, so re-rendering does not blow away what the
  * player is mid-way through typing.
  */
 function textRow(
   doc: Document,
   label: string,
-  type: 'text' | 'email' | 'password',
+  type: 'text' | 'email',
   value: string,
+  keep: KeepControl,
+  key: string,
   onChange: (value: string) => void,
 ): HTMLElement {
   const row = el(doc, 'label', { className: 'menu-text' });
   const text = el(doc, 'span', {});
   setText(text, label);
-  const input = el(doc, 'input', { attrs: { type } }) as HTMLInputElement;
+  const input = keep(el(doc, 'input', { attrs: { type } }), key) as HTMLInputElement;
   input.value = value;
   input.addEventListener('change', () => {
     onChange(input.value);
@@ -375,12 +873,14 @@ function toggleRow(
   doc: Document,
   label: string,
   value: boolean,
+  keep: KeepControl,
+  key: string,
   onChange: (value: boolean) => void,
 ): HTMLElement {
   const row = el(doc, 'label', { className: 'menu-toggle' });
   const text = el(doc, 'span', {});
   setText(text, label);
-  const input = el(doc, 'input', { attrs: { type: 'checkbox' } });
+  const input = keep(el(doc, 'input', { attrs: { type: 'checkbox' } }), key);
   if (value) input.setAttribute('checked', 'checked');
   input.addEventListener('change', () => {
     onChange((input as HTMLInputElement).checked);

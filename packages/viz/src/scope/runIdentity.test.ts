@@ -71,6 +71,32 @@ describe('the predicate answers the question it claims to', () => {
     }
   });
 
+  it('refuses a run that is one part of a longer day, because no board can record which part', () => {
+    /*
+     * § D288. Not a scope question and not a *this browser alone* question — the third kind: a run
+     * a **submission** cannot carry. `RunSubmission` is six fields and the window is in none of
+     * them, and the board re-simulates rather than trusting the client — so posting a lunch peak
+     * would have the server replay the seed over the whole ten hours and answer a different
+     * question, correctly.
+     *
+     * Asserted against the whole-period control in the same case, because the claim is that the
+     * window is what refuses it and not the length: both arms are thirty minutes.
+     */
+    const base = { ...baseState(), shiftLengthS: 1800 };
+    expect(runIdentityIssues({ ...base, windowStartS: null }, RESOURCES)).toEqual([]);
+
+    const windowed = runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES);
+    expect(windowed.map((issue) => issue.key)).toEqual(['viewer.windowStartS']);
+    expect(windowed[0]?.message).toContain('part of a longer day');
+    // The reason names the replay rather than only the row, because that is what actually happens.
+    expect(windowed[0]?.message).toContain('replay');
+    // ...and it survives `shift-week`, which permits every scope: this is not a scope refusal, so
+    // permitting `between-days` must not clear it.
+    expect(
+      runIdentityIssues({ ...base, windowStartS: 30 * 60 }, RESOURCES, 'shift-week').length,
+    ).toBe(1);
+  });
+
   it('reports every reason rather than the first', () => {
     const base = baseState();
     const bad: ViewerState = {

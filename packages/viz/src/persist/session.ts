@@ -453,9 +453,37 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
   return {
     ok: true,
     version,
-    session: record['session'],
+    session: withWindowStart(record['session'], version),
     library: version >= 2 ? record['library'] : EMPTY_LIBRARY,
   };
+}
+
+/**
+ * A version 1 or 2 `session`, given the one key version 3 added.
+ *
+ * `EMPTY_LIBRARY`'s argument, one level further in, and it has to survive the same objection.
+ * `null` is not a default standing in for a value nobody recorded: `null` means *"no window — run
+ * the whole period"* (§ D286), and a build with no window concept ran the whole period on every
+ * run it ever did. The absence **determines** the value rather than leaving it open, which is the
+ * test `types.ts` states for whether an older envelope may be read at all.
+ *
+ * Returns the value untouched when it is not the shape this can complete — not an object, no
+ * `freePlay`, a `freePlay` that is not an object, or one that already carries the key. Every one of
+ * those is a session `snapshotIssue` is about to refuse **by name**, and completing a malformed
+ * object first would replace a precise complaint with a vaguer one about whatever it found next.
+ * The version-3 path returns immediately and is not merely a no-op through here, so a current
+ * session cannot acquire a key it did not store.
+ */
+function withWindowStart(session: unknown, version: number): unknown {
+  if (version >= 3) return session;
+  if (!isPlainRecord(session)) return session;
+  const freePlay = session['freePlay'];
+  if (!isPlainRecord(freePlay) || 'windowStartS' in freePlay) return session;
+  return { ...session, freePlay: { ...freePlay, windowStartS: null } };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**

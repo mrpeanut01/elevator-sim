@@ -50,7 +50,6 @@
 
 import type {
   ConservationAudit,
-  DemandTemplateId,
   DispatchPolicyOptions,
   DispatcherProfile,
   DispatcherProfiles,
@@ -373,12 +372,18 @@ export interface DispatcherArmSpec {
 export interface TrafficArmSpec {
   readonly id: string;
   /**
-   * `'rise-and-fall'` (the doc's recommendation), `'constant-iso'`, or `'lunch-two-way'` — the
-   * third shipped template, whose directional mix varies within the run (DECISIONS.md § D169).
-   * `core`'s `DEMAND_TEMPLATE_IDS` is the authority; this sentence named two when three shipped,
-   * corrected 2026-07-30.
+   * The id of a record in the `demandTemplates` catalogue the run loads.
+   *
+   * `string` since `DECISIONS.md` § D274, and the widening is the point rather than a relaxation:
+   * `core`'s `DEMAND_TEMPLATE_IDS` names the shapes `core` can *build with no record to read*, and
+   * since § D273 a record may author its own `phases` and answer to an id that list cannot contain.
+   * The **catalogue** is the authority — `resolveDemandTemplate` looks the id up there first and
+   * throws by name for one nothing answers to — so this axis names a record and the run checks it
+   * against the data it loaded. (This sentence has gone stale twice already: it named two templates
+   * when three shipped, corrected 2026-07-30, and named a closed union when the union stopped being
+   * the authority, corrected here.)
    */
-  readonly demandTemplate?: DemandTemplateId | undefined;
+  readonly demandTemplate?: string | undefined;
   /** Demand horizon, seconds. Defaults to the template's own. */
   readonly durationS?: number | undefined;
   /** Window the summary is computed over. Defaults to the template's measurement window. */

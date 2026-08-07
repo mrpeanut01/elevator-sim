@@ -249,10 +249,18 @@ export function fixtureConfig(config: LoadedConfig, options: FixtureOptions = {}
  * building faster than a second rider turns up. No figure is published from these runs — they exist
  * to make a picture that has something in it — so the rate is chosen for coverage rather than for
  * realism, and saying so is the difference between a fixture and a claim.
+ *
+ * **`crown-hotel` went 10 → 16 for `DECISIONS.md` § D260, and it is the same reason a third time.**
+ * The hotel declares one access zone — `back-of-house` over `B1` — and § D254's defect refused every
+ * landing call raised there, so `B1` held a queue nothing would collect and the two-bands-at-one-
+ * landing identity was satisfied by a backlog rather than by traffic. Served properly the landing
+ * clears, and at 10 % the witness fails on all three seeds measured. 16 % restores it on all three
+ * and leaves the run quotable on all three; 18 % saturates on two of them, so the rate is chosen
+ * from the measurement rather than rounded up from it.
  */
 const BREADTH_DEMAND_BY_BUILDING: Readonly<Record<string, number>> = Object.freeze({
   'chancery-house': 30,
-  'crown-hotel': 10,
+  'crown-hotel': 16,
   'st-jude-hospital': 10,
 });
 
@@ -270,4 +278,112 @@ export function breadthConfig(
     onTimeout: options.onTimeout ?? 'report',
   });
   return rate === undefined ? base : { ...base, demand: { arrivalRatePctPop5min: rate } };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The two refused runs, named — `DECISIONS.md` § D260
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A run whose mean the statistics module refuses, stated as a rate rather than as a hope.**
+ *
+ * Nine suites need one: `live/noMeans`, `live/honesty`, `dev/leftRail`, `dev/rightRail`,
+ * `frame/overlay`, `mode/disclosure`, `render/describeFrame` and the two the campaign lane owns.
+ * Every one of them used to reach for an **access-zoned building at its shipped rate** and get a
+ * refusal, and the refusal was § D254's defect: the pickup check stranded landing calls, the queue
+ * grew because nobody collected it, and the suite read that as saturation. It was — but of the
+ * simulator rather than of the building. With the defect gone `vertical-city` completes at 100 %
+ * delivery on every seed tried and its mean is perfectly quotable, so eight guards named *"really
+ * is suppressed, or the rest of this proves nothing"* did exactly what they were written to do.
+ *
+ * The replacement is a **demand rate**, which is a property of the traffic rather than of a bug.
+ * The rate was **measured up to, not guessed**, over five seeds (`FIXTURE_SEED`, 424 242,
+ * 20 260 101, 7, 99 991), counting how many refuse their mean:
+ *
+ * | rate | runs refusing their mean |
+ * |---|---|
+ * | 8 %, 9 %, 10 % | **0 of 5** |
+ * | the building's shipped rate | 2 of 5 |
+ * | 11 %, 12 % | 2 of 5 |
+ * | 13 %, 14 %, 15 %, **16 %**, 17 %, 18 %, 20 % | **5 of 5** |
+ *
+ * **The ragged band at 11–12 % is why this constant is 16 and not 13.** Saturation is a trend test
+ * over the reporting window, so near the threshold it is a coin toss on the seed — which is the
+ * regime `docs/03` warns about and the last place a fixture should sit. 16 % is three points clear
+ * of the last rate that ever came back quotable, and every rate between 13 % and 20 % refuses on
+ * every seed, so the fixture is not perched on a boundary. (The shipped rate's own 2 of 5 is worth
+ * recording: even before § D254 this fixture only refused on some seeds, and the suites happened to
+ * pin one where it did.)
+ *
+ * **The ground is `saturated` on every seed measured**, which matters more here than the count:
+ * `mode/disclosure` asserts that the ground travels beside the prose, and a fixture that wandered
+ * between grounds would make that assertion about a different sentence each run.
+ *
+ * It still **drains** — `completed`, nobody undelivered — and that is a feature rather than a
+ * compromise: `live/honesty`'s *"the live casual card really does go calm on a refused run"* is a
+ * defect that only a **refused run that clears** can exhibit, and until now no shipped fixture
+ * produced one, so the case had to be made synthetically. For a run that does *not* clear, see
+ * {@link timedOutConfig}.
+ */
+export const SUPPRESSED_BUILDING_ID = 'vertical-city';
+
+/** See {@link suppressedConfig}. Percent of population per five minutes. */
+export const SUPPRESSED_DEMAND_PCT = 16;
+
+/**
+ * A run this build produces whose `awtIsValid` is `false` and whose `saturated` is `true`.
+ *
+ * The building is unchanged from the fixture these suites used before — what moved is the rate,
+ * which is now stated instead of inherited from a defect. See {@link SUPPRESSED_BUILDING_ID}.
+ */
+export function suppressedConfig(
+  config: LoadedConfig,
+  options: FixtureOptions = {},
+): SimulationConfig {
+  return {
+    ...breadthConfig(config, options.buildingId ?? SUPPRESSED_BUILDING_ID, options),
+    demand: { arrivalRatePctPop5min: SUPPRESSED_DEMAND_PCT },
+  };
+}
+
+/**
+ * **A run the drain deadline ends with people still standing** — `status: 'timed-out'`.
+ *
+ * A different claim from {@link suppressedConfig}'s and needed by two suites: `record/document`'s
+ * *"round-trips through a file for a building that times out"* (the documents a viewer most needs
+ * to load are the ones a run could not finish) and `render/describeFrame`'s *"reports a run that
+ * did not deliver everybody as such"*. Both reached for an access-zoned building for the same
+ * stale reason, and `vertical-city` at the shipped rate now completes.
+ *
+ * Timing out is a **much** stronger demand than saturating, and the gap is worth stating so nobody
+ * re-points this at 16 %: the horizon is 900 s of demand plus `sim.drainGraceS` of 3 600 s, so a
+ * configuration has to outrun its capacity by enough that an hour of drain does not clear it.
+ * `vertical-city` at 50 % is still `completed`. Measured over the same three seeds:
+ *
+ * | building / rate | status | undelivered | still waiting at `endedAt` |
+ * |---|---|---|---|
+ * | `mixed-use-high-rise` @ 40 % | `completed` on 3/3 | 0 | 0 |
+ * | **`mixed-use-high-rise` @ 80 %** | **`timed-out` on 3/3** | 606–732 | 578–684 |
+ *
+ * `mixed-use-high-rise` rather than `vertical-city`, which also times out at 80 %: it does so with
+ * 5 000 legs rather than 13 000, and neither suite here asserts anything about the building.
+ *
+ * **80 % of population per five minutes is not an operating point and is not offered as one.** It
+ * is `chancery-house`'s 30 % on the same footing — a fixture rate picked so a picture has something
+ * in it, with no figure published from the run.
+ */
+export const TIMED_OUT_BUILDING_ID = 'mixed-use-high-rise';
+
+/** See {@link timedOutConfig}. Percent of population per five minutes. */
+export const TIMED_OUT_DEMAND_PCT = 80;
+
+/** A run that ends `timed-out` with passengers still in the system. See {@link TIMED_OUT_BUILDING_ID}. */
+export function timedOutConfig(
+  config: LoadedConfig,
+  options: FixtureOptions = {},
+): SimulationConfig {
+  return {
+    ...breadthConfig(config, options.buildingId ?? TIMED_OUT_BUILDING_ID, options),
+    demand: { arrivalRatePctPop5min: TIMED_OUT_DEMAND_PCT },
+  };
 }

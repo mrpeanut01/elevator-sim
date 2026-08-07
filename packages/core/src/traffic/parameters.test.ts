@@ -83,6 +83,24 @@ const PARAMETERS_BY_CONFIG_FIELD = {
    * it changes, which is why it is `null` for a different reason than `idPrefix` is.
    */
   trafficModel: null,
+  /*
+   * Which *part of the day* the run covers (§ D285) — a scenario axis, not a knob, and `null` for a
+   * third reason on top of the two above.
+   *
+   * § D244 rule 3 kept `startOfDayS` out of this surface because an optimizer sampling *what hour it
+   * is* would search a dimension that cannot move a cost. The window is that hour made selectable,
+   * so the argument applies harder: sampling it would search *which experiment to run*, and
+   * CLAUDE.md § Tuning discipline says the opposite — tune per traffic pattern, which means holding
+   * the pattern fixed and searching the weights inside it.
+   *
+   * There is also a declaration this surface could not honestly make. A tunable declares a range,
+   * and the only true range here is `[0, the selected template's own durationS)` — 1 800 s for
+   * `rise-and-fall` and 36 000 s for `office-day`. `activeWhen` selects on a *value*, not on a
+   * length read out of `data/`, so any range written here would be wrong for five of the seven
+   * shipped records. A declared schema that disagrees with the resolver is worse than none.
+   */
+  windowStartS: null,
+  windowEndS: null,
 
   template: ['traffic.template'],
   templateOverrides: [
@@ -106,6 +124,7 @@ const PARAMETERS_BY_CONFIG_FIELD = {
   entranceWeights: ['traffic.entranceWeight'],
   interfloorWeighting: ['traffic.interfloorWeighting'],
   credentialAssignment: ['traffic.credentialAssignment'],
+  credentialGap: ['traffic.credentialGap.wrongZoneShare'],
   maxLegs: ['traffic.maxLegs'],
   batchSize: [
     'traffic.batchSize.distribution',
@@ -173,7 +192,7 @@ describe('traffic tunables declare their schema', () => {
     // Pinned as a count as well as a set, because `TRAFFIC_PARAMETERS`' own docstring quotes this
     // number in prose and said "two" while four were declared. A sentence nothing checks goes
     // stale; this is what makes the next edit to it fail rather than drift.
-    expect(nullDefaults.length).toBe(15);
+    expect(nullDefaults.length).toBe(16);
     expect(new Set(nullDefaults)).toEqual(
       new Set([
         'traffic.arrivalRatePctPop5min',
@@ -200,6 +219,11 @@ describe('traffic tunables declare their schema', () => {
         'traffic.dayVariation.minDemandFactor',
         'traffic.dayVariation.maxDemandFactor',
         'traffic.dayVariation.peakShiftS',
+        // § D265, and null for the `passengerMass` reason exactly: the share is a single figure in
+        // `data/traffic-profiles.json` with its reasoning attached, and it is an uncited assumption
+        // rather than a measurement. Declaring a second copy here would make two places that state
+        // it — and the one nobody is reading is the one that is right.
+        'traffic.credentialGap.wrongZoneShare',
       ]),
     );
 
@@ -428,6 +452,35 @@ const PROBES: readonly Probe[] = [
     observe: (config) =>
       generateTrace(config).passengers.every((p) => p.credentialGroup === undefined),
     expected: true,
+  },
+  {
+    ids: ['traffic.credentialGap.wrongZoneShare'],
+    buildingId: 'secure-tower',
+    // **0, the control arm, rather than a larger share.** The observation below is a boolean, and
+    // it has to differ between the base configuration and the probe: the base *is* the data's own
+    // share, which already produces refusals here, so probing a bigger share would observe `true`
+    // on both sides and assert nothing. Probing 0 is the one value that turns the quantity off,
+    // which is what makes `not.toEqual(expected)` separate the two. Asserting a *count* instead
+    // would pin a seed rather than a knob.
+    probe: { credentialGap: { wrongZoneShare: 0 } },
+    // The quantity the gap exists to move: legs whose own credential cannot reach the floor they
+    // are going to. Zero under every configuration this repository shipped before § D265.
+    observe: (config) => {
+      const permitted = new Map<string, readonly string[]>();
+      for (const zone of building('secure-tower').accessZones) {
+        for (const floorId of zone.floors) {
+          permitted.set(floorId, [...(permitted.get(floorId) ?? []), ...zone.credentialGroups]);
+        }
+      }
+      return generateTrace(config).passengers.some((passenger) => {
+        const groups = permitted.get(passenger.finalDestinationFloorId);
+        if (groups === undefined) return false;
+        return (
+          passenger.credentialGroup === undefined || !groups.includes(passenger.credentialGroup)
+        );
+      });
+    },
+    expected: false,
   },
   {
     ids: ['traffic.maxLegs'],

@@ -149,6 +149,32 @@ function sweepQueues(recording: VizRecording, t: SimTime): QueueSweep {
   const events: QueueDelta[] = [];
   for (const leg of recording.legs) {
     if (leg.arrivedAt > t) break;
+    /*
+     * A rider the building turned away never joined this queue — `DECISIONS.md` § D266.
+     *
+     * Without it a refused leg is a `+1` with no matching `-1`, so it stands here for the rest of
+     * the run and `deepestQueueNow` disagrees with `frame/overlay.ts`'s `queueAt`, which already
+     * accounts for it through `isWaitingAt`. That agreement is what `observations.test.ts` §
+     * *agrees with `queueAt` about the deepest queue standing right now* asserts, and it is
+     * evidence precisely because the two are **different code** reaching the same answer.
+     *
+     * **No event at all rather than a `+1` and a `-1`** — the same choice `record/recordRun.ts`'s
+     * `foldPassengers` makes, and the two folds agreeing is the whole point of the assertion above.
+     *
+     * A pair was written here first, and what it cost is worth recording because it is not what
+     * you would guess. `refusedAt` equals `arrivedAt` on **every** refused leg — measured, 4 of 4
+     * on `secure-tower` and 5 of 5 on `mixed-use-high-rise`, and none at all on the three buildings
+     * declaring no `accessZones` — so a pair is two events at one instant, cancelled only by the
+     * `delta` tie-break below happening to order them that way. **The suite did not catch it**, so
+     * a green run here is not evidence for either shape. The argument against the pair is therefore
+     * not that it computed a wrong number; it is that a rider who never joined the queue should not
+     * be modelled as joining and leaving it, and that a fold whose correctness rests on a sort
+     * order cancelling two events is one refactor away from being wrong silently.
+     *
+     * `refusedAt` is absent on every leg of the three shipped buildings that declare no
+     * `accessZones`, so this is inert on those runs.
+     */
+    if (leg.refusedAt !== undefined && leg.refusedAt <= t) continue;
     events.push({
       at: leg.arrivedAt,
       delta: 1,

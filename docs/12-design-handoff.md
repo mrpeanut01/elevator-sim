@@ -204,13 +204,34 @@ Every one of these is also a row in [`DECISIONS.md`](../DECISIONS.md) § D174–
 
 **The constraint.** This simulator does not step in real time. `core/` has no clock (invariant 3):
 `Simulation.run()` returns a whole result and `frameAt(recording, t)` samples it, which is what
-makes scrubbing backwards free and replay bit-identical. A sixteen-hour day of Midtown Office at
-its shipped demand is roughly 39 000 passengers; recording it synchronously in a browser tab is
-tens of seconds and hundreds of megabytes, and Vertical City is four times that. More important:
-**the shipped demand templates do not describe a sixteen-hour day.** `rise-and-fall` is thirty
-minutes; `constant-iso` is two hours. Drawing seven office phases over a thirty-minute
-rise-and-fall run would be a label that does not describe the demand underneath it — the exact
-failure the honesty card exists to prevent.
+makes scrubbing backwards free and replay bit-identical.
+
+> **Correction, 2026-08-05 — the cost figure this paragraph used to carry did not reproduce.**
+> It read: *"A sixteen-hour day of Midtown Office at its shipped demand is roughly 39 000
+> passengers; recording it synchronously in a browser tab is tens of seconds and hundreds of
+> megabytes, and Vertical City is four times that."*
+>
+> That is `1712 occupants × 12 %pop/5 min × 192 five-minute blocks = 39 444` — **the morning peak
+> rate held for sixteen hours.** No CIBSE day profile has that shape, and it is the same mistake
+> play-tester issue #81 reports in the product: treating the peak as if it were the day. Measured
+> instead at a realistic daily average of 2.2 %pop/5 min, a sixteen-hour Midtown day is about
+> **7 200 passengers**, and a full shaped day costs roughly **3.4×** a thirty-minute replication at
+> Midtown Office and **5.8×** at Vertical City — four to six times, not ten, and not *tens of
+> seconds*. CLAUDE.md's rule applies to this document too: if you publish a number, pin it to the
+> run that produced it.
+>
+> **One part of the original claim is not refuted and is still open.** The CLI measurements above
+> build no `VizRecording`. The viewer holds the whole recording in memory so scrubbing stays free,
+> and the size of that structure for a twenty-thousand-passenger day is **unmeasured**. Measure it
+> before offering a full day on Vertical City.
+
+The remaining constraint is real and unchanged: **the shipped demand templates do not describe a
+sixteen-hour day.** `rise-and-fall` is thirty minutes; `constant-iso` is two hours. Drawing seven
+office phases over a thirty-minute rise-and-fall run would be a label that does not describe the
+demand underneath it — the exact failure the honesty card exists to prevent. That is a missing
+*record*, not a missing model: `DemandPhase` already carries per-phase intensity and directional
+split, `intensityAt` is already one piecewise-linear evaluator over one knot list, and
+`shift-change` already ships six phases with two interior peaks.
 
 **What is implemented.** The timeline's segments are the **resolved demand template's own phases**,
 named and rated from the template (`ramp up`, `peak hold`, `ramp down`, `drain`), with their real
@@ -458,6 +479,39 @@ the dispatcher's own controls in `#panel-dispatcher`, and the challenge board is
 than a tab. Both follow § 4.7's rule for a control the handoff has no row for: it is drawn in the
 design's language, it is refused **beside itself** when the run will not read it, and it is recorded
 here.
+
+### 4.9 Two S5 rows the artefact wrote for a prototype with one audience, and a key it has no row for
+
+Every one of these is [§ D236](../DECISIONS.md), and each is a change to what the design specifies
+rather than an interpretation of it.
+
+**S5's step-aside loses two of its four elements.** The artefact marks the building's spec line
+(`design.html` `:37`) and the phase pill (`:43`) with `data-hide-narrow`, and this implementation had
+added the mode select and the banner to the set. The spec line and the banner keep it. The other two
+do not:
+
+- the **phase pill** is not *secondary text*, which is what S5's own sentence steps aside. In the
+  prototype it captions a toy simulator; here `FILLING`/`PEAK`/`EASING`/`DRAIN` is the only statement
+  on the screen of what the building is doing at the playhead, and every goal, band and report is
+  read against it. Six characters;
+- the **mode select** is the deeper case, and it is the one that shows why *the handoff wins every
+  disagreement about what the screen looks like* has a boundary. § 1.5 B1's two modes are this
+  implementation's addition to a prototype that has one audience, so the artefact has no opinion
+  about where their switch goes at 800 px — and `display: none` gave it a zero-size box, which took
+  it out of the **tab order** as well as off the screen. No other surface in the product changes
+  Casual/Engineer. That is not a look, it is a lockout.
+
+**The header wraps below 768 px.** The artefact's header is a nowrap flex row with `overflow: hidden`,
+which at 375 px put 141 px of itself — the clock, the day and the tenant count — where no gesture
+reaches. `flex-wrap: wrap` is a change to a rule the artefact wrote, and the layout it produces at
+1180 px and above is byte-identical.
+
+**A key for the building drawing, which the handoff has no row for.** § 1.3 M4 specifies one legend
+strip, for the *rider* wait bands, and the artefact draws its cars in four load colours and two
+direction arrows with nothing that says so. § 4.7's rule for a control the handoff has no row for
+applies to a *caption* the same way: it is drawn in the design's own legend component, immediately
+under M4's, and it spends no hue the stage does not draw. Its swatches read `render/tokens.ts`
+through three new shell tokens, so the key and the canvas cannot disagree.
 
 ---
 

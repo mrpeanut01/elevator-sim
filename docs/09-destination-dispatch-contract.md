@@ -11,7 +11,8 @@
 > | Prediction | Outcome |
 > |---|---|
 > | § 3.1 — a Level-1 run renders an **empty landing series** | ⚠️ **REFUTED.** The real defect was a *collapse*: 28 landings drawn against 92 landing calls and 132 promise groups, and a caption saying "unassigned" about promised passengers. The instruction it justified was right, and was followed |
-> | § 4.3 / § 8 — H-ACCESS-2, the *optimization* half of the access-control hypothesis | ⚠️ **REFUTED, as the pilot predicted.** `Δ_secure − Δ_midtown = +0.982 s [+0.584, +1.380]` at n = 150 per building. The saving is in the credential, and that is H-ACCESS-1, which is **CONFIRMED categorically** |
+> | § 4.3 / § 8 — H-ACCESS-2, the *optimization* half of the access-control hypothesis | ⚠️ **REFUTED, as the pilot predicted.** `Δ_secure − Δ_midtown = +1.020 s [+0.625, +1.414]` at n = 150 per building — `runAccessControlStudy({})`, seed 20 260 726, pinned in `benchmark/published.ts` and re-measured by [§ D280](../DECISIONS.md); the superseded `+0.982 s [+0.584, +1.380]` predates [§ D254](../DECISIONS.md). This row used to end *"the saving is in the credential, and that is H-ACCESS-1, which is **CONFIRMED categorically**"* — **H-ACCESS-1 is REFUTED** ([§ D256](../DECISIONS.md), [§ D279](../DECISIONS.md)), so the credential buys nothing under conventional dispatch and **where the saving comes from is unmeasured** |
+> | § 4.3 — H-ACCESS-1, the *coverage* half | ⚠️ **REFUTED, and it was measuring a defect.** *"Not servable at all"* was [§ D254](../DECISIONS.md)'s pickup-access check, not a property of conventional dispatch. Re-measured, `eta` and `destination-eta-unpriced` are **bit-identical on 150 of 150** Secure Tower replications on all seven identity metrics, and every access-zoned building ships servable at 100 % delivery. The **bare kiosk** survives at 61.2 % unserved — authorization of a *destination*, which § D254 never touched |
 > | § 8 — "the most likely way Phase 6 publishes a wrong conclusion is a single-building H-ACCESS-2" | ✅ **Correct, and the trap was avoided by design.** The study asserts the trap explicitly: Secure Tower alone *does* exclude zero on the confirming side |
 > | § 2.2 / § 4 — the operating points, arms and the n = 150 budget | ✅ Held. `sd(ΔTTD)` for the C→D contrast measured 0.908 s at the primary point, inside the contract's stated headroom by 3.7× |
 > | "Level 1 is trajectory-identical to Level 0 at the primary point" | ⚠️ **A single-seed reading.** 27 of 150 replications are bit-identical; 123 are not. The effect is near zero *and* the arms are demonstrably wired — the two readings that together rule out a dead seam |
@@ -618,6 +619,18 @@ passed — so all it can contribute is ordinary `rideTime` optimization, and Sec
 3 identical cars over 15–16 floors against Midtown's larger, more differentiated bank. **There is
 simply less for a destination to differentiate.** The "same step" saving is real, and it is entirely
 in the *credential*, which is H-ACCESS-1.
+
+> **⚠️ The last sentence above is withdrawn — its destination for the saving is unmeasured — and it
+> is left standing as the prediction it was.**
+> H-ACCESS-1 — § 4.3's coverage claim, *"not servable at all"* — was **REFUTED** on 2026-08-05
+> ([§ D256](../DECISIONS.md), [§ D279](../DECISIONS.md)): it was measuring
+> [§ D254](../DECISIONS.md)'s pickup-access defect rather than conventional dispatch. Re-measured,
+> `eta` and `destination-eta-unpriced` are **bit-identical on 150 of 150** Secure Tower replications
+> across all seven identity metrics, so the credential buys nothing there and the saving cannot be in
+> it. **Where the saving is instead is unmeasured**, and this contract does not supply a replacement
+> mechanism — the surviving measured statement is the *negative* one, that the same-step mechanism is
+> not what produces it. H-ACCESS-2's own direction, and this section's prediction of it, are
+> unaffected: the full-budget figure is `+1.020 [+0.625, +1.414]` ([§ D280](../DECISIONS.md)).
 
 **What would refute H-ACCESS-2 at the full budget:** the interval on `Δ_secure − Δ_midtown` excluding
 zero on the positive side, which is the pilot's direction. **What would confirm it:** the interval

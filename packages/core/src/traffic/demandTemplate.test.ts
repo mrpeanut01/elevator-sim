@@ -262,8 +262,10 @@ describe('resolution from data/traffic-profiles.json', () => {
     expect(() => resolveDemandTemplate('rise-and-fal' as 'rise-and-fall')).toThrow(
       /Unknown demand template/,
     );
+    // A record that names no shape *and* authors no phases is a record nothing can build, and
+    // the message now says both ways out of it — § D273 made authoring the phases the other one.
     expect(() => resolveDemandTemplate({ ...riseRecord, id: 'bathtub' })).toThrow(
-      /has no shape in this module/,
+      /declares no "phases" and names no shape this module knows/u,
     );
   });
 });

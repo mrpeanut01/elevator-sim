@@ -72,6 +72,10 @@ const DEMAND_SAMPLE = {
   entranceWeights: { G: 1, P1: 0 },
   interfloorWeighting: 'uniform',
   credentialAssignment: 'none',
+  // § D265. 0 rather than a fraction: it is the control arm, the one value a reader of a stored
+  // record most needs to survive the round trip, and the one a projection that dropped the block
+  // would silently turn back into the shipped share.
+  credentialGap: { wrongZoneShare: 0 },
   maxLegs: 4,
   peakWindowS: 420,
   baselineFraction: 0.25,
@@ -100,7 +104,7 @@ describe('the stored record carries every demand override', () => {
    * not quietly shrinking either — a row deleted to make a failure go away shows up here.
    */
   it('samples every field the demand surface declares', () => {
-    expect(Object.keys(DEMAND_SAMPLE).length).toBe(14);
+    expect(Object.keys(DEMAND_SAMPLE).length).toBe(15);
   });
 
   /**

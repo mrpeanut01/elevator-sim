@@ -350,6 +350,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
   'viewer.pattern':
     'same: a saved pattern is this browser’s alone (runIdentity.ts refuses a run carrying one), so restoring it would restore an unreproducible run',
   'viewer.shiftLengthS': 'the live run’s length; menu.freePlay.durationS is the persisted selection',
+  'viewer.windowStartS':
+    'the live run’s part of the day; menu.freePlay.windowStartS is the persisted selection, and the two travel together because they are one choice — a restored length without its window would run the right amount of demand out of the wrong hour (§ D286)',
   'viewer.freePlay':
     'the two override axes the live run is carrying, derived by enterFreePlay from the selection that is persisted — storing the derivation as well would let it drift from its source',
   'viewer.seed':
@@ -538,6 +540,42 @@ describe('a played session survives a reload', () => {
     if (!result.ok) return;
     expect(result.snapshot.week).not.toEqual(openWeek(FIRST_CONTRACT));
     expect(result.snapshot.settings).not.toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('brings back every preference by name, and moves every one first — GitHub issue #70', () => {
+    /*
+     * **This test is a refutation, kept because refutations go stale too.**
+     *
+     * Issue #70 reports that *"none of the four preferences survive a reload"*, with the evidence
+     * that `localStorage` has no key for theme, reduced motion, energy axis or playback speed. It
+     * does not: all four live inside `elevator-sim.session`, and they do come back. Driven in a
+     * browser at 1280×720 on the current tip — tick Reduce motion, set Playback speed to 8× and
+     * Theme to light, then reload — the slot holds
+     * `{"reduceMotion":true,"showEnergyAxis":false,"playbackSpeed":8,"theme":"light"}` before and
+     * after, the reloaded Settings screen shows the checkbox ticked, `8` and `light`, and the
+     * document carries `data-theme="light"`. The reporter's own third step is the one that came
+     * back true.
+     *
+     * The assertion above already covered this, whole-object. This one is **derived from
+     * `Settings`' own key set** rather than resting on one `toEqual`, and it asserts both halves per
+     * field: the value comes back, *and* the fixture moved it off its default first. The second half
+     * is the one that matters for a fifth preference — a field added to `Settings` and left at its
+     * default in {@link menuState} would round-trip trivially and prove nothing about whether the
+     * snapshot carries it.
+     */
+    const wanted = menuState().settings;
+    const result = loadSession(saved().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const keys = Object.keys(DEFAULT_SETTINGS) as (keyof typeof DEFAULT_SETTINGS)[];
+    expect(keys.length, 'Settings has no fields to check').toBeGreaterThan(3);
+    for (const key of keys) {
+      expect(
+        wanted[key],
+        `the fixture leaves ${key} at its default, so its round trip proves nothing`,
+      ).not.toEqual(DEFAULT_SETTINGS[key]);
+      expect(result.snapshot.settings[key], `${key} did not survive the reload`).toEqual(wanted[key]);
+    }
   });
 
   it('hands back a frozen value, because a week is a value everywhere else', () => {

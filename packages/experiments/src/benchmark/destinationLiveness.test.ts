@@ -23,7 +23,8 @@
  * | `destination-eta` + `rideTime 1`, `mobile-credential`, Midtown | **248 / 248** | **12 / 62 decisions** | — |
  * | the same weights at `up-down-buttons`, Midtown | **0 / 248** | **0 / 62 decisions** | — |
  * | shipped `destination-eta`, `mobile-credential`, Secure Tower | — | — | **0** refusals, **0** decisions wholly refused |
- * | the same profile at `up-down-buttons`, Secure Tower | — | — | **921** `accessDenied` refusals, **307 / 331** decisions wholly refused |
+ * | the same profile at `up-down-buttons`, Secure Tower | — | — | **0** verdicts of any reason |
+ * | the same profile at `destination-entry`, no credential, Secure Tower | — | — | **0** verdicts — and **29 of 65** legs carried, against 65 on both shipped arms |
  *
  * Both gates are flat on their off side and live on their on side, which is the proof obligation
  * docs/09 § 8 R6-2 puts on the author rather than the reviewer.
@@ -53,15 +54,22 @@
  * building declares no `accessZones` — so what makes it live there is the **pricing**: 260 of 260
  * evaluations non-zero, with cross-car spread in 12 of 65 decisions.
  *
- * On Secure Tower what its `callType` moves is the **eligibility filter**: the credential reaches
- * `estimateCost`, and cars stop refusing the call. The live direction is therefore *fewer* refusals
- * — and the refusals it removes are bank-wide, every car saying no to the same call, which is why
- * removing them turns 307 unassignable decisions per run into none and an unservable building into
- * a served one. That is H-ACCESS-1 one level down, in the filter that causes it.
+ * **On Secure Tower it used to move the eligibility filter, and since `DECISIONS.md` § D254 it moves
+ * nothing there.** This paragraph read: *the credential reaches `estimateCost`, cars stop refusing
+ * the call, and removing those bank-wide refusals turns 307 unassignable decisions per run into none
+ * and an unservable building into a served one — H-ACCESS-1 one level down, in the filter that
+ * causes it.* The filter was refusing because `estimateCost` asked the access question about a hall
+ * call's **pickup** floor, which is a modelling error; the check and the `accessDenied` reason are
+ * both deleted, and both Secure Tower rows now record **zero verdicts of any kind**. H-ACCESS-1 is
+ * refuted (§ D256) and this was its mechanism.
  *
- * Forcing one shape onto both would still lie. A count of refusals says nothing about an argmin and
- * a cross-car spread says nothing about a call nobody can serve; the profile earns its name on two
- * buildings for two different reasons, and both are counted.
+ * So the shipped profile's liveness on the zoned building is now the **pricing** — 153 of 153
+ * evaluations non-zero, cross-car spread in 2 of 51 decisions — the same shape it has on Midtown,
+ * rather than a second one. The eligibility census is kept, and kept honest by the third Secure
+ * Tower row: the **bare kiosk**, `destination-entry` with no credential, which still refuses every
+ * zoned destination on every car. Without it, *"zero refusals on both arms"* would be indis-
+ * tinguishable from a census that had stopped counting — § D261's vacuous-precondition trap, which
+ * this repository has already fallen into once with a filter matching a deleted reason.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -171,30 +179,83 @@ describe('Phase 6a liveness — counted through the shipped engine', () => {
     expect(off.ridePricing.decisionsWithSpread).toBe(0);
   }, TIMEOUT_MS);
 
-  it('shows the shipped profile removing every access refusal on the zoned building', async () => {
+  /**
+   * **There is no access refusal for the shipped profile to remove, and the bare kiosk is what
+   * proves the counter can still see one.**
+   *
+   * This case asserted that the conventional arm on Secure Tower produced `accessDenied` refusals
+   * and bank-wide unassignable decisions, and that the credential removed all of them — 921 against
+   * 0, and 307 of 331 decisions wholly refused against none. Every one of those numbers was
+   * `estimateCost` asking the access question about a hall call's **pickup** floor (§ D254). The
+   * reason `accessDenied` no longer exists in `core` at all, so the assertion cannot be repaired by
+   * renaming: the *direction* it measured — refusals that a credential makes disappear — is gone.
+   *
+   * The inversion needs care for the reason § D261 gives about the adversarial fixture: a filter
+   * looking for a deleted reason matches nothing, and a test asserting *zero* refusals then passes
+   * by being **vacuous**. Two arms both at zero is not evidence that the credential is inert; it is
+   * equally consistent with a census that has stopped counting.
+   *
+   * **Measured, the census is not blind — it is empty, and the refusal moved upstream of it.** The
+   * eligibility filter returns **0 verdicts of any kind** on all three Secure Tower configurations,
+   * not merely zero access refusals: no car is ineligible for any reason, so `decision.rejected` is
+   * empty everywhere. The bare kiosk is added here as the third row precisely to establish that,
+   * because it is the one configuration that still turns riders away — and it turns them away at
+   * `#kioskAllows`, one passenger at a time (§ T50-D1), **before a landing call is raised**. So
+   * `estimateCost` is never asked about them and the filter has nothing to record.
+   *
+   * That gives the non-vacuous pair this case needs, in this module's own units: the kiosk carries
+   * **29 of 65** comparable legs against the two shipped arms' **65 of 65**, on the same building,
+   * the same seed and the same traffic, while all three report the same empty filter. A census that
+   * had merely stopped counting would not have moved the leg count. Where the kiosk's refusals *are*
+   * counted is `StageActivity.kioskRefusedLegs`, which `accessControl.ts` reads at 34.1 per run.
+   */
+  it('finds an empty eligibility filter on every shipped arm — and a kiosk refusing upstream of it', async () => {
     const rows = await liveness();
     const credentialled = at(rows, 'destination-eta', 'secure-tower');
     const conventional = at(rows, 'liveness-conventional');
+    const kiosk = at(rows, 'liveness-bare-kiosk', 'secure-tower');
 
     expect(credentialled.callType).toBe('mobile-credential');
     expect(conventional.callType).toBe('up-down-buttons');
+    expect(kiosk.callType).toBe('destination-entry');
 
-    // The gate's off side is emphatically not flat here — it is where the building breaks.
-    expect(conventional.eligibility.accessRefusals).toBeGreaterThan(0);
-    expect(conventional.eligibility.byReason.accessDenied).toBeGreaterThan(0);
-    // Bank-wide refusals: no candidate left, so the call has no assignment at any cost. That is the
-    // difference between a slow building and an unservable one.
-    expect(conventional.eligibility.decisionsWhollyRefused).toBeGreaterThan(0);
+    // The filter is empty on all three — no verdict of any reason, access or otherwise. Asserted on
+    // `verdicts` rather than on `accessRefusals` because it is the stronger and more falsifiable
+    // statement: a filter that had started refusing for `serviceZone` would break this and would
+    // leave an `accessRefusals === 0` assertion green.
+    for (const [label, row] of [
+      ['up-down-buttons', conventional],
+      ['mobile-credential', credentialled],
+      ['destination-entry, no credential', kiosk],
+    ] as const) {
+      expect(row.eligibility.verdicts, label).toBe(0);
+      expect(row.eligibility.accessRefusals, label).toBe(0);
+      expect(row.eligibility.decisionsWhollyRefused, label).toBe(0);
+      expect(Object.keys(row.eligibility.byReason), label).toEqual([]);
+      // …and every one of them made real decisions, so the emptiness is a filter with nothing to
+      // refuse rather than a run that never dispatched anything.
+      expect(row.eligibility.decisions, label).toBeGreaterThan(0);
+    }
 
-    // And under the credential, none of it happens.
-    expect(credentialled.eligibility.accessRefusals).toBe(0);
-    expect(credentialled.eligibility.decisionsWhollyRefused).toBe(0);
+    /*
+     * The discriminating pair, and it is what stops the three zeros above from being a census that
+     * has quietly stopped counting. The kiosk still refuses — it refuses at the interface, before
+     * any car is asked — and the cost shows up as legs that never boarded.
+     */
+    expect(kiosk.panel.comparedLegs).toBeLessThan(conventional.panel.comparedLegs);
+    expect(credentialled.panel.comparedLegs).toBe(conventional.panel.comparedLegs);
+    // Non-vacuous in the other direction too: the shipped arms carry essentially everybody, so the
+    // kiosk's shortfall is the kiosk rather than a building nobody can serve.
+    expect(conventional.panel.comparedLegs / (conventional.panel.legs - conventional.panel.refusedLegs))
+      .toBeGreaterThan(0.95);
 
     console.log(
-      `secure-tower eligibility: up-down-buttons ${conventional.eligibility.accessRefusals} refusals / ` +
-        `${conventional.eligibility.decisionsWhollyRefused} wholly-refused decisions; ` +
-        `mobile-credential ${credentialled.eligibility.accessRefusals} / ` +
-        `${credentialled.eligibility.decisionsWhollyRefused}`,
+      `secure-tower: eligibility verdicts ${conventional.eligibility.verdicts}/` +
+        `${credentialled.eligibility.verdicts}/${kiosk.eligibility.verdicts} ` +
+        '(up-down-buttons / mobile-credential / bare kiosk); comparable legs ' +
+        `${conventional.panel.comparedLegs}/${credentialled.panel.comparedLegs}/${kiosk.panel.comparedLegs} ` +
+        `of ${conventional.panel.legs} legs, ${conventional.panel.refusedLegs} of which the building ` +
+        'turned away for want of a credential on every arm alike (§ D265)',
     );
   }, TIMEOUT_MS);
 });
@@ -268,7 +329,15 @@ describe('Phase 6b liveness — the shipped landing-panel profile', () => {
   it('keeps its promises on the access-controlled building too', async () => {
     const secure = at(await liveness(), 'destination-panel', 'secure-tower');
     expect(secure.panel.passengerModel).toBe('destination-dispatch');
-    expect(secure.panel.promisedLegs).toBe(secure.panel.legs);
+    /*
+     * **Every leg the panel could see** — § D266's term, added rather than the equality relaxed.
+     * The building turns a handful of riders away for want of a credential before any car is
+     * dispatched, so they never reach a landing queue and no panel is ever asked about them. The
+     * count is asserted to be real and non-zero below, so this cannot be satisfied by a run in
+     * which the panel quietly stopped promising anybody.
+     */
+    expect(secure.panel.refusedLegs).toBeGreaterThan(0);
+    expect(secure.panel.promisedLegs).toBe(secure.panel.legs - secure.panel.refusedLegs);
     expect(secure.panel.wrongCarBoardings).toBe(0);
     // D30/T16-D2: the panel is what authorizes, so the credentialled building is served.
     expect(secure.eligibility.decisionsWhollyRefused).toBe(0);

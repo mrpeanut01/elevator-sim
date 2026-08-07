@@ -273,9 +273,18 @@ describe.each(BUILDING_IDS)('%s — the per-leg array (schema 3)', (buildingId) 
     // array. They are built by different code, so agreement is evidence.
     const { recording } = recordRun(breadthConfig(config, buildingId));
     const boarded = recording.legs.filter((leg) => leg.boardedAt !== undefined).length;
+    /*
+     * **A rider the building turned away is in the leg array and in no queue** — `DECISIONS.md`
+     * § D266. They are a `VizLeg` because the run must be able to name them (`access/lockedOut.ts`
+     * is what names them), and they never join a landing, so the fold that counts *who is standing
+     * there* correctly leaves them out. Netting the term out here is what keeps this an agreement
+     * between two projections rather than a demand that they be the same projection. Zero on the
+     * three shipped buildings that declare no `accessZones`.
+     */
+    const refused = recording.legs.filter((leg) => leg.refusedAt !== undefined).length;
     expect(stepValueAt(recording.progress.boardedLegs, recording.endedAt)).toBe(boarded);
     expect(stepValueAt(recording.progress.waiting, recording.endedAt)).toBe(
-      recording.legs.length - boarded,
+      recording.legs.length - boarded - refused,
     );
   }, 300_000);
 
@@ -332,6 +341,7 @@ describe('the passenger model reaches the recording', () => {
       const byId = new Map(result.record.passengers.map((p) => [p.passengerId, p]));
 
       let promised = 0;
+      let refused = 0;
       let wrongCar = 0;
       const destinationsPerLanding = new Map<string, Set<string>>();
       for (const leg of recording.legs) {
@@ -341,6 +351,7 @@ describe('the passenger model reaches the recording', () => {
         expect(leg.assignedCarId).toBe(source?.assignedCarId);
         expect(leg.destinationFloorId).not.toBe(leg.originFloorId);
 
+        if (source?.refusedAt !== undefined) refused += 1;
         if (leg.assignedCarId !== undefined) {
           promised += 1;
           if (leg.carId !== undefined && leg.carId !== leg.assignedCarId) wrongCar += 1;
@@ -354,8 +365,16 @@ describe('the passenger model reaches the recording', () => {
       /* Witnesses. `destinationFloorId` is present under both models — it is a fact about the
          passenger — and the promise is present under exactly one of them. */
       if (dispatcherId === PANEL_DISPATCHER_ID) {
+        /*
+         * **Every leg the panel could see** — `DECISIONS.md` § D266's term, added rather than the
+         * equality relaxed. A leg the building turned away for want of a credential never reached a
+         * landing queue, so no panel was ever asked about it and no promise could have been made;
+         * `core`'s own `#reconcile` nets the same term out of the same identity. Zero on the three
+         * shipped buildings that declare no `accessZones`, which is why the four zoned ones are the
+         * only rows this changes.
+         */
         expect(promised, 'every leg of a Level-1 run is promised a car').toBe(
-          recording.legs.length,
+          recording.legs.length - refused,
         );
       } else {
         expect(promised, 'a conventional run promises nobody').toBe(0);

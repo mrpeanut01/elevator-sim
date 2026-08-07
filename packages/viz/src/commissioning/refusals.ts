@@ -47,6 +47,9 @@ import {
 } from '@elevator-sim/core/browser';
 
 import {
+  CAPITAL_UNITS_PER_MPS,
+  CAPITAL_UNITS_PER_RATED_RISE_M,
+  CAPITAL_UNITS_PER_SHAFT,
   asBuiltChoices,
   budgetFor,
   capitalOf,
@@ -525,12 +528,54 @@ function messageOf(error: unknown): string {
  * -------------------------------------------------------------------------- */
 
 /**
+ * What a capital unit is, and what moves it — issue #24.
+ *
+ * The report: *"Nowhere on this screen (or anywhere I could find in the app) is it explained what
+ * one capital unit corresponds to in-world … how changing shafts, machine class, or rated speed will
+ * move the figure, before you commit … what happens if a chosen configuration exceeds the
+ * allowed capital."* Three questions, and the module knew all three answers and printed none of
+ * them: a player could only find the price list by trial and error, on a screen whose controls did
+ * not respond (issue #42).
+ *
+ * **It says plainly that a unit is not money, because it is not.** `choices.ts` is explicit — *"it
+ * is not currency, it is not a measurement of anything real, it does not convert to energy or to
+ * time"* — and copy that implied a real-world cost would be inventing an engineering claim the
+ * reference data does not make. What it *is* is a monotone index over the three dimensions, and
+ * saying exactly that is both honest and enough to reason with.
+ *
+ * **The figures are interpolated from the constants rather than written out**, so the legend cannot
+ * drift from the arithmetic it describes — this repository's *pin a published number to the code
+ * that produces it* rule, at the smallest possible scale. A hand-typed `100` here would be wrong the
+ * first time `CAPITAL_UNITS_PER_SHAFT` moved, and nothing would have noticed.
+ *
+ * Vocabulary is constrained: `budget.test.ts` scans every string this module can print for
+ * comparative and scoring words and for the name of any run metric it must never stand beside. That
+ * is why this says *costs more* and never *worse*, and carries no percentage.
+ */
+function capitalLegend(): string {
+  return (
+    `A capital unit is this game’s own index of fabric rather than money: a shaft costs ` +
+    `${String(CAPITAL_UNITS_PER_SHAFT)} before anything is hung in it, and the machine in it adds ` +
+    `${String(CAPITAL_UNITS_PER_MPS)} for each m/s of rated top speed plus ` +
+    `${String(CAPITAL_UNITS_PER_RATED_RISE_M)} for each metre of rise its class is built to climb. ` +
+    `More shafts, faster cars and a taller-rated class each commit more. Choose past what the ` +
+    `constraint allows and the configuration is refused by name, never quietly trimmed to fit.`
+  );
+}
+
+/**
  * The constraint's one sentence about this configuration.
  *
  * A statement of a limit and of what was chosen against it — never a comparison with another
  * player, another configuration, or anything a run produced. There is no percentage of budget here
  * and there is no place to put one: `budget.test.ts` asserts that on the strings and on the report
  * shapes, for the reason `types.ts` gives at length.
+ *
+ * {@link capitalLegend} rides on every branch, including the refusing one. The screen has exactly
+ * three notice slots and this is the only one this module owns, and a legend a player can only see
+ * when nothing is wrong is a legend missing from the moment they most need it — *what happens if I
+ * exceed the allowance* is issue #24's third question, and the refusing arm is where it is being
+ * answered.
  */
 function sentenceFor(
   constraint: CapitalConstraint,
@@ -542,19 +587,20 @@ function sentenceFor(
   if (refusals.length > 0) {
     return (
       `${String(refusals.length)} thing${refusals.length === 1 ? '' : 's'} in this configuration ` +
-      `cannot be built as chosen. The week does not open until each is answered.`
+      `cannot be built as chosen. The week does not open until each is answered. ${capitalLegend()}`
     );
   }
   if (moved.length === 0) {
     return (
       `${constraint.label}: the building opens the week exactly as it stands, committing ` +
-      `${String(capitalUnits)} of the ${String(budgetUnits)} capital units allowed. ${constraint.note}`
+      `${String(capitalUnits)} of the ${String(budgetUnits)} capital units allowed. ` +
+      `${constraint.note} ${capitalLegend()}`
     );
   }
   return (
     `${constraint.label}: ${String(moved.length)} change${moved.length === 1 ? '' : 's'} to the ` +
     `fabric, committing ${String(capitalUnits)} of the ${String(budgetUnits)} capital units ` +
-    'allowed. The week runs on this building for all seven days.'
+    `allowed. The week runs on this building for all seven days. ${capitalLegend()}`
   );
 }
 
