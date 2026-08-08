@@ -21291,3 +21291,73 @@ requirement is written about.
 reported rather than quietly fixed, because a corpus that grows an axis and stays green is a
 different claim from one that grew an axis and had to be fixed first.
 
+
+## D301 — Casual's mass-market draw is the depth made legible, not the depth removed
+
+**Date: 2026-08-08 · The product owner's design thesis for Casual, and it inverts the usual one.**
+
+[§ D299](#d299) established that Casual carries full capability. This states *why that is the
+commercial argument rather than a constraint on it*:
+
+> **The mass-market draw is the non-dumbification of the settings and parameters — finding a way to
+> make them understandable and playable by the masses, trying different things and increasing
+> scores.**
+
+### 1. What this rejects
+
+The default move for a "casual mode" is subtraction: fewer controls, rounder numbers, a curated
+subset. Every issue in the #90–#119 backlog that touches Casual assumes it —
+[#110](https://github.com/mrpeanut01/elevator-sim/issues/110) proposes the thirteen dispatchers
+*become* four or five play styles, and [#100](https://github.com/mrpeanut01/elevator-sim/issues/100)
+reads as "hide AWT". **Both are refused.** A subtracted Casual would be a worse version of a product
+whose entire value is that it is not approximate — and it would compete with a hundred lighter sims
+on their ground rather than on its own.
+
+The thesis is the opposite: **the depth is the product, and the design work is comprehension.**
+`bypassLoadThreshold` does not become a slider called *Speed*. It becomes a control whose effect a
+player can see, name, and want to move again.
+
+### 2. What this makes the work
+
+Not simplification. **Legibility, and a fast loop between a change and its consequence.** Four
+things, in this order:
+
+1. **Naming.** Every parameter says what it *does to the building*, not what it is called in the
+   engine. The rail currently describes all thirteen dispatchers as camelCase engine identifiers —
+   *"1 of 13 terms weighted; heaviest `waitTime` 1.00"* — and nowhere says what any of them does
+   differently to a queue.
+2. **Cause and effect, visible.** A player moves one thing and sees what it did. This is the
+   product's own standing requirement — *move the control and require the run to change* — turned
+   from a test into a feature.
+3. **A score that moves and is understood.** *Trying things and increasing scores* is the loop, and
+   it needs a number that responds, is comparable run to run, and whose movement is attributable.
+4. **Low friction to try.** The current loop is change → save → navigate → run → an ambiguous
+   number. Every step removed is a hypothesis a player will actually test.
+
+### 3. The convergence, which is the useful discovery
+
+**Casual's mass-market work and Engineer's playability work are largely the same work**, and this is
+what makes the two-product decision affordable rather than a doubling.
+
+Making cause and effect legible is what
+[#92](https://github.com/mrpeanut01/elevator-sim/issues/92) asks for (a *Run this* and an inline
+delta), what [#117](https://github.com/mrpeanut01/elevator-sim/issues/117) and
+[#102](https://github.com/mrpeanut01/elevator-sim/issues/102) ask for (a *what moved* panel that
+compares comparable runs), and what
+[#119](https://github.com/mrpeanut01/elevator-sim/issues/119) asks for (draw the interval instead of
+describing it in seven hundred words). **A practitioner tuning a weight vector wants exactly what a
+newcomer trying things wants: to see what changed and why.** They differ in vocabulary and in how
+much is on screen at once — not in what the loop is.
+
+So those four issues are built **once**, for both products, and § D299 § 1's test governs:
+*a change may make Engineer easier to use; it may not make it say less.*
+
+### 4. What must not be traded away for it
+
+The honesty. A score that responds to everything is easy to build and is a lie; this product's
+suppression rules exist because *"increasing lift speed appearing to increase average waiting time"*
+is the documented failure mode of the whole field. **A Casual score may be simpler to read and may
+not be less true.** Where one run cannot support a claim, Casual says so in its own words rather
+than saying something weaker that sounds stronger — and the words are the design work, not an
+exemption from it.
+
