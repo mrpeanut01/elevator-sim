@@ -21361,3 +21361,94 @@ not be less true.** Where one run cannot support a claim, Casual says so in its 
 than saying something weaker that sounds stronger — and the words are the design work, not an
 exemption from it.
 
+
+## D302 — the competitive loop was three client-side omissions, and none was the fix either issue named
+
+**Date: 2026-08-08.** Issues [#112](https://github.com/mrpeanut01/elevator-sim/issues/112),
+[#113](https://github.com/mrpeanut01/elevator-sim/issues/113), and
+[#101](https://github.com/mrpeanut01/elevator-sim/issues/101) folded in.
+
+**#113 § 2's inference is wrong, and the truth is cheaper.** It reported custom dispatchers
+vanishing on reload and inferred two storage paths from the custom *building* surviving. There is
+**one writer** and **one reader** for all four shelves; the defect is *when*. `saveSessionNow` had
+two call sites and neither was a save button, so a dispatcher saved via *"Save it and run it"*
+survived — that runs a shift, which closes a day, which writes — and one saved via *"Save as a new
+dispatcher"* did not.
+
+`MountContext.update` now persists on a patch touching a library shelf, keyed on
+`patchTouchesLibrary`, **which reads the same table `libraryOf` does** — so a fifth shelf cannot be
+added to the library without also being watched for saves. The two facts cannot disagree because
+they are one table. **No debounce, and that was measured rather than assumed:** the shelf keys are
+written from seven sites, none on an input handler, while the hot patches (`dispatcherSpec`,
+`buildingSpec`, `levers`) touch no shelf. The predicate *is* the debounce. A **seventh write outside
+the choke point** was found doing it — `adoptEditedBuilding` assigns `state` directly because the
+JSON editor returns a whole `BuildingConfig` — and now saves itself.
+
+**#112's posted score returned 201 while the screen said *"No scores have been posted yet."*** A
+one-shot latch, never reset, plus a `submitScore` that did not refetch. Both closed — and **the
+identical latch on the challenge fetch went with them, with a worse consequence**: `state`,
+`opensInMs` and `closesInMs` are *server* measurements, so a challenge that opened while the reader
+was elsewhere stayed drawn as *not open yet* until reload — a **stopped countdown**, on the one
+screen [§ D218](#d218) § 3 forbids the client to compute one on.
+
+The optimistic insert #112 asks for was **declined with a reason**: the board a row belongs on is
+keyed by a digest the *server* computes over the run and its loaded `data/`, which the browser does
+not compute. Splicing would be guessing which board, and **a row on the wrong board is worse than a
+row a round-trip late.**
+
+**And `ChallengeBoardPage.entries` was fetched, threaded to the view model, and read by no
+renderer** — so *Order the board on* fired a real re-fetch whose only visible effect was a
+sentence's wording. That is the inert-control defect arriving from the **rendering** end rather than
+the state end. It survived because the document tier's fixture passed `challenge: () => undefined`
+for every case: **a screen nobody renders draws whatever it likes**, which is the standing
+requirement's blind spot restated for tests.
+
+## D303 — two editors disagreeing about Save is one defect, and the one that moves is the one whose indirection is not load-bearing
+
+The dispatcher editor's Save selected what it filed; the building editor's did not, so *"Save as a
+new building"* left the next run on the **old** building — the exact false negative the standing
+requirement exists to catch. Both were defensible alone, which is why the defect is the
+*disagreement*.
+
+The building editor's selection goes through `stateRunningSaved`, whose docstring documents a
+**week-contract forgery** a bare `buildingId` write reintroduces — a drawn tower banked against a
+real scenario assignment. That indirection is load-bearing, so the **dispatcher editor moved to its
+shape rather than the building editor moving to a bare write**: Save files it and says so in a
+`role="status"` line, and a second named verb carries the whole selection. A test asserts the
+building editor still has **no** bare `buildingId` write, so a later "fix" in the wrong direction
+goes red.
+
+That independently closes #113 § 3's *"each save auto-selects, so repeatedly pressing Save silently
+changes who is driving"*. Save now refuses empty and duplicate names, case- and space-folded against
+shipped **and** saved profiles, before minting an id; rename keeps the id, because `dispatcherId`,
+recordings and the challenge select all hold it.
+
+**#113 § 5's "read-only" is too weak, in a way the issue did not reach.** Copying an auction,
+zoning or destination profile round-trips its mechanism block **silently** — the reader gets a
+multi-round auction back without the word *auction* appearing anywhere. The panel now says a
+profile carries blocks it cannot author. § D227's rule, pointed at the gap between what a document
+holds and what a panel can reach.
+
+## D304 — a rate limit is only as good as the premise in its docstring
+
+`LINKS_PER_EMAIL` was three, justified by *"an address may have three unexpired links
+outstanding"*. **Against a client that holds its session token in memory by choice
+([§ D257](#d257)'s neighbour decision, unchanged here), that premise is false**: a reload spends the
+*session*, not the link — the link is already `DELETE`d by `consumeLoginToken` — so the budget is a
+**reload budget**, and three locked a player out of their own account on the third reload inside a
+quarter hour. Compounded by issue #106, where the first sign-in click was always swallowed, so
+reloading is exactly what a player did.
+
+Raised to ten. `LINKS_PER_CALLER` is untouched at thirty, so one sender's **total** output does not
+move; what rises is distributed concentration on a single victim, 12/hr → 40/hr, and that is stated
+in the docstring rather than waved at.
+
+**The right fix is not this number, and it is filed rather than done.** A *redeemed* link is not
+outstanding, so redemption should hand its budget back — unattackable without reading the victim's
+mail, and zero cost to the bound. It needs a release on `FixedWindowLimiter`, and inlining a second
+fixed-window counter beside the one next door would be two implementations of one policy.
+
+The two tests that pinned the old number were rewritten to pin **that there is a low ceiling**,
+looping until refused. A test that fails whenever a bounded policy is retuned trains its reader to
+edit the assertion, which is how a bound stops meaning anything.
+
