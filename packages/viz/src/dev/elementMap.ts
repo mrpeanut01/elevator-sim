@@ -805,6 +805,8 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     seed: 'batch-seed',
     replications: 'batch-replications',
     demand: 'batch-demand',
+    // Which point of the building's own declared arrival-rate band a batch runs at — issue #119.
+    demandLevel: 'batch-demand-level',
     run: 'batch-run',
     cancel: 'batch-cancel',
     progress: 'batch-progress',

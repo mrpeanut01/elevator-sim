@@ -38,6 +38,7 @@
  */
 
 import type {
+  DemandLevel,
   DispatcherProfiles,
   ElevatorSpecs,
   ResolvedBuilding,
@@ -226,6 +227,27 @@ export interface BatchRequest {
    * the estimate half of the batch is unreachable from the viewer on that building.
    */
   readonly arrivalRatePctPop5min: number | null;
+  /**
+   * Which point of the profile's own declared `arrivalRatePctPop5min` band to run at — issue #119.
+   *
+   * `undefined` is core's own `TRAFFIC_DEFAULTS.demandLevel`, which is `typical`, so a request that
+   * omits this is byte-identical to every batch run before this field existed.
+   *
+   * **It is a level rather than a second number because a number would have been invented and this
+   * is authored.** Every profile in `data/traffic-profiles.json` declares `{ min, typical, max }`;
+   * `min` is a point the reference data already states, *per building*, so it survives the panel
+   * inheriting a building other than the one it was chosen at — which a demand of *"15 %"* picked
+   * at Chancery House would not.
+   *
+   * {@link arrivalRatePctPop5min} beats it, and that ordering is core's rather than this file's:
+   * `traffic/generator.ts` reads `config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[level]`.
+   * A typed number therefore wins, and this is what a blank demand field means.
+   *
+   * On the request and not the arm, for the reason {@link arrivalRatePctPop5min} gives: it is a
+   * field the passenger trace is a function of, so two arms at different levels are two
+   * populations. `traceKeyOf` reads it, so it is part of the equivalence class the report prints.
+   */
+  readonly demandLevel?: DemandLevel | undefined;
 }
 
 /** The resolved objects a batch needs. Assembled by the caller; never fetched here. */
@@ -336,6 +358,13 @@ export interface BatchResult {
   readonly seed: string;
   readonly durationS: number;
   readonly arrivalRatePctPop5min: number | null;
+  /**
+   * The band point the batch ran at — carried so `batchReport`'s demand clause can name it.
+   *
+   * Optional for the same reason the request's is: a result recorded before this field existed
+   * reads as `undefined`, which is core's `typical`, which is what it ran at.
+   */
+  readonly demandLevel?: DemandLevel | undefined;
   readonly arms: readonly BatchArmResult[];
   readonly crn: BatchCrnAudit;
   /** Wall-clock milliseconds the batch took, from the injected clock. Diagnostic only. */
