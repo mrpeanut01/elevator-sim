@@ -23,12 +23,28 @@
  *    the run to change* requirement, pointed at a display: a cost line that did not move when
  *    `replications` did would be a number that looks right and means nothing.
  *
+ * 5. **The interval is drawn** — GitHub issue #119, and the reason this file's scope moved. *"This
+ *    is a product whose central claim is a confidence interval that excludes zero, and it never
+ *    draws one."* A drawn bar is a DOM node with a class and a position, so nothing under Node can
+ *    see it: `batch/intervalPlot.ts` is unit-tested against `intervalContainsZero`, and whether the
+ *    geometry it returns ever reaches the page is a claim only this tier can make.
+ *
  * ## What it deliberately does not claim
  *
  * § D220 § 4 forbids a browser test asserting a metric, a mean or any number the honesty search
- * and the replay harness already own. Nothing here runs a batch or reads a figure — every
- * assertion is about text and control state on a page that has computed nothing. There is no
- * screenshot, for § D220's reason: a pixel diff fails on a font hint and is repaired by
+ * and the replay harness already own, and that rule is kept exactly. What has changed is the
+ * sentence that used to sit beside it: the last two blocks **do** run a batch — the shipped
+ * default, and a two-replication one at a load the building cannot cope with — because there is no
+ * other way to put a report on the page, and a drawn interval cannot be asserted on a panel that
+ * has computed nothing.
+ *
+ * **Not one assertion below reads a value.** No mean, no bound, no count, no verdict text: what is
+ * checked is that a row with an interval has a bar, that the bar's class matches the row's own
+ * refusal, that the zero line is inside the plot, and that the prose the disclosure now hides is
+ * still on the page in full. Every one of those is a fact about the *rendering*, and every one of
+ * them is false in a way no Node test can see.
+ *
+ * There is no screenshot, for § D220's reason: a pixel diff fails on a font hint and is repaired by
  * re-baselining, which is a control that trains its owner to override it.
  */
 
@@ -282,4 +298,243 @@ describe.skipIf(!HAS_BROWSER)('the Lab does not open on an unwinnable run', () =
     expect(status).toContain('control run');
     expect(status).toContain('cannot be reached');
   });
+});
+
+/* ========================================================================== *
+ * The interval, drawn — GitHub issue #119
+ * ========================================================================== */
+
+/**
+ * Run a batch and wait for **that** batch's report to land.
+ *
+ * The wait is on `#batch-status`, and it names the replication count on purpose. Waiting for the
+ * word *"the answer"* in `#batch-output` was the first draft and it is wrong in the way that
+ * matters: after the first batch the phrase is already on the page, so the predicate is satisfied
+ * by the **previous** report and every assertion after it reads a stale DOM. Found by driving —
+ * the suppressed-batch block passed its wait instantly and then asserted against a report from a
+ * different configuration.
+ *
+ * The demand is a parameter because the two shapes this file needs are on either side of the
+ * complete-case rule: blank runs the shipped band point and every pair stands behind a mean; `40`
+ * is a load Chancery House does not cope with, and all three wait rows suppress. The counts differ
+ * between the two calls, which is what makes the status line unambiguous.
+ */
+async function runBatchOf(replications: string, demand: string): Promise<void> {
+  await openTab('tab-compare');
+  /*
+   * The building is named rather than left alone, and the reason is the test above this one: the
+   * panel now inherits the building the player is on, so *"whatever Compare opens on"* is a
+   * property of the scenario the harness started and not of this file. Which building the shipped
+   * default runs is `batch/shippedDefault.test.ts`'s claim; this block's claim is about drawing,
+   * and it needs a report with every kind of row on it.
+   */
+  await page.selectOption('#batch-building', 'chancery-house');
+  /*
+   * The seed and the horizon are named for the same reason the building is, and this one was found
+   * by driving rather than reasoned about: the panel inherits **all three** from the shell, so a
+   * batch run here was landing on the scenario's own seed and shift length and producing a
+   * different set of rows from the one measured. Pinning them is not a workaround — it is what
+   * makes the assertions below about the drawing rather than about whichever scenario the harness
+   * happened to start.
+   */
+  await page.fill('#batch-seed', '20260729');
+  await page.fill('#batch-duration', '900');
+  await page.fill('#batch-replications', replications);
+  await page.fill('#batch-demand', demand);
+  await page.click('#batch-run');
+  await page.waitForFunction(
+    (needle: string) =>
+      (document.querySelector('#batch-status') as HTMLElement | null)?.textContent?.includes(needle) === true,
+    `${replications} replications per arm in`,
+    { timeout: 120_000 },
+  );
+}
+
+describe.skipIf(!HAS_BROWSER)('the interval reaches the page', () => {
+  afterAll(async () => {
+    if (!HAS_BROWSER) return;
+    // The rest of this file reads the shipped defaults. Put them back.
+    await page.fill('#batch-replications', '50');
+    await page.fill('#batch-demand', '');
+  });
+
+  it('opens on the building the player is on, not on the first one in the file', async () => {
+    /*
+     * **Issue #119 item 4, and the defect was worse than the issue reported.** *"Playing Garden
+     * Apartments, opening Compare offers Chancery House."* `mountBatchPanel` has returned a handle
+     * with a `prefill` since it was written and `options.inherit` reads the viewer's live building
+     * — and **nothing in the tree called either**. A behaviour wired at one end and called from
+     * nowhere is `docs/05`'s standing requirement exactly, and it is why the rule is *name the
+     * non-test caller* rather than *is it reachable*.
+     *
+     * The harness starts *Scenarios → Open the doors*, whose building is Garden Apartments, so
+     * that is what a player on this page is looking at and what Compare has to offer. Asserted
+     * against the shell's own state rather than against the string, so a re-authored opening
+     * scenario moves both sides together instead of leaving this pinning a stale id.
+     *
+     * It runs **first** in this block, because the batches below name a building of their own.
+     */
+    await openTab('tab-compare');
+    const [inherited, running] = await page.evaluate(() => [
+      (document.querySelector('#batch-building') as HTMLSelectElement).value,
+      (document.querySelector('#pick-building') as HTMLSelectElement).value,
+    ]);
+    expect(running, 'the shell is not running any building, so there is nothing to inherit').not.toBe('');
+    // The shell's own picker names what the player is running; Compare must offer the same one.
+    expect(inherited).toBe(running);
+  }, 180_000);
+
+  it('draws one bar per row that has an interval, and none for a row that has not', async () => {
+    /*
+     * **The shipped default, at its shipped replication count.** A cheaper two-replication batch
+     * was the first draft and it does not reach the states this block is about: at n = 2 every
+     * interval is wide enough to contain zero, so nothing draws a filled bar and the distinction
+     * the plot exists to make is untested. Measured, not assumed — the run at 50 is about four
+     * seconds and produces all three bar states at once.
+     */
+    await runBatchOf('50', '');
+    const drawn = await page.evaluate(() => {
+      const figures = [...document.querySelectorAll('#batch-output .figure')];
+      return figures
+        .filter((figure) => figure.querySelector('.iv') !== null)
+        .map((figure) => ({
+          bars: figure.querySelectorAll('.iv-bar').length,
+          zeros: figure.querySelectorAll('.iv-zero').length,
+          means: figure.querySelectorAll('.iv-mean').length,
+        }));
+    });
+    // Eight metrics, every one of which has an interval on a batch that suppressed nothing.
+    expect(drawn.length).toBe(8);
+    for (const figure of drawn) {
+      expect(figure).toEqual({ bars: 1, zeros: 1, means: 1 });
+    }
+  }, 180_000);
+
+  it('positions every mark inside its own plot, zero line included', async () => {
+    /*
+     * The failure this catches is the one a unit test cannot: `intervalPlotFor` returns fractions
+     * and something has to turn them into `left`/`width`. A percentage written without its `%`, or
+     * a `NaN` from a degenerate interval, lands the bar off the panel and the page still renders.
+     */
+    const marks = await page.evaluate(() =>
+      [...document.querySelectorAll('#batch-output .iv-track')].flatMap((track) =>
+        [...track.children].map((child) => ({
+          className: (child as HTMLElement).className,
+          left: (child as HTMLElement).style.left,
+          width: (child as HTMLElement).style.width,
+        })),
+      ),
+    );
+    expect(marks.length).toBeGreaterThan(0);
+    for (const mark of marks) {
+      expect(mark.left, mark.className).toMatch(/^\d+(\.\d+)?%$/);
+      const left = Number.parseFloat(mark.left);
+      expect(left, mark.className).toBeGreaterThanOrEqual(0);
+      expect(left, mark.className).toBeLessThanOrEqual(100);
+      if (mark.width === '') continue;
+      expect(mark.width, mark.className).toMatch(/^\d+(\.\d+)?%$/);
+      expect(left + Number.parseFloat(mark.width), mark.className).toBeLessThanOrEqual(100.01);
+    }
+  }, 180_000);
+
+  it('gives a bar that clears zero a different class from one that straddles it', async () => {
+    /*
+     * The whole point of drawing anything. Two rows in the same report, one filled and one hollow,
+     * asserted as *different* rather than as two specific class names — the classes are `index.html`'s
+     * to rename and the distinction is the product's.
+     *
+     * The energy axes clear zero at Chancery House and the wait rows do not, so both states are on
+     * screen at once, which is also what makes the assertion non-vacuous.
+     */
+    const classes = await page.evaluate(() =>
+      [...document.querySelectorAll('#batch-output .iv-bar')].map((bar) => (bar as HTMLElement).className),
+    );
+    const ranked = classes.filter((name) => name.includes('iv-bar-clear'));
+    const axis = classes.filter((name) => name.includes('iv-bar-axis'));
+    const straddle = classes.filter((name) => name.includes('iv-bar-straddle'));
+    expect(ranked.length, 'no bar on this report is a resolved row, so the distinction is untested').toBeGreaterThan(0);
+    expect(axis.length, 'no bar clears zero without ranking, so R11 on the picture is untested').toBeGreaterThan(0);
+    expect(straddle.length, 'no bar on this report contains zero, so the distinction is untested').toBeGreaterThan(0);
+    // Total, so a fourth state cannot arrive unclassified.
+    expect(ranked.length + axis.length + straddle.length).toBe(classes.length);
+  }, 180_000);
+
+  it('says which it is in words as well as in shape — the colour is the second signal', async () => {
+    const captions = await page.evaluate(() =>
+      [...document.querySelectorAll('#batch-output .iv-caption')].map((node) => node.textContent ?? ''),
+    );
+    expect(captions.length).toBe(8);
+    expect(captions.some((text) => text.includes('contains zero'))).toBe(true);
+    expect(captions.some((text) => text.includes('excludes zero'))).toBe(true);
+    // R11 on the picture: the energy rows draw a bar clear of zero and refuse to rank on it.
+    expect(captions.some((text) => text.includes('an axis, so no arm is named ahead'))).toBe(true);
+  }, 180_000);
+
+  it('keeps every word of the prose, behind a disclosure rather than deleted', async () => {
+    /*
+     * *"The statistics are exemplary … Keep every word."* The prose moved into a `<details>`; a
+     * `<details>` keeps its content in the DOM and in a text selection whether it is open or shut,
+     * so this asserts the arithmetic sentence is still there — closed — rather than that it is
+     * visible.
+     */
+    const [summaries, hidden] = await page.evaluate(() => {
+      const details = [...document.querySelectorAll('#batch-output .figure-why')];
+      return [
+        details.map((node) => node.querySelector('summary')?.textContent ?? ''),
+        details.map((node) => node.querySelector('.figure-note')?.textContent ?? ''),
+      ] as const;
+    });
+    expect(summaries.length).toBeGreaterThan(0);
+    // The summary names what it opens. A control labelled only `why` is the defect this panel
+    // already shipped once, as a tab with no verb on it.
+    for (const text of summaries) expect(text).toContain('the arithmetic behind');
+    expect(hidden.some((text) => text.includes('Paired difference'))).toBe(true);
+    expect(hidden.some((text) => text.includes('Student-t at'))).toBe(true);
+    // R11's reason, unabridged and one click away.
+    expect(hidden.some((text) => text.includes('Energy is an axis and never a score'))).toBe(true);
+  }, 180_000);
+
+  it('leads with the answer rather than with the provenance', async () => {
+    const labels = await page.evaluate(() =>
+      [...document.querySelectorAll('#batch-output .figure-label')].map((node) => node.textContent?.trim() ?? ''),
+    );
+    expect(labels[0]).toBe('the answer');
+    // And the provenance is still there, unabridged — this is a reordering, not a deletion.
+    expect(labels).toContain('batch');
+    expect(labels).toContain('common random numbers');
+    expect(labels.indexOf('batch')).toBeGreaterThan(0);
+  }, 180_000);
+});
+
+describe.skipIf(!HAS_BROWSER)('a suppressed batch says what it cost and offers the lever', () => {
+  it('states the drop count up front and makes the remedy clickable', async () => {
+    /*
+     * Issue #119 items 3 and 5. At a load Chancery House does not cope with, all three wait rows
+     * suppress — which is the shape the issue is about — and the two things that were missing are
+     * a count near the top and a button instead of a paragraph.
+     */
+    await runBatchOf('2', '40');
+    const labels = await page.evaluate(() =>
+      [...document.querySelectorAll('#batch-output .figure-label')].map((node) => node.textContent?.trim() ?? ''),
+    );
+    expect(labels[0]).toBe('the answer');
+    expect(labels[1]).toBe('pairs dropped');
+    // Above the eight metric rows, which is the whole of "up front".
+    expect(labels.indexOf('pairs dropped')).toBeLessThan(labels.indexOf('average wait'));
+
+    const button = await textOf('.remedy-button');
+    expect(button, 'the remedy is still only a paragraph').toContain('Drop the load 10 %');
+
+    // …and it writes the field, which is what makes it a control rather than a caption.
+    const before = await page.inputValue('#batch-demand');
+    await page.click('.remedy-button');
+    await page.waitForFunction(
+      (previous: string) => (document.querySelector('#batch-demand') as HTMLInputElement).value !== previous,
+      before,
+      { timeout: 60_000 },
+    );
+    expect(Number(await page.inputValue('#batch-demand'))).toBeCloseTo(Number(before) * 0.9, 5);
+    await page.fill('#batch-replications', '50');
+    await page.fill('#batch-demand', '');
+  }, 180_000);
 });

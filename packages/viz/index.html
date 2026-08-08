@@ -1103,6 +1103,65 @@
       progress { width: 180px; }
       progress[hidden] { display: none; }
 
+      /* ---------------------------------------------------------------------
+         The drawn interval — GitHub issue #119.
+
+         Compare's central claim is a confidence interval that excludes zero and
+         it drew nothing. One bar per measure on a zero line: `dev/batchPanel.ts`
+         positions everything in percentages that `batch/intervalPlot.ts`
+         computed, so nothing here knows a metric or a verdict.
+
+         **The shape carries it, not the colour** — the same rule as KB-15 above.
+         An interval that excludes zero is a *filled* bar with the zero line
+         outside it; one that straddles zero is an *outlined* bar with the zero
+         line drawn through it. Both states are also written under the bar in
+         words. Remove every colour from this block and the two are still
+         distinguishable by whether a line crosses a box.
+         --------------------------------------------------------------------- */
+      .iv { margin: 6px 0 2px; max-width: 46em; }
+      .iv-track {
+        position: relative; height: 18px;
+        border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge);
+        background: var(--bg);
+      }
+      /* The zero line, full height, and drawn over the bar so a straddling
+         interval is visibly *crossed* rather than merely overlapping. */
+      .iv-zero {
+        position: absolute; top: -1px; bottom: -1px; width: 0;
+        border-left: 1px dashed var(--dimmer);
+      }
+      .iv-bar { position: absolute; top: 5px; height: 8px; border-radius: 2px; min-width: 2px; }
+      /* Resolved: the only state this project permits an ordering on. Solid. */
+      .iv-bar-clear { background: var(--accent); }
+      /* R11's axis, and § D171's under-budget interval: measured, clear of zero,
+         and naming no arm. Solid but muted, so it never outranks the row above
+         that earned the right to name one. */
+      .iv-bar-axis { background: var(--dimmer); }
+      /* Contains zero: hollow, so the zero line reads as passing through it. */
+      .iv-bar-straddle { background: transparent; border: 1px dashed var(--dim); }
+      .iv-mean { position: absolute; top: 2px; bottom: 2px; width: 0; border-left: 2px solid var(--text); }
+      .iv-scale {
+        display: flex; justify-content: space-between; gap: 8px;
+        color: var(--dimmer); font: 500 10px var(--mono); margin-top: 2px;
+      }
+      .iv-caption { color: var(--dim); text-align: center; flex: 1; }
+      .iv-caption-clear { color: var(--text); }
+
+      /* The ~700 words, behind a disclosure and not deleted — issue #119 item 1.
+         `<details>` keeps its text in the accessible tree and in a selection
+         whether it is open or shut, which is why it is this and not a tooltip. */
+      .figure-why { margin-top: 4px; }
+      .figure-why > summary {
+        cursor: pointer; color: var(--dimmer);
+        font: 500 10.5px var(--mono); letter-spacing: 0.04em;
+      }
+      .figure-why > summary:hover { color: var(--text); }
+      .figure-why .figure-note { margin-top: 4px; }
+
+      /* The remedy, as a control — issue #119 item 5. */
+      .figure-remedy { margin: 6px 0 0; }
+      .remedy-button { font-size: 11px; padding: 3px 8px; }
+
       /* docs/10 § 11 W4 — the generated parameter form. Keyed on a class the renderer
          emits for *every* control, never on a parameter id. */
       .control { padding: 6px 0; border-bottom: 1px solid var(--edge); }
@@ -2270,8 +2329,26 @@
               <label title="50–200 replications per configuration is this project’s budget; ten produced a 12 % error against the converged mean in the reference study">
                 replications <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
               </label>
-              <label title="blank runs the building's own traffic profile">
+              <label title="blank runs the building's own traffic profile at the band point beside it">
                 demand %pop/5&nbsp;min <input id="batch-demand" size="4" inputmode="decimal" placeholder="profile" />
+              </label>
+              <!--
+                Which point of the building's own declared arrival-rate band to run at — issue #119.
+
+                It opens on `min`, and the grounds are in `dev/batchPanel.ts`'s `demandLevelRow`:
+                a criterion written before any interval was looked at — the largest rate at which
+                all 50 paired replications stand behind a mean on both reference arms — swept 16 to
+                3 and selected 15, which is `office-prestige`'s own declared minimum. A *level* and
+                not the number 15, because every profile declares a band and a level survives this
+                panel being pointed at a different building.
+              -->
+              <label title="which point of the building's own declared arrival-rate band to run at; the demand field overrides it">
+                traffic band
+                <select id="batch-demand-level">
+                  <option value="min" selected>min</option>
+                  <option value="typical">typical</option>
+                  <option value="max">max</option>
+                </select>
               </label>
               <button id="batch-run">Run batch</button>
               <button id="batch-cancel">Cancel</button>

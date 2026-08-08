@@ -116,6 +116,17 @@ export interface BatchComparisonRow {
   readonly pairs: number;
   /** Pairs the batch ran. Equal to {@link pairs} on every row that carries a number. */
   readonly totalPairs: number;
+  /**
+   * Pairs the complete-case rule dropped: at least one arm's own summary refused to quote a mean.
+   *
+   * On the row rather than derived at the reader — issue #119, whose finding is that the count was
+   * *"four paragraphs down"* in a note nobody reaches. A caller cannot lead with a number it has to
+   * parse out of a sentence, and re-deriving it from `totalPairs - pairs` would be wrong on an
+   * `unmeasured` row, where the pairs went for the other reason.
+   */
+  readonly suppressedPairs: number;
+  /** Pairs on which the quantity was never measured. Distinct from {@link suppressedPairs}. */
+  readonly unmeasuredPairs: number;
   /** The reader's sentence. Carries its `n`, and contains no probability word. */
   readonly sentence: string;
   /** Why, in the same register. Never a tooltip; the mount draws it. */
@@ -196,6 +207,43 @@ export interface BatchOutcomeSummary {
   readonly underBudget: readonly BatchMetric[];
   /** The count and the routing, in one sentence. Never a winner. */
   readonly sentence: string;
+  /**
+   * The batch's disposition as an **answer**, in the first line a reader meets — issue #119.
+   *
+   * The finding this closes is not that the surface was wrong; it is that *"zero of eight produced
+   * a usable verdict"* was rendered as an inventory of failures — *3 came back with an interval
+   * containing zero; 3 could not be compared at all* — when two of those three states are answers.
+   * *These two are indistinguishable at n = 50* is a result. *This load saturates one setting and
+   * not the other* is a result. Neither had a sentence that said so first.
+   *
+   * Strictly weaker than {@link sentence}, which is itself strictly weaker than the rows: it is a
+   * projection of the same verdict counts, it names no arm, and there is no path by which it can
+   * assert something the rows do not. R10 holds here as everywhere — no probability word appears in
+   * any branch, and `report.test.ts` sweeps this field with the rest.
+   */
+  readonly answer: string;
+  /**
+   * *"1 of 50 pairs dropped — one arm's own summary refuses to quote a mean"*, or `null`.
+   *
+   * Issue #119 item 3: the count belongs at the top rather than inside a 90-word note under the
+   * third row that lost it. Names the measures it cost, so the reader is not left to work out which
+   * three rows the drop emptied.
+   */
+  readonly droppedSentence: string | null;
+  /**
+   * What a batch with no quotable mean **can** still say, when the arms diverged at different rates.
+   *
+   * This is `packages/cli/src/commands/compare.ts`'s framing, which that surface has printed since
+   * it was written and this one never had: *"A diverges at this load and B does not. That is a
+   * finding about capacity, and it does not need a mean to be true."* It is an observation over
+   * runs — R1's `observation` class, not `estimate` — so the complete-case rule that empties the
+   * three wait rows does not touch it, and it is the single most useful thing a saturated batch has
+   * to report.
+   *
+   * `null` when the two arms lost the same number of runs, because then there is no divergence to
+   * report and a sentence would be manufacturing one.
+   */
+  readonly capacityFinding: string | null;
   /** What to do about the rows that said nothing, or `null` when every row spoke. */
   readonly remedy: string | null;
 }
@@ -301,10 +349,7 @@ export function batchReport(result: BatchResult): BatchReport {
     seed: result.seed,
     durationS: result.durationS,
     replications,
-    demandClause:
-      result.arrivalRatePctPop5min === null
-        ? "at the building's own traffic profile"
-        : `at ${String(result.arrivalRatePctPop5min)} % of population arriving per 5 minutes`,
+    demandClause: demandClause(result),
     crnSentence: crnSentence(result),
     traceKey: result.crn.traceKey,
     budgetNote: budgetNote(replications),
@@ -327,10 +372,41 @@ function reportText(report: Omit<BatchReport, 'glossary'>): readonly string[] {
   const texts = [report.demandClause, report.crnSentence, report.budgetNote ?? ''];
   for (const arm of report.arms) texts.push(arm.sentence, ...arm.reasons);
   for (const comparison of report.comparisons) {
-    texts.push(comparison.summary.sentence, comparison.summary.remedy ?? '');
+    texts.push(
+      comparison.summary.sentence,
+      comparison.summary.answer,
+      comparison.summary.droppedSentence ?? '',
+      comparison.summary.capacityFinding ?? '',
+      comparison.summary.remedy ?? '',
+    );
     for (const row of comparison.rows) texts.push(row.label, row.sentence, row.note);
   }
   return texts;
+}
+
+/**
+ * What demand the batch ran at, in words — and it now has to name the **band point**.
+ *
+ * A typed rate beats the level, which is core's own precedence rather than this file's
+ * (`config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[level]`), so the two are never
+ * printed together: a clause naming both would tell a reader the level mattered when it did not.
+ *
+ * `undefined` prints exactly the string this clause printed before the level existed, because
+ * `undefined` **is** what every batch before it ran at — core's `TRAFFIC_DEFAULTS.demandLevel` is
+ * `typical` — and a provenance line that changed under a batch whose configuration did not would
+ * be the published-number defect with words instead of digits.
+ */
+function demandClause(result: BatchResult): string {
+  if (result.arrivalRatePctPop5min !== null) {
+    return `at ${String(result.arrivalRatePctPop5min)} % of population arriving per 5 minutes`;
+  }
+  if (result.demandLevel === undefined) return "at the building's own traffic profile";
+  return (
+    `at the ${result.demandLevel} of the building's own traffic profile — the ` +
+    `${result.demandLevel === 'typical' ? 'middle' : result.demandLevel === 'min' ? 'lightest' : 'heaviest'} ` +
+    'arrival rate that profile declares, which is a point of the reference data rather than a ' +
+    'number chosen here'
+  );
 }
 
 function budgetNote(replications: number): string | null {
@@ -502,6 +578,8 @@ function compareMetric(
     label: presentation.label,
     metricClass,
     totalPairs,
+    suppressedPairs: pairing.suppressedPairs,
+    unmeasuredPairs: pairing.unmeasuredPairs,
   } as const;
 
   if (!result.crn.aligned) {
@@ -795,8 +873,96 @@ function summarise(
     sentence:
       `${candidate.dispatcherProfileName} against ${baseline.dispatcherProfileName}, over ` +
       `${runs(pairs)} on the same passengers. Of ${String(total)} measures, ${clauses.join('; ')}.`,
+    answer: answerFor({ resolved, unresolved, underBudget, shown, pairs }),
+    droppedSentence: droppedSentenceFor(rows),
+    capacityFinding: capacityFindingFor(baseline, candidate),
     remedy: remedyFor(suppressed.length > 0, unresolved.length > 0, pairs),
   };
+}
+
+/**
+ * The disposition, as an answer — the first line the panel draws. See {@link BatchOutcomeSummary.answer}.
+ *
+ * Three branches and one ordering, and the ordering is the design. A batch that separated on any
+ * measure is *about* that separation, and the rows carry it. A batch that separated on none but
+ * drew intervals has an answer — *indistinguishable at this n* — which is the case the surface
+ * used to render as three shades of failure. A batch that drew no interval at all has neither, and
+ * says so plainly rather than dressing an absence up as a result.
+ *
+ * What no branch does is name an arm, or count *how many* measures went the candidate's way. The
+ * rows own the direction, under the one gate the project permits.
+ */
+function answerFor(input: {
+  readonly resolved: readonly BatchMetric[];
+  readonly unresolved: readonly BatchMetric[];
+  readonly underBudget: readonly BatchMetric[];
+  readonly shown: readonly BatchMetric[];
+  readonly pairs: number;
+}): string {
+  if (input.resolved.length > 0) {
+    return (
+      `Separated on ${String(input.resolved.length)} of the measures compared — ` +
+      `${labels(input.resolved)}. Each of those rows names the arm ahead, and does it under a ` +
+      `paired-t interval that excludes zero over ${runs(input.pairs)} on the same passengers.`
+    );
+  }
+  if (input.unresolved.length + input.underBudget.length + input.shown.length > 0) {
+    return (
+      `Indistinguishable at n = ${String(input.pairs)}: no measure this batch compared separated ` +
+      'the two. That is an answer rather than a missing one — the difference is smaller than this ' +
+      'many paired runs resolve — and it is not the same as the two settings being identical.'
+    );
+  }
+  return (
+    `No measure could be compared over ${runs(input.pairs)}, so this batch orders nothing. The ` +
+    'rows below say which measures were withheld and on what ground; what the batch observed about ' +
+    'the runs themselves is reported beside them.'
+  );
+}
+
+/**
+ * *"1 of 50 pairs dropped …"*, or `null` when the complete-case rule took nothing.
+ *
+ * Read off the rows rather than recomputed, so it cannot disagree with them. Every estimate-class
+ * row loses the same pairs — the gate is `awtIsValid` on both arms and is metric-independent — so
+ * the count is taken from the first row that has one and the *labels* are taken from all of them.
+ */
+function droppedSentenceFor(rows: readonly BatchComparisonRow[]): string | null {
+  const dropped = rows.find((row) => row.suppressedPairs > 0);
+  if (dropped === undefined) return null;
+  const affected = rows.filter((row) => row.verdict === 'suppressed').map((row) => row.metric);
+  return (
+    `${String(dropped.suppressedPairs)} of ${String(dropped.totalPairs)} pairs dropped — at least ` +
+    `one arm's own summary refuses to quote a mean on ${runs(dropped.suppressedPairs)} — so ` +
+    `${labels(affected)} cannot be compared. Every other row below is a count of what happened and ` +
+    'is unaffected.'
+  );
+}
+
+/**
+ * What a batch with no quotable mean can still say — `packages/cli`'s sentence, on this surface.
+ *
+ * See {@link BatchOutcomeSummary.capacityFinding}. The CLI's own version fires on a boolean
+ * *"this arm saturated"* over one aggregate; a batch has fifty runs per arm, so the counts are
+ * printed with their real denominators — R13 clause two, and the same rule `summariseArm` keeps.
+ */
+function capacityFindingFor(baseline: BatchArmResult, candidate: BatchArmResult): string | null {
+  const saturatedIn = (arm: BatchArmResult): number =>
+    arm.replications.filter((rep) => rep.saturated).length;
+  const left = saturatedIn(baseline);
+  const right = saturatedIn(candidate);
+  if (left === right) return null;
+  const diverging = left > right ? baseline : candidate;
+  const coping = diverging === baseline ? candidate : baseline;
+  const divergingCount = diverging === baseline ? left : right;
+  const copingCount = coping === baseline ? left : right;
+  return (
+    `${diverging.dispatcherProfileName}'s queues never stopped growing in ` +
+    `${String(divergingCount)} of ${String(baseline.replications.length)} runs and ` +
+    `${coping.dispatcherProfileName}'s in ${String(copingCount)}. That is a finding about ` +
+    'capacity, and it does not need a mean to be true: the two arms saw the same passengers, so ' +
+    'the load that one of them stopped coping with is the same load the other did.'
+  );
 }
 
 /**
