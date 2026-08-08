@@ -193,6 +193,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/main.ts#deepLinkSearchOf',
         'dev/state.ts#initialState',
         /*
+         * The other half of the same answer — issue #99. `PREFERRED_OPENING_BUILDINGS` is a list of
+         * building **ids** (`chancery-house`, `garden-apartments`) that `initialState`'s neighbour
+         * above and `menu/menu.ts#initialMenuState` resolve the opening selection through; the
+         * scanner reads the hyphens as word breaks, exactly as it does for `initialState` itself.
+         * Its sibling `PREFERRED_VIEWER_DISPATCHERS` is not derived at all, because `collective`
+         * and `eta` carry no separator — which is the whole of the difference between them. What a
+         * player *reads* about the building it names is `CatalogueEntry.name` and `.detail`, both
+         * driven by the `MENU` adapter.
+         */
+        'dev/defaults.ts#PREFERRED_OPENING_BUILDINGS',
+        /*
          * Returns a demand template **id** — `rise-and-fall`, `office-day` — so the scanner reads
          * the hyphen as a word break and nothing else. It authors no sentence; what a player reads
          * about the template it names is the part labels `partsOfDay` produces from it, which the

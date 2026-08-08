@@ -63,7 +63,7 @@ import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { screenOf } from '../menu/screens.js';
 import { DEFAULT_SETTINGS, MENU_SCREENS } from '../menu/types.js';
 import { CLIENT_FAILURES } from '../menu/client.js';
-import { canStart, freePlayIssues } from '../menu/menu.js';
+import { canStart, freePlayIssues, initialMenuState } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
@@ -3754,22 +3754,14 @@ const MENU: SurfaceAdapter = {
       metric: 'awtS',
     };
     const challengeInput = { view: CHALLENGE_VIEW, runsDone: 3 };
-    // The opening template's shortest offered part, taken from the catalogue rather than written
-    // here — the same derivation the menu itself uses, so a sweep cannot drive a selection the menu
-    // would never produce. § D286.
-    const openingTemplateId = catalogue.demandTemplates[0]?.id ?? '';
-    const openingPart = [...(catalogue.demandTemplates[0]?.parts ?? [])].sort(
-      (left, right) => left.durationS - right.durationS,
-    )[0];
-    const whole = {
-      buildingId: catalogue.buildings[0]?.id ?? '',
-      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
-      demandTemplateId: openingTemplateId,
-      arrivalRatePctPop5min: null,
-      durationS: openingPart?.durationS ?? 1800,
-      windowStartS: openingPart?.windowStartS ?? null,
-      seed: '20260804',
-    };
+    /*
+     * The opening selection, **from the menu's own opening state** rather than rebuilt here — so a
+     * sweep cannot drive a selection the menu would never produce. § D286 made the *part* a
+     * derivation and this file copied it; issue #99 moved the *pair* off `[0]` and this copy would
+     * have been the site that kept the retired answer alive (`dev/defaults.ts`, § D192's shape). One
+     * call now answers all six fields.
+     */
+    const whole = initialMenuState(catalogue).freePlay;
     const broken = { ...whole, buildingId: 'demolished', seed: 'not-a-seed', durationS: 7 };
     /*
      * A third selection, valid in every field and refused on a **cross-field** rule: a part that

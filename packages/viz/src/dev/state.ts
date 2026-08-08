@@ -93,7 +93,7 @@ import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
 
 import type { BrowserResources } from './data.js';
-import { PREFERRED_VIEWER_DISPATCHERS, preferredDispatcherId } from './defaults.js';
+import { PREFERRED_VIEWER_DISPATCHERS, preferredId } from './defaults.js';
 import type { RailSegment, TabName } from './elementMap.js';
 
 /*
@@ -695,7 +695,7 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
 function preferredDispatcher(resources: BrowserResources): string {
   const profiles = resources.dispatcherProfiles.profiles;
   return (
-    preferredDispatcherId(PREFERRED_VIEWER_DISPATCHERS, profiles) ?? profiles[0]?.id ?? 'collective'
+    preferredId(PREFERRED_VIEWER_DISPATCHERS, profiles) ?? profiles[0]?.id ?? 'collective'
   );
 }
 
