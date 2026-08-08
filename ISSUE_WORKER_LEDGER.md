@@ -46,18 +46,25 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 | **103** | No motion, doors, or people | **Combine** | **#115** | The *two-renderer* proposal (animated = Casual, schematic = Engineer). #115 asks for one stage. Interacts with **E-2** |
 | **94** | Building switch resets config | **Rescope, keep open** | #107 (reset half) | Dispatcher portability; traffic preservation; persistent building header anchor. **#107's save-slot fix does not cover these** |
 
-## Design — blocked on a human decision
+## Design — unblocked by § D299, and re-triaged against it
 
-| # | title (short) | blocked on | note |
+E-0 is decided: **two products over one engine.** Engineer is frozen and never compromised; Casual
+is a different door into the **same full capability** — named play styles are an entry point, never
+a ceiling. These dispositions follow from that and are no longer waiting on anybody.
+
+| # | title (short) | disposition under § D299 | note |
 |---|---|---|---|
-| **116** | Point of view (design charter) | **E-1** | **Epic — do not close.** Holds the only cost measurements in the backlog (181/828/1521 ms) |
-| **96** | Simulation stage is passive | **E-1** | Overlaps #116 § 2 |
-| **110** | "Casual" is not a mode | **E-2** | Measured: 44 words of 919; three surfaces byte-identical |
-| **115** | Nothing to watch | **E-2** | Also carries a separable defect: `LIVE METRICS` clips its own text, undetectable by DOM checks |
-| **90** | No "Start here" entry point | — | Schedule after defects |
-| **91** | Inter-day loop is invisible | — | Schedule after defects |
-| **92** | Editor has no "Run this" | — | Schedule after defects |
-| **93** | Leaderboard has no social hooks | — | Related to #112, not duplicate: "build what does not exist" vs "render what does" |
+| **110** | "Casual" is not a mode | **BUILD — real layout, full capability** | #110's own recommendation is **partly wrong**: it proposes the 13 dispatchers *become* 4–5 play styles. Under § D299 they may not — the full weight vector stays reachable, one disclosure away |
+| **100** | Casual surfaces engineer jargon | **BUILD with #110** | Supplies the panel checklist #110 lacks: live-metrics header, dispatcher cards, Day report |
+| **115** | Nothing to watch | **BUILD for Casual** | Stage as the stage, people drawn. Engineer keeps the schematic view — it is genuinely better *for engineers*. Also carries a separable defect: `LIVE METRICS` clips its own text, invisible to any DOM check |
+| **103** | No motion, doors, or people | **BUILD — its two-renderer framing is now the correct one** | Was filed as a subset of #115; under § D299 its *animated-for-Casual, schematic-for-Engineer* proposal is what the decision actually calls for |
+| **113 § 5** | Only 2 of 5 families authorable | **PROMOTED to the critical path** | *"Tweak it fully"* makes this load-bearing. **Not a Casual problem** — the authoring gap is in the shared editor and fails both products |
+| **90**, **98** | No entry point / no onboarding | **BUILD — one door per product** | There are now two products, so there are two first runs to design |
+| **116** | Point of view (design charter) | **Epic — keep open** | Its §2 stays deferred (§ D300). Its §3 *"there is no economy"* is **refuted** — `Commission the building` exists and #116 missed it twice |
+| **96** | Simulation stage is passive | **DEFERRED with #116 §2** | Re-ask once commissioning is surfaced |
+| **91** | Inter-day loop is invisible | **Schedule after the defect backlog** | Interacts with the between-day beat #116 §3 describes |
+| **92** | Editor has no "Run this" | **Schedule** | Cheap, and it serves both products |
+| **93** | Leaderboard has no social hooks | **Schedule after #112** | "Build what does not exist" vs #112's "render what does" — different acceptance criteria |
 
 ---
 
