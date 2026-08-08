@@ -87,7 +87,7 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, closeDay, openWeek, takeContract, withContract } from '../shift/week.js';
+import { SANDBOX_CONTRACT_ID, closeDay, openWeek, switchWeek } from '../shift/week.js';
 import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
@@ -324,6 +324,29 @@ export interface ViewerState {
 
   /* --- the week ----------------------------------------------------------- */
   readonly week: WeekState;
+  /**
+   * The weeks that are **not** on screen — one per assignment the player has stepped away from,
+   * GitHub issue #107.
+   *
+   * ## Why a second field rather than a map the live week is read out of
+   *
+   * The obvious shape is *all the weeks, keyed by contract*, with `week` derived from
+   * `contractId`. It was not taken: `state.week` is read in some forty places across this package
+   * and a derived accessor would put a lookup — and a `| undefined` — on every one of them, for a
+   * value that is never absent. Two fields keep `week` exactly what it has always been and give the
+   * others somewhere to wait.
+   *
+   * The cost is an invariant that has to be maintained rather than typed: **no parked week carries
+   * `week.contractId`**. `shift/week.ts#switchWeek` is the only function that writes this field and
+   * it is what maintains it, which is why the field is not written anywhere else — a second writer
+   * is how the screen comes to disagree with itself about what day it is.
+   *
+   * `[]` is a player who has only ever been on one assignment, and a first visit. It is not a
+   * stand-in for weeks nobody kept: before issue #107 there was one slot and every other week had
+   * already been destroyed, so an empty list is the **measured** state of a session written by an
+   * older build — see `persist/types.ts`, which reads one that way for exactly that reason.
+   */
+  readonly parkedWeeks: readonly WeekState[];
 
   /* --- what the reader has authored --------------------------------------- */
   readonly savedDispatchers: readonly SavedDispatcher[];
@@ -417,8 +440,14 @@ export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState
   return closeDay(state.week, outcome);
 }
 
+/** What was last read back out of the slot, or `undefined` on a first visit. */
+export interface StoredWeeks {
+  readonly week: WeekState;
+  readonly parkedWeeks: readonly WeekState[];
+}
+
 /**
- * The week that belongs in the saved session — § D231, and the other half of the same guard.
+ * The weeks that belong in the saved session — § D231, and the other half of the same guard.
  *
  * `saveSessionNow` writes the whole of `ViewerState`, and `closeShift` is not its only caller:
  * changing a setting saves too. So a guard on `closeDay` alone still lost the week the moment a
@@ -427,11 +456,26 @@ export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState
  * until a mode that owns one closes a day.
  *
  * `stored` is what `loadSession` last read back, or `undefined` on a first visit — in which case
- * there is nothing to protect and the current week is written, which is the ordinary path.
+ * there is nothing to protect and the current pair is written, which is the ordinary path.
+ *
+ * ## Why this returns both weeks and not one — GitHub issue #107
+ *
+ * It answered `week` alone until the parked weeks landed, and a sibling `parkedWeeksForSession`
+ * would have been two functions that have to agree. They cannot be allowed to disagree: the live
+ * week and the parked list are one campaign, and the invariant that binds them — **no parked week
+ * carries the live week's `contractId`** — is a property of the *pair*. Held back separately, a
+ * free-play save would write the campaign's stored week beside the in-memory parked list, and
+ * `enterFreePlay` reaches this state through `withBuilding`, which has just parked that very week.
+ * The player would reload onto a campaign holding Garden Apartments twice, on two different days.
+ *
+ * So the pair is chosen at one instant, from one side, and `persist.test.ts` drives that case
+ * rather than trusting this paragraph.
  */
-export function weekForSession(state: ViewerState, stored: WeekState | undefined): WeekState {
-  if (advancesTheWeek(state.playMode)) return state.week;
-  return stored ?? state.week;
+export function weeksForSession(state: ViewerState, stored: StoredWeeks | undefined): StoredWeeks {
+  if (advancesTheWeek(state.playMode)) {
+    return { week: state.week, parkedWeeks: state.parkedWeeks };
+  }
+  return stored ?? { week: state.week, parkedWeeks: state.parkedWeeks };
 }
 
 /**
@@ -507,14 +551,28 @@ export function withBuilding(
    * streak and its history — the player has not left the week, they have changed what it is *of* —
    * and it stops claiming to be an assignment. `contractById` returns `undefined`, which is the
    * answer the old comment claimed and did not produce.
+   *
+   * **And the week that is left behind is parked rather than destroyed** — GitHub issue #107. Until
+   * `switchWeek` existed this line was a bare `takeContract`, so *every* change of contract opened a
+   * fresh week: a player on Garden Apartments day 4 who looked at Midtown Office and came straight
+   * back got Garden Apartments **day 1**, with four cleared days, the streak and 40 tenants of
+   * growth gone and no confirmation, no warning and no undo. The rule that a scenario is a fresh
+   * seven days is kept exactly — it is what a *first* visit still does — and the second visit is now
+   * a resume. `shift/week.ts#switchWeek` owns the whole of that decision, including which week is
+   * evicted and how `completed` is merged, because a transition written inside this function is one
+   * `week.test.ts` cannot reach.
    */
   const contract = contractForBuilding(buildingId);
-  const week =
-    contract === undefined
-      ? withContract(state.week, SANDBOX_CONTRACT_ID)
-      : contract.id === state.week.contractId
-        ? state.week
-        : takeContract(state.week, contract.id);
+  const switched = switchWeek(
+    state.week,
+    state.parkedWeeks,
+    contract?.id ?? SANDBOX_CONTRACT_ID,
+    // `resume`, and the rule is the control: this is a `<select>` labelled *building*, sitting above
+    // **Run this shift**, and it reads like a setting. Nothing in the shell tells a player that
+    // touching it restarts a week, so it may not. `WeekArrival` is where the other answer is
+    // defended, on the surfaces whose own copy promises a restart.
+    'resume',
+  );
   /*
    * The fabric is dropped whenever the building actually moves, and left alone when it does not —
    * `withBuilding` is called from the coach select on every `change`, including one that re-picks
@@ -525,7 +583,8 @@ export function withBuilding(
   const next: ViewerState = {
     ...state,
     buildingId,
-    week,
+    week: switched.week,
+    parkedWeeks: switched.parked,
     ...(moved ? { commissioning: [] } : {}),
   };
   const withPattern = moved ? withReseededPattern(next, resources, state) : next;
@@ -665,6 +724,8 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
      */
     selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
     week: openWeek(contractForBuilding(buildingId)?.id),
+    // Nothing has been stepped away from yet. `switchWeek` is the only thing that fills this.
+    parkedWeeks: [],
     savedDispatchers: [],
     savedPatterns: [],
     savedClasses: [],

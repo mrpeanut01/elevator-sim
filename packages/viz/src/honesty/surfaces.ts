@@ -255,7 +255,7 @@ import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.j
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
 import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
-import { coachWeekLines } from '../shift/weekLabel.js';
+import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
 
@@ -1924,6 +1924,7 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/contracts.ts#nextContract',
     'shift/contracts.ts#statLineOf',
     'shift/weekLabel.ts#coachWeekLines',
+    'shift/weekLabel.ts#weekKeptLine',
   ],
   render(context) {
     const { recording } = context;
@@ -2096,6 +2097,39 @@ const SHIFT_REPORT: SurfaceAdapter = {
       seeds.push({
         field: `coachWeekLines(${name}).progress`,
         text: lines.progress,
+        role: 'observation',
+      });
+    }
+
+    /* ---- the line about the week that was just put down — issue #107 ---- */
+    /*
+     * `weekKeptLine` is a **claim about a week that is no longer on screen**, which is the hardest
+     * kind of string for a reader to check and therefore the one most worth sweeping: it names a
+     * day, sometimes a streak and sometimes a banked count, about a state the player cannot see.
+     *
+     * Four pairs, covering the three names it can produce — a scenario, an endless week, a drawn
+     * building's — and both of the endings, *starts a new week* and *picks up on day n*. The name
+     * coverage is the same defect `coachWeekLines` was written to close, one function over: a
+     * branch nothing can print is a claim nobody can check. The `undefined` case is not seeded
+     * because it is the absence of a string; `weekLabel.test.ts` is where it is asserted.
+     */
+    for (const [name, left, arrived] of [
+      ['scenario→scenario', { ...openWeek('c1'), day: 4, streak: 4, cleanRun: 4 }, openWeek('c2')],
+      ['scenario→resumed', { ...openWeek('c1'), day: 4, streak: 2 }, { ...openWeek('c2'), day: 3 }],
+      ['endless→scenario', { ...openEndless(), day: 12, cleanRun: 5 }, openWeek('c2')],
+      [
+        'scenario→sandbox',
+        { ...openWeek('c1'), day: 4, cleanRun: 1 },
+        { ...openWeek('no-such-contract'), day: 4 },
+      ],
+    ] as const) {
+      const line = weekKeptLine(left, arrived);
+      if (line === undefined) continue;
+      seeds.push({
+        // `observation` for `coachWeekLines(…).progress`'s reason: the line's whole content is
+        // counts, and classifying it `label` would exempt the half worth checking.
+        field: `weekKeptLine(${name})`,
+        text: line,
         role: 'observation',
       });
     }

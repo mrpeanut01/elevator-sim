@@ -115,7 +115,7 @@ import type {
   ReportFigure,
   ReportLever,
 } from '../shift/types.js';
-import { nextDay, takeContract } from '../shift/week.js';
+import { nextDay, switchWeek } from '../shift/week.js';
 
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
 import type { ReportElements, TabName } from './elementMap.js';
@@ -938,8 +938,17 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       framing?.kind === 'week-day' ? (framing.cleared?.nextContractId ?? null) : null;
     if (view !== undefined && nextId !== null) {
       const contract = contractById(nextId);
+      /*
+       * `restart` for the scenario card's reason (`WeekArrival`), and the week just cleared is
+       * **parked** rather than dropped — GitHub issue #107. This was a bare `takeContract`, so the
+       * button that congratulates a player on clearing a scenario also deleted the week they
+       * cleared it in: the sparkline, the streak and the seven days went the moment they accepted
+       * the reward.
+       */
+      const moved = switchWeek(view.state.week, view.state.parkedWeeks, nextId, 'restart');
       context.update({
-        week: takeContract(view.state.week, nextId),
+        week: moved.week,
+        parkedWeeks: moved.parked,
         ...(contract === undefined ? {} : { buildingId: contract.buildingId }),
         outOfServiceCarIds: [],
         recording: undefined,

@@ -57,7 +57,15 @@ import { DEFAULT_SETTINGS, PLAYBACK_SPEEDS, type MenuState } from '../menu/types
 import { CONTRACTS } from '../shift/contracts.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import type { WeekState } from '../shift/types.js';
-import { HISTORY_DAYS, closeDay, nextDay, openWeek, outcomeOf } from '../shift/week.js';
+import {
+  ENDLESS_CONTRACT_ID,
+  HISTORY_DAYS,
+  SANDBOX_CONTRACT_ID,
+  closeDay,
+  nextDay,
+  openWeek,
+  outcomeOf,
+} from '../shift/week.js';
 
 import { jsonRoundTripIssue } from './jsonSafety.js';
 import { clearSession, loadLibrary, loadSession, saveSession } from './session.js';
@@ -190,10 +198,32 @@ const library = (): SavedLibrary => ({
   classes: [SAVED_CLASS],
 });
 
+/**
+ * A second scenario the player has stepped away from — GitHub issue #107.
+ *
+ * Deliberately **not** a fresh week: `openWeek('c2')` round-trips through a module that persists
+ * nothing, exactly as `playedWeek`'s docstring says one floor up. This one has a day, a streak and
+ * a closed day in it, so *"the parked week survived"* is a claim about something that could be
+ * lost.
+ */
+function parkedWeek(): WeekState {
+  const day1 = outcomeOf({
+    day: 1,
+    dayIdx: 0,
+    eventId: 'ordinary',
+    arrived: 700,
+    carried: 690,
+    minutePct: 88,
+    readings: readGoals(goalsForDay(1), PERFECT),
+  });
+  return nextDay(closeDay(openWeek('c2'), day1));
+}
+
 function viewerState(): ViewerState {
   return {
     ...initialState(resources, VIEWER_SEED),
     week: playedWeek(),
+    parkedWeeks: [parkedWeek()],
     savedBuildings: library().buildings,
     savedDispatchers: library().dispatchers,
     savedPatterns: library().patterns,
@@ -297,6 +327,7 @@ const libraryOf = (envelope: Record<string, unknown>): Record<string, unknown> =
  */
 const PERSISTED_FROM: Readonly<Record<string, 'viewer' | 'menu'>> = Object.freeze({
   week: 'viewer',
+  parkedWeeks: 'viewer',
   settings: 'menu',
   freePlay: 'menu',
 });
@@ -532,6 +563,41 @@ describe('a played session survives a reload', () => {
     expect(result.snapshot.week).toEqual(playedWeek());
     expect(result.snapshot.settings).toEqual(menuState().settings);
     expect(result.snapshot.freePlay).toEqual(menuState().freePlay);
+  });
+
+  it('restores the weeks the player stepped away from — GitHub issue #107', () => {
+    /*
+     * The half a reload used to lose after the in-memory fix. `withBuilding` parks a week rather
+     * than destroying it, and a parked week that was not written to the slot would make the loss
+     * survive exactly one page load — which is the shape of the defect the reporter hit, moved a
+     * step further away from where anybody would look for it.
+     */
+    const result = loadSession(saved().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.parkedWeeks).toEqual([parkedWeek()]);
+  });
+
+  it('is not a fresh parked week either — the control for the assertion above', () => {
+    const parked = parkedWeek();
+    expect(parked).not.toEqual(openWeek('c2'));
+    expect(parked.day).toBeGreaterThan(1);
+    expect(parked.history.length).toBe(1);
+  });
+
+  it('never parks the week that is being played, across the round trip', () => {
+    /*
+     * `ViewerState.parkedWeeks`' invariant, asserted on the restored value rather than on the one
+     * that was written: a slot holding the same contract twice is a campaign that can say two
+     * different things about what day it is, and the reader on the other side of a reload has no
+     * way to tell which is true.
+     */
+    const result = loadSession(saved().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ids = result.snapshot.parkedWeeks.map((week) => week.contractId);
+    expect(ids).not.toContain(result.snapshot.week.contractId);
+    expect(new Set(ids).size, 'one parked week per assignment').toBe(ids.length);
   });
 
   it('restores something that is not the default — the same control, on the restored value', () => {
@@ -799,6 +865,7 @@ describe('the shape check matches the values, not only the types', () => {
     expect(
       snapshotIssue({
         week: playedWeek(),
+        parkedWeeks: [openWeek('c2')],
         settings: DEFAULT_SETTINGS,
         freePlay: initialMenuState(catalogueOf(resources)).freePlay,
       }),
@@ -1040,6 +1107,66 @@ describe('a contract this build no longer ships', () => {
     }
     expect(result.failure.missing).toEqual([GHOST]);
     expect(result.failure.message).toContain(GHOST);
+  });
+
+  it('refuses it for a *parked* week too, at the instant nothing is in progress', () => {
+    /*
+     * Parked weeks name contracts for exactly the same reason the live one does — GitHub issue
+     * #107. Checking only the live week would defer the refusal until the player picked that
+     * building, which is the one moment this module's own argument says it must not happen: being
+     * strict costs nothing before anything is in progress, and everything once a week is on screen.
+     */
+    const slots = saved();
+    tamper(slots, (envelope) => {
+      const parked = sessionOf(envelope)['parkedWeeks'] as Record<string, unknown>[];
+      const first = parked[0];
+      if (first === undefined) throw new Error('the fixture parks no week');
+      first['contractId'] = GHOST;
+    });
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(false);
+    if (result.ok || result.failure.kind !== 'stale') {
+      expect.unreachable('a parked week toward a vanished assignment is a stale session');
+      return;
+    }
+    expect(result.failure.missing).toEqual([GHOST]);
+  });
+
+  /**
+   * The two ids that answer to no contract **on purpose**, and the session they were refusing.
+   *
+   * Found while building issue #107's parked weeks. `unknownContractsIn` asked
+   * `contractById(id) === undefined`, and `week.ts` ships two sentinels that are meant to answer to
+   * nothing: `endless`, reached by pressing **Keep going**, and `sandbox`, reached by drawing a
+   * building. Both were reported as assignments *"this build no longer has"*, so every endless and
+   * every sandbox week was refused on reload and the slot was then cleared — the player lost the
+   * week, the library's own notice said nothing about it, and the reason they were given named an
+   * assignment that had never existed.
+   *
+   * Driven through the real `loadSession` rather than against `unknownContractsIn` alone, because
+   * the outcome that matters is *the week came back*, not *the helper returned an empty array*.
+   */
+  it('reads the two deliberate sentinels rather than calling them vanished', () => {
+    for (const contractId of [ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID]) {
+      expect(unknownContractsIn(openWeek(contractId)), contractId).toEqual([]);
+      const slots = saved();
+      tamper(slots, (envelope) => {
+        weekOf(envelope)['contractId'] = contractId;
+      });
+      const result = loadSession(slots.store);
+      expect(result.ok, `a ${contractId} week is a week, not a stale session`).toBe(true);
+      if (!result.ok) return;
+      expect(result.snapshot.week.contractId).toBe(contractId);
+      // The week itself is intact, not merely accepted: the streak and the banked days a player
+      // pressed **Keep going** with are the whole of what the refusal was taking away.
+      expect(result.snapshot.week.history).toEqual(playedWeek().history);
+    }
+  });
+
+  it('still refuses an id that was meant to name a contract and no longer does', () => {
+    // The negative control for the exemption above. Two sentinels are readable; a third id is not,
+    // which is what stops the exemption becoming *"anything unrecognised is fine"*.
+    expect(unknownContractsIn(openWeek(GHOST))).toEqual([GHOST]);
   });
 });
 

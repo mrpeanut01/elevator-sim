@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { contractById } from './contracts.js';
 import { ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID, openEndless, openWeek } from './week.js';
-import { coachWeekLines } from './weekLabel.js';
+import { coachWeekLines, weekKeptLine } from './weekLabel.js';
 
 const HALF_HOUR_S = 1800;
 
@@ -91,5 +91,57 @@ describe('a building the reader drew', () => {
      */
     expect(coachWeekLines(openWeek('c2'), HALF_HOUR_S).label).not.toBe('Sandbox');
     expect(coachWeekLines(openWeek('vanished'), HALF_HOUR_S).label).toBe('Sandbox');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The week you just put down — GitHub issue #107
+ * -------------------------------------------------------------------------- */
+
+describe('the line about the week that was parked', () => {
+  it('names the day and the streak the reporter watched disappear', () => {
+    const line = weekKeptLine({ ...openWeek('c1'), day: 4, streak: 4, cleanRun: 4 }, openWeek('c2'));
+    expect(line).toContain('Scenario 1');
+    expect(line).toContain('day 4');
+    expect(line).toContain('4-day streak');
+    expect(line).toContain('4 clean shifts banked');
+  });
+
+  it('says which of the two happened to the week that was picked up', () => {
+    // The half that makes the line worth printing: switching still shows day 1 on the ribbon, and a
+    // player has no way to tell a fresh week from the loss unless the sentence says which it is.
+    expect(weekKeptLine({ ...openWeek('c1'), day: 4 }, openWeek('c2'))).toContain(
+      'starts a new week',
+    );
+    expect(
+      weekKeptLine({ ...openWeek('c1'), day: 4 }, { ...openWeek('c2'), day: 3 }),
+    ).toContain('picks up on day 3');
+  });
+
+  it('says nothing at all about a week with nothing in it', () => {
+    /*
+     * The ordinary case, and the reason this is `undefined` rather than a sentence: a player still
+     * choosing a building changes it several times on day 1, and a reassurance printed each time
+     * would be noise on the one line the ribbon has for news.
+     */
+    expect(weekKeptLine(openWeek('c1'), openWeek('c2'))).toBeUndefined();
+    expect(weekKeptLine(openWeek('c1'), openWeek('c1'))).toBeUndefined();
+  });
+
+  it('prints no count it does not have', () => {
+    // A `0-day streak` is a number printed to fill a slot. The clause is absent instead.
+    const line = weekKeptLine({ ...openWeek('c1'), day: 4 }, openWeek('c2'));
+    expect(line).not.toContain('0-day');
+    expect(line).not.toContain('0 clean');
+    expect(line).toContain('day 4');
+  });
+
+  it('names an endless and a sandbox week as what they are', () => {
+    // The same defect `coachWeekLines` closed, one function over: a branch nothing can print is a
+    // claim nobody can check, so each name is asserted against a week a real caller produces.
+    expect(weekKeptLine({ ...openEndless(), day: 12 }, openWeek('c2'))).toContain('endless week');
+    expect(
+      weekKeptLine({ ...openWeek(SANDBOX_CONTRACT_ID), day: 6 }, openWeek('c2')),
+    ).toContain('own building');
   });
 });

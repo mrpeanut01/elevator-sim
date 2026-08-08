@@ -140,7 +140,7 @@ import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
-import { coachWeekLines } from '../shift/weekLabel.js';
+import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -187,7 +187,7 @@ import {
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
-  weekForSession,
+  weeksForSession,
   withBuilding,
   type ViewerState,
 } from './state.js';
@@ -1195,7 +1195,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       settings: restored.snapshot.settings,
       freePlay: restored.snapshot.freePlay,
     };
-    state = { ...state, week: restored.snapshot.week };
+    /*
+     * The pair, and in this order: `withBuilding` below reads `state.parkedWeeks` and would
+     * otherwise resume a week out of an empty list — which is the restored campaign losing every
+     * scenario except the one it opened on, at the first boot after issue #107 was fixed.
+     */
+    state = {
+      ...state,
+      week: restored.snapshot.week,
+      parkedWeeks: restored.snapshot.parkedWeeks,
+    };
     /*
      * The building follows the week rather than being persisted beside it. `persist/` excludes
      * `buildingId` deliberately: a contract names its building, so storing both would be two
@@ -1217,6 +1226,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let libraryNotice: string | undefined;
   let saveNotice: string | undefined;
 
+  /**
+   * What happened to the week the player just put down — GitHub issue #107, and `undefined` almost
+   * always.
+   *
+   * A third backward-looking line rather than a fourth kind of `restoreNotice`, because it is news
+   * about an action the player has just taken rather than about the save: it is written by one
+   * control, it is true for one moment, and `runShift` spends it on the next thing they do — the
+   * same lifetime `restoreNotice` and `libraryNotice` have and for the same reason.
+   */
+  let weekNotice: string | undefined;
+
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
     /*
@@ -1232,7 +1252,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const stored = loadSession(sessionStore);
     const written = saveSession(
       sessionStore,
-      { ...state, week: weekForSession(state, stored.ok ? stored.snapshot.week : undefined) },
+      // Both weeks or neither, from one instant — see `weeksForSession`. Holding the live week back
+      // while writing an in-memory parked list would store the campaign's week twice, once on each
+      // side of the pair, on two different days.
+      { ...state, ...weeksForSession(state, stored.ok ? stored.snapshot : undefined) },
       menuState,
     );
     /*
@@ -2611,9 +2634,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function wireCoach(): void {
     ui.coach.building.addEventListener('change', () => {
+      /*
+       * The week being put down, read **before** the switch — GitHub issue #107.
+       *
+       * `withBuilding` parks it rather than destroying it, and the ribbon still shows the new
+       * week's day 1, which from the outside looks exactly like the defect. `weekKeptLine` is the
+       * sentence that tells the difference; it is `undefined` for a week with nothing in it, which
+       * is every building change made while a player is still choosing one.
+       */
+      const leaving = state.week;
       state = withBuilding(state, resources, ui.coach.building.value);
       renderAll();
       runShift();
+      /*
+       * Set **after** the run and drawn on its own, because `runShift` is what spends the two
+       * notices already on screen — assigning this one before it would hand it to the line that
+       * clears it. Only the ribbon is redrawn: nothing else on the page depends on this string.
+       */
+      weekNotice = weekKeptLine(leaving, state.week);
+      if (weekNotice !== undefined) drawCoach(viewAt());
     });
     ui.coach.pattern.addEventListener('change', () => {
       context.update({ pattern: ui.coach.pattern.value });
@@ -2714,6 +2753,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (saveNotice !== undefined) return saveNotice;
     if (restoreNotice !== undefined) return restoreNotice;
     if (libraryNotice !== undefined) return libraryNotice;
+    /*
+     * Below the two that are about the save and above the run's own refusals — issue #107. It
+     * outranks `withheld` because a player who has just moved between assignments is asking *what
+     * happened to my week*, and it sits under the other two because those describe a condition that
+     * is still true while this one describes a keystroke.
+     */
+    if (weekNotice !== undefined) return weekNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
       return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
@@ -2743,12 +2789,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * step with the boot order.
      */
     /*
-     * The two backward-looking notices are spent once the player does something; `saveNotice` is
+     * The three backward-looking notices are spent once the player does something; `saveNotice` is
      * not, because it describes a condition that is still true and will still be true next time.
+     *
+     * `weekNotice` is written by the building select *after* this line has run in the same handler,
+     * which is what makes it survive its own change and no other — see `wireCoach`.
      */
     if (urlWritable) {
       restoreNotice = undefined;
       libraryNotice = undefined;
+      weekNotice = undefined;
     }
     try {
       const plan = shiftRunConfigOf(resources, state);

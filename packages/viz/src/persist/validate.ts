@@ -95,7 +95,12 @@ import {
   type ShiftGoal,
   type WeekState,
 } from '../shift/types.js';
-import { HISTORY_DAYS } from '../shift/week.js';
+import {
+  ENDLESS_CONTRACT_ID,
+  HISTORY_DAYS,
+  PARKED_WEEKS_MAX,
+  SANDBOX_CONTRACT_ID,
+} from '../shift/week.js';
 
 import {
   EMPTY_LIBRARY,
@@ -472,6 +477,21 @@ const FREE_PLAY_CHECKS: Readonly<Record<keyof FreePlaySelection, FieldCheck>> = 
 
 const SESSION_CHECKS: Readonly<Record<keyof SessionSnapshot, FieldCheck>> = Object.freeze({
   week: isObjectOf(WEEK_CHECKS, 'a week'),
+  /*
+   * The same table as the live week, and the same verdict — a bad field in a parked week refuses the
+   * whole session rather than dropping that week.
+   *
+   * That is the opposite of what the library does one key over, and the difference is the one
+   * `types.ts` argues: the library's entries are independent documents, and a parked week is a view
+   * of the same campaign as the week beside it. Dropping one silently would hand back a campaign
+   * with a scenario's progress missing and nothing on screen to say so, which is exactly what issue
+   * #107 was.
+   *
+   * `PARKED_WEEKS_MAX` rather than a literal, for `HISTORY_DAYS`' reason two tables up: `week.ts`
+   * owns how many weeks are kept and a ceiling written here would be the second answer to that
+   * question.
+   */
+  parkedWeeks: isArrayOf(isObjectOf(WEEK_CHECKS, 'a week'), PARKED_WEEKS_MAX, 'parked weeks'),
   settings: isObjectOf(SETTINGS_CHECKS, 'a settings block'),
   freePlay: isObjectOf(FREE_PLAY_CHECKS, 'a free-play selection'),
 });
@@ -520,6 +540,24 @@ export function snapshotIssue(value: unknown): ShapeIssue | undefined {
  * separately is three states that can disagree about what game is being played, and it hands the
  * caller eight combinations to write words for. A renamed scenario is a deploy-time event; a
  * partially restored session would be a permanent class of bug.
+ *
+ * ## The two ids that resolve to nothing **on purpose**, and the session this was refusing
+ *
+ * Found while building issue #107's parked weeks, and it is a defect of its own rather than a
+ * consequence of that work: this test was `contractById(id) === undefined`, and `week.ts` ships two
+ * ids that answer to no contract *by design* — `endless`, which a player reaches by pressing **Keep
+ * going**, and `sandbox`, which they reach by drawing a building. Both were reported as assignments
+ * *"this build no longer has"*, so **every endless and every sandbox week was refused on reload**,
+ * the slot was then cleared by `dev/main.ts#restoreSession`, and the player was told their week was
+ * banked toward something that had gone. It had not gone; it never existed, which is the whole point
+ * of a sentinel.
+ *
+ * The exemption is not a relaxation of the rule the section above states. That rule is about a
+ * player *"left looking at a streak, a banked count and a seven-day history that are progress toward
+ * an assignment the build cannot name"* — and these two weeks make no such claim: `contractStatus`
+ * returns `open` for every scenario, `closeDay` banks nothing, and `coachWeekLines` prints
+ * **Endless** and **Sandbox** precisely so the state is named on screen. What is refused is an id
+ * that was *meant* to name a contract and no longer does, which is still every other case.
  */
 export function unknownContractsIn(week: WeekState): readonly string[] {
   /*
@@ -537,9 +575,20 @@ export function unknownContractsIn(week: WeekState): readonly string[] {
     ...(award === null || award.nextContractId === null ? [] : [award.nextContractId]),
   ];
   return Object.freeze(
-    [...new Set(named.filter((id) => contractById(id) === undefined))].sort((a, b) =>
-      a.localeCompare(b),
-    ),
+    [...new Set(named.filter((id) => !namesSomething(id)))].sort((a, b) => a.localeCompare(b)),
+  );
+}
+
+/**
+ * Whether an id names a state this build has — a contract, or one of the two deliberate sentinels.
+ *
+ * Named rather than derived, and the set is closed: `week.ts` exports exactly two ids that resolve
+ * to no contract on purpose, and a third would have to be added here to be readable — which is the
+ * right amount of friction for a value that decides whether a player keeps their week.
+ */
+function namesSomething(id: string): boolean {
+  return (
+    contractById(id) !== undefined || id === ENDLESS_CONTRACT_ID || id === SANDBOX_CONTRACT_ID
   );
 }
 

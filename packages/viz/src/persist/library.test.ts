@@ -580,15 +580,23 @@ describe('a version-1 envelope', () => {
   };
 
   it('is a version this build no longer writes — the control for the rest', () => {
-    expect(SESSION_SCHEMA_VERSION).toBe(3);
+    /*
+     * Read against `SESSION_SCHEMA_VERSION` rather than against a literal, which this pair used to
+     * be — `expect(SESSION_SCHEMA_VERSION).toBe(3)` and a written `3`. Two numbers to hand-bump on
+     * every schema change is how a version assertion becomes a chore that gets edited without being
+     * read, and it says nothing the derived form does not: *what the fixture is* is older, and
+     * *what this build writes* is the constant. The strictness that matters is the inequality, and
+     * it is asserted here for the first time.
+     */
+    expect(SESSION_SCHEMA_VERSION).toBeGreaterThan(1);
     const slots = saved();
     const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
-    expect(envelope['schemaVersion']).toBe(3);
+    expect(envelope['schemaVersion']).toBe(SESSION_SCHEMA_VERSION);
   });
 
   it('is a fixture that really lacks the key, or every assertion below is vacuous', () => {
     // The fixture is derived from the live selection, so this is what stops it silently becoming a
-    // version-3 session wearing a version-1 number the day `withoutWindowStart` stops matching.
+    // current-shape session wearing a version-1 number the day `withoutWindowStart` stops matching.
     const slots = v1();
     const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
     const session = envelope['session'] as Record<string, unknown>;
@@ -701,11 +709,15 @@ describe('a version-2 envelope — the one the missing bump broke', () => {
     );
   });
 
-  it('is upgraded to 3 on the next save', () => {
+  it('is upgraded on the next save, not left where it was', () => {
     const slots = v2();
     expect(saveSession(slots.store, viewerWith(), menuState()).ok).toBe(true);
     const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
-    expect(envelope['schemaVersion']).toBe(3);
+    // `SESSION_SCHEMA_VERSION` rather than the literal this asserted, for the reason the version-1
+    // block above states: a second copy of the current version is a number somebody has to
+    // remember, and issue #107's bump to 4 is the first time it was not remembered.
+    expect(envelope['schemaVersion']).toBe(SESSION_SCHEMA_VERSION);
+    expect(envelope['schemaVersion']).not.toBe(2);
   });
 
   it('reads a version-2 envelope that already carries the key, because those exist', () => {
@@ -757,6 +769,81 @@ describe('a version-2 envelope — the one the missing bump broke', () => {
     if (result.ok) return;
     expect(result.failure.kind).toBe('shape');
     expect(result.failure.message).toContain('week');
+  });
+});
+
+/**
+ * The version before `parkedWeeks` — GitHub issue #107, and version 2's argument one bump on.
+ *
+ * A version-3 envelope has one week and no list beside it. `[]` is read as the **measured** state
+ * of such a session rather than as a default, and the measurement is the defect itself: those
+ * builds had one slot and changing building overwrote it, so at the instant those bytes were
+ * written there were no other weeks to record. Anything else would be inventing progress a player
+ * did not make, which is the test `types.ts` states for whether an older envelope may be read at
+ * all.
+ */
+describe('a version-3 envelope — the one before a week per assignment', () => {
+  /** What version 3 wrote: `windowStartS` present, `parkedWeeks` absent. */
+  const v3 = (): Slots => {
+    const slots = memoryStore();
+    const menu = menuState();
+    slots.written.set(
+      SESSION_KEY,
+      JSON.stringify({
+        schemaVersion: 3,
+        session: {
+          week: openWeek(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id),
+          settings: menu.settings,
+          freePlay: menu.freePlay,
+        },
+        library: { buildings: [], dispatchers: [], patterns: [], classes: [] },
+      }),
+    );
+    return slots;
+  };
+
+  it('is a fixture that really lacks the key, or every assertion below is vacuous', () => {
+    const envelope = JSON.parse(v3().written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    const session = envelope['session'] as Record<string, unknown>;
+    expect('parkedWeeks' in session).toBe(false);
+    // And the current build writes it, so the two versions genuinely differ.
+    expect(SESSION_SCHEMA_VERSION).toBeGreaterThan(3);
+  });
+
+  it('is restored rather than refused, with no weeks parked', () => {
+    const result = loadSession(v3().store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.parkedWeeks).toEqual([]);
+    expect(result.snapshot.week.contractId).toBe(CONTRACTS[1]?.id ?? CONTRACTS[0]?.id);
+    expect(result.snapshot.settings).toEqual(menuState().settings);
+  });
+
+  it('leaves a version-3 envelope that already carries the key alone', () => {
+    /*
+     * Version 2's own case, repeated because the completion is the same shape and so is the way it
+     * could go wrong: a build that shipped `parkedWeeks` without moving the number would write
+     * envelopes labelled 3 that carry it, and overwriting one with `[]` would delete a player's
+     * parked weeks in the name of reading their session.
+     */
+    const slots = v3();
+    const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    const session = envelope['session'] as Record<string, unknown>;
+    session['parkedWeeks'] = [openWeek(CONTRACTS[2]?.id ?? CONTRACTS[0]?.id)];
+    slots.written.set(SESSION_KEY, JSON.stringify(envelope));
+    const result = loadSession(slots.store);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.parkedWeeks.map((week) => week.contractId)).toEqual([
+      CONTRACTS[2]?.id ?? CONTRACTS[0]?.id,
+    ]);
+  });
+
+  it('is upgraded on the next save, not left where it was', () => {
+    const slots = v3();
+    expect(saveSession(slots.store, viewerWith(), menuState()).ok).toBe(true);
+    const envelope = JSON.parse(slots.written.get(SESSION_KEY) ?? '') as Record<string, unknown>;
+    expect(envelope['schemaVersion']).toBe(SESSION_SCHEMA_VERSION);
   });
 });
 
