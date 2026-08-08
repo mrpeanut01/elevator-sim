@@ -172,7 +172,13 @@ import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import { themeFor } from '../render/theme.js';
 import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
-import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/session.js';
+import {
+  clearSession,
+  loadLibrary,
+  loadSession,
+  patchTouchesLibrary,
+  saveSession,
+} from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
@@ -902,8 +908,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     page: undefined,
     notice: client === undefined ? NO_SERVER_BOARDS : undefined,
   };
-  /** Requests are started here and never from a render — a render that fetched would loop. */
-  let boardsRequested = false;
+  /**
+   * True **while** a boards request is in flight, and false again the moment it settles.
+   *
+   * Not a one-shot latch, which is what it was: `boardsRequested` was set on the first fetch and
+   * never cleared, so the arrival trigger died after the first visit to the screen and the sentence
+   * *"No scores have been posted yet."* — written on a board that was empty once — was permanent.
+   * A player who posted a run then walked back to the Leaderboard read the opposite of what the
+   * server had just told them, and only a full page reload ever corrected it (GitHub issue #112).
+   *
+   * The guard is still needed for the reason the latch was reached for: requests are started from
+   * arrivals and from a successful post, and two of those can overlap. Guarding *in flight* keeps
+   * the double-fetch out without also keeping the second visit out.
+   */
+  let boardsInFlight = false;
 
   /* ---------------------------------------------------------------------- *
    * Waking the container before the player needs it — § D247 § 5
@@ -965,7 +983,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     runsDone: 0,
     ...(client === undefined ? { notice: NO_SERVER_CHALLENGE } : {}),
   };
-  let challengeRequested = false;
+  /**
+   * In flight, on {@link boardsInFlight}'s rule and for the same defect.
+   *
+   * This was a one-shot latch too, and the consequence here is sharper than on the leaderboard: the
+   * whole of `view.state`, `opensInMs` and `closesInMs` is *the server's measurement at the moment
+   * it answered*, so a challenge that opened while the tab was on the run surface stayed drawn as
+   * *not open yet* until the page was reloaded — a countdown that had stopped, on the one screen
+   * § D218 § 3 forbids the client to compute a countdown on.
+   */
+  let challengeInFlight = false;
   /**
    * The seed set this browser has simulated, paired with the seed each recording is *of*.
    *
@@ -979,16 +1006,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let challengeRanWith = '';
 
   async function loadChallenge(): Promise<void> {
-    if (client === undefined || challengeRequested) return;
-    challengeRequested = true;
+    if (client === undefined || challengeInFlight) return;
+    challengeInFlight = true;
     challengeView = { ...challengeView, notice: 'Loading this week’s challenge…' };
     drawMenu();
-    const result = await client.challenges();
-    challengeView = result.ok
-      ? { ...challengeView, view: result.value.current, notice: undefined }
-      : { ...challengeView, notice: result.detail };
+    let ok = false;
+    try {
+      const result = await client.challenges();
+      ok = result.ok;
+      challengeView = result.ok
+        ? { ...challengeView, view: result.value.current, notice: undefined }
+        : { ...challengeView, notice: result.detail };
+    } finally {
+      challengeInFlight = false;
+    }
     drawMenu();
-    if (result.ok) void loadChallengeBoard();
+    if (ok) void loadChallengeBoard();
   }
 
   async function loadChallengeBoard(): Promise<void> {
@@ -1089,19 +1122,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   async function loadBoards(): Promise<void> {
-    if (client === undefined || boardsRequested) return;
-    boardsRequested = true;
+    if (client === undefined || boardsInFlight) return;
+    boardsInFlight = true;
     boardView = { ...boardView, notice: 'Loading boards…' };
     drawMenu();
-    const result = await client.boards();
-    boardView = result.ok
-      ? {
-          boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
-          selected: undefined,
-          page: undefined,
-          notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
-        }
-      : { ...boardView, notice: result.detail };
+    try {
+      const result = await client.boards();
+      boardView = result.ok
+        ? {
+            boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
+            selected: undefined,
+            page: undefined,
+            notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
+          }
+        : { ...boardView, notice: result.detail };
+    } finally {
+      /*
+       * `finally`, so a client that ever throws instead of returning a `Failure` does not wedge the
+       * screen shut for the rest of the session. `menu/client.ts` turns every transport error into a
+       * `Failure` today; that is a fact about a module next door, and this is the flag it would
+       * strand.
+       */
+      boardsInFlight = false;
+    }
     drawMenu();
   }
 
@@ -1824,6 +1867,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
     );
     drawMenu();
+    /*
+     * **The board is re-read after a 201** — GitHub issue #112, and it is the correctness half of
+     * that issue rather than a courtesy.
+     *
+     * This ended at `drawMenu()`. The server had just created an entry and answered with it, and the
+     * screen went on drawing the board list it had fetched on arrival — which, on a first visit to a
+     * fresh deployment, is the sentence *"No scores have been posted yet."* So the one action the
+     * whole surface exists for returned 201 and the screen said the opposite, and the only way to
+     * see the row was to reload the page.
+     *
+     * A refetch rather than an optimistic insert. The submission's own answer carries the accepted
+     * entry, but the board it belongs on is keyed by a digest the *server* computed over the run and
+     * the loaded `data/`, and this browser does not compute that digest. Splicing the row into
+     * whichever board happened to be selected would be this client guessing which board it is on —
+     * and a row shown on the wrong board is a worse failure than a row shown a round-trip late.
+     */
+    if (result.ok) void loadBoards();
   }
 
   const menuHost: MenuPanelHost = {
@@ -2000,6 +2060,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const context: MountContext = {
     update(patch) {
       state = { ...state, ...patch };
+      /*
+       * **The library is written the moment it changes** — GitHub issue #113 § 2.
+       *
+       * `saveSessionNow` had exactly two callers and neither was a save button: a `set-setting`
+       * intent, and `closeDay()`. That explains the report — *four dispatchers saved, one survived a
+       * reload* — precisely rather than approximately. A dispatcher filed through *Save it and run
+       * it* runs a shift, and a shift that ends closes a day, and closing a day writes the session;
+       * one filed through Save alone was never written at all, and the reporter's inference that
+       * there must be two storage paths is wrong. There is one writer and one reader.
+       *
+       * This is the choke point every panel already writes through, so it is the one place where
+       * *the library moved* is a fact rather than a convention each editor has to remember. See
+       * {@link patchTouchesLibrary} for why no debounce is needed: the hot patches — a slider drag
+       * writing `dispatcherSpec` — do not touch a shelf, and the ones that do are button presses.
+       */
+      if (patchTouchesLibrary(patch)) saveSessionNow();
       renderAll();
     },
     runShift() {
@@ -2794,6 +2870,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       { id, config },
     ];
     state = { ...state, savedBuildings: saved, buildingId: id, tab: 'run' };
+    /*
+     * The one library write that does **not** go through `context.update`, so it says so itself.
+     * The JSON editor hands a whole `BuildingConfig` back rather than a patch, and a building the
+     * reader typed out by hand is exactly the thing issue #113 § 2 is about losing on reload.
+     */
+    saveSessionNow();
     runShift();
   }
 

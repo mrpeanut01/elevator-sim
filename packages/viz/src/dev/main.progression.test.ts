@@ -164,3 +164,119 @@ describe('issue #67 — a finished run opens the sheet only over a reader who is
     expect(await bodyOf('closeShift')).toContain('reportOpensItself({');
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The two seams issues #112 and #113 are about, read the same way
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One object-literal member's block, from a named property to the literal's own close.
+ *
+ * {@link bodyOf} finds `function name(`, and `MountContext.update` is neither a `function` nor a
+ * top-level declaration — it is a method on the one object every panel is handed. The whole of what
+ * a panel may do to the world goes through it, which is exactly why the persistence hook belongs
+ * there and why this is the block worth reading.
+ */
+/**
+ * `main.ts` with its comments blanked — `boundaries.test.ts`'s method, for its reason.
+ *
+ * Needed by exactly one assertion below, and needed *because* of what this repository does with a
+ * removed identifier: it explains it. `boardsInFlight`'s own docstring names `boardsRequested` to say
+ * what it replaced and why, so a raw-text search for the latch finds the sentence describing its
+ * absence. Blanking rather than deleting keeps every offset where it was.
+ */
+async function mainCode(): Promise<string> {
+  return (await mainSource())
+    .replace(/\/\*[\s\S]*?\*\//gu, (block) => block.replace(/[^\n]/gu, ' '))
+    .replace(/\/\/[^\n]*/gu, (line) => ' '.repeat(line.length));
+}
+
+async function contextBlock(): Promise<string> {
+  const source = await mainSource();
+  const start = source.indexOf('const context: MountContext = {');
+  expect(start, 'main.ts no longer builds a MountContext').toBeGreaterThan(-1);
+  const end = source.indexOf('\n  };', start);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
+describe('issue #113 § 2 — the library is written the moment it changes', () => {
+  /*
+   * The reported symptom is *four dispatchers saved, one survived a reload*, and the cause is a
+   * `when` rather than a `where`: `saveSessionNow` had two callers and neither was a save button.
+   * The one that survived was filed through *Save it and run it*, which ran a shift, which closed a
+   * day, which wrote the session.
+   *
+   * `persist.test.ts` owns the predicate and its derived cover over the envelope's shelves. What
+   * only a text guard can reach is that `dev/main.ts` **asks** it, because the choke point is inside
+   * `boot()` and `boot()` needs a document, a canvas and a click. This file's own header is candid
+   * about that trade: weak evidence about behaviour, strong evidence about a line having been
+   * deleted, which is the failure mode this fix actually has.
+   */
+  it('asks the predicate at the one choke point every panel writes through', async () => {
+    const block = await contextBlock();
+    expect(block).toContain('patchTouchesLibrary(patch)');
+    expect(block).toContain('saveSessionNow()');
+  });
+
+  it('imports the predicate rather than restating which fields the library is made of', async () => {
+    // A hand-written `patch.savedDispatchers !== undefined ||…` here would be a second answer to
+    // *what the library is*, and the first one to go stale when a fifth shelf lands.
+    const source = await mainSource();
+    expect(source).toContain('patchTouchesLibrary');
+    expect(source).not.toMatch(/patch\.saved[A-Z]/u);
+  });
+
+  it('writes the one library change that does not go through a patch', async () => {
+    // The JSON editor hands back a whole `BuildingConfig`, so `adoptEditedBuilding` assigns
+    // `state` directly and the choke point never sees it.
+    expect(await bodyOf('adoptEditedBuilding')).toContain('saveSessionNow()');
+  });
+});
+
+describe('issue #112 — a board is re-read, and the screen is not latched shut', () => {
+  it('keeps no one-shot latch: the flag is in-flight and it is cleared', async () => {
+    /*
+     * The latch was set on the first fetch and **never cleared**, so the arrival trigger was dead
+     * after the first visit and *"No scores have been posted yet."* — true once — was permanent. Its
+     * absence is asserted by name, over comment-blanked source, because the name is precisely what a
+     * revert puts back and precisely what the replacement's docstring has to be free to mention.
+     */
+    const code = await mainCode();
+    expect(code).not.toContain('boardsRequested');
+    expect(code).not.toContain('challengeRequested');
+
+    const body = await bodyOf('loadBoards');
+    expect(body).toContain('boardsInFlight');
+    // Set *and* cleared. A flag that is only ever set is the latch again under a better name.
+    expect(body).toContain('boardsInFlight = true');
+    expect(body).toContain('boardsInFlight = false');
+    // Cleared in a `finally`, so a client that throws does not wedge the screen for the session.
+    expect(body).toMatch(/finally\s*\{[^}]*boardsInFlight = false/u);
+  });
+
+  it('re-reads the board after the server accepts a run', async () => {
+    /*
+     * `submitScore` ended in a notice and a `drawMenu()`. So the server created an entry, answered
+     * 201, and the screen went on drawing the board list it fetched on arrival — which on a fresh
+     * deployment is the sentence saying nothing has been posted. The one action the surface exists
+     * for returned success and the screen said the opposite.
+     */
+    const body = await bodyOf('submitScore');
+    expect(body).toContain('loadBoards()');
+    expect(body).toMatch(/if \(result\.ok\) void loadBoards\(\)/u);
+  });
+
+  it('re-reads the challenge board after the server accepts a set, which it already did', async () => {
+    // The half that was already right, pinned so the two posting paths cannot drift apart.
+    expect(await bodyOf('postChallenge')).toContain('loadChallengeBoard()');
+  });
+
+  it('starts a fetch on arrival, and never from inside a render', async () => {
+    // The reason the latch existed at all. Arrival is a transition, so it fires once per visit; a
+    // fetch started from a render would fetch again on every state change its own response caused.
+    const source = await mainSource();
+    expect(source).toContain('if (arrived) void loadBoards();');
+    expect(await bodyOf('drawMenu')).not.toContain('loadBoards');
+  });
+});

@@ -444,6 +444,142 @@ export function runThisDispatcherStateOf(
   return editingId === runningId ? 'alreadyDriving' : 'select';
 }
 
+/* -------------------------------------------------------------------------- *
+ * Naming a dispatcher — GitHub issue #113 § 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Why a name cannot be filed, or `undefined` when it can.
+ *
+ * ## The two defects this closes, both reported and both reproduced
+ *
+ * Save wrote whatever was in the field and `profileFromSpec` turned an empty one into *My
+ * dispatcher* — with **no dedupe of any kind**, so pressing Save three times on an untouched blank
+ * spec produced three cards with identical titles and no way to tell them apart. The right rail, the
+ * challenge screen's dispatcher select and this panel's own *your dispatchers* list all key on the
+ * id and all *display* the name, so three identical names is three identical rows over three
+ * different weight vectors.
+ *
+ * The comparison is case- and space-insensitive because the reader is the one who has to tell them
+ * apart on a list: `Mine` and `mine ` are two rows a person cannot distinguish, and a uniqueness
+ * rule that admits them has not delivered uniqueness. The shipped profiles are in `taken` as well as
+ * the reader's own — a saved dispatcher called `collective` sits in the same list as the shipped one
+ * and would be indistinguishable from it.
+ *
+ * ## Why it returns a code rather than a sentence
+ *
+ * {@link runThisDispatcherStateOf}'s reason, in full above: an exported producer of player-facing
+ * prose owes `honesty/surfaces.ts` an adapter, and this lane does not own that file. The copy is
+ * module-private, beside the button, in {@link NAME_REFUSAL_COPY}.
+ */
+export type NameRefusal = 'empty' | 'taken';
+
+export function saveNameRefusalOf(
+  name: string,
+  taken: readonly string[],
+): NameRefusal | undefined {
+  const wanted = name.trim().toLowerCase();
+  if (wanted === '') return 'empty';
+  return taken.some((other) => other.trim().toLowerCase() === wanted) ? 'taken' : undefined;
+}
+
+/**
+ * Whether *rename* is offered, and if not, why not.
+ *
+ * Issue #113 § 3: *"there is a delete but no rename"*. Deleting and re-saving is not a rename —
+ * it mints a new id, and the id is what a recording, the right rail and the challenge screen all
+ * hold — so a reader who mistyped a name had a choice between living with it and orphaning
+ * everything that referred to it.
+ *
+ * `notYours` rather than a disabled button with no reason: a shipped profile's name is `data/`'s,
+ * and this editor renaming one would put a second answer to *what is `collective` called* in the
+ * player's browser only.
+ */
+export type RenameState = 'notYours' | 'unchanged' | 'refused' | 'ready';
+
+export function renameStateOf(
+  name: string,
+  editingId: string,
+  saved: readonly { readonly id: string; readonly profile: DispatcherProfile }[],
+): RenameState {
+  const entry = saved.find((other) => other.id === editingId);
+  if (entry === undefined) return 'notYours';
+  if (name.trim() === entry.profile.name.trim()) return 'unchanged';
+  const others = saved
+    .filter((other) => other.id !== editingId)
+    .map((other) => other.profile.name);
+  return saveNameRefusalOf(name, others) === undefined ? 'ready' : 'refused';
+}
+
+/**
+ * The library with one entry renamed — the id, the weights and every carried field untouched.
+ *
+ * A `map` rather than a delete and an append, and that is the whole point: the entry keeps its
+ * position in the list and, far more importantly, its **id**. A rename that minted a new id would
+ * be a delete wearing a friendlier label, and `state.dispatcherId` would go on naming a dispatcher
+ * that no longer exists.
+ */
+export function renamedDispatchers(
+  saved: readonly { readonly id: string; readonly profile: DispatcherProfile }[],
+  id: string,
+  name: string,
+): readonly { readonly id: string; readonly profile: DispatcherProfile }[] {
+  return saved.map((entry) =>
+    entry.id === id ? { id: entry.id, profile: { ...entry.profile, name: name.trim() } } : entry,
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * What this editor cannot write — GitHub issue #113 § 5
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The blocks a profile carries that this editor's document cannot express.
+ *
+ * `data/dispatcher-profiles.json` advertises five families — `baseline`, `auction`, `zoning`,
+ * `destination` and the weighted-cost engine everything shares — and **two of them are authorable
+ * here**. The editor's document is thirteen weights plus three flags, so there is no control for an
+ * auction's rounds, a zone's split threshold, a destination panel's `passengerAssignment`, a
+ * reassignment policy or a hard constraint. Copying such a profile *does* round-trip those fields,
+ * because {@link profileFromSpec} spreads its `base` — which is precisely what makes the silence
+ * dangerous: the reader edits a multi-round auction's weights, saves, and gets a multi-round
+ * auction, with nothing on screen having mentioned the auction.
+ *
+ * § D227's rule, in its own words: *a control that writes nothing must say so.* This is the same
+ * rule pointed at the gap between what a document carries and what a panel can reach, and it is
+ * reported rather than fixed — building an auction editor is a lane, and a **silent** partial editor
+ * is the defect.
+ *
+ * Derived from the profile rather than from its `role`, because `role` is free-form and three of the
+ * thirteen shipped profiles declare none while carrying exactly these blocks.
+ */
+export type UnauthorableBlock =
+  | 'auction'
+  | 'zoning'
+  | 'panel'
+  | 'reassignment'
+  | 'timing'
+  | 'constraints'
+  | 'selection';
+
+export function unauthorableBlocksOf(
+  profile: DispatcherProfile | undefined,
+): readonly UnauthorableBlock[] {
+  if (profile === undefined) return [];
+  const dispatch = profile.dispatch;
+  const found: UnauthorableBlock[] = [];
+  if (profile.auction !== undefined) found.push('auction');
+  if (dispatch?.splitThresholdPassengers !== undefined) found.push('zoning');
+  if (dispatch?.passengerAssignment !== undefined) found.push('panel');
+  if (dispatch?.reassignmentPolicy !== undefined) found.push('reassignment');
+  if (dispatch?.assignmentTiming !== undefined) found.push('timing');
+  if (profile.hardConstraints !== undefined || profile.eligibility !== undefined) {
+    found.push('constraints');
+  }
+  if (profile.selection !== undefined) found.push('selection');
+  return found;
+}
+
 /*
  * The *now use this* copy. Module-private for the reason stated above, and for the one
  * `TRANSPORT_LANDING_TITLE` states in `buildingEditor.ts`: an exported string literal here becomes
@@ -470,6 +606,37 @@ const RUN_THIS_COPY: Readonly<
       'Makes the dispatcher shown here the one the shift runs, and runs it again on the same ' +
       'building, seed and traffic.',
   }),
+});
+
+/** The refusals {@link saveNameRefusalOf} returns, said where the reader typed the name. */
+const NAME_REFUSAL_COPY: Readonly<Record<NameRefusal, string>> = Object.freeze({
+  empty:
+    'Give this dispatcher a name before saving it. It is the only thing that tells it apart from ' +
+    'the others on every list it appears on.',
+  taken:
+    'A dispatcher with that name already exists. Two rows with one name are two rows you cannot ' +
+    'tell apart later — change a word and save again, or use Rename to move the name.',
+});
+
+/** Why *Rename* is off, said on the control rather than left for the reader to work out. */
+const RENAME_COPY: Readonly<Record<RenameState, string>> = Object.freeze({
+  notYours:
+    'Only a dispatcher you saved can be renamed. This one ships with the simulator, and its name ' +
+    'is the one every published figure was measured under.',
+  unchanged: 'The name in the field is already this dispatcher’s name.',
+  refused: 'That name is empty or already taken by another dispatcher.',
+  ready: 'Renames the saved dispatcher you are editing. Nothing else changes — same id, same weights.',
+});
+
+/** What each unauthorable block is, in the reader's words. One clause, naming the field. */
+const UNAUTHORABLE_COPY: Readonly<Record<UnauthorableBlock, string>> = Object.freeze({
+  auction: 'its auction (how many rounds of bidding, and the reserve)',
+  zoning: 'the size of the landing crowd that splits a zone',
+  panel: 'its destination panel wiring (who is told the destination, and when)',
+  reassignment: 'when an assignment stops being changeable',
+  timing: 'whether an assignment is made at once or deferred',
+  constraints: 'its hard constraints and eligibility rules',
+  selection: 'its mid-run weight-set selection',
 });
 
 /* -------------------------------------------------------------------------- *
@@ -522,7 +689,7 @@ export function mountDispatcherEditor(
   });
 
   elements.save.addEventListener('click', () => {
-    save();
+    save({ select: false });
   });
 
   /*
@@ -534,7 +701,66 @@ export function mountDispatcherEditor(
     className: 'primary',
     attrs: { type: 'button' },
   });
-  elements.save.parentElement?.append(runThis);
+
+  /*
+   * The two nodes the shipped markup does not carry, built here on `buildingEditor.ts`'s precedent
+   * and for the same two reasons — GitHub issue #113 §§ 3 and 4.
+   *
+   * **The confirmation** is what Save owes the reader now that it no longer navigates. It used to
+   * end in `context.openTab('run')`, so *something happened* was carried by the tab changing under
+   * the reader; a Save that files quietly and stays put would be the dead button issue #54 reported
+   * one panel over.
+   *
+   * **Rename** is the verb the panel was missing. Delete existed; rename did not, so the only way to
+   * correct a name was to delete and re-save, which mints a new id.
+   */
+  const savedNote = el(doc, 'span', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { color: 'var(--ok)', 'font-size': '11.5px' },
+  });
+  const rename = el(doc, 'button', {
+    className: 'chip',
+    text: 'Rename',
+    attrs: { type: 'button' },
+  });
+  /*
+   * The refusal § D227 requires — issue #113 § 5. It goes under the summary line, which is where
+   * this panel already says *what the dispatcher you are looking at is*, rather than beside the
+   * buttons: it is a fact about the document, not about a verb.
+   */
+  const unauthorable = el(doc, 'p', {
+    className: 'helpful',
+    style: { color: 'var(--warn)', 'font-size': '11.5px', margin: '4px 0 0' },
+  });
+  setHidden(savedNote, true);
+  setHidden(unauthorable, true);
+  elements.save.parentElement?.append(runThis, rename, savedNote);
+  elements.summary.parentElement?.append(unauthorable);
+
+  rename.addEventListener('click', () => {
+    const at = view;
+    const current = spec();
+    if (at === undefined || current === undefined) return;
+    const state = at.state;
+    if (renameStateOf(current.name, state.editingDispatcherId, state.savedDispatchers) !== 'ready') {
+      return;
+    }
+    /*
+     * The spec's name is rewritten to the trimmed form as well, so the field the reader typed into
+     * and the row they just renamed do not disagree by a space — and so `specIsDirty` compares
+     * equal afterwards, which is what stops *Rename* leaving the panel claiming unsaved changes.
+     */
+    context.update({
+      savedDispatchers: renamedDispatchers(
+        state.savedDispatchers,
+        state.editingDispatcherId,
+        current.name,
+      ),
+      dispatcherSpec: { ...current, name: current.name.trim() },
+    });
+    setText(elements.error, '');
+  });
 
   runThis.addEventListener('click', () => {
     const at = view;
@@ -551,9 +777,13 @@ export function mountDispatcherEditor(
     );
     if (action === 'alreadyDriving') return;
     if (action === 'saveFirst') {
-      // `save` already selects what it files — see its `dispatcherId: id`. It also opens the run
-      // tab, which is where a reader who pressed *run it* is going anyway.
-      save();
+      /*
+       * The **one** path that still selects, and it says so on its own label: *Save it and run it*.
+       * A press that refused — an empty or duplicated name — must not go on to run, because there
+       * is nothing filed for the run to resolve, so the return value is branched on rather than
+       * discarded.
+       */
+      if (!save({ select: true })) return;
     } else {
       context.update({ dispatcherId: at.state.editingDispatcherId });
       context.openTab('run');
@@ -561,10 +791,44 @@ export function mountDispatcherEditor(
     context.runShift();
   });
 
-  function save(): void {
+  /**
+   * File the spec as a new dispatcher. `true` when something was filed.
+   *
+   * ## Saving no longer selects — GitHub issue #113 §§ 3 and 4
+   *
+   * This wrote `dispatcherId: id` and then `context.openTab('run')`, so **every** press of Save
+   * silently changed who was driving and moved the reader off the panel. Issue #113 § 3 reports the
+   * consequence: a reader pressing Save repeatedly, as one does while tuning, kept re-pointing the
+   * run at whatever they had filed most recently without ever asking for it.
+   *
+   * § 4 reports the same seam from the other end — the building editor's Save does *not* select, so
+   * *"Save as a new building"* leaves the next run on the old building. The two editors disagreed,
+   * and **the dispatcher editor is the one that moved**, deliberately: the building editor's
+   * selection goes through {@link stateRunningSaved}, whose docstring documents a week-contract
+   * forgery that a bare `buildingId` write reintroduces — a drawn tower banked against a real
+   * assignment. That indirection is load-bearing and is not something to copy over here; what is
+   * copyable is its *shape*, which is **Save files it and says so, and a second, named verb runs
+   * it**. The building editor's second verb is *Run a day on it*; this panel's is the *now use this*
+   * control above, which has been here since issue #65 and now carries the whole of the selection.
+   */
+  function save(options: { readonly select: boolean }): boolean {
     const at = view;
     const current = spec();
-    if (at === undefined || current === undefined) return;
+    if (at === undefined || current === undefined) return false;
+    /*
+     * Refused **before** an id is minted, so a rejected save leaves nothing behind. The names it is
+     * checked against are every dispatcher on the list the reader will read it off — shipped and
+     * saved — because that is the list on which two identical rows are indistinguishable.
+     */
+    const refusal = saveNameRefusalOf(
+      current.name,
+      allDispatchers(at.resources, at.state.savedDispatchers).map((profile) => profile.name),
+    );
+    if (refusal !== undefined) {
+      setText(elements.error, NAME_REFUSAL_COPY[refusal]);
+      forgetConfirmation();
+      return false;
+    }
     try {
       const saved = at.state.savedDispatchers;
       const id = nextSavedId('yours', [
@@ -580,12 +844,24 @@ export function mountDispatcherEditor(
       });
       context.update({
         savedDispatchers: [...saved, { id, profile }],
-        dispatcherId: id,
+        ...(options.select ? { dispatcherId: id } : {}),
         editingDispatcherId: id,
         dispatcherSpec: { ...current, name: profile.name },
       });
       setText(elements.error, '');
-      context.openTab('run');
+      if (options.select) {
+        forgetConfirmation();
+        context.openTab('run');
+        return true;
+      }
+      confirmedId = id;
+      setText(
+        savedNote,
+        `Saved — “${profile.name}” is in your dispatchers. It is not driving yet; press ` +
+          `“${RUN_THIS_COPY.select.label}” to put it in charge of the shift.`,
+      );
+      setHidden(savedNote, false);
+      return true;
     } catch (error) {
       /*
        * A refused save is a fact about the document the reader is holding, not a crash. It lands in
@@ -595,7 +871,18 @@ export function mountDispatcherEditor(
       const message = error instanceof Error ? error.message : String(error);
       setText(elements.error, message);
       context.fail(message);
+      forgetConfirmation();
+      return false;
     }
+  }
+
+  /** The dispatcher the confirmation is about. Cleared the moment the reader edits again. */
+  let confirmedId = '';
+
+  function forgetConfirmation(): void {
+    confirmedId = '';
+    setText(savedNote, '');
+    setHidden(savedNote, true);
   }
 
   /* --- the term rows ------------------------------------------------------ */
@@ -757,7 +1044,40 @@ export function mountDispatcherEditor(
       costFunctionLine(current, (id) => shortTermNameOf(id, allIds)),
     );
     setText(elements.advice, adviceFor(current));
-    setHidden(elements.dirty, !specIsDirty(current, source));
+    const dirty = specIsDirty(current, source);
+    setHidden(elements.dirty, !dirty);
+
+    /*
+     * **What this editor cannot write about the profile in front of the reader** — issue #113 § 5,
+     * and § D227's rule that a control which writes nothing must say so. The note is keyed on the
+     * *source* profile rather than on the spec, because the spec has no room for these fields at
+     * all: they survive a save by riding on `profileFromSpec`'s `base`, which is exactly why their
+     * absence from the panel is invisible without this line.
+     */
+    const carried = unauthorableBlocksOf(source);
+    setText(
+      unauthorable,
+      carried.length === 0
+        ? ''
+        : `Carried through unchanged and not editable here: ${carried
+            .map((block) => UNAUTHORABLE_COPY[block])
+            .join('; ')}. Saving keeps them exactly as they are.`,
+    );
+    setHidden(unauthorable, carried.length === 0);
+
+    /*
+     * The confirmation is about a document that has not moved since. `buildingEditor.ts`'s rule,
+     * and for its reason: a green *saved* line still showing after the reader has dragged a weight
+     * is a claim about the thing on screen that stopped being true.
+     */
+    if (confirmedId !== '' && (dirty || state.editingDispatcherId !== confirmedId)) {
+      forgetConfirmation();
+    }
+
+    /* Rename — the verb this panel did not have. */
+    const renameState = renameStateOf(current.name, state.editingDispatcherId, state.savedDispatchers);
+    rename.disabled = renameState !== 'ready';
+    rename.title = RENAME_COPY[renameState];
 
     /* The *now use this* verb, relabelled for whichever of the three states the panel is in. */
     const action = runThisDispatcherStateOf(

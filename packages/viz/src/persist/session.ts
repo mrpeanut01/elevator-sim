@@ -177,6 +177,46 @@ function snapshotOf(viewer: ViewerState, menu: MenuState): SessionSnapshot {
 }
 
 /**
+ * Which `ViewerState` field each shelf of the saved library is read from.
+ *
+ * One table rather than four literals in two places, and that is the whole point of it: {@link
+ * libraryOf} reads through it and {@link patchTouchesLibrary} decides through it, so *what the
+ * library is made of* and *what counts as changing the library* cannot disagree. A fifth shelf added
+ * to `SavedLibrary` without a line here fails `persist.test.ts`'s derived cover, which reads the
+ * shelf names back off a written envelope rather than being told them.
+ */
+export const LIBRARY_STATE_KEYS = Object.freeze({
+  buildings: 'savedBuildings',
+  dispatchers: 'savedDispatchers',
+  patterns: 'savedPatterns',
+  classes: 'savedClasses',
+} as const);
+
+/**
+ * Whether a `ViewerState` patch moves anything the library is made of.
+ *
+ * ## Why this exists rather than *save on every change*
+ *
+ * `dev/main.ts`'s `MountContext.update` is the one choke point every panel writes state through, and
+ * it is **hot**: every slider drag patches `dispatcherSpec` or `buildingSpec` sixty times a second.
+ * Saving on each of those would put a `JSON.stringify` of the whole library inside a drag.
+ *
+ * The five patches that *do* move a shelf are all discrete button presses — the dispatcher editor's
+ * save and delete, the building editor's save, the machines editor's save, the traffic editor's save
+ * — which is why this predicate is a debounce all by itself, and why no timer is needed. That is
+ * counted from the tree rather than assumed: `savedBuildings|savedDispatchers|savedPatterns|
+ * savedClasses` are written from exactly those five sites plus `stateRunningSaved` and the JSON
+ * editor's adopt, and none of them is on an `input` handler.
+ *
+ * `in` rather than a truthiness test, so a patch that empties a shelf — the delete button — is a
+ * change like any other. An `undefined` value would be a caller writing *nothing* to a field the
+ * state requires, which `ViewerState` does not permit; the check is about the key being present.
+ */
+export function patchTouchesLibrary(patch: Partial<ViewerState>): boolean {
+  return Object.values(LIBRARY_STATE_KEYS).some((key) => key in patch);
+}
+
+/**
  * The four shelves, copied off the state as they are.
  *
  * Private for the same reason {@link snapshotOf} is: a public builder would let a caller assemble a
@@ -187,10 +227,10 @@ function snapshotOf(viewer: ViewerState, menu: MenuState): SessionSnapshot {
  */
 function libraryOf(viewer: ViewerState): SavedLibrary {
   return {
-    buildings: viewer.savedBuildings,
-    dispatchers: viewer.savedDispatchers,
-    patterns: viewer.savedPatterns,
-    classes: viewer.savedClasses,
+    buildings: viewer[LIBRARY_STATE_KEYS.buildings],
+    dispatchers: viewer[LIBRARY_STATE_KEYS.dispatchers],
+    patterns: viewer[LIBRARY_STATE_KEYS.patterns],
+    classes: viewer[LIBRARY_STATE_KEYS.classes],
   };
 }
 
