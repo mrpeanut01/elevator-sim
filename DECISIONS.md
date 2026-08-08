@@ -21452,3 +21452,68 @@ The two tests that pinned the old number were rewritten to pin **that there is a
 looping until refused. A test that fails whenever a bounded policy is retuned trains its reader to
 edit the assertion, which is how a bound stops meaning anything.
 
+
+## D305 — Compare draws its interval, and its default was chosen for reportability rather than for a verdict
+
+**Date: 2026-08-08.** Issue [#119](https://github.com/mrpeanut01/elevator-sim/issues/119) found the
+shipped batch answering **none of eight measures**: one saturated replication in fifty nullified the
+three headline metrics under the complete-case rule. **That rule is unchanged.** Three things moved.
+
+**The interval is drawn.** This is a product whose central claim is an interval that excludes zero,
+and it had never drawn one — ~700 words of monospace prose per verdict instead. A bar clear of zero
+is **filled**; one that straddles is **hollow with the zero line drawn through it**; every bar
+carries its caption in words and an `aria-label` with the whole row. Strip every colour and the two
+states are still told apart by whether a line crosses a box. `IntervalPlot.ranks` is **copied from
+the verdict, never inferred from `upper < 0`** — otherwise an energy axis and a
+[§ D171](#d171) under-budget interval would both draw as wins. The prose is **all kept**, moved
+beside the row it justifies.
+
+**The report leads with its answer** — the verdict, the drop count, and `packages/cli`'s own
+capacity framing, which already said the useful thing the viewer did not: *"A diverges at this load
+and B does not. That is a finding about capacity, and it does not need a mean to be true."*
+
+**The default runs the building's own profile at its declared `min`** — and the selection procedure
+is the part that matters. The criterion was written down and applied **before a single interval was
+read**: *the largest arrival rate on a 1 %-step grid at which all fifty paired replications stand
+behind a mean on both reference arms.* Swept 16 → 3; 16 loses one replication, 15 and below lose
+none. It returns **15**, which is `office-prestige`'s own declared floor. It ships as a **band
+select** (`min`/`typical`/`max`) rather than the number, so the *level* survives the panel
+inheriting a different building where a literal rate would not.
+
+**The shipped default now answers 8 of 8**, and its single separating row —
+ΔTTD **+3.933 s [+1.626, +6.241]** — names the **baseline** (`collective`) ahead. That a
+tuned-for-demonstration default would not have produced is the strongest available evidence this one
+was not.
+
+**The resolution limit was re-probed rather than inherited**, per [§ D151](#d151): at that cell, on
+TTD, at a **disjoint seed**, n = 50, 80 % power against a two-sided 95 % paired-t — near-neighbour
+**2.499 s**, structural **2.417 s**. The 3.933 s effect clears both. **The interval's lower bound of
+1.626 s does not, and that is stated in the code rather than smoothed over.**
+
+**Three of the issue's claims did not survive.** Its dispatcher-slug complaint is stale — both
+selects have read `Name (slug)` since § D236. Its implied "pick a better building" remedy does not
+exist: swept at their own traffic, **all eight shipped buildings suppress all three wait rows**, and
+Garden Apartments and St Jude reach only 47 of 50 quotable while saturating in **0** of 50 — other
+`awtIsValid` grounds. Demand really is the only lever. And `min` does not rescue every building —
+Midtown Office is 0 of 50 either way, and the panel says so.
+
+## D306 — the twelfth dead seam: `BatchPanelHandle.prefill`
+
+`mountBatchPanel` has returned a handle with `prefill()` since it was written, reading a live
+`inherit()` callback that reads the viewer's real state — and **nothing in the tree ever called
+either**. `dev/main.ts` discards the handle. So opening Compare while playing Garden Apartments
+offered Chancery House, and the mechanism to fix it had been sitting in the module the whole time.
+
+By the standing requirement's own test — *name the non-test caller* — this is the **twelfth**
+instance in code. The existing ordinals do not move: *the ninth* names § D114's instance and *the
+eleventh* names § D131's, and renumbering them would break every reference for a running total.
+
+Closed by giving it a caller **inside the module**, driven by the panel's own `[role=tabpanel]`
+visibility rather than by the shell, because the shell is another lane's file. An `isRunning()`
+added to the handle for the tab-steal fix was **deliberately not added**: an export with no non-test
+caller is the exact defect this entry is about, and the fix that needs it is sequenced onto the lane
+that owns `dev/main.ts`.
+
+**Still open from #119**, both blocked on `dev/main.ts`: the tab steal (a finishing run force-
+switches the centre column mid-batch), and the **dispatcher** half of the inheritance.
+
