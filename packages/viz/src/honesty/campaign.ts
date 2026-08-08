@@ -64,6 +64,7 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
   let simulations = 0;
   let skipped = 0;
   let suppressedCases = 0;
+  const temporal = { atPlayhead: 0, early: 0, declaredNow: 0, declaredWholeRun: 0 };
   const shrunkSignatures = new Set<string>();
 
   for (const seed of options.seeds) {
@@ -76,6 +77,10 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
     for (const surface of outcome.surfacesExercised) surfaces[surface] = (surfaces[surface] ?? 0) + 1;
     texts += outcome.textCount;
     simulations += outcome.simulations;
+    temporal.atPlayhead += outcome.temporal.atPlayhead;
+    temporal.early += outcome.temporal.early;
+    temporal.declaredNow += outcome.temporal.declaredNow;
+    temporal.declaredWholeRun += outcome.temporal.declaredWholeRun;
     if (outcome.skipped !== undefined) skipped += 1;
     if (outcome.suppressed) suppressedCases += 1;
 
@@ -118,6 +123,7 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
       surfaces: Object.freeze(surfaces),
       buildings: Object.freeze(buildings),
       modes: Object.freeze(modes),
+      temporal: Object.freeze({ ...temporal }),
     }),
   };
 }
@@ -137,6 +143,13 @@ export function formatHonestyStats(stats: HonestyCampaignStats): string {
     `buildings        ${entries(stats.buildings)}`,
     `modes            ${entries(stats.modes)}`,
     `surfaces         ${String(Object.keys(stats.surfaces).length)} produced at least one string`,
+    /*
+     * The temporal axis's own size, printed for the reason the rest of this block is: a property
+     * answerable only about strings said at a playhead is green for the wrong reason if the corpus
+     * stopped producing them, and `honesty.test.ts` asserts on all four of these numbers.
+     */
+    `at a playhead    ${String(stats.temporal.atPlayhead)} (${String(stats.temporal.early)} short of endedAt)`,
+    `declared basis   now=${String(stats.temporal.declaredNow)} whole-run=${String(stats.temporal.declaredWholeRun)}`,
   ].join('\n');
 }
 
