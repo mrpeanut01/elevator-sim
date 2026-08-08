@@ -65,12 +65,12 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 
 | id | question | status |
 |---|---|---|
-| **E-0** | **Teaching tool / research sandbox, or mass-market management sim?** Stated by the tester report, not by any issue. **E-1 and E-2 are both downstream of it** | **Open — decide first** |
-| **E-1** | Build deterministic intraday intervention (re-simulate from t=0 on each event)? Or ship only the honesty fallback (#104)? | **Open — needs a human.** Touches the run model, Invariants 2 and 5, and replay verification. **Scope reduced**: #116's "no economy" premise is refuted (see E-7) |
+| **E-0** | Teaching tool, mass-market sim, or a split? | **DECIDED 2026-08-08 — explicit split, two products over one engine.** Engineer is *frozen and never compromised*; Casual is a different door into the same full capability. § D299 |
+| **E-1** | Deterministic intraday intervention? | **DEFERRED 2026-08-08, not refused.** Ship #104 and surface `Commission the building` first, then re-ask against a product where the existing agency is visible. § D300 |
 | **E-7** | Deployed-build divergence: the tester played an Azure deployment, not HEAD | **RESOLVED 2026-08-07.** `git diff 769eb61 faf935b` is empty — HEAD is a merge commit with the deployed tree. Waves B/C were played against HEAD's content. Wave A's delta is purely additive and untouching. **All refutations stand.** |
-| **E-2** | Is Casual a real layout, or is the toggle removed? | **Open — needs a human.** Both branches large and opposite |
-| **E-3** | Board seeding (#101 residual): fabricate reference scores, or reframe the empty state? | **Open.** Interacts with the anti-cheat replay guarantee |
-| **E-4** | Phase 9's honesty sweep does not cover *temporal* honesty — it samples `t=0` and passes whole-run claims. Record as a named gap? | **Open.** See findings § J |
+| **E-2** | Casual: real layout, or remove the toggle? | **DECIDED 2026-08-08 — build it as a real layout, at FULL capability.** Named play styles are an entry point, never a ceiling; a Casual player authors and tunes completely. § D299 § 2 |
+| **E-3** | Board seeding (#101 residual) | **DECIDED 2026-08-08 — seed with verified baseline runs.** Not fabrication: posted through the normal path, so the server replays and verifies them like any score. Labelled *reference*, never as players. § D300 |
+| **E-4** | Phase 9's honesty sweep does not cover *temporal* honesty | **DECIDED 2026-08-08 — name the gap AND grow the sweep axis.** Naming alone leaves an uncovered property that happens to pass. Lane in flight. § D300 |
 | **E-5** | Auth token lockout | **DECIDED 2026-08-07 — fix at the rate limiter.** Token stays in memory; the documented decision is not reversed; #112 rec 3 not adopted as written |
 | **E-6** | Branch topology | **DECIDED 2026-08-07 — one owner, one sequenced branch**: #106 → #111 → #97a → #112 → #113 |
 
