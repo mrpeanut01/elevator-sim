@@ -21675,3 +21675,49 @@ back off the deployed Container App** rather than regenerated — the round trip
 reset the server's administrator credential to something its own connection string does not carry.
 Regenerating `appSecret` would have invalidated every session and every in-flight sign-in link, and
 that is a cost this lane had no reason to pay.
+
+---
+
+## D309 — nothing was locked, and the panels the report treats as one hold three behaviours
+
+**Date: 2026-08-08.** GitHub issue #104 asks for one inline note — *"locked for this shift, changes
+apply to your next run"* — on the Dispatcher, Traffic, Building and Machines tabs, on the premise
+that those controls *"are simply unresponsive"* once a shift is running. **The premise did not
+survive verification, and the fix is not the note the issue asks for.** Traced against
+`feat/azure-app-deployment` at `65f899b`:
+
+- **No control on any of those panels is disabled while a shift plays.** The only `disabled` writes
+  conditioned on *running* in the whole viewer are `dev/batchPanel.ts:157-169` and
+  `dev/campaignPanel.ts:408-414`, and both mean *a worker batch is in flight*, not *a recording is
+  being played back*.
+- The right rail's three lists are **live and destructive**: `dev/rightRail.ts:1040-1041`,
+  `:1075-1076` and `:1105-1106` each write and then call `MountContext.runShift`, and
+  `dev/main.ts:2830-2864` re-simulates and calls `adopt`, which builds a **new `Playback`**
+  (`:2933`). The day being watched is not steered and not paused — it is discarded, and the playhead
+  returns to zero. Taking a car out of service (`dev/main.ts:3252-3261`) is the same.
+- The group levers, the door dwell and the weight-set selector write a field `shiftRunConfigOf`
+  really does read and call **no** `runShift` (`dev/dispatcherEditor.ts:1011`, `:1034`,
+  `dev/selectorEditor.ts:443`). **Here the reporter's wording is exactly right**, and it is drawn
+  verbatim rather than reworded.
+- The four editors' working copies are **drafts** — `latent` in `scope/surface.ts:224-251`, realised
+  by a save or a select. This is the control the report describes moving: *"nudge a weight while
+  watching a queue build"*.
+
+So one sentence over all four panels would have been wrong about at least one panel wherever it was
+drawn, which is [§ D227](#d227)'s defect with better manners. Three sentences are drawn instead, and
+the block each one sits over is **derived from `SCOPE_OF` rather than asserted**
+(`packages/viz/src/scope/commitment.ts`): `scope/surface.ts` is asserted against the state's own
+keys in both directions and every row of it is decided by `scope.test.ts` running both arms and
+comparing the legs, so a re-scoped field moves the sentence with it. Where the derivation stops
+answering, the note is **absent** rather than stale — an absent sentence is not a false one, and
+`dev/scopeNotes.test.ts` is what stops the absence becoming permanent.
+
+That test file is also the first thing in this package to **drive** `mountRightRail` and the four
+editor mounts (`dev/mountRecorder.test-helper.ts`, `resolveElements` over the real
+`ELEMENT_IDS`). It narrows finding **N-6** rather than closing it: the mounts are driven through
+*construction*, which is where their static nodes are written, and not through `render`, which is
+where the pick lists and plates still are.
+
+**What is not claimed.** The evidence tier is the document recorder, third of `docs/16` S9's four.
+Nothing here consults `index.html`'s stylesheet, so this cannot say the notes are legible — the
+distinction `dev/menuPanel.test.ts` records at 1.03:1 applies word for word.

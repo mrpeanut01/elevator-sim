@@ -42,13 +42,31 @@ out of `core/`, so there is no "now" inside a run to intervene at.
 Three consequences, and each is a game-design fact rather than an implementation detail:
 
 1. **A control does not steer a day. It re-rolls one.** Moving a dispatcher weight does not change
-   what happens next; it discards the day and simulates a different one. `dev/main.ts` is honest
-   about this in its wiring — every state changer calls `runShift()` — but no surface says it.
+   what happens next; it discards the day and simulates a different one.
+
+   > **Corrected twice by GitHub issue #104's verification ([§ D309](../DECISIONS.md#d309)), and
+   > both halves were wrong in the same direction — this paragraph was more confident than the
+   > wiring.** It read *"`dev/main.ts` is honest about this in its wiring — every state changer calls
+   > `runShift()` — but no surface says it."*
+   >
+   > **Not every state changer does.** The right rail's three lists and the stage's out-of-service
+   > badge do, and the day on screen is discarded when they fire. The **group levers**, the **door
+   > dwell** and the **weight-set selector** write a field `shiftRunConfigOf` reads and call no
+   > `runShift` at all (`dev/dispatcherEditor.ts:1011`, `:1034`, `dev/selectorEditor.ts:443`), so
+   > their change waits for the next run — which is a fourth thing a control can do to a day and is
+   > why `scope/commitment.ts` distinguishes `re-runs-now` from `next-run`.
+   >
+   > **And a surface says it now**, on nine blocks across the right rail and the five editor mounts,
+   > derived from `SCOPE_OF` so that a re-scoped field moves the sentence rather than stranding it.
+
 2. **The only genuine mid-run adaptation the simulator has is the weight-set selector**
    (`selection.policy`, `core/src/dispatch/selector.ts`, with `patternSwitching` in
    `data/dispatcher-profiles.json`). Which means the player's real within-day lever is *configuring
-   an automatic policy in advance*, not intervening. That is a good mechanic and it is currently
-   invisible in every mode.
+   an automatic policy in advance*, not intervening. That is a good mechanic, and its last sentence
+   here — *"it is currently invisible in every mode"* — **stopped being true with
+   [§ D219](../DECISIONS.md#d219)**: `dev/selectorEditor.ts` is the panel, it sits under the
+   dispatcher's own controls, and § D309 added the note that keeps this heading's *mid-shift* from
+   reading as a promise about the control rather than about the mechanism.
 3. **A retry is therefore free, unlimited and unrecorded**, and any progression counted across days
    measures persistence rather than skill unless something says otherwise. See S6 and § 5 clause 1.
 

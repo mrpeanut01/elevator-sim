@@ -242,12 +242,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'the argument for a field’s scope, addressed to whoever changes that field, and it reaches ' +
         'no screen — `surface.test.ts` asserts every row carries one and `scope.test.ts` decides ' +
         'whether the row is true by running both arms, which is a stronger check than a string ' +
-        'search over a sentence no player reads. `permits` returns a boolean and authors nothing.',
+        'search over a sentence no player reads. `permits` returns a boolean and authors nothing. ' +
+        '`COMMITMENTS` is a third id tuple of the same kind and `commitmentOf` returns one of its ' +
+        'members — both derived only because a hyphen reads as a word break, so `re-runs-now` is ' +
+        'two adjacent words to the scanner’s eye and `docs/16`’s own `within-day` is too. The ' +
+        'sentences a player actually reads from that code are authored beside each control, in ' +
+        'the five mounts already excluded above as DOM-bound; issue #104’s note is that, and ' +
+        '`commitment.ts`’s own docstring states the limitation — a mount’s copy reaches the static ' +
+        'sweep and not the driven one.',
       ids: [
         'scope/types.ts#CHANGE_SCOPES',
         'scope/types.ts#PLAY_MODES',
         'scope/surface.ts#SCOPE_OF',
         'scope/permits.ts#permits',
+        'scope/commitment.ts#COMMITMENTS',
+        'scope/commitment.ts#commitmentOf',
       ],
     },
     {
