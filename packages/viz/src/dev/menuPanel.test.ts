@@ -72,7 +72,13 @@ import { SIGNED_OUT, updateForm, type AccountForm, type AccountState } from '../
 import type { BoardPage } from '../menu/client.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
-import { applyIntent, type CommissioningScreenInput, type MenuIntent } from '../menu/screens.js';
+import type { ChallengeBoardRow, ChallengeView } from '../menu/challenge.js';
+import {
+  applyIntent,
+  type ChallengeScreenInput,
+  type CommissioningScreenInput,
+  type MenuIntent,
+} from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -1343,6 +1349,195 @@ describe('an empty leaderboard shows what a board is', () => {
       }),
     });
     expect(textUnder(root)).not.toContain('An example of a board');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The challenge board is drawn — GitHub issue #112
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One challenge board, as `GET /api/challenge-board` answers it.
+ *
+ * Two entries and not one, because every assertion worth making here is about the *relationship*
+ * between rows: which one is the reader's, and how far behind the top row it is. A single-row
+ * fixture would pass a renderer that drew the first entry and dropped the rest.
+ */
+const CHALLENGE_BOARD = (): ChallengeScreenInput => {
+  const view: ChallengeView = {
+    challenge: {
+      id: 'week-2026-32',
+      name: 'Morning rush',
+      brief: 'The lobby fills for twenty minutes.',
+      config: {
+        buildingId: 'midtown-office',
+        demandTemplateId: 'up-peak',
+        arrivalRatePctPop5min: 2,
+        durationS: 900,
+      },
+      seeds: ['1', '2', '3', '4', '5'],
+      opensAtMs: 0,
+      closesAtMs: 1,
+    },
+    state: 'open',
+    seedCount: 5,
+    opensInMs: null,
+    closesInMs: 3_600_000,
+    clockNote: 'Times are the server’s.',
+    dataHash: 'aa',
+    compare: {
+      note: 'Compare is the only screen that may say one dispatcher beats another.',
+      buildingId: 'midtown-office',
+      demandTemplateId: 'up-peak',
+      arrivalRatePctPop5min: 2,
+      durationS: 900,
+    },
+  };
+  const score = (mean: number): ChallengeBoardRow['score'] => ({
+    runs: 5,
+    legs: 640,
+    meanAwtS: mean,
+    meanWt95S: mean * 2,
+    meanTtdMeanS: mean * 3,
+    meanPctOverLongWait: 7.5,
+    perSeed: [],
+  });
+  return {
+    runsDone: 5,
+    view,
+    board: {
+      challengeId: 'week-2026-32',
+      challenge: view.challenge,
+      state: 'open',
+      dataHash: 'aa',
+      metric: 'awtS',
+      seedCount: 5,
+      note: 'Ordered on average wait. The four figures are never added together.',
+      compare: view.compare,
+      entries: [
+        {
+          id: 'entry-1',
+          displayName: 'Grace Hopper',
+          dispatcherProfileId: 'collective',
+          score: score(21.0),
+          submittedAtMs: 10,
+        },
+        {
+          id: 'entry-2',
+          displayName: 'Ada Lovelace',
+          dispatcherProfileId: 'zoned-uppeak',
+          score: score(24.5),
+          submittedAtMs: 20,
+        },
+      ],
+      entriesOnOtherData: 0,
+    },
+  };
+};
+
+/** Signed in as the second row's author, so *which of these is mine* has an answer to find. */
+const SIGNED_IN_AS_ADA: AccountState = {
+  ...SIGNED_OUT,
+  token: 'session-token',
+  user: { id: 'u1', email: 'ada@example.test', displayName: 'Ada Lovelace', displayNameChosen: true },
+};
+
+describe('this week’s challenge draws the board it fetched — GitHub issue #112', () => {
+  /*
+   * ## What was wrong, and why nothing caught it
+   *
+   * `ChallengeBoardPage.entries` was fetched by `dev/main.ts#loadChallengeBoard`, threaded into
+   * `ChallengeScreenInput`, and **read by no renderer**: `menu/screens.ts#challengeBody` touched
+   * `board.note` and `board.otherDataNote` and nothing else. So the screen's *Order the board on*
+   * select fired a real re-fetch of a real board, and the only thing a player could see change was
+   * the wording of a sentence.
+   *
+   * It survived because **this file's own host fixture passes `challenge: () => undefined`** for
+   * every case above, so the challenge screen has never been rendered here at all. That is the
+   * document tier's blind spot rather than an oversight in a test: a screen nobody renders draws
+   * whatever it likes.
+   *
+   * Reverting `menuPanel.ts`'s `if (view.screen === 'challenge') children.push(challengeBoardTable(…))`
+   * fails every assertion in this block; the empty-board case below fails on the sentence.
+   */
+  it('puts a row on the page for each entry, with all four figures and the count behind them', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+    });
+    const rows = byClass(root, 'menu-board-row');
+    expect(rows.length, 'the challenge screen drew no board rows').toBe(2);
+
+    const text = textUnder(root);
+    expect(text).toContain('Grace Hopper');
+    expect(text).toContain('Ada Lovelace');
+    // All four, never a fifth and never a total — § D106 through `boardTable`'s own rule.
+    for (const metric of ['AWT', 'WT95', 'TTD', 'over-long']) expect(text).toContain(metric);
+    // R13: a mean without the count it was taken over is a different measurement.
+    expect(text).toContain('5 runs');
+    expect(text).toContain('640 legs');
+    // The axis this whole screen exists to vary, named on the row that chose it.
+    expect(text).toContain('collective');
+    expect(text).toContain('zoned-uppeak');
+    /*
+     * And no interval and no dispersion. `ChallengeScore`'s docstring forbids one in as many words —
+     * five runs cannot support an inference — so the negative is asserted rather than assumed.
+     */
+    expect(text).not.toMatch(/±|\[\s*-?\d/u);
+  });
+
+  it('marks the signed-in player’s own row in words as well as in a class', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+      account: () => SIGNED_IN_AS_ADA,
+    });
+    const mine = byClass(root, 'menu-board-row menu-board-you');
+    expect(mine.length, 'no row was marked as the reader’s own').toBe(1);
+    // KB-15: the class is the *second* signal. A highlight a screen reader cannot hear would leave
+    // the reader who most needs the answer without one.
+    expect(textUnder(mine[0] as Recorded)).toContain('Ada Lovelace — you');
+    // Ada is 3.5 s behind Grace on `awtS`, which is the metric this board declares.
+    expect(textUnder(root)).toContain('3.5 s behind the top row');
+  });
+
+  it('marks nobody when nobody is signed in, and names no gap', async () => {
+    // The negative control on the pair above: with `SIGNED_OUT`, both assertions must fail to find
+    // anything, or the highlight is being drawn on whatever row happens to be first.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+    });
+    expect(byClass(root, 'menu-board-row menu-board-you').length).toBe(0);
+    expect(textUnder(root)).not.toContain('behind the top row');
+  });
+
+  it('says an empty board is empty, and says how to be the first row on it', async () => {
+    const loaded = await catalogue();
+    const input = CHALLENGE_BOARD();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => ({
+        ...input,
+        ...(input.board === undefined ? {} : { board: { ...input.board, entries: [] } }),
+      }),
+    });
+    expect(byClass(root, 'menu-board-row').length).toBe(0);
+    const text = textUnder(root);
+    expect(text).toContain('Nothing has been posted to this board yet');
+    // Named from `seedCount`, so the sentence cannot say five while the challenge asks for eight.
+    expect(text).toContain('all 5 seeds');
+  });
+
+  it('draws nothing board-shaped when there is no board, rather than an empty table', async () => {
+    // The other negative control, and the case every other test in this file was in: no server, or
+    // no answer yet. The screen's own notices carry the reason; a wordless empty table would be a
+    // second answer to the same question.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => ({ runsDone: 0 }),
+    });
+    expect(byClass(root, 'menu-board').length).toBe(0);
+    expect(byClass(root, 'menu-board-row').length).toBe(0);
   });
 });
 

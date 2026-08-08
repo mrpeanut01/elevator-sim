@@ -1278,6 +1278,12 @@
       .menu-board-name { font: 600 13px var(--sans); color: var(--text); }
       .menu-board-figures { font: 400 11px var(--mono); color: var(--dim); }
       .menu-board-seed { font: 400 11px var(--mono); color: var(--dim); }
+      /* The signed-in player's own row on a board — GitHub issue #112.
+         KB-15: the tint is the *second* signal and never the only one. `menuPanel.ts#boardRow`
+         appends "— you" to the name itself, so a reader on a screen reader, on a monochrome
+         display, or with a colour vision deficiency is told the same thing this rule says. */
+      .menu-board-you { border-left: 3px solid var(--accent); padding-left: 8px; }
+      .menu-board-you .menu-board-name { color: var(--accent); }
 
       /* § D222 — the inactive control says so on its own label line.
          `controls/render.ts` emits `.control-lock` for every inactive control and for no

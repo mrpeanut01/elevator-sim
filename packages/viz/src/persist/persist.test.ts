@@ -60,7 +60,14 @@ import type { WeekState } from '../shift/types.js';
 import { HISTORY_DAYS, closeDay, nextDay, openWeek, outcomeOf } from '../shift/week.js';
 
 import { jsonRoundTripIssue } from './jsonSafety.js';
-import { clearSession, loadLibrary, loadSession, saveSession } from './session.js';
+import {
+  LIBRARY_STATE_KEYS,
+  clearSession,
+  loadLibrary,
+  loadSession,
+  patchTouchesLibrary,
+  saveSession,
+} from './session.js';
 import {
   SESSION_KEY,
   SESSION_SCHEMA_VERSION,
@@ -481,6 +488,80 @@ describe('what is persisted is accounted for in both directions', () => {
         source === 'viewer' ? viewer[key] : menu[key],
       );
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A save is written when the library moves — GitHub issue #113 § 2
+ * -------------------------------------------------------------------------- */
+
+describe('a patch that moves the library is recognised as one', () => {
+  /*
+   * ## The defect this is the gate for
+   *
+   * `dev/main.ts#saveSessionNow` had exactly **two** call sites and neither was a save button: a
+   * `set-setting` menu intent, and `closeDay()`. Issue #113 § 2 reports the consequence and gets the
+   * cause wrong — *"four custom dispatchers, one survived a reload"*, from which the reporter infers
+   * two storage paths, because their custom **building** survived. There is one writer
+   * (`session.ts#libraryOf`) and one reader (`validate.ts#restoreShelf`); what differs is *when*.
+   * A dispatcher filed through *Save it and run it* ran a shift, which closed a day, which wrote the
+   * session. One filed through Save alone was never written at all.
+   *
+   * `dev/main.ts`'s `MountContext.update` is now the choke point, and {@link patchTouchesLibrary} is
+   * what it asks. These cases fail on the unfixed source by not compiling — the export does not
+   * exist there — which is the weakest way a test can fail and is stated rather than dressed up; the
+   * assertion that carries weight is the derived cover below.
+   */
+  it('is true for each shelf, including one being emptied', () => {
+    for (const field of Object.values(LIBRARY_FROM)) {
+      expect(patchTouchesLibrary({ [field]: [] }), field).toBe(true);
+    }
+  });
+
+  it('is false for the patches a drag produces, which is why no debounce is needed', () => {
+    /*
+     * The hot path. Every slider in every editor patches one of these on `input`, sixty times a
+     * second, and a save on each would put a `JSON.stringify` of the whole library inside a drag.
+     * The predicate is the debounce: the five patches that *do* move a shelf are button presses.
+     */
+    expect(patchTouchesLibrary({ dispatcherSpec: viewerState().dispatcherSpec })).toBe(false);
+    expect(patchTouchesLibrary({ buildingSpec: viewerState().buildingSpec })).toBe(false);
+    expect(patchTouchesLibrary({ levers: viewerState().levers })).toBe(false);
+    expect(patchTouchesLibrary({ seed: 42n })).toBe(false);
+    expect(patchTouchesLibrary({})).toBe(false);
+  });
+
+  it('is true for the patch the dispatcher editor’s Save actually sends', () => {
+    // The shape from `dev/dispatcherEditor.ts#save`, which is the press that reported the loss.
+    expect(
+      patchTouchesLibrary({
+        savedDispatchers: [],
+        editingDispatcherId: 'yours-1',
+        dispatcherSpec: viewerState().dispatcherSpec,
+      }),
+    ).toBe(true);
+  });
+
+  it('covers every shelf the envelope actually has, derived from the bytes', () => {
+    /*
+     * The assertion with teeth, and the one a fifth shelf cannot slip past. It does not read
+     * `LIBRARY_STATE_KEYS`' four values and agree with them; it reads the shelf names **off a
+     * written envelope** and requires the predicate to answer `true` for each one's viewer field.
+     * A `SavedLibrary` grown a fifth member without a line in `LIBRARY_STATE_KEYS` would be
+     * persisted by `saveSession` and never *trigger* a save, which is this defect with one more
+     * shelf on it.
+     */
+    const slots = saved();
+    const envelope = JSON.parse(slots.written.get(slotKey(slots)) ?? '') as Record<string, unknown>;
+    const shelves = Object.keys(libraryOf(envelope));
+    expect(shelves.length, 'the envelope carries no library at all').toBeGreaterThan(0);
+    for (const shelf of shelves) {
+      const field = LIBRARY_FROM[shelf as keyof SavedLibrary];
+      expect(field, `library.${shelf} has no viewer field in the ledger`).toBeDefined();
+      expect(patchTouchesLibrary({ [field]: [] }), `library.${shelf}`).toBe(true);
+    }
+    // And the table the shipped code decides through is the ledger's, not a second copy of it.
+    expect(Object.entries(LIBRARY_STATE_KEYS).sort()).toEqual(Object.entries(LIBRARY_FROM).sort());
   });
 });
 
