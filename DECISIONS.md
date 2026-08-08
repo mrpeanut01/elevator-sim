@@ -21148,3 +21148,68 @@ shift existed and repainted by nothing, so **Resume refused a shift that was on 
 it** — which is what issue #97 saw and reported as a missing scenario list. The list was never
 missing.
 
+
+## D299 — two products, one engine: Engineer is frozen, Casual is a door not a subset
+
+**Date: 2026-08-08 · The positioning decision, taken by the product owner, and the parent of every
+design issue in the #90–#119 backlog.**
+
+The playtest report ended on the question no issue had asked: *"is this primarily a teaching tool
+and research sandbox … or a mass-market management-sim game that happens to be built on real traffic
+engineering?"* Eight open issues were downstream of the answer and unactionable without it.
+
+**The answer is neither of the two the report offered. It is an explicit split: two products over
+one engine.**
+
+### 1. Engineer is frozen as-is, and that is the load-bearing half
+
+Engineer mode is **not to be compromised, simplified, or partially migrated** in service of the
+other product. It is the research instrument, and everything expensive in this repository is in it:
+CIBSE and ISO 8100-32 reference data, paired-t intervals under common random numbers, saturation
+suppression on five grounds, the resolution limit measured per cell, server-side replay
+verification. Phase 6c was **refused three times** on the ground that the effect sat below what the
+apparatus can resolve ([§ D145](#d145), [§ D156](#d156)) — a reflex no mass-market product has, and
+the single hardest thing here to have earned.
+
+So the standing constraint is: **a change made for Casual may not remove a number from Engineer,
+widen a threshold, or move a figure out of Engineer's reach.** If a change cannot be made without
+doing one of those, it is a Casual-only change or it does not happen.
+
+### 2. Casual is a different door into the same building, not a smaller building
+
+This is the half that is easy to get wrong, and [§ #110](https://github.com/mrpeanut01/elevator-sim/issues/110)'s
+own recommendation gets it wrong: it proposes the thirteen dispatchers *become* four or five named
+play styles. **They may not.** The decision is explicit that Casual carries **full capability** —
+every parameter that can be edited is editable there, a Casual player can author their own
+dispatcher and tune it completely, and nothing is withheld on the grounds that the audience would
+not want it.
+
+What differs is **vocabulary, layout and the order things are met in** — not what can be reached.
+Named play styles are an *entry point* and never a ceiling; the full weight vector is one
+disclosure away and the disclosure is a door rather than a wall. The measured failure this replaces
+is Casual differing by **44 words out of 919** with three surfaces byte-identical, which is a
+promise the product does not keep. **A mode that quietly caps what a player can build would be the
+same broken promise wearing a better layout.**
+
+This also promotes a defect the backlog had rated minor: only **two of five** advertised dispatcher
+families are authorable — auction, zoning and destination have no controls
+([§ #113](https://github.com/mrpeanut01/elevator-sim/issues/113) § 5). Under *"tweak it fully"* that
+is no longer cosmetic, and it is not a Casual problem: **the authoring gap is in the shared editor
+and it fails both products.**
+
+### 3. What this decides, per issue
+
+| issue | disposition under this decision |
+|---|---|
+| #110, #100 | **Build.** Casual becomes a real layout with a real vocabulary — not a copy register, and not a capped subset |
+| #103, #115 | **Build for Casual.** A second renderer with motion, doors and drawn people, and the stage as the stage. Engineer keeps the schematic view, which is genuinely better *for engineers* |
+| #113 § 5 | **Promoted.** Authoring the other three families is now on the critical path |
+| #90, #98 | **Build.** A first-run door per product, since there are now two |
+| #96, #116 § 2 | **Still deferred**, and see [§ D300](#d300): the agency gap is smaller than #116 argued, because `Commission the building` exists and #116 missed it twice |
+
+### 4. What is not decided here
+
+Whether the two products share one build, one URL and one toggle, or diverge further, is **not**
+settled by this and should not be assumed from it. The toggle is the shipped mechanism and stays
+until something measured argues otherwise.
+
