@@ -308,12 +308,16 @@ is not repeated here.
    replicas are sound in principle, but nothing has run two.
 7. **No CI deploys this.** Deployment is `az` from your own machine with `az login`, so there is no
    stored credential in this repository because there is no automation to hold one. When that
-   changes, the right credential is a federated one on a Microsoft Entra app
-   (`subject: repo:OWNER/elevator-sim:ref:refs/heads/main`) rather than a stored secret — add it
-   when you automate the deployment, not before. *(The **viewer's** deployment is automated:
+   changes, the right credential is a federated one rather than a stored secret — add it when you
+   automate the deployment, not before. **Do not copy the subject from a tutorial**, and this
+   paragraph used to: it said `repo:OWNER/elevator-sim:ref:refs/heads/main`, which is the documented
+   form and is not what GitHub sends. A job declaring an `environment:` gets
+   `…:environment:NAME` instead of a ref, and the prefix carries the numeric account and repository
+   ids (`repo:owner@123/repo@456`). Read it from
+   `GET /repos/OWNER/REPO/actions/oidc/customization/sub` — [§ D308](../DECISIONS.md) is what
+   getting this wrong cost. *(The **viewer's** deployment is automated:
    `.github/workflows/deploy-viz.yml` federates into a user-assigned managed identity and stores no
-   secret. It is inert until armed, and it deploys the page only — never this app or this
-   database.)*
+   secret. It deploys the page only — never this app or this database.)*
 8. **A cold first page load takes 32.2 seconds**, measured on the live deployment against 0.13 s
    warm. `minReplicas: 0` is what makes this deployment cheap and it is also what makes the first
    visitor wait, because `serve.ts` serves the page out of the container that is asleep.
