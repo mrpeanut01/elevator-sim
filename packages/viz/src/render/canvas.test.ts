@@ -17,10 +17,18 @@ import { describe, expect, it } from 'vitest';
 
 import { FIXTURE_DOOR_CONFIG, fixtureSummary } from '../fixtures.test-helper.js';
 import { constantSeries } from '../contract/series.js';
-import { VIZ_SCHEMA_VERSION, type Frame, type VizRecording } from '../contract/types.js';
+import { VIZ_SCHEMA_VERSION, type Frame, type VizLeg, type VizRecording } from '../contract/types.js';
 import { DEFAULT_FOOTER_PX, MIN_HEADER_PX, buildLayout } from './layout.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
-import { DEFAULT_THEME, drawScene, formatClock, type Canvas2DLike, type Theme } from './canvas.js';
+import {
+  DEFAULT_THEME,
+  drawScene,
+  formatClock,
+  playheadHasReachedEnd,
+  undeliveredAt,
+  type Canvas2DLike,
+  type Theme,
+} from './canvas.js';
 import { themeFor } from './theme.js';
 import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
 import { MOOD_GLYPH, type BuildingMood } from './mood.js';
@@ -390,6 +398,83 @@ describe('drawScene', () => {
     expect(lines.some((line) => line.startsWith('simulation timed-out · '))).toBe(true);
   });
 
+  /* ------------------------------------------------------------------ *
+   * R6 / § D223 — the banner's count is read at the playhead, not at the end
+   *
+   * The temporal finding. `summary.undelivered` is *how many people were still in the building
+   * **when the run ended***, and the banner drew it on every frame — so on `honesty-9100032`
+   * (Vertical City, 2 817 s) it said `TIMED-OUT — 127 undelivered` at 00:00, when nobody was
+   * undelivered yet, and the same `127` at 704 s, when the live figure was **376**. Not merely
+   * early: wrong by a factor of three, in the clause RV-16 makes lead the banner.
+   *
+   * The fixture below reproduces that shape at fixture scale — 7 people in the building at 60 s
+   * against 2 undelivered at 120 s — so reverting `drawHeader`'s banner clause to
+   * `summary.undelivered` turns the first two assertions red.
+   * ------------------------------------------------------------------ */
+
+  /** A run whose live in-building count at 60 s is deliberately larger than its final one. */
+  function heldUp(): VizRecording {
+    const legs: VizLeg[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      const arrivedAt = 5 + i * 5;
+      legs.push({
+        passengerId: `p${String(i)}`,
+        originFloorId: 'G',
+        destinationFloorId: '2',
+        direction: 'up',
+        arrivedAt,
+        boardedAt: arrivedAt + 2,
+        carId: 'main-A',
+        bankId: 'main',
+        // One is delivered before the playhead; the rest land after it, so 7 are still riding.
+        alightedAt: i === 0 ? 30 : 100,
+      });
+    }
+    return {
+      ...RECORDING,
+      status: 'timed-out',
+      legs,
+      summary: { ...RECORDING.summary, generated: 8, delivered: 6, undelivered: 2 },
+    };
+  }
+
+  function bannerOf(recording: VizRecording, simTimeS: number): string {
+    const line = draw(frame({ simTimeS }), recording)
+      .calls.filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0]))
+      .find((text) => text.startsWith('TIMED-OUT'));
+    expect(line, `no banner at ${String(simTimeS)} s`).toBeDefined();
+    return line ?? '';
+  }
+
+  it('draws the live in-building count mid-run, and never the run’s ending', () => {
+    const run = heldUp();
+    const at60 = undeliveredAt(run, frame({ simTimeS: 60 }));
+    expect(at60.wholeRun).toBe(false);
+    expect(at60.count).toBe(7);
+    // The premise: the live figure and the finished one really do disagree, and in the direction
+    // that made the shipped banner understate the crowd on screen.
+    expect(at60.count).toBeGreaterThan(run.summary.undelivered);
+
+    expect(bannerOf(run, 60)).toBe('TIMED-OUT — 7 still in the building');
+    expect(bannerOf(run, 0)).toBe('TIMED-OUT — 0 still in the building');
+  });
+
+  it('draws the run’s own count once the playhead has reached the end', () => {
+    const run = heldUp();
+    expect(playheadHasReachedEnd(run, frame({ simTimeS: run.endedAt }))).toBe(true);
+    expect(bannerOf(run, run.endedAt)).toBe('TIMED-OUT — 2 undelivered');
+    // The two readings are worded differently because they are different quantities. A shared noun
+    // would invite the reader to watch one turn into the other.
+    expect(bannerOf(run, run.endedAt)).not.toContain('still in the building');
+    expect(bannerOf(run, 60)).not.toContain('undelivered');
+  });
+
+  // The third claim this rule needs — that `playheadHasReachedEnd` answers exactly as
+  // `dev/leftRail.ts#shiftIsOver` does, so the stage and the rail cannot come to disagree about
+  // which shift a reader is looking at — is pinned in `dev/leftRail.test.ts`, because the
+  // dependency runs that way round: `dev/` may import `render/` and not the reverse.
+
   it('is a pure function of its inputs: equal frames draw equal call sequences', () => {
     expect(draw(frame()).transcript).toBe(draw(frame()).transcript);
   });
@@ -521,7 +606,12 @@ describe('drawScene', () => {
       { saturated: false, awtIsValid: false, awtInvalidReason: 'censored above the limit', undelivered: 20 },
       'timed-out',
     );
-    const transcript = draw(frame({ runningMeanWaitS: 21 }), run).transcript;
+    // At `endedAt`, because that is the playhead the run's own `undelivered` belongs to — see
+    // `undeliveredAt`. The claim under test is about the mean, and it holds at either playhead.
+    const transcript = draw(
+      frame({ runningMeanWaitS: 21, simTimeS: RECORDING.endedAt }),
+      run,
+    ).transcript;
     expect(transcript).toContain('TIMED-OUT — 20 undelivered');
     expect(transcript).toContain('AWT suppressed');
     expect(transcript).not.toContain('SATURATED');

@@ -21098,3 +21098,481 @@ has a gap, so a **synthetic** building holds the docstring to it. `index` still 
 did; the **id** is what is held exact, because the id is what `servesFloors`, `accessZones` and
 `transportModes.connects` name a floor by.
 
+
+## D298 — the setup fields validate the keystroke they are on, and one stated caret mechanism is withdrawn
+
+Four defects and a correction, and **the correction is the part to read**.
+
+`change` on a text input fires on **blur**, so the menu's state lagged its own fields and `canStart`
+was computed from the lag. A player who typed `abc` kept a live Start; one who then typed a valid
+`777` kept a dead one, under a message describing a value no longer on screen. `textRow` now
+commits on `input` as well.
+
+**That is only safe because [§ D295](#d295)'s retention landed first**, and it was established by
+*forcing* the retainer to rebuild a fresh element every draw and watching two browser cases go red —
+not by argument. Before retention, an `input` listener would have fired a full `replaceChildren` per
+keystroke, which is the failure mode issue #106's reporter believed already existed.
+
+### The mechanism that was invented, and is now withdrawn
+
+`textRow` guards its write with `if (input.value !== spec.value)`, and four sites said the guard
+existed because **assigning `value` moves the text-entry cursor to the end even when the string is
+unchanged**. That is false. **Measured in Chromium**: an `<input>` holding `202604` with the caret
+at 4, re-assigned the identical `'202604'`, keeps the caret at **4**; assigned a different
+`'999999'`, it moves to **6**. HTML's value setter moves the cursor only when the value *differs*.
+
+Deleting the comparison is **observationally inert on every path this menu has**, because a commit
+is synchronous and neither reducer rewrites its own input. The guard is kept — it protects the day a
+reducer normalises a value — but its reason is now the measured one, and the four sites restating
+the invented one are corrected. This repository's rule is that a stated mechanism is either measured
+or called unmeasured; **this one was asserted in a docstring, repeated into a task brief, and
+repeated again in a status report before anybody ran it.**
+
+### The other three
+
+`applyIntent` takes the catalogue — **required, not optional** — so a template change re-derives its
+part instead of stranding the select on a value it cannot represent. The old behaviour was not a lag
+but a permanent disagreement: the box showed *Morning rush* while the model held a part the new
+template does not offer, and the refusal named four options of which the first was already selected.
+The stale-part refusal narrows to **restored** selections, and is asserted from both sides — a
+refusal nothing reaches is dead, and a refusal a live control reaches is the bug.
+
+`isSeedText` is now the single seed rule for the menu, the transport field and the deep link, **at
+the menu's bound**. The loose side was the one that needed to move, not the strict one: the
+transport's `/^\d+$/` was unbounded, and a run started there can be posted to a board, so an
+over-long seed was accepted, run, drawn, and then refused at post time by a rule that screen never
+mentioned. No `maxlength` — it truncates a paste in silence, which is the coercion § D198 removed.
+
+And `boot()` redraws the menu after its own `runShift()`. The overlay was painted before the first
+shift existed and repainted by nothing, so **Resume refused a shift that was on the board behind
+it** — which is what issue #97 saw and reported as a missing scenario list. The list was never
+missing.
+
+
+## D299 — two products, one engine: Engineer is frozen, Casual is a door not a subset
+
+**Date: 2026-08-08 · The positioning decision, taken by the product owner, and the parent of every
+design issue in the #90–#119 backlog.**
+
+The playtest report ended on the question no issue had asked: *"is this primarily a teaching tool
+and research sandbox … or a mass-market management-sim game that happens to be built on real traffic
+engineering?"* Eight open issues were downstream of the answer and unactionable without it.
+
+**The answer is neither of the two the report offered. It is an explicit split: two products over
+one engine.**
+
+### 1. Engineer's **rigour** is protected. Engineer's **playability is not frozen**
+
+> **Correction, same day.** An earlier draft of this section said *"Engineer is frozen as-is"* and
+> built a standing constraint on that word. **That was this document mis-transcribing the decision,
+> not the decision.** The owner's position is that Engineer should get playability improvements
+> too — Casual is what drives the mass-market reach, and Engineer is still a product somebody uses
+> all day. The wrong sentence is corrected here rather than left standing, because an engineer
+> reading *"frozen"* would refuse a good fix on the strength of it, and a decision record that
+> forbids improvement is worse than no record.
+
+What is protected is the **rigour**, and it is protected absolutely. Everything expensive in this
+repository lives in Engineer: CIBSE and ISO 8100-32 reference data, paired-t intervals under common
+random numbers, saturation suppression on five grounds, the resolution limit measured per cell,
+server-side replay verification. Phase 6c was **refused three times** on the ground that the effect
+sat below what the apparatus can resolve ([§ D145](#d145), [§ D156](#d156)) — a reflex no
+mass-market product has, and the single hardest thing here to have earned.
+
+**The standing constraint, stated as a test rather than a prohibition:**
+
+> A change to Engineer may make it **easier to use**. It may not make it **say less**.
+
+So a change is in scope if it improves how a practitioner reaches, reads or acts on a figure — and
+out of scope if it removes a number, widens a threshold, hides a qualifier, softens a refusal, or
+puts a figure out of Engineer's reach. *Draw the confidence interval* is in scope. *Stop printing
+the interval* is not. *Put the basis on the figure* is in scope. *Drop the basis because it is
+noisy* is not.
+
+**This materially widens the buildable backlog**, because several issues filed as game-design
+complaints are Engineer playability items that cost the rigour nothing:
+
+| issue | why it is Engineer work, not only Casual work |
+|---|---|
+| **#119** | Compare produces ~700 words of monospace prose per verdict and **never draws an interval**, in a product whose central claim *is* an interval. Drawing it is strictly more legible, and removes nothing |
+| **#92** | The dispatcher editor has no *Run this* and no inline delta. A practitioner tuning weights needs the delta more than a casual player does |
+| **#117**, **#102** | The *what moved* panel is the only place the product answers *"did that help?"* — the tuning loop's core, and it is Engineer's loop first |
+| **#115** § 6 | `LIVE METRICS` clips its own text on every building, and because it is drawn into the canvas no DOM check can see it. A defect, not a preference |
+| **#104** | Saying *why* a control is locked is information, not simplification |
+
+### 2. Casual is a different door into the same building, not a smaller building
+
+This is the half that is easy to get wrong, and [§ #110](https://github.com/mrpeanut01/elevator-sim/issues/110)'s
+own recommendation gets it wrong: it proposes the thirteen dispatchers *become* four or five named
+play styles. **They may not.** The decision is explicit that Casual carries **full capability** —
+every parameter that can be edited is editable there, a Casual player can author their own
+dispatcher and tune it completely, and nothing is withheld on the grounds that the audience would
+not want it.
+
+What differs is **vocabulary, layout and the order things are met in** — not what can be reached.
+Named play styles are an *entry point* and never a ceiling; the full weight vector is one
+disclosure away and the disclosure is a door rather than a wall. The measured failure this replaces
+is Casual differing by **44 words out of 919** with three surfaces byte-identical, which is a
+promise the product does not keep. **A mode that quietly caps what a player can build would be the
+same broken promise wearing a better layout.**
+
+This also promotes a defect the backlog had rated minor: only **two of five** advertised dispatcher
+families are authorable — auction, zoning and destination have no controls
+([§ #113](https://github.com/mrpeanut01/elevator-sim/issues/113) § 5). Under *"tweak it fully"* that
+is no longer cosmetic, and it is not a Casual problem: **the authoring gap is in the shared editor
+and it fails both products.**
+
+### 3. What this decides, per issue
+
+| issue | disposition under this decision |
+|---|---|
+| #110, #100 | **Build.** Casual becomes a real layout with a real vocabulary — not a copy register, and not a capped subset |
+| #103, #115 | **Build for Casual.** A second renderer with motion, doors and drawn people, and the stage as the stage. Engineer keeps the schematic view, which is genuinely better *for engineers* |
+| #113 § 5 | **Promoted.** Authoring the other three families is now on the critical path |
+| #90, #98 | **Build.** A first-run door per product, since there are now two |
+| #96, #116 § 2 | **Still deferred**, and see [§ D300](#d300): the agency gap is smaller than #116 argued, because `Commission the building` exists and #116 missed it twice |
+
+### 4. What is not decided here
+
+Whether the two products share one build, one URL and one toggle, or diverge further, is **not**
+settled by this and should not be assumed from it. The toggle is the shipped mechanism and stays
+until something measured argues otherwise.
+
+
+## D300 — the remaining escalations, decided: seeded boards are real runs, and the honesty sweep grows an axis
+
+**Date: 2026-08-08.** Three smaller decisions taken with [§ D299](#d299), recorded so the reasoning
+does not have to be reconstructed from a batch plan.
+
+### E-1 — intraday intervention stays deferred, and the reason changed
+
+[§ #116](https://github.com/mrpeanut01/elevator-sim/issues/116) § 2 proposes making a run
+`(seed, config, [{atS, change}, …])` and re-simulating from `t = 0` on each intervention. It is
+argued from a real measurement — 181 ms, 828 ms and 1 521 ms per full simulation — and the
+affordability claim survives.
+
+**What does not survive is its premise.** #116 states *"There is no economy … a shaft **is** free,
+and instant."* `Commission the building` is a capital-budget mechanic with a fixed capital-unit
+ceiling, locked in before the week starts, and it writes per-bank machine class **and** rated speed
+live with no save. #116 missed that screen **twice** — once here, and once when claiming speed is
+only editable behind *Save as a new building*.
+
+So the agency gap is narrower than argued: there is a pre-run agency layer, and it is not surfaced.
+**Ship the honesty note (#104) and surface commissioning first**, and re-ask the intervention
+question against a product where the existing agency is visible. Deferred, not refused; the
+measurement stands and is worth keeping.
+
+### E-3 — the boards are seeded, and the rows are genuine
+
+A board with nothing on it reads as a product with no players, next to a sign-in prompt. It is
+seeded — **and this is not fabrication, which is why it is allowed.** Every posted score is
+re-simulated by the server before it is accepted (a forged submission returns
+`422 metrics-do-not-reproduce`), so a reference row posted through the ordinary path is verified by
+exactly the mechanism a player's row is. Publishing the shipped baseline dispatchers' own figures is
+what `benchmark/published.ts` already does elsewhere in this project.
+
+Two constraints: the rows are labelled **reference**, never as players, so nobody is invented; and
+they are posted **through the normal path**, never written into the store directly, so the claim
+*"every score on this board was re-simulated"* stays true without an exception clause.
+
+### E-4 — the gap is named *and* the sweep grows the axis that would have caught it
+
+Phase 9's honesty property held under search — 60 cases, 271 985 strings, 0 violations. It samples
+playheads at `[0, .25, .5, .75, 1]`, and **`0` is `startedAt`**, so *"All 34 people got where they
+were going"* was in the corpus at the cold-load instant **and passing**. The property never asked
+whether a surface may publish a whole-run figure at a playhead short of `endedAt`.
+
+Both halves are done rather than one: the gap is named against Phase 9's *accepted with named gaps*
+verdict per [§ D163](#d163)'s rule that the status row and the verdict land together, **and** the
+sweep grows a temporal axis so the property covers what it was assumed to cover. Naming alone would
+leave an uncovered property that happens to pass, which is the shape this repository's standing
+requirement is written about.
+
+**This may surface further violations, and that is the point of doing it.** Any it finds are
+reported rather than quietly fixed, because a corpus that grows an axis and stays green is a
+different claim from one that grew an axis and had to be fixed first.
+
+
+## D301 — Casual's mass-market draw is the depth made legible, not the depth removed
+
+**Date: 2026-08-08 · The product owner's design thesis for Casual, and it inverts the usual one.**
+
+[§ D299](#d299) established that Casual carries full capability. This states *why that is the
+commercial argument rather than a constraint on it*:
+
+> **The mass-market draw is the non-dumbification of the settings and parameters — finding a way to
+> make them understandable and playable by the masses, trying different things and increasing
+> scores.**
+
+### 1. What this rejects
+
+The default move for a "casual mode" is subtraction: fewer controls, rounder numbers, a curated
+subset. Every issue in the #90–#119 backlog that touches Casual assumes it —
+[#110](https://github.com/mrpeanut01/elevator-sim/issues/110) proposes the thirteen dispatchers
+*become* four or five play styles, and [#100](https://github.com/mrpeanut01/elevator-sim/issues/100)
+reads as "hide AWT". **Both are refused.** A subtracted Casual would be a worse version of a product
+whose entire value is that it is not approximate — and it would compete with a hundred lighter sims
+on their ground rather than on its own.
+
+The thesis is the opposite: **the depth is the product, and the design work is comprehension.**
+`bypassLoadThreshold` does not become a slider called *Speed*. It becomes a control whose effect a
+player can see, name, and want to move again.
+
+### 2. What this makes the work
+
+Not simplification. **Legibility, and a fast loop between a change and its consequence.** Four
+things, in this order:
+
+1. **Naming.** Every parameter says what it *does to the building*, not what it is called in the
+   engine. The rail currently describes all thirteen dispatchers as camelCase engine identifiers —
+   *"1 of 13 terms weighted; heaviest `waitTime` 1.00"* — and nowhere says what any of them does
+   differently to a queue.
+2. **Cause and effect, visible.** A player moves one thing and sees what it did. This is the
+   product's own standing requirement — *move the control and require the run to change* — turned
+   from a test into a feature.
+3. **A score that moves and is understood.** *Trying things and increasing scores* is the loop, and
+   it needs a number that responds, is comparable run to run, and whose movement is attributable.
+4. **Low friction to try.** The current loop is change → save → navigate → run → an ambiguous
+   number. Every step removed is a hypothesis a player will actually test.
+
+### 3. The convergence, which is the useful discovery
+
+**Casual's mass-market work and Engineer's playability work are largely the same work**, and this is
+what makes the two-product decision affordable rather than a doubling.
+
+Making cause and effect legible is what
+[#92](https://github.com/mrpeanut01/elevator-sim/issues/92) asks for (a *Run this* and an inline
+delta), what [#117](https://github.com/mrpeanut01/elevator-sim/issues/117) and
+[#102](https://github.com/mrpeanut01/elevator-sim/issues/102) ask for (a *what moved* panel that
+compares comparable runs), and what
+[#119](https://github.com/mrpeanut01/elevator-sim/issues/119) asks for (draw the interval instead of
+describing it in seven hundred words). **A practitioner tuning a weight vector wants exactly what a
+newcomer trying things wants: to see what changed and why.** They differ in vocabulary and in how
+much is on screen at once — not in what the loop is.
+
+So those four issues are built **once**, for both products, and § D299 § 1's test governs:
+*a change may make Engineer easier to use; it may not make it say less.*
+
+### 4. What must not be traded away for it
+
+The honesty. A score that responds to everything is easy to build and is a lie; this product's
+suppression rules exist because *"increasing lift speed appearing to increase average waiting time"*
+is the documented failure mode of the whole field. **A Casual score may be simpler to read and may
+not be less true.** Where one run cannot support a claim, Casual says so in its own words rather
+than saying something weaker that sounds stronger — and the words are the design work, not an
+exemption from it.
+
+
+## D302 — the competitive loop was three client-side omissions, and none was the fix either issue named
+
+**Date: 2026-08-08.** Issues [#112](https://github.com/mrpeanut01/elevator-sim/issues/112),
+[#113](https://github.com/mrpeanut01/elevator-sim/issues/113), and
+[#101](https://github.com/mrpeanut01/elevator-sim/issues/101) folded in.
+
+**#113 § 2's inference is wrong, and the truth is cheaper.** It reported custom dispatchers
+vanishing on reload and inferred two storage paths from the custom *building* surviving. There is
+**one writer** and **one reader** for all four shelves; the defect is *when*. `saveSessionNow` had
+two call sites and neither was a save button, so a dispatcher saved via *"Save it and run it"*
+survived — that runs a shift, which closes a day, which writes — and one saved via *"Save as a new
+dispatcher"* did not.
+
+`MountContext.update` now persists on a patch touching a library shelf, keyed on
+`patchTouchesLibrary`, **which reads the same table `libraryOf` does** — so a fifth shelf cannot be
+added to the library without also being watched for saves. The two facts cannot disagree because
+they are one table. **No debounce, and that was measured rather than assumed:** the shelf keys are
+written from seven sites, none on an input handler, while the hot patches (`dispatcherSpec`,
+`buildingSpec`, `levers`) touch no shelf. The predicate *is* the debounce. A **seventh write outside
+the choke point** was found doing it — `adoptEditedBuilding` assigns `state` directly because the
+JSON editor returns a whole `BuildingConfig` — and now saves itself.
+
+**#112's posted score returned 201 while the screen said *"No scores have been posted yet."*** A
+one-shot latch, never reset, plus a `submitScore` that did not refetch. Both closed — and **the
+identical latch on the challenge fetch went with them, with a worse consequence**: `state`,
+`opensInMs` and `closesInMs` are *server* measurements, so a challenge that opened while the reader
+was elsewhere stayed drawn as *not open yet* until reload — a **stopped countdown**, on the one
+screen [§ D218](#d218) § 3 forbids the client to compute one on.
+
+The optimistic insert #112 asks for was **declined with a reason**: the board a row belongs on is
+keyed by a digest the *server* computes over the run and its loaded `data/`, which the browser does
+not compute. Splicing would be guessing which board, and **a row on the wrong board is worse than a
+row a round-trip late.**
+
+**And `ChallengeBoardPage.entries` was fetched, threaded to the view model, and read by no
+renderer** — so *Order the board on* fired a real re-fetch whose only visible effect was a
+sentence's wording. That is the inert-control defect arriving from the **rendering** end rather than
+the state end. It survived because the document tier's fixture passed `challenge: () => undefined`
+for every case: **a screen nobody renders draws whatever it likes**, which is the standing
+requirement's blind spot restated for tests.
+
+## D303 — two editors disagreeing about Save is one defect, and the one that moves is the one whose indirection is not load-bearing
+
+The dispatcher editor's Save selected what it filed; the building editor's did not, so *"Save as a
+new building"* left the next run on the **old** building — the exact false negative the standing
+requirement exists to catch. Both were defensible alone, which is why the defect is the
+*disagreement*.
+
+The building editor's selection goes through `stateRunningSaved`, whose docstring documents a
+**week-contract forgery** a bare `buildingId` write reintroduces — a drawn tower banked against a
+real scenario assignment. That indirection is load-bearing, so the **dispatcher editor moved to its
+shape rather than the building editor moving to a bare write**: Save files it and says so in a
+`role="status"` line, and a second named verb carries the whole selection. A test asserts the
+building editor still has **no** bare `buildingId` write, so a later "fix" in the wrong direction
+goes red.
+
+That independently closes #113 § 3's *"each save auto-selects, so repeatedly pressing Save silently
+changes who is driving"*. Save now refuses empty and duplicate names, case- and space-folded against
+shipped **and** saved profiles, before minting an id; rename keeps the id, because `dispatcherId`,
+recordings and the challenge select all hold it.
+
+**#113 § 5's "read-only" is too weak, in a way the issue did not reach.** Copying an auction,
+zoning or destination profile round-trips its mechanism block **silently** — the reader gets a
+multi-round auction back without the word *auction* appearing anywhere. The panel now says a
+profile carries blocks it cannot author. § D227's rule, pointed at the gap between what a document
+holds and what a panel can reach.
+
+## D304 — a rate limit is only as good as the premise in its docstring
+
+`LINKS_PER_EMAIL` was three, justified by *"an address may have three unexpired links
+outstanding"*. **Against a client that holds its session token in memory by choice
+([§ D257](#d257)'s neighbour decision, unchanged here), that premise is false**: a reload spends the
+*session*, not the link — the link is already `DELETE`d by `consumeLoginToken` — so the budget is a
+**reload budget**, and three locked a player out of their own account on the third reload inside a
+quarter hour. Compounded by issue #106, where the first sign-in click was always swallowed, so
+reloading is exactly what a player did.
+
+Raised to ten. `LINKS_PER_CALLER` is untouched at thirty, so one sender's **total** output does not
+move; what rises is distributed concentration on a single victim, 12/hr → 40/hr, and that is stated
+in the docstring rather than waved at.
+
+**The right fix is not this number, and it is filed rather than done.** A *redeemed* link is not
+outstanding, so redemption should hand its budget back — unattackable without reading the victim's
+mail, and zero cost to the bound. It needs a release on `FixedWindowLimiter`, and inlining a second
+fixed-window counter beside the one next door would be two implementations of one policy.
+
+The two tests that pinned the old number were rewritten to pin **that there is a low ceiling**,
+looping until refused. A test that fails whenever a bounded policy is retuned trains its reader to
+edit the assertion, which is how a bound stops meaning anything.
+
+
+## D305 — Compare draws its interval, and its default was chosen for reportability rather than for a verdict
+
+**Date: 2026-08-08.** Issue [#119](https://github.com/mrpeanut01/elevator-sim/issues/119) found the
+shipped batch answering **none of eight measures**: one saturated replication in fifty nullified the
+three headline metrics under the complete-case rule. **That rule is unchanged.** Three things moved.
+
+**The interval is drawn.** This is a product whose central claim is an interval that excludes zero,
+and it had never drawn one — ~700 words of monospace prose per verdict instead. A bar clear of zero
+is **filled**; one that straddles is **hollow with the zero line drawn through it**; every bar
+carries its caption in words and an `aria-label` with the whole row. Strip every colour and the two
+states are still told apart by whether a line crosses a box. `IntervalPlot.ranks` is **copied from
+the verdict, never inferred from `upper < 0`** — otherwise an energy axis and a
+[§ D171](#d171) under-budget interval would both draw as wins. The prose is **all kept**, moved
+beside the row it justifies.
+
+**The report leads with its answer** — the verdict, the drop count, and `packages/cli`'s own
+capacity framing, which already said the useful thing the viewer did not: *"A diverges at this load
+and B does not. That is a finding about capacity, and it does not need a mean to be true."*
+
+**The default runs the building's own profile at its declared `min`** — and the selection procedure
+is the part that matters. The criterion was written down and applied **before a single interval was
+read**: *the largest arrival rate on a 1 %-step grid at which all fifty paired replications stand
+behind a mean on both reference arms.* Swept 16 → 3; 16 loses one replication, 15 and below lose
+none. It returns **15**, which is `office-prestige`'s own declared floor. It ships as a **band
+select** (`min`/`typical`/`max`) rather than the number, so the *level* survives the panel
+inheriting a different building where a literal rate would not.
+
+**The shipped default now answers 8 of 8**, and its single separating row —
+ΔTTD **+3.933 s [+1.626, +6.241]** — names the **baseline** (`collective`) ahead. That a
+tuned-for-demonstration default would not have produced is the strongest available evidence this one
+was not.
+
+**The resolution limit was re-probed rather than inherited**, per [§ D151](#d151): at that cell, on
+TTD, at a **disjoint seed**, n = 50, 80 % power against a two-sided 95 % paired-t — near-neighbour
+**2.499 s**, structural **2.417 s**. The 3.933 s effect clears both. **The interval's lower bound of
+1.626 s does not, and that is stated in the code rather than smoothed over.**
+
+**Three of the issue's claims did not survive.** Its dispatcher-slug complaint is stale — both
+selects have read `Name (slug)` since § D236. Its implied "pick a better building" remedy does not
+exist: swept at their own traffic, **all eight shipped buildings suppress all three wait rows**, and
+Garden Apartments and St Jude reach only 47 of 50 quotable while saturating in **0** of 50 — other
+`awtIsValid` grounds. Demand really is the only lever. And `min` does not rescue every building —
+Midtown Office is 0 of 50 either way, and the panel says so.
+
+## D306 — the twelfth dead seam: `BatchPanelHandle.prefill`
+
+`mountBatchPanel` has returned a handle with `prefill()` since it was written, reading a live
+`inherit()` callback that reads the viewer's real state — and **nothing in the tree ever called
+either**. `dev/main.ts` discards the handle. So opening Compare while playing Garden Apartments
+offered Chancery House, and the mechanism to fix it had been sitting in the module the whole time.
+
+By the standing requirement's own test — *name the non-test caller* — this is the **twelfth**
+instance in code. The existing ordinals do not move: *the ninth* names § D114's instance and *the
+eleventh* names § D131's, and renumbering them would break every reference for a running total.
+
+Closed by giving it a caller **inside the module**, driven by the panel's own `[role=tabpanel]`
+visibility rather than by the shell, because the shell is another lane's file. An `isRunning()`
+added to the handle for the tab-steal fix was **deliberately not added**: an export with no non-test
+caller is the exact defect this entry is about, and the fix that needs it is sequenced onto the lane
+that owns `dev/main.ts`.
+
+**Still open from #119**, both blocked on `dev/main.ts`: the tab steal (a finishing run force-
+switches the centre column mid-batch), and the **dispatcher** half of the inheritance.
+
+
+## D307 — the stage banner counts the people in the building, not the ones the run ended with
+
+**Date: 2026-08-08.** Found by the new temporal property R6 ([§ D300](#d300)'s E-4) **on its first
+run**, and recorded rather than fixed in the lane that found it — so that a corpus which grew an
+axis and stayed green stayed distinguishable from one that had to be repaired first.
+
+`render/canvas.ts`'s banner led with `` `${status} — ${summary.undelivered} undelivered` `` on
+**every painted frame**. `summary.undelivered` is *how many people were still in the building when
+the run ended*, and `recordRun` simulates the whole day before the first paint, so the clause was
+never about the playhead. On `honesty-9100032` it read **127 at 00:00**, when nobody was undelivered
+yet, and **127 at 704 s, when the live figure was 376** — not merely early, but **smaller than the
+truth on the same image by a factor of three**, in the clause `UX.md`'s RV-16 makes lead the banner.
+
+### Closed with a live figure, and with neither precedent
+
+Both were weighed on paper before either was written:
+
+- **[§ D293](#d293)'s gate** is right for a card the reader can come back to. Here it would take
+  RV-16's lead off the bitmap for the whole of the run it is about — **the exact trade
+  [§ D294](#d294) refused on this same canvas**, because a bitmap has no later.
+- **§ D294's scoping** (*"127 undelivered when the run ended"*) is honest, and still not enough
+  while the reader is watching 376 people stack up beside it. **Scoping rescues a figure with no
+  live counterpart. This one has one.**
+
+So `undeliveredAt` publishes `arrived − carried` at the playhead, and the run's own figure once the
+playhead reaches `endedAt` — **worded differently, because they are different quantities.** The live
+count is not a synonym for *undelivered* and is not worded as one: it includes riders who took the
+stairs and riders the door turned away ([§ D265](#d265), [§ D266](#d266)).
+
+**And it is exactly the quantity R6 reads back**, so the product and the oracle cannot hold two
+definitions of it — which makes a coincidental match provably impossible rather than merely
+unlikely. `recording.status` is still drawn verbatim at every playhead: § D294's ruling on this same
+header, left standing.
+
+### The same defect was on the text alternative, twice
+
+`render/describeFrame.ts` joined **every** `MoodDriver` where § D293 gated the rail — 196
+violations across 49 of 49 always-on cases — and separately printed the banner's whole-run count
+through a branch needing none of the adapter's optional input, **reachable from `dev/main.ts` today
+at both call sites**. Both fixed, with `mood.retraction` taking the withheld rows' place exactly as
+on the rail.
+
+### Neither corpus moved, and that is measured rather than assumed
+
+**246 875 always-on and 312 104 deep, both unchanged.** § D293's rail lost 588 strings because it
+withheld *rows*; a gate inside one joined paragraph and one joined banner line changes what a string
+*says* and not how many there are. **A published figure asserted to have stayed still is the same
+discipline as one recorded moving.**
+
+Always-on is back to **0 violations**. The deep tier's single remaining failure —
+`honesty-9100031`, `suppressed-mean`, 10 violations — is unchanged in case, property and count, and
+is a cue-rule coincidence rather than a product defect: the caveat says *"a quotable average on 6 of
+20 consecutive seeds"* and the run's refused `meanWaitS` also rounds to 20.
+
+`render/canvas.ts#playheadHasReachedEnd` is a **second copy** of `dev/leftRail.ts#shiftIsOver`,
+because `render/` may not import `dev/`. `leftRail.test.ts` pins the two equal at five playheads of
+a real recording, in the file whose dependency direction allows it.
+

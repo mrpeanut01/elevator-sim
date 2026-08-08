@@ -13,7 +13,7 @@ import { isReplicationMetric } from '@elevator-sim/experiments/browser';
 import { describe, expect, it } from 'vitest';
 
 import { batchReport, type BatchComparisonRow, type BatchReport } from './report.js';
-import { fakeResult } from './fixtures.test-helper.js';
+import { fakeArm, fakeReplication, fakeResult } from './fixtures.test-helper.js';
 import {
   BATCH_METRICS,
   BATCH_METRIC_CLASS,
@@ -41,8 +41,12 @@ function everyString(report: BatchReport): readonly string[] {
   if (report.budgetNote !== null) out.push(report.budgetNote);
   for (const arm of report.arms) out.push(arm.sentence, ...arm.reasons);
   for (const comparison of report.comparisons) {
-    out.push(comparison.summary.sentence);
+    out.push(comparison.summary.sentence, comparison.summary.answer);
     if (comparison.summary.remedy !== null) out.push(comparison.summary.remedy);
+    // Issue #119's three new sentences go through the same word list as everything else. A field
+    // added to the summary and not added here is a sentence the R10 sweep stops seeing.
+    if (comparison.summary.droppedSentence !== null) out.push(comparison.summary.droppedSentence);
+    if (comparison.summary.capacityFinding !== null) out.push(comparison.summary.capacityFinding);
     for (const row of comparison.rows) out.push(row.sentence, row.note);
   }
   return out;
@@ -492,5 +496,128 @@ describe('per-arm reporting', () => {
     expect(baseline?.quotable).toBe(47);
     expect(baseline?.sentence).toContain('47 of 50 runs');
     expect(baseline?.reasons).toEqual(['the queues never stopped growing.']);
+  });
+});
+
+/* ========================================================================== *
+ * Issue #119 — the batch's disposition, said first and said as an answer
+ * ========================================================================== */
+
+describe('the answer is an answer, and never a winner', () => {
+  it('says INDISTINGUISHABLE in as many words when nothing separated', () => {
+    /*
+     * The finding this closes: a batch where every interval contained zero rendered as *"3 came
+     * back with an interval containing zero … 3 could not be compared at all"* — an inventory of
+     * failures for a run that had a perfectly good result. *These two are not separated at n = 50*
+     * is what happened, and it is what the first line now says.
+     */
+    const summary = summaryOf(batchReport(fakeResult({ delta: 0 })));
+    expect(summary.resolved).toEqual([]);
+    expect(summary.answer).toContain('Indistinguishable at n = 50');
+    expect(summary.answer).toContain('not the same as the two settings being identical');
+  });
+
+  it('names the measures that separated and never the arm that won', () => {
+    const report = batchReport(fakeResult({ delta: -3, spread: 0.2 }));
+    const summary = summaryOf(report);
+    expect(summary.resolved.length).toBeGreaterThan(0);
+    expect(summary.answer).toContain('Separated on');
+    expect(summary.answer).toContain('Each of those rows names the arm ahead');
+    /*
+     * The load-bearing negative. Every arm name the fixtures use is absent from this line, because
+     * the direction lives on the row that earned the right to state it — a second place deciding
+     * *better* is CLAUDE.md's named failure mode, and a roll-up is the easiest place to put one.
+     */
+    for (const arm of report.arms) {
+      expect(summary.answer, arm.dispatcherProfileName).not.toContain(arm.dispatcherProfileName);
+      expect(summary.answer, arm.dispatcherProfileId).not.toContain(arm.dispatcherProfileId);
+    }
+  });
+
+  it('says so plainly when no measure could be compared at all', () => {
+    // A broken CRN audit suppresses every row, which is the only shape that reaches this branch.
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3, aligned: false })));
+    expect(summary.answer).toContain('No measure could be compared');
+    expect(summary.answer).not.toContain('Indistinguishable');
+  });
+});
+
+describe('the drop count is a sentence of its own', () => {
+  it('leads with the count, the cause and the measures it cost', () => {
+    /*
+     * Issue #119 item 3, and the number in it is the shipped Chancery House case exactly: one
+     * replication in fifty refuses a mean, and three headline rows go with it.
+     */
+    const summary = summaryOf(batchReport(fakeResult({ delta: -3, invalidOn: [11] })));
+    expect(summary.droppedSentence).toContain('1 of 50 pairs dropped');
+    expect(summary.droppedSentence).toContain('refuses to quote a mean');
+    expect(summary.droppedSentence).toContain('average wait');
+    expect(summary.droppedSentence).toContain('door-to-door time');
+    // And the rows that are counts rather than means are said to be unaffected, because they are.
+    expect(summary.droppedSentence).toContain('unaffected');
+  });
+
+  it('is null when the complete-case rule took nothing', () => {
+    expect(summaryOf(batchReport(fakeResult({ delta: -3 }))).droppedSentence).toBeNull();
+  });
+
+  it('agrees with the rows it summarises', () => {
+    const report = batchReport(fakeResult({ delta: -3, invalidOn: [2, 5, 40] }));
+    const row = rowFor(report, 'awtS');
+    expect(row.suppressedPairs).toBe(3);
+    expect(summaryOf(report).droppedSentence).toContain('3 of 50 pairs dropped');
+    // An observation row loses nothing, because the gate is on the estimate class.
+    expect(rowFor(report, 'personsPer5Min').suppressedPairs).toBe(0);
+  });
+});
+
+describe('what a batch with no mean can still say', () => {
+  it('reports the capacity divergence the CLI has always reported and this surface never did', () => {
+    /*
+     * `packages/cli/src/commands/compare.ts`: *"A diverges at this load and B does not. That is a
+     * finding about capacity, and it does not need a mean to be true."* The viewer had no such
+     * sentence, which is why a batch that lost its three wait rows read as a batch that found
+     * nothing.
+     *
+     * Built by hand rather than through `fakeResult`, because `invalidOn` applies to **both** arms
+     * by construction — which is the right default for the suppression tests and is exactly the
+     * symmetry this sentence must refuse. The asymmetry is what the shipped Chancery House default
+     * had before this issue: `collective` lost one replication and `eta` lost none.
+     */
+    const asymmetric = {
+      ...fakeResult({ delta: -3 }),
+      arms: [
+        fakeArm(
+          'baseline',
+          'collective',
+          Array.from({ length: 50 }, (_, index) =>
+            fakeReplication(index, 10, { awtIsValid: index !== 4 }),
+          ),
+          'Conventional collective',
+        ),
+        fakeArm(
+          'candidate',
+          'eta',
+          Array.from({ length: 50 }, (_, index) => fakeReplication(index, 7)),
+          'Minimum estimated wait',
+        ),
+      ],
+    };
+    const summary = summaryOf(batchReport(asymmetric));
+    expect(summary.capacityFinding).toContain('Conventional collective');
+    expect(summary.capacityFinding).toContain('queues never stopped growing in 1 of 50 runs');
+    expect(summary.capacityFinding).toContain('finding about capacity');
+    expect(summary.capacityFinding).toContain('does not need a mean to be true');
+    // The reason it is admissible with every wait row suppressed: the arms saw the same people.
+    expect(summary.capacityFinding).toContain('same passengers');
+  });
+
+  it('is null when the two arms lost the same number of runs', () => {
+    /*
+     * A sentence here would be manufacturing a divergence out of a symmetry. Both arms whole is
+     * the obvious case; both arms losing equally is the one that matters, because that is Midtown
+     * Office at its own demand — 50 of 50 saturated either way, and nothing to choose between them.
+     */
+    expect(summaryOf(batchReport(fakeResult({ delta: -3 }))).capacityFinding).toBeNull();
   });
 });

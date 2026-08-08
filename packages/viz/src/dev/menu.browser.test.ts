@@ -119,6 +119,51 @@ describe.skipIf(!HAS_BROWSER)('a field commit does not swallow the press beside 
     await page.close();
   }, 120_000);
 
+  it('keeps the caret where the reader put it, one keystroke at a time — issue #111(a)', async () => {
+    /*
+     * **The property that made per-keystroke validation safe to add, observed rather than argued.**
+     *
+     * Issue #111(a) makes this overlay redraw on **every keystroke**: the Seed field now commits on
+     * `input` as well as `change`, because `change` fires on blur and the state was therefore one
+     * commit behind the box — Start refused a valid seed until the reader clicked elsewhere.
+     *
+     * What this pins is **retention**, and it was watched failing to establish that rather than
+     * assumed. With `menuPanel.ts#retainer` forced to build a fresh element on every draw, this
+     * case reports `expected '202604' to be '20269904'`: the two characters typed into the middle
+     * reached nothing at all, because the element being typed into stopped existing between
+     * keystrokes. *Tab out of the field reaches Start* fails in the same run.
+     *
+     * It does **not** pin `textRow`'s `if (input.value !== spec.value)` guard, and saying so is the
+     * point of this paragraph. That guard's stated reason — *assigning `value` moves the caret even
+     * when the string is unchanged* — is false: HTML's value setter moves the cursor only when the
+     * value differs, and Chromium implements it (measured: `202604`, caret at 4, re-assigned
+     * `'202604'`, caret still 4). Removing the guard leaves this case green. It is kept for the
+     * case that would break it — a reducer that normalises what it is handed — and `menuPanel.ts`
+     * now says that rather than the invented mechanism.
+     *
+     * Typed into the **middle**, which is the only place any of this is visible: appending to the
+     * end produces the same string either way, which is exactly why the three cases around this one
+     * cannot see it.
+     */
+    const page = await openFreePlay();
+    const seed = page.locator('.menu-overlay .menu-text input').first();
+    await seed.click();
+    await seed.fill('202604');
+    // Between the `6` and the `0` — four characters in, so a caret that survives inserts there and
+    // a caret that has been reset appends.
+    await seed.evaluate((node: HTMLInputElement) => {
+      node.setSelectionRange(4, 4);
+    });
+    await page.keyboard.type('99');
+
+    expect(
+      await seed.inputValue(),
+      'the caret was thrown to the end of the field by the redraw the keystroke caused, so the ' +
+        'middle of a seed cannot be corrected',
+    ).toBe('20269904');
+    await page.close();
+  }, 120_000);
+
   it('starts it on Enter in the field, without a pointer at all', async () => {
     /*
      * The keyboard half. The menu builds no `<form>`, so Enter in a text field had nothing to do:

@@ -72,7 +72,13 @@ import { SIGNED_OUT, updateForm, type AccountForm, type AccountState } from '../
 import type { BoardPage } from '../menu/client.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
-import type { CommissioningScreenInput, MenuIntent } from '../menu/screens.js';
+import type { ChallengeBoardRow, ChallengeView } from '../menu/challenge.js';
+import {
+  applyIntent,
+  type ChallengeScreenInput,
+  type CommissioningScreenInput,
+  type MenuIntent,
+} from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -1073,6 +1079,222 @@ describe('the first press after typing is not swallowed — GitHub issue #106', 
 });
 
 /* -------------------------------------------------------------------------- *
+ * The seed field validates the keystroke it is on — GitHub issue #111(a)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The Free play screen with a live host: `set-free-play` is **performed**, the way `dev/main.ts`
+ * performs it, rather than recorded.
+ *
+ * {@link accountScreen}'s argument, on the other screen with a text field. A host that only recorded
+ * the intent would leave the state — and therefore Start, and therefore the issue list — exactly
+ * where the first draw put it, and every assertion below would pass over a screen that never
+ * changed its mind. The reducer is the shipped `applyIntent`, so nothing here reproduces a transport
+ * it is measuring.
+ */
+function freePlayScreen(
+  loaded: MenuCatalogue,
+  seed: string,
+): ReturnType<typeof render> & { readonly stateNow: () => MenuState } {
+  const base = initialMenuState(loaded);
+  let state: MenuState = { ...base, screen: 'free-play', freePlay: { ...base.freePlay, seed } };
+  let redraw = (): void => {};
+  const made = render(state, loaded, {
+    state: () => state,
+    dispatch: (intent) => {
+      made.asked.push(intent);
+      state = applyIntent(state, intent, loaded);
+      redraw();
+    },
+  });
+  redraw = made.draw;
+  return { ...made, stateNow: () => state };
+}
+
+/** The Seed field, and a count of how many times a draw has written its `value` back. */
+function seedField(root: Recorded): { readonly node: Recorded; readonly writes: () => number } {
+  const node = walk(root).find((entry) => entry.attrs.get('data-menu-control') === 'free-play.seed');
+  if (node === undefined) throw new Error('the Free play screen renders no seed field');
+  /*
+   * A counting setter, because a recorder has no selection and *"the caret did not move"* is not a
+   * thing this tier can observe. What it observes is the **write**, which is one step upstream.
+   *
+   * Said precisely, because the sentence this replaces was not. A draw that writes the box back is
+   * not by itself a caret jump: HTML's value setter moves the text entry cursor only when the new
+   * value *differs* from the old, and Chromium implements that — measured, `202604` with the caret
+   * at 4, re-assigned `'202604'`, caret still 4. So zero writes is a claim about **the panel not
+   * writing over the reader**, which is the invariant that keeps a future normalising reducer from
+   * turning into a caret jump; the jump itself is the browser tier's, and
+   * `menu.browser.test.ts § keeps the caret where the reader put it` is where it is watched.
+   */
+  let held = node.value;
+  let writes = 0;
+  Object.defineProperty(node, 'value', {
+    get: () => held,
+    set: (next: string) => {
+      writes += 1;
+      held = next;
+    },
+    configurable: true,
+  });
+  // The reader's own typing is not a draw's write.
+  const typed = (text: string): void => {
+    held = text;
+  };
+  Object.assign(node, { type: typed });
+  return { node, writes: () => writes };
+}
+
+describe('the seed field validates the keystroke it is on — GitHub issue #111(a)', () => {
+  it('takes a valid seed back without waiting for a blur, and re-enables Start', async () => {
+    /*
+     * The reporter's steps, at the tier that can see the state as well as the markup: *"type `abc`
+     * → Start still enabled; blur → disabled; type `777` → **valid seed, Start still disabled**;
+     * blur → enabled."*
+     *
+     * The second half is the blocker. A player is looking at a box holding three digits, under a
+     * sentence saying a seed is 1–20 digits, with Start greyed out — and the only way out is to
+     * click somewhere else, which nothing on the screen suggests. `change` fires on blur, so the
+     * state was one commit behind the box and every decision taken from it was too.
+     *
+     * Driven through `input` and **not** `change`, deliberately: a case that fired both would pass
+     * on the old code through the `change` half and prove nothing.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, 'abc');
+    const { node } = seedField(made.root);
+
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.get('disabled'),
+      'the broken seed did not refuse Start, so this case starts from the wrong screen',
+    ).toBe('disabled');
+
+    (node as unknown as { type: (text: string) => void }).type('777');
+    node.listeners.get('input')?.();
+
+    expect(
+      made.stateNow().freePlay.seed,
+      'the keystroke never reached the state — the field is still committing on blur alone',
+    ).toBe('777');
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.has('disabled'),
+      'Start is still refused over a valid seed, which is the screen the issue reports',
+    ).toBe(false);
+    expect(
+      textUnder(made.root),
+      'the refusal is still on the page under a seed that satisfies it',
+    ).not.toContain('A seed is 1–20 digits');
+  });
+
+  it('refuses on the keystroke too, so an invalid seed cannot be pressed', async () => {
+    /*
+     * The other direction, and the one that stops the case above being satisfied by a Start that is
+     * simply always enabled. The first half of the reporter's steps: `abc` typed over a good seed
+     * used to leave Start pressable until the field lost focus — a refused selection a player could
+     * press, which `menuPanel.ts` has forbidden since it landed and could not enforce on a state
+     * that had not been told.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '20260804');
+    const { node } = seedField(made.root);
+
+    expect(byClass(made.root, 'menu-start')[0]?.attrs.has('disabled')).toBe(false);
+
+    (node as unknown as { type: (text: string) => void }).type('abc');
+    node.listeners.get('input')?.();
+
+    expect(made.stateNow().freePlay.seed).toBe('abc');
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.get('disabled'),
+      'Start stayed pressable over a seed the model refuses',
+    ).toBe('disabled');
+    expect(textUnder(made.root)).toContain('A seed is 1–20 digits');
+  });
+
+  it('redraws per keystroke without rebuilding the box, moving the caret or taking the focus', async () => {
+    /*
+     * **Why issue #106 had to land first, driven rather than argued.**
+     *
+     * Committing on `input` makes this overlay redraw on every keystroke. Before retention that
+     * would have been a `replaceChildren` per keystroke — the box the reader is typing into replaced
+     * between characters, a press thrown away with the node it began on, and focus dropped to
+     * `<body>` sixty times a word. Three properties are what make it safe, and all three are
+     * asserted here over a sequence of five keystrokes rather than read off the source:
+     *
+     * 1. the `<input>` is the **same object** afterwards and was never removed from its row, so no
+     *    `mousedown` is ever orphaned and nothing the reader is typing into goes away
+     *    (`reconcile` + `retainer`);
+     * 2. **no draw writes `value` back over the reader** — harmless in Chromium while the string is
+     *    identical (see {@link seedField}) and a caret jump the day a reducer normalises it;
+     * 3. focus is still on the field, because `restoreFocus` returns early while the reader is
+     *    already inside the overlay.
+     *
+     * The issue list appearing and disappearing under the box during the sequence is what makes it
+     * a real test of (1): the screen genuinely changes shape between the draws, which is the case
+     * `reconcile` exists for rather than the case a skip-if-unchanged would have covered.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '');
+    const { node, writes } = seedField(made.root);
+    const row = walk(made.root).find((entry) => entry.children.includes(node));
+    expect(row, 'the seed input has no row to be rebuilt out of').toBeDefined();
+
+    made.focus(node);
+    const onRow = watchChildren(row as Recorded);
+    const onRoot = watchChildren(made.root);
+
+    const shapes = new Set<number>();
+    for (const text of ['7', '7x', '7x7', '77', '777']) {
+      (node as unknown as { type: (t: string) => void }).type(text);
+      node.listeners.get('input')?.();
+      shapes.add(byClass(made.root, 'menu-issues').length);
+    }
+
+    expect(
+      shapes.size,
+      'the screen never changed shape across the sequence, so nothing here was reconciled under ' +
+        'pressure and the case is weaker than it reads',
+    ).toBeGreaterThan(1);
+    expect(onRow.touched, 'a keystroke rebuilt the seed box out of its own row').not.toContain(node);
+    expect(onRoot.touched, 'a keystroke carried the whole row off the overlay').not.toContain(row);
+    expect(
+      walk(made.root).find((entry) => entry.attrs.get('data-menu-control') === 'free-play.seed'),
+      'the seed field on the page is a different element from the one that was typed into',
+    ).toBe(node);
+    expect(
+      writes(),
+      'a draw wrote the field’s own value back over the reader — harmless in Chromium today, ' +
+        'because the string is identical, and a caret jump the moment any reducer normalises it',
+    ).toBe(0);
+    expect(made.focused(), 'a keystroke took the focus off the field being typed into').toBe(node);
+  });
+
+  it('states its rule under the box, before anything is broken — issue #111(c)', async () => {
+    /*
+     * The bound reached the screen only as a refusal, so the only way to learn it was to break
+     * Start. The hint is `MenuAffordance.detail` on the row, drawn under the field on every draw
+     * including the clean one — which is the half a refusal structurally cannot do.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '20260804');
+    const { node } = seedField(made.root);
+
+    expect(byClass(made.root, 'menu-start')[0]?.attrs.has('disabled'), 'the screen is refusing').toBe(
+      false,
+    );
+    const hint = byClass(made.root, 'menu-hint')[0];
+    expect(hint?.textContent, 'a clean Free play screen says nothing about what a seed is').toContain(
+      'Digits only, up to 20',
+    );
+    // The affordances the transport's own field has had all along, and this one had none of.
+    expect(node.attrs.get('inputmode')).toBe('numeric');
+    expect(node.attrs.get('placeholder')).toBe('1–20 digits');
+    // …and never `maxlength`, which would truncate a paste in silence — the coercion § D198 removed.
+    expect(node.attrs.has('maxlength')).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The leaderboard teaches its shape when it is empty — GitHub issue #34
  * -------------------------------------------------------------------------- */
 
@@ -1127,6 +1349,195 @@ describe('an empty leaderboard shows what a board is', () => {
       }),
     });
     expect(textUnder(root)).not.toContain('An example of a board');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The challenge board is drawn — GitHub issue #112
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One challenge board, as `GET /api/challenge-board` answers it.
+ *
+ * Two entries and not one, because every assertion worth making here is about the *relationship*
+ * between rows: which one is the reader's, and how far behind the top row it is. A single-row
+ * fixture would pass a renderer that drew the first entry and dropped the rest.
+ */
+const CHALLENGE_BOARD = (): ChallengeScreenInput => {
+  const view: ChallengeView = {
+    challenge: {
+      id: 'week-2026-32',
+      name: 'Morning rush',
+      brief: 'The lobby fills for twenty minutes.',
+      config: {
+        buildingId: 'midtown-office',
+        demandTemplateId: 'up-peak',
+        arrivalRatePctPop5min: 2,
+        durationS: 900,
+      },
+      seeds: ['1', '2', '3', '4', '5'],
+      opensAtMs: 0,
+      closesAtMs: 1,
+    },
+    state: 'open',
+    seedCount: 5,
+    opensInMs: null,
+    closesInMs: 3_600_000,
+    clockNote: 'Times are the server’s.',
+    dataHash: 'aa',
+    compare: {
+      note: 'Compare is the only screen that may say one dispatcher beats another.',
+      buildingId: 'midtown-office',
+      demandTemplateId: 'up-peak',
+      arrivalRatePctPop5min: 2,
+      durationS: 900,
+    },
+  };
+  const score = (mean: number): ChallengeBoardRow['score'] => ({
+    runs: 5,
+    legs: 640,
+    meanAwtS: mean,
+    meanWt95S: mean * 2,
+    meanTtdMeanS: mean * 3,
+    meanPctOverLongWait: 7.5,
+    perSeed: [],
+  });
+  return {
+    runsDone: 5,
+    view,
+    board: {
+      challengeId: 'week-2026-32',
+      challenge: view.challenge,
+      state: 'open',
+      dataHash: 'aa',
+      metric: 'awtS',
+      seedCount: 5,
+      note: 'Ordered on average wait. The four figures are never added together.',
+      compare: view.compare,
+      entries: [
+        {
+          id: 'entry-1',
+          displayName: 'Grace Hopper',
+          dispatcherProfileId: 'collective',
+          score: score(21.0),
+          submittedAtMs: 10,
+        },
+        {
+          id: 'entry-2',
+          displayName: 'Ada Lovelace',
+          dispatcherProfileId: 'zoned-uppeak',
+          score: score(24.5),
+          submittedAtMs: 20,
+        },
+      ],
+      entriesOnOtherData: 0,
+    },
+  };
+};
+
+/** Signed in as the second row's author, so *which of these is mine* has an answer to find. */
+const SIGNED_IN_AS_ADA: AccountState = {
+  ...SIGNED_OUT,
+  token: 'session-token',
+  user: { id: 'u1', email: 'ada@example.test', displayName: 'Ada Lovelace', displayNameChosen: true },
+};
+
+describe('this week’s challenge draws the board it fetched — GitHub issue #112', () => {
+  /*
+   * ## What was wrong, and why nothing caught it
+   *
+   * `ChallengeBoardPage.entries` was fetched by `dev/main.ts#loadChallengeBoard`, threaded into
+   * `ChallengeScreenInput`, and **read by no renderer**: `menu/screens.ts#challengeBody` touched
+   * `board.note` and `board.otherDataNote` and nothing else. So the screen's *Order the board on*
+   * select fired a real re-fetch of a real board, and the only thing a player could see change was
+   * the wording of a sentence.
+   *
+   * It survived because **this file's own host fixture passes `challenge: () => undefined`** for
+   * every case above, so the challenge screen has never been rendered here at all. That is the
+   * document tier's blind spot rather than an oversight in a test: a screen nobody renders draws
+   * whatever it likes.
+   *
+   * Reverting `menuPanel.ts`'s `if (view.screen === 'challenge') children.push(challengeBoardTable(…))`
+   * fails every assertion in this block; the empty-board case below fails on the sentence.
+   */
+  it('puts a row on the page for each entry, with all four figures and the count behind them', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+    });
+    const rows = byClass(root, 'menu-board-row');
+    expect(rows.length, 'the challenge screen drew no board rows').toBe(2);
+
+    const text = textUnder(root);
+    expect(text).toContain('Grace Hopper');
+    expect(text).toContain('Ada Lovelace');
+    // All four, never a fifth and never a total — § D106 through `boardTable`'s own rule.
+    for (const metric of ['AWT', 'WT95', 'TTD', 'over-long']) expect(text).toContain(metric);
+    // R13: a mean without the count it was taken over is a different measurement.
+    expect(text).toContain('5 runs');
+    expect(text).toContain('640 legs');
+    // The axis this whole screen exists to vary, named on the row that chose it.
+    expect(text).toContain('collective');
+    expect(text).toContain('zoned-uppeak');
+    /*
+     * And no interval and no dispersion. `ChallengeScore`'s docstring forbids one in as many words —
+     * five runs cannot support an inference — so the negative is asserted rather than assumed.
+     */
+    expect(text).not.toMatch(/±|\[\s*-?\d/u);
+  });
+
+  it('marks the signed-in player’s own row in words as well as in a class', async () => {
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+      account: () => SIGNED_IN_AS_ADA,
+    });
+    const mine = byClass(root, 'menu-board-row menu-board-you');
+    expect(mine.length, 'no row was marked as the reader’s own').toBe(1);
+    // KB-15: the class is the *second* signal. A highlight a screen reader cannot hear would leave
+    // the reader who most needs the answer without one.
+    expect(textUnder(mine[0] as Recorded)).toContain('Ada Lovelace — you');
+    // Ada is 3.5 s behind Grace on `awtS`, which is the metric this board declares.
+    expect(textUnder(root)).toContain('3.5 s behind the top row');
+  });
+
+  it('marks nobody when nobody is signed in, and names no gap', async () => {
+    // The negative control on the pair above: with `SIGNED_OUT`, both assertions must fail to find
+    // anything, or the highlight is being drawn on whatever row happens to be first.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => CHALLENGE_BOARD(),
+    });
+    expect(byClass(root, 'menu-board-row menu-board-you').length).toBe(0);
+    expect(textUnder(root)).not.toContain('behind the top row');
+  });
+
+  it('says an empty board is empty, and says how to be the first row on it', async () => {
+    const loaded = await catalogue();
+    const input = CHALLENGE_BOARD();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => ({
+        ...input,
+        ...(input.board === undefined ? {} : { board: { ...input.board, entries: [] } }),
+      }),
+    });
+    expect(byClass(root, 'menu-board-row').length).toBe(0);
+    const text = textUnder(root);
+    expect(text).toContain('Nothing has been posted to this board yet');
+    // Named from `seedCount`, so the sentence cannot say five while the challenge asks for eight.
+    expect(text).toContain('all 5 seeds');
+  });
+
+  it('draws nothing board-shaped when there is no board, rather than an empty table', async () => {
+    // The other negative control, and the case every other test in this file was in: no server, or
+    // no answer yet. The screen's own notices carry the reason; a wordless empty table would be a
+    // second answer to the same question.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'challenge' }, loaded, {
+      challenge: () => ({ runsDone: 0 }),
+    });
+    expect(byClass(root, 'menu-board').length).toBe(0);
+    expect(byClass(root, 'menu-board-row').length).toBe(0);
   });
 });
 

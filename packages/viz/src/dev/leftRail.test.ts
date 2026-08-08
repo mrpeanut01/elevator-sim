@@ -35,6 +35,8 @@ import type {
   WaitBands,
 } from '../live/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { frameAt } from '../frame/frameAt.js';
+import { playheadHasReachedEnd } from '../render/canvas.js';
 import { buildingMood, moodObservationsOf } from '../render/mood.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -782,6 +784,29 @@ describe('the mood card publishes no whole-day reading at a part-day playhead �
       expect(`${id}: ${String(early?.text)}`).toBe(`${id}: ${String(late?.text)}`);
     }
     expect(atStart.drivers.find((driver) => driver.id === 'standing')?.basis).toBe('now');
+  }, 600_000);
+
+  it('the stage reads the same clock — `render/canvas.ts#playheadHasReachedEnd` agrees', () => {
+    /*
+     * § D293 gated this card. The stage banner and the canvas's text alternative are gated by
+     * `render/canvas.ts#playheadHasReachedEnd`, which **cannot** call {@link shiftIsOver}: `dev/`
+     * may depend on `render/` and not the reverse, and `dev/leftRail.ts` already imports
+     * `render/mood.js`. So there are two copies of one comparison, and this is where they are held
+     * equal — the same thing `moodDriverRowsOf` does for `mood.provisional`, and the reason
+     * `shiftIsOver`'s own docstring gives for being exported at all: two copies of this decision is
+     * how the rail and the stage come to disagree about which shift a reader is looking at.
+     */
+    for (const t of [
+      recording.startedAt,
+      1,
+      recording.endedAt / 2,
+      recording.endedAt - 1,
+      recording.endedAt,
+    ]) {
+      expect(playheadHasReachedEnd(recording, frameAt(recording, t)), String(t)).toBe(
+        shiftIsOver(recording, t),
+      );
+    }
   }, 600_000);
 
   it('draws no row a whole-day reading came out of, until the playhead reaches the end', () => {

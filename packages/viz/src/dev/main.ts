@@ -69,7 +69,7 @@ import {
   fetchTransport,
   type LeaderboardClient,
 } from '../menu/client.js';
-import { initialMenuState, navigate } from '../menu/menu.js';
+import { initialMenuState, isSeedText, navigate, SEED_MAX_DIGITS } from '../menu/menu.js';
 import { partById, partIdOf, partsOfDay } from '../menu/partsOfDay.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
@@ -172,7 +172,13 @@ import { mountTrafficEditor } from './trafficEditor.js';
 import { playbackRateFor, shouldAutoplayWith } from './motion.js';
 import { themeFor } from '../render/theme.js';
 import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/notice.js';
-import { clearSession, loadLibrary, loadSession, saveSession } from '../persist/session.js';
+import {
+  clearSession,
+  loadLibrary,
+  loadSession,
+  patchTouchesLibrary,
+  saveSession,
+} from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import {
@@ -902,8 +908,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     page: undefined,
     notice: client === undefined ? NO_SERVER_BOARDS : undefined,
   };
-  /** Requests are started here and never from a render — a render that fetched would loop. */
-  let boardsRequested = false;
+  /**
+   * True **while** a boards request is in flight, and false again the moment it settles.
+   *
+   * Not a one-shot latch, which is what it was: `boardsRequested` was set on the first fetch and
+   * never cleared, so the arrival trigger died after the first visit to the screen and the sentence
+   * *"No scores have been posted yet."* — written on a board that was empty once — was permanent.
+   * A player who posted a run then walked back to the Leaderboard read the opposite of what the
+   * server had just told them, and only a full page reload ever corrected it (GitHub issue #112).
+   *
+   * The guard is still needed for the reason the latch was reached for: requests are started from
+   * arrivals and from a successful post, and two of those can overlap. Guarding *in flight* keeps
+   * the double-fetch out without also keeping the second visit out.
+   */
+  let boardsInFlight = false;
 
   /* ---------------------------------------------------------------------- *
    * Waking the container before the player needs it — § D247 § 5
@@ -965,7 +983,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
     runsDone: 0,
     ...(client === undefined ? { notice: NO_SERVER_CHALLENGE } : {}),
   };
-  let challengeRequested = false;
+  /**
+   * In flight, on {@link boardsInFlight}'s rule and for the same defect.
+   *
+   * This was a one-shot latch too, and the consequence here is sharper than on the leaderboard: the
+   * whole of `view.state`, `opensInMs` and `closesInMs` is *the server's measurement at the moment
+   * it answered*, so a challenge that opened while the tab was on the run surface stayed drawn as
+   * *not open yet* until the page was reloaded — a countdown that had stopped, on the one screen
+   * § D218 § 3 forbids the client to compute a countdown on.
+   */
+  let challengeInFlight = false;
   /**
    * The seed set this browser has simulated, paired with the seed each recording is *of*.
    *
@@ -979,16 +1006,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let challengeRanWith = '';
 
   async function loadChallenge(): Promise<void> {
-    if (client === undefined || challengeRequested) return;
-    challengeRequested = true;
+    if (client === undefined || challengeInFlight) return;
+    challengeInFlight = true;
     challengeView = { ...challengeView, notice: 'Loading this week’s challenge…' };
     drawMenu();
-    const result = await client.challenges();
-    challengeView = result.ok
-      ? { ...challengeView, view: result.value.current, notice: undefined }
-      : { ...challengeView, notice: result.detail };
+    let ok = false;
+    try {
+      const result = await client.challenges();
+      ok = result.ok;
+      challengeView = result.ok
+        ? { ...challengeView, view: result.value.current, notice: undefined }
+        : { ...challengeView, notice: result.detail };
+    } finally {
+      challengeInFlight = false;
+    }
     drawMenu();
-    if (result.ok) void loadChallengeBoard();
+    if (ok) void loadChallengeBoard();
   }
 
   async function loadChallengeBoard(): Promise<void> {
@@ -1089,19 +1122,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   async function loadBoards(): Promise<void> {
-    if (client === undefined || boardsRequested) return;
-    boardsRequested = true;
+    if (client === undefined || boardsInFlight) return;
+    boardsInFlight = true;
     boardView = { ...boardView, notice: 'Loading boards…' };
     drawMenu();
-    const result = await client.boards();
-    boardView = result.ok
-      ? {
-          boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
-          selected: undefined,
-          page: undefined,
-          notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
-        }
-      : { ...boardView, notice: result.detail };
+    try {
+      const result = await client.boards();
+      boardView = result.ok
+        ? {
+            boards: result.value.map((board) => ({ configHash: board.configHash, entries: board.entries })),
+            selected: undefined,
+            page: undefined,
+            notice: result.value.length === 0 ? 'No scores have been posted yet.' : undefined,
+          }
+        : { ...boardView, notice: result.detail };
+    } finally {
+      /*
+       * `finally`, so a client that ever throws instead of returning a `Failure` does not wedge the
+       * screen shut for the rest of the session. `menu/client.ts` turns every transport error into a
+       * `Failure` today; that is a fact about a module next door, and this is the flag it would
+       * strand.
+       */
+      boardsInFlight = false;
+    }
     drawMenu();
   }
 
@@ -1267,7 +1310,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       case 'back':
       case 'set-free-play':
       case 'set-setting': {
-        const next = applyIntent(menuState, intent);
+        const next = applyIntent(menuState, intent, menuCatalogue);
         const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
         const menuStateBefore = menuState.screen;
         menuState = next;
@@ -1423,7 +1466,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
 
       case 'set-challenge': {
-        menuState = applyIntent(menuState, intent);
+        menuState = applyIntent(menuState, intent, menuCatalogue);
         /*
          * Picking a different dispatcher **discards the runs**. They are simulations of a different
          * configuration, and keeping them would let a player run five seeds on one dispatcher, pick
@@ -1824,6 +1867,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
       result.ok ? 'Posted. The server replayed your seed and it reproduced.' : result.detail,
     );
     drawMenu();
+    /*
+     * **The board is re-read after a 201** — GitHub issue #112, and it is the correctness half of
+     * that issue rather than a courtesy.
+     *
+     * This ended at `drawMenu()`. The server had just created an entry and answered with it, and the
+     * screen went on drawing the board list it had fetched on arrival — which, on a first visit to a
+     * fresh deployment, is the sentence *"No scores have been posted yet."* So the one action the
+     * whole surface exists for returned 201 and the screen said the opposite, and the only way to
+     * see the row was to reload the page.
+     *
+     * A refetch rather than an optimistic insert. The submission's own answer carries the accepted
+     * entry, but the board it belongs on is keyed by a digest the *server* computed over the run and
+     * the loaded `data/`, and this browser does not compute that digest. Splicing the row into
+     * whichever board happened to be selected would be this client guessing which board it is on —
+     * and a row shown on the wrong board is a worse failure than a row shown a round-trip late.
+     */
+    if (result.ok) void loadBoards();
   }
 
   const menuHost: MenuPanelHost = {
@@ -2000,6 +2060,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
   const context: MountContext = {
     update(patch) {
       state = { ...state, ...patch };
+      /*
+       * **The library is written the moment it changes** — GitHub issue #113 § 2.
+       *
+       * `saveSessionNow` had exactly two callers and neither was a save button: a `set-setting`
+       * intent, and `closeDay()`. That explains the report — *four dispatchers saved, one survived a
+       * reload* — precisely rather than approximately. A dispatcher filed through *Save it and run
+       * it* runs a shift, and a shift that ends closes a day, and closing a day writes the session;
+       * one filed through Save alone was never written at all, and the reporter's inference that
+       * there must be two storage paths is wrong. There is one writer and one reader.
+       *
+       * This is the choke point every panel already writes through, so it is the one place where
+       * *the library moved* is a fact rather than a convention each editor has to remember. See
+       * {@link patchTouchesLibrary} for why no debounce is needed: the hot patches — a slider drag
+       * writing `dispatcherSpec` — do not touch a shelf, and the ones that do are button presses.
+       */
+      if (patchTouchesLibrary(patch)) saveSessionNow();
       renderAll();
     },
     runShift() {
@@ -2165,6 +2241,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
   applyTheme();
   renderAll();
   runShift();
+  /*
+   * **The overlay is redrawn once the opening shift exists** — GitHub issue #97.
+   *
+   * `drawMenu()` runs ~200 lines above, before this `runShift()`, so the first menu a player ever
+   * sees was painted against `runState().hasRun === false` — `state.recording` is `undefined` until
+   * `runShift` assigns it — and **nothing redrew it afterwards**. Neither `renderAll` nor `runShift`
+   * calls `drawMenu`; every other `drawMenu` in this file is on an intent arm, and boot presses no
+   * intent. So *Resume* sat disabled under *"There is no shift on screen to go back to yet"* over a
+   * shift that had been simulated, drawn and paused behind the overlay. That sentence is what issue
+   * #97's reporter quoted, and it was the honest output of a stale paint rather than of a stale
+   * fact.
+   *
+   * **Here and not inside `renderAll`.** `renderAll` runs on every state change — a tab, a slider, a
+   * playhead-driven panel sweep — and rebuilding the overlay on each of those is issue #106 with a
+   * new trigger: a press swallowed mid-`mousedown`, and focus taken off whatever the reader was on.
+   * Boot is the one moment where the menu's world changes and no intent says so, so boot is the one
+   * place that owes the redraw.
+   */
+  drawMenu();
   /*
    * The mailed link, redeemed on the way in.
    *
@@ -2775,6 +2870,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
       { id, config },
     ];
     state = { ...state, savedBuildings: saved, buildingId: id, tab: 'run' };
+    /*
+     * The one library write that does **not** go through `context.update`, so it says so itself.
+     * The JSON editor hands a whole `BuildingConfig` back rather than a patch, and a building the
+     * reader typed out by hand is exactly the thing issue #113 § 2 is about losing on reload.
+     */
+    saveSessionNow();
     runShift();
   }
 
@@ -3900,7 +4001,11 @@ export function deepLinkStateOf(
     patch.dispatcherId = dispatcherId;
   }
   const seed = params.get('seed');
-  if (seed !== null && /^\d+$/.test(seed)) patch.seed = BigInt(seed);
+  // The same bound the field takes and the menu takes — issue #111(c). A link is the third way a
+  // seed gets into this page, and a rule that held on two of three would be the drift the shared
+  // predicate exists to stop: an address carrying twenty-one digits would run something no field
+  // in this product would have accepted and no board would have taken.
+  if (seed !== null && isSeedText(seed)) patch.seed = BigInt(seed);
   const duration = params.get('duration');
   if (duration !== null && /^\d+$/.test(duration)) {
     patch.shiftLengthS = Math.max(60, Math.min(7200, Number(duration)));
@@ -3996,20 +4101,50 @@ export type SeedEntry =
  *
  * The shipped parse was `BigInt(raw.replace(/\D/g, '') || '0')`, so `banana` silently became
  * **seed 0**: the field kept reading `banana` while the footer read *seed 0* — a provenance
- * control reproducing a different run without saying so (§ D198). The rule is the deep-link
- * reader's own (`deepLinkStateOf`): a seed is `/^\d+$/`, and anything else is refused by name,
- * never coerced into a seed nobody typed. A blank field asks for a fresh draw — `UX.md` TP-08's
- * stated contract — and the caller shows whatever seed actually runs.
+ * control reproducing a different run without saying so (§ D198). Anything that is not a seed is
+ * refused by name, never coerced into a seed nobody typed. A blank field asks for a fresh draw —
+ * `UX.md` TP-08's stated contract — and the caller shows whatever seed actually runs.
+ *
+ * ## The rule is `menu/menu.ts#isSeedText`, and adopting it is GitHub issue #111(c)
+ *
+ * This took `/^\d+$/` — unbounded — while the menu's Seed field took `/^\d{1,20}$/`. The issue
+ * reported the two as inconsistent and named *this* one as the strict half, citing a
+ * `maxlength="20"` that does not exist anywhere in `packages/viz`; the inconsistency is real and
+ * runs the other way. It is not symmetric, either, which is why this side moved rather than the
+ * other: a run started from **this** field can be posted to a board, `menu.ts` bounds a seed at
+ * twenty digits so it survives JSON and a database byte for byte (§ D214 § 3), and a twenty-one
+ * digit seed typed here would have been accepted by the field, run, drawn, and then refused at post
+ * time by a rule nothing on this screen had mentioned.
+ *
+ * **No `maxlength` attribute**, and that is the same decision as the one above it. `maxlength`
+ * truncates a paste in silence, which would hand back the coercion § D198 removed — a field
+ * quietly holding the first twenty digits of a seed somebody meant. The bound is enforced where the
+ * refusal can name it.
+ *
+ * ## What still differs between the two fields, and why it is not the same rule twice
+ *
+ * A blank. Here it draws one, because this field is always showing the seed that is *running*, so
+ * an empty box is a gesture — *give me another* — and the caller writes the drawn seed straight
+ * back into it. The menu's field is naming a run that does not exist yet and has no generator
+ * behind it: a blank there is the absence of a choice, and `freePlayIssues` says so in words. One
+ * rule for *what a seed is*; two answers to *what nothing means*, because the two blanks are not
+ * the same blank.
  */
 export function seedEntryOf(raw: string): SeedEntry {
   const trimmed = raw.trim();
   if (trimmed === '') return { kind: 'draw' };
-  if (/^\d+$/.test(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  if (isSeedText(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  // Two refusals, because "that is not a number" is unhelpful about a string of digits. The long
+  // one names the count, so a reader can see what they are being asked to cut.
+  const overlong = /^\d+$/.test(trimmed);
   return {
     kind: 'refuse',
-    message:
-      `“${trimmed}” is not a seed — a seed is a whole number. ` +
-      'The field shows the seed that is still running.',
+    message: overlong
+      ? `“${trimmed}” is ${String(trimmed.length)} digits — a seed is 1–${String(SEED_MAX_DIGITS)} of ` +
+        'them, so it survives a round trip to a board and back. ' +
+        'The field shows the seed that is still running.'
+      : `“${trimmed}” is not a seed — a seed is 1–${String(SEED_MAX_DIGITS)} digits. ` +
+        'The field shows the seed that is still running.',
   };
 }
 

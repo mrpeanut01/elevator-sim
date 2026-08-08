@@ -115,6 +115,15 @@ interface Loaded {
   readonly painted: boolean;
   readonly distinctColours: number;
   readonly status: string;
+  /**
+   * What the opening menu says about the shift behind it — GitHub issue #97.
+   *
+   * The overlay is up on load, so this is read off the same first paint every other member here is
+   * read off. `Resume`'s label and its refusal are `menu/screens.ts`'s; what this tier adds is
+   * whether the paint a **player** meets agrees with the run that is actually on the board, which
+   * is a fact about `boot()`'s call order and reachable from nowhere else.
+   */
+  readonly resume: { readonly disabled: boolean; readonly detail: string };
 }
 
 async function load(): Promise<Loaded> {
@@ -157,6 +166,20 @@ async function load(): Promise<Loaded> {
   });
 
   const status = (await page.locator('#status').first().textContent()) ?? '';
+  /*
+   * Read off the overlay the load left up, by the attribute the panel writes rather than by
+   * anything this file recomputes — `menuPanel.ts` puts the affordance's own id in
+   * `data-menu-control`, and drops the attribute from a row it has refused, so *is Resume in the
+   * focus ring* and *is Resume pressable* are one fact with one writer.
+   */
+  const resume = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.menu-overlay button')];
+    const row = rows.find((node) => node.textContent?.startsWith('Resume') === true);
+    return {
+      disabled: row?.hasAttribute('disabled') ?? true,
+      detail: row?.querySelector('.menu-row-detail')?.textContent ?? '',
+    };
+  });
   await page.close();
   return {
     errors,
@@ -164,6 +187,7 @@ async function load(): Promise<Loaded> {
     painted: measured.painted,
     distinctColours: measured.distinct,
     status,
+    resume,
   };
 }
 
@@ -212,5 +236,38 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
     // Weaker than the throw and worth keeping separate: a failed `fetch` of `data/` is reported here
     // and not as a page error, and it is the other way this page dies without an exception.
     expect(loaded.consoleErrors).toEqual([]);
+  });
+
+  it('opens the menu over the shift it just ran, rather than over a stale paint — issue #97', () => {
+    /*
+     * **The first menu a player ever sees was painted before the first shift existed, and nothing
+     * repainted it.**
+     *
+     * `boot()` calls `drawMenu()` some two hundred lines above its own `runShift()`, and
+     * `runState().hasRun` is `state.recording !== undefined` — undefined until `runShift` assigns
+     * it. Neither `renderAll` nor `runShift` calls `drawMenu`, and every other `drawMenu` in
+     * `dev/main.ts` hangs off an intent arm, which boot presses none of. So *Resume* sat refused
+     * under *"There is no shift on screen to go back to yet"* over a shift that had been simulated,
+     * drawn and paused behind the overlay — the sentence issue #97's reporter quoted, produced by a
+     * stale paint rather than by a stale fact.
+     *
+     * **Only this tier can see it.** The defect is entirely in `boot()`'s call order: the pure
+     * layer is correct at every input (`screens.test.ts` drives both arms of `hasRun`), the panel
+     * is correct given the host, and the host is correct when asked. What was wrong is *when* it
+     * was asked, and nothing below a booted page has a `boot()` to observe.
+     *
+     * Watched failing by deleting the `drawMenu()` after `runShift()`:
+     *
+     *     × opens the menu over the shift it just ran, rather than over a stale paint
+     *       AssertionError: Resume is refused over a shift that has already run: expected true to be false
+     */
+    expect(
+      loaded.resume.disabled,
+      'Resume is refused over a shift that has already run, so the opening menu is a stale paint',
+    ).toBe(false);
+    expect(
+      loaded.resume.detail,
+      'the refusal for a cold shell is on screen over a warm one',
+    ).not.toContain('no shift on screen');
   });
 });

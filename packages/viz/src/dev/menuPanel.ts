@@ -29,6 +29,7 @@ import {
   type AccountState,
 } from '../menu/account.js';
 import type { BoardPage } from '../menu/client.js';
+import type { ChallengeScore } from '../menu/challenge.js';
 
 import {
   screenOf,
@@ -188,10 +189,17 @@ interface Draw {
  * ## Three things fall out of it, and only the first is what the issue asked for
  *
  * The submit button survives the redraw its own `mousedown` causes, so the click lands. **A text
- * field keeps its caret**, because a retained `<input>` is never rebuilt and its `value` is written
- * only when it differs — which is what makes it safe to redraw this overlay on *every keystroke*,
- * the thing issue #111's per-keystroke validation is about to do. And a `<details>` the reader
- * opened stays open, which it did not before.
+ * field keeps its caret and its focus**, because a retained `<input>` is never rebuilt — which is
+ * what makes it safe to redraw this overlay on *every keystroke*, the thing issue #111's
+ * per-keystroke validation now does. That half is measured rather than argued: forcing this
+ * function to build a fresh element every draw makes `menu.browser.test.ts § keeps the caret where
+ * the reader put it` report `'202604'` where `'20269904'` was typed — the keystrokes reach nothing,
+ * because what they were aimed at no longer exists. And a `<details>` the reader opened stays open,
+ * which it did not before.
+ *
+ * This paragraph used to credit `textRow`'s `value`-write guard alongside retention. It does not
+ * now: that guard turns out not to be what keeps the caret today, and `textRow`'s own docstring
+ * carries the measurement and the narrower reason the guard is still right.
  *
  * ## Why the map is rebuilt every draw rather than accumulated
  *
@@ -324,6 +332,13 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
    * screen print a sign-in error under a registration form.
    */
   const naming = namingStage(account);
+  /*
+   * Asked once and used twice, on the same rule {@link namingStage} is asked under: the screen's
+   * rows and notices are decided from it next door, and the board table below draws its `entries`.
+   * Two calls would be two answers to *what is on this week's board*, and the table would be able to
+   * show rows the notices above it were counted from a different fetch of.
+   */
+  const challenge = host.challenge();
   const view = screenOf({
     state: host.state(),
     catalogue: host.catalogue,
@@ -333,7 +348,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     rankingRefusal: run.rankingRefusal,
     boards: board.boards,
     viewMode: host.viewMode(),
-    challenge: host.challenge(),
+    challenge,
     commissioning: host.commissioning(),
     calendarPeriodId: host.calendarPeriodId(),
     naming,
@@ -408,8 +423,19 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   if (view.issues.length > 0) children.push(issueList(draw, 'issues', view.issues));
 
-  // The one screen with content an affordance cannot express: a table of somebody else's runs.
+  /*
+   * The two screens with content an affordance cannot express: a table of somebody else's runs.
+   *
+   * The challenge arm is GitHub issue #112. `ChallengeBoardPage.entries` was fetched, threaded
+   * through `dev/main.ts` into {@link ChallengeScreenInput} — and read by **no renderer**: the whole
+   * of `menu/screens.ts`'s use of the board was `board.note` and `board.otherDataNote`, two
+   * sentences. So the *Order the board on* select fired a real re-fetch of a real board, and its
+   * only visible effect was that a sentence changed wording. A control that reorders something
+   * nobody can see is the inert control this repository's standing requirement is written about,
+   * arriving from the rendering end rather than the wiring end.
+   */
   if (view.screen === 'leaderboard') children.push(boardTable(draw, board));
+  if (view.screen === 'challenge') children.push(challengeBoardTable(draw, challenge, account));
 
   // `reconcile` and not `fill`, and the whole of issue #106 is in that word: this container holds
   // controls, and a container of controls may not be rebuilt under a pointer that is already down
@@ -687,8 +713,19 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
     });
   }
   if (row.kind === 'text') {
-    return textRow(draw, row.label, 'text', row.value ?? '', row.id, (value) => {
-      host.dispatch(withValue(value));
+    return textRow(draw, {
+      label: row.label,
+      type: 'text',
+      value: row.value ?? '',
+      key: row.id,
+      // Said before it is broken rather than after — issue #111(c). The screen decides the words;
+      // this only draws them, and a row that carries none draws none.
+      hint: row.detail,
+      placeholder: row.placeholder,
+      inputMode: row.inputMode,
+      onChange: (value) => {
+        host.dispatch(withValue(value));
+      },
     });
   }
 
@@ -856,8 +893,14 @@ function accountForm(
 
   const field = (label: string, type: 'text' | 'email', key: string, value: string): void => {
     blocks.push(
-      textRow(draw, label, type, value, `account.${key}`, (next) => {
-        host.dispatch({ kind: 'account-form', patch: { [key]: next } });
+      textRow(draw, {
+        label,
+        type,
+        value,
+        key: `account.${key}`,
+        onChange: (next) => {
+          host.dispatch({ kind: 'account-form', patch: { [key]: next } });
+        },
       }),
     );
   };
@@ -939,28 +982,64 @@ function boardTable(draw: Draw, view: LeaderboardView): HTMLElement {
 
   const table = el(doc, 'ol', { className: 'menu-board' });
   for (const entry of page.entries) {
-    const row = el(doc, 'li', { className: 'menu-board-row' });
-    const name = el(doc, 'span', { className: 'menu-board-name' });
-    setText(name, entry.displayName);
-    const figures = el(doc, 'span', { className: 'menu-board-figures' });
-    // All four, always. Showing only the ranked one would let a reader infer the others moved with
-    // it, which is the claim the note exists to refuse.
-    setText(
-      figures,
-      `AWT ${entry.measured.awtS.toFixed(1)} s \u00b7 WT95 ${entry.measured.wt95S.toFixed(1)} s \u00b7 ` +
-        `TTD ${entry.measured.ttdMeanS.toFixed(1)} s \u00b7 over-long ${entry.measured.pctOverLongWait.toFixed(1)} %`,
+    table.append(
+      boardRow(doc, {
+        name: entry.displayName,
+        // All four, always. Showing only the ranked one would let a reader infer the others moved
+        // with it, which is the claim the note exists to refuse.
+        figures:
+          `AWT ${entry.measured.awtS.toFixed(1)} s \u00b7 WT95 ${entry.measured.wt95S.toFixed(1)} s \u00b7 ` +
+          `TTD ${entry.measured.ttdMeanS.toFixed(1)} s \u00b7 over-long ${entry.measured.pctOverLongWait.toFixed(1)} %`,
+        // Printed because it is what makes the row checkable: invariant 5 says a run replays from
+        // its seed, and a leaderboard that hid the seed would be asking to be taken on trust.
+        meta: `seed ${entry.run.seed} \u00b7 one run`,
+      }),
     );
-    const seed = el(doc, 'span', { className: 'menu-board-seed' });
-    // Printed because it is what makes the row checkable: invariant 5 says a run replays from its
-    // seed, and a leaderboard that hid the seed would be asking to be taken on trust.
-    setText(seed, `seed ${entry.run.seed} \u00b7 one run`);
-    fill(row, name, figures, seed);
-    table.append(row);
   }
   blocks.push(table);
   fill(wrap, ...blocks);
   return wrap;
 }
+
+/**
+ * One row of a board: who, the four figures, and the line that makes it checkable.
+ *
+ * Shared by the leaderboard, the challenge board and the worked example, so all three teach the same
+ * shape. The third argument is the only thing that differs between them \u2014 a seed for a single run, a
+ * run and leg count for a set \u2014 and it is a *string the caller composed* rather than a union this
+ * function switches on, because the moment it switched it would be deciding what a board row means
+ * and that decision belongs beside the data it is about.
+ */
+function boardRow(
+  doc: Document,
+  entry: {
+    readonly name: string;
+    readonly figures: string;
+    readonly meta: string;
+    /** The signed-in player's own row. Drawn differently, and never *only* differently \u2014 see below. */
+    readonly mine?: boolean;
+  },
+): HTMLElement {
+  const row = el(doc, 'li', {
+    className: entry.mine === true ? `menu-board-row ${MINE}` : 'menu-board-row',
+  });
+  const name = el(doc, 'span', { className: 'menu-board-name' });
+  /*
+   * The marker is **in the text**, not only in the class. KB-15 forbids a distinction carried by
+   * colour alone, and a highlighted row a screen reader cannot hear is exactly that: the reader who
+   * most needs *which of these is mine* answered is the one the stylesheet cannot answer it for.
+   */
+  setText(name, entry.mine === true ? `${entry.name} \u2014 you` : entry.name);
+  const figures = el(doc, 'span', { className: 'menu-board-figures' });
+  setText(figures, entry.figures);
+  const meta = el(doc, 'span', { className: 'menu-board-seed' });
+  setText(meta, entry.meta);
+  fill(row, name, figures, meta);
+  return row;
+}
+
+/** The signed-in player's own row. A modifier on `menu-board-row`, never a replacement for it. */
+const MINE = 'menu-board-you';
 
 /**
  * What a board looks like, drawn when there is none — GitHub issue #34.
@@ -1014,15 +1093,7 @@ function exampleBoard(doc: Document): HTMLElement {
     },
   ];
   for (const row of rows) {
-    const item = el(doc, 'li', { className: 'menu-board-row' });
-    const name = el(doc, 'span', { className: 'menu-board-name' });
-    setText(name, row.who);
-    const figures = el(doc, 'span', { className: 'menu-board-figures' });
-    setText(figures, row.figures);
-    const seed = el(doc, 'span', { className: 'menu-board-seed' });
-    setText(seed, row.seed);
-    fill(item, name, figures, seed);
-    table.append(item);
+    table.append(boardRow(doc, { name: row.who, figures: row.figures, meta: row.seed }));
   }
   wrap.append(table);
 
@@ -1035,6 +1106,140 @@ function exampleBoard(doc: Document): HTMLElement {
   );
   wrap.append(rule);
   return wrap;
+}
+
+/* -------------------------------------------------------------------------- *
+ * This week's challenge — the board it already had and never drew
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The challenge board's rows — GitHub issue #112.
+ *
+ * ## Why this is a second function rather than an argument to {@link boardTable}
+ *
+ * The two boards rank different things. A leaderboard row is **one run**, and the honest thing to
+ * print beside it is its seed, because a seed is what makes it replayable (invariant 5). A challenge
+ * row is **a set** — `seedCount` runs of the same numbered seeds — so its four figures are means and
+ * the honest thing beside them is the count they were taken over, which `ChallengeScore` carries as
+ * `runs` and `legs` for exactly this reason (R13). One function switching on which it had been given
+ * would be one place deciding what a row *means* for both.
+ *
+ * ## What it does not do
+ *
+ * **No interval and no dispersion.** `ChallengeScore`'s own docstring forbids it in as many words —
+ * five runs cannot support an inference and a `[min, max]` beside a mean is read as a confidence
+ * interval by everyone who has ever seen one — and `perSeed` is on the wire, which is what makes the
+ * ban worth restating here rather than assuming.
+ *
+ * **No note of its own.** `page.note` and `page.otherDataNote` are already drawn above, as notices,
+ * by `menu/screens.ts#challengeBody`. Printing them again here would be this file deciding a screen
+ * says something twice.
+ */
+function challengeBoardTable(
+  draw: Draw,
+  challenge: ChallengeScreenInput | undefined,
+  account: AccountState,
+): HTMLElement {
+  const doc = draw.doc;
+  const wrap = draw.retain('div', 'challenge-board', { className: 'menu-leaderboard' });
+  const page = challenge?.board;
+  if (page === undefined) {
+    // No server, nothing fetched yet, or a refused fetch — and each of those already has a sentence
+    // in the notices above. An empty table here would be a second, wordless answer.
+    fill(wrap);
+    return wrap;
+  }
+
+  if (page.entries.length === 0) {
+    const empty = el(doc, 'p', {});
+    setText(
+      empty,
+      `Nothing has been posted to this board yet. Run all ${String(page.seedCount)} seeds and post ` +
+        'the set to be the first row on it.',
+    );
+    fill(wrap, empty);
+    return wrap;
+  }
+
+  /*
+   * Which row is the reader's, matched on the display name.
+   *
+   * It is the only identity on the wire: `ChallengeBoardRow.id` is the *entry's* uuid and there is
+   * no user id in the body, deliberately. Matching on the name is sound rather than a guess — the
+   * store refuses a duplicate display name case-insensitively (`#userByName`), so one name is one
+   * account — and it is compared the same way, because a reader who signed up as `Ada` and is drawn
+   * as `ada` on the board would otherwise be told none of these rows is theirs.
+   */
+  const mine = account.user?.displayName.toLowerCase();
+  const ranked = RANKED_MEAN[page.metric];
+  const leaderScore = page.entries[0]?.score;
+
+  const table = el(doc, 'ol', { className: 'menu-board' });
+  for (const entry of page.entries) {
+    const isMine = mine !== undefined && entry.displayName.toLowerCase() === mine;
+    const score = entry.score;
+    table.append(
+      boardRow(doc, {
+        name: entry.displayName,
+        // All four, on `boardTable`'s rule and § D106's: one of them orders the board and the other
+        // three sit beside it, and none is ever folded into the others.
+        figures:
+          `AWT ${score.meanAwtS.toFixed(1)} s · WT95 ${score.meanWt95S.toFixed(1)} s · ` +
+          `TTD ${score.meanTtdMeanS.toFixed(1)} s · over-long ${score.meanPctOverLongWait.toFixed(1)} %`,
+        // The dispatcher, because it is the axis this whole screen exists to vary: everybody on this
+        // board ran the same building on the same seeds, so it is the only thing that differs.
+        meta:
+          `${String(score.runs)} runs · ${String(score.legs)} legs · ${entry.dispatcherProfileId}` +
+          gapToLeader(isMine, ranked, score, leaderScore),
+        ...(isMine ? { mine: true } : {}),
+      }),
+    );
+  }
+  fill(wrap, table);
+  return wrap;
+}
+
+/**
+ * How to read the ranked mean off a score, and what its unit is called.
+ *
+ * Written out rather than derived, because the four ids are a **wire vocabulary**:
+ * `/api/challenge-board` 400s `no-such-metric` on anything else. A metric this table does not know
+ * is left without a gap rather than guessed at — see {@link gapToLeader} — so a fifth one added
+ * server-side degrades to *no extra sentence* rather than to a number in the wrong unit.
+ */
+const RANKED_MEAN: Readonly<
+  Record<string, { readonly of: (score: ChallengeScore) => number; readonly unit: string } | undefined>
+> = Object.freeze({
+  awtS: { of: (score) => score.meanAwtS, unit: 's' },
+  wt95S: { of: (score) => score.meanWt95S, unit: 's' },
+  ttdMeanS: { of: (score) => score.meanTtdMeanS, unit: 's' },
+  pctOverLongWait: { of: (score) => score.meanPctOverLongWait, unit: 'points' },
+});
+
+/**
+ * The reader's distance from the top row, on the one metric the board is ordered by.
+ *
+ * On the reader's own row and nowhere else, which is the whole of what keeps it a fact rather than a
+ * claim: it is the difference between two published figures on the axis the server has already
+ * sorted, said to the person who posted one of them. It is deliberately **not** a sentence about
+ * dispatchers — `docs/10` § 5.5 and § D218 § 5 clause 5 leave that to Compare, which is the only
+ * surface with the replications to say it, and `view.compare.note` is drawn above this table saying
+ * so.
+ *
+ * Empty for the leader themselves, and empty for a metric this build does not know.
+ */
+function gapToLeader(
+  isMine: boolean,
+  ranked: { readonly of: (score: ChallengeScore) => number; readonly unit: string } | undefined,
+  score: ChallengeScore,
+  leader: ChallengeScore | undefined,
+): string {
+  if (!isMine || ranked === undefined || leader === undefined) return '';
+  const gap = ranked.of(score) - ranked.of(leader);
+  // Every ranked metric here is a cost, so a non-positive gap means this row *is* the top row — or
+  // ties it, which is not a thing to congratulate somebody on in a sentence about a difference.
+  if (gap <= 0) return '';
+  return ` · ${gap.toFixed(1)} ${ranked.unit} behind the top row on this board’s metric`;
 }
 
 function noticeLine(draw: Draw, key: string, text: string): HTMLElement {
@@ -1087,6 +1292,19 @@ function selectRow(
 }
 
 
+/** One text field, as the screen decided it. See {@link textRow}. */
+interface TextRowSpec {
+  readonly label: string;
+  readonly type: 'text' | 'email';
+  readonly value: string;
+  readonly key: string;
+  /** A line under the box that is always there — {@link MenuAffordance.detail} on a `text` row. */
+  readonly hint?: string | undefined;
+  readonly placeholder?: string | undefined;
+  readonly inputMode?: 'numeric' | undefined;
+  readonly onChange: (value: string) => void;
+}
+
 /**
  * A labelled text input.
  *
@@ -1098,13 +1316,62 @@ function selectRow(
  * `email` is not decoration either: it gets the right keyboard on a phone and the browser's own
  * autofill, on the one field a player is least willing to retype.
  *
+ * ## It commits on `input`, and that is GitHub issue #111(a)
+ *
+ * `change` on a text field fires on **blur**. So the state was one commit behind the box, and every
+ * decision taken from the state was one commit behind what the player was looking at. Measured on
+ * the Seed field: type `abc` and Start is still enabled — a refused selection you may press — blur
+ * and it disables; type `777` over it and Start stays **disabled under a valid seed**, beside a
+ * sentence saying *"a seed is 1–20 digits"* about a box holding three of them. Neither half is a
+ * cosmetic lag: the first offers a run the model has already refused, and the second refuses a run
+ * the model would accept, and a player has no way to tell that the fix is to click elsewhere.
+ *
+ * Both listeners stay. `input` is what makes the state track the box; `change` is what catches the
+ * commits `input` is not guaranteed to raise on every browser and assistive path, and a second
+ * commit of a string the state already holds is refused one layer down — `account.ts#updateForm`
+ * says so in its own words, and `updateFreePlay` of an identical value produces an identical
+ * selection.
+ *
+ * **What makes it safe is issue #106 and nothing else**, which is why that landed first. A commit
+ * redraws the whole overlay, so this is now a redraw per keystroke. **Retention is the whole of
+ * what carries it**, and that is measured rather than reasoned: with {@link retainer} forced to
+ * build a fresh element every draw, `menu.browser.test.ts § keeps the caret where the reader put
+ * it` fails with the field holding `202604` — the two characters typed into the middle of it
+ * reached nothing at all, because the element they were being typed into stopped existing between
+ * keystrokes — and *Tab out of the field reaches Start* fails beside it. With retention, both pass
+ * against a real Chromium.
+ *
  * The value is set as a property and not an attribute, so re-rendering does not blow away what the
- * player is mid-way through typing — **and only when it differs**, which is the stronger half.
- * Assigning `value` to a text input moves the caret to the end of the string even when the string
- * is unchanged, so a redraw during an edit would send a reader correcting the middle of an address
- * back to the end of it. That is not a live defect today because nothing redraws per keystroke; it
- * is written this way because issue #111's validation is about to, and `restoreFocus` restores a
- * control and has never restored a caret.
+ * player is mid-way through typing.
+ *
+ * ## The guard on that write, and the claim about it that was wrong
+ *
+ * This comment used to say — and `dev/dom.ts`'s sibling rules imply — that *assigning `value` to a
+ * text input moves the caret to the end of the string **even when the string is unchanged***. It
+ * was written for this change before this change existed, and it is **false**. HTML's own value
+ * setter moves the text entry cursor only when the sanitized new value *differs from the old*, and
+ * Chromium implements it: measured on a bare `<input>` holding `202604` with the caret at 4,
+ * assigning `'202604'` leaves it at **4** and assigning `'999999'` moves it to **6**. Removing the
+ * comparison below changes no browser-observable behaviour on any path this menu has today, because
+ * a commit is synchronous and neither `updateFreePlay` nor `account.ts#updateForm` rewrites the
+ * string it was handed — so the state and the box always agree by the time the draw runs.
+ *
+ * The guard stays, with the honest reason rather than the invented one: it is the difference
+ * between *the state agrees with the box* and *the state is written back onto the box*, and the day
+ * a reducer normalises a value — trims a seed, lower-cases an address — that is exactly the write
+ * that would throw a reader correcting the middle of a field to the end of it. It costs a string
+ * comparison and it is the only thing standing between here and that.
+ *
+ * `restoreFocus` restores a control and has never restored a caret, which is why none of this can
+ * be delegated to it.
+ *
+ * ## The account form now complains while you type, and that is the same fix
+ *
+ * `accountForm` shows `formIssues` once anything has been typed, so a live commit makes the
+ * complaint live too. That is deliberate: the alternative is a form that tells you the address is
+ * malformed only after you have left it, which is the defect above wearing a different label. The
+ * complaint clears on the keystroke that fixes it, which is the half a blur-only commit could not
+ * offer at all.
  *
  * ## Enter, and why it is here rather than in a `<form>`
  *
@@ -1117,30 +1384,48 @@ function selectRow(
  * `account.ts#updateForm` refuses a commit that changes nothing for the same reason, so the pair is
  * belt and braces rather than one guard doing all the work.
  */
-function textRow(
-  draw: Draw,
-  label: string,
-  type: 'text' | 'email',
-  value: string,
-  key: string,
-  onChange: (value: string) => void,
-): HTMLElement {
+function textRow(draw: Draw, spec: TextRowSpec): HTMLElement {
+  const { key, onChange } = spec;
   const row = draw.retain('label', `row.${key}`, { className: 'menu-text' });
   const text = draw.retain('span', `label.${key}`);
-  setText(text, label);
-  const input = draw.keep(draw.retain('input', `control.${key}`, { attrs: { type } }), key);
-  if (input.value !== value) input.value = value;
-  on(input, 'change', () => {
+  setText(text, spec.label);
+  /*
+   * The attributes are written at creation and never again, which {@link retainer} allows for
+   * everything but the class. They are constants of the field rather than of the draw — a seed field
+   * does not stop wanting a numeric keypad between keystrokes — so there is nothing here for a later
+   * draw to keep current.
+   */
+  const input = draw.keep(
+    draw.retain('input', `control.${key}`, {
+      attrs: {
+        type: spec.type,
+        ...(spec.placeholder === undefined ? {} : { placeholder: spec.placeholder }),
+        ...(spec.inputMode === undefined ? {} : { inputmode: spec.inputMode }),
+      },
+    }),
+    key,
+  );
+  if (input.value !== spec.value) input.value = spec.value;
+  const commit = (): void => {
     onChange(input.value);
-  });
+  };
+  // The pair, and the order they arrive in: `input` on every keystroke, `change` on the blur that
+  // follows. See the docstring for why both.
+  on(input, 'input', commit);
+  on(input, 'change', commit);
   const submit = draw.submit;
   on(input, 'keydown', (event) => {
     if ((event as KeyboardEvent).key !== 'Enter' || submit === undefined) return;
     event.preventDefault();
-    onChange(input.value);
+    commit();
     submit();
   });
-  reconcile(row, text, input);
+  const hint =
+    spec.hint === undefined || spec.hint === ''
+      ? undefined
+      : draw.retain('span', `hint.${key}`, { className: 'menu-hint' });
+  if (hint !== undefined) setText(hint, spec.hint ?? '');
+  reconcile(row, text, input, hint);
   return row;
 }
 

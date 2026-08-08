@@ -70,6 +70,8 @@ export type {
   HonestySkipReason,
   HonestyViolation,
   RenderedText,
+  TemporalReach,
+  TextPlayhead,
   TextProvenance,
   TextRole,
 } from './types.js';

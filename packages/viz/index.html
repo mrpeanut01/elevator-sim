@@ -1103,6 +1103,65 @@
       progress { width: 180px; }
       progress[hidden] { display: none; }
 
+      /* ---------------------------------------------------------------------
+         The drawn interval — GitHub issue #119.
+
+         Compare's central claim is a confidence interval that excludes zero and
+         it drew nothing. One bar per measure on a zero line: `dev/batchPanel.ts`
+         positions everything in percentages that `batch/intervalPlot.ts`
+         computed, so nothing here knows a metric or a verdict.
+
+         **The shape carries it, not the colour** — the same rule as KB-15 above.
+         An interval that excludes zero is a *filled* bar with the zero line
+         outside it; one that straddles zero is an *outlined* bar with the zero
+         line drawn through it. Both states are also written under the bar in
+         words. Remove every colour from this block and the two are still
+         distinguishable by whether a line crosses a box.
+         --------------------------------------------------------------------- */
+      .iv { margin: 6px 0 2px; max-width: 46em; }
+      .iv-track {
+        position: relative; height: 18px;
+        border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge);
+        background: var(--bg);
+      }
+      /* The zero line, full height, and drawn over the bar so a straddling
+         interval is visibly *crossed* rather than merely overlapping. */
+      .iv-zero {
+        position: absolute; top: -1px; bottom: -1px; width: 0;
+        border-left: 1px dashed var(--dimmer);
+      }
+      .iv-bar { position: absolute; top: 5px; height: 8px; border-radius: 2px; min-width: 2px; }
+      /* Resolved: the only state this project permits an ordering on. Solid. */
+      .iv-bar-clear { background: var(--accent); }
+      /* R11's axis, and § D171's under-budget interval: measured, clear of zero,
+         and naming no arm. Solid but muted, so it never outranks the row above
+         that earned the right to name one. */
+      .iv-bar-axis { background: var(--dimmer); }
+      /* Contains zero: hollow, so the zero line reads as passing through it. */
+      .iv-bar-straddle { background: transparent; border: 1px dashed var(--dim); }
+      .iv-mean { position: absolute; top: 2px; bottom: 2px; width: 0; border-left: 2px solid var(--text); }
+      .iv-scale {
+        display: flex; justify-content: space-between; gap: 8px;
+        color: var(--dimmer); font: 500 10px var(--mono); margin-top: 2px;
+      }
+      .iv-caption { color: var(--dim); text-align: center; flex: 1; }
+      .iv-caption-clear { color: var(--text); }
+
+      /* The ~700 words, behind a disclosure and not deleted — issue #119 item 1.
+         `<details>` keeps its text in the accessible tree and in a selection
+         whether it is open or shut, which is why it is this and not a tooltip. */
+      .figure-why { margin-top: 4px; }
+      .figure-why > summary {
+        cursor: pointer; color: var(--dimmer);
+        font: 500 10.5px var(--mono); letter-spacing: 0.04em;
+      }
+      .figure-why > summary:hover { color: var(--text); }
+      .figure-why .figure-note { margin-top: 4px; }
+
+      /* The remedy, as a control — issue #119 item 5. */
+      .figure-remedy { margin: 6px 0 0; }
+      .remedy-button { font-size: 11px; padding: 3px 8px; }
+
       /* docs/10 § 11 W4 — the generated parameter form. Keyed on a class the renderer
          emits for *every* control, never on a parameter id. */
       .control { padding: 6px 0; border-bottom: 1px solid var(--edge); }
@@ -1235,8 +1294,12 @@
          against `.menu-row-name` is carried by weight and size, which survive a photocopier. */
       .menu-start .menu-row-detail { color: var(--accent-ink); }
       .menu-back { background: transparent; margin-top: 4px; }
+      /* `flex-wrap` so a row may carry a third child on its own line — `.menu-hint` below. The
+         label and its control still share the first line, because both have a `flex` basis and the
+         hint is the only child that claims the whole width. */
       .menu-select, .menu-text, .menu-seed, .menu-toggle {
         display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        flex-wrap: wrap; row-gap: 4px;
         width: 100%; padding: 9px 14px; border-radius: var(--r-card);
         border: 1px solid var(--edge); background: var(--panel);
         font: 500 13px var(--sans); color: var(--text);
@@ -1246,6 +1309,13 @@
         border: 1px solid var(--edge-strong); background: var(--card);
         color: var(--text); font: 500 12px var(--sans);
       }
+      /* GitHub issue #111(c) — the rule said **before** it is broken.
+         The Seed field's contract reached the screen only as a refusal in the issue list, so a
+         player learned it by losing Start. This line is always there, sits under the box rather
+         than beside it, and is dimmed against the row's own `--text` so it reads as guidance and
+         not as a complaint — the complaint has `.menu-issues`, with its own border and its own
+         colour, and the two must not be mistaken for one another. */
+      .menu-hint { flex: 1 0 100%; font: 400 11px/1.45 var(--sans); color: var(--dim); }
       .menu-toggle input { flex: 0 0 auto; }
       .menu-issues {
         width: min(560px, 100%); margin: 12px 0 0; padding: 10px 14px 10px 30px;
@@ -1267,6 +1337,12 @@
       .menu-board-name { font: 600 13px var(--sans); color: var(--text); }
       .menu-board-figures { font: 400 11px var(--mono); color: var(--dim); }
       .menu-board-seed { font: 400 11px var(--mono); color: var(--dim); }
+      /* The signed-in player's own row on a board — GitHub issue #112.
+         KB-15: the tint is the *second* signal and never the only one. `menuPanel.ts#boardRow`
+         appends "— you" to the name itself, so a reader on a screen reader, on a monochrome
+         display, or with a colour vision deficiency is told the same thing this rule says. */
+      .menu-board-you { border-left: 3px solid var(--accent); padding-left: 8px; }
+      .menu-board-you .menu-board-name { color: var(--accent); }
 
       /* § D222 — the inactive control says so on its own label line.
          `controls/render.ts` emits `.control-lock` for every inactive control and for no
@@ -1686,7 +1762,11 @@
                    ============================================================= -->
               <div class="eyebrow-row eyebrow-row-after-card">
                 <span class="eyebrow">Provenance and replay</span>
-                <span class="eyebrow-note">every run carries its seed and replays from it</span>
+                <!-- The bound is named here rather than only in the refusal — issue #111(c), the
+                     same rule the menu's Seed field states under its own box. `dev/main.ts#seedEntryOf`
+                     is what enforces it, and `menu/menu.ts#SEED_MAX_DIGITS` is the one place the
+                     number lives; this line is the sentence a player reads before typing. -->
+                <span class="eyebrow-note">every run carries its seed and replays from it · 1–20 digits, or blank to draw one</span>
               </div>
               <div class="provenance">
                 <label class="field-inline" for="seed">seed
@@ -2255,8 +2335,26 @@
               <label title="50–200 replications per configuration is this project’s budget; ten produced a 12 % error against the converged mean in the reference study">
                 replications <input id="batch-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
               </label>
-              <label title="blank runs the building's own traffic profile">
+              <label title="blank runs the building's own traffic profile at the band point beside it">
                 demand %pop/5&nbsp;min <input id="batch-demand" size="4" inputmode="decimal" placeholder="profile" />
+              </label>
+              <!--
+                Which point of the building's own declared arrival-rate band to run at — issue #119.
+
+                It opens on `min`, and the grounds are in `dev/batchPanel.ts`'s `demandLevelRow`:
+                a criterion written before any interval was looked at — the largest rate at which
+                all 50 paired replications stand behind a mean on both reference arms — swept 16 to
+                3 and selected 15, which is `office-prestige`'s own declared minimum. A *level* and
+                not the number 15, because every profile declares a band and a level survives this
+                panel being pointed at a different building.
+              -->
+              <label title="which point of the building's own declared arrival-rate band to run at; the demand field overrides it">
+                traffic band
+                <select id="batch-demand-level">
+                  <option value="min" selected>min</option>
+                  <option value="typical">typical</option>
+                  <option value="max">max</option>
+                </select>
               </label>
               <button id="batch-run">Run batch</button>
               <button id="batch-cancel">Cancel</button>

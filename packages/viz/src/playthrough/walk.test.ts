@@ -192,7 +192,7 @@ describe('the menu graph has no dead ends', () => {
       for (const row of viewAt(state, ARMS[0] as (typeof ARMS)[number]).rows) {
         if (row.intent.kind !== 'navigate' || seen.has(row.intent.to)) continue;
         seen.add(row.intent.to);
-        queue.push(applyIntent(state, row.intent));
+        queue.push(applyIntent(state, row.intent, CATALOGUE));
       }
     }
     expect([...seen].sort()).toEqual([...MENU_SCREENS].sort());
@@ -216,7 +216,7 @@ describe('the menu graph has no dead ends', () => {
       let state = stateAt(screen);
       let steps = 0;
       while (state.screen !== 'main' && steps <= MENU_SCREENS.length) {
-        state = applyIntent(state, { kind: 'back' });
+        state = applyIntent(state, { kind: 'back' }, CATALOGUE);
         steps += 1;
       }
       expect(state.screen, `${screen} never reaches the root`).toBe('main');
@@ -314,12 +314,55 @@ describe('every affordance is usable', () => {
           for (const option of row.options ?? []) {
             const intent = withChosenValue(row.intent, option.id);
             if (!REDUCER_OWNS.has(intent.kind)) continue;
-            const next = applyIntent(stateAt(screen), intent);
+            const next = applyIntent(stateAt(screen), intent, CATALOGUE);
             const after = viewAt(next, arm).rows.find((candidate) => candidate.id === row.id);
             expect(
               after?.value,
               `${screen}/${row.id} (${arm}) did not take "${option.id}"`,
             ).toBe(option.id);
+          }
+        }
+      }
+    }
+  });
+
+  it('leaves every other select on the screen showing a value it still offers', () => {
+    /*
+     * **The hole the case above cannot see, and GitHub issue #111(b) fell straight through it.**
+     *
+     * That case applies an option and then re-reads *the same row*. So a select whose choice breaks
+     * a **different** select is invisible to it, and one did: picking a traffic shape rebuilt *Part
+     * of the day* from the new template's parts while `windowStartS`/`durationS` still held a part
+     * of the old one. No option matched, a browser falls back to index 0, and the box then showed a
+     * part the model did not hold — with no way back, since a `<select>` fires no `change` for the
+     * option it is already on.
+     *
+     * The invariant is the same one `offers a non-empty option list containing its own value`
+     * asserts about the *opening* state, carried across an edit: **after any option is applied,
+     * every select on the screen still contains its own value.** It is stated over the whole row
+     * list rather than over the pair of fields that were wrong, because *which* select a choice
+     * breaks is exactly what nobody knows in advance — that is what made this one survive.
+     *
+     * Watched failing before it was trusted: with `freePlayPatch`'s `demandTemplateId` arm writing
+     * only the template, this reports `free-play/free-play.part` for every template whose parts
+     * differ from the opening one.
+     */
+    for (const arm of ARMS) {
+      for (const screen of MENU_SCREENS) {
+        for (const row of viewAt(stateAt(screen), arm).rows) {
+          if (row.kind !== 'select') continue;
+          for (const option of row.options ?? []) {
+            const intent = withChosenValue(row.intent, option.id);
+            if (!REDUCER_OWNS.has(intent.kind)) continue;
+            const next = applyIntent(stateAt(screen), intent, CATALOGUE);
+            for (const sibling of viewAt(next, arm).rows) {
+              if (sibling.kind !== 'select') continue;
+              expect(
+                (sibling.options ?? []).map((entry) => entry.id),
+                `${screen}/${sibling.id} (${arm.name}) shows "${sibling.value ?? ''}", which it does ` +
+                  `not offer, after ${row.id} was set to "${option.id}"`,
+              ).toContain(sibling.value);
+            }
           }
         }
       }
@@ -383,7 +426,7 @@ describe('every affordance is usable', () => {
       for (const screen of MENU_SCREENS) {
         for (const row of viewAt(stateAt(screen), arm).rows) {
           if (row.kind !== 'toggle') continue;
-          const next = applyIntent(stateAt(screen), row.intent);
+          const next = applyIntent(stateAt(screen), row.intent, CATALOGUE);
           const after = viewAt(next, arm).rows.find((candidate) => candidate.id === row.id);
           expect(after?.value, `${screen}/${row.id} did not change`).not.toBe(row.value);
         }
