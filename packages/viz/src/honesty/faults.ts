@@ -4,7 +4,7 @@
  * **A property that has never failed is a property that cannot fail.** A green honesty search
  * that has never caught anything is indistinguishable from one that cannot catch anything, and
  * the only defence is to break, on purpose, the exact thing each property protects and watch it
- * fire. `faults.test.ts` does that for all six, on **real cases over the shipped data**, and
+ * fire. `faults.test.ts` does that for all seven, on **real cases over the shipped data**, and
  * prints what it saw.
  *
  * ## Why the fault is injected into the *rendered strings* and not into the code
@@ -16,7 +16,7 @@
  * fault below is the shape of the defect its property names, expressed as the smallest edit to
  * the output that produces it.
  *
- * Two of the six are worth stating precisely, because a lazy version of each would prove nothing:
+ * Two of them are worth stating precisely, because a lazy version of each would prove nothing:
  *
  * - **`suppressedMean`** re-classifies a *genuinely suppressed* figure back to `estimate` **and**
  *   restores the numeral the summary refused. A fault that only flipped the label would be caught
@@ -33,6 +33,8 @@
  * them would sail past every fault below. That is the point — these prove the checks are
  * independent of the surfaces they judge.
  */
+
+import { observationsAt } from '../live/observations.js';
 
 import type { HonestyContext } from './surfaces.js';
 import type { HonestyProperty, RenderedText } from './types.js';
@@ -204,12 +206,82 @@ export const goalWithoutRate: TextFault = (texts) =>
   );
 
 /**
+ * R6 / § D223 — the mood card's four whole-run drivers, drawn at a part-way playhead.
+ *
+ * **Issue #109's defect, restored to the exact string it produced**, and the reason the temporal
+ * axis exists: the rail's gates were all `recording === undefined`, boot runs a simulation with zero
+ * clicks, so a card drawn at 00:00 reported the end of the day beside a clock reading the start.
+ * `dev/leftRail.ts#moodDriverPanelOf` now filters on {@link MoodDriver.basis}; this puts the
+ * declaration back on a string the surface said early, which is exactly what removing that filter
+ * would do.
+ *
+ * Structural only. The `basis` is what fires it, so a check that read the words rather than the
+ * declaration would not see it — and the second fault below is the mirror of that.
+ */
+export const wholeRunDriverDrawnEarly: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.playhead !== undefined && text.playhead.atS < text.playhead.endedAt && text.role === 'observation',
+    /* c8 ignore next -- the predicate above already established `window` is defined. */
+    (text) =>
+      text.playhead === undefined
+        ? text
+        : { ...text, playhead: { ...text.playhead, basis: 'whole-run' as const } },
+  );
+
+/**
+ * R6 again, textually only — **the sentence § D293 was written about, verbatim.**
+ *
+ * > `All 34 people got where they were going`
+ *
+ * The left rail published that on a cold load, before the shift had played a second, and it was in
+ * the corpus and passing from the day the corpus existed, because not one of the six properties
+ * before this one asks at what playhead a string was said. The number is rebuilt from the run's own
+ * `summary.delivered`, so the fault carries the finished day's count rather than one chosen here.
+ *
+ * ## Where it lands, and why that is the sharp case rather than the convenient one
+ *
+ * On a string whose surface declared `basis: 'now'` — *this sentence is re-derived at the playhead
+ * and is true of the instant on screen* — at a playhead short of `endedAt`, where the day's count is
+ * genuinely unreachable. So the structural half **cannot** see it: the declaration says exactly what
+ * R6 wants to hear, and the words say the opposite. That is the half-separation this fault exists
+ * for, and it is the harder case of the two: `wholeRunDriverDrawnEarly` breaks a gate, this breaks a
+ * sentence behind a gate that is still shut.
+ *
+ * The playhead guard is not decoration. `WHOLE_RUN_COUNTS` fires only where the same quantity read
+ * at that playhead is a *different* number — otherwise the figure is reachable and the check is
+ * right to stay quiet — so a fault that ignored it would sometimes inject a string the property
+ * correctly passes, and the suite would read that as the property failing to fire.
+ */
+export const wholeRunCountInProse: TextFault = (texts, context) => {
+  const { summary } = context.recording;
+  if (!Number.isFinite(summary.delivered)) return texts;
+  return replaceFirst(
+    texts,
+    (text) =>
+      text.playhead !== undefined &&
+      text.playhead.atS < text.playhead.endedAt &&
+      text.playhead.basis === 'now' &&
+      (text.role === 'observation' || text.role === 'prose') &&
+      /* Only where the day's count is not also the count at this playhead — see WHOLE_RUN_COUNTS. */
+      observationsAt(context.recording, text.playhead.atS).carried !== summary.delivered,
+    (text) => ({
+      ...text,
+      text: `All ${String(summary.delivered)} people got where they were going.`,
+    }),
+  );
+};
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
- * Two of them carry a second, and in both cases because the property has two halves a fault for
- * one says nothing about: `estimate-without-n` is R13's two clauses, and `suppressed-mean` is
- * R3's structural and textual checks — the second was added when the textual check's window was
- * narrowed, so that the narrowing has something it must still catch.
+ * Three of them carry a second, and in every case because the property has two halves a fault for
+ * one says nothing about: `estimate-without-n` is R13's two clauses, `suppressed-mean` is R3's
+ * structural and textual checks — the second was added when the textual check's window was
+ * narrowed, so that the narrowing has something it must still catch — and `whole-run-figure-early`
+ * is R6's structural and textual checks, where one breaks the gate on a figure whose producer
+ * declared it whole-run and the other leaves the gate shut and puts the whole day's count inside a
+ * sentence the surface declared true of the instant.
  */
 export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: string; readonly fault: TextFault }[]>> =
   Object.freeze({
@@ -225,4 +297,8 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
     ],
     'energy-wait-blend': [{ name: 'energyScore', fault: energyScore }],
     'goal-without-rate': [{ name: 'goalWithoutRate', fault: goalWithoutRate }],
+    'whole-run-figure-early': [
+      { name: 'wholeRunDriverDrawnEarly', fault: wholeRunDriverDrawnEarly },
+      { name: 'wholeRunCountInProse', fault: wholeRunCountInProse },
+    ],
   });

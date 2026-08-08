@@ -36,16 +36,40 @@
  * rumour.
  */
 
+import type { WaitBandBasis } from '../live/types.js';
+
 /* -------------------------------------------------------------------------- *
  * Properties
  * -------------------------------------------------------------------------- */
 
 /**
  * The six properties § D163 clause 1 enumerates, each named by the rule of
- * [`docs/10`](../../../../docs/10-experience-layer-contract.md) § 1 it derives from.
+ * [`docs/10`](../../../../docs/10-experience-layer-contract.md) § 1 it derives from — **and a
+ * seventh, which is about *when* a string was said rather than about what it said.**
  *
  * Ordered as the decision lists them. Each is checked by one function in `properties.ts`, and
  * each has a fault in `faults.ts` that makes it fail.
+ *
+ * ## Why the seventh exists, and what it says about the first six
+ *
+ * `surfaces.ts#sampleTimes` has always driven every single-run surface at five playheads, and the
+ * **first of them is `startedAt`**. So the left rail's *"All 34 people got where they were going"*,
+ * published on a cold load before the shift had played a second, was in the corpus from the day the
+ * corpus existed and **passed every one of the six** — because not one of them asks *at what
+ * playhead*. R3 asks whether a mean is licensed, R13 whether an estimate carries its `n`, R11 what a
+ * figure blends; a whole-day count drawn beside a clock reading 00:00 is licensed, carries its `n`,
+ * blends nothing, and is a lie about the shift on screen.
+ *
+ * The rule it enforces is R6 — *"an outcome evaluated before the playhead reaches `endedAt` is a
+ * preview"* — as [`DECISIONS.md` § D223](../../../../DECISIONS.md) keeps it on the Day report and
+ * § D293 keeps it on the rail: the sheet whose figures are empty while you are watching, and the
+ * mood card that withholds its four whole-run drivers and draws a retraction in their place. This
+ * property is the claim that **every** surface obeys that rule, rather than the two that were
+ * caught obeying it.
+ *
+ * An uncovered property that happens to pass is the shape this repository's standing requirement is
+ * written about, which is why the axis was added after the defect was fixed rather than instead of
+ * fixing it.
  */
 export const HONESTY_PROPERTIES = [
   /** R3 — no mean, percentile or time-to-destination is shown on a run whose summary refuses it. */
@@ -60,6 +84,8 @@ export const HONESTY_PROPERTIES = [
   'energy-wait-blend',
   /** R12 / § D160 — no goal is reported without the measured pass rate that makes it a goal. */
   'goal-without-rate',
+  /** R6 / § D223 — no figure that can only be true of the whole run, at a playhead short of its end. */
+  'whole-run-figure-early',
 ] as const;
 
 export type HonestyProperty = (typeof HONESTY_PROPERTIES)[number];
@@ -121,6 +147,57 @@ export type TextRole =
   /** Everything else a player reads. */
   | 'prose';
 
+/**
+ * **When** a string was said, and over what window its figures are folded — the temporal axis.
+ *
+ * ## The declaration is the surfaces', not this file's
+ *
+ * *"Is this figure whole-run?"* is not answerable from a string, and a harness that guessed it from
+ * words would be judging a sentence it wrote itself. So {@link basis} is **copied** from whichever
+ * shipped type already answers that question about the value in hand — and three of them do, all
+ * spelling it with `live/types.ts`'s {@link WaitBandBasis} rather than a private union:
+ *
+ * | Declared by | On |
+ * |---|---|
+ * | `render/mood.ts#MoodDriver.basis` | each of the mood card's five drivers (§ D293) |
+ * | `live/types.ts#WaitBands.basis` | the banding the bar and legend are read off |
+ * | `live/types.ts#HonestyCard.basis` / `Mood.basis` | the honesty card and the card's face |
+ *
+ * A surface with no such declaration seeds {@link atS} and {@link endedAt} and leaves `basis`
+ * `undefined`: it is still on the axis, and the *textual* half of the property — a whole-run count
+ * printed beside a cue that names it, where the live count at that playhead is a different number —
+ * is what reaches it. That is deliberate. The structural half asserts the gates the product already
+ * has; the textual half is the one that can catch a surface which declares nothing.
+ *
+ * ## Why it is not called `window`
+ *
+ * `boundaries.test.ts` bans a bare `window` identifier anywhere outside `dev/`, *"precisely because
+ * a local of that name shadowing the global is how a DOM reference hides"* — and it caught this
+ * interface, which was called `TextWindow` with a `window` field for the length of one test run.
+ * `properties.ts` already carries the same note about a local named `clause`, and `contract/types.ts`
+ * carries `windowSeconds` for the same reason. The rule is worth more than the better noun.
+ *
+ * ## Why the playhead is carried rather than the fraction
+ *
+ * The rule is *short of `endedAt`*, and `dev/leftRail.ts#shiftIsOver` — the rail's own one home for
+ * that decision — compares the two numbers. Carrying `atS < endedAt` as a boolean computed here
+ * would be a second copy of that comparison, which is the failure `shiftIsOver`'s own docstring
+ * exists to prevent.
+ */
+export interface TextPlayhead {
+  /** The playhead this surface was driven at, simulated seconds. */
+  readonly atS: number;
+  /** The run's last instant, `recording.endedAt`. */
+  readonly endedAt: number;
+  /**
+   * The surface's **own** answer to *over what window is this folded* — never inferred here.
+   *
+   * `undefined` means the surface makes no such declaration, which is a fact about the surface and
+   * not a pass.
+   */
+  readonly basis?: WaitBandBasis | undefined;
+}
+
 /** One string a player would actually see, with the structural facts the surface knows about it. */
 export interface RenderedText {
   /** `<module>#<export>`, matching the ids `derive.ts` produces from the source tree. */
@@ -177,6 +254,14 @@ export interface RenderedText {
    * written here.
    */
   readonly gated?: boolean | undefined;
+  /**
+   * When this string was said, for a surface driven at a playhead. See {@link TextPlayhead}.
+   *
+   * `undefined` for a surface that has no playhead at all — a menu screen, an editor row, a batch
+   * report. Those are outside the temporal axis because there is no clock for them to be early
+   * against, which is a different fact from passing it.
+   */
+  readonly playhead?: TextPlayhead | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -268,6 +353,36 @@ export interface HonestyOutcome {
   readonly simulations: number;
   /** Whether the single run this case rendered had its estimates suppressed. */
   readonly suppressed: boolean;
+  /** How much of this case's text the temporal axis reached, and how it was declared. */
+  readonly temporal: TemporalReach;
+}
+
+/**
+ * The size of the temporal axis, measured rather than assumed.
+ *
+ * **A property that never sees a string it could fail is green for the wrong reason.** The six
+ * properties before this one are each answerable about every string in the corpus; this one is
+ * answerable only about strings a surface said *at a playhead*, and only interesting about the ones
+ * it said **early**. Both counts are therefore reported beside the corpus size — the same reason
+ * `HonestyCampaignStats.suppressedCases` is reported, and `honesty.test.ts` asserts on them for the
+ * same reason it asserts *"the corpus reaches both halves of the space, so R3 has something to
+ * check."*
+ *
+ * {@link declaredWholeRun} is the one that would go quietly to zero. It counts strings a surface
+ * declared whole-run **at any playhead**, and the shipped surfaces only ever declare that at
+ * `endedAt` — so a corpus in which it is zero is a corpus where the retrospective copy of the mood
+ * card, the banding and the honesty card was never rendered, and the structural half of the
+ * property is asserting a gate over an empty set.
+ */
+export interface TemporalReach {
+  /** Strings said at a playhead — the axis's whole population. */
+  readonly atPlayhead: number;
+  /** Of those, said at a playhead short of `endedAt`. Where the property can fail. */
+  readonly early: number;
+  /** Of those, whose surface declared the figure folded over the instant. */
+  readonly declaredNow: number;
+  /** Of those, whose surface declared the figure folded over the whole shift. */
+  readonly declaredWholeRun: number;
 }
 
 /** What a whole campaign measured. Printed by the always-on suite so the cost is never silent. */
@@ -284,4 +399,6 @@ export interface HonestyCampaignStats {
   readonly surfaces: Readonly<Record<string, number>>;
   readonly buildings: Readonly<Record<string, number>>;
   readonly modes: Readonly<Record<string, number>>;
+  /** The temporal axis's own size, summed over the campaign. See {@link TemporalReach}. */
+  readonly temporal: TemporalReach;
 }

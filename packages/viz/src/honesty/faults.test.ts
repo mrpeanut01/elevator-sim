@@ -11,7 +11,7 @@
  * Every fault runs on a **real case over the shipped `data/`**. Nothing is mocked and nothing
  * about the run changes: the recording, the batch and the statistics every property consults are
  * the real ones, and only what a surface *said* is corrupted. A property that merely echoed the
- * statistics would sail past all seven faults below.
+ * statistics would sail past all nine faults below.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -66,6 +66,15 @@ const FIXTURE_FOR: Readonly<Record<HonestyProperty, 'quotable' | 'suppressed'>> 
   'estimate-without-n': 'quotable',
   'energy-wait-blend': 'quotable',
   'goal-without-rate': 'quotable',
+  /*
+   * R6 needs neither, and takes `quotable` for the reason the others do: `sampleTimes` drives every
+   * single-run surface at four playheads short of `endedAt` on **every** case, so the temporal axis
+   * is populated whatever the summary decided about the means. `wholeRunCountInProse` does need
+   * `summary.delivered` to be a number the playhead cannot reach, and it checks that itself rather
+   * than relying on the fixture — a fault that silently became a no-op is what this file exists to
+   * refuse.
+   */
+  'whole-run-figure-early': 'quotable',
 });
 
 describe('every property fires when the thing it protects is broken', () => {
@@ -116,12 +125,22 @@ describe('every property fires when the thing it protects is broken', () => {
     const clean = evaluateCase(quotable, resources);
     const properties = new Set(clean.violations.map((found) => found.property));
     /*
-     * **Empty, and it did not used to be.** The R10 finding on the Parameters tab was here as the
-     * one exception until § D171 narrowed the rule to result-bearing surfaces; the exception is
-     * gone with the finding rather than kept as a habit. Every property must be quiet on a clean
-     * run, or the faults above prove nothing.
+     * **One entry, and it is the register's, not a habit.** This list was empty from § D171 — which
+     * removed the R10 finding on the Parameters tab by narrowing the rule — until the temporal axis
+     * ran and found `render/describeFrame.ts` joining every `MoodDriver` ungated. That finding is
+     * recorded in `honesty.test.ts`'s `OUTSTANDING`, with its surface, its reachability and what
+     * would close it; this is the same fact seen from here.
+     *
+     * The assertion is still exact in both directions: an eighth property going off on a clean run
+     * is red, and the day `describeFrame` is gated this line goes red too, telling whoever fixed it
+     * to delete the entry. It is not `toContain`, and it must not become one.
      */
-    expect([...properties].sort()).toEqual([]);
+    expect([...properties].sort()).toEqual(['whole-run-figure-early']);
+
+    // And the finding is the one recorded, not a second one wearing its property name.
+    expect(
+      [...new Set(clean.violations.map((found) => found.surfaceId))],
+    ).toEqual(['render/describeFrame.ts#describeFrame']);
   });
 
   it('a fault survives shrinking, and the shrunk case is smaller', () => {
