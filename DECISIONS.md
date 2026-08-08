@@ -21161,19 +21161,43 @@ engineering?"* Eight open issues were downstream of the answer and unactionable 
 **The answer is neither of the two the report offered. It is an explicit split: two products over
 one engine.**
 
-### 1. Engineer is frozen as-is, and that is the load-bearing half
+### 1. Engineer's **rigour** is protected. Engineer's **playability is not frozen**
 
-Engineer mode is **not to be compromised, simplified, or partially migrated** in service of the
-other product. It is the research instrument, and everything expensive in this repository is in it:
-CIBSE and ISO 8100-32 reference data, paired-t intervals under common random numbers, saturation
-suppression on five grounds, the resolution limit measured per cell, server-side replay
-verification. Phase 6c was **refused three times** on the ground that the effect sat below what the
-apparatus can resolve ([§ D145](#d145), [§ D156](#d156)) — a reflex no mass-market product has, and
-the single hardest thing here to have earned.
+> **Correction, same day.** An earlier draft of this section said *"Engineer is frozen as-is"* and
+> built a standing constraint on that word. **That was this document mis-transcribing the decision,
+> not the decision.** The owner's position is that Engineer should get playability improvements
+> too — Casual is what drives the mass-market reach, and Engineer is still a product somebody uses
+> all day. The wrong sentence is corrected here rather than left standing, because an engineer
+> reading *"frozen"* would refuse a good fix on the strength of it, and a decision record that
+> forbids improvement is worse than no record.
 
-So the standing constraint is: **a change made for Casual may not remove a number from Engineer,
-widen a threshold, or move a figure out of Engineer's reach.** If a change cannot be made without
-doing one of those, it is a Casual-only change or it does not happen.
+What is protected is the **rigour**, and it is protected absolutely. Everything expensive in this
+repository lives in Engineer: CIBSE and ISO 8100-32 reference data, paired-t intervals under common
+random numbers, saturation suppression on five grounds, the resolution limit measured per cell,
+server-side replay verification. Phase 6c was **refused three times** on the ground that the effect
+sat below what the apparatus can resolve ([§ D145](#d145), [§ D156](#d156)) — a reflex no
+mass-market product has, and the single hardest thing here to have earned.
+
+**The standing constraint, stated as a test rather than a prohibition:**
+
+> A change to Engineer may make it **easier to use**. It may not make it **say less**.
+
+So a change is in scope if it improves how a practitioner reaches, reads or acts on a figure — and
+out of scope if it removes a number, widens a threshold, hides a qualifier, softens a refusal, or
+puts a figure out of Engineer's reach. *Draw the confidence interval* is in scope. *Stop printing
+the interval* is not. *Put the basis on the figure* is in scope. *Drop the basis because it is
+noisy* is not.
+
+**This materially widens the buildable backlog**, because several issues filed as game-design
+complaints are Engineer playability items that cost the rigour nothing:
+
+| issue | why it is Engineer work, not only Casual work |
+|---|---|
+| **#119** | Compare produces ~700 words of monospace prose per verdict and **never draws an interval**, in a product whose central claim *is* an interval. Drawing it is strictly more legible, and removes nothing |
+| **#92** | The dispatcher editor has no *Run this* and no inline delta. A practitioner tuning weights needs the delta more than a casual player does |
+| **#117**, **#102** | The *what moved* panel is the only place the product answers *"did that help?"* — the tuning loop's core, and it is Engineer's loop first |
+| **#115** § 6 | `LIVE METRICS` clips its own text on every building, and because it is drawn into the canvas no DOM check can see it. A defect, not a preference |
+| **#104** | Saying *why* a control is locked is information, not simplification |
 
 ### 2. Casual is a different door into the same building, not a smaller building
 
