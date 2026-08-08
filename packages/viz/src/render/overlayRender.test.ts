@@ -907,15 +907,18 @@ describe('floor rows', () => {
  * -------------------------------------------------------------------------- */
 
 describe('the run status banner — RV-16', () => {
+  /** The playhead the run's own `undelivered` belongs to. See `canvas.ts#undeliveredAt`. */
+  const atEnd = { simTimeS: RECORDING.endedAt } as const;
+
   it('leads with the status and the undelivered count', () => {
     const timedOut: VizRecording = {
       ...RECORDING,
       status: 'timed-out',
       summary: { ...RECORDING.summary, undelivered: 69 },
     };
-    const text = draw(frame(), timedOut).texts.join('\n');
+    const text = draw(frame(atEnd), timedOut).texts.join('\n');
     expect(text).toContain('TIMED-OUT — 69 undelivered');
-    expect(draw(frame()).texts.join('\n')).not.toContain('TIMED-OUT');
+    expect(draw(frame(atEnd)).texts.join('\n')).not.toContain('TIMED-OUT');
   });
 
   it('shows both the status and the suppression when both apply', () => {
@@ -924,9 +927,23 @@ describe('the run status banner — RV-16', () => {
       status: 'timed-out',
       summary: { ...RECORDING.summary, undelivered: 12, saturated: true, awtIsValid: false },
     };
-    const text = draw(frame(), both).texts.join('\n');
+    const text = draw(frame(atEnd), both).texts.join('\n');
     expect(text).toContain('TIMED-OUT — 12 undelivered');
     expect(text).toContain('SATURATED — AWT suppressed');
+  });
+
+  it('keeps the status word at every playhead, and the run’s own count at only one', () => {
+    // § D294 on this same header: `recording.status` is printed verbatim mid-run, because a PNG
+    // exported at 01:40 has no later and RV-16's lead may not be the thing that goes missing from
+    // it. What is withheld is the *figure*, not the fact that the run did not finish.
+    const timedOut: VizRecording = {
+      ...RECORDING,
+      status: 'timed-out',
+      summary: { ...RECORDING.summary, undelivered: 69 },
+    };
+    const early = draw(frame(), timedOut).texts.join('\n');
+    expect(early).toContain('TIMED-OUT');
+    expect(early).not.toContain('69');
   });
 });
 

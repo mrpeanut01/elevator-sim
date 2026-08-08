@@ -125,22 +125,20 @@ describe('every property fires when the thing it protects is broken', () => {
     const clean = evaluateCase(quotable, resources);
     const properties = new Set(clean.violations.map((found) => found.property));
     /*
-     * **One entry, and it is the register's, not a habit.** This list was empty from § D171 — which
-     * removed the R10 finding on the Parameters tab by narrowing the rule — until the temporal axis
-     * ran and found `render/describeFrame.ts` joining every `MoodDriver` ungated. That finding is
-     * recorded in `honesty.test.ts`'s `OUTSTANDING`, with its surface, its reachability and what
-     * would close it; this is the same fact seen from here.
+     * **Empty, and it has been empty twice for two different reasons.** It emptied at § D171, which
+     * removed the R10 finding on the Parameters tab by narrowing the rule; it acquired one entry
+     * when the temporal axis found `render/describeFrame.ts` joining every `MoodDriver` ungated;
+     * and it is empty again because that join is now gated on `MoodDriver.basis` the way § D293
+     * gated the rail's copy of it. The register in `honesty.test.ts`'s `OUTSTANDING` says the same
+     * thing from the other side, and is empty for the same reason.
      *
-     * The assertion is still exact in both directions: an eighth property going off on a clean run
-     * is red, and the day `describeFrame` is gated this line goes red too, telling whoever fixed it
-     * to delete the entry. It is not `toContain`, and it must not become one.
+     * The assertion is exact in both directions and must stay that way: an eighth property going
+     * off on a clean run is red, and a finding that is *recorded* rather than fixed has to be added
+     * here as well, which is what stops a register entry being written without anybody noticing the
+     * clean run had started failing. It is not `toContain`, and it must not become one.
      */
-    expect([...properties].sort()).toEqual(['whole-run-figure-early']);
-
-    // And the finding is the one recorded, not a second one wearing its property name.
-    expect(
-      [...new Set(clean.violations.map((found) => found.surfaceId))],
-    ).toEqual(['render/describeFrame.ts#describeFrame']);
+    expect([...properties].sort()).toEqual([]);
+    expect([...new Set(clean.violations.map((found) => found.surfaceId))]).toEqual([]);
   });
 
   it('a fault survives shrinking, and the shrunk case is smaller', () => {

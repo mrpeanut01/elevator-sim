@@ -24,7 +24,7 @@ import { describeLockedOut } from '../access/lockedOut.js';
 import type { Frame, VizRecording } from '../contract/types.js';
 import type { FloorQueue, OverlayMetrics } from '../frame/overlay.js';
 import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
-import { formatClock } from './canvas.js';
+import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
 import type { BuildingMood } from './mood.js';
 
@@ -99,9 +99,20 @@ export function describeFrame(input: DescribeFrameInput): string {
       `at ${formatClock(frame.simTimeS)} of ${formatClock(recording.endedAt)}.`,
   );
 
+  /*
+   * The banner's lead clause, in the surface with no width — and read at the playhead for the
+   * reason {@link undeliveredAt} gives at length. `drawScene` draws the short form of exactly this
+   * sentence from exactly this reading, so the two cannot word the run's outcome differently, which
+   * is the whole point of the sighted and non-sighted halves coming out of one recording.
+   */
   if (recording.status !== 'completed') {
+    const undelivered = undeliveredAt(recording, frame);
     parts.push(
-      `Run status ${recording.status}, with ${String(recording.summary.undelivered)} passengers undelivered.`,
+      undelivered.wholeRun
+        ? `Run status ${recording.status}, with ${String(undelivered.count)} passengers undelivered.`
+        : `Run status ${recording.status}, with ${String(undelivered.count)} people still in the ` +
+          'building and not yet where they were going. How many end up undelivered is not known ' +
+          'until the run finishes.',
     );
   }
   if (recording.summary.saturated || !recording.summary.awtIsValid) {
@@ -192,10 +203,37 @@ export function describeFrame(input: DescribeFrameInput): string {
 
   const mood = input.mood;
   if (mood !== undefined) {
-    // Every driver, not only the level: the level is a maximum over these, and a reader who is
-    // told only the maximum cannot tell which observation produced it.
+    /*
+     * Every driver **the playhead has earned**, not only the level: the level is a maximum over
+     * these, and a reader who is told only the maximum cannot tell which observation produced it.
+     *
+     * The gate is § D293's, on the surface § D293 did not reach. `dev/leftRail.ts#moodDriverPanelOf`
+     * filters the card's rows on `MoodDriver.basis` and puts `mood.retraction` where the withheld
+     * ones were; this join did neither, so at 0 s of a 16:29 run the text alternative read
+     * *"…334 of 334 people got where they were going"* — the finished day's `summary.delivered`
+     * beside a clock reading the start, where the count at that playhead is 0. Found by the honesty
+     * sweep's temporal axis (R6) on 49 of 49 always-on cases.
+     *
+     * `mood.headline` already carries *"So far — the run has not finished, so this can still
+     * change"*, and that is precisely what § D293 measured as **insufficient**: a card that retracts
+     * in words while leaving the readings on screen is the defect, not the fix. So the readings go
+     * and the retraction — which names the withheld rows rather than counting them — takes their
+     * place, exactly as it does on the rail.
+     *
+     * The predicate is the frame's, not `mood.provisional`. Both are `atS < endedAt` over the same
+     * two numbers, and `describeFrame.test.ts` pins them equal; reading the frame is what makes this
+     * paragraph's mood clause and its status clause above answer to one clock, even if a caller
+     * hands in a mood built at another instant.
+     */
+    const over = playheadHasReachedEnd(recording, frame);
+    const drivers = over ? mood.drivers : mood.drivers.filter((driver) => driver.basis === 'now');
     parts.push(
-      `${mood.headline} ${mood.drivers.map((driver) => driver.text).join(' ')} ${mood.caveat}`,
+      [
+        mood.headline,
+        ...drivers.map((driver) => driver.text),
+        ...(over || mood.retraction === '' ? [] : [mood.retraction]),
+        mood.caveat,
+      ].join(' '),
     );
   }
 
