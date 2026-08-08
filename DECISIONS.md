@@ -21675,3 +21675,23 @@ back off the deployed Container App** rather than regenerated — the round trip
 reset the server's administrator credential to something its own connection string does not carry.
 Regenerating `appSecret` would have invalidated every session and every in-flight sign-in link, and
 that is a cost this lane had no reason to pay.
+
+### D308 addendum — the job that authenticates and declares no environment
+
+Pruning the orphaned credentials exposed a third instance of the same defect, in the workflow rather
+than the template. `close-preview` uses `azure/login` and declared **no `environment:`**, so it
+would have presented the ref-based subject — the one that had just been deleted for naming a shape
+GitHub does not send. It would have failed on every pull request close, and the visible symptom
+would not have been an authentication error: preview environments are torn down by that job, Free
+allows three, and the failure surfaces as **the fourth open pull request hitting a quota error that
+names neither the three holding the slots nor the login that never ran**.
+
+Fixed by declaring `environment: viz-preview` on it — the environment it is tearing down, so the
+line is also the honest description of what the job touches.
+
+**The check that would have caught it now runs.** The template cannot see the workflow, and the
+workflow is the thing that presents a subject, so agreement between them was asserted by nobody.
+`provision.sh` now requires every `azure/login` step to be matched by a job-level `environment:`,
+and both environment names to appear in the workflow. It is **a proxy and is documented as one**: it
+counts rather than parses, and it would miss two logins inside one job. It would have caught this,
+which is the bar — the alternative was a YAML parse depending on a library the script does not have.

@@ -314,6 +314,15 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # Required, and not for protection rules — this environment has none. The federated credential's
+    # subject is `repo:OWNER/REPO:environment:NAME` (§ D308), and a job that declares no environment
+    # presents the ref-based subject instead, which no credential now trusts. Without this line the
+    # login below fails with AADSTS700213 on every pull request close, and the failure is a preview
+    # environment that is never torn down — so the fourth open pull request hits a quota error
+    # naming neither cause. It is the same environment this job is tearing down, so naming it here
+    # is also the honest description of what the job touches.
+    environment:
+      name: viz-preview
     steps:
       # Free allows three concurrent preview environments. Without this job the fourth open pull
       # request fails to deploy with a quota error naming neither the three that are holding the

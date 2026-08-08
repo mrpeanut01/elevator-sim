@@ -297,6 +297,38 @@ ACTUAL=$(az identity federated-credential list --identity-name "$IDENTITY_NAME" 
   "  actual: $(echo "$ACTUAL" | tr '\n' ' ')")"
 echo "ok: exactly 2 credentials, both environment-scoped"
 
+# ---------------------------------------------------------------------------
+# The workflow is the thing that presents a subject, so it is the thing that has to agree.
+#
+# A credential is trusted for `repo:OWNER/REPO:environment:NAME`, and NAME comes from a job's
+# `environment:` key. A job that authenticates and declares no environment presents a ref-based
+# subject instead, which nothing trusts — and this repository shipped exactly that: `close-preview`
+# used `azure/login` with no `environment:`, so it would have failed on every pull request close,
+# leaving preview environments standing until the fourth open pull request hit a quota error naming
+# neither cause.
+#
+# The check below is a proxy rather than a parse — every `azure/login` step is matched against every
+# job-level `environment:` key, and the two environment names must both appear. It is stated as a
+# proxy because it is one: it counts rather than understands, and it would miss two logins in one
+# job. It would have caught the defect that motivated it, which is the bar.
+# ---------------------------------------------------------------------------
+say "The workflow's environments agree with the credentials"
+
+WORKFLOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/.github/workflows/deploy-viz.yml"
+[ -f "$WORKFLOW" ] || fail "workflow not found: $WORKFLOW"
+
+LOGINS=$(grep -c 'uses: azure/login@' "$WORKFLOW" || true)
+ENVS=$(grep -cE '^    environment:' "$WORKFLOW" || true)
+[ "$LOGINS" = "$ENVS" ] || fail "$(printf '%s\n' \
+  "$WORKFLOW has $LOGINS azure/login steps and $ENVS jobs declaring an environment." \
+  "A job that authenticates without one presents a ref-based subject, which no credential trusts.")"
+
+for wanted_env in "$PRODUCTION_ENVIRONMENT" "$PREVIEW_ENVIRONMENT"; do
+  grep -q "'$wanted_env'\|name: $wanted_env" "$WORKFLOW" ||
+    fail "the template declares environment '$wanted_env' and the workflow never names it"
+done
+echo "ok: $LOGINS authenticating jobs, $ENVS environments, both names present"
+
 say "GitHub environments"
 
 # Preview takes any branch: a pull request's head is by definition not the production branch.
