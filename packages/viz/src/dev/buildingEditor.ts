@@ -25,12 +25,26 @@
  * comes from `validateSpec`, whose sentence says advisory, and the loader's own warnings are shown
  * beside it rather than paraphrased.
  *
- * ## Two things the lobby row deliberately cannot do
+ * ## Two things an entrance row deliberately cannot do
  *
- * `buildingFromSpec` writes `floors[0].population = 0` and sets `isEntrance`, and it only marks a
- * transfer floor when `floor !== 0`. So on the lobby row the occupancy bar and the sky dot would
- * write fields nothing reads. They are drawn inert, with the reason in the tooltip, rather than
- * drawn live — `docs/05-roadmap.md`'s standing requirement applied to a control.
+ * `buildingFromSpec` writes an entrance floor's `population = 0` and sets `isEntrance`, and it
+ * never marks an entrance a transfer floor. So on an entrance row the occupancy bar and the sky dot
+ * would write fields nothing reads. They are drawn inert, with the reason in the tooltip, rather
+ * than drawn live — `docs/05-roadmap.md`'s standing requirement applied to a control.
+ *
+ * It is *an entrance* rather than *the lobby* because a building may have more than one and
+ * `midtown-office` does: its car park `P1` is flagged `isEntrance`, so it is a way into the
+ * building and carries nobody, while `crown-hotel`'s back of house one floor down is an ordinary
+ * occupied floor. The elevation draws both — the row range is {@link lowestFloorOf} upward, not
+ * `0` upward — and only the flag decides which is inert.
+ *
+ * ## The floor slider does not reach below the lobby, and says nothing that claims it does
+ *
+ * `SPEC_ROWS`'s *floors above the lobby* is exactly that: nothing in this editor digs or fills a
+ * basement, and {@link BuildingSpec.belowLobby} is written only by `specFromBuilding` off a loaded
+ * document. The below-lobby rows are therefore drawn, zoned, and connected by a machine, but their
+ * *count* is not a control here. That is the same shape as a stair's `{ upS, downS }` — carried
+ * because dropping it is destructive, not authored because there is no control that could.
  *
  * ## Why the rows are built once
  *
@@ -46,6 +60,7 @@ import {
   parseBuilding,
   resolveBuilding,
   type BuildingConfig,
+  type DirectionalTraversalTime,
   type ElevatorSpecs,
 } from '@elevator-sim/core/browser';
 
@@ -63,7 +78,10 @@ import {
   carLabelOf,
   credentialGroupsOf,
   escalatorSecondsFor,
+  floorCountOf,
   floorIdOf,
+  isEntranceFloor,
+  lowestFloorOf,
   nextTransportModeId,
   nextZoneId,
   occupancyAt,
@@ -74,6 +92,7 @@ import {
   specFromBuilding,
   specIsDirty,
   transportModesOf,
+  traversalTimeLabel,
   validateSpec,
   withTransportEnd,
   withTransportSeconds,
@@ -525,7 +544,7 @@ export function skyChipsOf(spec: BuildingSpec): readonly SkyChipView[] {
  * -------------------------------------------------------------------------- */
 
 export interface ElevationRow {
-  /** `0` is the lobby. */
+  /** `0` is the lobby; a negative number is a floor below it. */
   readonly floor: number;
   /** The floor id with its badge — `⌂ G`, `⇄ 11`, `4`. */
   readonly label: string;
@@ -537,7 +556,7 @@ export interface ElevationRow {
   readonly isSky: boolean;
   readonly skyMark: string;
   readonly skyTitle: string;
-  /** `false` on the lobby, where `buildingFromSpec` never writes `isTransferFloor`. */
+  /** `false` on an entrance, where `buildingFromSpec` never writes `isTransferFloor`. */
   readonly skyToggles: boolean;
   readonly occupancyPct: number;
   /** Whether this floor carries an override rather than the building-wide slider. */
@@ -556,34 +575,44 @@ export interface ElevationRow {
   readonly occTitle: string;
 }
 
-/** One row per floor, **top floor first** — the direction a building is drawn in. */
+/**
+ * One row per floor, **top floor first** — the direction a building is drawn in.
+ *
+ * The bottom of the loop is {@link lowestFloorOf} rather than `0`, so a building with a basement
+ * draws it. A below-lobby floor is an ordinary row unless the document flagged it an entrance, in
+ * which case it is drawn as one and carries no population — `midtown-office`'s car park is a way
+ * into the building, and `crown-hotel`'s back of house is a floor with people on it.
+ */
 export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
   const skies = new Set(spec.skyFloors);
   const rows: ElevationRow[] = [];
-  for (let floor = spec.floors; floor >= 0; floor -= 1) {
-    const isEntrance = floor === 0;
+  for (let floor = spec.floors; floor >= lowestFloorOf(spec); floor -= 1) {
+    const isEntrance = isEntranceFloor(spec, floor);
     const isSky = !isEntrance && skies.has(floor);
     const badge = isEntrance ? '⌂' : isSky ? '⇄' : '';
     const occupancyPct = isEntrance ? 0 : occupancyAt(spec, floor);
     const clamped = Math.min(OCCUPANCY_MAX_PCT, Math.max(0, occupancyPct));
     const people = isEntrance ? 0 : populationAt(spec, floor);
     const handSet = !isEntrance && spec.occupancyByFloor[floor] !== undefined;
+    const floorId = floorIdOf(spec, floor);
     rows.push({
       floor,
-      label: badge === '' ? floorIdOf(floor) : `${badge} ${floorIdOf(floor)}`,
+      label: badge === '' ? floorId : `${badge} ${floorId}`,
       badge,
       labelColor: isEntrance ? 'var(--entrance)' : isSky ? 'var(--transfer)' : 'var(--dim)',
       labelTitle: isEntrance
-        ? 'The lobby. Every bank lands here, and it carries no resident population.'
+        ? floor === 0
+          ? 'The lobby. Every bank lands here, and it carries no resident population.'
+          : `Floor ${floorId} is below the lobby and is an entrance too — floors[].isEntrance. It carries no resident population.`
         : isSky
-          ? `Floor ${floorIdOf(floor)} is a transfer level — floors[].isTransferFloor.`
-          : `Floor ${floorIdOf(floor)}.`,
+          ? `Floor ${floorId} is a transfer level — floors[].isTransferFloor.`
+          : `Floor ${floorId}.`,
       isEntrance,
       isSky,
       skyMark: isSky ? '⇄' : '',
       skyTitle: isEntrance
-        ? 'The lobby is the entrance; buildingFromSpec never marks it a transfer level, so this dot would write nothing.'
-        : `Make floor ${floorIdOf(floor)} a transfer level. Transfer levels cut the tower into segments and the cars are dealt round-robin into them, which is what makes a sky lobby worth building.`,
+        ? 'This floor is an entrance; buildingFromSpec never marks an entrance a transfer level, so this dot would write nothing.'
+        : `Make floor ${floorId} a transfer level. Transfer levels cut the tower into segments and the cars are dealt round-robin into them, which is what makes a sky lobby worth building.`,
       skyToggles: !isEntrance,
       occupancyPct,
       handSet,
@@ -596,7 +625,7 @@ export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
       peopleText: isEntrance ? 'entrance' : `${String(people)} / ${String(spec.capacityPerFloor)}`,
       peopleColor: occupancyPct > 100 ? 'var(--over)' : handSet ? 'var(--accent-soft)' : 'var(--dim)',
       occTitle: isEntrance
-        ? 'buildingFromSpec writes floors[0].population = 0, so there is nothing here to let.'
+        ? 'buildingFromSpec writes an entrance floor population = 0, so there is nothing here to let.'
         : `${String(Math.round(occupancyPct))}% of ${String(spec.capacityPerFloor)} — drag to let this floor alone, 0–${String(OCCUPANCY_MAX_PCT)}%. Past 100 is over design capacity.`,
     });
   }
@@ -652,7 +681,10 @@ const EXPRESS_TITLE =
  */
 export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
   const banks = banksOf(spec);
-  const rowCount = spec.floors + 1;
+  // The same row grid {@link elevationRowsOf} draws, basement rows included, so a shaft that opens
+  // onto one is drawn reaching it rather than stopping at the lobby.
+  const rowCount = floorCountOf(spec);
+  const lowest = lowestFloorOf(spec);
   const cars: ElevationCar[] = [];
   for (let car = 0; car < spec.cars; car += 1) {
     const band = bandOf(spec, car);
@@ -666,14 +698,26 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
      * `band only` is the same band with the toggle off, which is a different bank and a different
      * building. Calling both of them `express` would be the `serves` defect one column to the left.
      */
+    /*
+     * *every floor* means the bottom of the building as well as the top. On a building with a
+     * basement a band of `0…top` reaches every floor but one, and calling that *every floor* would
+     * be the `serves` defect one column to the left: a legend that is right about the shaft and
+     * wrong about the building.
+     */
     const role =
-      low === 0 ? (high >= spec.floors ? 'every floor' : 'low bank') : lobby ? 'express' : 'band only';
-    const serves =
-      low === 0
-        ? `${floorIdOf(0)}–${floorIdOf(high)}`
+      low <= 0
+        ? low <= lowest && high >= spec.floors
+          ? 'every floor'
+          : 'low bank'
         : lobby
-          ? `G + ${floorIdOf(low)}–${floorIdOf(high)}`
-          : `${floorIdOf(low)}–${floorIdOf(high)}`;
+          ? 'express'
+          : 'band only';
+    const serves =
+      low <= 0
+        ? `${floorIdOf(spec, low)}–${floorIdOf(spec, high)}`
+        : lobby
+          ? `${floorIdOf(spec, 0)} + ${floorIdOf(spec, low)}–${floorIdOf(spec, high)}`
+          : `${floorIdOf(spec, low)}–${floorIdOf(spec, high)}`;
     const id = carLabelOf(car);
     cars.push({
       car,
@@ -692,7 +736,7 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
       expressLabel: !canExpress(spec, car)
         ? ''
         : lobby
-          ? `✓ express from the lobby, skipping ${floorIdOf(1)}–${floorIdOf(low - 1)}`
+          ? `✓ express from the lobby, skipping ${floorIdOf(spec, 1)}–${floorIdOf(spec, low - 1)}`
           : 'stays in its band — click to run express from the lobby',
       expressTitle: EXPRESS_TITLE,
     });
@@ -702,9 +746,9 @@ export function elevationCarsOf(spec: BuildingSpec): readonly ElevationCar[] {
 
 /** The floor a vertical drag at `fraction` of the elevation's height is over. */
 export function floorAtFraction(spec: BuildingSpec, fraction: number): number {
-  const rowCount = spec.floors + 1;
+  const rowCount = floorCountOf(spec);
   const index = Math.floor(Math.min(0.999999, Math.max(0, fraction)) * rowCount);
-  return Math.min(spec.floors, Math.max(0, spec.floors - index));
+  return Math.min(spec.floors, Math.max(lowestFloorOf(spec), spec.floors - index));
 }
 
 /** The occupancy a horizontal drag at `fraction` of the bar's width asks for, snapped. */
@@ -714,10 +758,12 @@ export function occupancyAtFraction(fraction: number): number {
   return Math.min(OCCUPANCY_MAX_PCT, Math.max(0, snapped));
 }
 
-/** Every floor id of this building, lobby first — the order every run and every legend uses. */
+/** Every floor id of this building, bottom floor first — the order every run and every legend uses. */
 function floorIdsOf(spec: BuildingSpec): readonly string[] {
   const ids: string[] = [];
-  for (let floor = 0; floor <= spec.floors; floor += 1) ids.push(floorIdOf(floor));
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    ids.push(floorIdOf(spec, floor));
+  }
   return ids;
 }
 
@@ -819,8 +865,8 @@ export function accessMatrixOf(spec: BuildingSpec): AccessMatrix {
   const ids = floorIdsOf(spec);
   const rows: AccessFloorRow[] = [];
   const strandedIds: string[] = [];
-  for (let floor = spec.floors; floor >= 0; floor -= 1) {
-    const floorId = floorIdOf(floor);
+  for (let floor = spec.floors; floor >= lowestFloorOf(spec); floor -= 1) {
+    const floorId = floorIdOf(spec, floor);
     const permitted = permittedBy.get(floorId);
     const restricted = permitted !== undefined;
     const stranded = restricted && permitted.length === 0;
@@ -876,7 +922,7 @@ export function zoneChoicesOf(spec: BuildingSpec, selectedId: string): readonly 
       floorCount: floors.length,
       groupCount: zone.credentialGroups.length,
       selected: zone.id === selectedId,
-      runs: floorRunsOf(ids, floors.map((floor) => floorIdOf(floor))),
+      runs: floorRunsOf(ids, floors.map((floor) => floorIdOf(spec, floor))),
     };
   });
 }
@@ -907,15 +953,15 @@ export function zoneFloorChoicesOf(spec: BuildingSpec, zoneId: string): readonly
   const zone = spec.accessZones.find((entry) => entry.id === zoneId);
   const held = new Set(zone === undefined ? [] : zoneFloorsOf(spec, zone));
   const choices: ZoneFloorChoice[] = [];
-  for (let floor = spec.floors; floor >= 0; floor -= 1) {
+  for (let floor = spec.floors; floor >= lowestFloorOf(spec); floor -= 1) {
     choices.push({
       floor,
-      floorId: floorIdOf(floor),
+      floorId: floorIdOf(spec, floor),
       inZone: held.has(floor),
       otherZoneIds: spec.accessZones
         .filter((entry) => entry.id !== zoneId && zoneFloorsOf(spec, entry).includes(floor))
         .map((entry) => entry.id),
-      isEntrance: floor === 0,
+      isEntrance: isEntranceFloor(spec, floor),
     });
   }
   return choices;
@@ -937,16 +983,48 @@ export function zoneGroupChoicesOf(spec: BuildingSpec, zoneId: string): readonly
  * Sky lobbies — pure
  * -------------------------------------------------------------------------- */
 
-/** One escalator, as the selector draws it. Facts, not a label — the mount composes the words. */
+/** One machine, as the selector draws it. Facts, not a label — the mount composes the words. */
 export interface TransportChoice {
   readonly id: string;
   readonly lowerId: string;
   readonly upperId: string;
-  readonly seconds: number;
+  /**
+   * The declared traversal time, on whichever arm of `core`'s union it was authored — a scalar for
+   * an escalator, `{ upS, downS }` for a stair. Handed on rather than flattened here, so the mount
+   * decides how to say it and no caller can lose the descent by reading a number that was never one.
+   */
+  readonly seconds: number | DirectionalTraversalTime;
   readonly selected: boolean;
   /** Whether this machine is written to the saved document at all. */
   readonly written: boolean;
-  /** Whether a journey may change onto a lift at either of its two landings. */
+  /**
+   * What the machine **is** — `kind: 'stairs'` rather than an escalator.
+   *
+   * Kept apart from {@link editable} on purpose, even though `transportModeSchema` makes the two
+   * agree on every document it accepts. This one answers *what should I call it and what does the
+   * router do with it*; the other answers *can the control below write it*. Collapsing them would
+   * make a hand-built spec that disagrees with itself — the case `validateSpec` exists for —
+   * unreportable, because the surface would have no way to say which half was wrong.
+   */
+  readonly stairs: boolean;
+  /**
+   * Whether the reader may edit this machine's traversal time here.
+   *
+   * `false` on the directional arm, and the flag exists rather than being re-derived at each label
+   * because one disabled input and several sentences all turn on it. See `withTransportSeconds`:
+   * one number input cannot write two numbers, and writing one of them would delete the descent.
+   */
+  readonly editable: boolean;
+  /**
+   * Whether a journey may change onto a lift at either of its two landings.
+   *
+   * **Always `false` on a stair, whatever its landings are marked.** `traffic/route.ts` filters
+   * `kind: 'stairs'` out of the routing graph entirely — a stair is offered to a rider whose
+   * journey already begins and ends on its two floors, and never planned over — so *"a way
+   * through the building"* is a claim about an edge the router does not have. Reporting a stair on
+   * a sky lobby as a way through would be a true fact about the floors welded to a false one about
+   * what it does for the building.
+   */
   readonly wayThrough: boolean;
 }
 
@@ -958,14 +1036,17 @@ export function transportChoicesOf(
   const skies = new Set(spec.skyFloors);
   return spec.transportModes.map((mode): TransportChoice => {
     const [low, high] = [Math.min(...mode.connects), Math.max(...mode.connects)];
+    const stairs = (mode.kind ?? 'escalator') === 'stairs';
     return {
       id: mode.id,
-      lowerId: floorIdOf(low),
-      upperId: floorIdOf(high),
+      lowerId: floorIdOf(spec, low),
+      upperId: floorIdOf(spec, high),
       seconds: mode.traversalTimeS,
       selected: mode.id === selectedId,
       written: written.has(mode.id),
-      wayThrough: mode.connects.some((floor) => skies.has(floor)),
+      stairs,
+      editable: typeof mode.traversalTimeS === 'number',
+      wayThrough: !stairs && mode.connects.some((floor) => skies.has(floor)),
     };
   });
 }
@@ -1001,10 +1082,10 @@ export function transportFloorChoicesOf(
   const mode = spec.transportModes.find((entry) => entry.id === modeId);
   const skies = new Set(spec.skyFloors);
   const choices: TransportFloorChoice[] = [];
-  for (let floor = spec.floors; floor >= 0; floor -= 1) {
+  for (let floor = spec.floors; floor >= lowestFloorOf(spec); floor -= 1) {
     choices.push({
       floor,
-      floorId: floorIdOf(floor),
+      floorId: floorIdOf(spec, floor),
       chosen: mode?.connects[end] === floor,
       blocked: mode?.connects[1 - end] === floor,
       isTransfer: skies.has(floor),
@@ -1021,19 +1102,56 @@ export function transportFloorChoicesOf(
  * so an escalator with neither landing marked carries exactly the people who start on one of its
  * floors and finish on the other. That is a building somebody may mean; it is not one anybody
  * means by accident.
+ *
+ * **And it carries the refusal, which is the half § D227 makes non-optional.** A stair declares two
+ * traversal times and the control beside this sentence is one number input, so the editor cannot
+ * write one — and a control that cannot write something must say so, in the place a reader is
+ * already looking, rather than in a docstring nobody opens. The noun follows the building: a set
+ * with a stair in it is *machines*, because calling `st-jude-hospital`'s `main-stair` an escalator
+ * is a false statement about the building on the surface that describes it.
  */
 export function transportNoteOf(spec: BuildingSpec): string {
   const choices = transportChoicesOf(spec, '');
   if (choices.length === 0) return '';
   const written = choices.filter((choice) => choice.written);
   const through = written.filter((choice) => choice.wayThrough).length;
+  const stairs = choices.filter((choice) => choice.stairs).length;
+  const noun = stairs === 0 ? 'escalator' : 'machine';
+  const rides =
+    stairs === choices.length
+      ? ''
+      : ' The router rides an escalator in preference to a lift leg, so a crossing it carries is a ' +
+        'crossing the lifts are no longer charged for.';
+  /*
+   * Both stair sentences are true of a stair and of nothing else in this panel, so they are said
+   * only when there is one — a note that explained stairs on Vertical City would be describing a
+   * machine that building does not have. The first is the mechanism (`traffic/route.ts` filters
+   * `kind: 'stairs'` out of the routing graph, `sim/stairs.ts` makes the offer instead); the
+   * second is the refusal.
+   */
+  const said =
+    stairs === 0
+      ? ''
+      : ` ${String(stairs)} of them ${stairs === 1 ? 'is a stair' : 'are stairs'}. The router ` +
+        'never plans a journey over a stair — one is offered to the rider whose journey already ' +
+        'begins and ends on its two floors, and taken when the drawn propensity clears — so a ' +
+        'stair on a transfer level is still not a way through. A stair also declares two ' +
+        'traversal times, one up and one down, and the seconds control here writes one number: ' +
+        'it is disabled on a stair, and the pair on the loaded document is carried through ' +
+        'untouched rather than half-written. Edit it in the building JSON.';
   const lead =
-    `${String(written.length)} of ${String(choices.length)} escalator${choices.length === 1 ? '' : 's'} ` +
-    'written to the document. The router rides one in preference to a lift leg, so a crossing it ' +
-    'carries is a crossing the lifts are no longer charged for.';
-  if (written.length === 0) return lead;
+    `${String(written.length)} of ${String(choices.length)} ${noun}${choices.length === 1 ? '' : 's'} ` +
+    `written to the document.${rides}${said}`;
+  /*
+   * The transfer-level tail is an **escalator** claim — it is about where the router may change a
+   * journey onto a lift — so it is counted over the written escalators and withheld when there are
+   * none. Saying *"0 of 1 touch a transfer level"* about a building whose only machine is a stair
+   * would be arithmetic about a mechanism that does not reach it.
+   */
+  const escalators = written.filter((choice) => !choice.stairs).length;
+  if (escalators === 0) return lead;
   return (
-    `${lead} ${String(through)} of ${String(written.length)} touch a transfer level and are a way ` +
+    `${lead} ${String(through)} of ${String(escalators)} touch a transfer level and are a way ` +
     'through the building; the rest carry only the people who start on one of their two floors ' +
     'and finish on the other.'
   );
@@ -2176,25 +2294,46 @@ export function mountBuildingEditor(
       elements.transportChips,
       chipRow(
         doc,
-        transportChoicesOf(current, selectedTransportId).map((choice) => ({
-          label: `${choice.lowerId}↔${choice.upperId} · ${choice.seconds.toFixed(1)} s`,
-          selected: choice.selected,
-          title: choice.written
-            ? choice.wayThrough
-              ? `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${choice.seconds.toFixed(1)} s, and one of the two is a transfer level, so a journey can change onto a lift there.`
-              : `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${choice.seconds.toFixed(1)} s. Neither is a transfer level, so it carries only the people who start on one of those floors and finish on the other.`
-            : `${choice.id} is not written to the saved document — the elevation's warnings say why.`,
-          onPick: () => {
-            selectedTransportId = choice.id;
-            // A selection is not a document edit, so it redraws rather than going through `patch`.
-            drawTransport(current);
-          },
-        })),
+        transportChoicesOf(current, selectedTransportId).map((choice) => {
+          /*
+           * One label for both arms of the union. `traversalTimeLabel` names the two directions
+           * rather than printing `26.0 / 19.0`, because on a stair the difference between the two
+           * numbers is the whole modelling content and a chip that lost track of which was the
+           * climb would re-symmetrise it in the reader's head.
+           */
+          const took = traversalTimeLabel(choice.seconds);
+          return {
+            label: `${choice.lowerId}↔${choice.upperId} · ${took}`,
+            selected: choice.selected,
+            title: choice.written
+              ? choice.stairs
+                ? `${choice.id} is a stair joining ${choice.lowerId} and ${choice.upperId}: ${took}. The router never plans a journey over a stair — it is offered to a rider whose journey already begins and ends on those two floors — so a transfer level makes no difference to it, and the seconds control cannot edit its two times.`
+                : choice.wayThrough
+                  ? `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${took}, and one of the two is a transfer level, so a journey can change onto a lift there.`
+                  : `${choice.id} joins ${choice.lowerId} and ${choice.upperId} in ${took}. Neither is a transfer level, so it carries only the people who start on one of those floors and finish on the other.`
+              : `${choice.id} is not written to the saved document — the elevation's warnings say why.`,
+            onPick: () => {
+              selectedTransportId = choice.id;
+              // A selection is not a document edit, so it redraws rather than going through `patch`.
+              drawTransport(current);
+            },
+          };
+        }),
       ),
     );
     elements.removeTransport.disabled = mode === undefined;
-    elements.transportSeconds.disabled = mode === undefined;
-    const seconds = mode === undefined ? '' : mode.traversalTimeS.toFixed(1);
+    /*
+     * **The input refuses a stair rather than truncating it — § D227.** It is one `type="number"`
+     * field and a stair is two numbers, so the only thing it could write is the climb with the
+     * descent deleted. Disabled and blank is the honest state: `transportNoteOf` beside it says
+     * which machine cannot be edited here and why, and `withTransportSeconds` refuses the write a
+     * second time so a `change` event fired some other way still cannot land one.
+     */
+    const editable = mode !== undefined && typeof mode.traversalTimeS === 'number';
+    elements.transportSeconds.disabled = !editable;
+    const seconds = editable && typeof mode.traversalTimeS === 'number'
+      ? mode.traversalTimeS.toFixed(1)
+      : '';
     if (elements.transportSeconds.value !== seconds) elements.transportSeconds.value = seconds;
 
     for (const [end, node] of [
@@ -2338,7 +2477,7 @@ export function mountBuildingEditor(
           title:
             entry.every === 0
               ? 'No transfer levels: one bank serves the whole tower.'
-              : `Transfer levels at ${entry.floors.map((floor) => floorIdOf(floor)).join(', ')} — floors[].isTransferFloor. The cars are dealt round-robin into the segments those levels cut.`,
+              : `Transfer levels at ${entry.floors.map((floor) => floorIdOf(current, floor)).join(', ')} — floors[].isTransferFloor. The cars are dealt round-robin into the segments those levels cut.`,
           onPick: () => {
             patch({ skyFloors: entry.floors, bandByCar: {} });
           },

@@ -157,7 +157,13 @@ describe('the menu offers a how-to-play entry', () => {
      */
     const panel = readFileSync(new URL('../dev/menuPanel.ts', import.meta.url), 'utf8');
     expect(panel, 'dev/menuPanel.ts no longer reads the guide off the view').toContain('view.guide');
-    expect(panel).toMatch(/list\.append\(guideEntry\(/);
+    /*
+     * The call, not the write beside it. This read `list.append(guideEntry(` until GitHub issue
+     * #106 stopped the menu list being rebuilt on every draw — the entry is now collected with the
+     * six rows and reconciled in with them, which is the same caller through a different verb. The
+     * *entry sits in the list* half is `menuPanel.test.ts`'s, driven rather than matched.
+     */
+    expect(panel).toMatch(/guideEntry\(draw, view\.guide\)/);
   });
 });
 

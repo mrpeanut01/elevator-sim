@@ -961,3 +961,49 @@ template — provisioning declined on it**
 
 F6 is the one to read first: it is the condition that made three of this wave's invariant-5 defects
 possible, and it is not closed by any of them.
+
+---
+
+## Issue-worker wave — 2026-08-07
+
+Backlog sweep of the 29 open GitHub issues (#90–#119). Coordination artifacts:
+[`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md), [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md),
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md).
+
+Integration branch `integration/issue-worker`, off `faf935b`.
+
+### Verification lanes — all reported, read-only
+
+| id | issues | verdict |
+|---|---|---|
+| V-106 | #106 | Confirmed for email + display name. **Reporter's `input` mechanism refuted** — it is `change`, on blur. Settings claim unsupported |
+| V-109 | #109, #117 | #109 confirmed. **#117 is NOT caused by #109** — it needs the `playerHasChosen` split, and its headline symptom is unexplained |
+| V-111 | #111, #97 | #111 confirmed. **#97 refuted as filed** — the scenario list exists; two real one-line bugs found instead |
+| V-112 | #112, #113, #101 | All confirmed. **Both issues' nominated fixes refuted**; a ~50-line route neither named |
+| V-114 | #114 | Dead seam confirmed. **Issue's recommendation 4 is backwards** — the test exists and passes |
+
+### Build lanes — batch 1, isolated worktrees under `.claude/worktrees/iw/`
+
+| branch | issues | scope | conflicts |
+|---|---|---|---|
+| `fix/issue-108-stairs-union` | #108 | `authoring/buildingSpec.ts`, `dev/buildingEditor.ts`, new derived-from-disk guard test | none |
+| `fix/issue-114-machines-readonly` | #114 | `dev/rightRail.ts`, `scope/probes.test-helper.ts` | none |
+| `fix/issue-109-rail-provisional` | #109, #105 | `dev/leftRail.ts`, `render/mood.ts`, `render/canvas.ts` | none |
+| `fix/issue-106-menu-rebuild` | #106 | `dev/menuPanel.ts`, `dev/main.ts`, `menu/account.ts` | **head of the sequenced lane — #111, #97a, #112, #113 follow on this branch** |
+
+`DECISIONS.md`, `docs/` and the `ISSUE_*.md` artifacts are off-limits to every build lane; those
+entries are written at integration so four agents cannot conflict on one file.
+
+### Sequencing constraints that are not obvious from the issues
+
+- **#106 must land before #111.** #111 asks for validation on `input`; until #106 stops the overlay
+  rebuilding on field commit, that fires a full `replaceChildren` per keystroke — worse than today.
+- **#113's persist fix must land before its Compare fix.** Listing a dispatcher that does not
+  survive a reload is not worth doing, and the Compare selects cross a Worker boundary that throws
+  for an unresolvable arm.
+- **#118 is blocked by #108** — a shared link is a coin flip while one building crashes on load.
+
+### Resolved this wave
+
+**E-7** — the tester played a deployment, not this tree. `git diff 769eb61 faf935b` is empty; HEAD
+is a merge commit with the deployed tree. Every refutation stands.

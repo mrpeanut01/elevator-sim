@@ -46,10 +46,28 @@
  * labelled provisional until the playhead reaches `endedAt`"* — and {@link BuildingMood.provisional}
  * is that label. A mood shown at 4:12 of a 15:00 run is not a verdict on the run and says so, which
  * is the retraction-in-place behaviour applied to the only quantity this unit displays.
+ *
+ * ## R6 again, and why the label was not enough — issue #109
+ *
+ * A *preview* is a fair description of a reading that will settle as the playhead advances. **Four
+ * of these five drivers are not previews.** `record/recordRun.ts` is *"the only place in the package
+ * that runs a simulation"* and it simulates the whole day up front — boot runs one on a cold load
+ * with zero clicks — so `summary.saturated`, `summary.serviceLevel`, `summary.delivered` and
+ * `summary.handlingCapacity` carry the **finished day** into the very first frame. A card drawn at
+ * 00:00 was not previewing the shift; it was reporting the end of it beside a clock reading the
+ * start. Only `standing` re-folds at the playhead.
+ *
+ * So each driver now declares {@link MoodDriver.basis}, and a renderer gates on it rather than
+ * merely italicising the lot: `dev/leftRail.ts#moodDriverPanelOf` draws the `'now'` driver and
+ * withholds the `'whole-run'` ones until the shift is over — the rule `dev/reportPanel.ts`'s
+ * watching sheet already keeps (§ D223), copied rather than reinvented. {@link
+ * BuildingMood.retraction} is the words that go in their place, because the rail draws `drivers`
+ * and `provisional` and has never drawn `headline`.
  */
 
 import type { FloorQueue, WaitBand } from '../frame/overlay.js';
 import type { VizSummary } from '../contract/types.js';
+import type { WaitBandBasis } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { BAND_WORDS } from './riderQueue.js';
 
@@ -174,6 +192,30 @@ export interface MoodDriver {
   readonly level: MoodLevel;
   /** What this observation actually said, with its number. Never a bare adjective — R10. */
   readonly text: string;
+  /**
+   * **What window this driver's number is folded over** — and the field a renderer needs in order
+   * to keep R6 rather than merely announce it.
+   *
+   * `'now'` means the sentence is re-derived at the playhead and is true of the instant on screen.
+   * `'whole-run'` means it is folded over the entire shift and does not move with the playhead at
+   * all: `recordRun` simulates the whole day up front, so `summary.saturated`,
+   * `summary.serviceLevel`, `summary.delivered` and `summary.handlingCapacity` already carry the
+   * end of the day at the first frame of it.
+   *
+   * That is why {@link BuildingMood.provisional} was not enough on its own. A flag says *this may
+   * change*; four of these five sentences cannot change, because they were never about the instant
+   * they are drawn beside. What a reader needs is for them **not to be drawn** until the playhead
+   * has earned them, which is a decision only a renderer holding both the driver and the playhead
+   * can take — so the classification lives here, on the driver that knows it, rather than as a list
+   * of ids in whichever file happens to be doing the drawing.
+   *
+   * `WaitBandBasis` itself, rather than a private union spelling the same two words. The rail's
+   * mood card, its honesty card and now its driver rows all answer *over what window?*, and three
+   * copies of one two-valued vocabulary is how they would come to answer it differently. The import
+   * is type-only and adds no runtime edge; `live/types.ts` imports nothing from `render/`, so there
+   * is no cycle to acquire.
+   */
+  readonly basis: WaitBandBasis;
 }
 
 export interface BuildingMood {
@@ -186,6 +228,29 @@ export interface BuildingMood {
   readonly drivers: readonly MoodDriver[];
   /** True until the playhead reaches `endedAt` — R6. */
   readonly provisional: boolean;
+  /**
+   * **The retraction, in words** — non-empty exactly when {@link provisional}, and empty once the
+   * playhead has reached the end.
+   *
+   * `mood.test.ts` has asserted since this unit was written that *"a flag no renderer is obliged to
+   * read is not a retraction — the words carry it too"*, and pinned that claim on
+   * {@link headline}'s *So far*. The claim was true of the canvas, which draws `headline` under the
+   * building name, and false of the left rail, which draws `drivers`, `caveat` and `provisional`
+   * and **never `headline`** — the rail's own headline comes from `live/bands.ts`'s `moodOf`. So on
+   * the surface where the drivers are actually read, the whole of R6 was
+   * `.mood-provisional { font-style: italic; }`: a typographic signal with no text, on a card whose
+   * own docstring is a KB-15 table promising every signal a second channel.
+   *
+   * This field is that second channel, and it is a separate string from {@link headline} rather
+   * than a re-use of it because the two say different things. `headline` retracts a *verdict the
+   * card is still showing*; this retracts the readings the card has **stopped** showing, and names
+   * them, so a reader who saw four rows a moment ago knows where they went and what brings them
+   * back.
+   *
+   * The driver labels in it are derived from {@link drivers}, not written down: a sixth driver, or
+   * a driver whose basis changes, moves this sentence without anybody remembering to.
+   */
+  readonly retraction: string;
   /** R2, in the component. Names what this is not. */
   readonly caveat: string;
 }
@@ -278,6 +343,9 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.overwhelmed,
     label: 'queues',
+    // `summary.saturated` is the trend test over the whole run. It reads the same at 00:00 as at
+    // the last frame, because `recordRun` had already finished the day before the first paint.
+    basis: 'whole-run',
     level: summary.saturated ? 'distressed' : 'calm',
     text: summary.saturated
       ? 'The queues never stopped growing — the building could not keep up with the people arriving.'
@@ -289,6 +357,9 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.abandoned,
     label: 'the unluckiest rider',
+    // `summary.serviceLevel` folds every arrival in the run, including the ones the playhead has
+    // not reached: *the longest wait* is the longest wait of the day, not of the day so far.
+    basis: 'whole-run',
     level: level.verdict === 'starved' || overHorizon > 0 ? 'distressed' : 'calm',
     /*
      * The **abandonment horizon** is the phrase issue #71 measured surviving into Casual unchanged,
@@ -317,12 +388,42 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.stranded,
     label: 'delivered',
+    // Three run-level counts. None of them moves with the playhead.
+    basis: 'whole-run',
     level: summary.undelivered > 0 ? 'frustrated' : 'calm',
+    /*
+     * **`All N` was asserted over the wrong complement, and it is gone.**
+     *
+     * The identity `core` actually holds (`sim/types.ts`) is
+     * `generated === delivered + undelivered + abandoned + accessRefused`, and an `accessRefused`
+     * rider is in **neither** of the two buckets this driver could see: not delivered, not
+     * undelivered, turned away at the door by a credential their floor does not carry (§ D265).
+     * Seven of the eight shipped buildings declare `accessZones`, so `undelivered === 0` was never
+     * the same question as *did everybody get where they were going*, and on those buildings this
+     * card printed **All 34 people got where they were going** over riders who never boarded.
+     *
+     * `${delivered} of ${generated}` is true under every one of the four outcomes, because it
+     * claims only what it counts: this many of the people who turned up arrived. It is deliberately
+     * printed **unconditionally** — the branch is now only about whether there is a second sentence
+     * to add — so there is no arm left in which a total can be re-derived as a complement of one
+     * bucket.
+     *
+     * **What it still does not say, stated rather than left to be discovered.** When
+     * `undelivered === 0` and `delivered < generated`, the remainder is `accessRefused` plus
+     * `abandoned` and this sentence names neither: `MoodSummary` cannot see them. Naming them means
+     * widening `VizSummary` and the recording schema with it, which is a schema-version change and
+     * belongs in its own lane. The sentence is silent about the remainder; it does not claim there
+     * is none.
+     *
+     * The **level** is untouched and still reads `undelivered > 0`. Moving it would be a change to
+     * what the gauge judges rather than to what it says, and the two are not the same repair.
+     */
     text:
-      summary.undelivered > 0
-        ? `${String(summary.delivered)} of ${String(summary.generated)} people got where they were ` +
-          `going. ${String(summary.undelivered)} were still in the building when the run ended.`
-        : `All ${String(summary.delivered)} people got where they were going.`,
+      `${String(summary.delivered)} of ${String(summary.generated)} people got where they were ` +
+      'going.' +
+      (summary.undelivered > 0
+        ? ` ${String(summary.undelivered)} were still in the building when the run ended.`
+        : ''),
   });
 
   const band = worstStandingBand(queues);
@@ -332,6 +433,9 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.standing,
     label: 'standing right now',
+    // The one driver built from `queues`, which `queueAt` re-folds at the playhead. Its sentence is
+    // true of the instant on screen and of no other, which is what keeps it drawable mid-run.
+    basis: 'now',
     level: band === undefined ? 'calm' : BAND_LEVEL[band],
     text:
       band === undefined
@@ -347,6 +451,8 @@ export function buildingMood(
   drivers.push({
     id: DRIVER_IDS.demand,
     label: 'demand answered',
+    // Two run-level rates out of `summary.handlingCapacity`, both folded over the whole shift.
+    basis: 'whole-run',
     level: personsPer5Min < offeredPer5Min ? 'frustrated' : 'calm',
     /*
      * The other half of #71's measured diff on this card: *per 5 minutes* is a rate, and a rate
@@ -384,11 +490,47 @@ export function buildingMood(
     headline: headlineFor(overall, provisional),
     drivers: ordered,
     provisional,
+    retraction: provisional ? retractionFor(ordered) : '',
     caveat:
       'This describes what happened in this one run, at this one seed. It is not a verdict on the ' +
       'dispatcher: one replication cannot support that, and the same configuration on Secure ' +
       'Tower returned a quotable average on 6 of 20 consecutive seeds.',
   };
+}
+
+/**
+ * {@link BuildingMood.retraction} — what a card drawn short of the end is withholding, and why.
+ *
+ * **The labels are read off the drivers, never written down here.** A sixth driver, or one whose
+ * `basis` is corrected, changes this sentence on the same commit that changes the card; a
+ * hand-typed list would go stale the way `CLAUDE.md`'s § D227 records a *refusal* going stale —
+ * which is the worse half, because a sentence that names the wrong readings tells a reader the card
+ * is hiding something it is in fact showing them.
+ *
+ * **No numeral appears in it, and that is a choice.** Every number this module prints is an
+ * observation with a window behind it; a count of withheld rows would be a number about the
+ * *interface*, sitting in the one sentence whose whole job is to say that the numbers are not
+ * ready. Naming the rows says more and counts nothing.
+ *
+ * The two remedies it offers both exist: `dev/main.ts`'s `scrubTo` seeks on a timeline click, and
+ * the transport plays through. `dev/reportPanel.ts`'s watching sheet — § D223, the precedent this
+ * whole change copies — names the same two, and *two answers to one question* is that decision's
+ * own phrase, kept verbatim so the rail and the Day report refuse in one voice.
+ */
+function retractionFor(drivers: readonly MoodDriver[]): string {
+  const withheld = drivers.filter((driver) => driver.basis === 'whole-run').map((d) => d.label);
+  return (
+    `The run has not finished, so the readings that fold the whole shift — ${andList(withheld)} — ` +
+    'are withheld until the playhead reaches the end: a whole-day reading beside a clock this ' +
+    'early would be two answers to one question. Play the shift through, or click the far end of ' +
+    'the timeline, and they are here.'
+  );
+}
+
+/** `a, b and c`. Empty and single-item cases included because a driver set may shrink. */
+function andList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? 'none of them';
+  return `${items.slice(0, -1).join(', ')} and ${String(items[items.length - 1])}`;
 }
 
 /**

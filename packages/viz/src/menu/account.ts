@@ -133,6 +133,24 @@ export function namingStage(state: AccountState): boolean {
 
 export function updateForm(state: AccountState, patch: Partial<AccountForm>): AccountState {
   /*
+   * **A commit that changes nothing is not an edit** — GitHub issue #106.
+   *
+   * The panel commits a field on `change`, and a browser fires `change` on blur and again on Enter,
+   * so the same string arrives here two and three times over: once when the reader tabs away, once
+   * when they press Enter, once more on the blur that follows the button they pressed. Clearing the
+   * notice on each of those is the deception below with its sign flipped — it takes *"a link is on
+   * its way"* off the screen a beat after the request that earned it, about an address nobody has
+   * touched.
+   *
+   * So the rule is about the string and not about the event: the notice is still about the address
+   * in the box for exactly as long as the box says the same thing.
+   */
+  const changed = (Object.keys(patch) as (keyof AccountForm)[]).some(
+    (field) => patch[field] !== undefined && patch[field] !== state.form[field],
+  );
+  if (!changed) return state;
+
+  /*
    * Changing the address takes back *a link is on its way*, because it is no longer about the
    * address in the box. Leaving it standing would tell somebody who had just corrected a typo to go
    * and check an inbox they do not own.

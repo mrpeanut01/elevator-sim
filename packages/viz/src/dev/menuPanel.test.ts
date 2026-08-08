@@ -68,7 +68,7 @@ import { loadConfig } from '@elevator-sim/core';
 import { asBuiltChoices, shaftChoices, speedChoices } from '../commissioning/choices.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
 import { CONSTRAINTS, commissionableClasses, constraintById } from '../commissioning/types.js';
-import { SIGNED_OUT } from '../menu/account.js';
+import { SIGNED_OUT, updateForm, type AccountForm, type AccountState } from '../menu/account.js';
 import type { BoardPage } from '../menu/client.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
@@ -89,9 +89,19 @@ interface Recorded {
   className: string;
   textContent: string;
   value: string;
+  checked: boolean;
   hidden: boolean;
   readonly attrs: Map<string, string>;
   readonly children: Recorded[];
+  /**
+   * The same array as {@link Recorded.children}, under the name the DOM gives it.
+   *
+   * `dev/dom.ts#reconcile` walks `childNodes` and the panel walks `children`, and they are the same
+   * list in a browser too — the difference there is element-versus-node, and this recorder makes no
+   * nodes that are not elements. One array rather than two, because two would be a place for them
+   * to disagree.
+   */
+  readonly childNodes: Recorded[];
   readonly listeners: Map<string, (event?: unknown) => void>;
 }
 
@@ -125,14 +135,17 @@ function recorder(): Recorder {
   let active: Recorded | null = null;
 
   const make = (tag: string): Recorded => {
+    const children: Recorded[] = [];
     const node: Recorded = {
       tag,
       className: '',
       textContent: '',
       value: '',
+      checked: false,
       hidden: false,
       attrs: new Map(),
-      children: [],
+      children,
+      childNodes: children,
       listeners: new Map(),
     };
     return Object.assign(node, {
@@ -154,6 +167,25 @@ function recorder(): Recorder {
       replaceChildren(...kids: Recorded[]) {
         node.children.length = 0;
         node.children.push(...kids);
+      },
+      /*
+       * The two `reconcile` needs, and it needs them for the reason it exists: they are the writes
+       * that move **one** child, and a recorder that only had `replaceChildren` could not tell a
+       * container that rebuilt itself apart from one that left a button where it was. That
+       * distinction is the whole of GitHub issue #106.
+       */
+      removeChild(kid: Recorded) {
+        const at = node.children.indexOf(kid);
+        if (at >= 0) node.children.splice(at, 1);
+        return kid;
+      },
+      insertBefore(kid: Recorded, before: Recorded | null) {
+        const already = node.children.indexOf(kid);
+        if (already >= 0) node.children.splice(already, 1);
+        const at = before === null ? -1 : node.children.indexOf(before);
+        if (at < 0) node.children.push(kid);
+        else node.children.splice(at, 0, kid);
+        return kid;
       },
       addEventListener(type: string, handler: (event?: unknown) => void) {
         node.listeners.set(type, handler);
@@ -671,13 +703,22 @@ describe('the overlay behaves like the dialog it looks like', () => {
     expect(shell.attrs.has('aria-hidden'), 'the shell stayed hidden behind a closed menu').toBe(false);
   });
 
-  it('brings focus into the overlay, and puts it back on the same control after a redraw', async () => {
+  it('brings focus into the overlay, and leaves it there across a redraw', async () => {
     /*
-     * The half without which the trap is decorative. `fill` replaces every child on every redraw,
-     * so the focused element is destroyed by each state change — and the overlay is appended last
-     * to `document.body`, so the next Tab from `<body>` walks into the shell *behind* the menu.
-     * That is how #68's reporter reached the seed field: by tabbing forward from nowhere, not by
+     * The half without which the trap is decorative: the overlay is appended last to
+     * `document.body`, so the next Tab from `<body>` walks into the shell *behind* the menu. That
+     * is how #68's reporter reached the seed field — by tabbing forward from nowhere, not by
      * tabbing past the end of a short list.
+     *
+     * **The mechanism under it changed with issue #106 and the promise did not.** This used to
+     * assert that the redraw rebuilt the tree and that `restoreFocus` then found the reader's
+     * control again by key. Rebuilding is what swallowed the first press of every button beside a
+     * text field, so the panel now keeps its controls (`menuPanel.ts#retainer`) and there is
+     * nothing to restore in the ordinary case. What a reader gets is unchanged and stronger: the
+     * element they were standing on is still the element they are standing on.
+     *
+     * The non-vacuity guard moved with it. It was *"the redraw did rebuild"*; it is now *"the
+     * redraw did happen"*, read off a control the second draw had to write for it to be there.
      */
     const loaded = await catalogue();
     const { root, focused, focus, draw } = render(initialMenuState(loaded), loaded);
@@ -688,14 +729,41 @@ describe('the overlay behaves like the dialog it looks like', () => {
     expect(third).toBeDefined();
     focus(third ?? null);
     const key = third?.attrs.get('data-menu-control');
+    third?.attrs.delete('data-menu-control');
     draw();
 
     const after = walk(root).filter((node) => node.attrs.has('data-menu-control'));
-    expect(after[2], 'the redraw did not rebuild the tree').not.toBe(third);
+    expect(
+      after.length,
+      'the second draw wrote no focus ring at all, so this case proves nothing',
+    ).toBe(controls.length);
+    expect(after[2], 'the redraw threw the reader’s control away and built another').toBe(third);
     expect(
       focused()?.attrs.get('data-menu-control'),
       'a redraw moved the reader off the control they were standing on',
     ).toBe(key);
+  });
+
+  it('puts the reader on the new screen when the control they were on is gone', async () => {
+    /*
+     * The branch that survives `retainer` and still has work to do: a control keeps its element
+     * across a redraw of the *same* screen, and a redraw that changes screen legitimately takes it
+     * away. Without this the reader would be left on `<body>`, one Tab from the shell — #68 again.
+     */
+    const loaded = await catalogue();
+    let state = initialMenuState(loaded);
+    const made = render(state, loaded, { state: () => state });
+    const controls = walk(made.root).filter((node) => node.attrs.has('data-menu-control'));
+    made.focus(controls[1] ?? null);
+
+    state = { ...state, screen: 'settings' };
+    made.draw();
+    const after = walk(made.root).filter((node) => node.attrs.has('data-menu-control'));
+    expect(after[0], 'the settings screen registered no controls').toBeDefined();
+    expect(
+      made.focused(),
+      'a screen change left the reader outside the overlay, one Tab from the shell behind it',
+    ).toBe(after[0]);
   });
 
   it('does not reach into a hidden menu for the focus', async () => {
@@ -770,6 +838,237 @@ describe('the account screen collects one thing, and never a credential', () => 
     expect(field, 'Tab reaches the submit before the field it submits').toBeLessThan(submit);
     // …and Back is last, so the ordering is label, input, submit, out — #30's own suggestion.
     expect(keys.indexOf('back')).toBeGreaterThan(submit);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The first press after typing — GitHub issue #106
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Everything a container did to its own children, so a redraw that *moved* one is not mistaken for
+ * a redraw that left it alone.
+ *
+ * Node identity after the fact is not enough and that is the whole subtlety of this issue: a
+ * browser forgets the element a `mousedown` landed on the instant it is removed, and putting the
+ * same object back does not bring the memory back. So what has to be observed is the **write**, not
+ * the result — `removeChild` and the `insertBefore` that moves a child already in the list. This
+ * patches the two on one recorded node, which is instrumentation over the recorder rather than a
+ * member added to it: nothing in the panel calls it, and it asserts about a container the test
+ * chose.
+ */
+function watchChildren(node: Recorded): { readonly touched: readonly Recorded[] } {
+  const touched: Recorded[] = [];
+  const inner = node as unknown as {
+    removeChild: (kid: Recorded) => Recorded;
+    insertBefore: (kid: Recorded, before: Recorded | null) => Recorded;
+  };
+  const removeChild = inner.removeChild.bind(node);
+  const insertBefore = inner.insertBefore.bind(node);
+  inner.removeChild = (kid) => {
+    touched.push(kid);
+    return removeChild(kid);
+  };
+  inner.insertBefore = (kid, before) => {
+    if (node.children.includes(kid)) touched.push(kid);
+    return insertBefore(kid, before);
+  };
+  return { touched };
+}
+
+/**
+ * The account screen with a shell behind it: the host performs `account-form` the way
+ * `dev/main.ts` does — `updateForm`, then redraw — rather than merely recording that it was asked.
+ *
+ * Recording is not enough here. The defect is entirely in *what the redraw does to the tree*, so a
+ * host that swallowed the intent would leave the tree it is about untouched and every assertion
+ * below would pass over a screen that never redrew.
+ */
+function accountScreen(loaded: MenuCatalogue): ReturnType<typeof render> & {
+  readonly accountNow: () => AccountState;
+} {
+  let account = SIGNED_OUT;
+  let redraw = (): void => {};
+  const made = render({ ...initialMenuState(loaded), screen: 'account' }, loaded, {
+    account: () => account,
+    dispatch: (intent) => {
+      made.asked.push(intent);
+      if (intent.kind !== 'account-form') return;
+      account = updateForm(account, intent.patch as Partial<AccountForm>);
+      redraw();
+    },
+  });
+  redraw = made.draw;
+  return { ...made, accountNow: () => account };
+}
+
+describe('the first press after typing is not swallowed — GitHub issue #106', () => {
+  it('leaves the submit button, and its label, exactly where the pointer put them down', async () => {
+    /*
+     * The reporter's steps, at the tier that can see the mechanism: *"Type into the Account email
+     * field, click Email me a link once: no request, no error, no notice. Click again without
+     * typing: it works."*
+     *
+     * The order of events is the entire defect and it is worth spelling out, because the issue's own
+     * diagnosis — a rebuild per keystroke — is wrong and there is no `input` listener anywhere in
+     * the overlay. `mousedown` on the submit **blurs the field**, blur is what fires `change`,
+     * `change` commits the address, committing redraws, and the redraw used to replace every child
+     * of the overlay. By `mouseup` the element the press began on was no longer in the document, so
+     * the browser had already thrown away the click it was going to dispatch.
+     *
+     * So this asserts the write rather than the outcome: nothing removed or moved the button, or
+     * the span inside it that a pointer is actually standing on.
+     */
+    const loaded = await catalogue();
+    const made = accountScreen(loaded);
+    const { root } = made;
+
+    const submit = byClass(root, 'menu-start')[0];
+    const label = submit?.children[0];
+    const field = walk(root).find((node) => node.tag === 'input');
+    const list = byClass(root, 'menu-list')[0];
+    expect(submit, 'the account screen renders no submit').toBeDefined();
+    expect(field, 'the account screen renders no field').toBeDefined();
+    expect(label?.className, 'the submit has no label span to stand on').toBe('menu-row-name');
+
+    const onRoot = watchChildren(root);
+    const onList = watchChildren(list as Recorded);
+    const onButton = watchChildren(submit as Recorded);
+
+    // Typed, and then committed the way a `mousedown` on the button commits it.
+    (field as Recorded).value = 'ada@example.test';
+    field?.listeners.get('change')?.();
+
+    expect(
+      made.accountNow().form.email,
+      'the commit never reached the state, so this case is about nothing',
+    ).toBe('ada@example.test');
+    expect(
+      onButton.touched,
+      'the redraw rebuilt the submit’s own label — the span a pointer presses',
+    ).not.toContain(label);
+    expect(onList.touched, 'the redraw took the submit button out of the list').not.toContain(submit);
+    expect(onRoot.touched, 'the redraw took the whole menu list out of the overlay').not.toContain(list);
+    // …and it really is the same button, which is the cheap half of the same claim.
+    expect(byClass(root, 'menu-start')[0]).toBe(submit);
+    expect(byClass(root, 'menu-start')[0]?.children[0]).toBe(label);
+  });
+
+  it('leaves it where it is even when the commit changes what else is on screen', async () => {
+    /*
+     * The case issue #111 is about to make ordinary. A commit that adds or removes a line — a
+     * validation issue appearing, a notice being taken back — really does change the shape of the
+     * screen, and the button beside it still must not move. This is what makes `reconcile` a
+     * reconcile rather than a *skip the write when nothing changed*: the second would carry the
+     * case above and put this one straight back.
+     */
+    const loaded = await catalogue();
+    const made = accountScreen(loaded);
+    const submit = byClass(made.root, 'menu-start')[0];
+    const field = walk(made.root).find((node) => node.tag === 'input');
+    const list = byClass(made.root, 'menu-list')[0];
+    const before = byClass(made.root, 'menu-issues').length;
+
+    const onRoot = watchChildren(made.root);
+    const onList = watchChildren(list as Recorded);
+    (field as Recorded).value = 'not-an-address';
+    field?.listeners.get('change')?.();
+
+    expect(
+      byClass(made.root, 'menu-issues').length,
+      'the bad address drew no complaint, so nothing about the screen changed shape',
+    ).toBeGreaterThan(before);
+    expect(
+      onList.touched,
+      'a line appearing elsewhere on the screen carried the submit button off with it',
+    ).not.toContain(submit);
+    expect(onRoot.touched).not.toContain(list);
+  });
+
+  it('leaves the reader where the browser is putting them, instead of yanking them back', async () => {
+    /*
+     * The Tab-then-Enter trap, which is the same defect reached from the keyboard. `change` fires
+     * during a blur, and during a blur `document.activeElement` is the body — which used to look
+     * exactly like a dialog that had just opened, so `restoreFocus` pulled the reader to
+     * `controls[0]`. On this screen `controls[0]` is the address field they were leaving, so Tab
+     * out of it landed back in it every time and there was no keyboard route to the button at all.
+     */
+    const loaded = await catalogue();
+    const made = accountScreen(loaded);
+    const field = walk(made.root).find((node) => node.tag === 'input');
+
+    made.focus(field ?? null);
+    (field as Recorded).value = 'ada@example.test';
+    // The blur the browser performs before it hands focus on, and the `change` it fires doing it.
+    made.focus(null);
+    field?.listeners.get('change')?.();
+
+    expect(
+      made.focused(),
+      'the commit grabbed the focus back off the control the reader was moving to',
+    ).toBeNull();
+  });
+
+  it('submits on Enter, having first committed what is in the box', async () => {
+    /*
+     * The independent half of #106. The account screen is a form in every sense a player can see
+     * and none a browser can — the fields are a `<div>`, the submit is `<button type="button">`,
+     * and the overlay's keydown handler owns Escape and Tab — so Enter did nothing at all.
+     *
+     * The **order** is the assertion. Enter fires before the browser's own `change`, so a submit
+     * that did not commit first would validate and send the address as it was before the reader
+     * typed: on a blank form, the address the server never hears about.
+     */
+    const loaded = await catalogue();
+    const made = accountScreen(loaded);
+    const field = walk(made.root).find((node) => node.tag === 'input');
+
+    (field as Recorded).value = 'ada@example.test';
+    let defaulted = true;
+    field?.listeners.get('keydown')?.({
+      key: 'Enter',
+      preventDefault: () => {
+        defaulted = false;
+      },
+    });
+
+    expect(made.asked.map((intent) => intent.kind)).toEqual(['account-form', 'account-submit']);
+    expect(
+      made.accountNow().form.email,
+      'Enter asked for a link about an address the state had never been told',
+    ).toBe('ada@example.test');
+    /*
+     * Defaulted away, because a text input's own Enter behaviour is to fire `change` — a second
+     * commit of a string the state already holds, arriving after the request has started and
+     * clearing the notice it had just earned. `updateForm` refuses a commit that changes nothing
+     * for the same reason; this is the other half of that pair.
+     */
+    expect(defaulted, 'Enter was left to the browser as well as handled here').toBe(false);
+  });
+
+  it('refuses Enter exactly where it refuses the button', async () => {
+    /*
+     * The negative control, and the reason Enter is wired to `MenuScreenView.rows` rather than to
+     * an intent this file picked: a keyboard route that bypassed a refusal the screen had already
+     * made would be a worse defect than the one being fixed. Free play with a broken seed is the
+     * case — Start is disabled and says why, so Enter in the Seed field does exactly as little.
+     */
+    const loaded = await catalogue();
+    const { root, asked } = render(brokenFreePlay(loaded), loaded);
+    const seed = walk(root).find((node) => node.attrs.get('data-menu-control') === 'free-play.seed');
+    expect(seed, 'the Free play screen renders no seed field').toBeDefined();
+
+    seed?.listeners.get('keydown')?.({ key: 'Enter', preventDefault: () => undefined });
+    expect(asked, 'Enter started a run the screen had already refused to start').toEqual([]);
+
+    // …and it does fire where the same screen does offer a Start, so the case above is a refusal
+    // rather than a keydown handler that never works.
+    const whole = render(wholeFreePlay(loaded), loaded);
+    const ready = walk(whole.root).find(
+      (node) => node.attrs.get('data-menu-control') === 'free-play.seed',
+    );
+    ready?.listeners.get('keydown')?.({ key: 'Enter', preventDefault: () => undefined });
+    expect(whole.asked.map((intent) => intent.kind)).toEqual(['set-free-play', 'start']);
   });
 });
 

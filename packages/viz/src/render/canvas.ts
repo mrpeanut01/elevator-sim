@@ -1776,10 +1776,45 @@ function drawFooter(
   // header quotes a mean without saying which 300 seconds it covers will be read as covering the
   // whole run. The clause is produced by `render/runSummary.ts` rather than formatted here, so
   // the panel and the picture cannot word the same window differently.
-  ctx.fillText(
-    `${recording.status} · ${String(recording.summary.generated)} generated · ${windowClause(recording.summary)}`,
-    12,
-    layout.foot.statusY,
+  ctx.fillText(footerStatusLine(recording), 12, layout.foot.statusY);
+}
+
+/**
+ * The footer caption — issue #105, and the reason it is **scoped rather than gated**.
+ *
+ * ## The defect
+ *
+ * This line read `` `${recording.status} · ${generated} generated · ${windowClause(…)}` ``, and
+ * `recording.status` is `result.status` off `record/recordRun.ts` — the outcome of the **whole-day
+ * simulation**, which finishes before the first frame is painted. Directly above it sits the
+ * playback progress bar. So a viewer four minutes into a fifteen-minute shift read **completed**
+ * with the bar a quarter full: one word, one bar, two answers. `generated` has the same shape — it
+ * is the day's whole arrival count, printed unchanged at every playhead.
+ *
+ * ## Why not the gate `dev/leftRail.ts#moodDriverPanelOf` uses
+ *
+ * Because the two surfaces are owed different things, and the difference is this file's own stated
+ * reason for having a footer at all: **Export PNG** bakes this bitmap into a file that leaves the
+ * building, and § 7.4 requires every figure on it to carry its window. Withholding the caption
+ * until the playhead reaches the end would strip the window clause off every PNG exported mid-run —
+ * a rule about honesty, spending the one sentence that keeps another rule about honesty. The rail
+ * can withhold because the rail is on a screen the reader still has; a bitmap has no later.
+ *
+ * So every term is scoped to what it is actually true of. `simulation completed` cannot be read as
+ * *playback finished* — it names the thing that finished. `arrivals generated over the whole day`
+ * is #105's own suggestion, and it says which window the count covers, which is the sentence the
+ * rest of this footer already exists to make. Nothing is hidden, no figure moves, and the exported
+ * PNG keeps everything § 7.4 asks of it.
+ *
+ * `recording.status` is still printed verbatim rather than mapped through a word list: `timed-out`
+ * is the status that matters most and is the one a friendlier vocabulary would round off. It is
+ * also drawn a second time, larger, by `drawHeader`'s banner when it is not `completed`.
+ */
+function footerStatusLine(recording: VizRecording): string {
+  return (
+    `simulation ${recording.status} · ` +
+    `${String(recording.summary.generated)} arrivals generated over the whole day · ` +
+    windowClause(recording.summary)
   );
 }
 

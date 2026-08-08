@@ -80,6 +80,80 @@ export function fill(host: Element, ...children: readonly (Node | null | undefin
   host.replaceChildren(...children.filter((child): child is Node => child != null));
 }
 
+/**
+ * The same thing as {@link fill}, except that a child which is **already in the right place is not
+ * touched** — GitHub issue #106.
+ *
+ * ## Why the difference is a correctness one and not a saving
+ *
+ * A browser decides whether to fire `click` by remembering the element the pointer went **down**
+ * on, and it throws that memory away the moment the element is removed from the document — Blink
+ * does it in `MouseEventManager::NodeWillBeRemoved`, and the comment there says why: *"we don't
+ * dispatch click events if the mousedown node is removed before a mouseup event."* Re-inserting the
+ * same node does not bring the memory back.
+ *
+ * `replaceChildren` removes every child and re-inserts them, so it destroys that memory even when
+ * the list it is handed is identical to the one already there. That is issue #106: `mousedown` on
+ * the account screen's submit blurs the email field, the blur fires `change`, the shell redraws,
+ * and by `mouseup` the button the reader pressed is a node the browser has stopped tracking. No
+ * request, no error, no notice — and the second press works, because by then nothing has changed
+ * and nothing redraws.
+ *
+ * So this is the write a panel uses when something in the container can be **pressed**, and `fill`
+ * stays for containers of plain text. Neither is faster than the other in any way worth measuring;
+ * the difference is whether a pointer press survives the redraw it causes.
+ *
+ * Node identity is the caller's problem: reconciling against freshly built children removes and
+ * inserts exactly as `fill` would. See `dev/menuPanel.ts#retainer` for the half that keeps the
+ * nodes.
+ */
+export function reconcile(host: Element, ...children: readonly (Node | null | undefined)[]): void {
+  const wanted = children.filter((child): child is Node => child != null);
+  // Dropped first, so the second pass indexes into a list that holds nothing but survivors — and
+  // `Array.from` because `childNodes` is live and is about to be mutated under the loop.
+  for (const existing of Array.from(host.childNodes)) {
+    if (!wanted.includes(existing)) host.removeChild(existing);
+  }
+  for (const [index, node] of wanted.entries()) {
+    if (host.childNodes[index] === node) continue;
+    host.insertBefore(node, host.childNodes[index] ?? null);
+  }
+}
+
+/**
+ * The listener registry for elements that outlive a draw.
+ *
+ * Keyed on the node, so an element that is dropped takes its handlers with it.
+ */
+const HANDLERS = new WeakMap<Element, Map<string, (event: Event) => void>>();
+
+/**
+ * Attach a listener **once per node and type**, and let later draws replace what it does.
+ *
+ * A retained element is handed a new closure on every draw — a new `row.intent`, a new form patch —
+ * and calling `addEventListener` again would add a second listener rather than replace the first,
+ * so by the tenth redraw one click would dispatch ten intents. Removing the old one first would
+ * work and would need every caller to keep the exact function reference it passed, which is the
+ * kind of bookkeeping that is right nine times and wrong once.
+ *
+ * So the node gets one listener, ever, and it reads the current handler out of this map. It is the
+ * same shape `dev/menuPanel.ts` already uses for the overlay's own keydown and for the same reason:
+ * a closure captured at wiring time pins the first draw's world forever.
+ */
+export function on(node: Element, type: string, handler: (event: Event) => void): void {
+  let handlers = HANDLERS.get(node);
+  if (handlers === undefined) {
+    handlers = new Map();
+    HANDLERS.set(node, handlers);
+  }
+  const wired = handlers.has(type);
+  handlers.set(type, handler);
+  if (wired) return;
+  node.addEventListener(type, (event: Event) => {
+    HANDLERS.get(node)?.get(type)?.(event);
+  });
+}
+
 /** Set text only when it changed, so a 60 Hz redraw does not churn the accessibility tree. */
 export function setText(node: Element, text: string): void {
   if (node.textContent !== text) node.textContent = text;

@@ -22,7 +22,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import { DATA_DIR, fixtureConfig, suppressedConfig } from '../fixtures.test-helper.js';
-import { meansAreSuppressed } from '../frame/overlay.js';
+import { meansAreSuppressed, queueAt } from '../frame/overlay.js';
 import { WAIT_BANDS, moodOf, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
@@ -35,6 +35,7 @@ import type {
   WaitBands,
 } from '../live/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { buildingMood, moodObservationsOf } from '../render/mood.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
@@ -47,6 +48,7 @@ import {
   idleHonestyCard,
   idleStatRowsOf,
   mathsDisclosureOf,
+  moodDriverRowsOf,
   moodViewOf,
   runFiguresOf,
   servedCaptionFor,
@@ -717,3 +719,194 @@ function railMoodAt(recording: VizRecording, t: number): MoodView {
   const bands = waitBandsAt(recording, t, shiftIsOver(recording, t) ? 'whole-run' : 'now');
   return moodViewOf(bands, moodOf(bands));
 }
+
+/* -------------------------------------------------------------------------- *
+ * Issue #109 — the driver block at a playhead short of the end
+ * -------------------------------------------------------------------------- */
+
+describe('the mood card publishes no whole-day reading at a part-day playhead — issue #109', () => {
+  /*
+   * Modelled on `reportPanel.test.ts`'s § D223 block, deliberately and clause for clause, because
+   * it is the same defect on a different card and the Day report is the surface that already got it
+   * right: *no figure the chrome's own clock contradicts*, asserted by requiring the whole-day
+   * figure to appear in **no** string rather than by checking one field.
+   *
+   * The premise is what makes it a defect rather than a stale cache, and it is asserted below
+   * rather than assumed. `record/recordRun.ts` is *"the only place in the package that runs a
+   * simulation"* and it simulates the whole day up front; `dev/main.ts` runs one on a cold load
+   * with zero clicks. So at the first paint the recording is finished, the playhead is at
+   * `startedAt`, and four of the five drivers were already reporting the end of the day.
+   */
+  let config: LoadedConfig;
+  let recording: VizRecording;
+
+  beforeAll(async () => {
+    config = await loadConfig(DATA_DIR);
+    // `secure-tower` on purpose: it declares `accessZones`, so it is a building on which the
+    // `All N` sentence this change also removed could have been false. One run serves both.
+    recording = recordRun(
+      fixtureConfig(config, {
+        buildingId: 'secure-tower',
+        dispatcherId: 'collective',
+        durationS: 900,
+        onTimeout: 'report',
+      }),
+    ).recording;
+  }, 600_000);
+
+  /** The card's rows at `t`, through the rail's own gate rather than a recomputed one. */
+  const rowsAt = (t: number): readonly { readonly label: string; readonly text: string }[] =>
+    moodDriverRowsOf(buildingMood(moodObservationsOf(recording, queueAt(recording, t), t)));
+
+  const said = (t: number): string =>
+    rowsAt(t)
+      .map((row) => `${row.label}: ${row.text}`)
+      .join('\n');
+
+  it('the premise: the whole day is already simulated while the playhead is at the start', () => {
+    expect(recording.endedAt).toBeGreaterThan(recording.startedAt);
+    // Nothing has been played, and the run-level counts are nevertheless final.
+    expect(recording.summary.generated).toBeGreaterThan(0);
+    const atStart = buildingMood(
+      moodObservationsOf(recording, queueAt(recording, recording.startedAt), recording.startedAt),
+    );
+    const atEnd = buildingMood(
+      moodObservationsOf(recording, queueAt(recording, recording.endedAt), recording.endedAt),
+    );
+    // The four whole-run drivers say the same thing at both ends of the run. That is the defect:
+    // not a figure that drifts, a figure that was never about the playhead at all.
+    for (const id of ['overwhelmed', 'abandoned', 'stranded', 'demand']) {
+      const early = atStart.drivers.find((driver) => driver.id === id);
+      const late = atEnd.drivers.find((driver) => driver.id === id);
+      expect(early?.basis, id).toBe('whole-run');
+      expect(`${id}: ${String(early?.text)}`).toBe(`${id}: ${String(late?.text)}`);
+    }
+    expect(atStart.drivers.find((driver) => driver.id === 'standing')?.basis).toBe('now');
+  }, 600_000);
+
+  it('draws no row a whole-day reading came out of, until the playhead reaches the end', () => {
+    for (const t of [recording.startedAt, recording.endedAt / 2, recording.endedAt - 1]) {
+      const labels = rowsAt(t).map((row) => row.label);
+      expect(`${String(t)}: ${labels.join(',')}`).toBe(
+        `${String(t)}: standing right now,the whole shift`,
+      );
+    }
+  }, 600_000);
+
+  it('puts no count on the card that the chrome’s own clock contradicts', () => {
+    // The four numbers the withheld rows carry, each folded over the whole day. Not one of them
+    // may appear anywhere in the block while the day is unfinished — the shape
+    // `reportPanel.test.ts` uses on `carried`, applied to every figure this card can reach.
+    const early = said(recording.startedAt);
+    const { generated, delivered, undelivered } = recording.summary;
+    for (const figure of [
+      generated,
+      delivered,
+      undelivered,
+      recording.summary.serviceLevel.arrivalCount,
+      recording.summary.serviceLevel.overHorizonCount,
+    ]) {
+      if (figure === 0) continue;
+      expect(early, `whole-day figure ${String(figure)} is on a part-day card`).not.toMatch(
+        new RegExp(`\\b${String(figure)}\\b`),
+      );
+    }
+    // …and the assertion is not passing because the block is empty.
+    expect(rowsAt(recording.startedAt).length).toBeGreaterThan(1);
+  }, 600_000);
+
+  it('keeps the one driver that really is about the instant on screen', () => {
+    // The gate is by `basis`, never by level: a card that dropped its bad news mid-run would be
+    // the same defect with the polarity reversed.
+    const standing = buildingMood(
+      moodObservationsOf(
+        recording,
+        queueAt(recording, recording.endedAt / 2),
+        recording.endedAt / 2,
+      ),
+    ).drivers.find((driver) => driver.id === 'standing');
+    expect(said(recording.endedAt / 2)).toContain(String(standing?.text));
+  }, 600_000);
+
+  it('says what it is withholding, in words, and names every row it took away', () => {
+    // KB-15, and `mood.test.ts`'s own claim that *"a flag no renderer is obliged to read is not a
+    // retraction"*. Until this change the rail's entire retraction was an italic font style: it
+    // draws `drivers`, `caveat` and `provisional`, and never `headline`.
+    const retraction = rowsAt(recording.startedAt).at(-1);
+    expect(retraction?.label).toBe('the whole shift');
+    expect(retraction?.text).toContain('The run has not finished');
+    expect(retraction?.text).toContain('two answers to one question');
+    for (const label of ['queues', 'the unluckiest rider', 'delivered', 'demand answered']) {
+      expect(retraction?.text, `the retraction must name "${label}"`).toContain(label);
+    }
+    // It is a retraction, not a refusal to ever say: it names both ways back.
+    expect(retraction?.text).toContain('Play the shift through');
+    expect(retraction?.text).toContain('timeline');
+  }, 600_000);
+
+  it('draws the whole card, unchanged, once the playhead reaches the end', () => {
+    const done = rowsAt(recording.endedAt);
+    expect(done.map((row) => row.label)).toEqual([
+      'queues',
+      'the unluckiest rider',
+      'delivered',
+      'standing right now',
+      'demand answered',
+    ]);
+    // No retraction row, and the whole-day counts are back.
+    expect(said(recording.endedAt)).toMatch(
+      new RegExp(`\\b${String(recording.summary.generated)}\\b`),
+    );
+    expect(said(recording.endedAt)).not.toContain('The run has not finished');
+  }, 600_000);
+
+  it('answers the gate the same way through both of its doors', () => {
+    /*
+     * `drawDrivers` feeds `shiftIsOver(recording, t)`; `moodDriverRowsOf` feeds
+     * `!mood.provisional`, because the honesty sweep calls it holding a mood and no clock. The two
+     * are computed from the same pair of numbers and this is the assertion that keeps them that
+     * way — without it the corpus could enumerate a set of rows the screen never draws.
+     */
+    for (const t of [
+      recording.startedAt,
+      recording.startedAt + (recording.endedAt - recording.startedAt) * 0.25,
+      recording.endedAt / 2,
+      recording.endedAt - 1,
+      recording.endedAt,
+      recording.endedAt + 60,
+    ]) {
+      const mood = buildingMood(moodObservationsOf(recording, queueAt(recording, t), t));
+      expect(`${String(t)}: ${String(shiftIsOver(recording, t))}`).toBe(
+        `${String(t)}: ${String(!mood.provisional)}`,
+      );
+    }
+  }, 600_000);
+
+  it('never prints “All N” over a building that turns riders away at the door', () => {
+    /*
+     * Issue #105/#109's third half. `core`'s identity is
+     * `generated === delivered + undelivered + abandoned + accessRefused`, and an `accessRefused`
+     * rider is in neither bucket this card could see — so `undelivered === 0` was never the same
+     * question as *did everybody arrive*. `secure-tower` declares `accessZones`; seven of the eight
+     * shipped buildings do.
+     */
+    const { generated, delivered, undelivered } = recording.summary;
+    /*
+     * The premise, measured on this run rather than argued: four riders are in **neither** bucket.
+     * `undelivered` is 0, so the old branch fired and printed *All 196 people got where they were
+     * going* over a building that turned four of two hundred away at the door. This assertion is
+     * what makes the sentence below a fix instead of a rewording — delete the access gate and it
+     * goes red first.
+     */
+    expect(undelivered).toBe(0);
+    expect(delivered + undelivered).toBeLessThan(generated);
+
+    const stranded = buildingMood(
+      moodObservationsOf(recording, queueAt(recording, recording.endedAt), recording.endedAt),
+    ).drivers.find((driver) => driver.id === 'stranded');
+    expect(stranded?.text).not.toContain('All ');
+    expect(stranded?.text).toBe(
+      `${String(delivered)} of ${String(generated)} people got where they were going.`,
+    );
+  }, 600_000);
+});
