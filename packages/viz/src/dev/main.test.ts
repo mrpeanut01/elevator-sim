@@ -53,6 +53,8 @@ import { recordRun } from '../record/recordRun.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import type { DisclosureItem } from '../mode/types.js';
 
+import { isSeedText, SEED_MAX_DIGITS } from '../menu/menu.js';
+
 import {
   deepLinkDefaultsOf,
   deepLinkSearchOf,
@@ -648,6 +650,20 @@ describe('the deep-link reader refuses what the page cannot honour', () => {
     expect(arrived.seed).toBe(5n);
   });
 
+  it('ignores one past the bound too — the third way a seed gets in, issue #111(c)', () => {
+    // A link is the third door, after the transport field and the menu's. A rule that held on two
+    // of three is the drift the shared predicate exists to stop: an address carrying twenty-one
+    // digits would have run something no field in this product would have accepted.
+    const overlong = `?seed=${'1'.repeat(SEED_MAX_DIGITS + 1)}`;
+    expect(deepLinkStateOf(base(), resources, new URLSearchParams(overlong)).seed).toBe(5n);
+
+    const longest = '1'.repeat(SEED_MAX_DIGITS);
+    expect(
+      deepLinkStateOf(base(), resources, new URLSearchParams(`?seed=${longest}`)).seed,
+      'the bound refuses a seed that is exactly as long as the rule allows',
+    ).toBe(BigInt(longest));
+  });
+
   it('clamps the duration into the run lengths the page offers', () => {
     const short = deepLinkStateOf(base(), resources, new URLSearchParams('?duration=10'));
     const long = deepLinkStateOf(base(), resources, new URLSearchParams('?duration=999999'));
@@ -701,6 +717,53 @@ describe('the seed field — TP-08', () => {
   it('asks for a fresh draw on a blank field — the row’s own contract', () => {
     expect(seedEntryOf('')).toStrictEqual({ kind: 'draw' });
     expect(seedEntryOf('   ')).toStrictEqual({ kind: 'draw' });
+  });
+
+  it('takes the bound the menu takes, and names the count when it refuses — issue #111(c)', () => {
+    /*
+     * **The two seed fields had different contracts, the other way round from the report.**
+     *
+     * Issue #111(c) names this field as the strict one, citing a `maxlength="20"` that exists
+     * nowhere in `packages/viz` — its DevTools reading of `maxlength=-1` is an *absent* attribute.
+     * The real difference ran the other way: this took `/^\d+$/`, unbounded, while `menu/menu.ts`
+     * bounds a seed at twenty digits so it survives JSON and a database byte for byte (§ D214 § 3).
+     *
+     * This side moved because the asymmetry is not symmetric: a run started here can be posted to a
+     * board, so an over-long seed was accepted by the field, run, drawn into the footer, and then
+     * refused at post time by a rule nothing on this screen had mentioned. Both now ask
+     * `isSeedText`, which is the single predicate.
+     */
+    const longest = '1'.repeat(SEED_MAX_DIGITS);
+    expect(seedEntryOf(longest)).toStrictEqual({ kind: 'run', seed: BigInt(longest) });
+
+    const overlong = '1'.repeat(SEED_MAX_DIGITS + 1);
+    const refused = seedEntryOf(overlong);
+    expect(refused.kind).toBe('refuse');
+    // Named by count, because "that is not a whole number" is unhelpful about a string of digits —
+    // a reader has to be told what to cut, not that they were wrong.
+    if (refused.kind === 'refuse') {
+      expect(refused.message).toContain(String(overlong.length));
+      expect(refused.message).toContain(String(SEED_MAX_DIGITS));
+    }
+  });
+
+  it('is the same rule the menu applies, rather than a second one that agrees today', () => {
+    /*
+     * The guard that makes the sentence above true tomorrow. Two regexes that happen to match are
+     * exactly the shape this repository keeps finding stale, so the claim asserted is not *these
+     * two agree on some examples* but *this field consults the menu's own predicate*.
+     */
+    for (const raw of ['0', '7', '20260804', '1'.repeat(20), 'abc', '1.5', '-1', '', '1'.repeat(21)]) {
+      const entry = seedEntryOf(raw);
+      // The blank is the one honest divergence, and it is a divergence about *nothing*, not about
+      // what a seed is: this field is always showing the seed that is running, so an empty box asks
+      // for a draw. The menu's field is naming a run that does not exist yet and refuses a blank.
+      if (raw.trim() === '') {
+        expect(entry.kind).toBe('draw');
+        continue;
+      }
+      expect(entry.kind === 'run', raw).toBe(isSeedText(raw.trim()));
+    }
   });
 });
 

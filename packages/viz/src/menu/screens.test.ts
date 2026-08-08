@@ -60,7 +60,7 @@ import { HISTORY_DAYS } from '../shift/week.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 
 import { catalogueOf } from './catalogue.js';
-import { initialMenuState } from './menu.js';
+import { freePlayIssues, initialMenuState } from './menu.js';
 import {
   applyIntent,
   screenOf,
@@ -596,11 +596,43 @@ describe('the root offers a way out that is not a mode being entered', () => {
     expect(resume?.disabledWhy ?? '', 'the root’s way out refuses in silence').not.toBe('');
   });
 
+  it('points the refusal the way the rows are actually laid out — GitHub issue #97', () => {
+    /*
+     * **The word and the order disagreed, and the reporter followed the word.**
+     *
+     * The refusal said *"pick a scenario or a free-play selection **below**"* while this row is
+     * emitted **last**, so there was nothing below it — the panel appends only the how-to-play
+     * disclosure after the rows. The two rows the sentence names are the *first two* on the list.
+     * `resumeRow`'s own docstring said *"It is first"* over code that has only ever put it last,
+     * which is how the sentence survived: the comment agreed with it and the screen did not.
+     *
+     * **Derived rather than pinned to a word.** The expected direction comes from the row order, so
+     * moving the row demands the other word rather than quietly leaving this green — which is the
+     * failure mode the original sentence is an instance of.
+     */
+    const rows = rootRunning(false);
+    const at = (id: string): number => rows.findIndex((row) => row.id === id);
+    const resumeAt = at('main.resume');
+    const named = [at('main.campaign'), at('main.free-play')];
+
+    expect(resumeAt, 'the root has no Resume row').toBeGreaterThanOrEqual(0);
+    expect(named.every((index) => index >= 0), 'the refusal names a row the root does not have').toBe(
+      true,
+    );
+
+    const above = named.every((index) => index < resumeAt);
+    const refusal = rows[resumeAt]?.disabledWhy ?? '';
+    expect(refusal, `the rows it names sit ${above ? 'above' : 'below'} it`).toContain(
+      above ? 'above' : 'below',
+    );
+    expect(refusal, 'the refusal points both ways at once').not.toContain(above ? 'below' : 'above');
+  });
+
   it('is the only row on the root that leaves without choosing anything', () => {
     /*
      * The non-vacuity guard. Every other root row is a `navigate`, and the three commits that close
-     * the overlay — Start, Open the doors, Keep going — are each a mode being entered on a screen
-     * further in. A second `close` up here would be two answers to *what does leaving mean*.
+     * the overlay — Start, Pick a scenario, Keep going — each commit the player to something on a
+     * screen further in. A second `close` up here would be two answers to *what does leaving mean*.
      */
     const closers = rootRunning(true).filter((row) => row.intent.kind === 'close');
     expect(closers.map((row) => row.id)).toEqual(['main.resume']);
@@ -613,7 +645,58 @@ describe('the root offers a way out that is not a mode being entered', () => {
      * `reopen`'s answer (the root) and not this one's to give a second time.
      */
     const before = stateAt('settings');
-    expect(applyIntent(before, { kind: 'close' })).toBe(before);
+    expect(applyIntent(before, { kind: 'close' }, CATALOGUE)).toBe(before);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A row says what its intent does — GitHub issue #97
+ * -------------------------------------------------------------------------- */
+
+describe('the scenarios screen describes the thing its rows actually do', () => {
+  it('does not promise a week that `open-campaign` never starts', () => {
+    /*
+     * The row read *"Open the doors — Take the current scenario and start the week"*. Nothing
+     * starts a week on that path: `applyIntent` returns the state unchanged (asserted below), and
+     * `dev/main.ts`'s arm sets `tab: 'scenarios'` and closes the overlay. There is no *current
+     * scenario* in `ViewerState` for it to take either — a scenario becomes current by being
+     * pressed on the Scenarios surface, where `scenariosPanel.ts#take` restarts the week.
+     *
+     * The copy moved rather than the behaviour, and the choice was forced: a row that started a
+     * week would have to decide **which** scenario from a screen offering no scenario control, so
+     * it would either invent a default (a sixth hard-coded list, § D213) or start whichever week
+     * the shell was sitting on — which is the *"dropped the player on whatever tab the shell
+     * happened to be on"* defect `docs/16` § 5 clause 6 already fixed on this very row.
+     *
+     * Two tiers, said apart. The first assertion is a **fact about the reducer**; the rest are
+     * about the **words**, and words are the weaker half — the shell's arm is `dev/main.ts`'s and
+     * this file cannot reach it.
+     */
+    const before = stateAt('campaign');
+    expect(
+      applyIntent(before, { kind: 'open-campaign' }, CATALOGUE),
+      'the menu layer now starts something on this intent, so the copy below may be too modest',
+    ).toBe(before);
+
+    const row = rowsOn('campaign').find((entry) => entry.intent.kind === 'open-campaign');
+    expect(row, 'the scenarios screen no longer carries an open-campaign row').toBeDefined();
+    const copy = `${row?.label ?? ''} — ${row?.detail ?? ''}`;
+    for (const promise of ['start the week', 'starts the week', 'Take the current scenario']) {
+      expect(copy, `the row promises "${promise}" and its intent does not deliver one`).not.toContain(
+        promise,
+      );
+    }
+    // …and it says where it does go, which is the half that stops the fix being a deletion.
+    expect(copy, 'the row no longer names the surface it opens').toContain('Scenarios');
+  });
+
+  it('leaves the row that does start something saying so', () => {
+    // The control case. `start-endless` really does begin a week, so the vocabulary above is not
+    // banned from the screen — it is banned from the row whose intent cannot honour it.
+    const endless = rowsOn('campaign').find((entry) => entry.intent.kind === 'start-endless');
+    expect(endless, 'the scenarios screen no longer offers Keep going').toBeDefined();
+    expect(endless?.kind).toBe('commit');
+    expect(`${endless?.label ?? ''} ${endless?.detail ?? ''}`).toContain('week');
   });
 });
 
@@ -686,12 +769,78 @@ describe('the account screen asks one thing at a time', () => {
 
 describe('the two halves of the menu still meet', () => {
   it('applies a rewritten free-play choice to the state the screen then draws', () => {
-    // The pair the transport was already right about, kept as the control case: if this ever fails
-    // alongside the four above, the fault is in `applyIntent` rather than in the rewrite.
-    const row = rowsOn('free-play').find((entry) => entry.id === 'free-play.duration');
+    /*
+     * The pair the transport was already right about, kept as the control case: if this ever fails
+     * alongside the four above, the fault is in `applyIntent` rather than in the rewrite.
+     *
+     * **It named `free-play.duration`, which § D286 deleted**, so every lookup below returned
+     * `undefined` and the case asserted `undefined === undefined` — green, and about nothing. Found
+     * while threading the catalogue through `applyIntent` for issue #111(b), which is the second
+     * time an id in this directory outlived the row it named. The row is now one that exists, and
+     * the two `toBeDefined` guards are what stop it going quiet again rather than red.
+     */
+    const row = rowsOn('free-play').find((entry) => entry.id === 'free-play.building');
+    expect(row, 'the free-play screen no longer has a building row under that id').toBeDefined();
     const wanted = (row?.options ?? []).find((option) => option.id !== row?.value);
-    const next = applyIntent(stateAt('free-play'), withChosenValue(row?.intent ?? { kind: 'back' }, wanted?.id ?? ''));
-    const after = screenOf({ ...ARM, state: next }).rows.find((entry) => entry.id === 'free-play.duration');
+    expect(wanted, 'only one building ships, so choosing a different one asserts nothing').toBeDefined();
+
+    const next = applyIntent(
+      stateAt('free-play'),
+      withChosenValue(row?.intent ?? { kind: 'back' }, wanted?.id ?? ''),
+      CATALOGUE,
+    );
+    const after = screenOf({ ...ARM, state: next }).rows.find(
+      (entry) => entry.id === 'free-play.building',
+    );
     expect(after?.value).toBe(wanted?.id);
+  });
+
+  it('re-derives the part of the day when the template moves — GitHub issue #111(b)', () => {
+    /*
+     * **Not a lag. A value the new select cannot represent, and cannot get out of.**
+     *
+     * `freePlayPatch` wrote `demandTemplateId` and left `windowStartS`/`durationS` alone. The *Part
+     * of the day* row is then rebuilt from `partsFor(catalogue, theNewTemplate)` while its value is
+     * still `partIdOf(...)` of the **old** template's part — so no option matched, the browser fell
+     * back to its first, and the box and the model disagreed permanently. Permanently, because a
+     * native `<select>` fires no `change` for the option it is already showing: the issue's own
+     * stated recovery ("re-pick the identical option") is not a recovery a browser offers, and this
+     * case deliberately does not use it.
+     *
+     * Measured on the shipped catalogue rather than a fixture, because the defect was a
+     * disagreement between two shipped templates' part lists and a fixture can be authored not to
+     * have one: `rise-and-fall` offers exactly `null:1800`, and `office-day` offers none of it.
+     */
+    const opening = stateAt('free-play');
+    const template = rowsOn('free-play').find((entry) => entry.id === 'free-play.template');
+    const day = (template?.options ?? []).find((option) => option.id === 'office-day');
+    expect(day, 'office-day no longer ships, so this case has nothing to move to').toBeDefined();
+
+    const before = rowsOn('free-play').find((entry) => entry.id === 'free-play.part');
+    expect(
+      (before?.options ?? []).some((option) => option.id === before?.value),
+      'the opening state is already broken, so this case cannot show the fix',
+    ).toBe(true);
+
+    const next = applyIntent(
+      opening,
+      withChosenValue(template?.intent ?? { kind: 'back' }, 'office-day'),
+      CATALOGUE,
+    );
+    const after = screenOf({ ...ARM, state: next }).rows.find(
+      (entry) => entry.id === 'free-play.part',
+    );
+
+    // The invariant, stated over the row rather than over the two fields: whatever the reducer
+    // picked, the select can show it.
+    expect(
+      (after?.options ?? []).map((option) => option.id),
+      'the part select no longer offers the value it is drawn with, so the box shows one part and ' +
+        'the model holds another',
+    ).toContain(after?.value);
+    // …and the selection it landed on is startable, which is the half a player feels.
+    expect(freePlayIssues(next.freePlay, CATALOGUE)).toEqual([]);
+    // …and it really did move, so this is a re-derivation rather than a value that happened to fit.
+    expect(after?.value).not.toBe(before?.value);
   });
 });

@@ -96,7 +96,7 @@ async function openPausedRun(): Promise<Page> {
     timeout: 30_000,
   });
   await page.locator('.menu-overlay button', { hasText: 'Scenarios' }).first().click();
-  await page.locator('.menu-overlay button', { hasText: 'Open the doors' }).first().click();
+  await page.locator('.menu-overlay button', { hasText: 'Pick a scenario' }).first().click();
   await page.locator('#tab-run').first().click();
   await page.locator('#run').first().click();
   await page.waitForTimeout(1_200);
