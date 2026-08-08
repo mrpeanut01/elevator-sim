@@ -21213,3 +21213,57 @@ Whether the two products share one build, one URL and one toggle, or diverge fur
 settled by this and should not be assumed from it. The toggle is the shipped mechanism and stays
 until something measured argues otherwise.
 
+
+## D300 — the remaining escalations, decided: seeded boards are real runs, and the honesty sweep grows an axis
+
+**Date: 2026-08-08.** Three smaller decisions taken with [§ D299](#d299), recorded so the reasoning
+does not have to be reconstructed from a batch plan.
+
+### E-1 — intraday intervention stays deferred, and the reason changed
+
+[§ #116](https://github.com/mrpeanut01/elevator-sim/issues/116) § 2 proposes making a run
+`(seed, config, [{atS, change}, …])` and re-simulating from `t = 0` on each intervention. It is
+argued from a real measurement — 181 ms, 828 ms and 1 521 ms per full simulation — and the
+affordability claim survives.
+
+**What does not survive is its premise.** #116 states *"There is no economy … a shaft **is** free,
+and instant."* `Commission the building` is a capital-budget mechanic with a fixed capital-unit
+ceiling, locked in before the week starts, and it writes per-bank machine class **and** rated speed
+live with no save. #116 missed that screen **twice** — once here, and once when claiming speed is
+only editable behind *Save as a new building*.
+
+So the agency gap is narrower than argued: there is a pre-run agency layer, and it is not surfaced.
+**Ship the honesty note (#104) and surface commissioning first**, and re-ask the intervention
+question against a product where the existing agency is visible. Deferred, not refused; the
+measurement stands and is worth keeping.
+
+### E-3 — the boards are seeded, and the rows are genuine
+
+A board with nothing on it reads as a product with no players, next to a sign-in prompt. It is
+seeded — **and this is not fabrication, which is why it is allowed.** Every posted score is
+re-simulated by the server before it is accepted (a forged submission returns
+`422 metrics-do-not-reproduce`), so a reference row posted through the ordinary path is verified by
+exactly the mechanism a player's row is. Publishing the shipped baseline dispatchers' own figures is
+what `benchmark/published.ts` already does elsewhere in this project.
+
+Two constraints: the rows are labelled **reference**, never as players, so nobody is invented; and
+they are posted **through the normal path**, never written into the store directly, so the claim
+*"every score on this board was re-simulated"* stays true without an exception clause.
+
+### E-4 — the gap is named *and* the sweep grows the axis that would have caught it
+
+Phase 9's honesty property held under search — 60 cases, 271 985 strings, 0 violations. It samples
+playheads at `[0, .25, .5, .75, 1]`, and **`0` is `startedAt`**, so *"All 34 people got where they
+were going"* was in the corpus at the cold-load instant **and passing**. The property never asked
+whether a surface may publish a whole-run figure at a playhead short of `endedAt`.
+
+Both halves are done rather than one: the gap is named against Phase 9's *accepted with named gaps*
+verdict per [§ D163](#d163)'s rule that the status row and the verdict land together, **and** the
+sweep grows a temporal axis so the property covers what it was assumed to cover. Naming alone would
+leave an uncovered property that happens to pass, which is the shape this repository's standing
+requirement is written about.
+
+**This may surface further violations, and that is the point of doing it.** Any it finds are
+reported rather than quietly fixed, because a corpus that grows an axis and stays green is a
+different claim from one that grew an axis and had to be fixed first.
+
