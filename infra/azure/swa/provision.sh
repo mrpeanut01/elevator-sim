@@ -250,17 +250,54 @@ echo "ok: the API permits $SITE_ORIGIN and mails sign-in links there"
 #      here, as a deployment branch policy — set rather than documented, because a restriction in a
 #      runbook is a restriction until the first person who has not read it.
 # ---------------------------------------------------------------------------
-say "GitHub environments"
+# ---------------------------------------------------------------------------
+# Orphaned federated credentials.
+#
+# ARM's incremental mode does not delete what a template stops declaring, and a credential is
+# addressed by NAME. So renaming one — which is exactly what moving the subject from a ref to an
+# environment did (§ D308) — leaves the old one in place, trusted, and matching a subject GitHub no
+# longer sends. That is dead configuration on the security boundary, which is the one place this
+# repository's most-repeated defect is not merely untidy.
+#
+# Scoped to this identity, which exists for this workflow and nothing else, so "not declared by the
+# template" and "should not exist" are the same statement here. What is removed is printed.
+# ---------------------------------------------------------------------------
+say "Federated credentials"
 
 PRODUCTION_ENVIRONMENT=$(out productionEnvironmentName)
 PREVIEW_ENVIRONMENT=$(out previewEnvironmentName)
 PRODUCTION_BRANCH=$(out productionBranchName)
+IDENTITY_NAME=$(out deployIdentityName)
 
-# All three come back from the deployment rather than from a default here, and that is the point:
-# the environment names are half of a federated credential's subject, so a copy of them in this
-# script is a second place for them to be wrong. One parameter file, one template, one value.
-[ -n "$PRODUCTION_ENVIRONMENT" ] && [ -n "$PREVIEW_ENVIRONMENT" ] && [ -n "$PRODUCTION_BRANCH" ] \
-  || fail "the deployment did not return the environment names — is the template up to date?"
+# All four come back from the deployment rather than from defaults here, and that is the point: two
+# of them are literally half of a federated credential's subject, so a copy in this script is a
+# second place for them to be wrong — and the failure that produces is an AADSTS700213 naming the
+# string but not which of the two places authored it.
+[ -n "$PRODUCTION_ENVIRONMENT" ] && [ -n "$PREVIEW_ENVIRONMENT" ] &&
+  [ -n "$PRODUCTION_BRANCH" ] && [ -n "$IDENTITY_NAME" ] ||
+  fail "the deployment did not return the environment names — is the template up to date?"
+
+WANTED=$(printf 'repo:%s:environment:%s\nrepo:%s:environment:%s\n' \
+  "$REPO_ACTUAL" "$PRODUCTION_ENVIRONMENT" "$REPO_ACTUAL" "$PREVIEW_ENVIRONMENT" | sort)
+
+while IFS=$'\t' read -r fic_name fic_subject; do
+  [ -n "$fic_name" ] || continue
+  printf '%s\n' "$WANTED" | grep -Fqx "$fic_subject" && continue
+  echo "removing orphan: $fic_name ($fic_subject)"
+  az identity federated-credential delete \
+    --identity-name "$IDENTITY_NAME" -g "$RESOURCE_GROUP" --name "$fic_name" --yes --output none
+done < <(az identity federated-credential list --identity-name "$IDENTITY_NAME" \
+           -g "$RESOURCE_GROUP" --query "[].[name,subject]" -o tsv)
+
+ACTUAL=$(az identity federated-credential list --identity-name "$IDENTITY_NAME" \
+  -g "$RESOURCE_GROUP" --query "[].subject" -o tsv | sort)
+[ "$ACTUAL" = "$WANTED" ] || fail "$(printf '%s\n' \
+  "the identity's federated credentials are not the two this template declares." \
+  "  wanted: $(echo "$WANTED" | tr '\n' ' ')" \
+  "  actual: $(echo "$ACTUAL" | tr '\n' ' ')")"
+echo "ok: exactly 2 credentials, both environment-scoped"
+
+say "GitHub environments"
 
 # Preview takes any branch: a pull request's head is by definition not the production branch.
 gh api -X PUT "repos/$REPO_ACTUAL/environments/$PREVIEW_ENVIRONMENT" --silent

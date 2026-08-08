@@ -321,6 +321,9 @@ output defaultHostname string = 'https://${site.properties.defaultHostname}'
   that now enforces it.
 */
 
+@description('The identity whose federated credentials `provision.sh` prunes. ARM does not delete what a template stops declaring, and a credential is addressed by name — so a renamed subject leaves the old one trusted.')
+output deployIdentityName string = deployIdentity.name
+
 @description('The environment the production deploy job runs in. Half of the production federated credential subject; `provision.sh` creates it and pins its branch policy.')
 output productionEnvironmentName string = productionEnvironment
 
