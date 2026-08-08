@@ -107,6 +107,16 @@ if [ "$REPO_IN_PARAMS" != "$REPO_ACTUAL" ]; then
     "  this checkout is : $REPO_ACTUAL")"
 fi
 
+# The literal prefix GitHub puts in the token's `sub` claim. Read rather than constructed, because
+# it is NOT `repo:OWNER/REPO` — GitHub issues an immutable subject carrying the numeric account and
+# repository ids (`repo:owner@123/repo@456`), so that renaming a repository cannot hand a trust
+# relationship to whoever claims the old name. Nothing you would copy from a tutorial contains those
+# ids, and a credential built the documented way is refused with AADSTS700213 — which reads as a
+# propagation delay and is not one. Falls back to the documented form if the endpoint says nothing.
+SUBJECT_PREFIX=$(gh api "repos/$REPO_ACTUAL/actions/oidc/customization/sub" \
+  --jq '.sub_claim_prefix // empty' 2>/dev/null || true)
+[ -n "$SUBJECT_PREFIX" ] || SUBJECT_PREFIX="repo:$REPO_ACTUAL"
+
 SUBSCRIPTION=$(az account show --query name -o tsv)
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
@@ -115,6 +125,7 @@ cat <<SUMMARY
   Subscription   : $SUBSCRIPTION ($SUBSCRIPTION_ID)
   Resource group : $RESOURCE_GROUP  (region $LOCATION)
   Repository     : $REPO_ACTUAL
+  Token subject  : $SUBJECT_PREFIX:environment:… (read from GitHub, not constructed — see § D308)
   Template       : $TEMPLATE
 
   Creates: a Static Web App on the FREE plan (\$0), a user-assigned managed identity,
@@ -140,7 +151,8 @@ az deployment group what-if \
   --resource-group "$RESOURCE_GROUP" \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$TEMPLATE" \
-  --parameters "@$PARAMETERS" || fail "what-if failed — nothing has been created"
+  --parameters "@$PARAMETERS" \
+  --parameters githubSubjectPrefix="$SUBJECT_PREFIX" || fail "what-if failed — nothing has been created"
 
 if [ "$ASSUME_YES" != true ]; then
   read -r -p "Apply the above? [y/N] " reply
@@ -153,6 +165,7 @@ az deployment group create \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$TEMPLATE" \
   --parameters "@$PARAMETERS" \
+  --parameters githubSubjectPrefix="$SUBJECT_PREFIX" \
   --output none
 echo "ok"
 
@@ -277,8 +290,8 @@ IDENTITY_NAME=$(out deployIdentityName)
   [ -n "$PRODUCTION_BRANCH" ] && [ -n "$IDENTITY_NAME" ] ||
   fail "the deployment did not return the environment names — is the template up to date?"
 
-WANTED=$(printf 'repo:%s:environment:%s\nrepo:%s:environment:%s\n' \
-  "$REPO_ACTUAL" "$PRODUCTION_ENVIRONMENT" "$REPO_ACTUAL" "$PREVIEW_ENVIRONMENT" | sort)
+WANTED=$(printf '%s:environment:%s\n%s:environment:%s\n' \
+  "$SUBJECT_PREFIX" "$PRODUCTION_ENVIRONMENT" "$SUBJECT_PREFIX" "$PREVIEW_ENVIRONMENT" | sort)
 
 while IFS=$'\t' read -r fic_name fic_subject; do
   [ -n "$fic_name" ] || continue

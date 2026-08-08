@@ -87,6 +87,22 @@ boundary, so it has no default.
 param githubRepository string
 
 @description('''
+The literal prefix GitHub puts in the `sub` claim, read from
+`GET /repos/OWNER/REPO/actions/oidc/customization/sub` and passed in by `provision.sh`.
+
+Empty falls back to `repo:OWNER/REPO`, which is the form every tutorial shows and which was wrong
+here. GitHub now issues an **immutable** subject: `repo:owner@OWNERID/repo@REPOID`, with the numeric
+account and repository ids embedded, so that renaming a repository cannot silently transfer a trust
+relationship to whoever claims the old name. That is a better property and it is invisible until a
+token is refused — the ids are not in any documentation you would copy from, and the failure looks
+exactly like a typo in the repository name.
+
+Read rather than pasted, for the same reason the API's origin is (§ 3.2): a value typed twice is a
+value wrong once, and this one is wrong in a way that reads as propagation delay.
+''')
+param githubSubjectPrefix string = ''
+
+@description('''
 Branch whose pushes deploy to production. Pull requests get preview environments regardless.
 
 This is **not** part of any federated credential's subject, and it used to be. See the credentials
@@ -153,6 +169,9 @@ resource site 'Microsoft.Web/staticSites@2024-04-01' = {
 // The deploying identity
 // ---------------------------------------------------------------------------
 
+// The prefix GitHub actually issues, or the form every tutorial shows if nobody read it back.
+var subjectPrefix = empty(githubSubjectPrefix) ? 'repo:${githubRepository}' : githubSubjectPrefix
+
 resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: deployIdentityName
   location: location
@@ -201,7 +220,7 @@ resource pushCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federa
     // The exact subject GitHub puts in the token for a job running in this environment. A token
     // from another repository, or from a job in no environment at all, does not match and is
     // refused at token exchange — before any Azure permission is consulted.
-    subject: 'repo:${githubRepository}:environment:${productionEnvironment}'
+    subject: '${subjectPrefix}:environment:${productionEnvironment}'
     audiences: ['api://AzureADTokenExchange']
   }
 }
@@ -230,7 +249,7 @@ resource pullRequestCredential 'Microsoft.ManagedIdentity/userAssignedIdentities
     // not distinguish a fork's pull request from a branch's, and the environment form does not
     // change that — what does is the repository's fork-pull-request approval setting, plus the
     // `if:` in deploy-viz.yml that excludes a head repository other than this one.
-    subject: 'repo:${githubRepository}:environment:${previewEnvironment}'
+    subject: '${subjectPrefix}:environment:${previewEnvironment}'
     audiences: ['api://AzureADTokenExchange']
   }
 }
