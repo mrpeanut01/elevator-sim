@@ -21098,3 +21098,53 @@ has a gap, so a **synthetic** building holds the docstring to it. `index` still 
 did; the **id** is what is held exact, because the id is what `servesFloors`, `accessZones` and
 `transportModes.connects` name a floor by.
 
+
+## D298 — the setup fields validate the keystroke they are on, and one stated caret mechanism is withdrawn
+
+Four defects and a correction, and **the correction is the part to read**.
+
+`change` on a text input fires on **blur**, so the menu's state lagged its own fields and `canStart`
+was computed from the lag. A player who typed `abc` kept a live Start; one who then typed a valid
+`777` kept a dead one, under a message describing a value no longer on screen. `textRow` now
+commits on `input` as well.
+
+**That is only safe because [§ D295](#d295)'s retention landed first**, and it was established by
+*forcing* the retainer to rebuild a fresh element every draw and watching two browser cases go red —
+not by argument. Before retention, an `input` listener would have fired a full `replaceChildren` per
+keystroke, which is the failure mode issue #106's reporter believed already existed.
+
+### The mechanism that was invented, and is now withdrawn
+
+`textRow` guards its write with `if (input.value !== spec.value)`, and four sites said the guard
+existed because **assigning `value` moves the text-entry cursor to the end even when the string is
+unchanged**. That is false. **Measured in Chromium**: an `<input>` holding `202604` with the caret
+at 4, re-assigned the identical `'202604'`, keeps the caret at **4**; assigned a different
+`'999999'`, it moves to **6**. HTML's value setter moves the cursor only when the value *differs*.
+
+Deleting the comparison is **observationally inert on every path this menu has**, because a commit
+is synchronous and neither reducer rewrites its own input. The guard is kept — it protects the day a
+reducer normalises a value — but its reason is now the measured one, and the four sites restating
+the invented one are corrected. This repository's rule is that a stated mechanism is either measured
+or called unmeasured; **this one was asserted in a docstring, repeated into a task brief, and
+repeated again in a status report before anybody ran it.**
+
+### The other three
+
+`applyIntent` takes the catalogue — **required, not optional** — so a template change re-derives its
+part instead of stranding the select on a value it cannot represent. The old behaviour was not a lag
+but a permanent disagreement: the box showed *Morning rush* while the model held a part the new
+template does not offer, and the refusal named four options of which the first was already selected.
+The stale-part refusal narrows to **restored** selections, and is asserted from both sides — a
+refusal nothing reaches is dead, and a refusal a live control reaches is the bug.
+
+`isSeedText` is now the single seed rule for the menu, the transport field and the deep link, **at
+the menu's bound**. The loose side was the one that needed to move, not the strict one: the
+transport's `/^\d+$/` was unbounded, and a run started there can be posted to a board, so an
+over-long seed was accepted, run, drawn, and then refused at post time by a rule that screen never
+mentioned. No `maxlength` — it truncates a paste in silence, which is the coercion § D198 removed.
+
+And `boot()` redraws the menu after its own `runShift()`. The overlay was painted before the first
+shift existed and repainted by nothing, so **Resume refused a shift that was on the board behind
+it** — which is what issue #97 saw and reported as a missing scenario list. The list was never
+missing.
+
