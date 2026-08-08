@@ -164,6 +164,20 @@ resource pushCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federa
 resource pullRequestCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: deployIdentity
   name: 'github-pull-request'
+  // Serialised against the credential above, and this is a correctness requirement rather than a
+  // preference. `parent` makes both depend on the identity and neither on each other, so ARM writes
+  // them concurrently — and the resource provider refuses that outright:
+  //
+  //   ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity
+  //   "Concurrent Federated Identity Credentials writes under the same managed identity are not
+  //    supported."
+  //
+  // That is not a race that sometimes loses. It failed on the first real run of this template
+  // (docs/16 § 9 listed "no Azure resource has been created" as the most likely first failure, and
+  // this was it), and it failed at `what-if`-approved deploy time with six resources to create and
+  // zero created. `dependsOn` is the documented remedy; there is no batching or retry option on the
+  // credential resource itself.
+  dependsOn: [pushCredential]
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
     // Covers every pull request against this repository, which is what a preview environment per PR
