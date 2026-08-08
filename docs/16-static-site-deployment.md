@@ -425,25 +425,23 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
 | Both templates **deploy**, not merely compile | `provision.sh` creates all six resources; the app template re-deploys with `viewerOrigin` set |
 | The concurrency limit on federated credentials | Found by failing: `ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity`, deterministic, zero of six resources created. Fixed with `dependsOn` |
 | **The credential subject is the environment, not the ref** | Found by failing: `AADSTS700213 … 'repo:…:environment:viz-production'`. Both subjects were wrong; a push to `main` would have failed identically |
+| **And the subject is immutable** | The same error survived that correction. GitHub issues `repo:owner@ID/repo@ID:environment:NAME`; `provision.sh` now reads the prefix from the API rather than constructing it. Diagnosed as propagation delay first, which it was not |
 | The branch pin, in its new home | `viz-production`'s deployment branch policy names exactly `main`; the script reads it back and refuses to arm otherwise |
 | The API boots with the two origins agreeing | `main.ts` refuses to start when they disagree, so `GET /api/wake` → **200 in 0.12 s** is the assertion |
 | `provision.sh`'s refusal path | Reached for real: it refused to arm while `ELEVATOR_SIM_ALLOW_ORIGIN` was empty, and armed once it was not. The `az containerapp show --query` expression § 9 called *"the line most likely to be wrong"* is right |
 | The armed build's assertion, on the runner | `build site` passed with `ELEVATOR_SIM_API_ORIGIN` set: the tag matches and the CSP permits it |
+| **The whole authentication chain, end to end** | Run `31284407311`: OIDC token exchanged, `az staticwebapp secrets list` read the deployment token with `listSecrets` alone, and the artifact uploaded to a preview environment. This is what § 9 previously called *"the most likely first failure"*, and it took three corrections to reach |
 
 ### Not verified — reasoned about only
 
 1. **No page has ever been served cross-origin.** The CORS round trip — preflight, the
    `Authorization` header, a real sign-in — has not run against two real origins. Every part of it
    is unit-tested and none of it has met a browser.
-2. **`listSecrets` has still not been exercised.** Whether that action alone suffices for
-   `az staticwebapp secrets list` is still read from the ARM action list rather than measured,
-   because the token exchange in front of it failed first and the fixed workflow has not yet run a
-   deploy. It is now the most likely *next* failure.
-3. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
+2. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
    the behaviour has not been observed.
-4. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument
+3. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument
    against Standard and says so there too.
-5. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
+4. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
    mail's link is built from, so it makes that unverified path *more* load-bearing rather than less.
 
 ---

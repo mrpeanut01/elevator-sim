@@ -21695,3 +21695,42 @@ workflow is the thing that presents a subject, so agreement between them was ass
 and both environment names to appear in the workflow. It is **a proxy and is documented as one**: it
 counts rather than parses, and it would miss two logins inside one job. It would have caught this,
 which is the bar — the alternative was a YAML parse depending on a library the script does not have.
+
+### D308 addendum 2 — the subject was immutable, and "propagation delay" was the wrong diagnosis for twenty minutes
+
+Correcting the subject from a ref to an environment did not fix the token exchange. It kept failing:
+
+```
+AADSTS700213: No matching federated identity record found for presented assertion subject
+'repo:mrpeanut01@31497414/elevator-sim@1312422339:environment:viz-preview'
+```
+
+against a credential whose subject was `repo:mrpeanut01/elevator-sim:environment:viz-preview`. Issuer
+matched, audience matched, client id matched the identity holding the credential. **The working
+hypothesis was Entra propagation delay, and it was wrong** — it was believed for twenty minutes and
+three retries, because it is the explanation the internet offers for this error code and because the
+two strings look like the same string with the error message decorating it.
+
+They are not the same string. GitHub now issues an **immutable subject claim**, and
+`GET /repos/OWNER/REPO/actions/oidc/customization/sub` says so outright:
+
+```json
+{"use_default":true,"use_immutable_subject":false,"sub_claim_prefix":"repo:mrpeanut01@31497414/elevator-sim@1312422339"}
+```
+
+The numeric account and repository ids are **in the claim**, so that renaming a repository cannot
+hand a live trust relationship to whoever registers the old name next. That is a better property
+than the documented `repo:OWNER/REPO` form. It is also invisible in exactly the way that costs time:
+the ids appear in no documentation anyone would copy from, and the error prints the enriched subject
+in a position where it reads as Entra annotating its own message rather than as the literal claim.
+
+So `provision.sh` **reads the prefix** and passes it to the template as `githubSubjectPrefix`,
+falling back to the documented form when the endpoint offers none. Same discipline as the API's
+origin, same reason: a value typed twice is a value wrong once, and this one is wrong in a way that
+imitates a transient.
+
+**The lesson is about the diagnosis rather than the defect.** An error naming two strings that look
+identical should be read as *the strings are not identical* before it is read as *the system is
+eventually consistent*. Three of this lane's four failures were found by running it and none by
+reading it, and this one was additionally delayed by an explanation that fit the symptom and not the
+evidence.
