@@ -21517,3 +21517,62 @@ that owns `dev/main.ts`.
 **Still open from #119**, both blocked on `dev/main.ts`: the tab steal (a finishing run force-
 switches the centre column mid-batch), and the **dispatcher** half of the inheritance.
 
+
+## D307 — the stage banner counts the people in the building, not the ones the run ended with
+
+**Date: 2026-08-08.** Found by the new temporal property R6 ([§ D300](#d300)'s E-4) **on its first
+run**, and recorded rather than fixed in the lane that found it — so that a corpus which grew an
+axis and stayed green stayed distinguishable from one that had to be repaired first.
+
+`render/canvas.ts`'s banner led with `` `${status} — ${summary.undelivered} undelivered` `` on
+**every painted frame**. `summary.undelivered` is *how many people were still in the building when
+the run ended*, and `recordRun` simulates the whole day before the first paint, so the clause was
+never about the playhead. On `honesty-9100032` it read **127 at 00:00**, when nobody was undelivered
+yet, and **127 at 704 s, when the live figure was 376** — not merely early, but **smaller than the
+truth on the same image by a factor of three**, in the clause `UX.md`'s RV-16 makes lead the banner.
+
+### Closed with a live figure, and with neither precedent
+
+Both were weighed on paper before either was written:
+
+- **[§ D293](#d293)'s gate** is right for a card the reader can come back to. Here it would take
+  RV-16's lead off the bitmap for the whole of the run it is about — **the exact trade
+  [§ D294](#d294) refused on this same canvas**, because a bitmap has no later.
+- **§ D294's scoping** (*"127 undelivered when the run ended"*) is honest, and still not enough
+  while the reader is watching 376 people stack up beside it. **Scoping rescues a figure with no
+  live counterpart. This one has one.**
+
+So `undeliveredAt` publishes `arrived − carried` at the playhead, and the run's own figure once the
+playhead reaches `endedAt` — **worded differently, because they are different quantities.** The live
+count is not a synonym for *undelivered* and is not worded as one: it includes riders who took the
+stairs and riders the door turned away ([§ D265](#d265), [§ D266](#d266)).
+
+**And it is exactly the quantity R6 reads back**, so the product and the oracle cannot hold two
+definitions of it — which makes a coincidental match provably impossible rather than merely
+unlikely. `recording.status` is still drawn verbatim at every playhead: § D294's ruling on this same
+header, left standing.
+
+### The same defect was on the text alternative, twice
+
+`render/describeFrame.ts` joined **every** `MoodDriver` where § D293 gated the rail — 196
+violations across 49 of 49 always-on cases — and separately printed the banner's whole-run count
+through a branch needing none of the adapter's optional input, **reachable from `dev/main.ts` today
+at both call sites**. Both fixed, with `mood.retraction` taking the withheld rows' place exactly as
+on the rail.
+
+### Neither corpus moved, and that is measured rather than assumed
+
+**246 875 always-on and 312 104 deep, both unchanged.** § D293's rail lost 588 strings because it
+withheld *rows*; a gate inside one joined paragraph and one joined banner line changes what a string
+*says* and not how many there are. **A published figure asserted to have stayed still is the same
+discipline as one recorded moving.**
+
+Always-on is back to **0 violations**. The deep tier's single remaining failure —
+`honesty-9100031`, `suppressed-mean`, 10 violations — is unchanged in case, property and count, and
+is a cue-rule coincidence rather than a product defect: the caveat says *"a quotable average on 6 of
+20 consecutive seeds"* and the run's refused `meanWaitS` also rounds to 20.
+
+`render/canvas.ts#playheadHasReachedEnd` is a **second copy** of `dev/leftRail.ts#shiftIsOver`,
+because `render/` may not import `dev/`. `leftRail.test.ts` pins the two equal at five playheads of
+a real recording, in the file whose dependency direction allows it.
+
