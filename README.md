@@ -296,7 +296,13 @@ The server needs PostgreSQL (`ELEVATOR_SIM_DB`), a 32-character signing secret
 and, in production only, a real mailer. [`infra/README.md`](infra/README.md) is the Azure runbook:
 Container App, PostgreSQL flexible server, and Communication Services for confirmation mail, with
 the cost model derived from the template's own parameters rather than asserted beside it. Its § 0
-says plainly which claims were verified by running them and which have never been deployed.
+says plainly which claims were verified by running them and which are still only reasoned about.
+
+**The viewer is served from a CDN and the API from the container**, which removes a 32.2 s cold
+first page load — [`docs/16-static-site-deployment.md`](docs/16-static-site-deployment.md) is the
+runbook, and its § 9 keeps the same split between what was measured and what was argued. Arming it
+found two defects that reading it had not, both fatal and both invisible until a real token was
+exchanged ([§ D308](DECISIONS.md)).
 
 ## Status
 
