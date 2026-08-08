@@ -4,11 +4,18 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-07 · 29 open (#90–#119, no #95) · 0 open PRs · branch
-`feat/azure-app-deployment`, clean · `npm run typecheck` **passes** · `npm test` **passes (exit 0)**.
+**Snapshot:** 2026-08-08 · **18 open**, down from 29 · branch `feat/azure-app-deployment` at
+`53be9c8` · `npm run typecheck` **passes** · `npm test` **passes — 343 files, 6 934 tests, exit 0**
+(baseline 6 786).
 
-**No GitHub state has been changed.** No issue closed, combined, labelled, or commented on. Every
-row below is a *proposed* disposition awaiting authorization.
+**Eleven issues closed with evidence** — #105, #106, #108, #109, #111, #114, #97, #112, #113, #101,
+#119 — across PRs #120 and #121, each with a comment naming what was fixed and, where the report was
+wrong, what did not survive verification.
+
+**Shipped to production 2026-08-08.** `elevator-sim:53be9c8` is live on the Container App
+(revision `elevsim-app--0000009`), verified by run: `?building=st-jude-hospital` loads without the
+`TypeError` it used to crash on, the rail no longer prints `All N`, its retraction renders in words,
+and *Resume* no longer refuses a shift that is on the board behind it.
 
 Legend — **Verified**: `code` traced to file:line · `run` reproduced by a recorded run ·
 `—` not yet verified.
