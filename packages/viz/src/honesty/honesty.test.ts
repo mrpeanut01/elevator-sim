@@ -244,8 +244,9 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Two entries, and both arrived with the
- * temporal axis** — see the last two blocks in the array.
+ * What the search **found**, pinned in both directions. **Empty — and it has been empty three
+ * times, for three different reasons, which is the only thing that makes an empty register worth
+ * reading.**
  *
  * A found violation is a result before it is a patch, so a finding is recorded here rather than
  * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
@@ -255,15 +256,19 @@ describe('a counterexample shrinks', () => {
  * - everything in it must still be found — a finding that is fixed, or that the search stops
  *   being able to see, is also red, with a message saying to delete the entry.
  *
- * ## Why an entry names its tier
+ * ## Why an entry names its tier, and why the field survives an empty register
  *
  * The second half of that rule needs a corpus the finding actually reproduces in, and until the
  * temporal axis every recorded finding reproduced in the always-on tier — so the assertion could
- * read `standard.failures` and nothing said so. The canvas banner below fires only on a run whose
+ * read `standard.failures` and nothing said so. The canvas banner finding fired only on a run whose
  * `status` is not `completed`, which needs a horizon `STANDARD_SPACE` does not reach: **0 of 49
- * always-on cases, 2 of 60 deep**. Marking the tier is what lets the ghost check stay exact for
- * both — the deep tier now runs its own half, which it did not before — rather than being softened
- * to *"found somewhere"* for the one entry that would otherwise be a ghost.
+ * always-on cases, 2 of 60 deep**. Marking the tier is what let the ghost check stay exact for
+ * both — the deep tier runs its own half, which it did not before — rather than being softened to
+ * *"found somewhere"* for the one entry that would otherwise have been a ghost.
+ *
+ * The field and both `expectStillFound` calls stay now the register is empty, for the reason the
+ * empty-corpus negative control below stays: the next finding will arrive in one tier or the other,
+ * and rebuilding the mechanism at that point means rebuilding it in a hurry.
  *
  * ## The two entries that were here, and what closed each
  *
@@ -354,90 +359,60 @@ const OUTSTANDING: readonly {
    * in the voice it reports real ones in.
    *
    * That entry is gone, and the register stayed empty until the temporal axis ran — an entry that
-   * no longer reproduces is as much a defect as a finding that is not recorded.
+   * no longer reproduces is as much a defect as a finding that is not recorded. That is the whole
+   * reason the two entries below are prose and not rows: each was deleted **on the commit that
+   * made it stop reproducing**, and deleting it any earlier or later is the same defect twice.
    */
   /*
-   * ## The finding the **temporal axis** produced on its first run — open, and deliberately not
-   * fixed in the lane that found it
+   * ## The two findings the **temporal axis** produced on its first run — both **closed**, in the
+   * product, and left here as the record of what the axis is for
    *
-   * `render/describeFrame.ts` is the canvas's text alternative (KB-13), and handed a
-   * `BuildingMood` it joins **every** driver:
+   * They were recorded rather than fixed in the lane that found them, so the corpus claim stayed
+   * honest for a wave; both are now gone from the search, and this is what closed each.
+   *
+   * ### 1. `render/describeFrame.ts#describeFrame` — 196 violations, 49 of 49 always-on cases
+   *
+   * The canvas's text alternative (KB-13) joined **every** driver of a `BuildingMood`:
    *
    * > `mood.drivers.map((driver) => driver.text).join(' ')`
    *
-   * Four of those five carry `basis: 'whole-run'`. So at 0 s of a 16:29 run the paragraph reads
-   * *"…334 of 334 people got where they were going"* — the finished day's `summary.delivered`,
-   * beside a clock reading the start, where the count at that playhead is **0**. That is issue
-   * #109's defect on the surface a screen-reader user gets, and § D293 closed it on the rail only:
-   * `dev/leftRail.ts#moodDriverPanelOf` filters on `basis` and this join does not. The paragraph
-   * *does* carry `mood.headline`'s *"So far — the run has not finished, so this can still change"*,
-   * which is precisely the retraction § D293 measured as insufficient — a card that retracts in
-   * words while leaving the readings on screen is the defect, not the fix.
+   * Four of those five carry `basis: 'whole-run'`, so at 0 s of a 16:29 run the paragraph read
+   * *"…334 of 334 people got where they were going"* — the finished day's `summary.delivered`
+   * beside a clock reading the start, where the count at that playhead is **0**. Issue #109's
+   * defect on the surface a screen-reader user gets: § D293 closed it on the rail only, where
+   * `dev/leftRail.ts#moodDriverPanelOf` filters on `basis`, and this join was not gated with it.
+   * The paragraph *did* carry `mood.headline`'s *"So far — the run has not finished, so this can
+   * still change"*, which is exactly the retraction § D293 measured as **insufficient**.
    *
-   * Fires at **4 of 5 sampled playheads on 49 of 49 cases**, 196 violations, one surface, one
-   * quantity. The comment above the join says why it was written — *"a reader who is told only the
-   * maximum cannot tell which observation produced it"* — and that reason predates the basis field
-   * by several waves; the repair is a gate, not a deletion, and it belongs with whoever owns
-   * `render/`.
+   * Closed by the gate, not by a deletion — the comment above the join (*"a reader who is told only
+   * the maximum cannot tell which observation produced it"*) still holds, and every driver the
+   * playhead has earned is still spoken. `mood.retraction` takes the withheld ones' place, as it
+   * does on the rail. The paragraph also carried the **same defect a second time**, in a clause the
+   * adapter's optional `mood` was never needed to reach: *"Run status timed-out, with 127 passengers
+   * undelivered"*, which `dev/main.ts` produces today at both call sites. That is fixed with it.
    *
-   * **Reachability, stated precisely, because it changes how urgent this is and not whether it is
-   * real.** `DescribeFrameInput.mood` is optional and `dev/main.ts` passes it at neither of its two
-   * call sites (`:3143`, the canvas `aria-label`; `:3201`, the live region) — nor `metrics`,
-   * `queues`, `lockedOutLandings` or `unansweredCallFloorIds`. So no player reaches this sentence
-   * **today**, and this adapter drives the enriched input on purpose, to reach the branches. It is
-   * recorded here rather than downgraded because the branch is shipped, exported through
-   * `src/index.ts`, and one argument away from a screen.
-   */
-  {
-    property: 'whole-run-figure-early',
-    surfaceId: 'render/describeFrame.ts#describeFrame',
-    tier: 'standard',
-    fieldContains: 'describeFrame(@',
-    finding:
-      'joins every MoodDriver ungated, so the whole-run drivers reach a part-way playhead. ' +
-      '§ D293 gated the rail; the text alternative was not gated with it. Unreachable from ' +
-      'dev/main.ts today, which passes no `mood`.',
-  },
-  /*
-   * ## The second temporal finding — **on the screen itself**, and the sharper of the two
+   * ### 2. `render/canvas.ts#drawScene` — 2 of 60 deep cases, 0 of 49 always-on
    *
-   * `render/canvas.ts`'s stage banner, drawn on every frame `dev/main.ts` paints (`:3114`):
+   * The stage banner, drawn on every frame `dev/main.ts` paints:
    *
    * > `TIMED-OUT — 127 undelivered`
    *
    * `summary.undelivered` is *how many people were still in the building **when the run ended***.
-   * The banner draws it at every playhead, and on `honesty-9100032` (deep tier, 2 817 s) it says
-   * **127** at 0 s — when nobody is undelivered yet — and **127** at 704 s, when the live figure is
-   * **376**. That is the part worth reading twice: the number is not merely early, it is *smaller
-   * than the truth on screen by a factor of three*, in the one clause `RV-16` makes lead the banner
-   * because *"it is the fact that decides how much of the rest means anything."* A reader watching
-   * 376 people stack up is being told 127.
+   * The banner drew it at every playhead, and on `honesty-9100032` (2 817 s) it said **127** at 0 s
+   * — when nobody was undelivered yet — and **127** at 704 s, when the live figure was **376**. The
+   * part worth reading twice: not merely early, but *smaller than the truth on screen by a factor of
+   * three*, in the one clause `RV-16` makes lead the banner because *"it is the fact that decides
+   * how much of the rest means anything."*
    *
-   * Fully reachable, unlike the entry above: `drawScene` is called on every painted frame with no
-   * optional input involved, and `canvas.ts`'s own docstring already quotes this string
-   * (`TIMED-OUT — 20 undelivered · AWT suppressed`) as a worked example — it has been read many
-   * times and never asked *at what playhead*.
+   * Closed by publishing a **live** figure at the playhead and the run's own figure once the
+   * playhead reaches `endedAt` — `render/canvas.ts#undeliveredAt`, whose docstring is the argument
+   * for that over § D293's gate and § D294's scoping. `recording.status` is still drawn verbatim at
+   * every playhead, which is § D294's ruling on this same header.
    *
-   * **2 of 60 deep cases, 0 of 49 always-on**, because the branch needs `recording.status !==
-   * 'completed'` and `STANDARD_SPACE`'s horizons all complete. So the opt-in tier earned its cost
-   * here, which is a thing worth recording about the tier as well as about the banner.
-   *
-   * The repair is not to delete the count — a run that did not deliver everybody must still lead
-   * with that — but to say which count it is, or to withhold it as the rail withholds its
-   * whole-run drivers. `NAMES_ITS_OWN_WINDOW` in `properties.ts` is the form the check already
-   * accepts, and `drawScene`'s own footer (*"1018 arrivals generated over the whole day"*) is the
-   * same surface doing it correctly two lines away.
+   * It reproduced only in the deep tier because the branch needs `recording.status !== 'completed'`
+   * and `STANDARD_SPACE`'s horizons all complete. The opt-in tier earned its cost here, which is
+   * worth recording about the tier as much as about the banner.
    */
-  {
-    property: 'whole-run-figure-early',
-    surfaceId: 'render/canvas.ts#drawScene',
-    tier: 'deep',
-    contains: 'undelivered',
-    finding:
-      "draws `summary.undelivered` — the count at the end of the run — in the stage banner at " +
-      'every playhead, where the live figure at that instant is a different and often much larger ' +
-      'number. Reachable from dev/main.ts on every painted frame.',
-  },
 ]);
 
 interface FoundViolation {
