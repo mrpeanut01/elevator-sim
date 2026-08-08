@@ -329,8 +329,14 @@ second build of the same commit that nothing here controls, has ever tested, or 
 deliberate: the viewer has no client-side router, every real request names a file, and a catch-all
 rewrite turns a mistyped asset URL into a 200 carrying HTML — the browser then reports a syntax
 error inside what it was told was JavaScript. `assetFor` in `static.ts` refuses a catch-all for
-exactly that reason, so the two hosts now have one 404 policy. **Unverified against a live Static
-Web App** — see § 9.
+exactly that reason, so the two hosts now have one 404 policy. **Verified against a live Static Web
+App** (2026-08-08): `/no/such/page` answers 404 and `__buildings.json` is served as
+`application/json` rather than swallowed. This paragraph said *"Unverified"* until it was run.
+
+**A preview environment cannot reach the API**, and that is a consequence of § 3 rather than a
+defect in it: the allowlist holds exactly one origin and a preview gets a per-pull-request hostname.
+Previews are therefore good for layout and useless for accounts, the leaderboard, challenges and
+sign-in. Issue **#123** holds the decision that has not been made.
 
 ---
 
@@ -431,12 +437,23 @@ run corrected both of them ([§ D308](../DECISIONS.md)):
 | `provision.sh`'s refusal path | Reached for real: it refused to arm while `ELEVATOR_SIM_ALLOW_ORIGIN` was empty, and armed once it was not. The `az containerapp show --query` expression § 9 called *"the line most likely to be wrong"* is right |
 | The armed build's assertion, on the runner | `build site` passed with `ELEVATOR_SIM_API_ORIGIN` set: the tag matches and the CSP permits it |
 | **The whole authentication chain, end to end** | Run `31284407311`: OIDC token exchanged, `az staticwebapp secrets list` read the deployment token with `listSecrets` alone, and the artifact uploaded to a preview environment. This is what § 9 previously called *"the most likely first failure"*, and it took three corrections to reach |
+| **The absent `navigationFallback`, on a live site** | Against the deployed preview: `/` → 200, `__buildings.json` → 200 `application/json` with all 8 buildings, `/no/such/page` → **404**. No catch-all rewrite, so a mistyped asset URL is a 404 rather than a 200 carrying HTML. § 5 reasoned this; it is now observed |
+| The page names the right API, on a live site | The deployed document declares `content="https://elevsim-app.…azurecontainerapps.io"` — the failure mode of issues #21/#28/#29/#30/#32/#34, checked on the artifact that shipped rather than on the build that made it |
 
 ### Not verified — reasoned about only
 
-1. **No page has ever been served cross-origin.** The CORS round trip — preflight, the
-   `Authorization` header, a real sign-in — has not run against two real origins. Every part of it
-   is unit-tested and none of it has met a browser.
+1. **No page has ever been served cross-origin *to the permitted origin*.** The mechanism has now
+   met a browser and behaves: from the **preview** hostname, Chrome blocked `/api/boards` and
+   `/api/wake` at preflight and named the mismatch, and the page said *"The leaderboard server could
+   not be reached"* rather than claiming the server was down. That verifies the **refusal** half.
+   The **permitted** half — a preflight, an `Authorization` header and a real sign-in from the
+   production origin — is still unrun, because production had no content until the first merge.
+   `curl` shows the API answering a preflight from that origin with the right three headers and no
+   `Access-Control-Allow-Credentials`, which is the protocol and not the product.
+
+   That the preview origin is *never* permitted is a structural consequence of the one-origin
+   allowlist, not a misconfiguration, and it is **issue #123**: every pull request preview loads,
+   draws, and dead-ends every account, leaderboard and challenge surface.
 2. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
    the behaviour has not been observed.
 3. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument
