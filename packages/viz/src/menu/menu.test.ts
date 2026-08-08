@@ -24,6 +24,7 @@ import {
   updateFreePlay,
   updateSettings,
 } from './menu.js';
+import { applyIntent } from './screens.js';
 import {
   DEFAULT_SETTINGS,
   LONGEST_OFFERED_RUN_S,
@@ -223,8 +224,23 @@ describe('the free-play selection', () => {
      * The rule that replaced *"a template whose own period is longer than the run"* — § D286. It
      * subsumes it: `constant-iso`'s only offered part is its own two hours, so the fifteen-minute
      * run that used to be refused for leaving no measurement window is one a player cannot select.
-     * What remains reachable is changing the template while a part of the old one is still held,
-     * which is refused here rather than at `windowTemplate`, in a sentence naming the alternatives.
+     *
+     * ## What this refusal is now about, which is **not** what it was about — GitHub issue #111(b)
+     *
+     * It used to say *"changing the template while a part of the old one is still held"*, and the
+     * line below the fixture said *"which is the state a select can produce"*. That was true and it
+     * was the bug: `freePlayPatch` wrote the template alone, so moving the *Traffic shape* control
+     * left `windowStartS`/`durationS` on a part the new template does not have — and the screen a
+     * player then saw was a *Part of the day* box fallen back to its first option, over a model
+     * holding a different one, with a refusal underneath naming neither. A select **cannot** produce
+     * that any more: `applyIntent` re-derives the part with `openingPart`, and
+     * `screens.test.ts § re-derives the part of the day when the template moves` is what holds it.
+     *
+     * So this case is no longer about a control. It is about a selection that arrives **already
+     * inconsistent** — restored from a session written by an older build, or one whose part `data/`
+     * has since renamed, retimed or dropped. `updateFreePlay` is deliberately the door it comes
+     * through: the *reducer* is what a restore calls, and the refusal has to survive there whatever
+     * the live path does, because the live path is exactly what a restored state never took.
      */
     const withIso: MenuCatalogue = {
       ...CATALOGUE,
@@ -248,7 +264,9 @@ describe('the free-play selection', () => {
         },
       ],
     };
-    // The template moves and the part does not, which is the state a select can produce.
+    // A selection whose template and part disagree — what a restored session can hold, and what
+    // no control on the screen can now hand over. `updateFreePlay` and not `applyIntent`, and that
+    // is the whole distinction: the reducer takes the fields as given, which is what a restore does.
     const stale = updateFreePlay(initialMenuState(withIso), { demandTemplateId: 'constant-iso' });
     const [issue] = freePlayIssues(stale.freePlay, withIso);
     expect(issue?.field).toBe('windowStartS');
@@ -260,6 +278,24 @@ describe('the free-play selection', () => {
     // ...and it is accepted at the part that template does offer.
     const fixed = updateFreePlay(stale, { durationS: 7200, windowStartS: null });
     expect(freePlayIssues(fixed.freePlay, withIso)).toEqual([]);
+
+    /*
+     * The half that stops the case above being re-read as a description of the live control. The
+     * same template change, taken through the reducer a player's press actually reaches, produces
+     * no issue at all — so the refusal above is reachable *and* is not something a control can walk
+     * anybody into. Both directions, because either alone is the defect: a refusal nothing reaches
+     * is dead, and a refusal a control reaches is issue #111(b).
+     */
+    const chosen = applyIntent(
+      initialMenuState(withIso),
+      { kind: 'set-free-play', field: 'demandTemplateId', value: 'constant-iso' },
+      withIso,
+    );
+    expect(
+      freePlayIssues(chosen.freePlay, withIso),
+      'picking a traffic shape still strands the part select on the old template’s value',
+    ).toEqual([]);
+    expect(chosen.freePlay.durationS, 'the part did not move with the template').toBe(7200);
   });
 
   it('every shipped template can be run at some offered part', async () => {

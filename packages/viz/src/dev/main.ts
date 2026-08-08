@@ -69,7 +69,7 @@ import {
   fetchTransport,
   type LeaderboardClient,
 } from '../menu/client.js';
-import { initialMenuState, navigate } from '../menu/menu.js';
+import { initialMenuState, isSeedText, navigate, SEED_MAX_DIGITS } from '../menu/menu.js';
 import { partById, partIdOf, partsOfDay } from '../menu/partsOfDay.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
@@ -1267,7 +1267,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       case 'back':
       case 'set-free-play':
       case 'set-setting': {
-        const next = applyIntent(menuState, intent);
+        const next = applyIntent(menuState, intent, menuCatalogue);
         const arrived = next.screen === 'leaderboard' && menuState.screen !== 'leaderboard';
         const menuStateBefore = menuState.screen;
         menuState = next;
@@ -1423,7 +1423,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       }
 
       case 'set-challenge': {
-        menuState = applyIntent(menuState, intent);
+        menuState = applyIntent(menuState, intent, menuCatalogue);
         /*
          * Picking a different dispatcher **discards the runs**. They are simulations of a different
          * configuration, and keeping them would let a player run five seeds on one dispatcher, pick
@@ -2165,6 +2165,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
   applyTheme();
   renderAll();
   runShift();
+  /*
+   * **The overlay is redrawn once the opening shift exists** — GitHub issue #97.
+   *
+   * `drawMenu()` runs ~200 lines above, before this `runShift()`, so the first menu a player ever
+   * sees was painted against `runState().hasRun === false` — `state.recording` is `undefined` until
+   * `runShift` assigns it — and **nothing redrew it afterwards**. Neither `renderAll` nor `runShift`
+   * calls `drawMenu`; every other `drawMenu` in this file is on an intent arm, and boot presses no
+   * intent. So *Resume* sat disabled under *"There is no shift on screen to go back to yet"* over a
+   * shift that had been simulated, drawn and paused behind the overlay. That sentence is what issue
+   * #97's reporter quoted, and it was the honest output of a stale paint rather than of a stale
+   * fact.
+   *
+   * **Here and not inside `renderAll`.** `renderAll` runs on every state change — a tab, a slider, a
+   * playhead-driven panel sweep — and rebuilding the overlay on each of those is issue #106 with a
+   * new trigger: a press swallowed mid-`mousedown`, and focus taken off whatever the reader was on.
+   * Boot is the one moment where the menu's world changes and no intent says so, so boot is the one
+   * place that owes the redraw.
+   */
+  drawMenu();
   /*
    * The mailed link, redeemed on the way in.
    *
@@ -3900,7 +3919,11 @@ export function deepLinkStateOf(
     patch.dispatcherId = dispatcherId;
   }
   const seed = params.get('seed');
-  if (seed !== null && /^\d+$/.test(seed)) patch.seed = BigInt(seed);
+  // The same bound the field takes and the menu takes — issue #111(c). A link is the third way a
+  // seed gets into this page, and a rule that held on two of three would be the drift the shared
+  // predicate exists to stop: an address carrying twenty-one digits would run something no field
+  // in this product would have accepted and no board would have taken.
+  if (seed !== null && isSeedText(seed)) patch.seed = BigInt(seed);
   const duration = params.get('duration');
   if (duration !== null && /^\d+$/.test(duration)) {
     patch.shiftLengthS = Math.max(60, Math.min(7200, Number(duration)));
@@ -3996,20 +4019,50 @@ export type SeedEntry =
  *
  * The shipped parse was `BigInt(raw.replace(/\D/g, '') || '0')`, so `banana` silently became
  * **seed 0**: the field kept reading `banana` while the footer read *seed 0* — a provenance
- * control reproducing a different run without saying so (§ D198). The rule is the deep-link
- * reader's own (`deepLinkStateOf`): a seed is `/^\d+$/`, and anything else is refused by name,
- * never coerced into a seed nobody typed. A blank field asks for a fresh draw — `UX.md` TP-08's
- * stated contract — and the caller shows whatever seed actually runs.
+ * control reproducing a different run without saying so (§ D198). Anything that is not a seed is
+ * refused by name, never coerced into a seed nobody typed. A blank field asks for a fresh draw —
+ * `UX.md` TP-08's stated contract — and the caller shows whatever seed actually runs.
+ *
+ * ## The rule is `menu/menu.ts#isSeedText`, and adopting it is GitHub issue #111(c)
+ *
+ * This took `/^\d+$/` — unbounded — while the menu's Seed field took `/^\d{1,20}$/`. The issue
+ * reported the two as inconsistent and named *this* one as the strict half, citing a
+ * `maxlength="20"` that does not exist anywhere in `packages/viz`; the inconsistency is real and
+ * runs the other way. It is not symmetric, either, which is why this side moved rather than the
+ * other: a run started from **this** field can be posted to a board, `menu.ts` bounds a seed at
+ * twenty digits so it survives JSON and a database byte for byte (§ D214 § 3), and a twenty-one
+ * digit seed typed here would have been accepted by the field, run, drawn, and then refused at post
+ * time by a rule nothing on this screen had mentioned.
+ *
+ * **No `maxlength` attribute**, and that is the same decision as the one above it. `maxlength`
+ * truncates a paste in silence, which would hand back the coercion § D198 removed — a field
+ * quietly holding the first twenty digits of a seed somebody meant. The bound is enforced where the
+ * refusal can name it.
+ *
+ * ## What still differs between the two fields, and why it is not the same rule twice
+ *
+ * A blank. Here it draws one, because this field is always showing the seed that is *running*, so
+ * an empty box is a gesture — *give me another* — and the caller writes the drawn seed straight
+ * back into it. The menu's field is naming a run that does not exist yet and has no generator
+ * behind it: a blank there is the absence of a choice, and `freePlayIssues` says so in words. One
+ * rule for *what a seed is*; two answers to *what nothing means*, because the two blanks are not
+ * the same blank.
  */
 export function seedEntryOf(raw: string): SeedEntry {
   const trimmed = raw.trim();
   if (trimmed === '') return { kind: 'draw' };
-  if (/^\d+$/.test(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  if (isSeedText(trimmed)) return { kind: 'run', seed: BigInt(trimmed) };
+  // Two refusals, because "that is not a number" is unhelpful about a string of digits. The long
+  // one names the count, so a reader can see what they are being asked to cut.
+  const overlong = /^\d+$/.test(trimmed);
   return {
     kind: 'refuse',
-    message:
-      `“${trimmed}” is not a seed — a seed is a whole number. ` +
-      'The field shows the seed that is still running.',
+    message: overlong
+      ? `“${trimmed}” is ${String(trimmed.length)} digits — a seed is 1–${String(SEED_MAX_DIGITS)} of ` +
+        'them, so it survives a round trip to a board and back. ' +
+        'The field shows the seed that is still running.'
+      : `“${trimmed}” is not a seed — a seed is 1–${String(SEED_MAX_DIGITS)} digits. ` +
+        'The field shows the seed that is still running.',
   };
 }
 

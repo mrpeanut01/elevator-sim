@@ -188,10 +188,17 @@ interface Draw {
  * ## Three things fall out of it, and only the first is what the issue asked for
  *
  * The submit button survives the redraw its own `mousedown` causes, so the click lands. **A text
- * field keeps its caret**, because a retained `<input>` is never rebuilt and its `value` is written
- * only when it differs — which is what makes it safe to redraw this overlay on *every keystroke*,
- * the thing issue #111's per-keystroke validation is about to do. And a `<details>` the reader
- * opened stays open, which it did not before.
+ * field keeps its caret and its focus**, because a retained `<input>` is never rebuilt — which is
+ * what makes it safe to redraw this overlay on *every keystroke*, the thing issue #111's
+ * per-keystroke validation now does. That half is measured rather than argued: forcing this
+ * function to build a fresh element every draw makes `menu.browser.test.ts § keeps the caret where
+ * the reader put it` report `'202604'` where `'20269904'` was typed — the keystrokes reach nothing,
+ * because what they were aimed at no longer exists. And a `<details>` the reader opened stays open,
+ * which it did not before.
+ *
+ * This paragraph used to credit `textRow`'s `value`-write guard alongside retention. It does not
+ * now: that guard turns out not to be what keeps the caret today, and `textRow`'s own docstring
+ * carries the measurement and the narrower reason the guard is still right.
  *
  * ## Why the map is rebuilt every draw rather than accumulated
  *
@@ -687,8 +694,19 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
     });
   }
   if (row.kind === 'text') {
-    return textRow(draw, row.label, 'text', row.value ?? '', row.id, (value) => {
-      host.dispatch(withValue(value));
+    return textRow(draw, {
+      label: row.label,
+      type: 'text',
+      value: row.value ?? '',
+      key: row.id,
+      // Said before it is broken rather than after — issue #111(c). The screen decides the words;
+      // this only draws them, and a row that carries none draws none.
+      hint: row.detail,
+      placeholder: row.placeholder,
+      inputMode: row.inputMode,
+      onChange: (value) => {
+        host.dispatch(withValue(value));
+      },
     });
   }
 
@@ -856,8 +874,14 @@ function accountForm(
 
   const field = (label: string, type: 'text' | 'email', key: string, value: string): void => {
     blocks.push(
-      textRow(draw, label, type, value, `account.${key}`, (next) => {
-        host.dispatch({ kind: 'account-form', patch: { [key]: next } });
+      textRow(draw, {
+        label,
+        type,
+        value,
+        key: `account.${key}`,
+        onChange: (next) => {
+          host.dispatch({ kind: 'account-form', patch: { [key]: next } });
+        },
       }),
     );
   };
@@ -1087,6 +1111,19 @@ function selectRow(
 }
 
 
+/** One text field, as the screen decided it. See {@link textRow}. */
+interface TextRowSpec {
+  readonly label: string;
+  readonly type: 'text' | 'email';
+  readonly value: string;
+  readonly key: string;
+  /** A line under the box that is always there — {@link MenuAffordance.detail} on a `text` row. */
+  readonly hint?: string | undefined;
+  readonly placeholder?: string | undefined;
+  readonly inputMode?: 'numeric' | undefined;
+  readonly onChange: (value: string) => void;
+}
+
 /**
  * A labelled text input.
  *
@@ -1098,13 +1135,62 @@ function selectRow(
  * `email` is not decoration either: it gets the right keyboard on a phone and the browser's own
  * autofill, on the one field a player is least willing to retype.
  *
+ * ## It commits on `input`, and that is GitHub issue #111(a)
+ *
+ * `change` on a text field fires on **blur**. So the state was one commit behind the box, and every
+ * decision taken from the state was one commit behind what the player was looking at. Measured on
+ * the Seed field: type `abc` and Start is still enabled — a refused selection you may press — blur
+ * and it disables; type `777` over it and Start stays **disabled under a valid seed**, beside a
+ * sentence saying *"a seed is 1–20 digits"* about a box holding three of them. Neither half is a
+ * cosmetic lag: the first offers a run the model has already refused, and the second refuses a run
+ * the model would accept, and a player has no way to tell that the fix is to click elsewhere.
+ *
+ * Both listeners stay. `input` is what makes the state track the box; `change` is what catches the
+ * commits `input` is not guaranteed to raise on every browser and assistive path, and a second
+ * commit of a string the state already holds is refused one layer down — `account.ts#updateForm`
+ * says so in its own words, and `updateFreePlay` of an identical value produces an identical
+ * selection.
+ *
+ * **What makes it safe is issue #106 and nothing else**, which is why that landed first. A commit
+ * redraws the whole overlay, so this is now a redraw per keystroke. **Retention is the whole of
+ * what carries it**, and that is measured rather than reasoned: with {@link retainer} forced to
+ * build a fresh element every draw, `menu.browser.test.ts § keeps the caret where the reader put
+ * it` fails with the field holding `202604` — the two characters typed into the middle of it
+ * reached nothing at all, because the element they were being typed into stopped existing between
+ * keystrokes — and *Tab out of the field reaches Start* fails beside it. With retention, both pass
+ * against a real Chromium.
+ *
  * The value is set as a property and not an attribute, so re-rendering does not blow away what the
- * player is mid-way through typing — **and only when it differs**, which is the stronger half.
- * Assigning `value` to a text input moves the caret to the end of the string even when the string
- * is unchanged, so a redraw during an edit would send a reader correcting the middle of an address
- * back to the end of it. That is not a live defect today because nothing redraws per keystroke; it
- * is written this way because issue #111's validation is about to, and `restoreFocus` restores a
- * control and has never restored a caret.
+ * player is mid-way through typing.
+ *
+ * ## The guard on that write, and the claim about it that was wrong
+ *
+ * This comment used to say — and `dev/dom.ts`'s sibling rules imply — that *assigning `value` to a
+ * text input moves the caret to the end of the string **even when the string is unchanged***. It
+ * was written for this change before this change existed, and it is **false**. HTML's own value
+ * setter moves the text entry cursor only when the sanitized new value *differs from the old*, and
+ * Chromium implements it: measured on a bare `<input>` holding `202604` with the caret at 4,
+ * assigning `'202604'` leaves it at **4** and assigning `'999999'` moves it to **6**. Removing the
+ * comparison below changes no browser-observable behaviour on any path this menu has today, because
+ * a commit is synchronous and neither `updateFreePlay` nor `account.ts#updateForm` rewrites the
+ * string it was handed — so the state and the box always agree by the time the draw runs.
+ *
+ * The guard stays, with the honest reason rather than the invented one: it is the difference
+ * between *the state agrees with the box* and *the state is written back onto the box*, and the day
+ * a reducer normalises a value — trims a seed, lower-cases an address — that is exactly the write
+ * that would throw a reader correcting the middle of a field to the end of it. It costs a string
+ * comparison and it is the only thing standing between here and that.
+ *
+ * `restoreFocus` restores a control and has never restored a caret, which is why none of this can
+ * be delegated to it.
+ *
+ * ## The account form now complains while you type, and that is the same fix
+ *
+ * `accountForm` shows `formIssues` once anything has been typed, so a live commit makes the
+ * complaint live too. That is deliberate: the alternative is a form that tells you the address is
+ * malformed only after you have left it, which is the defect above wearing a different label. The
+ * complaint clears on the keystroke that fixes it, which is the half a blur-only commit could not
+ * offer at all.
  *
  * ## Enter, and why it is here rather than in a `<form>`
  *
@@ -1117,30 +1203,48 @@ function selectRow(
  * `account.ts#updateForm` refuses a commit that changes nothing for the same reason, so the pair is
  * belt and braces rather than one guard doing all the work.
  */
-function textRow(
-  draw: Draw,
-  label: string,
-  type: 'text' | 'email',
-  value: string,
-  key: string,
-  onChange: (value: string) => void,
-): HTMLElement {
+function textRow(draw: Draw, spec: TextRowSpec): HTMLElement {
+  const { key, onChange } = spec;
   const row = draw.retain('label', `row.${key}`, { className: 'menu-text' });
   const text = draw.retain('span', `label.${key}`);
-  setText(text, label);
-  const input = draw.keep(draw.retain('input', `control.${key}`, { attrs: { type } }), key);
-  if (input.value !== value) input.value = value;
-  on(input, 'change', () => {
+  setText(text, spec.label);
+  /*
+   * The attributes are written at creation and never again, which {@link retainer} allows for
+   * everything but the class. They are constants of the field rather than of the draw — a seed field
+   * does not stop wanting a numeric keypad between keystrokes — so there is nothing here for a later
+   * draw to keep current.
+   */
+  const input = draw.keep(
+    draw.retain('input', `control.${key}`, {
+      attrs: {
+        type: spec.type,
+        ...(spec.placeholder === undefined ? {} : { placeholder: spec.placeholder }),
+        ...(spec.inputMode === undefined ? {} : { inputmode: spec.inputMode }),
+      },
+    }),
+    key,
+  );
+  if (input.value !== spec.value) input.value = spec.value;
+  const commit = (): void => {
     onChange(input.value);
-  });
+  };
+  // The pair, and the order they arrive in: `input` on every keystroke, `change` on the blur that
+  // follows. See the docstring for why both.
+  on(input, 'input', commit);
+  on(input, 'change', commit);
   const submit = draw.submit;
   on(input, 'keydown', (event) => {
     if ((event as KeyboardEvent).key !== 'Enter' || submit === undefined) return;
     event.preventDefault();
-    onChange(input.value);
+    commit();
     submit();
   });
-  reconcile(row, text, input);
+  const hint =
+    spec.hint === undefined || spec.hint === ''
+      ? undefined
+      : draw.retain('span', `hint.${key}`, { className: 'menu-hint' });
+  if (hint !== undefined) setText(hint, spec.hint ?? '');
+  reconcile(row, text, input, hint);
   return row;
 }
 

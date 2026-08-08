@@ -1235,8 +1235,12 @@
          against `.menu-row-name` is carried by weight and size, which survive a photocopier. */
       .menu-start .menu-row-detail { color: var(--accent-ink); }
       .menu-back { background: transparent; margin-top: 4px; }
+      /* `flex-wrap` so a row may carry a third child on its own line — `.menu-hint` below. The
+         label and its control still share the first line, because both have a `flex` basis and the
+         hint is the only child that claims the whole width. */
       .menu-select, .menu-text, .menu-seed, .menu-toggle {
         display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        flex-wrap: wrap; row-gap: 4px;
         width: 100%; padding: 9px 14px; border-radius: var(--r-card);
         border: 1px solid var(--edge); background: var(--panel);
         font: 500 13px var(--sans); color: var(--text);
@@ -1246,6 +1250,13 @@
         border: 1px solid var(--edge-strong); background: var(--card);
         color: var(--text); font: 500 12px var(--sans);
       }
+      /* GitHub issue #111(c) — the rule said **before** it is broken.
+         The Seed field's contract reached the screen only as a refusal in the issue list, so a
+         player learned it by losing Start. This line is always there, sits under the box rather
+         than beside it, and is dimmed against the row's own `--text` so it reads as guidance and
+         not as a complaint — the complaint has `.menu-issues`, with its own border and its own
+         colour, and the two must not be mistaken for one another. */
+      .menu-hint { flex: 1 0 100%; font: 400 11px/1.45 var(--sans); color: var(--dim); }
       .menu-toggle input { flex: 0 0 auto; }
       .menu-issues {
         width: min(560px, 100%); margin: 12px 0 0; padding: 10px 14px 10px 30px;
@@ -1686,7 +1697,11 @@
                    ============================================================= -->
               <div class="eyebrow-row eyebrow-row-after-card">
                 <span class="eyebrow">Provenance and replay</span>
-                <span class="eyebrow-note">every run carries its seed and replays from it</span>
+                <!-- The bound is named here rather than only in the refusal — issue #111(c), the
+                     same rule the menu's Seed field states under its own box. `dev/main.ts#seedEntryOf`
+                     is what enforces it, and `menu/menu.ts#SEED_MAX_DIGITS` is the one place the
+                     number lives; this line is the sentence a player reads before typing. -->
+                <span class="eyebrow-note">every run carries its seed and replays from it · 1–20 digits, or blank to draw one</span>
               </div>
               <div class="provenance">
                 <label class="field-inline" for="seed">seed

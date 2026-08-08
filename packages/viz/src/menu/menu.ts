@@ -107,8 +107,21 @@ export function partsFor(catalogue: MenuCatalogue, demandTemplateId: string): re
  * When nothing fits, the whole period is returned and {@link freePlayIssues} refuses it in words.
  * That is the honest answer: inventing a length outside what is offered would move the refusal to
  * Start, one screen later and with nothing to act on.
+ *
+ * ## Why it is exported, which is GitHub issue #111(b)
+ *
+ * *A fresh player opens on this* and *a player who has just changed the template lands on this* are
+ * the same question, and they were answered in one place and nowhere. `screens.ts#freePlayPatch`
+ * wrote `demandTemplateId` and left `windowStartS`/`durationS` alone, so the part select was rebuilt
+ * with the **new template's options and the old template's value**, no option matched, and the
+ * browser fell back to index 0. The box then showed a part the model did not hold — permanently,
+ * because nothing about a select re-fires for an option it is already on, and *"re-pick the same
+ * option"* is not a recovery a browser offers.
+ *
+ * So the opening answer is the changing answer. It stays private to the *rate*, the *seed* and every
+ * other field for the reason its own paragraphs give: only the part depends on the template.
  */
-function openingPart(
+export function openingPart(
   catalogue: MenuCatalogue,
   demandTemplateId: string,
 ): { readonly durationS: number; readonly windowStartS: number | null } {
@@ -225,6 +238,41 @@ export const FREE_PLAY_RATES: readonly (number | null)[] = Object.freeze([
 ]);
 
 /**
+ * How many digits a seed may carry — the bound, named once.
+ *
+ * A seed is an identity and is replayed by the server (§ D214 § 3), so it has to survive a round
+ * trip through JSON and a database exactly. Digits only rules out the float that would lose
+ * precision; the bound rules out the 10 kB string that would be stored.
+ *
+ * Twenty because that is what `BIGINT`/`NUMERIC(20)` and a JSON string round-trip without argument,
+ * and because every seed this product *draws* is far inside it — `dev/main.ts#randomSeed` builds
+ * `(u32 << 16) ^ u32`, at most fifteen digits. So the bound refuses nothing the viewer produces and
+ * refuses everything a board would later reject.
+ */
+export const SEED_MAX_DIGITS = 20;
+
+/**
+ * Whether a string is a seed — the **one** answer, for both fields that ask — GitHub issue #111(c).
+ *
+ * The issue reported the two seed fields as having different contracts and named the menu's as the
+ * loose one. It is the reverse: the menu was bounded here and the transport's `dev/main.ts#seedEntryOf`
+ * took `/^\d+$/`, unbounded. That is the direction that costs something, because a run started from
+ * the transport can be posted to a board, and a twenty-one-digit seed would have been refused at
+ * post time by a rule the field it was typed into never mentioned.
+ *
+ * So the transport adopted this bound rather than this dropping it, and the predicate lives here —
+ * beside the sentence that refuses in words — so there is no second answer to *what is a seed*.
+ *
+ * It deliberately does **not** trim. The transport trims before asking, because a blank field there
+ * means *draw me one*; the menu does not, because a selection is what a player typed and a leading
+ * space is a keystroke they can see. One predicate, two callers, and the whitespace decision stays
+ * with whoever owns the field.
+ */
+export function isSeedText(raw: string): boolean {
+  return new RegExp(`^\\d{1,${String(SEED_MAX_DIGITS)}}$`, 'u').test(raw);
+}
+
+/**
  * Everything wrong with a selection, or an empty array.
  *
  * Returns **all** the problems rather than the first, because a player who fixes one and is then
@@ -304,13 +352,10 @@ export function freePlayIssues(
       message: 'An arrival rate must be a positive percentage, or unset to use the building’s own.',
     });
   }
-  // A seed is an identity and is replayed by the server (§ D214 § 3), so it has to survive a round
-  // trip through JSON and a database exactly. Digits only, and bounded, which rules out both the
-  // float that would lose precision and the 10 kB string that would be stored.
-  if (!/^\d{1,20}$/u.test(selection.seed)) {
+  if (!isSeedText(selection.seed)) {
     issues.push({
       field: 'seed',
-      message: 'A seed is 1–20 digits. It names a run rather than measuring one.',
+      message: `A seed is 1–${String(SEED_MAX_DIGITS)} digits. It names a run rather than measuring one.`,
     });
   }
 

@@ -72,7 +72,7 @@ import { SIGNED_OUT, updateForm, type AccountForm, type AccountState } from '../
 import type { BoardPage } from '../menu/client.js';
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { initialMenuState } from '../menu/menu.js';
-import type { CommissioningScreenInput, MenuIntent } from '../menu/screens.js';
+import { applyIntent, type CommissioningScreenInput, type MenuIntent } from '../menu/screens.js';
 import type { MenuCatalogue, MenuState } from '../menu/types.js';
 import { RESOURCES } from '../scope/probes.test-helper.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
@@ -1069,6 +1069,222 @@ describe('the first press after typing is not swallowed — GitHub issue #106', 
     );
     ready?.listeners.get('keydown')?.({ key: 'Enter', preventDefault: () => undefined });
     expect(whole.asked.map((intent) => intent.kind)).toEqual(['set-free-play', 'start']);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The seed field validates the keystroke it is on — GitHub issue #111(a)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The Free play screen with a live host: `set-free-play` is **performed**, the way `dev/main.ts`
+ * performs it, rather than recorded.
+ *
+ * {@link accountScreen}'s argument, on the other screen with a text field. A host that only recorded
+ * the intent would leave the state — and therefore Start, and therefore the issue list — exactly
+ * where the first draw put it, and every assertion below would pass over a screen that never
+ * changed its mind. The reducer is the shipped `applyIntent`, so nothing here reproduces a transport
+ * it is measuring.
+ */
+function freePlayScreen(
+  loaded: MenuCatalogue,
+  seed: string,
+): ReturnType<typeof render> & { readonly stateNow: () => MenuState } {
+  const base = initialMenuState(loaded);
+  let state: MenuState = { ...base, screen: 'free-play', freePlay: { ...base.freePlay, seed } };
+  let redraw = (): void => {};
+  const made = render(state, loaded, {
+    state: () => state,
+    dispatch: (intent) => {
+      made.asked.push(intent);
+      state = applyIntent(state, intent, loaded);
+      redraw();
+    },
+  });
+  redraw = made.draw;
+  return { ...made, stateNow: () => state };
+}
+
+/** The Seed field, and a count of how many times a draw has written its `value` back. */
+function seedField(root: Recorded): { readonly node: Recorded; readonly writes: () => number } {
+  const node = walk(root).find((entry) => entry.attrs.get('data-menu-control') === 'free-play.seed');
+  if (node === undefined) throw new Error('the Free play screen renders no seed field');
+  /*
+   * A counting setter, because a recorder has no selection and *"the caret did not move"* is not a
+   * thing this tier can observe. What it observes is the **write**, which is one step upstream.
+   *
+   * Said precisely, because the sentence this replaces was not. A draw that writes the box back is
+   * not by itself a caret jump: HTML's value setter moves the text entry cursor only when the new
+   * value *differs* from the old, and Chromium implements that — measured, `202604` with the caret
+   * at 4, re-assigned `'202604'`, caret still 4. So zero writes is a claim about **the panel not
+   * writing over the reader**, which is the invariant that keeps a future normalising reducer from
+   * turning into a caret jump; the jump itself is the browser tier's, and
+   * `menu.browser.test.ts § keeps the caret where the reader put it` is where it is watched.
+   */
+  let held = node.value;
+  let writes = 0;
+  Object.defineProperty(node, 'value', {
+    get: () => held,
+    set: (next: string) => {
+      writes += 1;
+      held = next;
+    },
+    configurable: true,
+  });
+  // The reader's own typing is not a draw's write.
+  const typed = (text: string): void => {
+    held = text;
+  };
+  Object.assign(node, { type: typed });
+  return { node, writes: () => writes };
+}
+
+describe('the seed field validates the keystroke it is on — GitHub issue #111(a)', () => {
+  it('takes a valid seed back without waiting for a blur, and re-enables Start', async () => {
+    /*
+     * The reporter's steps, at the tier that can see the state as well as the markup: *"type `abc`
+     * → Start still enabled; blur → disabled; type `777` → **valid seed, Start still disabled**;
+     * blur → enabled."*
+     *
+     * The second half is the blocker. A player is looking at a box holding three digits, under a
+     * sentence saying a seed is 1–20 digits, with Start greyed out — and the only way out is to
+     * click somewhere else, which nothing on the screen suggests. `change` fires on blur, so the
+     * state was one commit behind the box and every decision taken from it was too.
+     *
+     * Driven through `input` and **not** `change`, deliberately: a case that fired both would pass
+     * on the old code through the `change` half and prove nothing.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, 'abc');
+    const { node } = seedField(made.root);
+
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.get('disabled'),
+      'the broken seed did not refuse Start, so this case starts from the wrong screen',
+    ).toBe('disabled');
+
+    (node as unknown as { type: (text: string) => void }).type('777');
+    node.listeners.get('input')?.();
+
+    expect(
+      made.stateNow().freePlay.seed,
+      'the keystroke never reached the state — the field is still committing on blur alone',
+    ).toBe('777');
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.has('disabled'),
+      'Start is still refused over a valid seed, which is the screen the issue reports',
+    ).toBe(false);
+    expect(
+      textUnder(made.root),
+      'the refusal is still on the page under a seed that satisfies it',
+    ).not.toContain('A seed is 1–20 digits');
+  });
+
+  it('refuses on the keystroke too, so an invalid seed cannot be pressed', async () => {
+    /*
+     * The other direction, and the one that stops the case above being satisfied by a Start that is
+     * simply always enabled. The first half of the reporter's steps: `abc` typed over a good seed
+     * used to leave Start pressable until the field lost focus — a refused selection a player could
+     * press, which `menuPanel.ts` has forbidden since it landed and could not enforce on a state
+     * that had not been told.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '20260804');
+    const { node } = seedField(made.root);
+
+    expect(byClass(made.root, 'menu-start')[0]?.attrs.has('disabled')).toBe(false);
+
+    (node as unknown as { type: (text: string) => void }).type('abc');
+    node.listeners.get('input')?.();
+
+    expect(made.stateNow().freePlay.seed).toBe('abc');
+    expect(
+      byClass(made.root, 'menu-start')[0]?.attrs.get('disabled'),
+      'Start stayed pressable over a seed the model refuses',
+    ).toBe('disabled');
+    expect(textUnder(made.root)).toContain('A seed is 1–20 digits');
+  });
+
+  it('redraws per keystroke without rebuilding the box, moving the caret or taking the focus', async () => {
+    /*
+     * **Why issue #106 had to land first, driven rather than argued.**
+     *
+     * Committing on `input` makes this overlay redraw on every keystroke. Before retention that
+     * would have been a `replaceChildren` per keystroke — the box the reader is typing into replaced
+     * between characters, a press thrown away with the node it began on, and focus dropped to
+     * `<body>` sixty times a word. Three properties are what make it safe, and all three are
+     * asserted here over a sequence of five keystrokes rather than read off the source:
+     *
+     * 1. the `<input>` is the **same object** afterwards and was never removed from its row, so no
+     *    `mousedown` is ever orphaned and nothing the reader is typing into goes away
+     *    (`reconcile` + `retainer`);
+     * 2. **no draw writes `value` back over the reader** — harmless in Chromium while the string is
+     *    identical (see {@link seedField}) and a caret jump the day a reducer normalises it;
+     * 3. focus is still on the field, because `restoreFocus` returns early while the reader is
+     *    already inside the overlay.
+     *
+     * The issue list appearing and disappearing under the box during the sequence is what makes it
+     * a real test of (1): the screen genuinely changes shape between the draws, which is the case
+     * `reconcile` exists for rather than the case a skip-if-unchanged would have covered.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '');
+    const { node, writes } = seedField(made.root);
+    const row = walk(made.root).find((entry) => entry.children.includes(node));
+    expect(row, 'the seed input has no row to be rebuilt out of').toBeDefined();
+
+    made.focus(node);
+    const onRow = watchChildren(row as Recorded);
+    const onRoot = watchChildren(made.root);
+
+    const shapes = new Set<number>();
+    for (const text of ['7', '7x', '7x7', '77', '777']) {
+      (node as unknown as { type: (t: string) => void }).type(text);
+      node.listeners.get('input')?.();
+      shapes.add(byClass(made.root, 'menu-issues').length);
+    }
+
+    expect(
+      shapes.size,
+      'the screen never changed shape across the sequence, so nothing here was reconciled under ' +
+        'pressure and the case is weaker than it reads',
+    ).toBeGreaterThan(1);
+    expect(onRow.touched, 'a keystroke rebuilt the seed box out of its own row').not.toContain(node);
+    expect(onRoot.touched, 'a keystroke carried the whole row off the overlay').not.toContain(row);
+    expect(
+      walk(made.root).find((entry) => entry.attrs.get('data-menu-control') === 'free-play.seed'),
+      'the seed field on the page is a different element from the one that was typed into',
+    ).toBe(node);
+    expect(
+      writes(),
+      'a draw wrote the field’s own value back over the reader — harmless in Chromium today, ' +
+        'because the string is identical, and a caret jump the moment any reducer normalises it',
+    ).toBe(0);
+    expect(made.focused(), 'a keystroke took the focus off the field being typed into').toBe(node);
+  });
+
+  it('states its rule under the box, before anything is broken — issue #111(c)', async () => {
+    /*
+     * The bound reached the screen only as a refusal, so the only way to learn it was to break
+     * Start. The hint is `MenuAffordance.detail` on the row, drawn under the field on every draw
+     * including the clean one — which is the half a refusal structurally cannot do.
+     */
+    const loaded = await catalogue();
+    const made = freePlayScreen(loaded, '20260804');
+    const { node } = seedField(made.root);
+
+    expect(byClass(made.root, 'menu-start')[0]?.attrs.has('disabled'), 'the screen is refusing').toBe(
+      false,
+    );
+    const hint = byClass(made.root, 'menu-hint')[0];
+    expect(hint?.textContent, 'a clean Free play screen says nothing about what a seed is').toContain(
+      'Digits only, up to 20',
+    );
+    // The affordances the transport's own field has had all along, and this one had none of.
+    expect(node.attrs.get('inputmode')).toBe('numeric');
+    expect(node.attrs.get('placeholder')).toBe('1–20 digits');
+    // …and never `maxlength`, which would truncate a paste in silence — the coercion § D198 removed.
+    expect(node.attrs.has('maxlength')).toBe(false);
   });
 });
 
