@@ -238,6 +238,55 @@ fi
 echo "ok: the API permits $SITE_ORIGIN and mails sign-in links there"
 
 # ---------------------------------------------------------------------------
+# The GitHub environments, and the branch restriction that now lives on one of them.
+#
+# The federated credentials are keyed on `repo:OWNER/REPO:environment:NAME`, because a job that
+# declares `environment:` gets that subject instead of a ref-based one (main.bicep says why, and it
+# is a correction a failed run made). Two consequences, and neither is optional:
+#
+#   1. The environments have to EXIST with exactly these names, or the subject GitHub presents names
+#      an environment Entra has never heard of.
+#   2. The subject carries no ref, so Entra no longer pins production to a branch. That pin moves
+#      here, as a deployment branch policy — set rather than documented, because a restriction in a
+#      runbook is a restriction until the first person who has not read it.
+# ---------------------------------------------------------------------------
+say "GitHub environments"
+
+PRODUCTION_ENVIRONMENT=$(out productionEnvironmentName)
+PREVIEW_ENVIRONMENT=$(out previewEnvironmentName)
+PRODUCTION_BRANCH=$(out productionBranchName)
+
+# All three come back from the deployment rather than from a default here, and that is the point:
+# the environment names are half of a federated credential's subject, so a copy of them in this
+# script is a second place for them to be wrong. One parameter file, one template, one value.
+[ -n "$PRODUCTION_ENVIRONMENT" ] && [ -n "$PREVIEW_ENVIRONMENT" ] && [ -n "$PRODUCTION_BRANCH" ] \
+  || fail "the deployment did not return the environment names — is the template up to date?"
+
+# Preview takes any branch: a pull request's head is by definition not the production branch.
+gh api -X PUT "repos/$REPO_ACTUAL/environments/$PREVIEW_ENVIRONMENT" --silent
+echo "ok: $PREVIEW_ENVIRONMENT (any branch — a pull request head is never $PRODUCTION_BRANCH)"
+
+# Production takes exactly one branch. `custom_branch_policies` rather than `protected_branches`,
+# because the latter means "whatever happens to be protected right now" — which is a different rule
+# on a repository that later protects a second branch.
+#
+# `--input -` rather than `-f`/`--raw-field`: `deployment_branch_policy` is a nested object and both
+# of those send a string, which the API rejects with a 422 naming the type.
+gh api -X PUT "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT" --input - --silent <<JSON
+{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+JSON
+# Idempotent: the create 422s if the policy is already there, and that is a success for our purposes.
+gh api -X POST "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT/deployment-branch-policies" \
+  -f "name=$PRODUCTION_BRANCH" -f 'type=branch' --silent 2>/dev/null || true
+
+POLICY=$(gh api "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT/deployment-branch-policies" \
+  --jq '[.branch_policies[].name] | join(",")')
+[ "$POLICY" = "$PRODUCTION_BRANCH" ] || fail "$(printf '%s\n' \
+  "$PRODUCTION_ENVIRONMENT permits branches [$POLICY], expected exactly [$PRODUCTION_BRANCH]." \
+  "The federated credential no longer pins a branch, so this policy is the only thing that does.")"
+echo "ok: $PRODUCTION_ENVIRONMENT deploys from $POLICY and nothing else"
+
+# ---------------------------------------------------------------------------
 # Arm. Order matters: AZURE_SWA_NAME last, because it is the switch.
 # ---------------------------------------------------------------------------
 say "Arming the workflow"
@@ -255,6 +304,18 @@ echo "ok: 6 variables set"
 # Deploy
 # ---------------------------------------------------------------------------
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$DEPLOY_NOW" = true ] && [ "$BRANCH" != "$PRODUCTION_BRANCH" ]; then
+  fail "$(printf '%s\n' \
+    "--deploy-now can only deploy '$PRODUCTION_BRANCH', and this checkout is on '$BRANCH'." \
+    "" \
+    "$PRODUCTION_ENVIRONMENT's deployment branch policy permits one branch, and the deploy job runs" \
+    "in that environment — so a dispatch from here is refused by GitHub before it authenticates," \
+    "which reads as a failed deploy rather than as the restriction working." \
+    "" \
+    "Everything else is done: the site exists, the API permits it, and the workflow is armed." \
+    "Merge to $PRODUCTION_BRANCH and the push deploys.")"
+fi
 
 if [ "$DEPLOY_NOW" = true ]; then
   say "Dispatching a deploy of '$BRANCH'"

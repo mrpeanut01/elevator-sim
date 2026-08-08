@@ -10,24 +10,43 @@ of this document, and § 2 is the honest account of what it costs.
 
 ---
 
-## 0. Read this first: nothing here is switched on, and nothing here has been deployed
+## 0. Read this first: this is armed, and running it corrected two things reading it did not
 
-**No Azure resource has been created by this lane.** No Static Web App exists, the federated
-credential has never been exchanged, the custom role has never been assigned, and no page has ever
-been served from a CDN. § 9 is the itemised list of what was verified by running it and what was
-only reasoned about, in the voice `infra/README.md` § 0 already uses — because that section exists
-precisely because a previous `infra/` in this repository published a figure that did not reproduce
-from its own template, and what let it survive review was that its untested parts read exactly like
-its tested ones.
+**This section said the opposite until 2026-08-08, and it was the accurate statement of the day it
+was written.** It read *"No Azure resource has been created by this lane… no page has ever been
+served from a CDN."* That is now false in every clause, and a refusal that has gone stale is worse
+than a figure that has, because it tells the reader not to touch a control that is live (§ D227).
 
-Every deploying job in `.github/workflows/deploy-viz.yml` is guarded by `vars.AZURE_SWA_NAME != ''`,
-and **unset is the shipped state**. Unarmed, the workflow builds the site on every push and pull
-request, asserts the artifact, and deploys nothing. Arming is `./infra/azure/swa/provision.sh`;
-disarming is `gh variable delete AZURE_SWA_NAME`, and that is the rollback.
+What is true now:
 
-The existing deployment is untouched until somebody arms this. The container still serves the page
-and the API from one origin, `ELEVATOR_SIM_ALLOW_ORIGIN` is still absent, and the meta tag is still
-injected by the server with the value `"/"` (§ D243).
+| | |
+|---|---|
+| Static Web App | `elevator-sim-viz`, Free SKU, resource group `elevator-sim-viz` |
+| Site | `https://yellow-glacier-0ff81230f.7.azurestaticapps.net` |
+| API | unchanged, `https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io` |
+| The app's `viewerOrigin` | set to the site; `ELEVATOR_SIM_ORIGIN` and `ELEVATOR_SIM_ALLOW_ORIGIN` both name it |
+| The six repository variables | set, `AZURE_SWA_NAME` last |
+| Production deploys | from `main` only, enforced by the `viz-production` environment's branch policy |
+
+**Arming it found two defects that reading it had not**, both in the provisioning path and both
+fatal: two federated credentials cannot be written concurrently under one managed identity, and the
+credential subjects named a ref where GitHub sends an environment — so *neither* credential could
+ever have matched, and a push to `main` would have failed exactly as the dispatch that found it did.
+[§ D308](../DECISIONS.md) is the full account. § 9 below is the itemised list of what is now
+verified by running it and what is still only reasoned about, in the voice `infra/README.md` § 0
+already uses — because that section exists precisely because a previous `infra/` in this repository
+published a figure that did not reproduce from its own template, and what let it survive review was
+that its untested parts read exactly like its tested ones. That is the sentence this lane went on to
+demonstrate about itself.
+
+The switch has not moved. Every deploying job in `.github/workflows/deploy-viz.yml` is still guarded
+by `vars.AZURE_SWA_NAME != ''`; what changed is that the variable is now set. Unarmed, the workflow
+builds the site on every push and pull request, asserts the artifact, and deploys nothing. Arming is
+`./infra/azure/swa/provision.sh`; **disarming is `gh variable delete AZURE_SWA_NAME`, and that is
+still the rollback** — instant, and it puts the workflow back to building only.
+
+Disarming does **not** put the API back to serving its own page: `ELEVATOR_SIM_ALLOW_ORIGIN` stays
+set, and the app keeps mailing sign-in links to the static site. § 7 is the command for that half.
 
 ---
 
@@ -322,10 +341,20 @@ That is not belt-and-braces: GitHub issues no OIDC token to a fork's `pull_reque
 job cannot authenticate and would fail on every external contribution — a permanently red check that
 means nothing.
 
-The `pull_request` federated credential's subject (`repo:OWNER/REPO:pull_request`) does **not**
-distinguish a fork's pull request from a branch's. On a public repository, before arming, set
-*Settings → Actions → Fork pull request workflows* to require approval for all outside
-collaborators. That repository setting is the control that matters, not the `if:` above it.
+The preview federated credential's subject (`repo:OWNER/REPO:environment:viz-preview` — § D308 for
+why it is not `:pull_request`) does **not** distinguish a fork's pull request from a branch's. On a
+public repository, before arming, set *Settings → Actions → Fork pull request workflows* to require
+approval for all outside collaborators. That repository setting is the control that matters, not the
+`if:` above it.
+
+**Set on this repository, 2026-08-08**, at the same time as arming:
+
+```sh
+gh api -X PUT repos/OWNER/REPO/actions/permissions/fork-pr-contributor-approval \
+  -f approval_policy=all_external_contributors
+```
+
+It was `first_time_contributors`, which is GitHub's default and is not what this asks for.
 
 ---
 
@@ -386,26 +415,35 @@ sent"* as still unverified after a successful deployment; this holds to that sta
 | The provisioning script parses | `bash -n`. `shellcheck` is not installed here and it has **not** been run |
 | The suite | `npm run typecheck` clean; `vitest --project server` **205 passed**, up from 199, +37 new assertions in `static.test.ts` |
 
+### Also verified, by arming it — 2026-08-08
+
+Items 1 and 3 of the list below used to sit under *not verified*. They were moved by a run, and the
+run corrected both of them ([§ D308](../DECISIONS.md)):
+
+| Claim | How |
+|---|---|
+| Both templates **deploy**, not merely compile | `provision.sh` creates all six resources; the app template re-deploys with `viewerOrigin` set |
+| The concurrency limit on federated credentials | Found by failing: `ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity`, deterministic, zero of six resources created. Fixed with `dependsOn` |
+| **The credential subject is the environment, not the ref** | Found by failing: `AADSTS700213 … 'repo:…:environment:viz-production'`. Both subjects were wrong; a push to `main` would have failed identically |
+| The branch pin, in its new home | `viz-production`'s deployment branch policy names exactly `main`; the script reads it back and refuses to arm otherwise |
+| The API boots with the two origins agreeing | `main.ts` refuses to start when they disagree, so `GET /api/wake` → **200 in 0.12 s** is the assertion |
+| `provision.sh`'s refusal path | Reached for real: it refused to arm while `ELEVATOR_SIM_ALLOW_ORIGIN` was empty, and armed once it was not. The `az containerapp show --query` expression § 9 called *"the line most likely to be wrong"* is right |
+| The armed build's assertion, on the runner | `build site` passed with `ELEVATOR_SIM_API_ORIGIN` set: the tag matches and the CSP permits it |
+
 ### Not verified — reasoned about only
 
-1. **No Azure resource has been created.** No Static Web App exists. The federated credential has
-   never been exchanged and the custom role has never been assigned; whether `listSecrets` alone
-   suffices for `az staticwebapp secrets list` is read from the ARM action list, not measured. This
-   is inherited unchanged from the pull request this lane reuses, and remains the most likely first
-   failure.
-2. **No page has ever been served cross-origin.** The CORS round trip — preflight, the
+1. **No page has ever been served cross-origin.** The CORS round trip — preflight, the
    `Authorization` header, a real sign-in — has not run against two real origins. Every part of it
    is unit-tested and none of it has met a browser.
-3. **`provision.sh` has never been executed.** Its Azure queries, its refusal path and its
-   post-deploy checks are unrun. The `az containerapp show --query` expression that reads
-   `ELEVATOR_SIM_ALLOW_ORIGIN` back off the deployed revision is the line most likely to be wrong,
-   and its failure mode is a script that refuses to arm a correctly configured deployment — a
-   recoverable failure, chosen over the other direction.
-4. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
+2. **`listSecrets` has still not been exercised.** Whether that action alone suffices for
+   `az staticwebapp secrets list` is still read from the ARM action list rather than measured,
+   because the token exchange in front of it failed first and the fixed workflow has not yet run a
+   deploy. It is now the most likely *next* failure.
+3. **The absent `navigationFallback` is unverified against a live site.** The reasoning is § 5's;
    the behaviour has not been observed.
-5. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument
+4. **The Standard-plan proxy timeout is documentation, not measurement.** § 2 uses it as an argument
    against Standard and says so there too.
-6. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
+5. **Still no mail has ever been sent** (`infra/README.md` § 0.2). This lane moves the origin that
    mail's link is built from, so it makes that unverified path *more* load-bearing rather than less.
 
 ---

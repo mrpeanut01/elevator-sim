@@ -86,8 +86,29 @@ boundary, so it has no default.
 ''')
 param githubRepository string
 
-@description('Branch whose pushes deploy to production. Pull requests get preview environments regardless.')
+@description('''
+Branch whose pushes deploy to production. Pull requests get preview environments regardless.
+
+This is **not** part of any federated credential's subject, and it used to be. See the credentials
+below: because the deploy job declares `environment:`, GitHub replaces the ref-based subject with an
+environment-based one, and a credential naming a branch is never presented. The branch restriction
+is real and it lives on the GitHub environment instead, as a deployment branch policy — which
+`provision.sh` sets, so that it is provisioned rather than remembered.
+''')
 param productionBranch string = 'main'
+
+@description('''
+The GitHub environment the production deploy runs in. Must equal the `environment.name` that
+`.github/workflows/deploy-viz.yml` gives the deploy job for a non-pull-request event, because that
+string is half of the federated credential's subject.
+''')
+param productionEnvironment string = 'viz-production'
+
+@description('''
+The GitHub environment a pull request's preview deploy runs in. Same requirement as above, for the
+`pull_request` branch of the same expression.
+''')
+param previewEnvironment string = 'viz-preview'
 
 @description('''
 Name for the user-assigned managed identity GitHub Actions authenticates as.
@@ -148,22 +169,46 @@ resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-0
   whole of the provisioning and `what-if` shows the whole of the change.
 */
 
+/*
+  The subject is the ENVIRONMENT, not the branch, and that correction was made by a run.
+
+  These two credentials named `ref:refs/heads/main` and `pull_request` until the first real deploy
+  presented a token and Entra refused it:
+
+      AADSTS700213: No matching federated identity record found for presented assertion subject
+      'repo:mrpeanut01/elevator-sim:environment:viz-production'
+
+  The deploy job declares `environment:` (deploy-viz.yml — it is how the deployment URL and the
+  protection rules work at all), and when a job references an environment GitHub *replaces* the
+  ref-based subject with `repo:OWNER/REPO:environment:NAME` rather than adding to it. So neither
+  credential could ever have matched, and the failure was not specific to the `workflow_dispatch`
+  that found it: a push to `main` would have been refused with the same message.
+
+  What this costs, stated rather than implied. A branch-pinned subject would not match a deploy
+  dispatched from any other branch; an environment-pinned one does, because the subject carries no
+  ref at all. The branch restriction is therefore no longer enforced by Entra and has moved to the
+  GitHub environment's deployment branch policy, which `provision.sh` sets to exactly
+  `productionBranch`. Two mechanisms became two mechanisms in different places — it is not a
+  weakening, but it is a MOVE, and the half that now lives in GitHub is the half that can be
+  changed without touching this file.
+*/
+
 resource pushCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: deployIdentity
-  name: 'github-${productionBranch}'
+  name: 'github-${productionEnvironment}'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    // The exact subject GitHub puts in the token for a push to this branch. A token from another
-    // branch, another repository, or an environment does not match and is refused at token
-    // exchange — before any Azure permission is consulted.
-    subject: 'repo:${githubRepository}:ref:refs/heads/${productionBranch}'
+    // The exact subject GitHub puts in the token for a job running in this environment. A token
+    // from another repository, or from a job in no environment at all, does not match and is
+    // refused at token exchange — before any Azure permission is consulted.
+    subject: 'repo:${githubRepository}:environment:${productionEnvironment}'
     audiences: ['api://AzureADTokenExchange']
   }
 }
 
 resource pullRequestCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: deployIdentity
-  name: 'github-pull-request'
+  name: 'github-${previewEnvironment}'
   // Serialised against the credential above, and this is a correctness requirement rather than a
   // preference. `parent` makes both depend on the identity and neither on each other, so ARM writes
   // them concurrently — and the resource provider refuses that outright:
@@ -182,8 +227,10 @@ resource pullRequestCredential 'Microsoft.ManagedIdentity/userAssignedIdentities
     issuer: 'https://token.actions.githubusercontent.com'
     // Covers every pull request against this repository, which is what a preview environment per PR
     // requires. Read `docs/16` § 6 before enabling this on a public repository: this subject does
-    // not distinguish a fork's pull request from a branch's.
-    subject: 'repo:${githubRepository}:pull_request'
+    // not distinguish a fork's pull request from a branch's, and the environment form does not
+    // change that — what does is the repository's fork-pull-request approval setting, plus the
+    // `if:` in deploy-viz.yml that excludes a head repository other than this one.
+    subject: 'repo:${githubRepository}:environment:${previewEnvironment}'
     audiences: ['api://AzureADTokenExchange']
   }
 }
@@ -257,6 +304,31 @@ output subscriptionId string = subscription().subscriptionId
 
 @description('Where the site will answer once something has been deployed to it. Also the value the app template takes as `viewerOrigin`, and the origin its CORS will then permit.')
 output defaultHostname string = 'https://${site.properties.defaultHostname}'
+
+/*
+  The three values below are outputs so that `provision.sh` reads them back rather than keeping its
+  own copies, and that is not tidiness. Two of them are literally half of a federated credential's
+  subject: if this template says `viz-production` and the script creates `viz-prod`, GitHub presents
+  a subject for an environment Entra has never heard of, and the failure is an AADSTS700213 that
+  names the string but not which of the two places is wrong.
+
+  `productionBranchName` is here for the same reason and one more: it is the ONLY use of the
+  `productionBranch` parameter, and it has to be. When the credential subject moved from a ref to an
+  environment, that parameter stopped feeding any Azure resource and the linter said so
+  (`no-unused-params`) — a parameter still declared, still documented, still in every example file,
+  and reaching nothing. That is this repository's most-repeated defect wearing infrastructure
+  clothes. It is not deleted, because the branch restriction is real; it is *routed* to the place
+  that now enforces it.
+*/
+
+@description('The environment the production deploy job runs in. Half of the production federated credential subject; `provision.sh` creates it and pins its branch policy.')
+output productionEnvironmentName string = productionEnvironment
+
+@description('The environment a pull request preview runs in. Half of the preview federated credential subject.')
+output previewEnvironmentName string = previewEnvironment
+
+@description('The one branch `productionEnvironmentName` may deploy from. Enforced by a GitHub deployment branch policy, because the federated credential subject no longer carries a ref.')
+output productionBranchName string = productionBranch
 
 @description('''
 The three values that have to agree, named in one place so a reader does not have to reconstruct

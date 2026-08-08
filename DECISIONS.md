@@ -21576,3 +21576,102 @@ is a cue-rule coincidence rather than a product defect: the caveat says *"a quot
 because `render/` may not import `dev/`. `leftRail.test.ts` pins the two equal at five playheads of
 a real recording, in the file whose dependency direction allows it.
 
+
+---
+
+## D308 — the federated credential's subject names the environment, and the branch pin moved out of Azure
+
+`docs/16` § 9 listed six things this lane had reasoned about and never run, and named the first as
+*"the most likely first failure"*: no Azure resource had been created, the federated credential had
+never been exchanged, and whether `listSecrets` alone suffices was read from a documentation table
+rather than measured. It has now been run end to end. **Two of the six were wrong, both in the
+provisioning path, and neither was found by reading.**
+
+### The first: two credentials on one identity cannot be written at once
+
+`what-if` approved six resources; the deploy created zero:
+
+```
+ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity
+"Concurrent Federated Identity Credentials writes under the same managed identity are not supported."
+```
+
+`parent: deployIdentity` makes both credentials depend on the identity and neither on each other, so
+ARM writes them in parallel — which the resource provider refuses outright. Not a race that
+sometimes loses: it is deterministic, it fails the whole deployment, and there is no batching or
+retry knob on the credential resource. Closed with `dependsOn: [pushCredential]`.
+
+### The second, and the one worth reading: the subject was for a ref, and GitHub sends an environment
+
+With the resources created, the first real token exchange was refused:
+
+```
+AADSTS700213: No matching federated identity record found for presented assertion subject
+'repo:mrpeanut01/elevator-sim:environment:viz-production'
+```
+
+The credentials named `repo:OWNER/REPO:ref:refs/heads/main` and `repo:OWNER/REPO:pull_request`, and
+the template's own comment asserted the first was *"the exact subject GitHub puts in the token for a
+push to this branch."* It is not. **When a job declares `environment:`, GitHub replaces the
+ref-based subject with `repo:OWNER/REPO:environment:NAME`** — it does not add to it — and every
+deploying job in `deploy-viz.yml` declares one, because that is how the deployment URL and the
+protection rules work at all.
+
+So **neither credential could ever have matched**. The failure was not an artefact of the
+`workflow_dispatch` that found it; a push to `main` would have been refused with the same message,
+on the first merge, with the site provisioned and the API already pointed at it.
+
+This is [§ D112](#d112)'s shape in infrastructure clothing — a configuration that was authored,
+reviewed, schema-checked, deployed, and could not reach the thing it named. What let it survive
+review is what always lets it survive: **its untested parts read exactly like its tested ones**, and
+the sentence asserting the subject was more confident than anything that had run.
+
+### What the correction costs, stated rather than implied
+
+A ref-pinned subject refuses a deploy dispatched from any other branch. An environment-pinned one
+does not, because the subject carries no ref. **That restriction is real and it has moved rather
+than been dropped** — to the `viz-production` environment's deployment branch policy, set to exactly
+`main`, with `custom_branch_policies` rather than `protected_branches` because the latter means
+*whatever happens to be protected right now*, a different rule on a repository that later protects a
+second branch.
+
+The move is recorded because it is a genuine change of venue: the half that now lives in GitHub can
+be changed without touching a template, and the audit trail for it is GitHub's, not Azure's.
+`provision.sh` **sets** it rather than documenting it — a restriction in a runbook holds until the
+first person who has not read the runbook — and then reads it back and refuses to arm if it names
+anything other than the one branch. `--deploy-now` refuses from a non-production branch for the same
+reason, with the reason in the message, because a policy working correctly and a deploy broken look
+identical in a run log.
+
+### The dead parameter the correction created, and why it is routed rather than deleted
+
+Moving the subject off the ref left `productionBranch` declared, documented, present in every
+example parameter file, and **feeding no Azure resource** — which Bicep's linter said out loud
+(`no-unused-params`). That is this repository's most-repeated defect wearing infrastructure clothes,
+and the fix is not deletion, because the branch restriction is real. It is routed: the template
+emits `productionBranchName`, `productionEnvironmentName` and `previewEnvironmentName` as outputs,
+and `provision.sh` reads all three back from the deployment instead of keeping its own copies. The
+two environment names are literally half of a credential's subject, so a second copy of them in the
+script is a second place for them to be wrong — and the failure that produces is an AADSTS700213
+that names the string and not which of the two places authored it.
+
+### What is now verified by running it, and what is still not
+
+Verified: both templates deploy; six resources exist; the site answers; the app boots with
+`ELEVATOR_SIM_ORIGIN` and `ELEVATOR_SIM_ALLOW_ORIGIN` naming the site and agreeing with each other
+(it refuses to start otherwise, so a 200 from `/api/wake` is the assertion); the armed build emits
+the tag and widens the CSP, asserted on the runner; `provision.sh` runs, refuses to arm before the
+API is pointed at the site, and arms after.
+
+**Still unverified, and the list is shorter rather than empty:** no page has been served
+cross-origin to a browser, so the CORS round trip — preflight, `Authorization`, a real sign-in —
+remains reasoned about; `listSecrets` has still not been exercised, because the token exchange that
+precedes it failed first; the absent `navigationFallback` has not met a live site; and **still no
+mail has ever been sent**.
+
+Re-running `infra/azure/main.bicep` needed both `@secure()` parameters again, and they were **read
+back off the deployed Container App** rather than regenerated — the round trip through
+`uriComponent` checked before deploying, because a password that fails to decode identically would
+reset the server's administrator credential to something its own connection string does not carry.
+Regenerating `appSecret` would have invalidated every session and every in-flight sign-in link, and
+that is a cost this lane had no reason to pay.
