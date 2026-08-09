@@ -793,21 +793,40 @@ const CANVAS: SurfaceAdapter = {
           playhead: atPlayhead(recording, at),
         });
       }
-      const overlayCtx = textCapturingContext();
-      drawOverlay(overlayCtx, {
-        recording,
-        frame: bundle.frame,
-        metrics: bundle.metrics,
-        layout,
-        theme: DEFAULT_THEME,
-      });
-      for (const [index, text] of overlayCtx.texts.entries()) {
-        seeds.push({
-          field: `drawOverlay(@${at.toFixed(0)}s).fillText[${String(index)}]`,
-          text,
-          role: 'prose',
-          playhead: atPlayhead(recording, at),
+      /*
+       * **Both registers, on every case** — GitHub issue #100, and `honesty/types.ts#HONESTY_MODES`
+       * said this day would come: *"the value of generating the axis is the day a mode-aware
+       * renderer lands: it is driven on both modes from that day, rather than from the day somebody
+       * remembers to check it."* `render/overlay.ts` is that renderer, and § D194's measured null —
+       * the second mode value producing zero new strings — stops being null here.
+       *
+       * Rendered both ways rather than branching on `context.case.mode`, which is the disclosure
+       * adapter's own precedent: a mode that only half the cases draw is a mode half the corpus
+       * never sees, and the panel's Casual words include the one string on it that may never be
+       * wrong — the refusal.
+       *
+       * `drawScene` above is left at its default, and that is a claim rather than an oversight:
+       * `render/canvas.ts` passes `input.mode` to `drawOverlay` and to nothing else, so every
+       * mode-sensitive string it can emit is emitted here, twice.
+       */
+      for (const mode of VIEW_MODES) {
+        const overlayCtx = textCapturingContext();
+        drawOverlay(overlayCtx, {
+          recording,
+          frame: bundle.frame,
+          metrics: bundle.metrics,
+          layout,
+          theme: DEFAULT_THEME,
+          mode,
         });
+        for (const [index, text] of overlayCtx.texts.entries()) {
+          seeds.push({
+            field: `drawOverlay(${mode}@${at.toFixed(0)}s).fillText[${String(index)}]`,
+            text,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
       }
       if (selection !== undefined) {
         seeds.push({
@@ -1528,6 +1547,14 @@ const MODE: SurfaceAdapter = {
   covers: [
     'mode/disclosure.ts#disclosureItems',
     'mode/disclosure.ts#SUPPRESSION_LEAD',
+    /*
+     * The per-ground half of the same refusal, which became an export when a **second** surface
+     * needed it — the Day report, GitHub issue #100. It reaches the corpus twice over: through
+     * `disclosureItems` below, which is the call this adapter drives, and through
+     * `dev/reportPanel.ts#reportViewOf`'s Casual arm, which is driven in that adapter. Two drivers
+     * for one sentence is what makes it one sentence rather than two that agree today.
+     */
+    'mode/disclosure.ts#suppressionLeadFor',
     'mode/disclosure.ts#BASIC_WINDOW_VALUE',
     'mode/parity.ts#parityViolations',
     'mode/parity.ts#parityRefusal',
@@ -2812,6 +2839,23 @@ const REPORT_PANEL: SurfaceAdapter = {
      */
     'dev/reportPanel.ts#leverRowsOf',
     'dev/reportPanel.ts#LEVER_SURFACES',
+    /*
+     * Casual's reading of the same sheet — GitHub issues #110 and #100, `mode/casualDay.ts`.
+     *
+     * Every one of these reaches the corpus through `reportViewOf(…, mode)` in the loop below,
+     * which renders **both** registers on every case. They are named rather than excluded because
+     * each of them produces a sentence a player reads: the note leads, the section heading, the
+     * small-print translation and the reach note. `casualFigureOrderOf` produces no prose at all
+     * and is listed for the reason `LEVER_SURFACES` is — the derived scanner reads its hyphenated
+     * figure ids as phrases, and the honest answer is that what it decides (an order) is driven
+     * here, twice, rather than that it is exempt.
+     */
+    'mode/casualDay.ts#casualNoteFor',
+    'mode/casualDay.ts#casualFigureOrderOf',
+    'mode/casualDay.ts#CASUAL_FIGURE_ORDER',
+    'mode/casualDay.ts#CASUAL_LEVERS_HEADING',
+    'mode/casualDay.ts#CASUAL_SMALL_PRINT_LEAD',
+    'mode/casualDay.ts#CASUAL_REACH_NOTE',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -2825,12 +2869,32 @@ const REPORT_PANEL: SurfaceAdapter = {
        * product shipped two.
        */
       for (const shaped of [entry.report, entry.singleRunReport]) {
-      const at = `day${String(entry.day)}.${shaped.of}`;
-      const view = reportViewOf(shaped);
+      /*
+       * **Both registers, on every case** — GitHub issues #110 and #100.
+       *
+       * Until this loop, `reportViewOf` took no mode and the sheet was byte-identical in Casual and
+       * Engineer, so one render was one render. It now leads with different cells, words a refused
+       * mean for the reader who met it and translates the small print, and every one of those
+       * strings is a claim about this run. Rendering one mode would put the other's sentences
+       * outside the search — issue #127's shape, which is open because a surface escaped it.
+       */
+      for (const mode of VIEW_MODES) {
+      const at = `day${String(entry.day)}.${shaped.of}.${mode}`;
+      const view = reportViewOf(shaped, undefined, undefined, mode);
       seeds.push({ field: `${at}.title`, text: view.title, role: 'label' });
       seeds.push({ field: `${at}.lede`, text: view.lede, role: 'observation' });
+      if (view.leversHeading !== undefined) {
+        seeds.push({ field: `${at}.leversHeading`, text: view.leversHeading, role: 'label' });
+      }
       for (const [index, cell] of view.figures.entries()) {
-        const source = entry.report.figures[index];
+        /*
+         * Paired by **id**, not by index. Casual reorders the grid (`casualFigureOrderOf`), so the
+         * position a cell sits at in the view is no longer the position it sits at on the sheet —
+         * and the shape being looked up decides whether R3 gates this string and whether R13 wants
+         * a count beside it. An index lookup would have attributed the energy axis's exemption to
+         * whatever cell happened to land eighth.
+         */
+        const source = shaped.figures.find((figure) => figure.label === cell.label);
         const shape = source === undefined
           ? { role: 'observation' as TextRole, gated: false, energyAxis: false }
           : reportFigureShape(source);
@@ -2912,11 +2976,45 @@ const REPORT_PANEL: SurfaceAdapter = {
       }
       const firstFigure = entry.report.figures[0];
       if (firstFigure !== undefined) {
-        const cell = figureViewOf(firstFigure);
+        const cell = figureViewOf(firstFigure, mode);
         seeds.push({
           field: `${at}.figureViewOf(${cell.label})`,
           text: `${cell.label}: ${cell.value}`,
           role: reportFigureShape(firstFigure).role,
+        });
+        /*
+         * The **note**, which is the half of this cell the mode moves — and on a refused run it is
+         * the whole of Casual's answer to issue #100: `mode/disclosure.ts#suppressionLeadFor`'s
+         * per-ground sentence, in front of `core`'s own reason. Seeded as a `reason` when the cell
+         * is refused, for the loop above's reason: the refusal is the one string entitled to quote
+         * the numbers it is refusing.
+         */
+        seeds.push({
+          field: `${at}.figureViewOf(${cell.label}).note`,
+          text: cell.note,
+          role: reportFigureShape(firstFigure).role === 'suppressed' ? 'reason' : 'observation',
+        });
+      }
+      /*
+       * The one cell that can be refused, driven **in both registers on every case** — and it is
+       * the only figure this adapter reaches by id rather than by position.
+       *
+       * `figures[0]` above is `carried` on every shipped sheet, so the loop that was here drove the
+       * Casual wording of a count and never of a refusal. On the 14 of 60 generated cases whose
+       * summary refuses a mean, `average-wait` is where every new sentence in `mode/casualDay.ts`
+       * actually lands.
+       */
+      const refusable = shaped.figures.find((figure) => figure.id === 'average-wait');
+      if (refusable !== undefined) {
+        const cell = figureViewOf(refusable, mode);
+        const shape = reportFigureShape(refusable);
+        seeds.push({
+          field: `${at}.figureViewOf(average-wait).note`,
+          text: cell.note,
+          role: shape.role === 'suppressed' ? 'reason' : 'observation',
+          declaredCount: shape.gated ? context.recording.summary.waitCount : undefined,
+          countShown: shape.gated ? /(\d[\d,]*)/.test(cell.note) : undefined,
+          gated: shape.gated,
         });
       }
       for (const [index, row] of diagnosisRowsOf(entry.report.diagnosis).entries()) {
@@ -2925,6 +3023,7 @@ const REPORT_PANEL: SurfaceAdapter = {
           text: row.what,
           role: 'observation',
         });
+      }
       }
       }
     }

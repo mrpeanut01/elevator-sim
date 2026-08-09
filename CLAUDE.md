@@ -66,8 +66,17 @@ verdict:
 
   | tier | cases | strings | surfaces | violations |
   |---|---|---|---|---|
-  | always-on | 49 | **246 875** | 30 | **0** |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **312 104** | 30 | **10, one case** |
+  | always-on | 49 | **278 756** | 30 of 31 | **0** |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **352 073** | 31 of 31 | **10, one case** |
+
+  Re-measured 2026-08-08 on the branch that made the Day report and the live-metrics panel
+  mode-aware (GitHub issues #110 and #100): both adapters now render **both** registers on every
+  case, so the always-on tier moved **246 875 → 278 756** and the deep tier **312 104 → 352 073**.
+  The surface column is corrected as well as re-measured — it published `30` for both tiers, and
+  the deep tier reaches **31**, because `campaign/judge.ts#judgeStage` is silent in the always-on
+  tier by construction (`STANDARD_SPACE` sets `stageProbability: 0`, a stage being 50 replications)
+  and loud in the deep one. `honesty.test.ts` asserts that silence in one tier and that noise in
+  the other, so *30* was never the deep tier's number.
 
   The deep tier's one failure is `honesty-9100031` / `suppressed-mean`, a **cue-rule coincidence
   rather than a product defect**: the caveat says *"a quotable average on 6 of 20 consecutive
@@ -92,7 +101,10 @@ verdict:
   docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
   verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
   honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
-  second value produced zero new strings, a measured null)*,
+  second value produced zero new strings, **and that measured null has since stopped being true**:
+  the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
+  both adapters now render **both** registers on every case, which is where the always-on tier's
+  string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
   three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 

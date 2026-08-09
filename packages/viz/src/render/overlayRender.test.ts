@@ -1160,3 +1160,190 @@ describe('the live metrics panel is never narrower than its own content — issu
     }
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The panel in Casual — GitHub issue #100, whose first checklist item is this panel
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the live-metrics panel is allowed to say to a Casual reader.
+ *
+ * The measurement: `drawOverlay` took no mode, so `LIVE METRICS`, `rolling mean wait`,
+ * `SUPPRESSED`, `BY BANK` and `CAR LOAD` were what both audiences got. #100 reports exactly that
+ * — *"during a saturated run the simulation header still prints SATURATED and AWT suppressed"*.
+ *
+ * Four rules, and the third and fourth are the ones that make the first two safe:
+ *
+ * 1. **The words move.** A player reads different labels.
+ * 2. **They fit.** Every Casual string is measured at its own face against the narrowest panel the
+ *    layout will hand over — the bound issue #115 § 6 exists for, applied to the strings this lane
+ *    added rather than to the ones somebody remembered.
+ * 3. **A refusal stays a refusal.** `SUPPRESSED` becomes a line that says there is **no average**,
+ *    in the warning colour, with no number beside it and with the reason still reachable. It is
+ *    never softened into *a busy day*, and it never claims a ground the run may not have.
+ * 4. **Engineer is untouched.** The default is the engineer's panel, byte for byte.
+ */
+describe('the live metrics panel speaks a player’s words in Casual — issue #100', () => {
+  const at = 100;
+
+  /** The saturating summary the width suite already uses — `core`'s own prose, verbatim. */
+  const SATURATED: VizRecording = {
+    ...RECORDING,
+    summary: {
+      ...RECORDING.summary,
+      saturated: true,
+      awtIsValid: false,
+      awtInvalidReason:
+        'Queue length rose by 268.0 persons (53.59/min, 12.0x the queue’s own scatter) over the ' +
+        '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
+        'saturated, AWT is not approximately normal and its confidence interval must be ' +
+        'suppressed.',
+    },
+  };
+
+  const panelText = (recording: VizRecording, mode: 'basic' | 'advanced'): string => {
+    const ctx = new RecordingContext();
+    drawOverlay(ctx, {
+      recording,
+      frame: frame({ simTimeS: at }),
+      metrics: overlayAt(recording, at),
+      layout: layoutFor(recording),
+      theme: DEFAULT_THEME,
+      mode,
+    });
+    return ctx.texts.join('\n');
+  };
+
+  it('says what the panel is in a player’s words, and keeps the engineer’s', () => {
+    const casual = panelText(RECORDING, 'basic');
+    const engineer = panelText(RECORDING, 'advanced');
+    expect(casual).not.toBe(engineer);
+    for (const jargon of ['LIVE METRICS', 'rolling mean wait', 'BY BANK', 'CAR LOAD']) {
+      expect(engineer, jargon).toContain(jargon);
+      expect(casual, jargon).not.toContain(jargon);
+    }
+    expect(casual).toContain('RIGHT NOW');
+    expect(casual).toContain('BY LIFT GROUP');
+  });
+
+  it('defaults to the engineer’s panel, byte for byte', () => {
+    const ctx = new RecordingContext();
+    drawOverlay(ctx, {
+      recording: RECORDING,
+      frame: frame({ simTimeS: at }),
+      metrics: overlayAt(RECORDING, at),
+      layout: layoutFor(RECORDING),
+      theme: DEFAULT_THEME,
+    });
+    expect(ctx.texts.join('\n')).toBe(panelText(RECORDING, 'advanced'));
+  });
+
+  it('keeps the window’s basis rather than dropping it', () => {
+    /*
+     * The one label that could have been made plainer by making it false. `boarded (window)` is a
+     * count over the rolling window; drawn as a count over the day it would be a wrong figure, not
+     * a friendlier one — so Casual keeps the basis and says it in minutes.
+     */
+    const casual = panelText(RECORDING, 'basic');
+    expect(casual).toContain('got a car (5min)');
+    const metrics = overlayAt(RECORDING, at);
+    expect(casual).toContain(`the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`);
+  });
+
+  it('refuses a mean just as hard, and says so in words a player has', () => {
+    const casual = panelText(SATURATED, 'basic');
+    const engineer = panelText(SATURATED, 'advanced');
+    expect(engineer).toContain('SUPPRESSED');
+    expect(casual).not.toContain('SUPPRESSED');
+    // Still a refusal, and it says the thing that matters first: there is no average.
+    expect(casual).toContain('NO AVERAGE');
+    expect(casual).toMatch(/refuse/i);
+    // Never softened into a description of the day, and never claiming a ground this panel cannot
+    // see — `awtIsValid` has five grounds and only one of them is saturation.
+    expect(casual.toLowerCase()).not.toContain('busy day');
+    expect(casual.toLowerCase()).not.toContain('could not cope');
+    // The observations survive, because they are how a reader *sees* a queue diverging.
+    for (const row of ['people waiting', 'longest wait', 'got a car (5min)']) {
+      expect(casual, row).toContain(row);
+    }
+  });
+
+  it('prints no mean anywhere on a refused run, in either register', () => {
+    const mean = (overlayAt(RECORDING, at).rollingMeanWaitS ?? 0).toFixed(1);
+    // The premise: the same panel on the unrefused run does print it.
+    expect(panelText(RECORDING, 'basic')).toContain(`${mean} s`);
+    for (const mode of ['basic', 'advanced'] as const) {
+      expect(panelText(SATURATED, mode), mode).not.toContain(`${mean} s`);
+    }
+  });
+
+  it('draws the refusal in the warning colour, not in body ink', () => {
+    const ctx = new RecordingContext();
+    drawOverlay(ctx, {
+      recording: SATURATED,
+      frame: frame({ simTimeS: at }),
+      metrics: overlayAt(SATURATED, at),
+      layout: layoutFor(SATURATED),
+      theme: DEFAULT_THEME,
+      mode: 'basic',
+    });
+    const refusal = ctx.calls.find(
+      (call) => call.op === 'fillText' && String(call.args[0]).startsWith('NO AVERAGE'),
+    );
+    expect(refusal).toBeDefined();
+    expect(refusal?.args[3]).toBe(DEFAULT_THEME.warning);
+  });
+
+  it('fits the narrowest panel the layout hands over — issue #115 § 6, on the new strings', () => {
+    /*
+     * The bound is **found**, not transcribed: `render/layout.ts` owns the floor and a literal here
+     * would be a second copy of it. Measured at each string's own face, because a bound computed at
+     * the 12 px face is 9 % too generous for every 11 px line — the error `wrap` shipped with.
+     */
+    let floor = 0;
+    for (let asked = 1; asked <= 600 && floor === 0; asked += 1) {
+      const probe = buildLayout({
+        width: 2400,
+        height: 900,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        overlayWidthPx: asked,
+      });
+      if (probe.overlay !== undefined) floor = probe.overlay.width;
+    }
+    expect(floor).toBeGreaterThan(120);
+
+    for (const recording of [RECORDING, SATURATED]) {
+      const layout = buildLayout({
+        width: 2400,
+        height: 900,
+        floors: recording.floors,
+        shafts: recording.shafts,
+        overlayWidthPx: floor,
+      });
+      const panel = layout.overlay;
+      if (panel === undefined) throw new Error('expected a panel');
+      const ctx = new FacedContext();
+      drawOverlay(ctx, {
+        recording,
+        frame: frame({
+          cars: Array.from({ length: 4 }, (_ignored, index) =>
+            car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.25 * index }),
+          ),
+        }),
+        metrics: overlayAt(recording, at),
+        layout,
+        theme: DEFAULT_THEME,
+        mode: 'basic',
+      });
+      const inPanel = ctx.drawn.filter((entry) => entry.x >= panel.x);
+      expect(inPanel.length).toBeGreaterThan(8);
+      for (const entry of inPanel) {
+        expect(
+          entry.x + entry.text.length * entry.advancePx,
+          `"${entry.text}" runs past the panel`,
+        ).toBeLessThanOrEqual(panel.x + panel.width);
+      }
+    }
+  });
+});
