@@ -122,6 +122,21 @@ export interface MenuPanelHost {
    * claim than the silence it replaced.
    */
   hasServer?: (() => boolean) | undefined;
+  /**
+   * Whether this page loaded with nothing restored — GitHub issues #90 and #98.
+   *
+   * Only the shell can answer it, for {@link MenuPanelHost.hasServer}'s reason one layer over: the
+   * answer comes from `loadSession` against `window.localStorage`, and `menu/screens.ts` does not
+   * depend on the persistence layer to draw a menu. `dev/main.ts` reads it once during
+   * `restoreSession` — the one instant the product has ever known it — and latches it, rather than
+   * re-reading per draw and letting the notice disappear under a reader the first time anything saves.
+   *
+   * Optional, and `undefined` means **nobody has said** rather than *no*. A test or an embedder that
+   * has no session store is honestly in that state, and a menu that welcomed a returning player as a
+   * new one is the same class of wrong claim as one that asserted *needs a server* on a build that has
+   * one. See `menu/screens.ts`'s {@link MenuViewInput.firstVisit}.
+   */
+  firstVisit?: (() => boolean) | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -353,6 +368,9 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     calendarPeriodId: host.calendarPeriodId(),
     naming,
     ...(host.hasServer === undefined ? {} : { hasServer: host.hasServer() }),
+    // Same shape as `hasServer` above and for the same reason: an absent host method is *nobody has
+    // said*, which the view models as `undefined` and answers with silence rather than a guess.
+    ...(host.firstVisit === undefined ? {} : { firstVisit: host.firstVisit() }),
   });
 
   /*
@@ -415,9 +433,32 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
 
   const list = draw.retain('div', 'list', { className: 'menu-list' });
   const rows: Node[] = view.rows.map((row) => affordance(draw, host, row));
-  // The seventh entry on the root, and it is an entry rather than a row: see the comment on
-  // `MenuScreenView.guide` for why the guide carries no intent and asks nothing of the shell.
-  if (view.guide !== undefined) rows.push(guideEntry(draw, view.guide));
+  /*
+   * **Second, directly under the row that recommends a path** — GitHub issue #98, which asks for
+   * *How to play* at the top of the nav or behind a persistent `?`.
+   *
+   * It was **last**, after all six navigations and after Resume, and the issue is right about what
+   * that costs: *"Most new players will not find it."* The entry is a `<details>` and it is an entry
+   * rather than a row — see the comment on `MenuScreenView.guide` for why it carries no intent and
+   * asks nothing of the shell.
+   *
+   * It is second rather than first, and the order is the argument. A player who does not yet know
+   * what a dispatcher is needs the explanation before the five ways of doing it, and needs the one
+   * recommendation before the explanation — otherwise the first thing on the product's first screen
+   * is a wall of prose, which is the failure #98 describes one screen later. So: press this, or read
+   * why first.
+   *
+   * ## Why the index is found rather than assumed
+   *
+   * `rows[1]` would be a claim that the recommended row is `rows[0]`, made here, by a number. The
+   * recommendation is `MenuAffordance.primary` and `menu/screens.ts` decides it, so this asks. A
+   * screen with a guide and no recommendation puts it first, which is the honest position when there
+   * is nothing to sit under.
+   */
+  if (view.guide !== undefined) {
+    const recommended = view.rows.findIndex((row) => row.primary === true);
+    rows.splice(recommended + 1, 0, guideEntry(draw, view.guide));
+  }
   reconcile(list, ...rows);
   children.push(list);
 
@@ -729,8 +770,20 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
     });
   }
 
+  const base = row.kind === 'back' ? 'menu-back' : row.kind === 'commit' ? 'menu-start' : 'menu-row';
   const button = draw.retain('button', `row.${row.id}`, {
-    className: row.kind === 'back' ? 'menu-back' : row.kind === 'commit' ? 'menu-start' : 'menu-row',
+    /*
+     * A **modifier**, appended and never substituted — `MINE`'s precedent below, and the reason is
+     * the same one. The recommendation this marks is already in the row's own words (*Start here*),
+     * so the class is the second channel rather than the only one (KB-15); and a replacement class
+     * would have taken the row's padding, border and focus ring with it, so the recommended row would
+     * have stopped looking like a row of this menu at all.
+     *
+     * `retainer` re-applies `className` on the reuse path whenever it differs, so a row that gains or
+     * loses the recommendation across a redraw is restyled rather than left carrying the old class —
+     * which is what makes this safe on the one screen whose rows change with the view mode.
+     */
+    className: row.primary === true ? `${base} ${PRIMARY_ROW}` : base,
     attrs: { type: 'button' },
   });
   /*
@@ -765,6 +818,20 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
   else button.removeAttribute(CONTROL_KEY);
   return button;
 }
+
+/**
+ * The row a screen recommends — GitHub issue #90's *"there is no row that says Start here"*.
+ *
+ * A modifier over `menu-row` or `menu-start`, on {@link MINE}'s rule: the tint is never the only
+ * signal, because the row says *Start here* in its own label and `MenuAffordance.primary` is what the
+ * stylesheet is agreeing with rather than what it is asserting.
+ *
+ * Written as a `const` so `dev/surfaces.test.ts` sees it. That test derives the class names this file
+ * emits **from this file's source** and requires a rule for each in `index.html`; it matches single
+ * quotes, so a name that only ever appeared inside a template literal would be invisible to it and
+ * would ship unstyled — which is the exact failure that test was written about.
+ */
+const PRIMARY_ROW = 'menu-row-primary';
 
 /* -------------------------------------------------------------------------- *
  * How to play — an entry that discloses rather than navigates

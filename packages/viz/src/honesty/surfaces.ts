@@ -3897,7 +3897,29 @@ const MENU: SurfaceAdapter = {
      * grown building. That sentence is shown beside a disabled **Post this run**, which is a claim
      * about why somebody's score is not going up, and is exactly the shape R2 exists to police.
      */
-    const menuStates = [
+    /*
+     * **The two axes added with the cold-start door** \u2014 GitHub issues #90 and #98.
+     *
+     * `screenOf` defaults `viewMode` to `advanced` and `firstVisit` to *nobody has said*, so the three
+     * arms above drive Engineer's door and no welcome at all. That would have left the Casual sentence
+     * and the whole first-visit note outside the corpus while every count in the phase's status row
+     * went up \u2014 which is the shape issue #127 was filed about one lane over, arriving here by
+     * omission rather than by oversight.
+     *
+     * Two arms rather than a cross product: the axes are independent of the three above (a refused
+     * selection does not change what a welcome says), so four extra cells would be four extra copies
+     * of the same strings. What is needed is that **every string the root can emit** is reached, and
+     * one Casual arm plus one first-visit arm reaches all of them.
+     */
+    const menuStates: readonly {
+      readonly label: string;
+      readonly selection: typeof whole;
+      readonly canPost: boolean;
+      readonly hasRun: boolean;
+      readonly refusal: string | undefined;
+      readonly viewMode?: 'basic' | 'advanced';
+      readonly firstVisit?: boolean;
+    }[] = [
       { label: 'whole', selection: whole, canPost: true, hasRun: true, refusal: undefined },
       { label: 'broken', selection: broken, canPost: false, hasRun: false, refusal: undefined },
       {
@@ -3908,7 +3930,23 @@ const MENU: SurfaceAdapter = {
         refusal:
           'day 7 grows the building by 66 % and schedules \u201cMove-in day\u201d, and neither travels with a selection',
       },
-    ] as const;
+      {
+        label: 'casual',
+        selection: whole,
+        canPost: true,
+        hasRun: true,
+        refusal: undefined,
+        viewMode: 'basic',
+      },
+      {
+        label: 'first-visit',
+        selection: whole,
+        canPost: true,
+        hasRun: true,
+        refusal: undefined,
+        firstVisit: true,
+      },
+    ];
     for (const arm of menuStates) {
       for (const screen of MENU_SCREENS) {
         const view = screenOf({
@@ -3923,6 +3961,8 @@ const MENU: SurfaceAdapter = {
           canPost: arm.canPost,
           hasRun: arm.hasRun,
           ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
+          ...(arm.viewMode === undefined ? {} : { viewMode: arm.viewMode }),
+          ...(arm.firstVisit === undefined ? {} : { firstVisit: arm.firstVisit }),
           boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
           challenge: challengeInput,
         });

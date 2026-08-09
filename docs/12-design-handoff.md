@@ -456,12 +456,34 @@ own count attached.
 
 | Screen | Why the handoff has no row for it | The constraint it is built under |
 |---|---|---|
-| Main | The prototype has one mode and opens straight into it | Six destinations, each with a line saying what it is; never a bare list of nouns |
+| Main | The prototype has one mode and opens straight into it | Six destinations, each with a line saying what it is; never a bare list of nouns — **and one of them recommended, in words** (see below) |
 | Campaign | The prototype's week has no way in or out — it simply is | Says which of the two things called Campaign this is, and selects the surface rather than dropping the reader on whatever tab was last open |
 | Free play | The prototype has no configuration a player chooses | Six axes, all derived from `data/`; Start disabled **and explained**; the run is day one and the screen says so |
 | Settings | The prototype has no presentation controls at all | Presentation only, and that claim is **measured** — `scope.test.ts` moves each and requires the legs byte-identical |
 | Leaderboard | There is no server in the prototype | Says what a board *is* rather than letting the word imply a skill ranking |
 | Challenge | Neither is there a competition | The window is drawn and never computed; the dispatcher is the only axis; every row carries its `n` |
+
+**The Main row's constraint gained a clause, and the clause is a deviation the handoff cannot settle**
+— GitHub issues #90 and #98, under [§ D299](../DECISIONS.md). *"Six destinations, each with a line
+saying what it is"* is what the row asked for and it is what shipped, and it turned out to be
+insufficient in a direction the sentence does not cover: six equally-weighted destinations are a
+complete set of *choices* and an empty set of *recommendations*, so a player arriving for the first
+time is told what each row is and never which one to press. #90 measures the cost — four first-touch
+paths tried in the order a curious player would, none of them the intended one.
+
+So the root now leads with a **recommendation** rather than a seventh destination: one row, labelled
+*Start here*, whose intent is one of the six the screen already offered. Three things make it a
+deviation the handoff has no view on rather than a disagreement with it. The handoff draws no menu at
+all, so there is no row it contradicts. Nothing is removed or reordered — the six destinations and
+Resume are on the screen in the order they were, which is [§ D299](../DECISIONS.md) § 2's constraint
+that a first run may **sequence** what a player meets and may not **remove** what they can reach. And
+it states no figure, including no duration: #90 proposes *"it takes about 5 minutes"* and nothing in
+this repository measures that, so it is not said.
+
+**It is one row with two destinations, because § D299 says there are two products.** Casual's opens
+the scenarios board; Engineer's opens Free play. *How to play* moves with it, from last on the list to
+directly under the recommendation — #98's third recommendation, and the half of it that does not need
+a persistent `?` in the header the handoff also has no row for.
 
 **One rename, and it is the one disagreement with the handoff's own vocabulary.** The prototype uses
 *Campaign* for its batch-judged stage list. This implementation also has a contract week, which the

@@ -495,6 +495,151 @@ describe('the how-to-play entry reaches the page', () => {
     const elsewhere = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded);
     expect(walk(elsewhere.root).some((node) => node.tag === 'details')).toBe(false);
   });
+
+  /**
+   * **Second, not last** — GitHub issue #98's third recommendation, driven.
+   *
+   * The issue is a claim about *position*: *"The 'How to play' link is listed last, after Scenarios,
+   * Free Play, Challenge, Leaderboard, Account, Settings, and Resume. Most new players will not find
+   * it."* That was true — `renderMenu` pushed the entry after every row — and it is the kind of claim
+   * only this tier can settle, because the two tiers below it can see the guide **exists** and cannot
+   * see where on the page it ended up.
+   *
+   * It is also the claim `menu/screens.ts#FIRST_VISIT_NOTE` makes to a first-time player in so many
+   * words — *"How to play, directly under it"*. A sentence about a layout is pinned by the layout or
+   * it is not pinned at all, which is § D227's rule pointed at wayfinding rather than at a refusal.
+   */
+  it('is drawn directly under the row the screen recommends — issue #98', async () => {
+    const loaded = await catalogue();
+    for (const mode of ['basic', 'advanced'] as const) {
+      const { root } = render(initialMenuState(loaded), loaded, { viewMode: () => mode });
+      const list = byClass(root, 'menu-list')[0];
+      const kids = list?.children ?? [];
+
+      const recommended = kids.findIndex((child) => child.className.includes('menu-row-primary'));
+      const guide = kids.findIndex((child) => child.tag === 'details');
+      expect(recommended, `no recommended row on the root in ${mode}`).toBeGreaterThanOrEqual(0);
+      expect(guide, `no guide entry on the root in ${mode}`).toBeGreaterThanOrEqual(0);
+      expect(guide, `the guide is not directly under the recommended row in ${mode}`).toBe(
+        recommended + 1,
+      );
+      // Non-vacuity in the direction that matters: it must be **above** the ordinary rows, not merely
+      // adjacent to the first one. Before this change it was last, so this is the assertion that
+      // would have been red.
+      expect(kids.length, 'the root draws only the guide and one row').toBeGreaterThan(guide + 1);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The cold start — GitHub issues #90 and #98
+ * -------------------------------------------------------------------------- */
+
+describe('the root menu recommends one row, and says so in more than a colour', () => {
+  /**
+   * The row exists, is first, and carries the recommendation as a **modifier**.
+   *
+   * #90's complaint is that the root offers rows *"of equal visual weight"* with *"no row that says
+   * Start here"*. The first half is a styling claim this tier explicitly cannot answer — see this
+   * file's own docstring on what a recorder is not — so what is asserted here is the half a document
+   * can carry: the class the stylesheet keys on is written, it is written **alongside** the base
+   * class rather than instead of it, and it is on the first row.
+   */
+  it('puts a recommended row first, without taking the row vocabulary away from it', async () => {
+    const loaded = await catalogue();
+    for (const mode of ['basic', 'advanced'] as const) {
+      const { root } = render(initialMenuState(loaded), loaded, { viewMode: () => mode });
+      const list = byClass(root, 'menu-list')[0];
+      const first = list?.children[0];
+      expect(first?.className, `the first entry on the root is not recommended in ${mode}`).toContain(
+        'menu-row-primary',
+      );
+      // A modifier, never a replacement: the row keeps whichever base class its kind earns, so it
+      // keeps that class's padding, border, focus ring and disabled handling.
+      expect(
+        first?.className.split(' ').filter((name) => name !== 'menu-row-primary'),
+        `the recommended row lost its base class in ${mode}`,
+      ).toEqual([mode === 'basic' ? 'menu-start' : 'menu-row']);
+    }
+  });
+
+  /**
+   * KB-15, on the one row whose whole job is to be noticed.
+   *
+   * A recommendation carried only by a tint is invisible to a screen reader, to a monochrome display
+   * and to a photocopy — and this repository has already paid for that once, on the board row that
+   * marked *which of these is mine* in colour alone. So the words have to say it too, and the words
+   * are what this tier can actually read.
+   */
+  it('says it is the one to press in the row’s own text, not only in its class', async () => {
+    const loaded = await catalogue();
+    for (const mode of ['basic', 'advanced'] as const) {
+      const { root } = render(initialMenuState(loaded), loaded, { viewMode: () => mode });
+      const first = byClass(root, 'menu-list')[0]?.children[0];
+      const text = textUnder(first as Recorded);
+      expect(text, `the recommended row does not name itself in ${mode}`).toContain('Start here');
+      expect(text, `the recommended row does not say who it is for in ${mode}`).toContain(
+        'if you are new',
+      );
+    }
+  });
+
+  /**
+   * **It is not inert**, which is the standing requirement this package exists to keep.
+   *
+   * A row that looks recommended and dispatches nothing would be the eleventh dead seam wearing the
+   * one costume guaranteed to be pressed first. The intent differs by product — § D299's *one door
+   * per product* — and both are members the shell's exhaustive switch already performs, so neither
+   * arm could compile against a shell that did not handle it.
+   */
+  it('presses, and asks the shell for the door this product opens', async () => {
+    const loaded = await catalogue();
+    const casual = render(initialMenuState(loaded), loaded, { viewMode: () => 'basic' });
+    byClass(casual.root, 'menu-list')[0]?.children[0]?.listeners.get('click')?.();
+    expect(casual.asked, 'Casual’s door does not open the scenarios board').toEqual([
+      { kind: 'open-campaign' },
+    ]);
+
+    const engineer = render(initialMenuState(loaded), loaded, { viewMode: () => 'advanced' });
+    byClass(engineer.root, 'menu-list')[0]?.children[0]?.listeners.get('click')?.();
+    expect(engineer.asked, 'Engineer’s door does not open Free play').toEqual([
+      { kind: 'navigate', to: 'free-play' },
+    ]);
+  });
+
+  /**
+   * The welcome is a fact about the load, and a host that has not looked says nothing.
+   *
+   * `undefined` is *nobody has said* — `MenuViewInput.firstVisit`'s rule and `hasServer`'s precedent
+   * — so the default host in this file, which has no session store at all, must draw no welcome. A
+   * menu that greeted a returning player as a new one is the same class of false claim as one that
+   * asserted *needs a server* on a build that has one.
+   */
+  it('welcomes a first visit, and only when the shell has actually said it is one', async () => {
+    const loaded = await catalogue();
+    const silent = render(initialMenuState(loaded), loaded);
+    expect(textUnder(silent.root)).not.toContain('Nothing was restored');
+
+    const returning = render(initialMenuState(loaded), loaded, { firstVisit: () => false });
+    expect(textUnder(returning.root)).not.toContain('Nothing was restored');
+
+    const fresh = render(initialMenuState(loaded), loaded, { firstVisit: () => true });
+    const welcome = byClass(fresh.root, 'menu-notice').map((node) => node.textContent).join(' ');
+    expect(welcome, 'a first visit gets no welcome').toContain('Nothing was restored');
+    // The two wayfinding claims in that sentence are the ones the cases above pin to the page. It
+    // may not name a third thing nothing checks.
+    expect(welcome).toContain('Start here');
+    expect(welcome).toContain('How to play');
+  });
+
+  /** The welcome belongs to the screen a player lands on, and to no other. */
+  it('says it on the root and nowhere else', async () => {
+    const loaded = await catalogue();
+    const elsewhere = render({ ...initialMenuState(loaded), screen: 'settings' }, loaded, {
+      firstVisit: () => true,
+    });
+    expect(textUnder(elsewhere.root)).not.toContain('Nothing was restored');
+  });
 });
 
 /* -------------------------------------------------------------------------- *

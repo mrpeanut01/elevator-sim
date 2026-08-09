@@ -1238,6 +1238,32 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let restoreNotice: string | undefined;
 
+  /**
+   * Whether this page loaded with nothing restored — GitHub issues #90 and #98.
+   *
+   * ## The knowledge existed and was thrown away, which is why this is a variable rather than a call
+   *
+   * `persist/types.ts` has carried a dedicated `absent` arm since it was written, arguing in its own
+   * docstring that *"nothing stored yet is an ordinary first visit"* and must not be reported as a
+   * loss. It had two readers and neither was a screen: `restoreNoticeFor` returns `undefined` for it
+   * (correctly — a first visit is not a loss to announce), and the line below declines to clear the
+   * slot. So the product knew, at exactly one instant per load, that nobody had ever played here, and
+   * the answer went nowhere. #90 asks for the surface that would have used it.
+   *
+   * ## Latched at boot rather than asked per draw
+   *
+   * `saveSessionNow` runs on the first setting a player touches, so a per-draw `loadSession` would
+   * answer *yes* on one redraw and *no* on the next — the welcome vanishing under somebody reading
+   * it, and the menu changing shape mid-sentence. This is therefore a fact about **this load**, and
+   * `menu/screens.ts`'s `FIRST_VISIT_NOTE` is worded about what was restored rather than about what
+   * is stored, so it stays true for the life of the page.
+   *
+   * It starts `false`: a shell that never restored is not a shell that found nothing, and claiming a
+   * first visit before looking would be the guess `MenuViewInput.firstVisit`'s `undefined` exists to
+   * avoid.
+   */
+  let loadedWithNothingRestored = false;
+
   function restoreSession(): void {
     /*
      * **The library first, and on both paths.**
@@ -1268,6 +1294,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * precise reason the whole way here before being dropped on the floor.
        */
       restoreNotice = restoreNoticeFor(restored.failure);
+      /*
+       * The same arm, read for the other half of what it means — issues #90 and #98. `absent` is the
+       * one failure that is not one, and it is the only signal this product has ever had that
+       * somebody is here for the first time. It was already branched on for *do not clear the slot*;
+       * it is now also branched on for *say so on the menu*. One read, two consumers (`docs/16` S5).
+       */
+      loadedWithNothingRestored = restored.failure.kind === 'absent';
       if (restored.failure.kind !== 'absent') clearSession(sessionStore);
       return;
     }
@@ -1981,6 +2014,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * branch on, so this introduces no second answer to *is there a server*.
      */
     hasServer: () => client !== undefined,
+    /*
+     * Issues #90 and #98's one line, and the shell is the only thing that can write it: the answer
+     * comes from `loadSession` against this browser's `localStorage`, which `menu/screens.ts` has no
+     * dependency on. See {@link loadedWithNothingRestored} for why it is latched at boot rather than
+     * re-read here.
+     */
+    firstVisit: () => loadedWithNothingRestored,
     shell: shellBehindMenu,
     calendarPeriodId: () => state.calendar?.id ?? '',
     commissioning: () => commissioningInput(),
