@@ -61,6 +61,17 @@ import { refusalsBeside, type CommissioningReview } from '../commissioning/refus
 import { movedChoiceText } from '../commissioning/choices.js';
 
 import type { ChallengeBoardPage, ChallengeView } from './challenge.js';
+import type { BoardPage, RunSubmission } from './client.js';
+import {
+  BEATING_NOTE,
+  BEAT_LABEL,
+  beatDetailOf,
+  beatRefusalOf,
+  boardConfigurationOf,
+  boardRevealOf,
+  boardRevealRefusalOf,
+  selectionFromRun,
+} from './boardRun.js';
 import {
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
@@ -135,6 +146,23 @@ export type MenuIntent =
    */
   | { readonly kind: 'start-endless' }
   | { readonly kind: 'open-board'; readonly configHash: string }
+  /**
+   * Take a board row's own configuration and run it — GitHub issue #93 § 1.
+   *
+   * **The run travels on the intent rather than an index into the page**, and the difference is not
+   * stylistic. The board is refetched on arrival and after every accepted post, so an index would
+   * name whichever row happens to be in that slot when the shell gets round to it — and a player who
+   * pressed the fourth row and ran the fifth would have no way to tell, because both are real rows
+   * with real figures. A tagged **value** cannot drift out from under its own press, which is this
+   * union's founding argument applied to the one member whose subject is not the state.
+   *
+   * It is the menu's to apply, unlike its neighbours: {@link applyIntent} writes the selection into
+   * `MenuState.freePlay`, so the Free play screen afterwards shows exactly the configuration that
+   * ran rather than the one the player had before. The shell's arm then performs it through
+   * `enterFreePlay`, which is the same path **Start** takes — deliberately, because two ways to
+   * begin a free-play run is two ways for one of them to stop resetting the week.
+   */
+  | { readonly kind: 'beat-score'; readonly run: RunSubmission }
   | { readonly kind: 'account-form'; readonly patch: Record<string, string> }
   /**
    * Send the form. **One member for two questions**, because there are two and they never overlap.
@@ -294,6 +322,7 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'open-campaign':
     case 'start-endless':
     case 'open-board':
+    case 'beat-score':
     case 'account-form':
     case 'account-submit':
     case 'sign-out':
@@ -436,6 +465,21 @@ export interface MenuViewInput {
    */
   readonly rankingRefusal?: string | undefined;
   readonly boards?: readonly { readonly configHash: string; readonly entries: number }[] | undefined;
+  /**
+   * The board a player has opened, or `undefined` when none is — GitHub issue #93.
+   *
+   * The **page**, not a row and not a list of rows, because the two things this screen has to say
+   * about a board are claims about the board: what every row on it ran, and whether the rows agree
+   * that they ran it. `boardRun.ts#boardConfigurationOf` decides both, and it cannot be asked from
+   * one entry.
+   *
+   * `dev/menuPanel.ts` already held this — `LeaderboardView.page` has carried it since the board
+   * table was drawn — and it reached the panel and stopped. That is why the rows built from it are
+   * here rather than there: a per-row control decided inside `boardTable` would be a decision no
+   * test can reach without a document, and it would sit outside the honesty sweep, which drives
+   * `screenOf` and not the panel.
+   */
+  readonly boardPage?: BoardPage | undefined;
   /**
    * Everything the challenge screen needs, and **nothing it could decide with**.
    *
@@ -1948,6 +1992,44 @@ function leaderboardBody(input: MenuViewInput): Body {
   }));
 
   /*
+   * The open board's own rows — GitHub issue #93 § 1, and the whole of what makes a board a thing to
+   * come back to rather than a table to read once.
+   *
+   * One control per entry rather than one for the board, because the **seed** is the only thing that
+   * differs between two rows here and it is on the row. A single *run this board* control would have
+   * had to pick a seed, and picking one on the player's behalf is picking which run they are
+   * compared against.
+   *
+   * The refusal is per row for the same reason it is per row on the Free play screen: a build that
+   * cannot resolve the dispatcher cannot run *any* of them, but a build whose `data/` moved a
+   * template's parts can fail on one and not another, and a control disabled for a reason that is
+   * true of a different row is worse than no reason at all.
+   */
+  const page = input.boardPage;
+  const pageRuns = (page?.entries ?? []).map((entry) => entry.run);
+  const configuration = boardConfigurationOf(pageRuns, input.catalogue);
+  const beatRows: MenuAffordance[] = (page?.entries ?? []).map((entry, index) => {
+    const why = beatRefusalOf(entry.run, input.catalogue, (selection) =>
+      freePlayIssues(selection, input.catalogue),
+    );
+    return {
+      // Indexed by position on the board, which is what the reader is looking at. The entry's own id
+      // is a uuid and would put a database key in a DOM id for no reader's benefit.
+      id: `leaderboard.beat.${String(index)}`,
+      label: `${BEAT_LABEL} — ${entry.displayName}`,
+      detail: beatDetailOf(entry.run),
+      kind: 'commit' as const,
+      // Every field of the row is the run's identity, hashed into the board it came from. Same scope
+      // as **Start**, because it is the same six axes arriving from somewhere else. `docs/16` § 3.
+      scope: 'between-games' as const,
+      enabled: why === undefined,
+      ...(why === undefined ? {} : { disabledWhy: why }),
+      intent: { kind: 'beat-score' as const, run: entry.run },
+    };
+  });
+  rows.push(...beatRows);
+
+  /*
    * Posting is refused for two entirely different reasons and they are never collapsed.
    *
    * *Nobody is signed in* is about the player. *This run cannot be ranked* is about the run — day 2,
@@ -1970,9 +2052,44 @@ function leaderboardBody(input: MenuViewInput): Body {
     intent: { kind: 'submit-score' },
   });
 
+  /*
+   * The way to the surface that answers the question this one cannot — #93 § 4.
+   *
+   * Offered only with a board open, because that is the moment the reader has just been told the
+   * dispatcher is in the board's key and has nowhere to take the thought. `challengeBody` has had
+   * the mirror row (*Open the leaderboard*) since it was written; this is the return leg, and its
+   * absence is why the two screens read as rivals rather than as two questions.
+   */
+  if (page !== undefined) {
+    rows.push({
+      id: 'leaderboard.challenge',
+      label: 'This week’s challenge',
+      detail: 'The same seeds for everybody, and the dispatcher left free — the other question',
+      kind: 'navigate',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'navigate', to: 'challenge' },
+    });
+  }
+
+  /*
+   * Order matters: what the board *is* comes before what a reader may do about it. The refusal is
+   * printed beside the reveal rather than instead of it, because a configuration line carrying
+   * `predictive-x — not in this build` needs the sentence that says what that dash means.
+   */
+  const reveal = page === undefined ? undefined : boardRevealOf(configuration);
+  const revealRefusal = page === undefined ? undefined : boardRevealRefusalOf(configuration);
+
   return {
     rows: Object.freeze(rows),
-    notices: Object.freeze([LEADERBOARD_NOTE]),
+    notices: Object.freeze([
+      LEADERBOARD_NOTE,
+      ...(reveal === undefined ? [] : [reveal]),
+      ...(revealRefusal === undefined ? [] : [revealRefusal]),
+      // Gated with the reveal rather than with the page, because its subject sentence — *every one
+      // of them is that same dispatcher* — is a claim about a board whose rows agree.
+      ...(reveal === undefined ? [] : [BEATING_NOTE]),
+    ]),
     issues: Object.freeze([]),
   };
 }
@@ -2129,6 +2246,18 @@ export function applyIntent(
       return updateSettings(state, settingsPatch(intent.field, intent.value));
     case 'set-challenge':
       return updateChallenge(state, { [intent.field]: intent.value });
+    /*
+     * **The menu's, unlike its neighbours below** — the row's configuration *is* a Free Play
+     * selection (`boardRun.ts#selectionFromRun`), so writing it here is the same operation
+     * `set-free-play` performs six fields at a time.
+     *
+     * Written even when it cannot start. `freePlayIssues` is what refuses an unresolvable row, and
+     * it refuses it *on the Free play screen with the offending field named* — which is a better
+     * place to be told than a leaderboard row that silently did nothing. The shell's arm asks
+     * `enterFreePlay`, which returns `undefined` for exactly that case, so nothing runs.
+     */
+    case 'beat-score':
+      return updateFreePlay(state, selectionFromRun(intent.run));
     case 'set-calendar':
     case 'set-commissioning':
     case 'set-constraint':

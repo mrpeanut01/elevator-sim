@@ -21,6 +21,7 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import type { ViewerState } from '../dev/state.js';
 import { baseState, legsOf, RESOURCES } from '../scope/probes.test-helper.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
+import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
 import { nextDay } from '../shift/week.js';
 
 import { catalogueOf } from './catalogue.js';
@@ -86,6 +87,30 @@ describe('entering free play', () => {
   it('refuses a selection that cannot start, rather than running something else', () => {
     const broken = { ...SELECTION, buildingId: 'demolished' };
     expect(enterFreePlay(baseState(), RESOURCES, broken, CATALOGUE)).toBeUndefined();
+  });
+
+  it('drops the calendar period and the commissioned fabric the campaign was under', () => {
+    /*
+     * The same clause as the held car above, two fields over — and they were missed until GitHub
+     * issue #93 needed a board row to run the configuration it named. Neither is an axis this menu
+     * offers: the calendar select is on *Scenarios* and the fabric has its own screen, so a run that
+     * inherited either would not be the run this screen described.
+     *
+     * The legs half of this is `menu/boardRun.test.ts`, on `midtown-office` at 1 800 s, because
+     * Garden Apartments at 900 s answers every call with two cars and a commissioned shaft cannot
+     * show. This is the field assertion, next to the fields.
+     */
+    const under: ViewerState = {
+      ...deepInAWeek(),
+      calendar: periodOnDays(CALENDAR_PERIODS['quarter-end'], 1, 7),
+      commissioning: [{ bankId: 'main', shafts: 9, machineClassId: 'geared-traction', ratedSpeedMps: 1.6 }],
+    };
+    const entered = enterFreePlay(under, RESOURCES, SELECTION, CATALOGUE);
+    expect(entered?.calendar).toBeNull();
+    expect(entered?.commissioning).toEqual([]);
+    // Not vacuous: the state it was entered from carried both.
+    expect(under.calendar).not.toBeNull();
+    expect(under.commissioning.length).toBeGreaterThan(0);
   });
 });
 

@@ -1562,6 +1562,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
         return;
       }
 
+      case 'beat-score': {
+        /*
+         * A board row, run — GitHub issue #93 § 1.
+         *
+         * **Through `applyIntent` and `enterFreePlay`, and not through a second path.** The
+         * selection is written into `menuState.freePlay` by the reducer, exactly as if the player had
+         * moved all six Free Play selects to the row's values, and the run is entered by the same
+         * function **Start** uses. A shortcut that built a `ViewerState` here would be a second way
+         * to begin a free-play run, and the first thing the second one would stop doing is resetting
+         * the week — which is `docs/16` § 5 clause 3, the defect `enterFreePlay` exists to have
+         * ended.
+         *
+         * The selection is written **even when the run cannot start**, which is why the two lines are
+         * in this order. `enterFreePlay` returns `undefined` for a row this build cannot resolve, and
+         * leaving the selection behind means the player can press *Free play* and read
+         * `freePlayIssues`' own sentence with the offending field named — rather than pressing a row
+         * and watching nothing happen. `menu/screens.ts` disables the row with that same sentence, so
+         * this is the backstop rather than the notice.
+         */
+        menuState = applyIntent(menuState, intent, menuCatalogue);
+        const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
+        if (entered === undefined) {
+          drawMenu();
+          return;
+        }
+        state = entered;
+        menuState = navigate(menuState, 'main');
+        closeMenu('entered-a-mode');
+        runShift();
+        return;
+      }
+
       case 'submit-score': {
         void submitScore();
         return;

@@ -62,7 +62,7 @@ import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '..
 import { catalogueOf, type CatalogueSource } from '../menu/catalogue.js';
 import { screenOf } from '../menu/screens.js';
 import { DEFAULT_SETTINGS, MENU_SCREENS } from '../menu/types.js';
-import { CLIENT_FAILURES } from '../menu/client.js';
+import { CLIENT_FAILURES, type BoardEntry, type BoardPage } from '../menu/client.js';
 import { canStart, freePlayIssues, initialMenuState } from '../menu/menu.js';
 import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
@@ -4140,6 +4140,21 @@ const MENU: SurfaceAdapter = {
     'menu/screens.ts#screenOf',
     'menu/screens.ts#titleOf',
     'menu/screens.ts#applyIntent',
+    /*
+     * GitHub issue #93's three sentences about a board, and every one of them is a claim about a run
+     * this browser did not make. The reveal names the dispatcher that produced somebody's figures;
+     * the refusal says why it cannot; the detail line promises a reproduction. Driven below on a
+     * board that resolves, one that does not, and one whose rows disagree — because the two refusals
+     * are where careless wording on this screen would be, and a surface only ever swept with a
+     * well-formed board would leave both unread.
+     */
+    'menu/boardRun.ts#boardConfigurationOf',
+    'menu/boardRun.ts#boardRevealOf',
+    'menu/boardRun.ts#boardRevealRefusalOf',
+    'menu/boardRun.ts#BEAT_LABEL',
+    'menu/boardRun.ts#beatDetailOf',
+    'menu/boardRun.ts#beatRefusalOf',
+    'menu/boardRun.ts#BEATING_NOTE',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -4341,6 +4356,72 @@ const MENU: SurfaceAdapter = {
         firstVisit: true,
       },
     ];
+    /*
+     * An **open** board, in three states — GitHub issue #93.
+     *
+     * The arms above drive the leaderboard screen with a board *list* and no board open, which is
+     * every sentence that surface had before #93 and none of the ones it has now. What is added is
+     * the configuration reveal, the two refusals behind it and the per-row control's own line — all
+     * four of which are claims about somebody else's run, which is the hardest thing on any screen
+     * in this product to word safely.
+     *
+     * Three pages rather than one, on the broken-selection precedent two hundred lines up: `resolved`
+     * is the ordinary case, `unknown` names a dispatcher this build does not ship (a live case, since
+     * the viewer is served from a CDN and the API from a separate container — § D308), and
+     * `disagreeing` is a page whose rows do not share a configuration, which is the state in which
+     * this screen must say nothing about what ran rather than name the first row's dispatcher for
+     * all of them.
+     *
+     * The runs are constructed rather than fetched, and that is stated rather than smoothed for
+     * `CHALLENGE_VIEW`'s reason: no `data/` in this package ships a posted score, and the wire shape
+     * is the server's. What keeps the constructed ids honest is that they are the **catalogue's
+     * own** — a sweep over a building this build does not ship would be checking a sentence no
+     * player can reach.
+     */
+    const openingRun = {
+      buildingId: whole.buildingId,
+      dispatcherProfileId: whole.dispatcherProfileId,
+      demandTemplateId: whole.demandTemplateId,
+      arrivalRatePctPop5min: whole.arrivalRatePctPop5min,
+      durationS: whole.durationS,
+      windowStartS: whole.windowStartS,
+      seed: whole.seed,
+    };
+    const measured = Object.freeze({
+      awtS: 24.6,
+      wt95S: 51.2,
+      ttdMeanS: 63.4,
+      pctOverLongWait: 8.1,
+      awtIsValid: true,
+    });
+    const entryOf = (name: string, run: typeof openingRun): BoardEntry => ({
+      id: `entry-${name}`,
+      displayName: name,
+      run,
+      measured,
+      submittedAtMs: 0,
+    });
+    const pageOf = (entries: readonly BoardEntry[]): BoardPage => ({
+      configHash: 'abcdef0123456789',
+      metric: 'awtS',
+      note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
+      entries,
+    });
+    const boardPages: readonly { readonly label: string; readonly page: BoardPage }[] = [
+      { label: 'resolved', page: pageOf([entryOf('A player', openingRun), entryOf('Another', { ...openingRun, seed: '77' })]) },
+      {
+        label: 'unknown',
+        page: pageOf([entryOf('A player', { ...openingRun, dispatcherProfileId: 'a-profile-this-build-lacks' })]),
+      },
+      {
+        label: 'disagreeing',
+        page: pageOf([
+          entryOf('A player', openingRun),
+          entryOf('Another', { ...openingRun, arrivalRatePctPop5min: 6 }),
+        ]),
+      },
+    ];
+
     for (const arm of menuStates) {
       for (const screen of MENU_SCREENS) {
         const view = screenOf({
@@ -4376,6 +4457,43 @@ const MENU: SurfaceAdapter = {
           if (row.disabledWhy !== undefined) {
             seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
           }
+        }
+      }
+    }
+
+    /*
+     * The leaderboard with a board open. One screen rather than the whole set, because `boardPage`
+     * reaches exactly one of them and driving the other seven with it would be seven copies of
+     * strings that do not depend on it — the same argument the two extra arms above are kept flat
+     * for.
+     */
+    for (const { label, page } of boardPages) {
+      const view = screenOf({
+        state: {
+          screen: 'leaderboard',
+          history: [],
+          settings: DEFAULT_SETTINGS,
+          freePlay: whole,
+          challenge: challengeSelection,
+        },
+        catalogue,
+        canPost: true,
+        hasRun: true,
+        boards: [{ configHash: page.configHash, entries: page.entries.length }],
+        boardPage: page,
+        challenge: challengeInput,
+      });
+      const at = `board.${label}`;
+      for (const [index, notice] of view.notices.entries()) {
+        seeds.push({ field: `${at}.notice.${String(index)}`, text: notice, role: 'prose' });
+      }
+      for (const row of view.rows) {
+        seeds.push({ field: `${at}.${row.id}.label`, text: row.label, role: 'label' });
+        if (row.detail !== undefined) {
+          seeds.push({ field: `${at}.${row.id}.detail`, text: row.detail, role: 'prose' });
+        }
+        if (row.disabledWhy !== undefined) {
+          seeds.push({ field: `${at}.${row.id}.why`, text: row.disabledWhy, role: 'reason' });
         }
       }
     }

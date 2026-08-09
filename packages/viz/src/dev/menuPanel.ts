@@ -28,7 +28,7 @@ import {
   postingRefusal,
   type AccountState,
 } from '../menu/account.js';
-import type { BoardPage } from '../menu/client.js';
+import type { BoardPage, ClaimedMetrics } from '../menu/client.js';
 import type { ChallengeScore } from '../menu/challenge.js';
 
 import {
@@ -362,6 +362,15 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     hasRun: run.hasRun,
     rankingRefusal: run.rankingRefusal,
     boards: board.boards,
+    /*
+     * The open board, handed to the decision half — GitHub issue #93.
+     *
+     * `board.page` has been in this view since the table below was written and reached nothing but
+     * the table. Every control a reader gets over a row is decided next door from this, on
+     * `namingStage`'s rule one screen over: two answers to *what is on the board a player is looking
+     * at* would let the rows below disagree with the sentences above them.
+     */
+    ...(board.page === undefined ? {} : { boardPage: board.page }),
     viewMode: host.viewMode(),
     challenge,
     commissioning: host.commissioning(),
@@ -475,7 +484,7 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
    * nobody can see is the inert control this repository's standing requirement is written about,
    * arriving from the rendering end rather than the wiring end.
    */
-  if (view.screen === 'leaderboard') children.push(boardTable(draw, board));
+  if (view.screen === 'leaderboard') children.push(boardTable(draw, board, account));
   if (view.screen === 'challenge') children.push(challengeBoardTable(draw, challenge, account));
 
   // `reconcile` and not `fill`, and the whole of issue #106 is in that word: this container holds
@@ -1013,7 +1022,7 @@ function accountForm(
  * metric orders the rows and the others sit beside it, never combined. And a board with nothing in
  * it says so in words rather than drawing an empty table that reads like a failure.
  */
-function boardTable(draw: Draw, view: LeaderboardView): HTMLElement {
+function boardTable(draw: Draw, view: LeaderboardView, account: AccountState): HTMLElement {
   const doc = draw.doc;
   /*
    * Only the wrapper is retained, and that is enough: everything inside it is prose and figures,
@@ -1047,8 +1056,23 @@ function boardTable(draw: Draw, view: LeaderboardView): HTMLElement {
     return wrap;
   }
 
+  /*
+   * Which row is the reader's, and how far off the top it is \u2014 GitHub issue #93 \u00a7 3.
+   *
+   * The challenge board next door has done both since issue #112 and this one did neither, which is
+   * the half of #93 that is a straightforward omission rather than a design question: `boardRow`'s
+   * own `mine` parameter was written here, documented here, and set by exactly one of its two
+   * callers. Matched on the display name for `challengeBoardTable`'s reason \u2014 it is the only
+   * identity on the wire, the store refuses a duplicate name case-insensitively, and it is compared
+   * case-insensitively so a reader who signed up as `Ada` is not told none of these rows is theirs.
+   */
+  const mine = account.user?.displayName.toLowerCase();
+  const ranked = RANKED_MEASURED[page.metric];
+  const leader = page.entries[0]?.measured;
+
   const table = el(doc, 'ol', { className: 'menu-board' });
   for (const entry of page.entries) {
+    const isMine = mine !== undefined && entry.displayName.toLowerCase() === mine;
     table.append(
       boardRow(doc, {
         name: entry.displayName,
@@ -1059,7 +1083,17 @@ function boardTable(draw: Draw, view: LeaderboardView): HTMLElement {
           `TTD ${entry.measured.ttdMeanS.toFixed(1)} s \u00b7 over-long ${entry.measured.pctOverLongWait.toFixed(1)} %`,
         // Printed because it is what makes the row checkable: invariant 5 says a run replays from
         // its seed, and a leaderboard that hid the seed would be asking to be taken on trust.
-        meta: `seed ${entry.run.seed} \u00b7 one run`,
+        //
+        // The dispatcher is deliberately **not** here, and that is the one place this row differs
+        // from the challenge board's. There the dispatcher is the axis that varies and belongs on
+        // every row; here it is in the board's own key, so printing it per row would say it varies
+        // when it cannot. It is named once, above the table, by `menu/boardRun.ts#boardRevealOf`.
+        meta:
+          `seed ${entry.run.seed} \u00b7 one run` +
+          (isMine && ranked !== undefined && leader !== undefined
+            ? gapSentence(ranked.of(entry.measured) - ranked.of(leader), ranked.unit)
+            : ''),
+        ...(isMine ? { mine: true } : {}),
       }),
     );
   }
@@ -1302,12 +1336,43 @@ function gapToLeader(
   leader: ChallengeScore | undefined,
 ): string {
   if (!isMine || ranked === undefined || leader === undefined) return '';
-  const gap = ranked.of(score) - ranked.of(leader);
-  // Every ranked metric here is a cost, so a non-positive gap means this row *is* the top row — or
-  // ties it, which is not a thing to congratulate somebody on in a sentence about a difference.
-  if (gap <= 0) return '';
-  return ` · ${gap.toFixed(1)} ${ranked.unit} behind the top row on this board’s metric`;
+  return gapSentence(ranked.of(score) - ranked.of(leader), ranked.unit);
 }
+
+/**
+ * The one sentence both boards say about a gap, so they cannot come to say it differently.
+ *
+ * Extracted when the configuration board grew the same feature (GitHub issue #93 § 3): the challenge
+ * board has highlighted the reader's row and printed its distance from the top since issue #112, and
+ * the leaderboard — the screen #93 is actually about — did neither. Two copies of this arithmetic
+ * would be two places deciding what *behind* means, and the tie case is exactly where they would
+ * drift.
+ */
+function gapSentence(gap: number, unit: string): string {
+  // Every ranked metric on either board is a cost, so a non-positive gap means this row *is* the top
+  // row — or ties it, which is not a thing to congratulate somebody on in a sentence about a
+  // difference.
+  if (!(gap > 0)) return '';
+  return ` · ${gap.toFixed(1)} ${unit} behind the top row on this board’s metric`;
+}
+
+/**
+ * How to read the ranked figure off a leaderboard row, and what its unit is called.
+ *
+ * {@link RANKED_MEAN}'s sibling, and separate for that record's own reason: the two boards rank
+ * different things. A challenge score is a **mean over a seed set** and a leaderboard entry is
+ * **one run**, so a shared table would have to decide which a `metric` names, and the four ids only
+ * look like the same vocabulary. Both degrade the same way — a metric this build does not know gets
+ * no gap sentence rather than a number in the wrong unit.
+ */
+const RANKED_MEASURED: Readonly<
+  Record<string, { readonly of: (measured: ClaimedMetrics) => number; readonly unit: string } | undefined>
+> = Object.freeze({
+  awtS: { of: (measured) => measured.awtS, unit: 's' },
+  wt95S: { of: (measured) => measured.wt95S, unit: 's' },
+  ttdMeanS: { of: (measured) => measured.ttdMeanS, unit: 's' },
+  pctOverLongWait: { of: (measured) => measured.pctOverLongWait, unit: 'points' },
+});
 
 function noticeLine(draw: Draw, key: string, text: string): HTMLElement {
   const line = draw.retain('p', key, { className: 'menu-notice' });
