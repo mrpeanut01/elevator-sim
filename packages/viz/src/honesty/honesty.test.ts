@@ -244,9 +244,9 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Empty — and it has been empty three
- * times, for three different reasons, which is the only thing that makes an empty register worth
- * reading.**
+ * What the search **found**, pinned in both directions. **Four entries and two findings** — each
+ * finding entered once per tier it reproduces in, because the second direction below is asked per
+ * tier and a finding recorded in one corpus is a ghost in the other.
  *
  * A found violation is a result before it is a patch, so a finding is recorded here rather than
  * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
@@ -256,7 +256,7 @@ describe('a counterexample shrinks', () => {
  * - everything in it must still be found — a finding that is fixed, or that the search stops
  *   being able to see, is also red, with a message saying to delete the entry.
  *
- * ## Why an entry names its tier, and why the field survives an empty register
+ * ## Why an entry names its tier, and why the field is load-bearing again
  *
  * The second half of that rule needs a corpus the finding actually reproduces in, and until the
  * temporal axis every recorded finding reproduced in the always-on tier — so the assertion could
@@ -266,11 +266,23 @@ describe('a counterexample shrinks', () => {
  * both — the deep tier runs its own half, which it did not before — rather than being softened to
  * *"found somewhere"* for the one entry that would otherwise have been a ghost.
  *
- * The field and both `expectStillFound` calls stay now the register is empty, for the reason the
- * empty-corpus negative control below stays: the next finding will arrive in one tier or the other,
- * and rebuilding the mechanism at that point means rebuilding it in a hurry.
+ * That mechanism was kept while the register was empty *"because the next finding will arrive in one
+ * tier or the other, and rebuilding it at that point means rebuilding it in a hurry"*. It did, in
+ * both: R13 on the delta block reproduces in the always-on tier, and the R3 cue collision on
+ * `honesty-9100031` reproduces only in the deep one.
  *
- * ## The two entries that were here, and what closed each
+ * ## The entry that was missing, and what its absence cost
+ *
+ * `honesty-9100031`/`suppressed-mean` has been described in {@link violationsOf}'s docstring as a
+ * live finding, and published in `CLAUDE.md` and `docs/05-roadmap.md` as *outstanding*, since the
+ * temporal axis landed — **and it was never in this list**. So the deep tier was red: measured on
+ * `integration/issue-wave-15` before any of this wave's work, `ELEVATOR_SIM_HONESTY=deep` reported
+ * `expected [ …(10) ] to deeply equal []`. A finding the documents call recorded and the register
+ * does not hold is the same defect as a ghost, pointing the other way: the tier cannot come back
+ * green, so nobody runs it, so the next real finding arrives in a suite that was already failing.
+ * It is entered below.
+ *
+ * ## The two entries that were here **before** those, and what closed each
  *
  * Both were escalated rather than resolved in the harness author's lane, both were adjudicated by
  * [§ D171](../../../../DECISIONS.md), and **neither was closed by widening this list**:
@@ -413,6 +425,119 @@ const OUTSTANDING: readonly {
    * and `STANDARD_SPACE`'s horizons all complete. The opt-in tier earned its cost here, which is
    * worth recording about the tier as much as about the banner.
    */
+
+  /*
+   * ## 1. R13 on the Day report's delta block — **found on the first run of GitHub issue #127's
+   * pairing, and it is a real gap rather than a classification artefact**
+   *
+   * `honesty/surfaces.ts` rendered `reportViewOf(shaped)` with no `previous`, so `ReportView.delta`
+   * was `null` on every seeded case and the block's caption, both arms of its note and every paired
+   * row had never been in the corpus. Issue #127 built the pairing; the corpus answered on its first
+   * run, on **24 of 49** always-on cases:
+   *
+   * > `AVERAGE WAIT was 17.8 s → 23.4 s`
+   *
+   * One row, one figure, one property. `AVERAGE WAIT` is the only cell on the sheet that
+   * `summary.awtIsValid` speaks for, and R13 clause one is *"an estimate string must carry a count,
+   * in the same visual unit"*. The block draws `LABEL was X → Y` and **no count anywhere in its
+   * box** — `dev/reportPanel.ts#deltaRow` is a label, a `was` value, a decorative arrow and a value,
+   * and `deltaBox` is its own bordered region with a caption above and one sentence below.
+   *
+   * **Why it is not the harness's defect, which is the question this adapter has been wrong about
+   * before.** The figure-grid loop in `REPORT_PANEL` seeds a cell's value with `countShown` read off
+   * that cell's **note**, and its comment records why: seeding the value alone *"asked R13 a question
+   * about a string nobody draws"*, because the sheet draws the value and the note together. Here the
+   * opposite holds — the row is drawn exactly as it is seeded, with nothing beside it. The seed is
+   * the string.
+   *
+   * **And the surface where it costs most is not the sheet.** On the Day report the block sits above
+   * a figure grid that does print `mean over N waits · peak-5min window`, one block away. On
+   * `dev/dispatcherEditor.ts`'s result strip — the second surface § D310 pointed at the same
+   * `reportViewOf` — there is no sheet at all: the strip is a caption, these rows and the block's
+   * note. That is `REPORT_CARD`'s argument in miniature (*"a claim on it is read with none of that
+   * around it"*), and it is why this is recorded as a finding rather than argued away.
+   *
+   * **Recorded rather than fixed, on § D307's own precedent** — the two temporal findings were left
+   * standing in the lane that found them *"because a corpus that grew an axis and stayed green is a
+   * different claim from one that had to be repaired first"*. The same holds for a corpus that
+   * acquired a surface. The fix is a product decision this lane does not own: `DeltaRowView` would
+   * carry the current sheet's own `note` for a paired figure — a string the sheet already published,
+   * so the block stays arithmetic-free — and both renderers would draw it, which is a change to what
+   * two shipped surfaces look like and belongs with the handoff. It needs its own issue.
+   */
+  Object.freeze({
+    property: 'estimate-without-n',
+    surfaceId: 'dev/reportPanel.ts#reportViewOf',
+    tier: 'standard' as const,
+    /*
+     * Pinned to the **row**, not to a value: every case prints a different pair of seconds, and the
+     * claim is about `AVERAGE WAIT` travelling out of the unit that carried its `n`. A second gated
+     * figure added to the sheet would be a new finding here rather than an inherited pass.
+     */
+    fieldContains: 'delta.figures(AVERAGE WAIT)',
+    finding: 'the delta block pairs the sheet’s mean with no count in its own box — issue #127',
+  }),
+  /*
+   * The same finding in the deep tier, entered separately because {@link expectStillFound} runs the
+   * ghost check per tier. Two entries rather than one with a widened `tier`, so that a finding which
+   * stops reproducing in *one* corpus is still red — which is the whole point of the second
+   * direction.
+   */
+  Object.freeze({
+    property: 'estimate-without-n',
+    surfaceId: 'dev/reportPanel.ts#reportViewOf',
+    tier: 'deep' as const,
+    fieldContains: 'delta.figures(AVERAGE WAIT)',
+    finding: 'the delta block pairs the sheet’s mean with no count in its own box — issue #127',
+  }),
+
+  /*
+   * ## 2. R3's cue collision on `honesty-9100031` — **the entry the documents already claimed was
+   * here**
+   *
+   * Deep tier only, 10 violations, one case: Vertical City / `nearest-car` at seed
+   * 900 344 702 126 007, a run whose queue grows through the reporting window and whose mean is
+   * therefore refused. That refused `meanWaitS` is **19.65**, which rounds to `20` — and
+   * `render/mood.ts`'s caveat says, verbatim and about a different building:
+   *
+   * > `the same configuration on Secure Tower returned a quotable average on 6 of 20 consecutive`
+   * > `seeds`
+   *
+   * A cue naming the mean, a `20` in the same clause, on a run whose mean is suppressed. It is a
+   * **coincidence between a rule and a sentence**, not a false claim on screen: the caveat is
+   * `campaign`-authored prose about **M7**'s measurement, the number is a seed count, and no reader
+   * is being shown this run's average.
+   *
+   * It fires on two surfaces because `render/describeFrame.ts` joins the caveat into its own
+   * paragraph — the canvas's text alternative quotes the mood card whole, so one sentence produces
+   * five reports per surface across the five sampled playheads.
+   *
+   * **Not closed by a rule change, and that is deliberate.** The corrections § D171 records were all
+   * cases where the check was reading the words wrongly; this one reads them correctly and the words
+   * happen to collide. Narrowing the clause further, or exempting a numeral that is also a seed
+   * count, would be an allow-rule with a hiding place in it. What would close it is the caveat citing
+   * its measurement without a bare integer — a copy change on a sentence § D160 owns — and that is
+   * somebody's decision rather than a harness edit.
+   */
+  Object.freeze({
+    property: 'suppressed-mean',
+    surfaceId: 'render/mood.ts#buildingMood',
+    tier: 'deep' as const,
+    contains: 'quotable average on 6 of 2',
+    finding: 'the M7 caveat’s seed count collides with a refused mean that rounds to 20',
+  }),
+  Object.freeze({
+    property: 'suppressed-mean',
+    surfaceId: 'render/describeFrame.ts#describeFrame',
+    tier: 'deep' as const,
+    /*
+     * The seed, because the caveat sentence this is the same collision as falls outside the 200
+     * characters a violation quotes on this surface — `describeFrame` opens with the building, the
+     * dispatcher, the seed and the clock. It pins the finding to one run, which is what it is about.
+     */
+    contains: 'seed 900344702126007',
+    finding: 'the same collision, quoted through the canvas text alternative',
+  }),
 ]);
 
 interface FoundViolation {

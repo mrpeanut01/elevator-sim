@@ -177,6 +177,7 @@ import {
   goalRowViewOf,
   reportViewOf,
   runProgressOf,
+  type ReportDeltaView,
 } from '../dev/reportPanel.js';
 import {
   buildingPlateOf,
@@ -206,6 +207,8 @@ import {
   clockRange,
   dayReportOf,
   NOT_RECORDED,
+  type ShapedDayReport,
+  type ShiftPlan,
   type SingleRunReport,
   type WeekDayReport,
 } from '../shift/report.js';
@@ -283,6 +286,19 @@ export interface HonestyContext {
   readonly case: HonestyCase;
   /** The single replication every `single-run` surface is driven from. */
   readonly recording: VizRecording;
+  /**
+   * **The run before this one** — the second replication, on the case's candidate arm. Issue #127.
+   *
+   * Present so a surface that pairs two runs can be driven as a pairing rather than as a first
+   * sheet. It is never the *subject* of a property: every check reads {@link recording}, so a
+   * pairing adapter puts this one in the `before` column and the case's own run in the `after`,
+   * which is what the shell does (`dev/reportPanel.ts#rotatedOn` — the sheet on screen is the new
+   * one). An adapter that put it the other way round would be asking R3 about a run the context
+   * does not describe.
+   *
+   * `run.ts#comparisonConfigFor` says why it is a second simulation and why it is the candidate arm.
+   */
+  readonly comparisonRecording: VizRecording;
   /** What the run's own summary says about its estimates. R9's one gate, asked once. */
   readonly suppressed: boolean;
   readonly batch: BatchResult;
@@ -1917,6 +1933,32 @@ interface ShiftDay {
   readonly report: WeekDayReport;
   /** The same day shaped as a single run — `docs/17` § 3.2. Both shapes ship; both are swept. */
   readonly singleRunReport: SingleRunReport;
+  /**
+   * The same day, closed a **second** time — *attempt 2 at this day*.
+   *
+   * The `previous` half of the pairing a reader produces by pressing Run twice on one selection.
+   * `runId` is building-dispatcher-seed, so the second run reproduces bit-identically (§ D223) and
+   * the two sheets differ only in their attempt line — which is not one of `SELECTION_ROWS`' three,
+   * so the block draws its *nothing moved* arm. That is the arm no seeded case had ever rendered.
+   */
+  readonly retried: WeekDayReport;
+  /**
+   * The same day on the **candidate** dispatcher — the pairing the delta block exists for.
+   *
+   * One building, one day, one seed, one plan, a different arm. `ReportBasis` deliberately does not
+   * refuse it (`shift/report.ts`: *"a retry with a different dispatcher on one day is the comparison
+   * this block exists to draw"*), so this is the pairing whose figure rows are actually drawn.
+   */
+  readonly swapped: WeekDayReport;
+  /**
+   * The same day run over a **different stretch** — issue #126's first new refusal axis.
+   *
+   * Same recording and same day: the *only* thing that differs is `ShiftPlan.shiftLengthS`, which is
+   * what makes the refusal this pairs into attributable to one axis rather than to a run.
+   */
+  readonly shorterShift: WeekDayReport;
+  /** The same day built from a **different arrival pattern** — issue #126's second new axis. */
+  readonly otherPattern: WeekDayReport;
 }
 
 interface ShiftBundle {
@@ -1932,15 +1974,44 @@ interface ShiftBundle {
  */
 const SHIFT_BUNDLES = new WeakMap<HonestyContext, ShiftBundle>();
 
+/**
+ * What the day was set to run, for a seeded case — `shift/report.ts#ShiftPlan`, issue #126.
+ *
+ * The case's own horizon rather than a constant, so the plan a sheet publishes is the plan the
+ * recording was actually made under: `HonestyCase.durationS` is what `recordingConfigFor` passes as
+ * `durationS`, and a basis naming a length the run did not have would be the defect § D227 is about
+ * with the polarity reversed.
+ *
+ * `windowStartS: null` and `patternId: 'building'` are the comparable defaults — the whole of the
+ * period, and the building's own traffic profile, which is the demand every published figure in this
+ * repository was measured under and the one `recordingConfigFor` actually asks for.
+ */
+function planFor(context: HonestyContext): ShiftPlan {
+  return { shiftLengthS: context.case.durationS, windowStartS: null, patternId: 'building' };
+}
+
 function shiftBundleOf(context: HonestyContext): ShiftBundle {
   const hit = SHIFT_BUNDLES.get(context);
   if (hit !== undefined) return hit;
 
   const { recording } = context;
   const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
-  const dispatcherName =
-    context.profiles.find((profile) => profile.id === recording.dispatcherProfileId)?.name ??
-    recording.dispatcherProfileId;
+  const nameOf = (profileId: string): string =>
+    context.profiles.find((profile) => profile.id === profileId)?.name ?? profileId;
+  const dispatcherName = nameOf(recording.dispatcherProfileId);
+  const shiftPlan = planFor(context);
+  /*
+   * The candidate run, folded at its own end — the `previous` half of every drawn pairing.
+   *
+   * A second fold rather than a reuse, because it is a second run: `live/` folds once per recording
+   * and this projects it, exactly as the case's own recording is folded above. See
+   * `run.ts#comparisonConfigFor` for why the run exists at all.
+   */
+  const comparison = context.comparisonRecording;
+  const comparisonObservations = shiftObservationsOf(
+    observationsAt(comparison, comparison.endedAt),
+  );
+  const comparisonName = nameOf(comparison.dispatcherProfileId);
 
   const plan: readonly { readonly day: number; readonly contractId: string; readonly own: boolean }[] = [
     // The building's own scenario, on the odd-day goal set.
@@ -1981,7 +2052,60 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       dispatcherName,
       dayStartS: DAY_START_S,
     };
-    const report = dayReportOf({ ...common, subject: { kind: 'week-day' } }) as WeekDayReport;
+    const report = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+    }) as WeekDayReport;
+    /*
+     * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
+     *
+     * Built here rather than in the adapter for `singleRunReport`'s reason one field down: a sheet is
+     * a pure function of its input, six of them cost nothing beside the fold above, and an adapter
+     * that assembled its own `DayReportInput` would be a second answer to *what a day's sheet is*.
+     *
+     * `retried` closes the **same** outcome onto the week the first close returned, which is what
+     * `week.ts`'s retry branch keys on — a second independently opened week would say *attempt 1*
+     * and pair as a sheet the shell cannot produce.
+     */
+    const retried = dayReportOf({
+      ...common,
+      week: closeDay(banked, outcome),
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+    }) as WeekDayReport;
+    const swapped = dayReportOf({
+      ...common,
+      recording: comparison,
+      /*
+       * The candidate run's **own** fold, and its own dispatcher name. `dayReportOf` reads today's
+       * goals against whatever observations it is handed, so the swapped sheet's figures, verdict and
+       * goal readings are all statements about the candidate run — which is what makes the delta rows
+       * underneath it a pairing of two runs rather than one run printed twice.
+       */
+      observations: comparisonObservations,
+      dispatcherName: comparisonName,
+      subject: { kind: 'week-day' },
+      plan: shiftPlan,
+    }) as WeekDayReport;
+    const shorterShift = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      // Half the horizon, and nothing else. `Math.round` keeps it a whole minute, which is what
+      // `extentLineOf` compares on.
+      plan: { ...shiftPlan, shiftLengthS: Math.round(shiftPlan.shiftLengthS / 120) * 60 },
+    }) as WeekDayReport;
+    const otherPattern = dayReportOf({
+      ...common,
+      subject: { kind: 'week-day' },
+      /*
+       * A **shipped** profile id rather than an invented one, so the axis is driven on a value the
+       * rail's pattern select can actually produce: `dev/rightRail.ts#patternOptionsOf` offers
+       * `'building'` plus every `data/traffic-profiles.json` profile, and the first of those is what
+       * a reader picks when they leave the comparable default.
+       */
+      plan: { ...shiftPlan, patternId: context.trafficProfiles.profiles[0]?.id ?? 'office-standard' },
+    }) as WeekDayReport;
     /*
      * The **same day, shaped as a single run** — driven beside the week-day sheet rather than
      * instead of it.
@@ -1997,8 +2121,24 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
         kind: 'single-run',
         selection: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null, durationS: 1800 },
       },
+      plan: shiftPlan,
     }) as SingleRunReport;
-    return { day, dayIdx, contract, event, goals, readings, week, banked, report, singleRunReport };
+    return {
+      day,
+      dayIdx,
+      contract,
+      event,
+      goals,
+      readings,
+      week,
+      banked,
+      report,
+      singleRunReport,
+      retried,
+      swapped,
+      shorterShift,
+      otherPattern,
+    };
   });
 
   const bundle: ShiftBundle = { observations, dispatcherName, days };
@@ -2779,6 +2919,128 @@ const RAIL_VIEW: SurfaceAdapter = {
 };
 
 /**
+ * Two sheets the panel is asked to difference, and what makes the pair interesting.
+ *
+ * `current` is always a sheet of {@link HonestyContext.recording}, and that is not a convenience: it
+ * is what keeps the properties answerable. Every check reads `context.recording.summary`, so a
+ * pairing whose *current* sheet described the candidate run would be asking R3 whether a mean is
+ * licensed against a run the context is not about. The candidate run goes in the `before` column,
+ * which is also where the shell puts it — `rotatedOn` makes the sheet on screen the new one.
+ */
+interface ReportPairing {
+  readonly label: string;
+  readonly previous: ShapedDayReport;
+  readonly current: ShapedDayReport;
+}
+
+/**
+ * The six pairings, and the branch of `reportDeltaOf` each one reaches.
+ *
+ * A list rather than six inline calls, because the claim being made is about **coverage**: every
+ * branch of the block is drawn by a state a player can produce, and a branch nobody reaches is a
+ * branch nobody sweeps. Three draw and three refuse, which is the split the block itself has.
+ *
+ * | pairing | what a player did | branch |
+ * |---|---|---|
+ * | `retry` | pressed Run twice on one selection | drawn, *nothing moved* |
+ * | `swap` | clicked a different dispatcher card | drawn, figure rows |
+ * | `another-day` | played Tuesday after Monday | refused — traffic |
+ * | `free-play-then-week` | finished a Free Play run, opened a scenario day | refused — mode and traffic |
+ * | `shorter-shift` | changed the run length between days | refused — the stretch (#126) |
+ * | `other-pattern` | changed the arrival pattern between days | refused — the pattern (#126) |
+ *
+ * **`swap` is the one that carries the block's content**, and on a case whose two arms are the same
+ * profile it degenerates to `retry`'s branch — see `run.ts#comparisonConfigFor`. That is left as it
+ * falls rather than forced: `caseFromSeed` draws the identical-arm control on 15 % of cases, so the
+ * corpus reaches both arms of the note without this list deciding which.
+ *
+ * The two `#126` rows are the axes that did not exist before this wave, and they are the reason the
+ * refusal half is three pairings rather than one: a refusal that only ever names *the building* would
+ * leave the sentence composed for four other axes unrendered, which is the same defect one level in.
+ */
+function reportPairingsOf(bundle: ShiftBundle): readonly ReportPairing[] {
+  const first = bundle.days[0];
+  const second = bundle.days[1];
+  if (first === undefined) return [];
+  return [
+    { label: 'retry', previous: first.report, current: first.retried },
+    { label: 'swap', previous: first.swapped, current: first.report },
+    ...(second === undefined
+      ? []
+      : [{ label: 'another-day', previous: second.report, current: first.report }]),
+    { label: 'free-play-then-week', previous: first.singleRunReport, current: first.report },
+    { label: 'shorter-shift', previous: first.shorterShift, current: first.report },
+    { label: 'other-pattern', previous: first.otherPattern, current: first.report },
+  ];
+}
+
+/**
+ * Every string the delta block draws, seeded — and the two classification decisions in it.
+ *
+ * ## The roles are the sheet's own, and the figure rows are the argument
+ *
+ * `DeltaRowView` is `{ label, before, after }` and carries no classification of its own, so
+ * `types.ts`'s rule would make every row `prose`. That rule has a second half — *"an adapter copies
+ * the surface's classification; it never invents one"* — and a figure row **is** a figure: it is
+ * matched back to the `ReportFigure` the current sheet published, by the label the row was built
+ * from, and it takes that cell's role, its `gated` flag and its `axisOnly` flag. A row pairing
+ * `AVERAGE WAIT` is the sheet's own estimate with a second value beside it, and calling it prose
+ * because the pairing dropped the tone would be the adapter deciding a property does not apply.
+ *
+ * `countShown` is therefore `false` for a gated row, and that is a **measurement rather than a
+ * concession**: the block draws `LABEL was X → Y` and no count anywhere in the box, so if R13 has
+ * something to say here it should say it. The alternative — reading the digits out of the *value* —
+ * would be the adapter answering *is there a count?* with *is there a number?*.
+ *
+ * ## The note is `prose`, deliberately, and it is the stronger choice
+ *
+ * Both arms of `ReportDeltaView.note` are refusals in substance (*"not a result, and not a
+ * direction"*; *"Nothing here is a comparison"*), and `role: 'reason'` would have exempted them from
+ * R2's textual half and R3's — the exemption `smallPrint` legitimately takes. They are seeded `prose`
+ * instead, so both scans run over them: the block's whole claim is that it compares without ordering,
+ * and the cheapest way to stop checking that claim is to classify it as already true.
+ */
+function deltaSeeds(
+  at: string,
+  delta: ReportDeltaView,
+  current: ShapedDayReport,
+  playhead?: TextPlayhead,
+): readonly TextSeed[] {
+  const seeds: TextSeed[] = [];
+  const withPlayhead = playhead === undefined ? {} : { playhead };
+  seeds.push({ field: `${at}.delta.caption`, text: delta.caption, role: 'label', ...withPlayhead });
+  for (const row of delta.selection) {
+    seeds.push({
+      field: `${at}.delta.selection(${row.label})`,
+      // The row as a reader hears it: `was` in words, because the arrow is `aria-hidden`.
+      text: `${row.label} was ${row.before} → ${row.after}`,
+      role: 'observation',
+      ...withPlayhead,
+    });
+  }
+  const cellOf = new Map(current.figures.map((figure) => [figure.label, figure] as const));
+  for (const row of delta.figures) {
+    const source = cellOf.get(row.label);
+    const shape =
+      source === undefined
+        ? { role: 'observation' as TextRole, gated: false, energyAxis: false }
+        : reportFigureShape(source);
+    seeds.push({
+      field: `${at}.delta.figures(${row.label})`,
+      text: `${row.label} was ${row.before} → ${row.after}`,
+      role: shape.role,
+      // Not `undefined`: the block prints no count beside the value, and saying so is the point.
+      countShown: shape.gated ? false : undefined,
+      energyAxis: shape.energyAxis,
+      gated: shape.gated,
+      ...withPlayhead,
+    });
+  }
+  seeds.push({ field: `${at}.delta.note`, text: delta.note, role: 'prose', ...withPlayhead });
+  return seeds;
+}
+
+/**
  * The observation sheet as the panel draws it — § 4.2's figure grid, goal rows and diagnosis.
  *
  * A second rendering of the same `DayReport`, and it is worth searching separately for one reason:
@@ -2790,6 +3052,20 @@ const RAIL_VIEW: SurfaceAdapter = {
  * The roles come from the **report's** cells rather than from the view's, because the view drops
  * `id` and `tone` on the way through. The two lists are the same list in the same order —
  * `reportViewOf` is `report.figures.map(figureViewOf)` — so they are zipped by index.
+ *
+ * ## The delta block, swept for the first time — GitHub issue #127
+ *
+ * `reportViewOf` takes a third argument and this adapter passed none, so `ReportView.delta` was
+ * `null` on every seeded case: the caption, **both** arms of the note, the refusal sentence issues
+ * #117/#102 added and every paired row were rendered by nothing. § D310 recorded it as a gap it
+ * walked past; § D311 recorded that the gap had since widened, because the dispatcher editor's
+ * result strip draws the **same** `ReportDeltaView` through the same export. An unswept refusal is
+ * the shape § D227 rates above a stale figure: a stale figure is wrong, a stale refusal tells a
+ * reader not to look.
+ *
+ * {@link REPORT_PAIRINGS} is what closes it — six pairings over the sheets `shiftBundleOf` builds,
+ * chosen so that each of the block's branches is reached by a **shipped** state rather than by a
+ * constructed one, and so that every refusal names one axis a reader could have moved.
  */
 const REPORT_PANEL: SurfaceAdapter = {
   id: 'dev/reportPanel.ts#reportViewOf',
@@ -2929,6 +3205,29 @@ const REPORT_PANEL: SurfaceAdapter = {
       }
     }
 
+    /*
+     * The delta block — GitHub issue #127, and the first time these strings have been in the corpus.
+     *
+     * Six pairings, drawn through the shipped `reportViewOf` with a real `previous` rather than
+     * through a second implementation, so what the search checks is what the panel and the
+     * dispatcher editor's strip both draw. See {@link reportPairingsOf} for what each pair is a
+     * player doing, and {@link deltaSeeds} for why a figure row keeps the sheet's own role.
+     *
+     * Asserted rather than assumed: a pairing whose `delta` came back `null` would be this adapter
+     * certifying the block on a case that did not draw it, which is `honesty.test.ts`'s *"an adapter
+     * whose renderer silently returns nothing certifies a surface it never looked at"* one level in.
+     * `reportViewOf` returns a delta for every non-`undefined` `previous` on a played-out sheet, so
+     * the throw is unreachable rather than defensive — and it is the kind of unreachable that stops
+     * being unreachable when somebody adds a fourth arm to `reportViewOf`.
+     */
+    for (const pairing of reportPairingsOf(bundle)) {
+      const paired = reportViewOf(pairing.current, { kind: 'played-out' }, pairing.previous);
+      if (paired.delta === null) {
+        throw new Error(`pairing "${pairing.label}" drew no delta block`);
+      }
+      seeds.push(...deltaSeeds(`pair(${pairing.label})`, paired.delta, pairing.current));
+    }
+
     /* The empty sheet, which is drawn rather than hidden — § 2.2. */
     const empty = emptyReportView();
     seeds.push({ field: 'emptyReportView.title', text: empty.title, role: 'label' });
@@ -2947,6 +3246,7 @@ const REPORT_PANEL: SurfaceAdapter = {
      * the only sentence on the surface that names two clock times of its own composition.
      */
     const filed = bundle.days[0]?.report;
+    const before = bundle.days[0]?.swapped;
     if (filed !== undefined) {
       /*
        * **Driven at every sampled playhead, and on the temporal axis** — because this surface is
@@ -2958,13 +3258,33 @@ const REPORT_PANEL: SurfaceAdapter = {
        * title and lede at the fifth. That is *"this surface obeys § D223"* stated as a run: the
        * property sees the whole-day figures appear exactly when the playhead earns them, and would
        * see them appear early.
+       *
+       * **And the pairing rides the same loop** — issue #127's third acceptance clause, which is R6
+       * pointed at the delta block. `ReportView.delta` is documented `null` *"on both sheets that are
+       * not an account of a played-out run: § D223's rule is that a sheet reporting a whole day waits
+       * for the whole day, and a delta is made of that sheet's figures, so it waits too"* — and until
+       * this argument it was a sentence rather than a run. Driven here with a real `previous`, the
+       * four early playheads seed **nothing** (there is no block to seed) and the fifth seeds every
+       * row of it at `atS === endedAt`, so a delta that started appearing early would arrive on the
+       * axis carrying whole-run figures and R6 would have it.
        */
       for (const at of sampleTimes(context.recording)) {
         const stamp = at.toFixed(0);
         const running = reportViewOf(
           filed,
           runProgressOf({ recording: context.recording, simTimeS: at }),
+          before,
         );
+        if (running.delta !== null) {
+          seeds.push(
+            ...deltaSeeds(
+              `runningReportView(@${stamp}s)`,
+              running.delta,
+              filed,
+              atPlayhead(context.recording, at),
+            ),
+          );
+        }
         seeds.push({
           field: `runningReportView(@${stamp}s).title`,
           text: running.title,

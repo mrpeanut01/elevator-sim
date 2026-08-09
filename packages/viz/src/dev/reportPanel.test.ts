@@ -32,6 +32,7 @@ import type { VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
 import { contractById } from '../shift/contracts.js';
 import { SHIFT_EVENTS } from '../shift/events.js';
+import type { ShiftEvent } from '../shift/types.js';
 import { GOAL_GLYPHS, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -40,6 +41,7 @@ import {
   dayReportOf,
   type ReportSubject,
   type ShapedDayReport,
+  type ShiftPlan,
   type WeekDayReport,
 } from '../shift/report.js';
 import type { GoalReading, ReportFigure } from '../shift/types.js';
@@ -114,11 +116,22 @@ function runOf(
     .recording;
 }
 
+/**
+ * What the day was set to run — issue #126's required field, and the constant every sheet below
+ * shares unless a case is *about* moving one of its axes.
+ *
+ * Held once rather than inlined so a suite that varies an axis says so in one visible place: two
+ * sheets built from two silently different plans would be incomparable for a reason no test chose,
+ * which is the failure mode the comparability gate itself exists to make visible.
+ */
+const PLAN: ShiftPlan = { shiftLengthS: 900, windowStartS: null, patternId: 'building' };
+
 /** The same fixture path `shift/report.test.ts` takes: one real run, folded at its own end. */
 function reportOf(
   recording: VizRecording,
   day = 4,
   subject: ReportSubject = { kind: 'week-day' },
+  plan: ShiftPlan = PLAN,
 ): ShapedDayReport {
   const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
   const goals = goalsForDay(day);
@@ -143,6 +156,7 @@ function reportOf(
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
     subject,
+    plan,
   });
 }
 
@@ -164,6 +178,9 @@ function weekDayReport(report: ShapedDayReport): WeekDayReport {
   if (report.of !== 'week-day') throw new Error(`expected a week-day sheet, got "${report.of}"`);
   return report;
 }
+
+/** A day of a week — named so a case that varies the *plan* does not have to spell the subject. */
+const WEEK: ReportSubject = { kind: 'week-day' };
 
 /** The Free Play selection the shape suite runs from. */
 const SINGLE: ReportSubject = {
@@ -216,6 +233,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
         subject: { kind: 'week-day' },
+        plan: PLAN,
       }),
     );
   }
@@ -1277,21 +1295,115 @@ describe('two runs that were not asked the same question — issues #117 and #10
     expect(delta.caption).toBe('What moved since the run before this one');
   });
 
-  it('cannot see a campaign day’s run length, and that gap is pinned here rather than claimed shut', () => {
+  it('refuses two days run over different stretches of the day — issue #126', () => {
     /*
-     * § D227: a refusal is pinned by a run, never by another sentence. `DayReportInput` carries no
-     * shift length, and the recording's own span is unusable as a basis because `endedAt` is
-     * `max(lastEventAt, demandEndedAt)` and therefore moves with the **dispatcher** — keying on it
-     * would refuse the one comparison the block is for.
+     * The gap this suite used to **pin open**, closed. Two campaign days of one day number, one run
+     * for half an hour and one for an hour, are not the same question: a `CARRIED` that doubled
+     * because the day was twice as long says nothing about the dispatcher.
      *
-     * So two campaign days of one day number, run at different lengths, still pair. This case
-     * exists so that gap is a measured fact with a name, and so a reader of `ReportBasis`' docstring
-     * can check the paragraph against a run. Closing it means a required field on `DayReportInput`,
-     * which is wider than either issue asks for.
+     * Note what is varied and what is not. **One recording, two plans** — so the refusal cannot be
+     * coming from the runs having produced different figures, which is the confound a two-recording
+     * case would carry. `ShiftPlan` is the only difference between the two sheets.
      */
-    expect(reportOf(longer).basis).toEqual(reportOf(clean).basis);
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, shiftLengthS: 1800 }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['over a different stretch of the day']);
+    expect(delta.figures).toEqual([]);
+    expect(delta.note).toContain('over a different stretch of the day');
+  });
+
+  it('refuses two days run over the same length from a different part of the day — issue #126', () => {
+    /*
+     * The half of the axis a length alone would have missed, and it is not hypothetical: § D286
+     * splits one control into `shiftLengthS` and `windowStartS` precisely because a *part* of a day
+     * may not travel as a duration, and `menu/partsOfDay.ts` derives its parts from a template's own
+     * phase boundaries — nothing stops two of them being equally long. A 30-minute morning peak and
+     * a 30-minute lunch dip are different questions with one number.
+     */
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, windowStartS: 1800 }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['over a different stretch of the day']);
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('refuses two days built from different arrival patterns — issue #126', () => {
+    // The axis the reporter of #126 could edit between two days of one week without the sheet
+    // noticing: the pattern select writes `ViewerState.pattern`, and the basis now carries it.
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, patternId: 'office-standard' }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['built from a different arrival pattern']);
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('reads the stretch off the plan and never off the recording — issue #126’s trap, pinned', () => {
+    /*
+     * **The case that makes the two above a fix rather than a cheaper defect.**
+     *
+     * `endedAt` is `max(lastEventAt, demandEndedAt)`, so a recording's own span moves with the
+     * *dispatcher*: #126 measured `09:25 / 09:22 / 09:20` for three dispatchers on one selection. A
+     * basis keyed on the span would have refused all three of those comparisons — the one comparison
+     * the block exists to draw — while looking, from the outside, exactly like this fix.
+     *
+     * So: two recordings whose spans genuinely differ, one plan, and the basis must be **equal**.
+     * The span difference is asserted rather than assumed, because a case whose two recordings
+     * happened to end at the same second would pass this while proving nothing.
+     */
     expect(longer.endedAt - longer.startedAt).toBeGreaterThan(clean.endedAt - clean.startedAt);
+    expect(reportOf(longer).basis).toEqual(reportOf(clean).basis);
     expect(deltaOf(reportOf(clean), reportOf(longer)).refused).toBeNull();
+  });
+
+  it('is threaded from the state the run was started from, not from the recording — the shell’s half', async () => {
+    /*
+     * **The standing requirement's second half, and the half a pure test cannot reach.**
+     *
+     * `scope/scope.test.ts` already pins the first: `viewer.shiftLengthS`, `viewer.windowStartS` and
+     * `viewer.pattern` each *move the legs*, driven through `shiftRunConfigOf`, which is the shipped
+     * path that turns a `ViewerState` into a run. The cases above pin the third: a plan that differs
+     * on any of them makes the block refuse. What neither can see is the wiring between them —
+     * `closeShift` needs a `document`, a canvas and a played-out run, and there is no jsdom here — so
+     * the wiring is pinned at the source, exactly as DR-13's two button bindings are.
+     *
+     * Both directions, because only one of them is about a missing line. A plan assembled from the
+     * **recording** would compile, would pass every case above, and would refuse the dispatcher swap
+     * on a real screen — issue #126's trap, arriving through the one file the trap tests cannot
+     * reach.
+     */
+    const shell = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const plan = /plan:\s*\{([^}]*)\}/.exec(shell)?.[1] ?? '';
+    expect(plan, 'closeShift must name the day’s own length').toContain('state.shiftLengthS');
+    expect(plan, 'and which part of the day it ran').toContain('state.windowStartS');
+    expect(plan, 'and the pattern it was built from').toContain('state.pattern');
+    // The trap, refused at the shell: nothing in the plan may come off the run that happened.
+    expect(plan).not.toMatch(/recording|endedAt|startedAt/);
+  });
+
+  it('cannot see an event a calendar wrote over one day, and that gap is pinned rather than claimed shut', () => {
+    /*
+     * § D227: a refusal is pinned by a run, never by another sentence — so the axis `ReportBasis`
+     * still cannot see gets a case of its own, exactly as the run length had one until this wave.
+     *
+     * `dev/main.ts#closeShift` derives the sheet's event as `eventFor(week.day, week.dayIdx)` — the
+     * ordinary schedule — while `dev/state.ts#shiftRunConfigOf` derives the **run's** event by
+     * consulting the authored calendar first, because a period may name today's event (`moving-week`
+     * is *`move-in` every day*). Where a calendar overrides, the two disagree and two days that ran
+     * under different events pair as one question.
+     *
+     * What this case pins is the half that **works**: one day number under two different events is
+     * refused, so `demand` is carrying the event and the gap is the shell's derivation rather than
+     * the basis's shape. Closing it is one line in `closeShift` and belongs to whoever owns the
+     * calendar seam.
+     */
+    const booked = (event: ShiftEvent): ShapedDayReport =>
+      dayReportOf({
+        recording: clean,
+        observations: shiftObservationsOf(observationsAt(clean, clean.endedAt)),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
+        contract: contractById('c2'),
+        event,
+        subject: { kind: 'week-day' },
+        plan: PLAN,
+      });
+    const delta = deltaOf(booked(SHIFT_EVENTS.ordinary), booked(SHIFT_EVENTS['move-in']));
+    expect(delta.refused?.differsOn).toEqual(['against different traffic']);
   });
 });
 

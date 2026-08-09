@@ -748,6 +748,22 @@ const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.fr
   buildingId: 'in a different building',
   subject: 'in a different mode',
   demand: 'against different traffic',
+  /*
+   * The two GitHub issue #126 added, and the table's exhaustiveness is what made adding them a
+   * compile error rather than an edit somebody had to remember. Both are clauses of the same
+   * sentence as the three above, so a refusal naming all five still reads as English.
+   *
+   * *A different stretch* rather than *a different length*: the axis is one string over a length
+   * **and** a window start (`shift/report.ts#extentLineOf`), so a phrase naming only the length
+   * would be wrong about a reader who moved the run to the afternoon and kept it half an hour long.
+   *
+   * *Built from* rather than *against*, so the pattern reads as a different question from `demand`'s
+   * *against different traffic* on a screen that can carry both at once. `demand` is what the day
+   * asked for — its day number and event, or a Free Play selection line; `patternId` is which
+   * authored arrival pattern the day was built out of.
+   */
+  extent: 'over a different stretch of the day',
+  patternId: 'built from a different arrival pattern',
 });
 
 /**

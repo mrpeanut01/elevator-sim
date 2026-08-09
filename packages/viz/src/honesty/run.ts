@@ -191,6 +191,49 @@ export function recordingConfigFor(
   };
 }
 
+/**
+ * The **second** replication a case runs — the run a pairing surface differences against.
+ * GitHub issue #127.
+ *
+ * ## Why a second simulation, when the corpus is measured in simulations
+ *
+ * `dev/reportPanel.ts#reportViewOf` takes a `previous` sheet, and the corpus handed it none — so
+ * `ReportDeltaView`'s caption, both arms of its note and every paired row were rendered by nothing,
+ * on a block § D310 draws on **two** surfaces. Half of that is reachable without a second run: two
+ * sheets of one recording pair as *nothing moved*, and two sheets of different questions refuse. The
+ * half that is not is the one the block exists for — **a dispatcher swap on one configuration**,
+ * where the figures actually differ and the block prints rows. A corpus that drove only the empty
+ * arms would have swept the block's frame and not its content.
+ *
+ * So the case's **candidate** arm is run once at single-run scale, which is a change of one
+ * simulation per case against a batch of `2 × replications`. It is the candidate rather than an
+ * invented profile because the case already names it: `HonestyCase.candidateProfileId` is the arm
+ * `batchRequestFor` puts opposite the baseline, and drawing a different dispatcher here would search
+ * a comparison the case is not about.
+ *
+ * **When the two arms are the same profile this is bit-identical to {@link recordingConfigFor}'s
+ * run**, which is not a defect and is not special-cased: `caseFromSeed` draws the identical-arm
+ * control at `identicalArmProbability`, and on those cases the pairing correctly renders *nothing
+ * moved* — § D223's *"the same day simulated again … it reproduces exactly"*, which is a shipped
+ * state a reader reaches by pressing Run twice. The corpus therefore reaches both arms of the note
+ * by construction rather than by a flag set here.
+ *
+ * Derived from {@link recordingConfigFor} rather than reassembled, for that function's own stated
+ * reason: a second construction of *what a case's run is* is § D159's second false-negative variant
+ * arriving inside the instrument built to find it. `runId` is the only other field that moves, so
+ * the two recordings are distinguishable in a counterexample.
+ */
+export function comparisonConfigFor(
+  honestyCase: HonestyCase,
+  resources: HonestyResources,
+): SimulationConfig {
+  return {
+    ...recordingConfigFor(honestyCase, resources),
+    dispatcherProfile: requireProfile(resources, honestyCase.candidateProfileId),
+    runId: `${honestyCase.caseId}-candidate`,
+  };
+}
+
 /** The batch every `batch` surface is driven from. Exported for the same reason. */
 export function batchRequestFor(
   honestyCase: HonestyCase,
@@ -252,6 +295,8 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
   requireProfile(resources, honestyCase.candidateProfileId);
 
   const { recording } = recordRun(recordingConfigFor(honestyCase, resources));
+  /* The run a pairing surface differences against — see {@link comparisonConfigFor}. */
+  const comparison = recordRun(comparisonConfigFor(honestyCase, resources)).recording;
   const batch: BatchResult = runBatch(
     batchRequestFor(honestyCase, resources),
     batchResourcesFor(honestyCase, resources),
@@ -267,6 +312,7 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
   return {
     case: honestyCase,
     recording,
+    comparisonRecording: comparison,
     suppressed: suppressionOf(recording),
     batch,
     report: batchReport(batch),
@@ -323,10 +369,18 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
     };
   }
 
-  // Counted from the batch that actually ran, not from the case: a stage case runs the stage's
-  // own declared replications, and a cost report derived from the wrong number is decoration.
+  /*
+   * Counted from the batch that actually ran, not from the case: a stage case runs the stage's
+   * own declared replications, and a cost report derived from the wrong number is decoration.
+   *
+   * **Two**, not one, since issue #127: the case's own run and the candidate run a pairing surface
+   * differences against ({@link comparisonConfigFor}). Counted here rather than left at 1 because
+   * this figure is published — `docs/05-roadmap.md` carries it beside the corpus size — and a cost
+   * that under-reports by a run per case is the class of stale number CLAUDE.md's own
+   * *"pin it to the run that produced it"* is about.
+   */
   const simulations =
-    1 + context.batch.arms.reduce((total, arm) => total + arm.replications.length, 0);
+    2 + context.batch.arms.reduce((total, arm) => total + arm.replications.length, 0);
   try {
     const rendered = renderAll(context);
     const texts = resources.corruptTexts === undefined ? rendered : resources.corruptTexts(rendered, context);

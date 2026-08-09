@@ -58,21 +58,46 @@ verdict:
   to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
   against a fail state the product deliberately does not ship.
 
-  **The figures this row published were stale, and three of five had moved before anybody
-  re-measured them.** It read *"60 cases, 271 985 strings, 4 650 simulations, 23 surfaces, 0
-  violations"*. Measured 2026-08-08 **before** any of that day's work: 60 cases, **311 384**
-  strings, 4 650 simulations, **30** surfaces, and **1 failing case** — so *0 violations* had
-  already stopped being true. The current figures, after [§ D307](DECISIONS.md):
+  **The figures this row published have now gone stale twice, which is the thing to notice about
+  them.** They read *"60 cases, 271 985 strings, 4 650 simulations, 23 surfaces, 0 violations"*, were
+  re-measured by [§ D307](DECISIONS.md) to 246 875 always-on and 312 104 deep — and **both of those
+  had moved again before anybody looked**. Measured on `integration/issue-wave-15` 2026-08-09,
+  **before** this wave's work: always-on **49 cases, 259 956 strings, 30 surfaces, 0 violations**;
+  deep **60 cases, 327 805 strings, 31 surfaces, 4 650 simulations, 10 violations in one case**. Two
+  of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
+  because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
+  being true of the deep half the day the temporal axis landed. The current figures, re-measured on
+  both tiers after issue #127 (a decision number is owed for that wave; the argument is in
+  `honesty/surfaces.ts` and `honesty/run.ts`):
 
-  | tier | cases | strings | surfaces | violations |
-  |---|---|---|---|---|
-  | always-on | 49 | **246 875** | 30 | **0** |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **312 104** | 30 | **10, one case** |
+  | tier | cases | strings | surfaces | simulations | violations |
+  |---|---|---|---|---|---|
+  | always-on | 49 | **261 176** | 30 | **606** | **48, 24 cases** |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **329 357** | 31 | **4 710** | **66, 29 cases** |
 
-  The deep tier's one failure is `honesty-9100031` / `suppressed-mean`, a **cue-rule coincidence
+  **Both string counts went up, and both for the same reason**: issue #127 put the Day report's
+  **run-to-run delta block** into the corpus, which had never been in it — `honesty/surfaces.ts`
+  rendered `reportViewOf(shaped)` with no `previous`, so the caption, both arms of the note, the
+  comparability refusal § D311 added and every paired row were swept by nothing, on a block § D310
+  draws on **two** surfaces. Six pairings per case, each a state a player can produce, add **+1 220**
+  always-on and **+1 552** deep. The simulations move by exactly one per case (**+49** and **+60**)
+  because a *drawn* comparison needs two runs, and the case's candidate arm is the honest second one.
+
+  **The violation counts went up too, and that is the finding rather than the cost.** The block's
+  first sweep produced one R13 violation, in 24 of 49 always-on and 28 of 60 deep cases:
+  `AVERAGE WAIT was 17.8 s → 23.4 s`, a mean with **no count anywhere in its box**. It is real rather
+  than a classification artefact — the block's rows carry no note, and on `dispatcherEditor.ts`'s
+  result strip there is no figure grid nearby either — and it is **recorded rather than fixed**, on
+  § D307's own precedent that a corpus which acquired a surface and had to be repaired first is a
+  different claim from one that acquired it and reported. The fix is a change to what two shipped
+  surfaces draw and needs its own issue.
+
+  The deep tier's other failure is `honesty-9100031` / `suppressed-mean`, a **cue-rule coincidence
   rather than a product defect**: the caveat says *"a quotable average on 6 of 20 consecutive
-  seeds"* and that run's refused `meanWaitS` also rounds to 20. It is outstanding and it is not a
-  false claim on screen.
+  seeds"* and that run's refused `meanWaitS` (19.65) also rounds to 20. It has been published as
+  outstanding since the temporal axis landed **and was in no register**, so the deep tier was simply
+  red on this base; it is entered in `honesty.test.ts`'s `OUTSTANDING` now, where the ghost check
+  holds it accountable in both directions.
 
   **The sweep now has a temporal axis, and it is the first thing in this verdict that did not come
   back green** ([§ D300](DECISIONS.md)'s E-4, [§ D307](DECISIONS.md)). A seventh property asks

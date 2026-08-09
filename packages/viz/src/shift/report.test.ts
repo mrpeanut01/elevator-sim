@@ -55,6 +55,7 @@ import {
   dayReportOf,
   type ReportSubject,
   type ShapedDayReport,
+  type ShiftPlan,
   type SingleRunReport,
   type WeekDayReport,
 } from './report.js';
@@ -85,6 +86,16 @@ function singleRun(report: ShapedDayReport): SingleRunReport {
   if (report.of !== 'single-run') throw new Error(`expected a single-run sheet, got "${report.of}"`);
   return report;
 }
+
+/**
+ * What the day was set to run — issue #126's required field, held once so the suites below vary the
+ * thing each of them is about.
+ *
+ * Every sheet in this file is a sheet of the same plan, which is what makes the comparability suite
+ * in `dev/reportPanel.test.ts` able to vary one axis at a time: a plan differing case by case here
+ * would make two sheets incomparable for a reason no test had chosen.
+ */
+const PLAN: ShiftPlan = { shiftLengthS: 900, windowStartS: null, patternId: 'building' };
 
 /** The one selection the shape suite runs from. Free Play's own six axes, minus what the recording carries. */
 const SELECTION = {
@@ -144,6 +155,7 @@ function reportOf(recording: VizRecording, day = 4): WeekDayReport {
       week,
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     }),
   );
@@ -273,6 +285,7 @@ describe('the observations, which are never suppressed', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     expect(figure(report, 'deepest-queue').note).toBe('never more than a handful');
@@ -307,6 +320,7 @@ describe('WORST WAIT states its censoring', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     const worst = figure(report, 'worst-wait');
@@ -333,6 +347,7 @@ describe('WORST WAIT states its censoring', () => {
         week: openWeek('c2'),
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }).figures.find((cell) => cell.id === 'worst-wait')?.value,
     ).toBe(NOT_RECORDED);
@@ -390,6 +405,7 @@ describe('energy is an axis, never a score — § D106', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     expect(figure(report, 'energy-work').value).toBe(NOT_RECORDED);
@@ -415,6 +431,7 @@ describe('energy is an axis, never a score — § D106', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
       ...(showEnergyAxis === undefined ? {} : { showEnergyAxis }),
     });
@@ -505,6 +522,7 @@ describe('where it went wrong is derived from the run', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     const phaseRow = report.diagnosis.find((row) => row.id === 'peak-phase');
@@ -585,6 +603,7 @@ describe('the rest of the sheet', () => {
         week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
         contract: contractById('c2'),
         event: SHIFT_EVENTS['move-in'],
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }),
     );
@@ -607,6 +626,7 @@ describe('the rest of the sheet', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS['move-in'],
+      plan: PLAN,
       subject: { kind: 'single-run', selection: SELECTION },
     }).metaLines.join('\n');
     expect(meta).not.toContain(SHIFT_EVENTS['move-in'].name);
@@ -679,6 +699,7 @@ describe('the rest of the sheet', () => {
         week: { ...openWeek('c2'), cleanRun: 5 },
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }),
     );
@@ -695,6 +716,7 @@ describe('the rest of the sheet', () => {
         week: openWeek('c2'),
         contract: undefined,
         event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }),
     );
@@ -720,6 +742,7 @@ describe('the rest of the sheet', () => {
         week: openEndless(),
         contract: undefined,
         event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }),
     );
@@ -782,6 +805,7 @@ describe('one judgement, four sentences — issue #53', () => {
         week: { ...openWeek('c2'), day: 4, dayIdx: 3, streak: 2 },
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
         subject: { kind: 'week-day' },
       }),
     );
@@ -1073,6 +1097,7 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
       week,
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
       subject,
     });
   }
