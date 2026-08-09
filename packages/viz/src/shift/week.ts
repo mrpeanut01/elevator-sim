@@ -37,7 +37,7 @@
  * reader clear a scenario by closing five empty days.
  */
 
-import { contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
+import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
 import {
   weekdayOf,
   type ClearedAward,
@@ -335,8 +335,17 @@ export function nextDay(week: WeekState): WeekState {
  * player is on day 4 with a streak of two and they still are; what has changed is that there is now
  * nothing to bank toward. Restarting there would confiscate a week for opening the editor.
  *
- * Used with {@link SANDBOX_CONTRACT_ID} by `withBuilding`, and it is deliberately narrow: it moves
- * one field and nothing else, so it cannot become a second way of taking a contract.
+ * Deliberately narrow: it moves one field and nothing else, so it cannot become a second way of
+ * taking a contract.
+ *
+ * ## Its non-test caller
+ *
+ * {@link switchWeek}, and **only** that — it was `dev/state.ts#withBuilding` until issue #107 put
+ * `switchWeek` between them. Named rather than left implicit, because an export whose every outside
+ * reference is a test is the shape this repository counts, and the answer here is that the
+ * behaviour is reached on every switch to a building no scenario runs. The export survives because
+ * `week.test.ts` pins the sandbox carry as a rule of its own, which is what `switchWeek`'s sandbox
+ * arm is asserted against.
  */
 export function withContract(week: WeekState, contractId: string): WeekState {
   return { ...week, contractId };
@@ -348,9 +357,170 @@ export function withContract(week: WeekState, contractId: string): WeekState {
  * `design.html` :1643, and the scenarios card's own sentence. The history goes with the week — a
  * sparkline that mixed Garden Apartments' quiet mornings with Vertical City's would be seven bars
  * of two different buildings.
+ *
+ * ## Its non-test caller
+ *
+ * {@link switchWeek}, on every first visit to an assignment and on every `restart` arrival. It had
+ * three direct callers before issue #107 — `withBuilding`, the scenario card and *Take the next
+ * assignment* — and **all three were destroying the week they were called on**, because restarting
+ * the destination was the only thing a single slot could express. They now go through
+ * `switchWeek`, which parks the departure and calls this for the arrival.
  */
 export function takeContract(week: WeekState, contractId: string): WeekState {
   return { ...openWeek(contractId), completed: week.completed };
+}
+
+/* -------------------------------------------------------------------------- *
+ * A week per assignment — GitHub issue #107
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How many weeks are kept beside the one being played, and why it is this number.
+ *
+ * One per contract, plus the two sentinel weeks a player can also be on — {@link SANDBOX_CONTRACT_ID}
+ * and {@link ENDLESS_CONTRACT_ID}. So the set is *closed*: every id {@link switchWeek} can ever be
+ * asked for has a place, and the ceiling is a bound on a slot rather than a policy about how much
+ * history a player may keep.
+ *
+ * It is derived from `CONTRACTS` rather than written as `10`, for § D213's reason: three buildings
+ * landed after the campaign was designed and five hand-written lists had to be widened by hand, two
+ * of them guards that could no longer see what they were guarding. A ninth scenario must not silently
+ * start evicting somebody's week.
+ *
+ * The ceiling can still bite, and what it evicts is stated rather than left to a `slice`: a week
+ * restored from an older build may name a contract this build no longer ships, and those are the
+ * entries that go — oldest parked first. `persist/validate.ts#unknownContractsIn` refuses such a
+ * session outright, so in practice the list never fills.
+ */
+export const PARKED_WEEKS_MAX = CONTRACTS.length + 2;
+
+/** The live week and the ones parked beside it, which are only ever produced together. */
+export interface WeekSwitch {
+  readonly week: WeekState;
+  /** Weeks not currently being played, at most one per `contractId`, least recently parked first. */
+  readonly parked: readonly WeekState[];
+}
+
+/**
+ * The parked week for an assignment, or `undefined` when it has never been played.
+ *
+ * **Not exported**, and that is the standing requirement applied to a one-line reader rather than
+ * to a subsystem: {@link switchWeek} is its only caller, and an exported version would have had
+ * `week.test.ts` and nothing else outside this file. A helper whose every external reference is a
+ * test is the shape this repository has shipped eleven times, and it is no less that shape for
+ * being three lines long.
+ */
+function parkedWeekFor(
+  parked: readonly WeekState[],
+  contractId: string,
+): WeekState | undefined {
+  return parked.find((entry) => entry.contractId === contractId);
+}
+
+/**
+ * What arriving somewhere means, which is **not** the same question as what leaving means.
+ *
+ * The week being left is parked either way — that is the whole of issue #107 and no caller opts out
+ * of it. What the two callers genuinely disagree about is the destination, and the disagreement is
+ * decided by what the player was told they were pressing:
+ *
+ * | caller | rule | what the player was told |
+ * |---|---|---|
+ * | the building select (`withBuilding`) | `resume` | nothing — it is a `<select>` labelled *building*, and a control that reads like a setting may not restart a week |
+ * | a scenario card, *Take the next assignment* | `restart` | *"taking this assignment restarts the week on Garden Apartments"*, in the card's own `title` |
+ *
+ * So `restart` **discards** a parked week for the destination, and that is not this issue arriving
+ * through a third door: it is the card's promise kept. A card that said *restarts* and resumed would
+ * be the stale-refusal defect with the polarity flipped — copy describing a behaviour the code no
+ * longer has. If that copy ever changes, this argument is what has to change with it.
+ *
+ * Required rather than defaulted: a default would let the next caller inherit a decision without
+ * making it, and which of these two a surface is doing is exactly what its own copy has to match.
+ */
+export type WeekArrival = 'resume' | 'restart';
+
+/**
+ * Move to another assignment **without destroying the one being left** — GitHub issue #107.
+ *
+ * ## The defect, which was data loss through the most ordinary control on the tab
+ *
+ * `withBuilding` called {@link takeContract} on every change of contract, and `takeContract` is a
+ * *fresh* week by construction. So a player on Garden Apartments day 4 with a four-day streak who
+ * touched the building select — a plain `<select>` sitting above **Run this shift**, which reads
+ * like a setting — was moved to Midtown Office day 1, and moving straight back gave them Garden
+ * Apartments **day 1**. Four cleared days, the streak and 40 tenants of growth, gone with no
+ * confirmation and no undo, and `saveSessionNow` then wrote the loss to `localStorage`. Reproduced
+ * from the code in `state.test.ts` before this existed: `c1 day 4 → c2 day 1 → c1 day 1`.
+ *
+ * `takeContract` is not the bug and is unchanged. *Taking* an assignment **should** restart the week
+ * — `design.html` :1643 and the scenarios card say so in words. What was missing is that changing
+ * building is not always taking an assignment: the second visit to a scenario is a **resume**, and
+ * there was nowhere for the first visit to have been kept.
+ *
+ * ## The four arms
+ *
+ * | the destination | what happens | why |
+ * |---|---|---|
+ * | already the live week's | nothing at all, by identity | the coach select fires `change` on a re-pick of the building already running, and a re-pick that shuffled the week would be the control moving on its own |
+ * | a week that is parked, under `resume` | **resumed**, with `completed` merged | it is the week the player left, and it is theirs |
+ * | a week that is parked, under `restart` | {@link takeContract}, and the parked copy goes | the card said *restarts the week on that building*; see {@link WeekArrival} |
+ * | never played | {@link takeContract}, or {@link withContract} for the sandbox | unchanged from before this function existed |
+ *
+ * The sandbox arm keeps {@link withContract}'s documented behaviour rather than opening a fresh
+ * week: *"Moving to a building no scenario runs is not a new week — the player is on day 4 with a
+ * streak of two and they still are"*. That decision was made when there was one slot, and the
+ * obvious reading now is that it should be reversed — park the scenario week and open the sandbox at
+ * day 1. It is deliberately **not** reversed, because the loss it was written to prevent is real and
+ * parking removes the *other* loss without touching it: the departing week is parked under its own
+ * id on every arm, so the player gets their scenario back **and** keeps the day loop they carried
+ * into their own building. The two weeks then run on independently, which cannot double-bank
+ * anything — a sandbox week resolves to no contract, so `closeDay` clears nothing there, which
+ * `state.test.ts` asserts rather than this paragraph.
+ *
+ * ## Why `completed` is merged rather than taken from either side
+ *
+ * `completed` is the one field of a week that is **not** about that week: it is every scenario the
+ * player has ever cleared, which is why {@link takeContract} carries it across. A parked week's copy
+ * is a snapshot from the moment it was parked, so resuming one verbatim would forget a scenario
+ * cleared while it was away — and `closeDay`'s `!base.completed.includes(contract.id)` guard is what
+ * stops a contract clearing twice, so forgetting one is not cosmetic: it lets the same assignment be
+ * cleared, and awarded, a second time. The union is taken live-first, so the order a player cleared
+ * things in survives.
+ */
+export function switchWeek(
+  week: WeekState,
+  parked: readonly WeekState[],
+  contractId: string,
+  arrival: WeekArrival,
+): WeekSwitch {
+  if (contractId === week.contractId) return { week, parked };
+
+  const resumed = arrival === 'resume' ? parkedWeekFor(parked, contractId) : undefined;
+  const next =
+    resumed !== undefined
+      ? { ...resumed, completed: mergedCompleted(week.completed, resumed.completed) }
+      : contractId === SANDBOX_CONTRACT_ID && arrival === 'resume'
+        ? withContract(week, SANDBOX_CONTRACT_ID)
+        : takeContract(week, contractId);
+
+  /*
+   * The departing week goes to the end, and any previous entry under its id goes: there is one week
+   * per assignment and the live one is always the newer. The destination's entry leaves the list
+   * because it is no longer parked — it is the week on screen, and a copy left behind would be a
+   * second answer to *what day is it on Garden Apartments*.
+   */
+  const kept = parked.filter(
+    (entry) => entry.contractId !== contractId && entry.contractId !== week.contractId,
+  );
+  return { week: next, parked: Object.freeze([...kept, week].slice(-PARKED_WEEKS_MAX)) };
+}
+
+/** Every id in `live` then every id in `parked` that is not already there. Neither side loses one. */
+function mergedCompleted(
+  live: readonly string[],
+  parked: readonly string[],
+): readonly string[] {
+  return [...live, ...parked.filter((id) => !live.includes(id))];
 }
 
 /** The award payload the report's green banner reads. */

@@ -43,7 +43,7 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 import { BLANK_SPEC } from '../authoring/buildingSpec.js';
 import { CONTRACTS, contractStatus, statLineOf } from '../shift/contracts.js';
 import type { ContractStatus, ScenarioContract, WeekState } from '../shift/types.js';
-import { takeContract } from '../shift/week.js';
+import { switchWeek } from '../shift/week.js';
 
 import { el, fill } from './dom.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -253,8 +253,24 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
   function take(card: ScenarioCardView): void {
     const view = latest;
     if (view === undefined || !card.resolved) return;
+    /*
+     * **`restart`, and the week being left is parked anyway** — GitHub issue #107.
+     *
+     * This was a bare `takeContract`, which restarted the destination *and* destroyed the week the
+     * player was on: taking Scenario 2 on Garden Apartments day 4 threw four cleared days away, the
+     * same loss the building select was doing one tab over. Only the destination half of that is
+     * what the card promises — its own `title` says *"taking this assignment restarts the week on
+     * Garden Apartments"* — so the arrival stays `restart` and the departure is parked.
+     */
+    const moved = switchWeek(
+      view.state.week,
+      view.state.parkedWeeks,
+      card.contractId,
+      'restart',
+    );
     context.update({
-      week: takeContract(view.state.week, card.contractId),
+      week: moved.week,
+      parkedWeeks: moved.parked,
       buildingId: card.buildingId,
       /*
        * The scenario's own shift — § D234, issue #27.

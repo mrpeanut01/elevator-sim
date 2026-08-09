@@ -173,7 +173,15 @@ function deepFreeze<T>(value: T): T {
  * is written whole.
  */
 function snapshotOf(viewer: ViewerState, menu: MenuState): SessionSnapshot {
-  return { week: viewer.week, settings: menu.settings, freePlay: menu.freePlay };
+  return {
+    week: viewer.week,
+    // Taken from the same state as `week` and never from anywhere else: the two are one campaign,
+    // and a pair assembled from two instants can claim the same contract twice. `dev/main.ts`'s
+    // `weeksForSession` is what makes sure the shell hands over a pair from one instant.
+    parkedWeeks: viewer.parkedWeeks,
+    settings: menu.settings,
+    freePlay: menu.freePlay,
+  };
 }
 
 /**
@@ -493,7 +501,7 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
   return {
     ok: true,
     version,
-    session: withWindowStart(record['session'], version),
+    session: withParkedWeeks(withWindowStart(record['session'], version), version),
     library: version >= 2 ? record['library'] : EMPTY_LIBRARY,
   };
 }
@@ -520,6 +528,27 @@ function withWindowStart(session: unknown, version: number): unknown {
   const freePlay = session['freePlay'];
   if (!isPlainRecord(freePlay) || 'windowStartS' in freePlay) return session;
   return { ...session, freePlay: { ...freePlay, windowStartS: null } };
+}
+
+/**
+ * A version 1, 2 or 3 `session`, given the one key version 4 added — GitHub issue #107.
+ *
+ * {@link withWindowStart}'s argument, and it has to survive the same objection: is `[]` a value the
+ * absence *determines*, or a guess about a list nobody wrote down? It is determined, and by a
+ * defect rather than by a convention. Those builds had **one week slot**, and changing building
+ * overwrote it — that is the whole of issue #107 — so at the instant those bytes were written there
+ * were no other weeks to record. An empty list is what the player had.
+ *
+ * Returns the value untouched when it is not the shape this can complete, for the reason
+ * {@link withWindowStart} gives: every one of those is a session `snapshotIssue` is about to refuse
+ * by name, and completing a malformed object first replaces a precise complaint with a vaguer one.
+ * The version-4 path returns immediately, so a current session cannot acquire a key it did not
+ * store.
+ */
+function withParkedWeeks(session: unknown, version: number): unknown {
+  if (version >= 4) return session;
+  if (!isPlainRecord(session) || 'parkedWeeks' in session) return session;
+  return { ...session, parkedWeeks: [] };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -579,7 +608,19 @@ export function loadSession(store: SessionStore): SessionRestore {
   // tables that are generated from `SessionSnapshot`'s own keys.
   const snapshot = deepFreeze(envelope.session as SessionSnapshot);
 
-  const missing = unknownContractsIn(snapshot.week);
+  /*
+   * Every week in the envelope, not only the live one — issue #107.
+   *
+   * A parked week names a contract for exactly the same reason the live one does, and a build that
+   * has lost that contract would put the player back on it the moment they picked the building.
+   * Checking only `snapshot.week` would have deferred the refusal to a control press, which is the
+   * one place this module's own argument says it must not happen: *"the instant before anything is
+   * in progress"* is the cheapest moment to be strict, and a week the player has just resumed is
+   * the most expensive.
+   */
+  const missing = [
+    ...new Set([snapshot.week, ...snapshot.parkedWeeks].flatMap(unknownContractsIn)),
+  ].sort((a, b) => a.localeCompare(b));
   if (missing.length > 0) {
     return {
       ok: false,

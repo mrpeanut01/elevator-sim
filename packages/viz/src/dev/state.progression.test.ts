@@ -41,7 +41,7 @@ import {
   advancesTheWeek,
   closedWeekOf,
   initialState,
-  weekForSession,
+  weeksForSession,
   type ViewerState,
 } from './state.js';
 
@@ -200,7 +200,7 @@ describe('issue #64 — a free-play run does not overwrite the saved scenario we
 });
 
 describe('issue #64 — the session keeps the week on disk while a mode does not own one', () => {
-  const stored = bankedWeek();
+  const stored = { week: bankedWeek(), parkedWeeks: [] as readonly WeekState[] };
 
   it('writes back what the slot already has when the mode does not advance the week', () => {
     /*
@@ -213,16 +213,16 @@ describe('issue #64 — the session keeps the week on disk while a mode does not
       playMode: 'free-play',
       week: openWeek('c1'),
     };
-    expect(weekForSession(state, stored)).toBe(stored);
+    expect(weeksForSession(state, stored).week).toBe(stored.week);
   });
 
   it('writes the live week when the mode does own one', () => {
     const state: ViewerState = {
       ...initialState(resources, 20260804n),
       playMode: 'shift-week',
-      week: stored,
+      week: stored.week,
     };
-    expect(weekForSession(state, openWeek('c1'))).toBe(stored);
+    expect(weeksForSession(state, { week: openWeek('c1'), parkedWeeks: [] }).week).toBe(stored.week);
   });
 
   it('writes the live week on a first visit, when there is nothing to protect', () => {
@@ -234,6 +234,33 @@ describe('issue #64 — the session keeps the week on disk while a mode does not
       playMode: 'free-play',
       week: fresh,
     };
-    expect(weekForSession(state, undefined)).toBe(fresh);
+    expect(weeksForSession(state, undefined).week).toBe(fresh);
+  });
+
+  /**
+   * The pair is chosen from one side — GitHub issue #107.
+   *
+   * This is the case that made `weekForSession` become `weeksForSession` rather than gain a sibling.
+   * `enterFreePlay` reaches Free Play through `withBuilding`, which has *just parked* the campaign
+   * week; holding the live week back while writing the in-memory parked list would store Garden
+   * Apartments twice — once as the live week from the slot, once as a parked week from memory — on
+   * two different days. Nothing on the screen after the next reload could say which was true.
+   */
+  it('holds the parked weeks back with the week, never one without the other', () => {
+    const parked = [openWeek('c2')];
+    const held = { week: bankedWeek(), parkedWeeks: [] as readonly WeekState[] };
+    const state: ViewerState = {
+      ...initialState(resources, 20260804n),
+      playMode: 'free-play',
+      week: openWeek('c1'),
+      parkedWeeks: parked,
+    };
+    const written = weeksForSession(state, held);
+    expect(written.week).toBe(held.week);
+    expect(written.parkedWeeks).toBe(held.parkedWeeks);
+    expect(
+      written.parkedWeeks.some((entry) => entry.contractId === written.week.contractId),
+      'no parked week may carry the live week’s contract',
+    ).toBe(false);
   });
 });

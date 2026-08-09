@@ -102,3 +102,70 @@ export function coachWeekLines(week: WeekState, shiftLengthS: number): CoachWeek
     progress: `${String(Math.round(shiftLengthS / 60))} min of demand · nothing to bank`,
   };
 }
+
+/* -------------------------------------------------------------------------- *
+ * What happened to the week you just left — GitHub issue #107
+ * -------------------------------------------------------------------------- */
+
+/** What to call a week in a sentence about two of them. */
+function weekName(week: WeekState): string {
+  const contract = contractById(week.contractId);
+  if (contract !== undefined) return contract.label;
+  if (week.contractId === ENDLESS_CONTRACT_ID) return 'Your endless week';
+  return 'Your own building’s week';
+}
+
+/**
+ * One line about the week that was just put down and the one that was picked up — issue #107.
+ *
+ * ## Why this exists after the loss has already been fixed
+ *
+ * The issue asks for a confirmation — *"Garden Apartments is on day 4 with a 4-day streak. Switch to
+ * Midtown Office? Your Garden week is kept."* — and that request was written against a product that
+ * **destroyed** the week. A dialog guarding an action with no consequence is a worse answer than
+ * none: it teaches a player to dismiss a prompt, which is exactly how the next prompt that does
+ * matter gets dismissed too.
+ *
+ * What is genuinely owed is the *second half* of the issue's own sentence. Switching to Midtown
+ * Office still puts **day 1** on the ribbon, and from the outside that is indistinguishable from the
+ * defect: the player has no way to know their four days are waiting rather than gone until they
+ * switch back and find out. So the fix is told rather than confirmed, and it is told **once**, in
+ * the hint slot the coach ribbon already uses for news about a save.
+ *
+ * ## It is a claim about state and therefore has to be true
+ *
+ * Every figure in it is read off the week being parked at the moment it is parked, and the claim it
+ * makes — *going back to it carries on from here* — is the property `state.test.ts` drives on the
+ * legs rather than on the ribbon. A line saying a week is kept, over a build that dropped it, would
+ * be this repository's own named failure with the polarity that matters most: a **false
+ * reassurance** about progress.
+ *
+ * `undefined` when there is nothing to say, which is the ordinary case: a week on day 1 with no
+ * streak and no closed days has nothing that could have been lost, and a notice about it would be
+ * noise on every building change a player makes while they are still choosing one.
+ */
+export function weekKeptLine(left: WeekState, arrived: WeekState): string | undefined {
+  if (left.contractId === arrived.contractId) return undefined;
+  const hasProgress = left.day > 1 || left.streak > 0 || left.cleanRun > 0 || left.history.length > 0;
+  if (!hasProgress) return undefined;
+
+  /*
+   * The counts are the two the issue names, and each appears only when it is non-zero — a *"with a
+   * 0-day streak"* is a number printed to fill a slot, which is `docs/10` R3's blank-where-a-figure-
+   * should-be with the blank filled in.
+   */
+  const also = [
+    ...(left.streak > 0 ? [`a ${String(left.streak)}-day streak`] : []),
+    ...(left.cleanRun > 0
+      ? [`${String(left.cleanRun)} clean shift${left.cleanRun === 1 ? '' : 's'} banked`]
+      : []),
+  ];
+  const carried =
+    `day ${String(left.day)}` + (also.length === 0 ? '' : ` with ${also.join(' and ')}`);
+
+  return (
+    `${weekName(left)} is kept on ${carried} — pick that building again and it carries on from ` +
+    `there. ${weekName(arrived)} ` +
+    (arrived.day > 1 ? `picks up on day ${String(arrived.day)}.` : 'starts a new week.')
+  );
+}
