@@ -128,5 +128,38 @@ export function enterFreePlay(
      */
     outOfServiceCarIds: [],
     levers: DEFAULT_LEVERS,
+    /*
+     * **The same argument as the two fields above, two fields over — and they were missed.**
+     *
+     * `viewer.calendar` and `viewer.commissioning` are not axes this menu offers either. The
+     * calendar select lives on the *Scenarios* screen (`screens.ts#campaignRows`) and the fabric on
+     * its own; neither appears among the six a Free Play selection names. So a player who put a
+     * vacation week over their campaign, or commissioned an extra shaft, and then started a free-play
+     * run got that week's population factor and that fabric's cars applied to a run the screen had
+     * just described as *"the building as it ships"*. `dev/state.ts#shiftRunConfigOf` reads both —
+     * `commissionedBuilding(authored, state.commissioning, classes)` and
+     * `calendarDayFor(state.calendar, …)` — so this is a live chain, not a dormant field.
+     *
+     * `withBuilding` above clears the fabric **only when the building actually moves**, which is
+     * right for a re-pick and wrong here: taking a leaderboard row's configuration is very often the
+     * building already loaded, and that is precisely the case where the commissioned shaft would have
+     * survived into a run claiming to be the authored one.
+     *
+     * ## Why this is not the decision GitHub issue #129 is holding open
+     *
+     * #129 asks whether a *deliberately* commissioned or calendared run should be **refused** by
+     * `scope/runIdentity.ts` or **carried** by `RunSubmission`, and warns that answering it in one
+     * consumer and not the other is the two-answer state a replay-verified board cannot survive.
+     * Nothing here answers it: no refusal is added, no field is added, and a campaign run under a
+     * vacation week is exactly as postable as it was. What changes is only what a **free-play**
+     * selection inherits, which is this module's own stated rule and was already applied to the held
+     * car and the levers.
+     *
+     * `commissioningConstraintId` is deliberately **not** reset. It decides what the commissioning
+     * screen will *let* a player move and reaches no run — `state.ts` says so where it is declared —
+     * so clearing it would throw away a preference to no effect on the legs.
+     */
+    calendar: null,
+    commissioning: [],
   };
 }
