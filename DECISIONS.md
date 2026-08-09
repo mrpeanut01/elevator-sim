@@ -22603,10 +22603,20 @@ cleared it, and `boot()` simulates a shift before the player can press anything 
 recording was drawn on the **previous run's clock**, in four places. [§ D227](#d227) again: the
 sentence was the only thing enforcing the property.
 
-### What is left, and named rather than closed
+### What was left, and named rather than closed — now closed by issue #140
 
-`runIdentity`'s day-1 gate still calls a run reproducible under a period that names **no** event and
-scales the population — `vacation` runs the building at about a quarter. That is the period's fact
-rather than the event's, and closing it needs a refusal that **names the period**: a gate opened
-without one would tell a player their run cannot be shared because of an event, when it was the
-population factor. Issue **#140**.
+`runIdentity`'s day-1 gate called a run reproducible under a period that names **no** event and
+scales the population. That is the period's fact rather than the event's, and closing it needed a
+refusal that **names the period**: a gate opened without one would tell a player their run cannot be
+shared because of an event, when it was the population factor. Issue **#140**, and it is closed —
+*a decision number is owed; the argument is in `shift/calendar.ts#calendarAsks`,
+`scope/runIdentity.ts#weekCarries`, `scope/runIdentity.ts#SELECTION_CARRIES_A_CALENDAR_PERIOD` and
+`dev/state.ts#calendarAskInputOf`.*
+
+**The figure in this paragraph's first draft was wrong, and the correction is the shape of the
+defect rather than a typo.** It read *"`vacation` runs the building at about a quarter"*.
+`vacation`'s `populationFactor` is **0.6**; the quarter is **`public-holiday`**'s 0.25, which is
+also the sharper case — `fromDay: 1, toDay: 1`, so it exists *only* on the day the gate opened. The
+hole was wider than this paragraph said, too: measured on the legs, **four** of the five shipped
+periods move a day-1 run while booking no event (`public-holiday`, `vacation`, `quarter-end`,
+`rota-week`), and only `moving-week` was refused, through its event.

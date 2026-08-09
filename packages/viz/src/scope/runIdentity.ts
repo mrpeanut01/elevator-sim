@@ -36,8 +36,14 @@
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import type { BrowserResources } from '../dev/data.js';
-import type { ViewerState } from '../dev/state.js';
-import { scheduledEventFor } from '../shift/calendar.js';
+import { buildingConfigOf, calendarAskInputOf, type ViewerState } from '../dev/state.js';
+import {
+  calendarAsks,
+  calendarDayFor,
+  scheduledEventFor,
+  type CalendarAsk,
+  type CalendarShift,
+} from '../shift/calendar.js';
 
 import { permits } from './permits.js';
 import { SCOPE_OF } from './surface.js';
@@ -65,32 +71,14 @@ function viewerControls(): readonly { readonly key: SurfaceKey; readonly field: 
  * test**, not a silent pass — `runIdentity.test.ts` asserts the two agree, which is what stops this
  * switch quietly shrinking as `ViewerState` grows.
  */
-function carriesState(state: ViewerState, field: string): string | undefined {
+function carriesState(
+  state: ViewerState,
+  resources: BrowserResources,
+  field: string,
+): string | undefined {
   switch (field) {
-    case 'week': {
-      /*
-       * Through the calendar — GitHub issue #135's **fourth** caller, and the one where the wrong
-       * event does more than misname something. `changesNothing` is the *gate*: on `eventFor`
-       * alone, day 1 of a `moving-week` was `ordinary`, `changesNothing` was true, and this
-       * returned `undefined` — declaring a day the calendar had made a move-in reproducible from a
-       * selection that carries no calendar. The name in the sentence below was the visible half;
-       * this line was the one that let a run be published as something it was not.
-       *
-       * **A narrower hole is left open on purpose and named rather than patched here.** A period
-       * that names *no* event still scales the population and can swap the template — `vacation` is
-       * a quarter of the building — so day 1 under one is still declared reproducible by the
-       * clause below. That is the *period*'s fact and not the *event*'s, and closing it means a
-       * sentence that says which period, which this one does not: a gate opened without the
-       * sentence to match would file a refusal that names the wrong reason, which § D227 rates
-       * below the gap itself. It needs its own issue.
-       */
-      const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
-      if (state.week.day === 1 && event.effect.changesNothing) return undefined;
-      return (
-        `day ${String(state.week.day)} grows the building by ${String(Math.round((state.week.day - 1) * 11))} % ` +
-        `and schedules “${event.name}”, and neither travels with a selection`
-      );
-    }
+    case 'week':
+      return weekCarries(state, resources);
     case 'outOfServiceCarIds':
       return state.outOfServiceCarIds.length === 0
         ? undefined
@@ -108,6 +96,198 @@ function carriesState(state: ViewerState, field: string): string | undefined {
     default:
       return undefined;
   }
+}
+
+/**
+ * **Whether the artefacts that reproduce a run can express the calendar period a day is under.**
+ *
+ * `false`, and it is a fact about the **artefacts** rather than about the calendar. All three
+ * enumerate their fields and none of them has one for a period:
+ *
+ * | artefact | what it carries | a period? |
+ * |---|---|---|
+ * | `menu/client.ts#RunSubmission` | building, dispatcher, template, rate, duration, window, seed | no |
+ * | `dev/main.ts#deepLinkSearchOf` | those, plus `tab`, `rail`, `mode` | no |
+ * | `provenanceLineOf`'s CLI line | `--building --dispatcher --traffic --template --seed --duration --part` | no |
+ *
+ * The subtlety worth writing down is the **one axis that looks carried and is not**. A period may
+ * impose a demand template, and `RunSubmission` has a `demandTemplateId` field — but the value put
+ * in it comes from `dev/state.ts#shiftDemandTemplateId`, which *deliberately does not consult the
+ * calendar*. So the submission would name the template the run would have used and the server would
+ * replay a different one. A field existing is not the same as the value reaching it.
+ *
+ * ## Why a constant and not a derivation
+ *
+ * There is no runtime source of truth to read this from: `RunSubmission` is a TypeScript interface
+ * and `deepLinkSearchOf` writes its parameters inline. Deriving it would mean a fourth expression
+ * that has to agree with three places by hand, which is the shape this repository keeps paying for.
+ * So it is one named fact with one reader and the enumeration beside it.
+ *
+ * ## It is also the seam for GitHub issue #129, which is open and being worked
+ *
+ * #129 asks whether a deliberately calendared or commissioned run should be **refused** here or
+ * **carried** by `RunSubmission`, and warns that answering it in one consumer and not the other is
+ * the two-answer state a replay-verified board cannot survive. Both answers land on this line:
+ *
+ * - **carry** — `RunSubmission` grows the field, `configHashOf` digests it and the replay honours
+ *   it. Then this becomes `true`, {@link weekCarries}'s period clause goes quiet on its own, and
+ *   the product stops refusing a run the board can now reproduce. One line, and the assertions in
+ *   `runIdentity.test.ts` that pin today's refusals turn red — which is the right noise, because
+ *   they are the record of a decision that would have been reversed.
+ * - **refuse** — `viewer.calendar` acquires a refusal of its own. Then the clause below is a
+ *   *second* reason for one fact and belongs in that arm instead; the merge is a deletion here
+ *   rather than an edit, and the sentence {@link askClause} builds is the thing that moves.
+ *
+ * What may not happen is this line quietly disagreeing with `RunSubmission`. That is why the table
+ * above names the three artefacts rather than asserting the conclusion.
+ */
+const SELECTION_CARRIES_A_CALENDAR_PERIOD: boolean = false;
+
+/**
+ * What today carries that a selection does not — the week's arm, and the longest of them.
+ *
+ * ## Three facts, each with its own subject, because the wrong subject is the defect
+ *
+ * A day can be un-reproducible for three independent reasons and this sentence has to attribute
+ * each to the thing that caused it:
+ *
+ * | fact | caused by | expressed by |
+ * |---|---|---|
+ * | the building has grown | `week.day` | `growth.ts`'s 11 %/day, day 1 excepted |
+ * | the calendar edited today | `state.calendar` | `shift/calendar.ts#calendarAsks` |
+ * | the day schedules an event | the week, **or** the period | `shift/calendar.ts#scheduledEventFor` |
+ *
+ * They are joined rather than merged, and each keeps its subject — *"the calendar's “Vacation
+ * week” …"*, *"the day schedules …"* — because a period does not necessarily book the day's event:
+ * a fire drill inside a vacation week is the **week's** drill, and a sentence reading *"Vacation
+ * week … and schedules “Fire drill”"* would attribute it to the calendar. That is the same class
+ * of mistake as the one this function was fixed for, one clause over.
+ *
+ * ## What changed, and why the old gate was wrong — GitHub issue #140
+ *
+ * The gate was `day === 1 && event.effect.changesNothing`, and the sentence named the day number
+ * and the event. Both halves were wrong for a *period*:
+ *
+ * - **The gate.** Four of the five shipped periods change the run on day 1 while naming no event
+ *   (`shift/calendar.ts#calendarAsks` tabulates them), so a run on a quarter of the building was
+ *   published as reproducible. Issue #135 found this and deliberately did not fix it, because —
+ *   - **the sentence.** It could only say *"day 1 … schedules “Ordinary day”"*, which is a refusal
+ *     giving the wrong reason: the run moved because of a population factor and the player would be
+ *     told it was an event. § D227 rates that below the gap itself, and `runIdentity` is the one
+ *     derivation the leaderboard submit path and `copy run` share — the surface that must never
+ *     accuse somebody of something they did not do.
+ *
+ * The growth clause is also **gone on day 1**, and that was a live falsehood rather than a tidy-up:
+ * under `moving-week` the shipped product printed *"day 1 grows the building by 0 % and schedules
+ * “Move-in day”"*, offering a reader a 0 % growth as a reason their run could not be posted.
+ *
+ * ## Why the clauses are authored here and the decision is taken in `shift/calendar.ts`
+ *
+ * The decision — *which of the period's asks reached the run* — is `calendarPatch`'s, and
+ * `calendarAsks` shares its two conditional branches rather than restating them, so a mix bias the
+ * engine withheld cannot appear in a refusal. The **prose** is here because this is where the
+ * product's refusals are written and read; a second sentence built in `shift/` would be a second
+ * description of one period, which is the drift `calendarLine` exists to prevent.
+ *
+ * ## Two questions, and only one of them is this function's
+ *
+ * *Did the calendar change the run?* is `calendarAsks`'. *Is that something a selection cannot
+ * carry?* is {@link SELECTION_CARRIES_A_CALENDAR_PERIOD}'s, and it is a fact about the sharing
+ * artefacts rather than about the calendar — the difference matters because GitHub issue #129 is
+ * currently deciding it. Splitting them is what stops this arm from asserting *"a calendar means
+ * unreproducible"*, which would be true today and false the day a submission grows the field.
+ */
+function weekCarries(state: ViewerState, resources: BrowserResources): string | undefined {
+  const facts: string[] = [];
+
+  if (state.week.day > 1) {
+    facts.push(
+      `day ${String(state.week.day)} grows the building by ` +
+        `${String(Math.round((state.week.day - 1) * 11))} %`,
+    );
+  }
+
+  /*
+   * The period's asks, decided against the same four inputs `shiftRunConfigOf` hands
+   * `calendarPatch` — `calendarAskInputOf` is that one value, and this is its second caller.
+   *
+   * The building is looked up through `buildingConfigOf`, which answers `undefined` rather than
+   * throwing, because this predicate exists to describe states naming a building `data/buildings/`
+   * does not ship. `shiftRunConfigOf` throws on exactly those, which is why the run plan is not
+   * consulted here even though it knows the answer for a shipped building.
+   */
+  const today = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
+  if (today !== null && !SELECTION_CARRIES_A_CALENDAR_PERIOD) {
+    const clauses = calendarAsks({
+      day: today,
+      ...calendarAskInputOf(
+        resources,
+        state,
+        buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+      ),
+    })
+      .map((ask) => askClause(ask, today.shift))
+      .filter((clause): clause is string => clause !== null);
+    if (clauses.length > 0) facts.push(`the calendar’s “${today.name}” ${listOf(clauses)}`);
+  }
+
+  /*
+   * The event, through `scheduledEventFor` — GitHub issue #135's **fourth** caller, and the one
+   * where the wrong event does more than misname something. On `eventFor` alone, day 1 of a
+   * `moving-week` was `ordinary` and this returned `undefined`, declaring a day the calendar had
+   * made a move-in reproducible.
+   */
+  const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+  if (!event.effect.changesNothing) facts.push(`the day schedules “${event.name}”`);
+
+  if (facts.length === 0) return undefined;
+  return `${facts.join(', ')}, and none of that travels with a selection`;
+}
+
+/**
+ * The clause naming one of the period's asks, read off the shift the ask came from.
+ *
+ * Exhaustive over {@link CalendarAsk}, which is derived from `CalendarShift`'s own keys — so a
+ * sixth field of a period is a **compile error here** rather than an ask with no sentence. That is
+ * the half of issue #140's fix a test cannot supply: a test asserts what exists, and this asserts
+ * what must be written before the next field can ship.
+ *
+ * `null` where the shift's own value is absent. Unreachable by construction — `calendarAsks` names
+ * a field only when it reached the run, and the two nullable fields reach it only when set — and
+ * expressed as a filtered `null` rather than a non-null assertion or a throw, because the one thing
+ * this function may not do is put a placeholder in a refusal.
+ */
+function askClause(ask: CalendarAsk, shift: CalendarShift): string | null {
+  switch (ask) {
+    case 'populationFactor':
+      // The factor, not the head count: the count `calendarLine` quotes is `expandFloors`' own on
+      // the edited building, and this function has no building. A percentage is true of the ask
+      // without claiming to be a measurement of the result.
+      return `scales the building’s population to ${String(Math.round(shift.populationFactor * 100))} %`;
+    case 'splitBias':
+      return shift.splitBias === null ? null : `pulls the mix ${shift.splitBias.label}`;
+    case 'demandTemplateId':
+      return shift.demandTemplateId === null
+        ? null
+        : `runs on the ${shift.demandTemplateId} demand template`;
+    case 'goodsCars':
+      /*
+       * **No count, and the omission is the accurate half.** A period asks for a number of cars and
+       * `calendarPatch`'s `reserveCars` may reserve fewer — it never empties a bank, so
+       * `moving-week`'s Saturday asks Garden Apartments' two-car bank for two and gets one. This
+       * function has no building and cannot know which happened, and *"reserves 2 cars"* on a day
+       * that reserved one is a refusal with a false number in it. *At least one* is true of every
+       * case a shipped building can produce, and `shift/calendar.ts#calendarAsks` names the single
+       * case it would not be true of, with the assertion that pins it.
+       */
+      return 'reserves at least one car out of passenger service';
+  }
+}
+
+/** `a`, `a and b`, `a, b and c`. The list a reader would write, for a list of any length. */
+function listOf(items: readonly string[]): string {
+  if (items.length < 2) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`;
 }
 
 /**
@@ -177,7 +357,7 @@ export function runIdentityIssues(
     const entry = SCOPE_OF[key];
     if (entry === undefined || entry.kind !== 'control') continue;
     if (permits(mode, entry.scope)) continue;
-    const carried = carriesState(state, field);
+    const carried = carriesState(state, resources, field);
     if (carried !== undefined) issues.push({ key, scope: entry.scope, message: carried });
   }
 

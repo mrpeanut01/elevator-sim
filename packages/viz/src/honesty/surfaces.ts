@@ -264,7 +264,7 @@ import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/no
 import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
-import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
+import { closeDay, nextDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
@@ -4497,6 +4497,30 @@ const MENU: SurfaceAdapter = {
      * of the same strings. What is needed is that **every string the root can emit** is reached, and
      * one Casual arm plus one first-visit arm reaches all of them.
      */
+    /*
+     * **The `unrankable` arm's refusal is produced rather than quoted — GitHub issue #140.**
+     *
+     * It was a hand-copied literal: *"day 7 grows the building by 66 % and schedules “Move-in
+     * day”, and neither travels with a selection"*. Two things were wrong with it and only one of
+     * them was ever going to be noticed. It was a **copy of another module's sentence**, so it went
+     * stale the moment `runIdentity` reworded — § D227's subject exactly, and #140 is the reword.
+     * And it was **not a sentence the product could produce for the state it described**:
+     * `eventFor(7, dayIdx)` is `ordinary` on a weekday of day 7 and `weekend` on its Sunday, so a
+     * day 7 that books a move-in needs a calendar period the fixture named nowhere. A corpus seeded
+     * with a refusal no reader can meet sweeps wording no reader will ever see.
+     *
+     * Six `nextDay`s rather than `{ ...week, day: 7 }`, for `tomorrowFactsOf`'s reason: the weekday
+     * index wraps the way the shipped transition wraps, so this is a week a player can actually be
+     * standing in.
+     */
+    const menuResources = browserResourcesOf(context);
+    const day1 = initialState(menuResources, 1n);
+    const [grownDay] = runIdentityIssues(
+      { ...day1, week: [1, 2, 3, 4, 5, 6].reduce((week) => nextDay(week), day1.week) },
+      menuResources,
+      'ranked',
+    );
+
     const menuStates: readonly {
       readonly label: string;
       readonly selection: typeof whole;
@@ -4513,8 +4537,7 @@ const MENU: SurfaceAdapter = {
         selection: whole,
         canPost: true,
         hasRun: true,
-        refusal:
-          'day 7 grows the building by 66 % and schedules \u201cMove-in day\u201d, and neither travels with a selection',
+        refusal: grownDay?.message,
       },
       {
         label: 'casual',

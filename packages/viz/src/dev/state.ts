@@ -85,6 +85,7 @@ import {
   calendarLine,
   calendarPatch,
   scheduledEventFor,
+  type CalendarAskInput,
   type CalendarPeriod,
 } from '../shift/calendar.js';
 import { commissionedBuilding } from '../commissioning/building.js';
@@ -161,6 +162,44 @@ export function shiftDemandTemplateId(
   const spec = selectedPatternSpec(resources, state, building);
   const fromPattern = spec === undefined ? 'rise-and-fall' : demandFromSpec(spec).demandTemplate;
   return state.freePlay?.demandTemplateId ?? fromPattern;
+}
+
+/**
+ * The four inputs a calendar period's asks are decided against, for a given state — GitHub
+ * issue #140.
+ *
+ * ## Why this is a function and not four expressions at two call sites
+ *
+ * {@link shiftRunConfigOf} passes them to `calendarPatch`, and `scope/runIdentity.ts` needs the
+ * **same four** to ask `shift/calendar.ts#calendarAsks` *did the period's mix bias actually reach
+ * the run?* — because a refusal naming a bias the engine withheld is exactly the wrong-reason
+ * failure § D227 rates below the gap it fixes. Two expressions for one set of inputs is
+ * `scheduledEventFor`'s subject at a different seam: the run and the sentence describing it would
+ * agree until somebody changed one of them.
+ *
+ * `templateChosenByPlayer` is the field that makes this worth a function rather than a comment. It
+ * is *"the player used Free Play's template select"*, spelled `state.freePlay?.demandTemplateId
+ * !== undefined`, and it is the difference between a period imposing `office-down-peak` and a
+ * period being told it may not — a difference a second copy of that expression could lose in one
+ * edit.
+ *
+ * The `building` argument is {@link shiftDemandTemplateId}'s and is passed straight through, which
+ * is why it admits `undefined`: `runIdentityIssues` is the predicate that has to survive a state
+ * naming a building `data/buildings/` does not ship, and `shiftRunConfigOf` **throws** on one.
+ */
+export function calendarAskInputOf(
+  resources: BrowserResources,
+  state: ViewerState,
+  building: BuildingConfig | undefined,
+): Omit<CalendarAskInput, 'day'> {
+  return {
+    // The cast `shiftDemandTemplateId` already forces on its callers: it answers with a plain
+    // string because `FreePlaySelection` carries one, and the id it returns is a template's.
+    demandTemplateId: shiftDemandTemplateId(resources, state, building) as CalendarAskInput['demandTemplateId'],
+    demandTemplates: resources.trafficProfiles.demandTemplates,
+    runLengthS: state.shiftLengthS,
+    templateChosenByPlayer: state.freePlay?.demandTemplateId !== undefined,
+  };
 }
 
 /**
@@ -1055,7 +1094,15 @@ export function shiftRunConfigOf(
    * A `null` rate passes nothing, which is what makes "the building's own profile" a real
    * selection rather than a reconstruction of one.
    */
-  const demandTemplate = (state.freePlay?.demandTemplateId ?? pattern.demandTemplate) as typeof pattern.demandTemplate;
+  /*
+   * Through {@link calendarAskInputOf} rather than spelled out here, and the two are the same
+   * expression: `state.freePlay?.demandTemplateId ?? pattern.demandTemplate` **is**
+   * `shiftDemandTemplateId`, which that helper is built on. What the helper adds is that the three
+   * fields `calendarPatch` is handed below and the three `scope/runIdentity.ts` decides a period's
+   * asks against are now one value rather than two copies of four expressions (issue #140).
+   */
+  const askInput = calendarAskInputOf(resources, state, authored);
+  const demandTemplate = askInput.demandTemplateId as typeof pattern.demandTemplate;
   const rate = state.freePlay?.arrivalRatePctPop5min;
   const demand =
     rate === undefined || rate === null
@@ -1093,10 +1140,7 @@ export function shiftRunConfigOf(
     day: calendarDay,
     building: grown,
     split: patch.demand.directionalSplit ?? baseOf(resources, authored, demand).split,
-    demandTemplateId: demandTemplate,
-    demandTemplates: resources.trafficProfiles.demandTemplates,
-    runLengthS: state.shiftLengthS,
-    templateChosenByPlayer: state.freePlay?.demandTemplateId !== undefined,
+    ...askInput,
     spokenForCarIds: patch.outOfServiceCarIds,
   });
 
