@@ -93,6 +93,8 @@ import {
 } from '../authoring/selectorSpec.js';
 import type { WeightSetPolicy } from '@elevator-sim/core/browser';
 
+import { commitmentOf } from '../scope/commitment.js';
+
 import { sliderHandlesOf, updateSliderRow, type SliderHandles } from './dispatcherEditor.js';
 import { chip, el, fill, setHidden, setText, slider } from './dom.js';
 import type { SelectorEditorElements } from './elementMap.js';
@@ -412,6 +414,30 @@ export function changedNoteOf(
  * The mount
  * -------------------------------------------------------------------------- */
 
+/*
+ * The scope note — GitHub issue #104, and this is the panel where the two senses of *mid-shift*
+ * collide.
+ *
+ * The heading above these chips reads *"the one thing that changes mid-shift"*, and it is accurate
+ * about the **mechanism**: `selection.policy` really does re-weight the dispatcher while the day
+ * runs, which is what makes it the simulator's only genuine within-day adaptation. It is not
+ * accurate about the **control**, and a player watching a queue build has no way to tell the two
+ * apart from the heading alone — this panel writes `selectorSpec` and asks for no run, so the shift
+ * on screen was simulated under whatever was set before it started. The note draws the distinction
+ * rather than leaving the heading to be read as a promise about the control.
+ *
+ * The wording is issue #104's own, because on this block it is true. Module-private beside the
+ * control, and empty when `scope/surface.ts` stops declaring it — `dispatcherEditor.ts` states both
+ * reasons and `scope/commitment.ts` states why silence is the failure direction.
+ */
+const APPLIES_NEXT_RUN =
+  commitmentOf('viewer.selectorSpec', 'writes-only') === 'next-run'
+    ? 'Locked for this shift: changes apply to your next run. The policy itself does switch ' +
+      'weight sets while a day runs — that is what it is for — but choosing one here is still a ' +
+      'setting the next run is simulated with, and the shift on screen keeps the switching it was ' +
+      'simulated under.'
+    : '';
+
 /** Nodes of one arm row, kept so a redraw writes into the row instead of replacing it. */
 interface ArmHandles {
   readonly root: HTMLElement;
@@ -444,6 +470,18 @@ export function mountSelectorEditor(
   }
 
   /* --- static wiring, once ------------------------------------------------ */
+
+  /* The scope note, above the chips it is about — issue #104. See {@link APPLIES_NEXT_RUN}. */
+  if (APPLIES_NEXT_RUN !== '') {
+    elements.policy.parentElement?.insertBefore(
+      el(doc, 'p', {
+        className: 'advice',
+        text: APPLIES_NEXT_RUN,
+        style: { 'margin-bottom': '10px' },
+      }),
+      elements.policy,
+    );
+  }
 
   elements.reset.addEventListener('click', () => {
     const at = view;

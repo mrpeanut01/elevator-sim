@@ -114,6 +114,7 @@ import {
   type CredentialState,
 } from '../access/zoning.js';
 import { plainDescription, specFromClass, specsWithClass, type MachineClass } from '../authoring/machineSpec.js';
+import { commitmentOf } from '../scope/commitment.js';
 
 import {
   nextSavedId,
@@ -1319,6 +1320,37 @@ const TRANSPORT_TRANSFER_TITLE =
 const TRANSPORT_BLOCKED_TITLE =
   'The other landing already stands here. The loader refuses a connection whose two ends name one floor — a machine that starts and ends on the same floor moves nobody.';
 
+/**
+ * The verb the save's confirmation offers, hoisted so {@link DRAFT_NOTE} can name it — issue #104.
+ *
+ * It was a literal inside the `el` call that builds the button. One string with two readers is the
+ * shape `RUN_THIS_COPY` uses next door, and the alternative is a note quoting a label that a later
+ * lane renames underneath it — which is the stale-refusal defect § D227 names, in miniature.
+ */
+const RUN_SAVED_LABEL = 'Run a day on it';
+
+/*
+ * The scope note — issue #104. Module-private beside the control, for {@link TRANSPORT_LANDING_TITLE}'s
+ * stated constraint.
+ *
+ * The panel names **both** verbs because it needs both: unlike the dispatcher editor, Save here
+ * deliberately does *not* select — `dispatcherEditor.ts#save` records why, and the indirection
+ * through `stateRunningSaved` that makes it load-bearing — so a reader who saves and stops has a
+ * building nothing is pointed at. `Save as a new building` is `index.html`'s label and
+ * `dev/scopeNotes.test.ts` pins this sentence to it, along with {@link RUN_SAVED_LABEL}.
+ *
+ * Empty when `scope/surface.ts` stops calling this working copy a draft — see
+ * `scope/commitment.ts` for why the failure direction is silence.
+ */
+const DRAFT_NOTE =
+  commitmentOf('viewer.buildingSpec', 'writes-only') === 'draft'
+    ? 'Nothing you draw here reaches a run yet — this panel holds a draft, and the shift on screen ' +
+      'keeps the building it was simulated in. Save as a new building files it and points nothing ' +
+      `at it; ${RUN_SAVED_LABEL}, which appears beside Save afterwards, is what hands it to the ` +
+      'shift, and that re-runs the whole day from the start rather than steering the one you are ' +
+      'watching.'
+    : '';
+
 /*
  * Issue #43 § 4: this said *"core’s own semantics"* — `core` is a source package and means nothing to
  * a player — and *"what four of the five shipped buildings declare"*, which was wrong in both halves.
@@ -1649,7 +1681,7 @@ export function mountBuildingEditor(
   });
   const runSaved = el(doc, 'button', {
     className: 'primary',
-    text: 'Run a day on it',
+    text: RUN_SAVED_LABEL,
     title:
       'Makes the building you just saved the one the week runs, and runs a day on it. It belongs ' +
       'to no scenario, so the week keeps its day and stops claiming to be an assignment.',
@@ -1658,6 +1690,14 @@ export function mountBuildingEditor(
   setHidden(savedNote, true);
   setHidden(runSaved, true);
   elements.save.parentElement?.append(savedNote, runSaved);
+
+  /* The scope note, above the first control it is about — issue #104. See {@link DRAFT_NOTE}. */
+  if (DRAFT_NOTE !== '') {
+    elements.rows.parentElement?.insertBefore(
+      el(doc, 'p', { className: 'advice', text: DRAFT_NOTE, style: { 'margin-bottom': '10px' } }),
+      elements.rows,
+    );
+  }
 
   /** The building the confirmation is about. Cleared the moment the reader edits again. */
   let confirmedId = '';

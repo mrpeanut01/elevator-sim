@@ -92,6 +92,8 @@ import {
 import type { VizRecording } from '../contract/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
+import { commitmentOf } from '../scope/commitment.js';
+import type { SurfaceKey } from '../scope/types.js';
 import { statLineOf } from '../shift/contracts.js';
 
 import type { BrowserResources } from './data.js';
@@ -965,6 +967,31 @@ export function selectedPatternSpecOf(
  * The mount
  * -------------------------------------------------------------------------- */
 
+/*
+ * The sentence the three live segments carry — GitHub issue #104.
+ *
+ * Module-private, beside the control, on the precedent `dispatcherEditor.ts#RUN_THIS_COPY` sets and
+ * for the reason its docstring gives: an exported string here would be a new player-facing prose
+ * producer owing `honesty/surfaces.ts` an adapter, and this lane does not own that file. It reaches
+ * the static sweep, which is weaker than being driven and is said rather than dressed up.
+ *
+ * **The issue's own wording is refused, and that is the point of the fix.** It asks for *locked for
+ * this shift, changes apply to your next run*. Verified against this tree, no card on these three
+ * panels is disabled while a shift plays: each `onPick` below writes and then calls
+ * `context.runShift()`, and `dev/main.ts#runShift` builds a **new `Playback`** off the new
+ * recording. So the card is not inert and it is not deferred — it is destructive, and *locked* is a
+ * refusal a run refutes. § D227 rates that above a missing one.
+ *
+ * The playhead clause is the half a player actually loses something to, and it is the half the
+ * report is describing from the other side: press a card thirty seconds into a queue building and
+ * the queue is gone, because the day it was in is gone.
+ */
+const PICKS_RE_RUN =
+  'The simulator runs the whole day before it plays any of it back, so picking a card here does ' +
+  'not steer the shift on screen — it throws that day away and simulates a different one from the ' +
+  'start. Nothing on this panel is locked while a shift plays: the run you are watching is ' +
+  'replaced rather than paused, and the playhead goes back to the beginning with it.';
+
 /**
  * Build the right rail. Nothing is drawn until {@link Panel.render} is called.
  *
@@ -997,6 +1024,30 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
   ui.openMachines.addEventListener('click', () => {
     context.openTab('machines');
   });
+
+  /*
+   * The scope note, written once at mount rather than on every render — GitHub issue #104.
+   *
+   * **Above the cards and not below them**, because it is the rule a reader needs *before* pressing
+   * one, and a sentence under the list is an explanation of something already lost. It goes in this
+   * mount rather than in `index.html` for the reason {@link commitmentOf}'s docstring gives: markup
+   * cannot be derived from `scope/surface.ts`, and a hand-written sentence about what a control
+   * does is the stale-refusal defect § D227 names.
+   *
+   * Nothing is drawn when a key stops being a control that runs the shift. That direction is
+   * deliberate — an absent sentence is not a false one — and `scopeNotes.test.ts` drives this mount
+   * and reads the note back out, which is what stops the absence becoming permanent.
+   */
+  const scopeNote = (list: HTMLElement, key: SurfaceKey): void => {
+    if (commitmentOf(key, 'runs-the-shift') !== 're-runs-now') return;
+    list.parentElement?.insertBefore(
+      el(doc, 'p', { className: 'rail-prose', text: PICKS_RE_RUN }),
+      list,
+    );
+  };
+  scopeNote(ui.dispatcherList, 'viewer.dispatcherId');
+  scopeNote(ui.trafficList, 'viewer.pattern');
+  scopeNote(ui.buildingList, 'viewer.buildingId');
 
   const dispatcherList = keyedList(ui.dispatcherList);
   const trafficList = keyedList(ui.trafficList);

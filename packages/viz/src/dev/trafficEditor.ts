@@ -71,6 +71,7 @@ import {
   type PeakOrder,
 } from '../authoring/patternSpec.js';
 import { DAY_START_S, PHASE_PALETTE, QUIET_PALETTE, hhmm } from '../live/timeline.js';
+import { commitmentOf } from '../scope/commitment.js';
 
 import {
   sliderHandlesOf,
@@ -464,6 +465,26 @@ const USE_THIS_COPY: Readonly<
   }),
 });
 
+/*
+ * The scope note — GitHub issue #104, and the reason it is not the sentence the issue asks for.
+ *
+ * Everything above the preview writes `patternSpec`, a draft `shiftRunConfigOf` never reads. So the
+ * honest complaint about this panel is not *locked* — nothing here is disabled — but that a reader
+ * watching a queue build can move every slider on it and see the queue do exactly what it was
+ * always going to do. The verb is interpolated from {@link USE_THIS_COPY} rather than quoted, on
+ * `dispatcherEditor.ts`'s stated rule: a refusal is pinned by the thing it points at.
+ *
+ * Empty when `scope/surface.ts` stops calling this working copy a draft — see
+ * `scope/commitment.ts` for why the failure direction is silence.
+ */
+const DRAFT_NOTE =
+  commitmentOf('viewer.patternSpec', 'writes-only') === 'draft'
+    ? 'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
+      `screen keeps the demand it was simulated with. ${USE_THIS_COPY.select.label} is what hands ` +
+      `it over, or ${USE_THIS_COPY.saveFirst.label} while the draft is still unfiled; either one ` +
+      're-runs the whole day from the start rather than steering the one you are watching.'
+    : '';
+
 /* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
@@ -497,6 +518,14 @@ export function mountTrafficEditor(
   /* *Now use this* — issue #65, beside the two verbs that were the whole of the panel's vocabulary. */
   const useThis = el(doc, 'button', { className: 'primary', attrs: { type: 'button' } });
   elements.save.parentElement?.append(useThis);
+
+  /* The scope note, above the first control it is about — issue #104. See {@link DRAFT_NOTE}. */
+  if (DRAFT_NOTE !== '') {
+    elements.orderChips.parentElement?.insertBefore(
+      el(doc, 'p', { className: 'advice', text: DRAFT_NOTE, style: { 'margin-bottom': '10px' } }),
+      elements.orderChips,
+    );
+  }
 
   useThis.addEventListener('click', () => {
     const at = view;

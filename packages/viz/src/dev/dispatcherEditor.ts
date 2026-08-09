@@ -53,6 +53,8 @@ import {
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
 
+import { commitmentOf } from '../scope/commitment.js';
+
 import { chip, el, fill, pick, setHidden, setStyle, setText, slider, toggle } from './dom.js';
 import type { DispatcherEditorElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -639,6 +641,51 @@ const UNAUTHORABLE_COPY: Readonly<Record<UnauthorableBlock, string>> = Object.fr
   selection: 'its mid-run weight-set selection',
 });
 
+/*
+ * The two scope notes this panel carries — GitHub issue #104.
+ *
+ * ## Two, because this panel holds two behaviours a hand's width apart
+ *
+ * The weights, the flags and the name write `dispatcherSpec`, which `shiftRunConfigOf` never reads;
+ * the group levers and the door dwell write `levers`, which it does. Both blocks are drawn in the
+ * same editor panel, in the same slider and toggle components, and **neither of them changes the
+ * shift on screen** — for two different reasons, needing two different sentences. The report asks
+ * for one note; one note here would have been wrong about one of the blocks it covered.
+ *
+ * ## The reporter's own wording, on the block it is true of
+ *
+ * *"Locked for this shift, changes apply to your next run"* is issue #104's suggested copy. It is
+ * refused on the right rail — a card there discards the day outright — and it is exactly right
+ * about the levers, so it is used verbatim there. A fix that improved the wording of a correct
+ * sentence would have been this repository rewriting a reporter for style.
+ *
+ * ## Why the verbs are interpolated rather than typed out
+ *
+ * {@link RUN_THIS_COPY} is the module that decides what the button beneath these sliders says. A
+ * note naming *Run this dispatcher* in its own quotes would be a second answer to the same
+ * question, and the label is exactly the sort of thing a later lane renames — `rightRail.ts`'s
+ * machines refusal makes the same move against `menu/screens.ts` and `index.html`, and says why:
+ * *a refusal is pinned by the thing it points at, never by another sentence.*
+ *
+ * Both are empty when `scope/surface.ts` stops declaring what they claim. See
+ * `scope/commitment.ts` for why the failure direction is silence rather than a stale sentence.
+ */
+const DRAFT_NOTE =
+  commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'draft'
+    ? 'Nothing you move here reaches a run yet — this panel holds a draft, and the shift on ' +
+      `screen keeps the dispatcher it was simulated with. ${RUN_THIS_COPY.select.label} is what ` +
+      `hands it over, or ${RUN_THIS_COPY.saveFirst.label} while the draft is still unfiled; ` +
+      'either one re-runs the whole day from the start rather than steering the one you are ' +
+      'watching.'
+    : '';
+
+const LEVERS_NOTE =
+  commitmentOf('viewer.levers', 'writes-only') === 'next-run'
+    ? 'Locked for this shift: changes apply to your next run. These do reach a run — the day is ' +
+      'simulated with them — but moving one asks for no run of its own, so the shift on screen ' +
+      'keeps the levers it was simulated under until something else runs one.'
+    : '';
+
 /* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
@@ -737,6 +784,25 @@ export function mountDispatcherEditor(
   setHidden(unauthorable, true);
   elements.save.parentElement?.append(runThis, rename, savedNote);
   elements.summary.parentElement?.append(unauthorable);
+
+  /*
+   * The two scope notes, written once at mount rather than on every render — issue #104. Each sits
+   * **above** the block it is about, because it is the rule a reader needs before moving a slider;
+   * a sentence underneath is an explanation of something already spent. Built here for
+   * {@link DRAFT_NOTE}'s stated reason: `index.html` cannot derive a claim from `scope/surface.ts`.
+   */
+  const scopeNote = (before: HTMLElement, text: string): void => {
+    if (text === '') return;
+    // `.advice` is this panel's own voice for *a sentence about the controls beside it*, with a
+    // bottom margin added because the class is written for a line that ends a block and this one
+    // opens one.
+    before.parentElement?.insertBefore(
+      el(doc, 'p', { className: 'advice', text, style: { 'margin-bottom': '10px' } }),
+      before,
+    );
+  };
+  scopeNote(elements.terms, DRAFT_NOTE);
+  scopeNote(elements.levers, LEVERS_NOTE);
 
   rename.addEventListener('click', () => {
     const at = view;
