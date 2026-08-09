@@ -192,6 +192,7 @@ import {
   allBuildingIds,
   buildingConfigOf,
   shiftDemandTemplateId,
+  shiftSubmittedSelection,
   closedWeekOf,
   specsWithSaved,
   buildingNameOf,
@@ -1947,13 +1948,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
       run: {
         buildingId: state.buildingId,
         dispatcherProfileId: state.dispatcherId,
-        demandTemplateId: menuState.freePlay.demandTemplateId,
-        arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+        // `state`, never `menuState.freePlay` — see {@link shiftSubmittedSelection}. These two lines
+        // read the menu until § D318, and the comment below already held the argument against it.
+        ...shiftSubmittedSelection(
+          resources,
+          state,
+          buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+        ),
         durationS: state.shiftLengthS,
-        // `state`, not `menuState.freePlay`, and the distinction matters here more than it does on
-        // the lines above: this is the window the run *was simulated with*, and the menu holds the
-        // window currently *selected*. They agree until somebody changes the selection after a run
-        // and before posting, and then only one of them describes the seed the server is about to
+        // `state`, not `menuState.freePlay`, and the distinction is the same one the two lines above
+        // now obey: this is the window the run *was simulated with*, and the menu holds the window
+        // currently *selected*. They agree until somebody changes the selection after a run and
+        // before posting, and then only one of them describes the seed the server is about to
         // replay. § D285.
         windowStartS: state.windowStartS,
         seed: state.seed.toString(),
@@ -3267,9 +3273,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state.playMode === 'free-play'
           ? {
               kind: 'single-run' as const,
+              // From `state`, never from the menu — {@link shiftSubmittedSelection}, § D318. This
+              // read the menu until then, so the sheet's own description of a finished run moved
+              // when a select moved, with no re-run: § D227's stale-refusal shape applied to a
+              // figure's *basis* rather than to a refusal.
               selection: {
-                demandTemplateId: menuState.freePlay.demandTemplateId,
-                arrivalRatePctPop5min: menuState.freePlay.arrivalRatePctPop5min,
+                ...shiftSubmittedSelection(
+                  resources,
+                  state,
+                  buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+                ),
                 durationS: state.shiftLengthS,
               },
             }

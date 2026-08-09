@@ -1475,3 +1475,48 @@ describe('the cold-start ladder names the band the player is actually in', () =>
     }
   });
 });
+
+describe('which freePlay a finished run is described by — § D318', () => {
+  /*
+   * A source assertion, on `main.test.ts`'s own precedent: the `#legend` test above asserts that
+   * `index.html` carries **no second copy** of something derived, because a second copy typechecks,
+   * looks identical today, and drifts by the afternoon. This is the same shape with the sources
+   * swapped — two expressions for *what did this run use*, one of them right.
+   *
+   * ## Why this is a source assertion and not a driven one
+   *
+   * The honest reason: `shiftSubmittedSelection`'s own unit tests **cannot fail against the bug**,
+   * because the function did not exist while the bug did. They prove the derivation is right and say
+   * nothing about whether `main.ts` calls it — which is precisely this repository's standing defect,
+   * arriving in a fix for a different one. Driving `submitScore` needs a mounted shell, a server
+   * double and a recorded run; that is worth building and is not this change.
+   *
+   * So the call sites are pinned by the one property that separates right from wrong here: the
+   * submission and the Day report's subject may not mention `menuState.freePlay` at all. This test
+   * fails against the defect — three occurrences before, one after.
+   *
+   * ## The one occurrence that is correct, and why it is not an exception
+   *
+   * `enterFreePlay(state, resources, menuState.freePlay, …)` reads the menu **on purpose**: entering
+   * Free Play is the moment the menu's selection becomes the run's, and it is the only moment the
+   * arrow points that way. Everything after it describes a run that already exists, and a run knows
+   * what it ran. If a second legitimate reader ever appears, this test should be widened
+   * deliberately rather than loosened to a count.
+   */
+  it('reads the menu only where the menu becomes the run', async () => {
+    const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const lines = source.split('\n');
+    const reads = lines
+      .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+      .filter(({ line }) => line.includes('menuState.freePlay') && !line.startsWith('//'));
+
+    expect(
+      reads.map(({ line, number }) => `${String(number)}: ${line}`),
+      'A finished run is described from `state`, never from what the menu currently has selected. ' +
+        'The leaderboard submission is the expensive half: the server replays the submitted ids, ' +
+        'fails to reproduce, and answers 422 — this product\'s one accusation, aimed at a player ' +
+        'who only moved a select. See `shiftSubmittedSelection`.',
+    ).toHaveLength(1);
+    expect(reads[0]?.line).toContain('enterFreePlay(');
+  });
+});
