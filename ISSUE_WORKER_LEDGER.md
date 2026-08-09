@@ -4,16 +4,18 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-09 · **13 of the play-test backlog remain open**, down from 29 — plus the
-**5 filed from findings this wave**, so 18 open in total · branch `integration/issue-wave-14` ·
-`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 121 files, 2 917 tests,
+**Snapshot:** 2026-08-09 · **11 of the play-test backlog remain open**, down from 29 — plus the
+**6 filed from findings this wave**, so 17 open in total · branch `integration/issue-wave-14` ·
+`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 122 files, 2 952 tests,
 exit 0**.
 
-**Sixteen issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
-#102, #104 and #92** in this wave. Five of the five carried a claim that did not survive
-verification, which is the wave's own headline: #104's premise (*nothing is locked*), #107's
+**Eighteen issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
+#102, #104, #92, #99 and #118** in this wave. **Seven of seven carried a claim that did not survive
+verification**, which is the wave's own headline: #104's premise (*nothing is locked*), #107's
 recommendation (*confirm-before-abandon*), #92's two (*no Run now*, *no delta anywhere*), and
-#117's lead symptom, which is now **driven and not reproduced** rather than merely unexplained.
+#117's lead symptom, which is now **driven and not reproduced** rather than merely unexplained; #99's
+premise, wrong twice over; and #118's, where the *requested fix* would have been worse than the
+defect if applied as written.
 
 **Five new issues filed from findings this wave** — #123 (a preview environment can never reach the
 API), #124 (the new change-scope notes are unverified for contrast), #125 (Free play still clobbers
@@ -46,9 +48,9 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 | **113** | Custom dispatchers can't be proved | P2 | **code** | **Fix** | — | Persist on `saved*` patch (~5 lines) **first**; Compare selects later |
 | **119** | Compare default resolves nothing | P2 | **run** | **Fix** | — | Render INDISTINGUISHABLE as an answer; draw intervals; **do not** tune the default for its verdict |
 | **117** | WHAT MOVED compares a phantom run | P2 | **code + run** | **FIXED; headline NOT REPRODUCED** | — | `closeMenu` takes a required exit reason. § D311. Driven three runs → **three different baselines**; blast radius measured at one poisoned delta, self-recovering |
-| **99** | Free play defaults saturate | P2 | **run** | **Fix — premise corrected** | — | Curate the opening pair. Default is Chancery + `nearest-car`, **not** Midtown + collective |
+| **99** | Free play defaults saturate | P2 | **run** | **FIXED — premise corrected twice** | — | § D313. The menu still held `nearest-car`, the dispatcher **§ D134 retired from the Run viewer** — two doors, one held the old answer. Chancery stays (Garden serves 2–8 riders and both arms return identical runs); the dispatcher moves. Measured over 6 seeds |
 | **97** | "Scenarios" goes nowhere | P2 | **code** | **Rescope — premise refuted** | — | A scenario list *does* exist. Two real one-line bugs found instead |
-| **118** | Export PNG / `copy run` point away | P2 | **code (partial)** | **Fix** | — | Export the Day report card; copy a URL. **Blocked by #108** (shared link is a coin flip) |
+| **118** | Export PNG / `copy run` point away | P2 | **code** | **FIXED — the requested fix needed a prerequisite** | — | § D314. Copying the URL **as it stood** would have been a worse provenance claim than the CLI line — `deepLinkSearchOf` carried four axes and dropped four. The link grew first, then the button was pointed at it |
 | **104** | No explanation for locked controls | P2 | **code** | **FIXED — premise refuted** | — | **Not one note.** Nothing is disabled during a run; the rail's lists are *live and destructive*. Nine notes derived from `SCOPE_OF`, three behaviours. § D309 |
 | **102** | Comparison mixes buildings and modes | P2 | **code** | **FIXED with #117** | **#117** | `ReportBasis` checked before pairing; refusal in words on the `WITHHELD` precedent. A dispatcher swap is explicitly not refused |
 | **105** | "Completed" appears mid-playback | P3 | **code** | **Combine → #109** | **#109** | `canvas.ts:1780` reads `result.status`. **Canvas footer, not rail** — fix must cover both |
