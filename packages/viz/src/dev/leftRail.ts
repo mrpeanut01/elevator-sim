@@ -77,7 +77,7 @@ import type {
 import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
-import { eventFor } from '../shift/events.js';
+import { scheduledEventFor } from '../shift/calendar.js';
 import { PENDING_DISPLAY, bestLineFor, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -1135,7 +1135,14 @@ function drawShift(
     ),
   );
 
-  const event = eventFor(week.day, week.dayIdx);
+  /*
+   * Through the calendar — GitHub issue #135's **third** caller, found by neither lane that filed
+   * it. The rail names today's event and its note, on screen for the whole shift, and it named the
+   * ordinary schedule's: under `moving-week` it read *Weekend goods run* beside cars running a
+   * move-in. `shift/calendar.ts#scheduledEventFor` is the one answer to the question and this is
+   * one of its four callers.
+   */
+  const event = scheduledEventFor(state.calendar, week.day, week.dayIdx);
   setText(ui.event, event.name);
   setText(ui.note, event.note);
 

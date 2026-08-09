@@ -407,3 +407,75 @@ describe('issue #91 — the beat is built where the day closes, and nowhere else
     expect(beatCleared, 'every place the sheet is cleared clears the beat too').toBe(sheetCleared);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * Issue #136 — a run read off disk is not a day of this week
+ * -------------------------------------------------------------------------- */
+
+describe('issue #136 — a loaded recording banks nothing', () => {
+  /*
+   * ## The seam
+   *
+   * `loadRecordingFile` puts a `VizRecording` read off disk on screen and `adopt` arms the filing
+   * gate behind it, so the transport reaching `endedAt` calls `closeShift` exactly as it would for
+   * a run this shell had just simulated. Every day-level fact `closeShift` uses comes from `state`
+   * — the day number, the contract, the calendar period and so the event, `ShiftPlan`'s three axes
+   * — and `closedWeekOf` then writes the streak, the clean-run count and the cleared contract.
+   *
+   * The decision, the three options it was chosen from and the evidence for choosing it are
+   * `shift/banking.ts`'s docstring; the behaviour is driven in `shift/banking.test.ts` against two
+   * real recordings on two shipped buildings, one of them round-tripped through the shipped document
+   * format. What is left is the wiring, which lives inside `boot()` and is read here as text — this
+   * file's own pattern, and its own caveat: weak evidence about behaviour, strong evidence about a
+   * line having been deleted.
+   */
+  it('asks before it writes, and asks in closeShift rather than at one caller of it', async () => {
+    const body = await bodyOf('closeShift');
+    expect(
+      body,
+      'closeShift no longer consults shift/banking.ts, so a recording loaded from a file can bank ' +
+        'a day against the shell’s last simulated plan',
+    ).toContain('bankingRefusalFor(recording, simulatedRecording)');
+
+    /*
+     * **Before** anything is written, and the ordering is the assertion rather than the presence.
+     * `filedRunId` latching first would mark the loaded run as filed and turn every later press
+     * into the first line's silent early return; `closedWeekOf` running first would bank the day
+     * this refusal exists to stop.
+     */
+    const asked = body.indexOf('const cannotBank');
+    expect(asked).toBeGreaterThan(-1);
+    for (const written of ['filedRunId = recording.runId', 'closedWeekOf(state', 'outcomeOf({']) {
+      const at = body.indexOf(written);
+      expect(at, `closeShift does not reach ${written}`).toBeGreaterThan(-1);
+      expect(at, `${written} runs before the day is refused`).toBeGreaterThan(asked);
+    }
+  });
+
+  it('holds the run it simulated, and writes it in exactly one place', async () => {
+    /*
+     * One writer, in `runShift`. A second — in `adopt`, say, which is the tempting place because
+     * every recording passes through it — would set it for loaded recordings too and make the whole
+     * gate inert: a control that writes nothing while looking exactly like one that does, which is
+     * the defect this repository has shipped eleven times.
+     *
+     * Over `mainCode()` rather than `mainSource()`, so the prose explaining the binding does not
+     * count as a second writer.
+     */
+    const code = await mainCode();
+    const writes = [...code.matchAll(/simulatedRecording\s*=[^=]/g)];
+    expect(writes, 'simulatedRecording is written somewhere other than runShift').toHaveLength(1);
+    expect(await bodyOf('runShift')).toContain('simulatedRecording = recorded.recording');
+  });
+
+  it('clears the run’s own hour on load, so the docstring that says it does is true', async () => {
+    /*
+     * `runStartOfDayS`'s docstring says it is `undefined` *"for a recording restored from a file,
+     * where the clock falls back to the shipped `DAY_START_S`"*. Nothing cleared it, and `boot()`
+     * simulates a shift before the player can press anything, so a loaded recording was drawn on
+     * the **previous** run's clock in all four places that read it. A refusal pinned by a sentence
+     * rather than by a line is § D227, and this was one.
+     */
+    expect(await bodyOf('loadRecordingFile')).toContain('runStartOfDayS = undefined');
+  });
+});

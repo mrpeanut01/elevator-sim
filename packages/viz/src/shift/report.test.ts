@@ -31,8 +31,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { DATA_DIR, fixtureConfig, fixtureSummary } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import type { VizRecording, VizSummary } from '../contract/types.js';
+import {
+  CALENDAR_PERIODS,
+  scheduledEventFor,
+  type CalendarPeriod,
+} from './calendar.js';
 import { contractById } from './contracts.js';
-import { SHIFT_EVENTS } from './events.js';
+import { SHIFT_EVENTS, eventFor } from './events.js';
 import { goalsForDay } from './goals.js';
 import { observationsAt } from '../live/observations.js';
 import { shiftObservationsOf } from './observations.js';
@@ -131,7 +136,11 @@ function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: num
 }
 
 /** A report over a real recording, with the week already closed on it. */
-function reportOf(recording: VizRecording, day = 4): WeekDayReport {
+function reportOf(
+  recording: VizRecording,
+  day = 4,
+  calendar: CalendarPeriod | null = null,
+): WeekDayReport {
   const observations = observationsOfRun(recording);
   const goals = goalsForDay(day);
   const opened = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
@@ -156,6 +165,7 @@ function reportOf(recording: VizRecording, day = 4): WeekDayReport {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar,
       subject: { kind: 'week-day' },
     }),
   );
@@ -286,6 +296,7 @@ describe('the observations, which are never suppressed', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'week-day' },
     });
     expect(figure(report, 'deepest-queue').note).toBe('never more than a handful');
@@ -321,6 +332,7 @@ describe('WORST WAIT states its censoring', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'week-day' },
     });
     const worst = figure(report, 'worst-wait');
@@ -348,6 +360,7 @@ describe('WORST WAIT states its censoring', () => {
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }).figures.find((cell) => cell.id === 'worst-wait')?.value,
     ).toBe(NOT_RECORDED);
@@ -406,6 +419,7 @@ describe('energy is an axis, never a score — § D106', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'week-day' },
     });
     expect(figure(report, 'energy-work').value).toBe(NOT_RECORDED);
@@ -432,6 +446,7 @@ describe('energy is an axis, never a score — § D106', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'week-day' },
       ...(showEnergyAxis === undefined ? {} : { showEnergyAxis }),
     });
@@ -523,6 +538,7 @@ describe('where it went wrong is derived from the run', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'week-day' },
     });
     const phaseRow = report.diagnosis.find((row) => row.id === 'peak-phase');
@@ -604,6 +620,7 @@ describe('the rest of the sheet', () => {
         contract: contractById('c2'),
         event: SHIFT_EVENTS['move-in'],
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }),
     );
@@ -627,6 +644,7 @@ describe('the rest of the sheet', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS['move-in'],
       plan: PLAN,
+      calendar: null,
       subject: { kind: 'single-run', selection: SELECTION },
     }).metaLines.join('\n');
     expect(meta).not.toContain(SHIFT_EVENTS['move-in'].name);
@@ -673,6 +691,68 @@ describe('the rest of the sheet', () => {
     expect(report.nextDayName).toBe('Friday');
   });
 
+  /*
+   * GitHub issue #135 — the card named the event the ordinary schedule would give, and the run
+   * would be built from the calendar's override.
+   *
+   * `moving-week` is the period the issue names and it is the right one to drive: it books
+   * `move-in` on six of its seven days, so the patched and unpatched answers differ wherever the
+   * schedule was not already going to say `move-in`. An ordinary week passes against the bug, which
+   * is why every case here carries a period.
+   */
+  describe('the Tomorrow card names the event the next run will be under — issue #135', () => {
+    const movingWeek = CALENDAR_PERIODS['moving-week'];
+
+    it('names the period’s event, not the schedule’s, where the two disagree', () => {
+      // Today is Thursday, day 4; tomorrow is Friday, day 5, whose slot is `5 % 5 === 0` — a fire
+      // drill on the ordinary schedule. The period books a move-in, and the run tomorrow gets is
+      // built from the period.
+      expect(eventFor(5, 4).id).toBe('fire-drill');
+      const report = reportOf(clean, 4, movingWeek);
+      expect(report.forecast.name).toBe(SHIFT_EVENTS['move-in'].name);
+      expect(report.forecast.note).toBe(SHIFT_EVENTS['move-in'].note);
+      // The negative control that makes the assertion mean something: the card is not simply
+      // printing whatever it was handed for *today*, which is `ordinary` on this fixture.
+      expect(report.forecast.name).not.toBe(SHIFT_EVENTS.ordinary.name);
+    });
+
+    it('agrees with the run tomorrow will actually be built from, on every day of the period', () => {
+      /*
+       * The card against `shift/calendar.ts#scheduledEventFor` — the same expression
+       * `dev/state.ts#shiftRunConfigOf` builds the run from — on all seven days rather than on the
+       * one this suite happens to like. A card that agreed on day 4 and nowhere else would pass the
+       * case above.
+       */
+      for (const day of [1, 2, 3, 4, 5, 6, 7]) {
+        const nextIdx = day % 7;
+        const willRun = scheduledEventFor(movingWeek, day + 1, nextIdx);
+        expect(reportOf(clean, day, movingWeek).forecast.name, `day ${String(day)}`).toBe(
+          willRun.name,
+        );
+      }
+    });
+
+    it('hands the week back on a day the period names no event — the Sunday override', () => {
+      /*
+       * `moving-week`'s Sunday override sets `eventId: null` because the movers do not work Sunday,
+       * and the week's own schedule is meant to stand. So today Saturday day 6 forecasts a Sunday
+       * that is `weekend` on **both** derivations — a case where patched and unpatched agree, and
+       * the one that would break if `null` were read as *no event* rather than as *not this
+       * period's to say*.
+       */
+      const report = reportOf(clean, 6, movingWeek);
+      expect(report.forecast.name).toBe(SHIFT_EVENTS.weekend.name);
+      expect(report.nextDayName).toBe('Sunday');
+    });
+
+    it('leaves an ordinary week exactly where it was', () => {
+      // The regression guard. `null` is *no calendar*, and the card's answer must be byte-identical
+      // to the one it gave before the period could reach it.
+      expect(reportOf(clean, 4, null).forecast).toEqual(reportOf(clean, 4).forecast);
+      expect(reportOf(clean, 4, null).forecast.name).toBe(SHIFT_EVENTS['fire-drill'].name);
+    });
+  });
+
   it('prints the small print, naming this run’s dispatcher', () => {
     const report = reportOf(clean);
     expect(report.smallPrint).toContain('one replication of one day on one seed');
@@ -700,6 +780,7 @@ describe('the rest of the sheet', () => {
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }),
     );
@@ -717,6 +798,7 @@ describe('the rest of the sheet', () => {
         contract: undefined,
         event: SHIFT_EVENTS.ordinary,
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }),
     );
@@ -743,6 +825,7 @@ describe('the rest of the sheet', () => {
         contract: undefined,
         event: SHIFT_EVENTS.ordinary,
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }),
     );
@@ -806,6 +889,7 @@ describe('one judgement, four sentences — issue #53', () => {
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
         plan: PLAN,
+        calendar: null,
         subject: { kind: 'week-day' },
       }),
     );
@@ -1098,6 +1182,7 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       plan: PLAN,
+      calendar: null,
       subject,
     });
   }

@@ -200,7 +200,8 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { baseDemandOf, eventFor, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { LOADED_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -254,6 +255,7 @@ import {
   calendarLine,
   calendarPatch,
   periodOnDays,
+  scheduledEventFor,
 } from '../shift/calendar.js';
 import { asBuiltChoices, movedChoiceText, movedChoices, withBankChoice } from '../commissioning/choices.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
@@ -1376,10 +1378,32 @@ const CONTROLS: SurfaceAdapter = {
 
 const REPLAY: SurfaceAdapter = {
   id: 'record/document.ts#verifyReplay',
-  covers: ['record/document.ts#verifyReplay'],
+  covers: [
+    'record/document.ts#verifyReplay',
+    'shift/banking.ts#bankingRefusalFor',
+    'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
+  ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
-    return singleRun(this.id, [{ field: 'verifyReplay.message', text: verdict.message, role: 'observation' }]);
+    return singleRun(this.id, [
+      { field: 'verifyReplay.message', text: verdict.message, role: 'observation' },
+      /*
+       * What a loaded recording may not do — GitHub issue #136, and it belongs on this surface
+       * rather than beside `NO_SHEET_YET` because both sentences here are about the standing of a
+       * run that arrived from somewhere else.
+       *
+       * `reason` for `NO_SHEET_YET`'s reason: it explains a refusal and names what to do instead,
+       * which is the shape R3 judges. `authored` because it is a constant rather than a reading —
+       * nothing about this run produced it, and classifying it `single-run` would let a figure into
+       * it without the count rules noticing.
+       */
+      {
+        field: 'loadedRunCannotBank',
+        text: LOADED_RUN_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+    ]);
   },
 };
 
@@ -2053,7 +2077,18 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
     const contract = own ? undefined : contractById(contractId);
     const goals = goalsForDay(day);
     const readings = readGoals(goals, observations);
-    const event = eventFor(day, dayIdx);
+    /*
+     * Through `scheduledEventFor` with **no period**, which is the shape every other axis on this
+     * bundle takes: one ordinary week, varied one field at a time.
+     *
+     * `null` rather than a period on purpose, and said rather than left to look like an oversight —
+     * GitHub issue #135. The strings a calendar can put on this sheet are `SHIFT_EVENTS`' own names
+     * and notes, seeded below and swept on every shipped period by `CALENDAR_AND_FABRIC`, so a
+     * third bundle day under `moving-week` would multiply six sheets across two surfaces to sweep a
+     * vocabulary already in the corpus. What a period changes is *which* of those the card picks,
+     * and that is a `report.test.ts` case rather than an R-property.
+     */
+    const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
       day,
       dayIdx,
@@ -2077,6 +2112,10 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       week: banked,
       contract,
       event,
+      // The same `null` the event above was resolved against, and it has to be the same one: a
+      // bundle whose today came from no period and whose tomorrow came from one would put two
+      // weeks on one sheet.
+      calendar: null,
       dispatcherName,
       dayStartS: DAY_START_S,
     };
@@ -4983,6 +5022,13 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
     'shift/calendar.ts#calendarPatch',
     'shift/calendar.ts#CALENDAR_PERIODS',
     'shift/calendar.ts#CALENDAR_PERIOD_IDS',
+    /*
+     * `scheduledEventFor` is deliberately **not** claimed here, and `derive.test.ts` is why: it
+     * returns a `ShiftEvent`, not prose, so it is no more a text producer than `calendarDayFor` is.
+     * A `covers` entry for it would be a coverage claim for nothing — which that suite refuses in
+     * those words, and did, on the first draft of this line. Its *output* is swept below, because
+     * the name and note the override picks are strings a player reads.
+     */
     'commissioning/types.ts#CONSTRAINTS',
     'commissioning/types.ts#constraintById',
     'commissioning/types.ts#DIMENSION_LABELS',
@@ -5029,6 +5075,19 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
           text: today === null ? '' : calendarLine(patch),
           role: 'observation',
         });
+        /*
+         * The event the day is actually under — GitHub issue #135's fix, swept on every shipped
+         * period rather than only on the ordinary week the shift bundle drives.
+         *
+         * These are `SHIFT_EVENTS`' own name and note, which `SHIFT_REPORT` already seeds for the
+         * schedule's answer; what is new here is the **override's** answer, and it is a different
+         * pair on five of `moving-week`'s seven days. `label` and `prose` match the roles those two
+         * strings carry everywhere else, so a period cannot smuggle a figure onto a surface by
+         * booking an event with one in its note.
+         */
+        const booked = scheduledEventFor(placed, day, (day - 1) % 7);
+        seeds.push({ field: `period.${id}.day${String(day)}.event.name`, text: booked.name, role: 'label' });
+        seeds.push({ field: `period.${id}.day${String(day)}.event.note`, text: booked.note, role: 'prose' });
         for (const [index, withheld] of patch.withheld.entries()) {
           seeds.push({
             field: `period.${id}.day${String(day)}.withheld[${String(index)}]`,

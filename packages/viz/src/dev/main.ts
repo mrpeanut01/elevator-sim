@@ -82,6 +82,7 @@ import {
 import {
   CALENDAR_PERIODS,
   periodOnDays,
+  scheduledEventFor,
   type CalendarPeriod,
   type CalendarPeriodId,
 } from '../shift/calendar.js';
@@ -142,7 +143,7 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { eventFor } from '../shift/events.js';
+import { bankingRefusalFor } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
@@ -586,6 +587,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let selectedLandingId = '';
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
+  /**
+   * The run **this shell simulated**, as opposed to the run on screen — GitHub issue #136.
+   *
+   * The two are the same except after {@link loadRecordingFile}, which is the whole of the issue:
+   * a recording read off disk reaches {@link closeShift}, where the day's facts come from `state`
+   * and the week gets written. `shift/banking.ts` carries the argument for refusing that and for
+   * why refusing is the only one of the three options the file's own contents allow.
+   *
+   * **The recording itself, not its `runId`.** `runId` looks like a per-run identity and is a
+   * digest of building, dispatcher and seed — `shift/banking.ts` records how that was found and why
+   * comparing it would have been the option this decision rejected.
+   *
+   * A second `let` beside {@link filedRunId} rather than a widening of it, because they answer
+   * different questions — *has this run already been filed?* and *did we run it?* — and § D311 is
+   * the case law: two questions sharing one flag is how **Resume** came to un-gate a filing.
+   */
+  let simulatedRecording: VizRecording | undefined;
   /**
    * What the sheet on screen was shaped from, so a presentation setting can re-shape it.
    *
@@ -3080,6 +3098,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // The template's own hour, moved on by the window when the run is a part of a day. Absent for
       // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
       runStartOfDayS = recorded.result.trace.startOfDayS;
+      // The run this shell simulated — GitHub issue #136, and the only place it is written. See
+      // {@link simulatedRecording}.
+      simulatedRecording = recorded.recording;
       // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
       // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
       // under today's date, which is the stale-sheet defect § D223 closed one field over.
@@ -3306,11 +3327,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * banked day is not the only thing a premature file costs.
      */
     if (!playerHasChosen) return;
+    /*
+     * **And a run this shell did not simulate files nothing** — GitHub issue #136.
+     *
+     * Above `filedRunId` on purpose. Latching there would mark the loaded run as filed, and the
+     * next thing the player does with it — press *Day report*, press *Export report PNG* — would
+     * then be met by the first line's silent early return instead of by a sentence. The decision
+     * and its argument are `shift/banking.ts`'s; the only thing that happens here is that it is
+     * asked, before anything has been written.
+     */
+    const cannotBank = bankingRefusalFor(recording, simulatedRecording);
+    if (cannotBank !== null) {
+      setText(ui.transport.status, cannotBank);
+      return;
+    }
     filedRunId = recording.runId;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
     const readings = readGoals(goals, observations);
-    const event = eventFor(state.week.day, state.week.dayIdx);
+    /*
+     * The event the run was under, not the one the ordinary schedule would have given — GitHub
+     * issue #135, and this is the caller with the widest blast radius of the four. It feeds three
+     * things: `outcomeOf`'s `eventId`, which goes into the week's own history; the sheet's
+     * `bookedLine`, which prints the name and the note as *identity*; and `ReportBasis.demand`'s
+     * week-day arm, where a wrong id makes a calendar-overridden day pair with an ordinary one as
+     * one question — the exact comparison § D311 built the basis to refuse.
+     */
+    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
     const outcome = outcomeOf({
       day: state.week.day,
       dayIdx: state.week.dayIdx,
@@ -3387,6 +3430,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
         patternId: state.pattern,
       },
       event,
+      /*
+       * The period, so the *Tomorrow* card can name tomorrow's event the way the run tomorrow will
+       * be built — GitHub issue #135. The period rather than the resolved event, because deciding
+       * *which day tomorrow is* is `shift/report.ts`'s arithmetic and a third copy of it here is
+       * how the two derivations drifted in the first place.
+       *
+       * From `state`, never from `recording`: a recording knows what happened and a period is what
+       * was scheduled. That is #126's trap and #135's, said twice because both issues record it.
+       */
+      calendar: state.calendar,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
        * The run's own hour, not a flat 06:00 — issue #83. `DAY_START_S` survives as the fallback for
@@ -3905,6 +3958,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // and an overnight reveal left standing beside it would describe a building the loaded run
       // has nothing to do with.
       state = { ...state, recording: loaded.recording, report: undefined, tomorrow: undefined };
+      /*
+       * The run's own hour goes with them, and this line makes a sentence true that was not —
+       * GitHub issue #136's other half. {@link runStartOfDayS}'s docstring says it is `undefined`
+       * *"for a recording restored from a file, where the clock falls back to the shipped
+       * `DAY_START_S`"*, and nothing cleared it: `boot()` simulates a shift before the player can
+       * press anything, so a loaded recording was drawn on the **previous** run's clock in all four
+       * places that read this. A refusal pinned by a sentence rather than by a line is § D227, and
+       * this was one.
+       */
+      runStartOfDayS = undefined;
       adopt(loaded.recording);
       renderAll();
     } catch (error) {
@@ -3937,7 +4000,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (state.report === undefined && playheadHasRunOut()) closeShift();
     const report = state.report;
     if (report === undefined) {
-      setText(ui.transport.status, NO_SHEET_YET);
+      /*
+       * Two reasons there is no sheet, and they are different instructions — GitHub issue #136.
+       * `NO_SHEET_YET` says *run a shift to the end*, which is false advice to a reader who has
+       * just watched a loaded recording to its end: doing it again changes nothing. The banking
+       * refusal names what a loaded run is for and what to do instead.
+       */
+      setText(ui.transport.status, bankingRefusalFor(state.recording, simulatedRecording) ?? NO_SHEET_YET);
       return;
     }
     const surface = document.createElement('canvas');

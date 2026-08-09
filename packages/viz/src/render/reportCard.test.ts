@@ -137,6 +137,7 @@ function sheetOf(recording: VizRecording, day = 4): ShapedDayReport {
     week,
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
+    calendar: null,
     subject: { kind: 'week-day' },
     // What the day was set to run — issue #126. The card copies the sheet's strings and never reads
     // the basis, so this is here to say what the sheet is *of* rather than to be asserted on.

@@ -55,6 +55,7 @@ import {
   calendarLine,
   calendarPatch,
   periodOnDays,
+  scheduledEventFor,
   type CalendarPeriod,
 } from './calendar.js';
 import { SHIFT_EVENTS, baseDemandOf, eventFor, shiftRunPatch } from './events.js';
@@ -127,9 +128,10 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
   const grownResolved = resolveBuilding(parseBuilding(grown as unknown), specs);
 
   const calendarDay = calendarDayFor(period, state.week.day, state.week.dayIdx);
-  const scheduled = eventFor(state.week.day, state.week.dayIdx);
-  const eventId = calendarDay?.shift.eventId ?? null;
-  const event = eventId === null ? scheduled : SHIFT_EVENTS[eventId];
+  // Through the shipped composition rather than a copy of it — GitHub issue #135. This harness
+  // held its own ternary, which made it a **sixth** site deriving the day's event: a harness that
+  // re-implements the thing it is standing in for can only ever agree with itself.
+  const event = scheduledEventFor(period, state.week.day, state.week.dayIdx);
 
   const profile = RESOURCES.trafficProfiles.profiles.find(
     (candidate) => candidate.id === authored.trafficProfile,
@@ -296,6 +298,88 @@ describe('a period resolves to a day, or to nothing at all', () => {
       expect(period.note.length, id).toBeGreaterThan(0);
       expect(period.fromDay, id).toBeLessThanOrEqual(period.toDay);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The event a day is under — GitHub issue #135
+ * -------------------------------------------------------------------------- */
+
+describe('one answer to what event a day is under — issue #135', () => {
+  it('is the ordinary schedule when there is no period', () => {
+    // `null` has to be byte-identical to `eventFor`, because *no calendar* is the shipped week and
+    // any drift here would move every day of it.
+    for (let day = 1; day <= 14; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      expect(scheduledEventFor(null, day, dayIdx), `day ${String(day)}`).toBe(
+        eventFor(day, dayIdx),
+      );
+    }
+  });
+
+  it('is the period’s event where the period names one, and it differs from the schedule', () => {
+    const moving = CALENDAR_PERIODS['moving-week'];
+    /*
+     * Every day of `moving-week`, with the schedule's own answer beside it. Five of the seven
+     * differ — day 3 is a move-in on the schedule anyway, and Sunday is handed back — so this both
+     * asserts the override and measures how often it bites. A period that overrode nothing would
+     * pass a test that only checked *equals the period's event*.
+     */
+    const differ: number[] = [];
+    for (let day = 1; day <= 7; day += 1) {
+      const dayIdx = (day - 1) % 7;
+      const booked = scheduledEventFor(moving, day, dayIdx);
+      const schedule = eventFor(day, dayIdx);
+      const named = calendarDayFor(moving, day, dayIdx)?.shift.eventId;
+      expect(booked.id, `day ${String(day)}`).toBe(named ?? schedule.id);
+      if (booked.id !== schedule.id) differ.push(day);
+    }
+    expect(differ).toEqual([1, 2, 4, 5, 6]);
+  });
+
+  it('hands the day back when a period names no event, rather than inventing a quiet one', () => {
+    const moving = CALENDAR_PERIODS['moving-week'];
+    // Sunday's override is an explicit `null` — the movers do not work Sunday — and `vacation`
+    // names no event at all. Both are *the ordinary day*, and a caller that distinguished them
+    // would be inventing a state the product does not have.
+    expect(scheduledEventFor(moving, 7, 6).id).toBe(eventFor(7, 6).id);
+    expect(scheduledEventFor(CALENDAR_PERIODS.vacation, 3, 2).id).toBe(eventFor(3, 2).id);
+  });
+
+  it('is outside a period’s window exactly as far as the period is', () => {
+    // The window is `calendarDayFor`'s and is not re-implemented here. Driven at both edges so a
+    // future off-by-one in either function shows up as a day the run and the sheet disagree on.
+    const period = periodOnDays(CALENDAR_PERIODS['moving-week'], 3, 4);
+    expect(scheduledEventFor(period, 2, 1).id).toBe(eventFor(2, 1).id);
+    expect(scheduledEventFor(period, 3, 2).id).toBe('move-in');
+    expect(scheduledEventFor(period, 4, 3).id).toBe('move-in');
+    expect(scheduledEventFor(period, 5, 4).id).toBe(eventFor(5, 4).id);
+  });
+
+  it('is what the shipped builder runs, compared on the legs rather than on a name', () => {
+    /*
+     * The standing requirement, pointed at the seam rather than at a control — and driven through
+     * `shiftRunConfigOf` itself rather than through this file's harness, because the whole issue is
+     * that the *description* and the *run* were two expressions and a harness is a third.
+     *
+     * Day 5 on the ordinary schedule is a fire drill; `moving-week` books a move-in. Two different
+     * events, so two different runs. A `scheduledEventFor` that fell back to the schedule, or a
+     * `shiftRunConfigOf` that stopped consulting it, would make these identical.
+     */
+    const friday = { ...monday(), week: { ...monday().week, day: 5, dayIdx: 4 } };
+    expect(eventFor(5, 4).id).toBe('fire-drill');
+    expect(scheduledEventFor(CALENDAR_PERIODS['moving-week'], 5, 4).id).toBe('move-in');
+
+    const legs = (state: ViewerState): string => {
+      const plan = shiftRunConfigOf(RESOURCES, state);
+      return legsOfRun(
+        recordRun(plan.config, {
+          recordDecisions: false,
+          outOfServiceCarIds: plan.outOfServiceCarIds,
+        }),
+      );
+    };
+    expect(legs({ ...friday, calendar: CALENDAR_PERIODS['moving-week'] })).not.toBe(legs(friday));
   });
 });
 
