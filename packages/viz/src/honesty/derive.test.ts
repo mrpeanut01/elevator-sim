@@ -314,6 +314,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/permits.ts#permits',
         'scope/commitment.ts#COMMITMENTS',
         'scope/commitment.ts#commitmentOf',
+        /*
+         * GitHub issue #129's two, and both are the `SCOPE_OF` case above rather than a new one.
+         *
+         * `EXPRESSIBLE_IN_A_SELECTION` names the `between-games` fields a `RunSubmission` and a deep
+         * link carry, one row per field, and its values are **developer** prose in exactly
+         * `SCOPE_OF.why`'s sense: each is the argument for why that field travels, addressed to
+         * whoever changes the wire, and it reaches no screen. `runIdentity.test.ts` decides whether
+         * a row is true by reading `packages/server/src/leaderboard/submission.ts`'s own source,
+         * which is a stronger check than a string search over a sentence no player reads.
+         *
+         * `fieldsAnsweredFor` returns `SurfaceKey`s and field names — `viewer.commissioning`,
+         * `outOfServiceCarIds` — and authors no sentence at all. It is derived only because the
+         * hyphen and the dot read as word breaks, which is the same false positive `commitmentOf`
+         * is excluded for two lines up.
+         */
+        'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
+        'scope/runIdentity.ts#fieldsAnsweredFor',
       ],
     },
     {
@@ -324,8 +341,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'directly above it and inherits its limitation too: swept statically, not driven, which is ' +
         'weaker and is said rather than dressed up. What changed is that the better fix got ' +
         'cheaper — these sentences are now produced by a pure function of a state and the loaded ' +
-        'resources, so the adapter that exclusion has been asking for no longer needs a document.',
-      ids: ['scope/runIdentity.ts#runIdentityIssues'],
+        'resources, so the adapter that exclusion has been asking for no longer needs a document. ' +
+        '`CARRY_CHECKS` is the same sentences and not a second set: GitHub issue #129 moved the ' +
+        'body of `runIdentityIssues`’ `switch` into a table keyed by field, so that the key set ' +
+        'became a value a test could compare against the fields the walk visits — the assertion ' +
+        'this module’s docstring claimed and did not have. Every string in it is returned by ' +
+        '`runIdentityIssues` and by nothing else, so it reaches a reader by exactly the route above ' +
+        'and is accounted for by exactly the same limitation.',
+      ids: ['scope/runIdentity.ts#runIdentityIssues', 'scope/runIdentity.ts#CARRY_CHECKS'],
     },
     {
       reason:
