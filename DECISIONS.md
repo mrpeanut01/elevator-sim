@@ -21879,3 +21879,70 @@ the honesty corpus**. `REPORT_PANEL` renders `reportViewOf(shaped)` with no `pre
 is `null` on every seeded case, and the caption, both note arms and every paired row are swept by
 nothing. That was true before this change and is true after it — no corpus figure moves — but the
 block is now drawn on **two** surfaces, which makes it worth its own issue rather than a footnote.
+
+---
+
+## D311 — the day report compares a run that happened, and refuses when the two are not comparable
+
+Issues #117 and #102. #102 is a duplicate whose entire ask is #117's second recommendation, so they
+land together.
+
+### The confirmed defect, reproduced before it was fixed
+
+`dev/main.ts:1961` latched **one** flag on every exit from the menu, including *Resume* — which is
+the exit that changes nothing. So opening the menu and changing your mind marked the player as
+having chosen a configuration, and the next Day report compared the run against a baseline the
+player had never run. Driven in the shipped shell at `?building=garden-apartments&seed=424242`,
+Escape → play to end → Day report:
+
+```
+SHEET : Monday — day 1 | Garden Apartments · Conventional collective · seed 424242
+STREAK: "First clean day. Streak started."
+DELTA : … was Garden Apartments · Conventional collective → Chancery House · Nearest car
+```
+
+Split into `playerHasChosen` (the filing gate) and `menuHasBeenDismissed` (the autoplay gate).
+`closeMenu` now takes a **required** `exit: 'entered-a-mode' | 'changed-their-mind'`, so a sixth exit
+path cannot forget to answer — the type asks, rather than a comment asking.
+
+### #102's ask is a refusal, and it follows the precedent rather than inventing one
+
+`ShapedDayReport` carries a `ReportBasis` — building, subject, demand — and `reportDeltaOf` checks it
+**before** pairing. On a mismatch it draws the identity rows, **no figure rows**, a caption that stops
+promising a comparison, and a note naming each axis that differs. That is `WITHHELD` and
+`awtInvalidReason`'s shape: the figure is refused *in words*, never quietly dropped and never filled
+with a number the run itself calls invalid.
+
+A dispatcher swap is **not** refused, and that is asserted rather than assumed — it is the comparison
+the block exists for.
+
+### The headline did not reproduce, and that is the finding rather than the absence of one
+
+#117's lead claim is *three consecutive runs printed an identical baseline*. Triage recorded it as
+"not reproducible from code"; this lane drove it rather than leaving it there. The rotation lived in
+three closure `let`s in `mountReport` and was extracted into a pure reducer (`rotatedOn`,
+`SheetContinuity`, `topWritten`) precisely so it *could* be driven.
+
+Free play on `midtown-office`, seed 424242, three dispatcher cards pressed in turn, each played to
+`endedAt`, the delta block read off the DOM after each: run 1 draws no block, run 2 reads
+`Minimum estimated wait → Conventional collective, en-route pickup`, run 3 reads
+`Conventional collective, en-route pickup → Fairness first`. **Three runs, three different
+baselines.** The headline does not reproduce on this build.
+
+What does reproduce is the confirmed defect, and its blast radius is now measured rather than
+argued: **one** poisoned delta, and the next run recovers unaided. Both facts are pinned in
+`reportPanel.test.ts` — the one poisoned delta, and that it is now a refusal rather than arithmetic.
+
+### Two gaps named rather than closed
+
+**The basis cannot see a campaign day's shift length or a week-day traffic edit** (issue #126), and
+the obvious substitute is a trap worth recording: the recording's own span looks free and is not.
+`endedAt` is `max(lastEventAt, demandEndedAt)`, so it moves with the *traffic* — measured at
+`09:25 / 09:22 / 09:20` for three dispatchers on one selection. A span-keyed basis would refuse
+exactly the comparison the block exists for. The cheap fix is worse than the gap.
+
+**The delta block is not in the honesty corpus** (issue #127). `honesty/surfaces.ts` renders
+`reportViewOf(shaped)` with no `previous`, so `delta` is `null` on every seeded case and this lane's
+new refusal sentence is unswept prose on a shipped surface. True before this change and not a
+regression — and now drawn on two surfaces, since § D310's strip reuses the same view. Recorded
+because an unswept refusal is the shape § D227 rates above a stale figure.
