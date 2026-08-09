@@ -37,7 +37,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { batchReport } from './report.js';
 import { runBatch } from './runBatch.js';
 import type { BatchRequest, BatchResources } from './types.js';
-import { PREFERRED_BATCH_BASELINE, PREFERRED_BATCH_CANDIDATE, preferredDispatcherId } from '../dev/defaults.js';
+import { PREFERRED_BATCH_BASELINE, PREFERRED_BATCH_CANDIDATE, preferredId } from '../dev/defaults.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
 const INDEX_HTML = fileURLToPath(new URL('../../index.html', import.meta.url));
@@ -76,8 +76,8 @@ function shippedDefaultRequest(): BatchRequest {
   const building = config.buildings[0];
   if (building === undefined) throw new Error('data/ ships no buildings');
   const profiles = config.dispatcherProfiles.profiles;
-  const baseline = preferredDispatcherId(PREFERRED_BATCH_BASELINE, profiles) ?? profiles[0]?.id ?? '';
-  const candidate = preferredDispatcherId(PREFERRED_BATCH_CANDIDATE, profiles) ?? profiles[0]?.id ?? '';
+  const baseline = preferredId(PREFERRED_BATCH_BASELINE, profiles) ?? profiles[0]?.id ?? '';
+  const candidate = preferredId(PREFERRED_BATCH_CANDIDATE, profiles) ?? profiles[0]?.id ?? '';
   const demandText = inputValue('batch-demand').trim();
   const level = selectedOption('batch-demand-level');
   return {
