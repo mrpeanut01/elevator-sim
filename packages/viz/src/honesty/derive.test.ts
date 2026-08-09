@@ -129,6 +129,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/dom.ts#plateRow',
         'dev/dom.ts#slider',
         'dev/dom.ts#toggle',
+        /*
+         * The exported report card's painter — `dev/dom.ts`'s case exactly, one layer over. Every
+         * string it puts on the bitmap is one `reportCardOf` handed it, and `reportCardOf` is
+         * **driven** by the `REPORT_CARD` adapter, both sheet shapes and both arms of the recipe.
+         * Its own literals are the seven font declarations; it is derived because
+         * `600 15px ui-monospace, SFMono-Regular, Menlo, monospace` reads as adjacent words, which
+         * is `render/theme.ts#themeFor`'s reason a few entries up. Driving it would put the
+         * caller's sentences in the corpus twice under the painter's name.
+         */
+        'render/reportCard.ts#drawReportCard',
       ],
     },
     {
@@ -191,6 +201,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // adjacent words. The keys' agreement with the reader is what `main.test.ts`'s
         // round-trip asserts.
         'dev/main.ts#deepLinkSearchOf',
+        /*
+         * `shareLinkOf` is the same false positive one line down: its whole body is
+         * `` `${base}${deepLinkSearchOf(state, defaults)}` ``, and the scanner keeps a template
+         * substitution's text and reads `deepLinkSearchOf(state, defaults)` as adjacent words. It
+         * authors no sentence at all — its `ok` arm is a URL and its refusal arm is
+         * `runIdentityIssues`', excluded below under its own name and driven through the report
+         * card, which quotes those sentences on the one surface that leaves the browser.
+         */
+        'dev/main.ts#shareLinkOf',
         'dev/state.ts#initialState',
         /*
          * The other half of the same answer — issue #99. `PREFERRED_OPENING_BUILDINGS` is a list of

@@ -458,7 +458,10 @@ export interface RailElements {
 export interface FooterElements {
   readonly statusLine: HTMLElement;
   readonly seedLine: HTMLElement;
+  /** Copies the **link** that opens this run. Issue #118 § 2 — the artefact a stranger can use. */
   readonly copyRun: HTMLButtonElement;
+  /** Copies the CLI flags, for the reader who wants the run outside a browser. The secondary one. */
+  readonly copyCli: HTMLButtonElement;
   readonly right: HTMLElement;
 }
 
@@ -767,6 +770,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     statusLine: 'status-line',
     seedLine: 'seed-line',
     copyRun: 'copy-run',
+    copyCli: 'copy-cli',
     right: 'footer-right',
   }),
   tabs: Object.freeze({

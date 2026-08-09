@@ -1193,10 +1193,14 @@
         padding: 7px 16px; background: var(--rail); border-top: 1px solid var(--edge);
         font: 500 11px var(--mono); color: var(--dimmer); width: 100%; min-width: 0;
       }
-      #copy-run {
+      #copy-run, #copy-cli {
         background: none; border: 1px solid var(--edge-mid); color: var(--dim);
         border-radius: var(--r-chip); padding: 3px 9px; font: inherit; cursor: pointer; white-space: nowrap;
       }
+      /* The secondary of the two share controls — issue #118 § 2. A URL is what a player sends to
+         a person; the CLI line is for the reader who wants the run outside a browser, so it is a
+         step quieter rather than a second primary. */
+      #copy-cli { border-color: var(--edge); color: var(--dimmer); }
       #footer-right { margin-left: auto; min-width: 0; }
 
       /* The confirm dialog: themed like the rest, so a modal does not look like another app. */
@@ -1778,7 +1782,10 @@
                      carries the focus ring `:focus-visible` would have drawn on the input. -->
                 <label class="ghost file-ghost" for="load-recording">Load recording…
                   <input id="load-recording" class="sr-only" type="file" accept="application/json,.json" /></label>
-                <button type="button" class="chip" id="export-png">Export PNG</button>
+                <!-- Issue #118 § 1: this writes the Day report card, not the stage. The label says
+                     which, because a control called "Export PNG" beside a canvas reads as a
+                     screenshot button and the artefact it produces is a report sheet. -->
+                <button type="button" class="chip" id="export-png" title="write the day's report card as a 1200×630 image">Export report PNG</button>
                 <span class="provenance-rule" aria-hidden="true"></span>
                 <label class="field-inline" for="bank-filter">bank
                   <select id="bank-filter"><option value="">all</option></select></label>
@@ -2484,7 +2491,8 @@
       <footer class="footbar">
         <span id="status-line"></span>
         <span style="color: var(--dim); white-space: nowrap" id="seed-line"></span>
-        <button type="button" id="copy-run">copy run</button>
+        <button type="button" id="copy-run" title="copy a link that opens this run — seed, building, dispatcher, traffic and window">copy run</button>
+        <button type="button" id="copy-cli" title="copy the elevator-sim flags that reproduce this run outside a browser">copy CLI</button>
         <span id="footer-right">observations only — nothing on this screen is averaged over a queue that never settled</span>
       </footer>
     </div>

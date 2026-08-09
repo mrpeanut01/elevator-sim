@@ -81,6 +81,9 @@ import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { drawOverlay } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
+import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
+import { initialState } from '../dev/state.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
 import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } from '../render/runSummary.js';
 import { goalReport } from '../scenario/goalReport.js';
@@ -4525,6 +4528,114 @@ const GLOSSARY: SurfaceAdapter = {
   },
 };
 
+/**
+ * The exported report card — the one surface here that **leaves the building** — issue #118 § 1.
+ *
+ * Every other adapter drives something a reader sees while they still have the run in front of
+ * them: they can open the sheet, move the playhead, read the small print. This one drives a PNG
+ * that gets pasted into a chat, so a claim on it is read with none of that around it and cannot be
+ * corrected by the next screen. That makes it the surface where a suppressed figure drawn as a
+ * figure, or a mean quoted without its window, costs the most — and it is why the card exists as a
+ * pure `reportCardOf` at all rather than as drawing code inside `dev/`.
+ *
+ * Both shapes of sheet, per day, exactly as `REPORT_PANEL` drives them — and **both arms of the
+ * recipe**, because the refusal is a sentence a reader has to act on and the card is where they
+ * meet it. The reasons handed in are `runIdentityIssues`' own, quoted through a fixture rather than
+ * regenerated here: the point of driving them on this surface is the *card's* framing of them, and
+ * the sentences themselves are `scope/runIdentity.ts`'s and are accounted for there.
+ */
+const REPORT_CARD: SurfaceAdapter = {
+  id: 'render/reportCard.ts#reportCardOf',
+  covers: ['render/reportCard.ts#reportCardOf', 'render/reportCard.ts#NO_SHEET_YET'],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+    const resources = browserResourcesOf(context);
+    const recipes: readonly (readonly [string, CardRecipe])[] = [
+      ['link', { ok: true, line: `https://elevator.example/?seed=${String(context.recording.seed)}` }],
+      [
+        'refused',
+        {
+          ok: false,
+          /*
+           * Ids `data/` does **not** ship, deliberately: a value taken from the loaded configuration
+           * would be reproducible by construction and the refusal arm would render nothing. These
+           * are the two *"yours alone"* refusals a reader is most likely to meet.
+           */
+          reasons: runIdentityIssues(
+            { ...initialState(resources, 1n), buildingId: 'my-tower', dispatcherId: 'my-dispatcher' },
+            resources,
+            'ranked',
+          ).map((issue) => issue.message),
+        },
+      ],
+    ];
+
+    for (const entry of bundle.days) {
+      for (const shaped of [entry.report, entry.singleRunReport]) {
+        for (const [arm, recipe] of recipes) {
+          const at = `day${String(entry.day)}.${shaped.of}.${arm}`;
+          const card = reportCardOf({
+            report: shaped,
+            buildingName: context.case.buildingId,
+            seed: String(context.recording.seed),
+            recipe,
+          });
+          seeds.push({ field: `${at}.eyebrow`, text: card.eyebrow, role: 'label' });
+          seeds.push({ field: `${at}.title`, text: card.title, role: 'label' });
+          seeds.push({ field: `${at}.verdictLine`, text: card.verdictLine, role: 'observation' });
+          seeds.push({ field: `${at}.lede`, text: card.lede.join(' '), role: 'observation' });
+          for (const [index, tile] of card.tiles.entries()) {
+            const source = shaped.figures[index];
+            const shape =
+              source === undefined
+                ? { role: 'observation' as TextRole, gated: false, energyAxis: false }
+                : reportFigureShape(source);
+            seeds.push({
+              field: `${at}.tile[${String(index)}](${tile.label}).value`,
+              text: `${tile.label}: ${tile.value}`,
+              role: shape.role,
+              declaredCount: shape.gated ? context.recording.summary.waitCount : undefined,
+              countShown: shape.gated ? /(\d[\d,]*)/.test(tile.note) : undefined,
+              energyAxis: shape.energyAxis,
+              gated: shape.gated,
+            });
+            seeds.push({
+              field: `${at}.tile[${String(index)}](${tile.label}).note`,
+              text: tile.note,
+              role: shape.role === 'suppressed' ? 'reason' : 'observation',
+              energyAxis: shape.energyAxis,
+            });
+          }
+          seeds.push({ field: `${at}.section`, text: card.sectionHeading, role: 'label' });
+          for (const [index, row] of card.rows.entries()) {
+            seeds.push({
+              field: `${at}.row[${String(index)}]`,
+              text: row,
+              role: 'observation',
+            });
+          }
+          for (const [index, line] of card.footer.entries()) {
+            seeds.push({
+              field: `${at}.footer[${String(index)}]`,
+              text: line,
+              role: recipe.ok ? 'observation' : 'reason',
+            });
+          }
+        }
+      }
+    }
+
+    /*
+     * The refusal the control itself shows, which is not on any card: pressing **Export report
+     * PNG** before a day has been filed. It is `reason` rather than `label` because it explains a
+     * refusal and names what to do instead, which is the shape R3 judges.
+     */
+    seeds.push({ field: 'noSheetYet', text: NO_SHEET_YET, role: 'reason', provenance: 'authored' });
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -4565,6 +4676,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // matching a shape, so an adapter inserted earlier would move every fault onto a different
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
+  REPORT_CARD,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
