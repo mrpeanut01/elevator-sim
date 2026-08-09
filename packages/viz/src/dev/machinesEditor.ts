@@ -39,6 +39,7 @@ import {
   type MachineRow,
   type MachineSpec,
 } from '../authoring/machineSpec.js';
+import { commitmentOf } from '../scope/commitment.js';
 
 import {
   nextSavedId,
@@ -46,7 +47,7 @@ import {
   updateSliderRow,
   type SliderHandles,
 } from './dispatcherEditor.js';
-import { chipRow, fill, setHidden, setText, slider } from './dom.js';
+import { chipRow, el, fill, setHidden, setText, slider } from './dom.js';
 import type { MachinesEditorElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
 import { allClasses, classById } from './state.js';
@@ -219,6 +220,37 @@ export function ratedSpeedChipsOf(
     }));
 }
 
+/**
+ * The panel's own Save, quoted so {@link DRAFT_NOTE} can name it — issue #104.
+ *
+ * The label is authored in `index.html` and `dev/scopeNotes.test.ts` pins this string to it, on
+ * `rightRail.ts`'s rule for the machines refusal: a sentence that names a door is worth what the
+ * assertion behind the door is worth.
+ */
+const SAVE_LABEL = 'Save as a new class';
+
+/*
+ * The scope note — issue #104, and the one of the four editors whose second half is different.
+ *
+ * The other three drafts are realised by a **selection**: filing a dispatcher or a pattern leaves
+ * the shift where it was until something points at it. `savedClasses` is not — `scope/surface.ts`
+ * calls it out as *"the one save that then reaches a run with no further selection"*, because the
+ * library a building resolves its cars against is simply wider afterwards. So the note may not say
+ * *and then select it*, and it may not say the class reaches a **car** either: `rightRail.ts`'s
+ * machines segment is the sentence that owns that, and this one agrees with it rather than
+ * competing.
+ *
+ * Empty when `scope/surface.ts` stops calling this working copy a draft — see
+ * `scope/commitment.ts` for why the failure direction is silence.
+ */
+const DRAFT_NOTE =
+  commitmentOf('viewer.machineSpec', 'writes-only') === 'draft'
+    ? 'Nothing you move here reaches a run yet — this panel holds a draft of a machine class, and ' +
+      `the shift on screen keeps the cars it was simulated with. ${SAVE_LABEL} files it into the ` +
+      'library the next shift resolves against, with no further selection needed; it does not ' +
+      'put the class in any car, and it does not re-run the shift you are watching.'
+    : '';
+
 /* -------------------------------------------------------------------------- *
  * The mount
  * -------------------------------------------------------------------------- */
@@ -239,6 +271,14 @@ export function mountMachinesEditor(
     const current = spec();
     if (current === undefined) return;
     context.update({ machineSpec: { ...current, ...next } });
+  }
+
+  /* The scope note, above the controls it is about — issue #104. See {@link DRAFT_NOTE}. */
+  if (DRAFT_NOTE !== '') {
+    elements.rows.parentElement?.insertBefore(
+      el(doc, 'p', { className: 'advice', text: DRAFT_NOTE, style: { 'margin-bottom': '10px' } }),
+      elements.rows,
+    );
   }
 
   elements.name.addEventListener('input', () => {

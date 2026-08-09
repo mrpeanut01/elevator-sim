@@ -129,6 +129,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/dom.ts#plateRow',
         'dev/dom.ts#slider',
         'dev/dom.ts#toggle',
+        /*
+         * The exported report card's painter — `dev/dom.ts`'s case exactly, one layer over. Every
+         * string it puts on the bitmap is one `reportCardOf` handed it, and `reportCardOf` is
+         * **driven** by the `REPORT_CARD` adapter, both sheet shapes and both arms of the recipe.
+         * Its own literals are the seven font declarations; it is derived because
+         * `600 15px ui-monospace, SFMono-Regular, Menlo, monospace` reads as adjacent words, which
+         * is `render/theme.ts#themeFor`'s reason a few entries up. Driving it would put the
+         * caller's sentences in the corpus twice under the painter's name.
+         */
+        'render/reportCard.ts#drawReportCard',
       ],
     },
     {
@@ -191,7 +201,27 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         // adjacent words. The keys' agreement with the reader is what `main.test.ts`'s
         // round-trip asserts.
         'dev/main.ts#deepLinkSearchOf',
+        /*
+         * `shareLinkOf` is the same false positive one line down: its whole body is
+         * `` `${base}${deepLinkSearchOf(state, defaults)}` ``, and the scanner keeps a template
+         * substitution's text and reads `deepLinkSearchOf(state, defaults)` as adjacent words. It
+         * authors no sentence at all — its `ok` arm is a URL and its refusal arm is
+         * `runIdentityIssues`', excluded below under its own name and driven through the report
+         * card, which quotes those sentences on the one surface that leaves the browser.
+         */
+        'dev/main.ts#shareLinkOf',
         'dev/state.ts#initialState',
+        /*
+         * The other half of the same answer — issue #99. `PREFERRED_OPENING_BUILDINGS` is a list of
+         * building **ids** (`chancery-house`, `garden-apartments`) that `initialState`'s neighbour
+         * above and `menu/menu.ts#initialMenuState` resolve the opening selection through; the
+         * scanner reads the hyphens as word breaks, exactly as it does for `initialState` itself.
+         * Its sibling `PREFERRED_VIEWER_DISPATCHERS` is not derived at all, because `collective`
+         * and `eta` carry no separator — which is the whole of the difference between them. What a
+         * player *reads* about the building it names is `CatalogueEntry.name` and `.detail`, both
+         * driven by the `MENU` adapter.
+         */
+        'dev/defaults.ts#PREFERRED_OPENING_BUILDINGS',
         /*
          * Returns a demand template **id** — `rise-and-fall`, `office-day` — so the scanner reads
          * the hyphen as a word break and nothing else. It authors no sentence; what a player reads
@@ -203,13 +233,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
          * the `PlayMode` members they switch on — `shift-week`, `free-play` — as prose, because
-         * they are hyphenated. They return a boolean and two `WeekState`s between them and author
+         * they are hyphenated. They return a boolean and three `WeekState`s between them and author
          * no sentence at all. What a player is *told* about a free-play run is the report sheet's
          * `single-run` framing, which the `REPORT_PANEL` adapter already drives on both subjects.
+         *
+         * `weeksForSession` was `weekForSession` until issue #107 gave it a second week to hold
+         * back; it switches on the same union and still authors nothing.
          */
         'dev/state.ts#advancesTheWeek',
         'dev/state.ts#closedWeekOf',
-        'dev/state.ts#weekForSession',
+        'dev/state.ts#weeksForSession',
       ],
     },
     {
@@ -242,12 +275,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'the argument for a field’s scope, addressed to whoever changes that field, and it reaches ' +
         'no screen — `surface.test.ts` asserts every row carries one and `scope.test.ts` decides ' +
         'whether the row is true by running both arms, which is a stronger check than a string ' +
-        'search over a sentence no player reads. `permits` returns a boolean and authors nothing.',
+        'search over a sentence no player reads. `permits` returns a boolean and authors nothing. ' +
+        '`COMMITMENTS` is a third id tuple of the same kind and `commitmentOf` returns one of its ' +
+        'members — both derived only because a hyphen reads as a word break, so `re-runs-now` is ' +
+        'two adjacent words to the scanner’s eye and `docs/16`’s own `within-day` is too. The ' +
+        'sentences a player actually reads from that code are authored beside each control, in ' +
+        'the five mounts already excluded above as DOM-bound; issue #104’s note is that, and ' +
+        '`commitment.ts`’s own docstring states the limitation — a mount’s copy reaches the static ' +
+        'sweep and not the driven one.',
       ids: [
         'scope/types.ts#CHANGE_SCOPES',
         'scope/types.ts#PLAY_MODES',
         'scope/surface.ts#SCOPE_OF',
         'scope/permits.ts#permits',
+        'scope/commitment.ts#COMMITMENTS',
+        'scope/commitment.ts#commitmentOf',
       ],
     },
     {

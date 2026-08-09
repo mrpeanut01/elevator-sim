@@ -18,10 +18,13 @@ import { readGoals } from './goals.js';
 import { goalsForDay } from './goals.js';
 import {
   HISTORY_DAYS,
+  PARKED_WEEKS_MAX,
+  SANDBOX_CONTRACT_ID,
   closeDay,
   nextDay,
   openWeek,
   outcomeOf,
+  switchWeek,
   takeContract,
 } from './week.js';
 import type { DayOutcome, GoalReading, WeekState } from './types.js';
@@ -219,6 +222,168 @@ describe('taking an assignment restarts the week and keeps what was cleared', ()
     expect(taken.history).toEqual([]);
     // …and the scenario already cleared stays cleared.
     expect(taken.completed).toEqual(['c1']);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A week per assignment — GitHub issue #107
+ * -------------------------------------------------------------------------- */
+
+describe('switching assignment parks the week rather than destroying it', () => {
+  /**
+   * The parked week for an assignment, read the way a caller would.
+   *
+   * Written here rather than imported: `week.ts` keeps its own reader private, because an exported
+   * one would have had this file as its only reference outside its own module — the shape the
+   * standing requirement is about, at three lines.
+   */
+  const parkedWeekFor = (
+    parked: readonly WeekState[],
+    contractId: string,
+  ): WeekState | undefined => parked.find((entry) => entry.contractId === contractId);
+
+  /** A week four days in, with a streak and a banked shift — something there is to lose. */
+  function played(contractId: string): WeekState {
+    let week = openWeek(contractId);
+    for (let d = 1; d <= 3; d += 1) {
+      week = nextDay(closeDay(week, day(week, 'met')));
+    }
+    return week;
+  }
+
+  it('opens a fresh week on the first visit, exactly as it always did', () => {
+    // The rule that was *not* broken: taking an assignment restarts the week (`design.html` :1643).
+    const from = played('c1');
+    const { week } = switchWeek(from, [], 'c4', 'resume');
+    expect(week).toEqual(takeContract(from, 'c4'));
+  });
+
+  it('hands back the same week on the second visit — the whole of issue #107', () => {
+    /*
+     * Reproduced from the shipped code before this function existed: Garden Apartments day 4 with a
+     * streak, switch to Midtown Office, switch straight back, and the week read **day 1, streak 0,
+     * nothing banked**. `withBuilding` called `takeContract` on every change of contract, and a
+     * `takeContract` is a fresh week by construction.
+     */
+    const from = played('c1');
+    const away = switchWeek(from, [], 'c2', 'resume');
+    const back = switchWeek(away.week, away.parked, 'c1', 'resume');
+    expect(back.week.day).toBe(from.day);
+    expect(back.week.streak).toBe(from.streak);
+    expect(back.week.cleanRun).toBe(from.cleanRun);
+    expect(back.week.history).toEqual(from.history);
+  });
+
+  it('does nothing at all when the destination is the week already on screen', () => {
+    // By identity, because the coach select fires `change` on a re-pick of the running building and
+    // a re-pick that reshuffled the week would be the control moving on its own.
+    const from = played('c1');
+    const parked = [openWeek('c2')];
+    const same = switchWeek(from, parked, 'c1', 'resume');
+    expect(same.week).toBe(from);
+    expect(same.parked).toBe(parked);
+  });
+
+  it('keeps one week per assignment, and never the one being played', () => {
+    let state = { week: played('c1'), parked: [] as readonly WeekState[] };
+    for (const id of ['c2', 'c3', 'c1', 'c2']) {
+      state = switchWeek(state.week, state.parked, id, 'resume');
+      const ids = state.parked.map((entry) => entry.contractId);
+      expect(new Set(ids).size, 'one entry per assignment').toBe(ids.length);
+      expect(ids, 'the live week may not also be parked').not.toContain(state.week.contractId);
+    }
+    // …and the third visit to `c1` is still a resume rather than a restart.
+    const back = switchWeek(state.week, state.parked, 'c1', 'resume');
+    expect(back.week.day).toBeGreaterThan(1);
+  });
+
+  it('merges what has been cleared, so a resumed week cannot clear a scenario twice', () => {
+    /*
+     * `closeDay`'s `!base.completed.includes(contract.id)` guard is what stops a contract clearing
+     * and awarding a second time. A parked week's `completed` is a snapshot from the moment it was
+     * parked, so resuming one verbatim would forget a scenario cleared while it was away — and then
+     * that scenario could clear again, on a week the player had already been rewarded for.
+     */
+    const away = switchWeek(played('c1'), [], 'c2', 'resume');
+    const cleared = { ...away.week, completed: ['c7'] };
+    const back = switchWeek(cleared, away.parked, 'c1', 'resume');
+    expect(back.week.completed).toContain('c7');
+    // The union, not a replacement: an id only the parked side knows about survives too.
+    const parkedKnows = switchWeek(
+      { ...cleared, completed: ['c7'] },
+      [{ ...(parkedWeekFor(away.parked, 'c1') as WeekState), completed: ['c6'] }],
+      'c1',
+      'resume',
+    );
+    expect([...parkedKnows.week.completed].sort()).toEqual(['c6', 'c7']);
+  });
+
+  it('carries the week into the sandbox and parks the scenario at the same time', () => {
+    /*
+     * `withContract`'s documented decision is unchanged: moving to a building no scenario runs is
+     * not a new week, and restarting there *"would confiscate a week for opening the editor"*. That
+     * was written when there was one slot, so the week could only be carried **or** kept, never
+     * both. It can now be both, which is why the decision did not have to be reversed to close this
+     * issue.
+     */
+    const from = played('c1');
+    const sandbox = switchWeek(from, [], SANDBOX_CONTRACT_ID, 'resume');
+    expect(sandbox.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+    expect(sandbox.week.day).toBe(from.day);
+    expect(sandbox.week.streak).toBe(from.streak);
+    expect(parkedWeekFor(sandbox.parked, 'c1')).toEqual(from);
+  });
+
+  it('bounds the list, and the bound covers every id it can be asked for', () => {
+    // One per contract plus the two sentinels, so nothing a player can reach evicts anything else.
+    expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + 2);
+    let state = { week: openWeek(CONTRACTS[0]?.id), parked: [] as readonly WeekState[] };
+    for (const contract of CONTRACTS) state = switchWeek(state.week, state.parked, contract.id, 'resume');
+    state = switchWeek(state.week, state.parked, SANDBOX_CONTRACT_ID, 'resume');
+    expect(state.parked.length).toBeLessThan(PARKED_WEEKS_MAX);
+    expect(state.parked.length).toBe(CONTRACTS.length);
+  });
+
+  it('mutates neither the week nor the list it is handed', () => {
+    const from = deepFreeze(played('c1'));
+    const parked = deepFreeze([openWeek('c2')]);
+    expect(() => switchWeek(from, parked, 'c2', 'resume')).not.toThrow();
+    expect(() => switchWeek(from, parked, 'c5', 'resume')).not.toThrow();
+    expect(parked.length).toBe(1);
+  });
+
+  /* ------------------------------------------------------------------ *
+   * `restart` — the surfaces whose own copy promises one
+   * ------------------------------------------------------------------ */
+
+  it('restarts the destination under `restart`, and still parks what is left', () => {
+    /*
+     * The scenario card's `title` says *"taking this assignment restarts the week on Garden
+     * Apartments"*, so the destination half of what it does is not this issue's business. The
+     * departure half was: it called `takeContract` and threw the week the player was on away.
+     */
+    const from = played('c1');
+    const taken = switchWeek(from, [], 'c2', 'restart');
+    expect(taken.week).toEqual(takeContract(from, 'c2'));
+    expect(parkedWeekFor(taken.parked, 'c1')).toEqual(from);
+  });
+
+  it('drops the destination’s parked week under `restart`, because that is what restart means', () => {
+    // The two arrivals genuinely differ, and this is where. A card that said *restarts* and quietly
+    // resumed would be copy describing a behaviour the code no longer has.
+    const from = played('c1');
+    const away = switchWeek(from, [], 'c2', 'resume');
+    const restarted = switchWeek(away.week, away.parked, 'c1', 'restart');
+    expect(restarted.week.day).toBe(1);
+    expect(restarted.week.history).toEqual([]);
+    expect(parkedWeekFor(restarted.parked, 'c1')).toBeUndefined();
+    // …and the week it just left is parked, which is the half that is the same on both arrivals.
+    expect(parkedWeekFor(restarted.parked, 'c2')).toEqual(away.week);
+  });
+
+  it('keeps what has been cleared across a restart, exactly as `takeContract` always did', () => {
+    const from = { ...played('c1'), completed: ['c7'] };
+    expect(switchWeek(from, [], 'c2', 'restart').week.completed).toEqual(['c7']);
   });
 });
 

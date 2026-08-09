@@ -60,6 +60,7 @@ import {
   deepLinkSearchOf,
   deepLinkStateOf,
   provenanceLineOf,
+  shareLinkOf,
   seedEntryOf,
   seekActionForKey,
   shaftsForBank,
@@ -628,6 +629,8 @@ describe('the URL round-trips — SH-09', () => {
       tab: opening.tab,
       railSegment: opening.railSegment,
       mode: opening.mode,
+      pattern: opening.pattern,
+      windowStartS: opening.windowStartS,
     });
   });
 });
@@ -897,6 +900,310 @@ describe('copy run names the same run — TP-13', () => {
     const opening = initialState(resources, 9n);
     const state: ViewerState = { ...opening, levers: { ...opening.levers, express: true } };
     expect(provenanceLineOf(state, resources).ok).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The two share artefacts — GitHub issue #118 § 2
+ * -------------------------------------------------------------------------- */
+
+/** A state carrying the two axes Free Play asks for and the pattern select cannot express. */
+function freePlayState(overrides: Partial<ViewerState> = {}): ViewerState {
+  return {
+    ...initialState(resources, 555n),
+    playMode: 'free-play',
+    buildingId: 'garden-apartments',
+    shiftLengthS: 900,
+    freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: 9 },
+    ...overrides,
+  };
+}
+
+describe('the CLI line names the command — issue #118', () => {
+  it('starts with the binary `packages/cli` actually installs, and its subcommand', async () => {
+    /*
+     * The issue's first complaint about this artefact: *"flags with no command name, for someone
+     * who has the repository checked out"*. The name is asserted against the manifest rather than
+     * against itself, because `viz` cannot import `cli` — so a rename of the binary would otherwise
+     * leave a clipboard line naming a command that no longer exists, with nothing red.
+     */
+    const manifest = JSON.parse(
+      await readFile(fileURLToPath(new URL('../../../cli/package.json', import.meta.url)), 'utf8'),
+    ) as { readonly bin: Readonly<Record<string, string>> };
+    const [binary] = Object.keys(manifest.bin);
+    expect(binary).toBeDefined();
+
+    const provenance = provenanceLineOf(initialState(resources, 9n), resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    expect(provenance.line.startsWith(`${String(binary)} run --building `)).toBe(true);
+  });
+});
+
+describe('the CLI line names Free Play’s own axes — issue #118', () => {
+  it('emits --rate for a rate the player chose, and none for the building’s own profile', () => {
+    const chosen = provenanceLineOf(freePlayState(), resources);
+    expect(chosen.ok).toBe(true);
+    if (!chosen.ok) return;
+    expect(flagsOf(chosen.line).get('--rate')).toBe('9');
+
+    /*
+     * `null` is *the building's own profile* — a selection rather than a missing one — and the CLI
+     * expresses it by having no `--rate` at all. Emitting `--rate 0` would be a run nobody asked
+     * for; emitting the profile's number would pin a figure `data/` may move.
+     */
+    const own = provenanceLineOf(
+      freePlayState({ freePlay: { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null } }),
+      resources,
+    );
+    expect(own.ok).toBe(true);
+    if (!own.ok) return;
+    expect(own.line).not.toContain('--rate');
+  });
+
+  it('emits Free Play’s template, and lets it win over the pattern’s', () => {
+    /*
+     * `shiftRunConfigOf` applies `freePlay.demandTemplateId` **over** the pattern's, last, for its
+     * own stated reason. A line that named the pattern's template would spell a run the viewer is
+     * not running — which is the defect this whole function exists to have closed once.
+     */
+    const state = freePlayState({
+      pattern: 'hotel',
+      freePlay: { demandTemplateId: 'office-down-peak', arrivalRatePctPop5min: null },
+    });
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    const flags = flagsOf(provenance.line);
+    expect(flags.get('--traffic')).toBe('hotel');
+    // `hotel` alone would have emitted `lunch-two-way`; Free Play's choice is the later word.
+    expect(flags.get('--template')).toBe('office-down-peak');
+  });
+
+  it('names the part of the day as a clock range, from the template’s own hour', () => {
+    /*
+     * `office-day` starts at 08:00 (`startOfDayMin` 480) and its morning rush is the 1 800 s at
+     * 1 800 s in. The CLI's `dayWindowOf` computes `windowStartS = (fromMin − startOfDayMin) × 60`;
+     * this is that arithmetic run backwards, so the flag's value is a fact about the same record
+     * rather than a second opinion about where the day begins.
+     */
+    const state = freePlayState({
+      shiftLengthS: 1800,
+      windowStartS: 1800,
+      freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+    });
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    expect(flagsOf(provenance.line).get('--part')).toBe('08:30-09:00');
+    /*
+     * …and **no `--duration` beside it**, because the CLI refuses the pair. `office-day`'s phases
+     * are authored, so `templateOverrides.durationS` is rejected outright (§ D285) and a line
+     * carrying both is one the CLI answers with an error rather than a run. Driven, not argued:
+     * `--template office-day --part 08:30-09:00 --duration 1800` fails at the command line and the
+     * same line without `--duration` runs.
+     */
+    expect(provenance.line).not.toContain('--duration');
+  });
+
+  it('rebuilds the windowed run leg for leg, which is the only thing that makes it provenance', () => {
+    /*
+     * The pin. A `--part` that parsed and named a different half-hour would satisfy every
+     * assertion above and reproduce nothing, so the flags are turned back into a `SimulationConfig`
+     * the way `planRun`'s `dayWindowOf` does — `windowStartS = (fromMin − startOfDayMin) × 60` —
+     * and the legs must match the viewer's bit for bit.
+     */
+    const state = freePlayState({
+      buildingId: 'garden-apartments',
+      shiftLengthS: 1800,
+      windowStartS: 1800,
+      freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: null },
+    });
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(true);
+    if (!provenance.ok) return;
+    const flags = flagsOf(provenance.line);
+
+    const range = String(flags.get('--part')).split('-');
+    const minutesOf = (clock: string): number => {
+      const [hours, minutes] = clock.split(':').map(Number);
+      return Number(hours) * 60 + Number(minutes);
+    };
+    const record = resources.trafficProfiles.demandTemplates.find(
+      (entry) => entry.id === flags.get('--template'),
+    );
+    const startOfDayMin = record?.startOfDayMin ?? 0;
+    const cliConfig: SimulationConfig = {
+      building: resources.buildings.find((entry) => entry.id === state.buildingId) as never,
+      dispatcherProfile: profileById(resources, [], String(flags.get('--dispatcher'))),
+      trafficProfiles: resources.trafficProfiles,
+      elevatorSpecs: resources.elevatorSpecs,
+      dispatcherProfiles: resources.dispatcherProfiles,
+      seed: BigInt(String(flags.get('--seed'))),
+      onTimeout: 'report',
+      demandTemplate: String(flags.get('--template')) as SimulationConfig['demandTemplate'],
+      windowStartS: (minutesOf(String(range[0])) - startOfDayMin) * 60,
+      windowEndS: (minutesOf(String(range[1])) - startOfDayMin) * 60,
+    };
+
+    const viewerRun = recordRun(shiftRunConfigOf(resources, state).config, {
+      recordDecisions: false,
+    });
+    const cliRun = recordRun(cliConfig, { recordDecisions: false });
+    expect(viewerRun.recording.legs.length).toBeGreaterThan(0);
+    expect(cliRun.recording.legs).toStrictEqual(viewerRun.recording.legs);
+  }, 120_000);
+
+  it('refuses a windowed run on a template with no hour, rather than running the whole period', () => {
+    /*
+     * `constant-iso` declares no `startOfDayMin` (§ D244), so there is no clock for `--part` to
+     * name. A line without it would be honoured by the CLI and turn into the whole two hours —
+     * a different run wearing this one's provenance, which is the one thing this control may not
+     * produce.
+     */
+    const state = freePlayState({
+      shiftLengthS: 7200,
+      windowStartS: 1800,
+      freePlay: { demandTemplateId: 'constant-iso', arrivalRatePctPop5min: null },
+    });
+    const provenance = provenanceLineOf(state, resources);
+    expect(provenance.ok).toBe(false);
+    if (provenance.ok) return;
+    expect(provenance.reasons.join(' ')).toContain('constant-iso');
+    expect(provenance.reasons.join(' ')).toContain('declares no hour');
+  });
+});
+
+describe('copy run copies a link — issue #118 § 2', () => {
+  it('is the page’s own address with the run on it', () => {
+    const link = shareLinkOf(
+      freePlayState({ buildingId: 'secure-tower' }),
+      resources,
+      defaults,
+      'https://elevator.example/play',
+    );
+    expect(link.ok).toBe(true);
+    if (!link.ok) return;
+    expect(link.line.startsWith('https://elevator.example/play?')).toBe(true);
+    const params = new URLSearchParams(link.line.slice(link.line.indexOf('?')));
+    expect(params.get('seed')).toBe('555');
+    expect(params.get('building')).toBe('secure-tower');
+    expect(params.get('duration')).toBe('900');
+    expect(params.get('template')).toBe('rise-and-fall');
+    expect(params.get('rate')).toBe('9');
+  });
+
+  it('omits the building when it is the page’s own — the address stays readable', () => {
+    // `garden-apartments` is `initialState`'s opening building, so a link from it says nothing
+    // about the building and the recipient's page opens on the same one. The omit-defaults rule,
+    // and the reason `deepLinkDefaultsOf` derives from `initialState` rather than restating it.
+    const link = shareLinkOf(freePlayState(), resources, defaults, 'https://elevator.example/play');
+    expect(link.ok).toBe(true);
+    if (!link.ok) return;
+    expect(new URLSearchParams(link.line.slice(link.line.indexOf('?'))).get('building')).toBeNull();
+    const arrived = deepLinkStateOf(
+      initialState(resources, 1n),
+      resources,
+      new URLSearchParams(link.line.slice(link.line.indexOf('?'))),
+    );
+    expect(arrived.buildingId).toBe('garden-apartments');
+  });
+
+  it('refuses through the same predicate the CLI line refuses through', () => {
+    /*
+     * One answer to *can this run be reproduced elsewhere from its own selection?* — `docs/16` S5.
+     * A link is where a second, looser answer would cost the most: it would send somebody a page
+     * that runs a different building under this run's name, and neither of them would know.
+     */
+    const mine = freePlayState({ buildingId: 'my-tower' });
+    const link = shareLinkOf(mine, resources, defaults, 'https://elevator.example/play');
+    expect(link.ok).toBe(false);
+    if (link.ok) return;
+    expect(link.reasons.join(' ')).toContain('my-tower');
+    expect(link.reasons).toStrictEqual(
+      provenanceLineOf(mine, resources).ok ? [] : (provenanceLineOf(mine, resources) as { reasons: readonly string[] }).reasons,
+    );
+  });
+});
+
+describe('the four new params round-trip, and they reach the run', () => {
+  it('reproduces the pattern, the window and both Free Play axes', () => {
+    const state = freePlayState({
+      pattern: 'hotel',
+      windowStartS: 1800,
+      shiftLengthS: 1800,
+      freePlay: { demandTemplateId: 'office-day', arrivalRatePctPop5min: 4 },
+    });
+    const arrived = deepLinkStateOf(
+      initialState(resources, 111111n),
+      resources,
+      new URLSearchParams(deepLinkSearchOf(state, defaults)),
+    );
+    expect(arrived.pattern).toBe('hotel');
+    expect(arrived.windowStartS).toBe(1800);
+    expect(arrived.freePlay).toStrictEqual({
+      demandTemplateId: 'office-day',
+      arrivalRatePctPop5min: 4,
+    });
+    expect(arrived.buildingId).toBe(state.buildingId);
+    expect(arrived.seed).toBe(state.seed);
+  });
+
+  it('carries “the building’s own profile” as a rate rather than as a missing param', () => {
+    // `null` is a selection, not an absence — `scope/surface.ts` says so of the field, and a link
+    // that dropped the template with it would arrive on a page running a different shape.
+    const state = freePlayState({
+      freePlay: { demandTemplateId: 'lunch-two-way', arrivalRatePctPop5min: null },
+    });
+    const search = deepLinkSearchOf(state, defaults);
+    expect(new URLSearchParams(search).get('rate')).toBeNull();
+    const arrived = deepLinkStateOf(initialState(resources, 1n), resources, new URLSearchParams(search));
+    expect(arrived.freePlay).toStrictEqual({
+      demandTemplateId: 'lunch-two-way',
+      arrivalRatePctPop5min: null,
+    });
+  });
+
+  it('ignores a template and a traffic profile the data does not ship', () => {
+    const arrived = deepLinkStateOf(
+      initialState(resources, 5n),
+      resources,
+      new URLSearchParams('?template=jetpack&traffic=teleport&rate=4'),
+    );
+    // Not coerced into the nearest thing that parses, and not a `freePlay` carrying a rate with no
+    // template — the same refusal shape the other seven params take.
+    expect(arrived.freePlay).toBeUndefined();
+    expect(arrived.pattern).toBe('building');
+  });
+
+  it('and the link moves the run — the legs differ when the rate does', () => {
+    /*
+     * The standing requirement (`docs/05-roadmap.md`), pointed at a URL parameter, and compared on
+     * the **legs**: a param that parses, round-trips and moves no passenger is the dead seam this
+     * repository has shipped eleven times, wearing a share button.
+     *
+     * Everything but `rate` is held equal — same building, same seed, same dispatcher, same length,
+     * same template — so the rate is the only thing that moved. Neither arm may be empty: a
+     * fingerprint of zero legs equals any other fingerprint of zero legs.
+     */
+    const legsFor = (search: string): string => {
+      const arrived = deepLinkStateOf(
+        initialState(resources, 4242n),
+        resources,
+        new URLSearchParams(search),
+      );
+      return JSON.stringify(
+        recordRun(shiftRunConfigOf(resources, arrived).config, {
+          recordDecisions: false,
+        }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+      );
+    };
+    const base = '?building=garden-apartments&seed=4242&duration=900&template=rise-and-fall';
+    const quiet = legsFor(`${base}&rate=3`);
+    const busy = legsFor(`${base}&rate=12`);
+    expect(quiet).not.toBe('[]');
+    expect(busy).not.toBe('[]');
+    expect(quiet).not.toBe(busy);
   });
 });
 

@@ -52,11 +52,17 @@ import {
   goalRowViewOf,
   LEVER_SURFACES,
   leverRowsOf,
+  NOTHING_FILED_YET,
   reportViewOf,
+  rotatedOn,
   runProgressOf,
   toneColourOf,
+  topWritten,
   type FigureView,
+  type ReportDeltaView,
   type ReportView,
+  type RunProgress,
+  type SheetContinuity,
   type WeekFramingView,
 } from './reportPanel.js';
 
@@ -65,12 +71,44 @@ let clean: VizRecording;
 let saturated: VizRecording;
 /** `clean`'s selection, run a second time — the same run, not a second one. See the #16 suite. */
 let again: VizRecording;
+/**
+ * `clean`'s question, answered by a different dispatcher — the retry loop, and the **only** change
+ * the delta block exists to draw.
+ *
+ * Same building, same rate, same length, same seed; `nearest-car` instead of the fixture's `eta`.
+ * That is what a player does when they click a dispatcher card, and after issues #117 and #102 it is
+ * the pairing the suite has to be built on: every other pair the suite used to reach for differs on
+ * an axis the block now refuses.
+ */
+let swapped: VizRecording;
+/**
+ * A third answer to `clean`'s question — so the #117 headline can be driven over **three** runs.
+ *
+ * The reporter ran three dispatchers back to back and reported that all three sheets printed one
+ * baseline. Two runs cannot tell that claim from the confirmed one-delta defect; three can.
+ */
+let thirdDispatcher: VizRecording;
+/**
+ * `clean`'s selection at a longer run length — the pin on {@link ReportBasis}' named gap.
+ *
+ * A campaign day's shift length is not on `DayReportInput`, so two days of one day number at
+ * different lengths compare as the same question. That is stated in `shift/report.ts` and it is
+ * pinned by a case here, because a limitation described only in prose is a limitation that goes
+ * stale (§ D227).
+ */
+let longer: VizRecording;
 
-function runOf(buildingId: string, arrivalRatePctPop5min: number, durationS: number): VizRecording {
+function runOf(
+  buildingId: string,
+  arrivalRatePctPop5min: number,
+  durationS: number,
+  dispatcherId?: string,
+): VizRecording {
   const base: SimulationConfig = fixtureConfig(config, {
     buildingId,
     durationS,
     onTimeout: 'report',
+    ...(dispatcherId === undefined ? {} : { dispatcherId }),
   });
   return recordRun({ ...base, demand: { arrivalRatePctPop5min } }, { recordDecisions: false })
     .recording;
@@ -144,22 +182,18 @@ function cell(view: ReportView, label: string): FigureView {
 }
 
 /**
- * The two sheets `main.ts`'s `closeShift` files when one selection is run, filed, and run again.
+ * The sheets `main.ts`'s `closeShift` files when one day is run, filed, and run again — in order.
  *
- * The week is carried from the first close into the second, which is the whole of what makes the
- * second sheet say *attempt 2 at this selection* — `week.ts`'s `retry` branch keys on `closedDay`.
- * A pair of independently opened weeks would both say *attempt 1* and the suite below would be
- * asserting against a sequence the shell cannot produce.
+ * The week is carried from each close into the next, which is the whole of what makes the second
+ * sheet say *attempt 2 at this day* — `week.ts`'s `retry` branch keys on `closedDay`. A list of
+ * independently opened weeks would all say *attempt 1* and the suites below would be asserting
+ * against a sequence the shell cannot produce.
  */
-function attemptsOf(
-  first: VizRecording,
-  second: VizRecording,
-  day = 4,
-): readonly [ShapedDayReport, ShapedDayReport] {
+function closesOf(recordings: readonly VizRecording[], day = 4): readonly ShapedDayReport[] {
   const goals = goalsForDay(day);
   let week = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
   const filed: ShapedDayReport[] = [];
-  for (const recording of [first, second]) {
+  for (const recording of recordings) {
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     week = closeDay(
       week,
@@ -185,7 +219,16 @@ function attemptsOf(
       }),
     );
   }
-  const [one, two] = filed;
+  return filed;
+}
+
+/** {@link closesOf} for the two-run case, narrowed so the caller can destructure it. */
+function attemptsOf(
+  first: VizRecording,
+  second: VizRecording,
+  day = 4,
+): readonly [ShapedDayReport, ShapedDayReport] {
+  const [one, two] = closesOf([first, second], day);
   if (one === undefined || two === undefined) throw new Error('two closes produced fewer sheets');
   return [one, two];
 }
@@ -252,6 +295,11 @@ beforeAll(async () => {
   saturated = runOf('midtown-office', 25, 900);
   // The same three arguments, a second time. Nothing about the call differs, which is the point.
   again = runOf('garden-apartments', 12, 900);
+  // One axis moved, and it is the axis a player can move: the dispatcher.
+  swapped = runOf('garden-apartments', 12, 900, 'nearest-car');
+  thirdDispatcher = runOf('garden-apartments', 12, 900, 'energy-aware');
+  // Same question in every respect the sheet can see, and a longer day. See {@link longer}.
+  longer = runOf('garden-apartments', 12, 1500);
 }, 180_000);
 
 describe('the premises this suite rests on', () => {
@@ -261,6 +309,20 @@ describe('the premises this suite rests on', () => {
     expect(saturated.summary.awtIsValid).toBe(false);
     // Suppression is a refusal to print a number that exists, not the absence of one.
     expect(Number.isFinite(saturated.summary.meanWaitS)).toBe(true);
+  });
+
+  it('has a pair that differs by the dispatcher alone, and really is a different day', () => {
+    /*
+     * The delta suite's foundation after issues #117 and #102, so it is asserted rather than
+     * assumed. Two things have to hold at once and they pull in opposite directions: the two runs
+     * must be *comparable* — same building, same shape of sheet, same demand — and they must
+     * actually **differ**, or every pairing case below would pass over an empty list.
+     */
+    expect(swapped.buildingId).toBe(clean.buildingId);
+    expect(swapped.dispatcherProfileId).not.toBe(clean.dispatcherProfileId);
+    expect(reportOf(swapped).basis).toEqual(reportOf(clean).basis);
+    const moved = reportViewOf(reportOf(swapped), { kind: 'played-out' }, reportOf(clean)).delta;
+    expect(moved?.figures.length ?? 0).toBeGreaterThan(0);
   });
 });
 
@@ -909,6 +971,15 @@ describe('what moved since the run before this one — issue #38', () => {
    * So: every value in the block is a string one of the two sheets already published (no arithmetic,
    * so a withheld cell survives the pairing as the word), the note carries the refusal, and the
    * identity rows are there so a reader cannot attribute a change to the wrong cause.
+   *
+   * ## Every pairing case below is now a **dispatcher swap**, and that is issues #117 and #102
+   *
+   * This suite used to pair Garden Apartments against Midtown Office, because two recordings that
+   * differ in every figure make the loudest assertions. That pairing is exactly the one the product
+   * now refuses — see the suite below — so the cases moved onto {@link swapped}: one building, one
+   * demand, one seed, a different dispatcher. That is not a weaker fixture. It is the only pairing
+   * the block was ever *for*, and running the suite on it means the assertions are about the case a
+   * player can actually produce.
    */
   const deltaOf = (previous: ShapedDayReport, current: ShapedDayReport) => {
     const delta = reportViewOf(current, { kind: 'played-out' }, previous).delta;
@@ -927,8 +998,9 @@ describe('what moved since the run before this one — issue #38', () => {
 
   it('pairs the figures that moved, and only those', () => {
     const before = reportOf(clean);
-    const after = reportOf(saturated);
+    const after = reportOf(swapped);
     const delta = deltaOf(before, after);
+    expect(delta.refused).toBeNull();
     const moved = new Map(delta.figures.map((row) => [row.label, row]));
     expect(moved.size).toBeGreaterThan(0);
     for (const cell of after.figures) {
@@ -946,10 +1018,32 @@ describe('what moved since the run before this one — issue #38', () => {
   it('copies both values verbatim, so a refused figure stays refused in the was column', () => {
     /*
      * The property that makes R3 hold here for free: there is no arithmetic, so there is no
-     * difference to fail to take. A saturated run's `AVERAGE WAIT` pairs as the literal word, and no
+     * difference to fail to take. A run whose mean is refused pairs as the literal word, and no
      * digit of the mean it refuses appears anywhere in the block.
+     *
+     * ## Why the refusal is flipped on a real recording rather than taken from a saturating run
+     *
+     * The pair has to be **comparable** — the block refuses two sheets of different questions before
+     * it pairs anything (issues #117, #102) — and no shipped configuration saturates for one
+     * dispatcher and not another on one building at one rate. So `swapped` is re-published with
+     * `awtIsValid` false and everything else untouched.
+     *
+     * That keeps the interesting half of the original fixture intact and loses nothing this case is
+     * about: the run **has** a finite `meanWaitS` and must not print it, which is the failure mode,
+     * and `shift/report.ts` reaches the same branch whichever of the five grounds set the flag. The
+     * suite that proves a *real* saturating run refuses its mean is above, on `saturated`, and it is
+     * untouched.
      */
-    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const refusedTwin: VizRecording = {
+      ...swapped,
+      summary: {
+        ...swapped.summary,
+        awtIsValid: false,
+        awtInvalidReason: 'the queue was still growing when the window closed',
+      },
+    };
+    const delta = deltaOf(reportOf(clean), reportOf(refusedTwin));
+    expect(delta.refused).toBeNull();
     const wait = delta.figures.find((row) => row.label === 'AVERAGE WAIT');
     expect(wait?.after).toBe(WITHHELD);
     expect(wait?.after).not.toMatch(/\d/);
@@ -957,7 +1051,7 @@ describe('what moved since the run before this one — issue #38', () => {
       .flatMap((row) => [row.label, row.before, row.after])
       .join('\n');
     for (const places of [0, 1, 2]) {
-      expect(text).not.toContain(saturated.summary.meanWaitS.toFixed(places));
+      expect(text).not.toContain(refusedTwin.summary.meanWaitS.toFixed(places));
     }
     // And the other direction: the earlier sheet's publishable mean is quoted exactly as it printed.
     expect(wait?.before).toBe(`${clean.summary.meanWaitS.toFixed(1)} s`);
@@ -967,11 +1061,10 @@ describe('what moved since the run before this one — issue #38', () => {
     // Six numbers moving with no word about the seed invites a reader to credit the one thing they
     // touched. The identity rows are the guard, and they are the run's own meta lines.
     const before = reportOf(clean);
-    const after = reportOf(saturated);
+    const after = reportOf(swapped);
     const delta = deltaOf(before, after);
     const labels = delta.selection.map((row) => row.label);
     expect(labels).toContain('BUILDING & DISPATCHER');
-    expect(labels).toContain('SEED & SPAN');
     const building = delta.selection.find((row) => row.label === 'BUILDING & DISPATCHER');
     expect(building?.before).toBe(before.metaLines[0]);
     expect(building?.after).toBe(after.metaLines[0]);
@@ -994,7 +1087,7 @@ describe('what moved since the run before this one — issue #38', () => {
   });
 
   it('states no verdict, orders nothing, and carries the refusal in its own words', () => {
-    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const delta = deltaOf(reportOf(clean), reportOf(swapped));
     const prose = [delta.caption, delta.note].join('\n');
     // R2's own construction. A block that ordered two runs would say it here or nowhere.
     expect(prose).not.toMatch(/\b(?:improved|worse than|better than|beats?\b|outperform)/i);
@@ -1007,7 +1100,7 @@ describe('what moved since the run before this one — issue #38', () => {
   it('gives no row a colour, because there is no direction to signal — KB-15 and R2', () => {
     // Asserted structurally: `DeltaRowView` has three fields and none of them is a colour, a tone or
     // a direction. A green *took the stairs* would be the verdict this block exists not to state.
-    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const delta = deltaOf(reportOf(clean), reportOf(swapped));
     for (const row of [...delta.selection, ...delta.figures]) {
       expect(Object.keys(row).sort()).toEqual(['after', 'before', 'label']);
     }
@@ -1022,11 +1115,11 @@ describe('what moved since the run before this one — issue #38', () => {
       times.add(clockOf(recording.endedAt));
       return times;
     };
-    const delta = deltaOf(reportOf(clean), reportOf(saturated));
+    const delta = deltaOf(reportOf(clean), reportOf(swapped));
     for (const row of [...delta.selection, ...delta.figures]) {
       for (const [text, span] of [
         [row.before, inside(clean)],
-        [row.after, inside(saturated)],
+        [row.after, inside(swapped)],
       ] as const) {
         for (const found of text.match(/\d{2}:\d{2}/g) ?? []) {
           expect(span.has(found), `${found} in "${text}" is outside its own run`).toBe(true);
@@ -1035,21 +1128,332 @@ describe('what moved since the run before this one — issue #38', () => {
     }
   });
 
-  it('rotates once per sheet, before the view is built', async () => {
+  it('rotates before the view it feeds is built', async () => {
     /*
-     * The mount's continuity is not reachable without a DOM, so it is pinned at the source in the
-     * DR-13 idiom. Both halves matter and both were got wrong first: rotating **after** the view is
-     * built makes every sheet its own predecessor on the next frame — sixty frames a second — and
-     * rotating on an **unfiled** identity throws away the sheet the reader just read, because
-     * pressing *Run this shift* clears the report between every pair of filed ones.
+     * The **order** is a source property and stays a source guard; everything else about the
+     * rotation is now driven directly, below. Rotating after the view is built makes every sheet its
+     * own predecessor on the next frame — sixty frames a second — and no unit test of a pure reducer
+     * can see that, because it is a fact about where the call sits.
      */
     const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
-    const rotate = panel.indexOf('previousSheet = currentSheet;');
+    const rotate = panel.indexOf('continuity = rotatedOn(');
     const build = panel.indexOf('const drawn = reportViewOf(');
     expect(rotate).toBeGreaterThan(-1);
     expect(build).toBeGreaterThan(-1);
     expect(rotate, 'the rotation must precede the view it feeds').toBeLessThan(build);
-    expect(panel).toContain("if (identity !== '' && identity !== filedIdentity)");
+  });
+});
+
+describe('two runs that were not asked the same question — issues #117 and #102', () => {
+  /*
+   * ## What was reported
+   *
+   * #102: *"after finishing a Free play run on Midtown Office, the next run was a Scenario day on
+   * Garden Apartments. The comparison table still rendered, showing carried was 726, now 48, as if
+   * that were a meaningful swing."* #117, from the other end: a building switch mid-session drew
+   * `BUILDING & DISPATCHER was Garden Apartments … → Vertical City …` and then `CARRIED was 48 →
+   * 5961` underneath it — *"at least labelled, so the reader can see the two runs aren't
+   * comparable"*, and still six rows of arithmetic between two towers.
+   *
+   * ## The line this suite holds
+   *
+   * The block **refuses the arithmetic** and says which axis differs, in words. That is #117's own
+   * recommendation 2 and the whole of #102's ask. It is the same shape as every other refusal in
+   * this product: a figure the run cannot support is replaced by a statement of what is not being
+   * said, never by a plausible number and never by a silent hole.
+   *
+   * The identity rows survive a refusal. They are not the comparison — they are the reason there
+   * is not one — and hiding them would leave a reader told *"these are different"* with no way to
+   * see how.
+   */
+  const deltaOf = (previous: ShapedDayReport, current: ShapedDayReport): ReportDeltaView => {
+    const delta = reportViewOf(current, { kind: 'played-out' }, previous).delta;
+    if (delta === null) throw new Error('expected a delta');
+    return delta;
+  };
+
+  /** #102's own pairing: one building's Free Play run, then another building's scenario day. */
+  const freePlayThenScenario = (): ReportDeltaView =>
+    deltaOf(reportOf(saturated, 4, SINGLE), reportOf(clean));
+
+  it('draws no figure row at all when the two runs are of different buildings', () => {
+    /*
+     * The reported symptom, asserted as an absence. `CARRIED was 726 → 48` is a true statement
+     * about two counts and is not a statement about anything the player did — the count follows
+     * the building.
+     */
+    const delta = deltaOf(reportOf(saturated), reportOf(clean));
+    expect(delta.refused).not.toBeNull();
+    expect(delta.figures).toEqual([]);
+    expect(delta.refused?.differsOn).toEqual(['in a different building']);
+  });
+
+  it('draws no figure row when one run is Free Play and the other a day of a week', () => {
+    // #102's pairing exactly. Two axes differ here — the mode and the demand — because a campaign
+    // day's demand is its day number and event, and a Free Play run's is its own selection line.
+    const delta = freePlayThenScenario();
+    expect(delta.refused).not.toBeNull();
+    expect(delta.figures).toEqual([]);
+    expect(delta.refused?.differsOn).toContain('in a different mode');
+  });
+
+  it('draws no figure row when the traffic differs and nothing else does', () => {
+    /*
+     * The axis that is easiest to overlook, and the one a player changes most often without
+     * thinking of it as a change of question: same building, same mode, a different day of the week
+     * — which is 11 % more tenants per day (`shift/growth.ts`) and possibly a different event
+     * booked over the demand.
+     */
+    const delta = deltaOf(reportOf(clean, 4), reportOf(clean, 5));
+    expect(delta.refused?.differsOn).toEqual(['against different traffic']);
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('names every axis that differs, not just the first', () => {
+    const delta = freePlayThenScenario();
+    expect(delta.refused?.differsOn.length).toBeGreaterThan(1);
+    for (const axis of delta.refused?.differsOn ?? []) expect(delta.note).toContain(axis);
+  });
+
+  it('keeps the identity rows, because they are the reason there is no comparison', () => {
+    const delta = deltaOf(reportOf(saturated), reportOf(clean));
+    const labels = delta.selection.map((row) => row.label);
+    expect(labels).toContain('BUILDING & DISPATCHER');
+    expect(delta.selection.length).toBeGreaterThan(0);
+  });
+
+  it('stops calling itself “what moved”, because nothing here moved for a reason', () => {
+    // The heading is the part a reader keeps. A caption promising a comparison over a paragraph
+    // declining one is the same defect as the figures were, in fewer words.
+    const delta = deltaOf(reportOf(saturated), reportOf(clean));
+    expect(delta.caption).not.toContain('What moved');
+    expect(delta.caption).toBe('The run before this one');
+  });
+
+  it('says it is not a comparison, and still says where one can be had', () => {
+    const delta = freePlayThenScenario();
+    expect(delta.note).toContain('Nothing here is a comparison');
+    expect(delta.note).toContain('not asked the same question');
+    // A reader told *this is not a comparison* is exactly the reader who wants to know where one
+    // is. Dropping the pointer would answer their question with a door closing.
+    expect(delta.note).toContain('Compare');
+    expect(delta.note).toContain('interval that excludes zero');
+    // R2 does not relax because the block is refusing: no word orders the two runs.
+    expect(delta.note).not.toMatch(/\b(?:improved|worse than|better than|beats?\b|outperform)/i);
+  });
+
+  it('pairs figures exactly when it does not refuse — the two are one condition', () => {
+    /*
+     * The invariant that keeps the two branches from drifting: an empty `figures` means either
+     * *nothing moved* or *nothing may be compared*, and `refused` is the only thing that tells them
+     * apart. A refusal that still emitted rows would be the defect with a caveat on top.
+     */
+    const pairs: readonly (readonly [ShapedDayReport, ShapedDayReport])[] = [
+      [reportOf(clean), reportOf(swapped)],
+      [reportOf(saturated), reportOf(clean)],
+      [reportOf(clean, 4, SINGLE), reportOf(clean)],
+      [reportOf(clean, 4), reportOf(clean, 5)],
+      ...[attemptsOf(clean, again)],
+    ];
+    for (const [previous, current] of pairs) {
+      const delta = deltaOf(previous, current);
+      if (delta.refused !== null) {
+        expect(delta.figures, delta.caption).toEqual([]);
+        expect(delta.refused.differsOn.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('does not refuse the one change the block exists for — a different dispatcher', () => {
+    /*
+     * The standing requirement, pointed the other way. A comparability gate that refused a
+     * dispatcher swap would silence the block on the only control a player can move and re-run
+     * against the same passengers, which is worse than the defect it fixes: the panel would look
+     * careful and say nothing.
+     */
+    const delta = deltaOf(reportOf(clean), reportOf(swapped));
+    expect(delta.refused).toBeNull();
+    expect(delta.figures.length).toBeGreaterThan(0);
+    expect(delta.caption).toBe('What moved since the run before this one');
+  });
+
+  it('cannot see a campaign day’s run length, and that gap is pinned here rather than claimed shut', () => {
+    /*
+     * § D227: a refusal is pinned by a run, never by another sentence. `DayReportInput` carries no
+     * shift length, and the recording's own span is unusable as a basis because `endedAt` is
+     * `max(lastEventAt, demandEndedAt)` and therefore moves with the **dispatcher** — keying on it
+     * would refuse the one comparison the block is for.
+     *
+     * So two campaign days of one day number, run at different lengths, still pair. This case
+     * exists so that gap is a measured fact with a name, and so a reader of `ReportBasis`' docstring
+     * can check the paragraph against a run. Closing it means a required field on `DayReportInput`,
+     * which is wider than either issue asks for.
+     */
+    expect(reportOf(longer).basis).toEqual(reportOf(clean).basis);
+    expect(longer.endedAt - longer.startedAt).toBeGreaterThan(clean.endedAt - clean.startedAt);
+    expect(deltaOf(reportOf(clean), reportOf(longer)).refused).toBeNull();
+  });
+});
+
+describe('the baseline is the run before this one — issue #117’s headline, driven', () => {
+  /*
+   * ## The claim under investigation
+   *
+   * #117: *"Chancery House, seed 424242. Ran three dispatchers back to back, opening the Day report
+   * after each. All three sheets printed the **identical** baseline."* The triage recorded that as
+   * **not reproducible from code** and could not do better than an argument, because the rotation
+   * lived in three `let`s inside a mount that needs a `document` — see {@link SheetContinuity}.
+   *
+   * It is a reducer now, so the sequence can be **run**. What follows is not a re-reading of the
+   * code: it is the shell's own frame order — a run cleared, a run watched to its end, a sheet
+   * filed, and the frames a reader sits on afterwards — fed through the panel three times, with the
+   * `was` column read off each sheet.
+   *
+   * ## What driving it found
+   *
+   * The headline does **not** reproduce. Three consecutive filed runs difference against their own
+   * immediate predecessor, and the three baselines are three different runs. What does reproduce is
+   * the confirmed defect's blast radius: **one** unrequested run poisons **one** delta, and the run
+   * after it recovers on its own. Both are asserted below rather than asserted in prose.
+   *
+   * The building is Garden Apartments rather than the reporter's Chancery House, and the claim is
+   * unaffected: the rotation reads a sheet's title and meta block and never a tower.
+   */
+  interface Frame {
+    readonly report: ShapedDayReport | undefined;
+    readonly progress: RunProgress;
+  }
+
+  /**
+   * Every frame `renderAll` draws for one run, in the order `main.ts` produces them.
+   *
+   * Three stages, and the middle one is the one an argument would skip. `runShift` writes
+   * `report: undefined` and adopts the recording at its start; the transport advances the playhead
+   * with no report on the state; then `tick` reaches the end and `closeShift` writes the sheet. The
+   * frames after that are the reader looking at it, at sixty a second.
+   */
+  function framesOf(recording: VizRecording, sheet: ShapedDayReport): readonly Frame[] {
+    const span = recording.endedAt - recording.startedAt;
+    const watching = [0, 0.25, 0.5, 0.75, 0.99].map(
+      (fraction): Frame => ({
+        report: undefined,
+        progress: runProgressOf({ recording, simTimeS: recording.startedAt + span * fraction }),
+      }),
+    );
+    const filed: Frame = {
+      report: sheet,
+      progress: runProgressOf({ recording, simTimeS: recording.endedAt }),
+    };
+    // The filed frame, then the reader sitting on it. Repeated deliberately: rotating on every
+    // frame rather than on every new sheet is the mistake this ordering exists to make visible.
+    return [...watching, filed, filed, filed, filed];
+  }
+
+  /** What the panel left on screen after each run — the block a player would have read. */
+  function drive(
+    runs: readonly (readonly [VizRecording, ShapedDayReport])[],
+  ): readonly (ReportDeltaView | null)[] {
+    let memory: SheetContinuity = NOTHING_FILED_YET;
+    const seen: (ReportDeltaView | null)[] = [];
+    for (const [recording, sheet] of runs) {
+      let last: ReportDeltaView | null = null;
+      for (const frame of framesOf(recording, sheet)) {
+        memory = rotatedOn(memory, frame.report, frame.progress);
+        last = reportViewOf(frame.report, frame.progress, memory.previous).delta;
+      }
+      seen.push(last);
+    }
+    return seen;
+  }
+
+  it('does not reproduce: three runs back to back give three different baselines', () => {
+    const [first, second, third] = closesOf([clean, swapped, thirdDispatcher]);
+    if (first === undefined || second === undefined || third === undefined) {
+      throw new Error('three closes produced fewer sheets');
+    }
+    const seen = drive([
+      [clean, first],
+      [swapped, second],
+      [thirdDispatcher, third],
+    ]);
+
+    // Run 1 has nothing before it, so there is no block at all — not a block with a phantom in it.
+    expect(seen[0]).toBeNull();
+    // Runs 2 and 3 each difference the run immediately before them.
+    expect(seen[1]?.refused).toBeNull();
+    expect(seen[2]?.refused).toBeNull();
+    const wasOn = (delta: ReportDeltaView | null): string | undefined =>
+      delta?.selection.find((row) => row.label === 'BUILDING & DISPATCHER')?.before;
+    expect(wasOn(seen[1] ?? null)).toBe(first.metaLines[0]);
+    expect(wasOn(seen[2] ?? null)).toBe(second.metaLines[0]);
+    // The headline in one assertion: the two baselines a player reads are not the same run.
+    expect(wasOn(seen[1] ?? null)).not.toBe(wasOn(seen[2] ?? null));
+  });
+
+  it('sixty frames a second of one sheet neither rotate nor re-owe anything', () => {
+    /*
+     * The mechanism behind the case above, isolated. If a frame of an unchanged sheet rotated,
+     * every sheet would be its own predecessor within 17 ms of appearing and every delta would read
+     * *nothing moved* — which is a different bug from #117's and would have been read as this one.
+     */
+    const [sheet] = closesOf([clean]);
+    if (sheet === undefined) throw new Error('one close produced no sheet');
+    const filed = { kind: 'played-out' } as const;
+    const once = rotatedOn(NOTHING_FILED_YET, sheet, filed);
+    let memory = once;
+    for (let frame = 0; frame < 120; frame += 1) memory = rotatedOn(memory, sheet, filed);
+    // By reference: an unchanged frame returns the memory it was given, not a copy of it.
+    expect(memory).toBe(once);
+  });
+
+  it('an unfiled sheet between two filed ones does not become the baseline', () => {
+    /*
+     * `runShift` writes `report: undefined`, so an unfiled frame stands between every pair of filed
+     * ones. Rotating on that would hand the next delta an `undefined` predecessor and lose the run
+     * the reader just read — the block would vanish on every second run rather than lie on one.
+     */
+    const [first, second] = attemptsOf(clean, again);
+    const filed = { kind: 'played-out' } as const;
+    let memory = rotatedOn(NOTHING_FILED_YET, first, filed);
+    memory = rotatedOn(memory, undefined, filed);
+    memory = rotatedOn(memory, undefined, runProgressOf({ recording: again, simTimeS: again.startedAt }));
+    memory = rotatedOn(memory, second, filed);
+    expect(memory.previous).toBe(first);
+  });
+
+  it('a run the player never asked for poisons exactly one delta, and it is now a refusal', () => {
+    /*
+     * The confirmed half of #117, measured. Boot's own `runShift()` puts a recording on screen
+     * before anything is pressed; while `closeMenu` latched the filing gate on **Resume** as well as
+     * on a mode, that recording could be filed and rotate into the `was` column (`main.ts`, and
+     * `main.progression.test.ts` holds the gate).
+     *
+     * Two facts come out of driving it, and the second is why the panel change matters on its own:
+     *
+     * 1. The blast radius is **one** delta. Run 2 differences run 1 and the sheet recovers with no
+     *    intervention — which is what the triage's *"the confirmed defect can poison one delta, not
+     *    three"* asserted from reading, now run.
+     * 2. That one delta is no longer six rows of arithmetic. The phantom is a run of a different
+     *    building, so the comparability gate refuses it in words. **Both halves of this fix would
+     *    have to fail** for the reported screen to come back.
+     */
+    const boot = reportOf(saturated);
+    const [first, second] = closesOf([clean, swapped]);
+    if (first === undefined || second === undefined) throw new Error('two closes produced fewer sheets');
+    const seen = drive([
+      [saturated, boot],
+      [clean, first],
+      [swapped, second],
+    ]);
+
+    expect(seen[0]).toBeNull();
+    expect(seen[1]?.refused?.differsOn).toEqual(['in a different building']);
+    expect(seen[1]?.figures).toEqual([]);
+    // And the recovery: the very next run is differenced against a run the player did start.
+    expect(seen[2]?.refused).toBeNull();
+    expect(
+      seen[2]?.selection.find((row) => row.label === 'BUILDING & DISPATCHER')?.before,
+    ).toBe(first.metaLines[0]);
   });
 });
 
@@ -1083,9 +1487,27 @@ describe('a new sheet opens at its own top — issue #62', () => {
     const panel = await readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
     expect(panel).toContain("view.state.tab === 'report'");
     expect(panel).toContain('scroller.scrollTop = 0;');
-    expect(panel).toContain('owesTop = false;');
+    expect(panel).toContain('continuity = topWritten(continuity);');
     // The scroll container is `.sheet`, which is the element `index.html` gives `overflow: auto`.
     expect(panel).toContain("ui.title.closest('.sheet')");
+  });
+
+  it('owes the top on a new filed sheet and on nothing else, and the debt clears once', () => {
+    /*
+     * The half the source guard above cannot see, now that the rotation is a value: **when** the
+     * debt is incurred. Driven rather than read.
+     */
+    const [first, second] = attemptsOf(clean, again);
+    const filed = { kind: 'played-out' } as const;
+    expect(NOTHING_FILED_YET.owesTop).toBe(false);
+    const afterFirst = rotatedOn(NOTHING_FILED_YET, first, filed);
+    expect(afterFirst.owesTop).toBe(true);
+    // Sixty frames a second of the same sheet do not re-incur it, and do not re-rotate.
+    expect(rotatedOn(topWritten(afterFirst), first, filed).owesTop).toBe(false);
+    expect(rotatedOn(afterFirst, second, filed).owesTop).toBe(true);
+    // An unfiled frame between two filed ones owes nothing — pressing *Run this shift* is not a
+    // sheet arriving.
+    expect(rotatedOn(topWritten(afterFirst), undefined, filed).owesTop).toBe(false);
   });
 });
 

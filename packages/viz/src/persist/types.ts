@@ -94,6 +94,7 @@ export const SESSION_KEY = 'elevator-sim.session';
  * | 1 | The first shape: the week, the menu `Settings` and the `FreePlaySelection`. |
  * | 2 | The same `session` object, **byte for byte**, plus a sibling {@link SavedLibrary}. |
  * | 3 | `session.freePlay` gains `windowStartS` — the first version to change the week's own shape. |
+ * | 4 | `session` gains `parkedWeeks` — the weeks the player is not currently playing (issue #107). |
  *
  * **A newer payload is still refused**, because this build cannot know what a field it has never
  * seen means — and silently dropping it would hand back a *partially* applied week, which is the
@@ -144,6 +145,19 @@ export const SESSION_KEY = 'elevator-sim.session';
  * one, and would refuse. That is the question to ask, not whether the field sits in `session` or
  * beside it.
  *
+ * ## Version 4 is read for the same reason, and the reason is a defect rather than an argument
+ *
+ * `parkedWeeks` is the weeks a player has stepped away from (issue #107). A version 1–3 envelope has
+ * none, and `[]` is not a default standing in for a list nobody wrote down: **there was one slot and
+ * changing building overwrote it**, so a build that wrote those bytes had already destroyed every
+ * week except the one in `session.week`. An empty list is the *measured* state of such a session,
+ * exactly as `windowStartS: null` is the measured state of a build with no window concept and an
+ * empty library is the measured state of version 1. Nothing is invented, so nothing is refused.
+ *
+ * The reading is one-way, and the newer direction stays a refusal for the ordinary reason: a
+ * version-5 payload may hold a field this build would drop, and a partially applied week is what
+ * {@link SessionRestore} exists to make impossible.
+ *
  * ## Bumping is not optional, and version 3 exists because it was skipped once
  *
  * `windowStartS` shipped **without** this constant moving. The envelope still said 2, so a
@@ -160,7 +174,7 @@ export const SESSION_KEY = 'elevator-sim.session';
  * {@link SessionSnapshot} is a `bigint` today; the guard is what makes that a checked property of
  * the value rather than a claim about the types, which are erased by the time this code runs.
  */
-export const SESSION_SCHEMA_VERSION = 3;
+export const SESSION_SCHEMA_VERSION = 4;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -170,7 +184,7 @@ export const SESSION_SCHEMA_VERSION = 3;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted
@@ -225,6 +239,24 @@ export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1,
  */
 export interface SessionSnapshot {
   readonly week: WeekState;
+  /**
+   * The weeks the player is not currently playing — one per assignment, GitHub issue #107.
+   *
+   * ## Why this is inside the all-or-nothing half rather than beside it like the library
+   *
+   * A parked week looks like a library entry — several independent documents, restorable one at a
+   * time — and it is not one, because {@link week} and this list are **two views of one campaign**.
+   * They share `completed`, they must never both claim the same `contractId`, and the number a
+   * player reads off the scenarios panel is derived from whichever of them is on screen. Restoring
+   * the live week and dropping a parked one would hand back a campaign in which Garden Apartments
+   * was cleared according to one field and untouched according to the other — the *"a week whose
+   * banked count came from the save and whose contract came from the default"* failure this type's
+   * own docstring names, with a second week to disagree with instead of a default.
+   *
+   * A saved building is genuinely independent of the other nineteen. A parked week is not
+   * independent of the week beside it, so it goes in the half that is refused whole.
+   */
+  readonly parkedWeeks: readonly WeekState[];
   readonly settings: Settings;
   readonly freePlay: FreePlaySelection;
 }

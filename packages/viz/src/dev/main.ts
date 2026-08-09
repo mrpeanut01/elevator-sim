@@ -127,6 +127,13 @@ import {
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
 import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
+import {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  NO_SHEET_YET,
+  drawReportCard,
+  reportCardOf,
+} from '../render/reportCard.js';
 import { AWT_ID, WT95_ID } from '../render/runSummary.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import { parityRefusal } from '../mode/parity.js';
@@ -140,7 +147,7 @@ import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
-import { coachWeekLines } from '../shift/weekLabel.js';
+import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
@@ -193,8 +200,9 @@ import {
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
-  weekForSession,
+  weeksForSession,
   withBuilding,
+  type PatternSelection,
   type ViewerState,
 } from './state.js';
 import {
@@ -656,8 +664,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
    *
    * It is **not** the same question as *"is the menu hidden right now?"*. Re-opening the menu
    * mid-week must not un-choose the mode the player is in; this latches once and never goes back.
+   *
+   * ## The two questions this used to be, and why they had to come apart — GitHub issue #117
+   *
+   * One flag answered both of the numbered points above, and {@link closeMenu} latched it on
+   * **every** way out of the overlay — including **Resume**, whose own docstring says *"Resume
+   * itself starts nothing"*. For autoplay that is right and is argued there. For filing it is not:
+   * Resume is a change of mind, and it un-gated `closeShift` over a recording nobody had asked for.
+   *
+   * What that cost is issue #117. Boot's own `runShift()` puts a full recording on screen before the
+   * player has touched anything (a saved session's building and dispatcher, on a saved seed). Press
+   * **Escape**, press play, and that run reached the end, filed as a real day, and **rotated into
+   * the `was` column of the Day report's *What moved since the run before this one***. The next
+   * genuine run was then differenced against a day the player never asked for: the reporter's
+   * `CARRIED was 39 → 621`, a real improvement rendered as a catastrophe.
+   *
+   * So the *filing* gate is this flag and it is latched only where a mode is entered; the *autoplay*
+   * gate is {@link menuHasBeenDismissed}, latched on every way out. The two were always two
+   * questions and the second one only looked like the first because both start `false`.
    */
   let playerHasChosen = false;
+  /**
+   * Whether the overlay has ever been dismissed — the **autoplay** half of what was one flag.
+   *
+   * True on every way out, **Resume included**, and that is the argument {@link closeMenu} used
+   * to make for latching everything: a player who pressed *Resume* to get back to the shift they
+   * were watching has left the menu on purpose, and a run they then re-roll should play, exactly as
+   * it would have had they never opened the menu.
+   *
+   * It gates nothing that counts. `adopt` reads it for `autoplay` and nothing else does — see
+   * {@link playerHasChosen} for the half that must not follow it, and for what happened when it did.
+   */
+  let menuHasBeenDismissed = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -1238,7 +1276,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       settings: restored.snapshot.settings,
       freePlay: restored.snapshot.freePlay,
     };
-    state = { ...state, week: restored.snapshot.week };
+    /*
+     * The pair, and in this order: `withBuilding` below reads `state.parkedWeeks` and would
+     * otherwise resume a week out of an empty list — which is the restored campaign losing every
+     * scenario except the one it opened on, at the first boot after issue #107 was fixed.
+     */
+    state = {
+      ...state,
+      week: restored.snapshot.week,
+      parkedWeeks: restored.snapshot.parkedWeeks,
+    };
     /*
      * The building follows the week rather than being persisted beside it. `persist/` excludes
      * `buildingId` deliberately: a contract names its building, so storing both would be two
@@ -1260,6 +1307,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let libraryNotice: string | undefined;
   let saveNotice: string | undefined;
 
+  /**
+   * What happened to the week the player just put down — GitHub issue #107, and `undefined` almost
+   * always.
+   *
+   * A third backward-looking line rather than a fourth kind of `restoreNotice`, because it is news
+   * about an action the player has just taken rather than about the save: it is written by one
+   * control, it is true for one moment, and `runShift` spends it on the next thing they do — the
+   * same lifetime `restoreNotice` and `libraryNotice` have and for the same reason.
+   */
+  let weekNotice: string | undefined;
+
   /** Write the session back. Cheap, total, and never throws — a refusing browser is not an error. */
   function saveSessionNow(): void {
     /*
@@ -1275,7 +1333,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const stored = loadSession(sessionStore);
     const written = saveSession(
       sessionStore,
-      { ...state, week: weekForSession(state, stored.ok ? stored.snapshot.week : undefined) },
+      // Both weeks or neither, from one instant — see `weeksForSession`. Holding the live week back
+      // while writing an in-memory parked list would store the campaign's week twice, once on each
+      // side of the pair, on two different days.
+      { ...state, ...weeksForSession(state, stored.ok ? stored.snapshot : undefined) },
       menuState,
     );
     /*
@@ -1390,7 +1451,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // than here for the reason that module exists at all.
         state = entered;
         menuState = navigate(menuState, 'main');
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
       }
@@ -1400,8 +1461,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * The way out that is not a mode being entered — issues #40, #33 and #68. `renderAll`
          * rather than `runShift`: leaving the menu is not asking for a different day, and re-running
          * here would throw away the shift the player pressed **Resume** to get back to.
+         *
+         * **And the one arm that must not latch the filing gate** — issue #117. It is the arm
+         * Escape presses, and behind the overlay on a cold load sits boot's own recording, which
+         * nobody asked for; letting this count as a choice let that run be filed and become the
+         * baseline the next real run was measured against. See `closeMenu`.
          */
-        closeMenu();
+        closeMenu('changed-their-mind');
         renderAll();
         return;
 
@@ -1412,7 +1478,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * the simulation, not the scenarios. The screen behind the menu is now selected explicitly.
          */
         state = { ...state, tab: 'scenarios' };
-        closeMenu();
+        closeMenu('entered-a-mode');
         renderAll();
         return;
 
@@ -1428,7 +1494,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         state = enterEndless(state);
         menuState = navigate(menuState, 'main');
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
 
@@ -1544,7 +1610,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * disagree the day the review gains a gate.
          */
         state = { ...state, tab: 'run' };
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
 
@@ -2000,27 +2066,44 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   /**
-   * Leave the menu — and the one place {@link playerHasChosen} is latched.
+   * Leave the menu — and the one place either latch is set.
    *
-   * Three of the four ways out are a mode being entered: **Start** (free play), **Open the doors**
-   * (the campaign) and **Keep going** (endless). **Resume** is the fourth, and it is a change of
-   * mind rather than a choice — GitHub issue #40, and the intent Escape presses.
+   * Four of the five ways out are a mode being entered: **Start** (free play), **Open the doors**
+   * (the campaign), **Keep going** (endless) and **Open the week on this fabric** (commissioning).
+   * **Resume** is the other, and it is a change of mind rather than a choice — GitHub issue #40, and
+   * the intent Escape presses.
    *
-   * It latches `playerHasChosen` all the same, and that is deliberate rather than an oversight in
-   * the new arm. The flag gates autoplay on the next `adopt`, and a player who pressed **Resume** to
-   * get back to the shift they were watching has left the menu on purpose; a run they then re-roll
-   * should play, exactly as it would have had they never opened the menu. Resume itself starts
-   * nothing — there is no `adopt` on this path — so the shift on screen stays where the playhead
-   * left it.
+   * ## Why the caller has to say which, and may not omit it — GitHub issue #117
+   *
+   * This latched `playerHasChosen` unconditionally, on every arm, and the docstring argued for it:
+   * a player who pressed **Resume** has left the menu on purpose and a run they re-roll should play.
+   * That argument is sound about **autoplay** and false about **filing**, and one flag could not
+   * hold both. Boot's own `runShift()` has a full recording on screen before the player has touched
+   * anything, and un-gating `closeShift` from Resume let that recording be filed as a real day and
+   * become the baseline the *next* run was differenced against — #117's phantom `was`.
+   *
+   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode.
+   * The two are still latched **here** rather than in the five arms, which is the property the
+   * previous docstring was protecting and it survives: a sixth way out of the overlay cannot forget
+   * to answer, because {@link exit} is a required parameter with two values and no default. That is
+   * `shift/report.ts`'s own rule about `ReportSubject` — *a required field cannot be forgotten by
+   * the next mode that arrives; a default would let the same bug ship again in silence.*
+   *
+   * Resume itself starts nothing — there is no `adopt` on that path — so the shift on screen stays
+   * where the playhead left it either way.
    *
    * **It redraws**, because the overlay's `hidden` is what `menuPanel.ts#coverShell` reads to decide
    * whether the shell behind is `inert`. Setting `hidden` without drawing would hide the menu and
    * leave the page underneath it out of the accessibility tree and unclickable — issue #68 with the
    * sign flipped, and the reason the covering is keyed on one value with one writer.
+   *
+   * @param exit whether this way out is a play mode being entered, or the player changing their
+   *   mind about having opened the menu at all.
    */
-  function closeMenu(): void {
+  function closeMenu(exit: 'entered-a-mode' | 'changed-their-mind'): void {
     menuRoot.hidden = true;
-    playerHasChosen = true;
+    menuHasBeenDismissed = true;
+    if (exit === 'entered-a-mode') playerHasChosen = true;
     drawMenu();
   }
 
@@ -2458,6 +2541,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     window.history.replaceState(null, '', `${window.location.pathname}${search}`);
   }
 
+  /**
+   * Where a shared link points, without its query — the origin and path this page is served from.
+   *
+   * Read from `window.location` rather than configured, because the answer differs between the dev
+   * server, the deployed static site and a file somebody opened locally, and a configured base
+   * would be the one of those three that is wrong for the other two.
+   */
+  function shareBase(): string {
+    return `${window.location.origin}${window.location.pathname}`;
+  }
+
   function wireNavigation(): void {
     for (const tab of Object.keys(ui.tabs) as TabName[]) {
       ui.tabs[tab].addEventListener('click', () => {
@@ -2553,14 +2647,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (!isViewMode(linked) && isViewMode(remembered)) state = { ...state, mode: remembered };
 
     /*
-     * One copy control, not two. `#copy-provenance` on the transport called this same function
-     * with the same arguments and produced the same line as the footer's `#copy-run` — and
-     * `#copy-run` is the handoff's own S4 requirement, so the duplicate was the one to go
-     * (`docs/12` § 4.7). RV-T7 asks for *one* control that copies the run's provenance, and it now
-     * has exactly one.
+     * **Two controls, and they copy two different artefacts** — GitHub issue #118 § 2.
+     *
+     * It was one, and the history matters: `#copy-provenance` on the transport called the same
+     * function with the same arguments and produced the *same line* as `#copy-run`, so the
+     * duplicate went (`docs/12` § 4.7) and RV-T7's *one control that copies the run's provenance*
+     * was satisfied. That is still true — what changed is which artefact is the provenance.
+     *
+     * `copy run` now copies a **URL that opens the run**, because that is the thing a player can
+     * send to somebody who does not have the repository checked out, and because this product's
+     * determinism is what makes a link worth sending. `copy CLI` keeps the flags, for the reader
+     * who wants the run outside a browser in the tool every published figure was measured with.
+     * Two artefacts, two controls, and neither pretending to be the other.
      */
     ui.footer.copyRun.addEventListener('click', () => {
-      void copyProvenance('copy run', ui.footer.copyRun);
+      void copyArtefact(
+        'copy run',
+        ui.footer.copyRun,
+        shareLinkOf(state, resources, deepLinkDefaults, shareBase()),
+        'link',
+      );
+    });
+    ui.footer.copyCli.addEventListener('click', () => {
+      void copyArtefact('copy CLI', ui.footer.copyCli, provenanceLineOf(state, resources), 'CLI line');
     });
   }
 
@@ -2614,27 +2723,36 @@ function boot(ui: Elements, resources: BrowserResources): void {
     );
   }
 
-  async function copyProvenance(label: string, button: HTMLButtonElement): Promise<void> {
-    const provenance = provenanceLineOf(state, resources);
-    if (!provenance.ok) {
-      /*
-       * TP-13: the control refuses rather than copying a line the CLI would honour and turn into
-       * a *different* run. A refused copy names every reason, because each one is a fact about
-       * this run the reader would otherwise discover as an unexplained mismatch.
-       */
-      setText(ui.transport.status, `no CLI line reproduces this run — ${provenance.reasons.join('; ')}`);
-      setText(button, 'no CLI line');
+  /**
+   * Copy one provenance artefact, or say why there is none — TP-13, widened to two artefacts.
+   *
+   * `noun` is what the refusal calls the thing that does not exist (*no link*, *no CLI line*),
+   * because a button that reads *no artefact* tells a reader nothing about which of the two they
+   * pressed. The refusal itself is the same shape as before and for the same reason: the control
+   * refuses rather than copying something that would rebuild a **different** run, and it names
+   * every reason, because each is a fact about this run the reader would otherwise meet as an
+   * unexplained mismatch.
+   */
+  async function copyArtefact(
+    label: string,
+    button: HTMLButtonElement,
+    artefact: Provenance,
+    noun: string,
+  ): Promise<void> {
+    if (!artefact.ok) {
+      setText(ui.transport.status, `no ${noun} reproduces this run — ${artefact.reasons.join('; ')}`);
+      setText(button, `no ${noun}`);
       window.setTimeout(() => {
         setText(button, label);
       }, 1400);
       return;
     }
     try {
-      await navigator.clipboard.writeText(provenance.line);
+      await navigator.clipboard.writeText(artefact.line);
       setText(button, 'copied');
     } catch {
       // A clipboard a browser refuses is not an error the reader caused. Show the line instead.
-      setText(ui.transport.status, provenance.line);
+      setText(ui.transport.status, artefact.line);
     }
     window.setTimeout(() => {
       setText(button, label);
@@ -2706,9 +2824,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function wireCoach(): void {
     ui.coach.building.addEventListener('change', () => {
+      /*
+       * The week being put down, read **before** the switch — GitHub issue #107.
+       *
+       * `withBuilding` parks it rather than destroying it, and the ribbon still shows the new
+       * week's day 1, which from the outside looks exactly like the defect. `weekKeptLine` is the
+       * sentence that tells the difference; it is `undefined` for a week with nothing in it, which
+       * is every building change made while a player is still choosing one.
+       */
+      const leaving = state.week;
       state = withBuilding(state, resources, ui.coach.building.value);
       renderAll();
       runShift();
+      /*
+       * Set **after** the run and drawn on its own, because `runShift` is what spends the two
+       * notices already on screen — assigning this one before it would hand it to the line that
+       * clears it. Only the ribbon is redrawn: nothing else on the page depends on this string.
+       */
+      weekNotice = weekKeptLine(leaving, state.week);
+      if (weekNotice !== undefined) drawCoach(viewAt());
     });
     ui.coach.pattern.addEventListener('change', () => {
       context.update({ pattern: ui.coach.pattern.value });
@@ -2809,6 +2943,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (saveNotice !== undefined) return saveNotice;
     if (restoreNotice !== undefined) return restoreNotice;
     if (libraryNotice !== undefined) return libraryNotice;
+    /*
+     * Below the two that are about the save and above the run's own refusals — issue #107. It
+     * outranks `withheld` because a player who has just moved between assignments is asking *what
+     * happened to my week*, and it sits under the other two because those describe a condition that
+     * is still true while this one describes a keystroke.
+     */
+    if (weekNotice !== undefined) return weekNotice;
     if (state.withheld.length > 0) return state.withheld.join(' ');
     if (view.recording === undefined) {
       return 'Press play and watch a call appear, a car answer it, and the wait end. That is the whole simulator in one move.';
@@ -2838,12 +2979,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * step with the boot order.
      */
     /*
-     * The two backward-looking notices are spent once the player does something; `saveNotice` is
+     * The three backward-looking notices are spent once the player does something; `saveNotice` is
      * not, because it describes a condition that is still true and will still be true next time.
+     *
+     * `weekNotice` is written by the building select *after* this line has run in the same handler,
+     * which is what makes it survive its own change and no other — see `wireCoach`.
      */
     if (urlWritable) {
       restoreNotice = undefined;
       libraryNotice = undefined;
+      weekNotice = undefined;
     }
     try {
       const plan = shiftRunConfigOf(resources, state);
@@ -2940,15 +3085,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
        * asked for the same thing by a different route and was being ignored.
        *
-       * **And nothing plays until a mode has been chosen** — § D232, issue #39. Boot's own
+       * **And nothing plays until the overlay has been dismissed** — § D232, issue #39. Boot's own
        * `runShift()` lands under the menu overlay, so a page nobody had touched read
        * `running · 0 arrived, 0 carried` on load and had carried 376 people by the time the reader
        * finished the menu. The recording is still made and still drawn — the stage shows the
        * building at 06:00, which is the start state a cold load should sit at — it simply does not
        * start moving on its own behind a screen the player has not left yet.
+       *
+       * `menuHasBeenDismissed` rather than `playerHasChosen` — issue #117 split the two, and this
+       * is the half that keeps **Resume** behaving exactly as § D232 wrote it: a player who pressed
+       * Resume has left the menu on purpose, and a run they re-roll should play. What Resume no
+       * longer does is let a run **count**; that is `closeShift`'s gate and the reason for the
+       * split.
        */
       autoplay:
-        playerHasChosen &&
+        menuHasBeenDismissed &&
         shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
@@ -3021,6 +3172,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * cold load with the overlay still up reached `tick`, found `playback.state === 'ended'`, and
      * closed a day: `1 clean days running` and `1/3 banked this scenario` on a page nobody had
      * touched. The run itself is real and stays on screen; what it may not do is count.
+     *
+     * **And `playerHasChosen` is the narrow flag, not `menuHasBeenDismissed`** — GitHub issue #117.
+     * Pressing *Resume* dismisses the overlay without entering a mode, and while the two questions
+     * shared one flag that press un-gated this line over boot's own recording: it filed as a real
+     * day and became the baseline the Day report differenced the player's *next* run against. A
+     * banked day is not the only thing a premature file costs.
      */
     if (!playerHasChosen) return;
     filedRunId = recording.runId;
@@ -3572,10 +3729,60 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
   }
 
+  /**
+   * Write the **Day report card**, not the stage — GitHub issue #118 § 1.
+   *
+   * This was `ui.stage.canvas.toBlob(...)`: the live canvas at the playhead, which after a finished
+   * day is a picture of an empty building with a clipped metrics panel on it. `render/reportCard.ts`
+   * carries the argument for what replaces it and why a stage screenshot is a false claim rather
+   * than a plain one.
+   *
+   * **It files the day first, on the same guard the Day report tab files it on** — § D223's, through
+   * `closeShift` itself rather than a second copy of the decision. A reader who has watched a run to
+   * the end and pressed this has done exactly what pressing *Day report* does, and refusing them a
+   * card over a sheet that has not been *looked at* would be a refusal about navigation dressed as
+   * one about the run. `closeShift` returns early for a run it has already filed, so pressing this
+   * twice banks nothing twice.
+   *
+   * **And it refuses rather than falling back.** With no sheet — the playhead short of `endedAt`,
+   * so § D232's guard holds and nothing may be filed — there is nothing to draw, and the old
+   * behaviour (export the stage) is precisely the artefact the issue is about, so it is not the
+   * graceful degradation it looks like. The refusal names what to do instead, on the same status
+   * line every other transport refusal lands on.
+   */
   function exportPng(): void {
-    ui.stage.canvas.toBlob((blob) => {
+    if (state.report === undefined && playheadHasRunOut()) closeShift();
+    const report = state.report;
+    if (report === undefined) {
+      setText(ui.transport.status, NO_SHEET_YET);
+      return;
+    }
+    const surface = document.createElement('canvas');
+    surface.width = CARD_WIDTH;
+    surface.height = CARD_HEIGHT;
+    const ctx = surface.getContext('2d');
+    if (ctx === null) {
+      setText(ui.transport.status, 'this browser gave no 2d context, so there is no card to write');
+      return;
+    }
+    // The same cast `drawScene`'s call site makes, for the same reason: `Canvas2DLike` is the
+    // subset the renderers use, and `fillStyle` there is a `string` rather than the DOM's
+    // `string | CanvasGradient | CanvasPattern`.
+    drawReportCard(
+      ctx as unknown as Canvas2DLike,
+      reportCardOf({
+        report,
+        buildingName: buildingNameOf(resources, state.savedBuildings, state.buildingId),
+        seed: state.seed.toString(),
+        // The same artefact `copy run` puts on the clipboard, so the picture and the link a reader
+        // is handed name one run in one form. Its refusal arm is drawn, not dropped.
+        recipe: shareLinkOf(state, resources, deepLinkDefaults, shareBase()),
+      }),
+      stageTheme,
+    );
+    surface.toBlob((blob) => {
       if (blob === null) return;
-      downloadBlob(blob, `${state.buildingId}-${state.seed.toString()}.png`);
+      downloadBlob(blob, `${state.buildingId}-${state.seed.toString()}-report.png`);
     });
   }
 
@@ -3871,6 +4078,15 @@ export function shaftsForBank<T extends { readonly bankId: string }>(
  * Copy run — TP-13
  * ========================================================================== */
 
+/**
+ * The binary `copy CLI` writes a line for — `packages/cli/package.json`'s `bin` key.
+ *
+ * Spelled here rather than imported because `viz` does not depend on `cli` and must not start:
+ * `main.test.ts` reads that manifest and asserts the two agree, which is the check an import would
+ * have given for free and a hard-coded string would otherwise have given never.
+ */
+const CLI_COMMAND = 'elevator-sim';
+
 /** A CLI line that reproduces the run, or the reasons no such line exists. */
 export type Provenance =
   | { readonly ok: true; readonly line: string }
@@ -3898,6 +4114,21 @@ export type Provenance =
  *   reasons is the honest form — the whole point of the control is that the reader could not
  *   otherwise reproduce the run, so a line that reproduces a *different* one is worse than none.
  *
+ * ## The third change, and it is Free Play's whole selection — GitHub issue #118
+ *
+ * The line still omitted **`freePlay`** and **`windowStartS`**, which is to say it omitted the two
+ * axes the menu asks a Free Play player for and the pattern select cannot express. Both reach the
+ * kernel — `shiftRunConfigOf` applies the template and the rate *over* the pattern's, and the
+ * window selects part of the authored schedule — and both are `between-games` controls the
+ * leaderboard hashes into a board's identity. A player who set the rate to 6 % and copied the line
+ * got a command that runs the building's own rate instead, silently: exactly the defect the two
+ * bullets above closed for `--traffic`, one field over, and the one the issue reports.
+ *
+ * `--part` is a **clock range**, because that is the only form the CLI's flag takes, so it is
+ * derived from the template record's own `startOfDayMin`. A template that declares no hour
+ * (`constant-iso`) has no clock for a part to name, so a windowed run on one is **refused** rather
+ * than given a line that would run the whole period.
+ *
  * Pure, so the claim *this line is this run* is testable without a clipboard.
  */
 export function provenanceLineOf(state: ViewerState, resources: BrowserResources): Provenance {
@@ -3913,8 +4144,18 @@ export function provenanceLineOf(state: ViewerState, resources: BrowserResources
    *
    * What stays here is the half that is genuinely about the CLI: which flags spell this run.
    */
-  const reasons = runIdentityIssues(state, resources, 'ranked').map((issue) => issue.message);
-  const flags: string[] = [`--building ${state.buildingId}`, `--dispatcher ${state.dispatcherId}`];
+  const reasons = [...runIdentityIssues(state, resources, 'ranked').map((issue) => issue.message)];
+  const flags: string[] = [
+    /*
+     * The command, not just its flags — issue #118 § 2. The line was `--building … --dispatcher …`
+     * with nothing to run, so the reader had to know the binary's name and the subcommand before
+     * the clipboard was worth anything. `elevator-sim run` is exactly what `cli/commands/run.ts`
+     * echoes back on every run it prints, so the two artefacts read the same.
+     */
+    `${CLI_COMMAND} run`,
+    `--building ${state.buildingId}`,
+    `--dispatcher ${state.dispatcherId}`,
+  ];
 
   let template: string | undefined;
   if (state.pattern !== 'building') {
@@ -3925,12 +4166,84 @@ export function provenanceLineOf(state: ViewerState, resources: BrowserResources
       if (demand.demandTemplate !== 'rise-and-fall') template = demand.demandTemplate;
     }
   }
+  /*
+   * Free Play's template wins over the pattern's, because `shiftRunConfigOf` applies it last and
+   * for its stated reason: it is the reader's most recent and most explicit statement about what to
+   * run. `rise-and-fall` is still omitted — it is the CLI's own default, and a flag that restates a
+   * default is noise in a line somebody has to read.
+   */
+  if (state.freePlay !== undefined && state.freePlay.demandTemplateId !== 'rise-and-fall') {
+    template = state.freePlay.demandTemplateId;
+  }
+
+  const part = partFlagFor(state, resources, template);
+  if (part.kind === 'refused') reasons.push(part.reason);
 
   if (reasons.length > 0) return { ok: false, reasons };
-  // The CLI's own echo order — `planRun`'s `commandLine` puts `--template` after `--duration`.
-  flags.push(`--seed ${state.seed.toString()}`, `--duration ${String(state.shiftLengthS)}`);
+  // The CLI's own echo order — `planRun`'s `commandLine` puts `--template`, then `--rate`, then
+  // `--part`, after `--duration`.
+  flags.push(`--seed ${state.seed.toString()}`);
+  /*
+   * `--duration` and `--part` are **mutually exclusive**, and the CLI is what says so rather than a
+   * preference here: a template with authored phases refuses `templateOverrides.durationS` outright
+   * (§ D285 — *"there is no geometry to refit and a new duration would rescale a whole day's
+   * schedule"*), so a line carrying both is a line the CLI answers with an error. The part's clock
+   * range already carries the length, so nothing is lost by leaving it out. Verified by running it:
+   * `--template office-day --part 08:30-09:00 --duration 1800` fails, and the same line without
+   * `--duration` runs.
+   */
+  if (part.kind !== 'named') flags.push(`--duration ${String(state.shiftLengthS)}`);
   if (template !== undefined) flags.push(`--template ${template}`);
+  const rate = state.freePlay?.arrivalRatePctPop5min;
+  if (rate !== undefined && rate !== null) flags.push(`--rate ${String(rate)}`);
+  if (part.kind === 'named') flags.push(`--part ${part.range}`);
   return { ok: true, line: flags.join(' ') };
+}
+
+/** `--part 08:30-09:00`, nothing to say, or the reason no clock range names this window. */
+type PartFlag =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'named'; readonly range: string }
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/**
+ * The clock range `--part` takes, derived from the template record's own hour.
+ *
+ * The CLI's `dayWindowOf` computes `windowStartS = (fromMin − startOfDayMin) × 60`; this is that
+ * arithmetic run backwards, which is what makes the flag's value a fact about the same record
+ * rather than a second opinion about where the day starts. A template with no `startOfDayMin` has
+ * no clock at all (`constant-iso`, § D244), so a run windowed onto one gets a refusal rather than a
+ * line the CLI would honour by running the whole period — the module's own rule, applied to the
+ * axis that had no flag.
+ */
+function partFlagFor(
+  state: ViewerState,
+  resources: BrowserResources,
+  templateFlag: string | undefined,
+): PartFlag {
+  if (state.windowStartS === null) return { kind: 'none' };
+  const templateId =
+    templateFlag ??
+    shiftDemandTemplateId(
+      resources,
+      state,
+      buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+    );
+  const record = resources.trafficProfiles.demandTemplates.find((entry) => entry.id === templateId);
+  const startOfDayMin = record?.startOfDayMin;
+  if (startOfDayMin === undefined) {
+    return {
+      kind: 'refused',
+      reason:
+        `this run covers part of “${templateId}”, and that template declares no hour — ` +
+        '--part takes a clock range, so no CLI line names this window',
+    };
+  }
+  const fromMin = startOfDayMin + state.windowStartS / 60;
+  const toMin = fromMin + state.shiftLengthS / 60;
+  const clock = (minutes: number): string =>
+    `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(Math.round(minutes % 60)).padStart(2, '0')}`;
+  return { kind: 'named', range: `${clock(fromMin)}-${clock(toMin)}` };
 }
 
 /* ========================================================================== *
@@ -3982,7 +4295,23 @@ function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerS
   return deepLinkStateOf(state, resources, new URLSearchParams(window.location.search));
 }
 
-/** The reader's decisions: which of the seven params are honoured, and what refuses each. */
+/**
+ * The reader's decisions: which of the eleven params are honoured, and what refuses each.
+ *
+ * ## It was seven, and the four that were missing are the run — GitHub issue #118
+ *
+ * `?building&dispatcher&seed&duration` names four of the axes `shiftRunConfigOf` reads and left
+ * `pattern`, `windowStartS` and both halves of `freePlay` on the floor. Every one of those is a
+ * `between-games` control in `scope/surface.ts`, which is to say it is *part of the run's identity*
+ * — the leaderboard hashes them into the board a score belongs to — so a link that dropped them was
+ * a different run wearing the same address, which is the exact failure the *"the seed is always
+ * written"* clause below exists to prevent, three axes over.
+ *
+ * The param names are the CLI's — `traffic`, `template`, `rate` — so the two artefacts `copy run`
+ * can produce say the same thing in the same words. `windowStart` is seconds into the template's
+ * period and is deliberately *not* called `window`: the CLI's `--window` names the reporting window
+ * and `--part` takes a clock range, and a third meaning for either would be worse than a new word.
+ */
 export function deepLinkStateOf(
   state: ViewerState,
   resources: BrowserResources,
@@ -4017,6 +4346,36 @@ export function deepLinkStateOf(
   const mode = params.get('mode');
   if (isViewMode(mode)) patch.mode = mode;
   /*
+   * The four run axes, each refused the way the four above are refused: a value `data/` does not
+   * ship is dropped and the page keeps its own, never coerced into the nearest thing that parses.
+   *
+   * `traffic` names a **shipped** profile only. A saved pattern is one this browser has and the
+   * recipient does not, which is why `runIdentityIssues` refuses to put one in a shareable
+   * artefact at all — so there is nothing here for a link to honour.
+   */
+  const traffic = params.get('traffic');
+  if (traffic !== null && resources.trafficProfiles.profiles.some((entry) => entry.id === traffic)) {
+    patch.pattern = traffic;
+  }
+  const windowStart = params.get('windowStart');
+  if (windowStart !== null && /^\d+$/.test(windowStart)) patch.windowStartS = Number(windowStart);
+  /*
+   * `template` and `rate` are one field — `ViewerState.freePlay` — so they are read as one. A link
+   * carrying either puts the page in the state Free Play's Start puts it in, because that is the
+   * only state in which `shiftRunConfigOf` reads them: writing `rate` alone onto a page whose
+   * `freePlay` is `undefined` would need a template to go with it, and the template a link did not
+   * name is not one this page may invent.
+   */
+  const template = params.get('template');
+  const rate = params.get('rate');
+  const templateShips =
+    template !== null &&
+    resources.trafficProfiles.demandTemplates.some((entry) => entry.id === template);
+  if (templateShips) {
+    const parsedRate = rate !== null && /^\d+(\.\d+)?$/.test(rate) ? Number(rate) : null;
+    patch.freePlay = { demandTemplateId: template, arrivalRatePctPop5min: parsedRate };
+  }
+  /*
    * The **state's** opening length when the link names none, not the module constant — § D234.
    *
    * These two were `DEFAULT_SHIFT_LENGTH_S` and `deepLinkDefaultsOf(...).shiftLengthS`, two
@@ -4046,10 +4405,14 @@ export interface DeepLinkDefaults {
   readonly tab: TabName;
   readonly railSegment: RailSegment;
   readonly mode: ViewMode;
+  /** `'building'` on a fresh page — the building's own demand, and what every figure was measured under. */
+  readonly pattern: PatternSelection;
+  /** `null` on a fresh page: the whole of whichever period the template declares. § D285. */
+  readonly windowStartS: number | null;
 }
 
 export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefaults {
-  // The seed argument is irrelevant to the six fields read off; `0n` is not a default seed.
+  // The seed argument is irrelevant to the eight fields read off; `0n` is not a default seed.
   const opening = initialState(resources, 0n);
   return {
     buildingId: opening.buildingId,
@@ -4058,11 +4421,13 @@ export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefault
     tab: opening.tab,
     railSegment: opening.railSegment,
     mode: opening.mode,
+    pattern: opening.pattern,
+    windowStartS: opening.windowStartS,
   };
 }
 
 /**
- * The other half of {@link deepLinkStateOf}: the same seven params, written — `SH-09`.
+ * The other half of {@link deepLinkStateOf}: the same eleven params, written — `SH-09`.
  *
  * Two decisions, both deliberate:
  *
@@ -4073,6 +4438,11 @@ export function deepLinkDefaultsOf(resources: BrowserResources): DeepLinkDefault
  *   — and it is the one param without which the pasted link is a different run wearing the same
  *   address. Invariant 5 puts the seed on every persisted run record; the address bar is a place
  *   a run gets persisted to.
+ *
+ * `freePlay` has **no default to compare against**: `initialState` leaves it `undefined`, and
+ * `undefined` there is not *"the same as the opening page"* but *"the campaign owns the run"*. So
+ * the two params are written whenever the field is present, and a rate of `null` — the building's
+ * own profile, a selection rather than a missing one — is written as the word rather than omitted.
  */
 export function deepLinkSearchOf(state: ViewerState, defaults: DeepLinkDefaults): string {
   const params = new URLSearchParams();
@@ -4080,10 +4450,55 @@ export function deepLinkSearchOf(state: ViewerState, defaults: DeepLinkDefaults)
   if (state.dispatcherId !== defaults.dispatcherId) params.set('dispatcher', state.dispatcherId);
   params.set('seed', state.seed.toString());
   if (state.shiftLengthS !== defaults.shiftLengthS) params.set('duration', String(state.shiftLengthS));
+  if (state.pattern !== defaults.pattern) params.set('traffic', state.pattern);
+  if (state.windowStartS !== defaults.windowStartS && state.windowStartS !== null) {
+    params.set('windowStart', String(state.windowStartS));
+  }
+  if (state.freePlay !== undefined) {
+    params.set('template', state.freePlay.demandTemplateId);
+    if (state.freePlay.arrivalRatePctPop5min !== null) {
+      params.set('rate', String(state.freePlay.arrivalRatePctPop5min));
+    }
+  }
   if (state.tab !== defaults.tab) params.set('tab', state.tab);
   if (state.railSegment !== defaults.railSegment) params.set('rail', state.railSegment);
   if (state.mode !== defaults.mode) params.set('mode', state.mode);
   return `?${params.toString()}`;
+}
+
+/**
+ * The **link** `copy run` copies — GitHub issue #118 § 2, and the artefact this product is for.
+ *
+ * The control copied `--building … --dispatcher … --seed … --duration …`: flags with no command
+ * name, for somebody who has the repository checked out. The issue's own argument is the right one
+ * — *"this product's determinism is its superpower: a seed **is** a shareable object"* — and the
+ * page already accepts every axis of a run in its own address. So the primary artefact is a URL that
+ * **opens the run**, and the CLI line stays behind a second control for the people who want it.
+ *
+ * ## It refuses through the same predicate the CLI line refuses through
+ *
+ * `runIdentityIssues`, not a second opinion — `docs/16` S5's whole argument, and it applies here
+ * more sharply than anywhere: a link that quietly dropped a saved building would send somebody a
+ * page that runs a different building under this run's name, and neither of them would know. What a
+ * URL may carry is exactly what {@link deepLinkSearchOf} writes and {@link deepLinkStateOf} honours,
+ * and `main.test.ts` holds the round trip.
+ *
+ * ## Where it is *more* faithful than the CLI line, and why that is not an argument for dropping one
+ *
+ * A run windowed onto a template that declares no hour has no `--part` to name it, so
+ * {@link provenanceLineOf} refuses; `windowStart` is seconds and carries it fine. The line still
+ * earns its place — it is the artefact that reproduces a run **outside a browser**, in the tool the
+ * published figures were measured with.
+ */
+export function shareLinkOf(
+  state: ViewerState,
+  resources: BrowserResources,
+  defaults: DeepLinkDefaults,
+  base: string,
+): Provenance {
+  const reasons = runIdentityIssues(state, resources, 'ranked').map((issue) => issue.message);
+  if (reasons.length > 0) return { ok: false, reasons };
+  return { ok: true, line: `${base}${deepLinkSearchOf(state, defaults)}` };
 }
 
 /* -------------------------------------------------------------------------- *

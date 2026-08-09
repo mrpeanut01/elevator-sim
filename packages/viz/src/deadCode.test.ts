@@ -130,7 +130,8 @@ const DEAD_CANDIDATES: Readonly<Record<string, string>> = Object.freeze({
    * state.ts's private preferredDispatcher() re-derived ['collective', 'eta'] from its own
    * literal, so § D134's decision was enforced by a duplicate and the const decided nothing.
    * Dispositioned by wiring: state.ts now resolves the opening dispatcher through the constant
-   * and preferredDispatcherId, defaults.ts's docstring names the real caller, and the
+   * and preferredId (preferredDispatcherId when that finding was written), defaults.ts's
+   * docstring names the real caller, and the
    * duplicate literal is gone.
    */
   /*

@@ -1,19 +1,35 @@
 /**
  * The menu state machine, and the catalogue's derivation from real `data/`.
  *
- * Two tiers, deliberately. The reducer is exercised against a three-line fixture, because it is a
+ * Three tiers, deliberately. The reducer is exercised against a three-line fixture, because it is a
  * pure function and a `data/` load would only make it slower. The **catalogue** is exercised against
  * the real configuration in both directions, because its whole purpose is to track `data/` and a
- * fixture would prove only that it tracks a fixture.
+ * fixture would prove only that it tracks a fixture. And the **opening selection** is exercised by
+ * simulating it, because a default is a claim about a run and issue #99 is the record of what
+ * happens when nobody checks it — see the last block in this file.
  */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { loadConfig } from '@elevator-sim/core';
+import {
+  loadConfig,
+  parseBuilding,
+  parseDispatcherProfiles,
+  parseElevatorSpecs,
+  parseTrafficProfiles,
+  resolveBuilding,
+} from '@elevator-sim/core';
 
+import type { BrowserResources } from '../dev/data.js';
+import { initialState, shiftRunConfigOf } from '../dev/state.js';
 import { DATA_DIR } from '../fixtures.test-helper.js';
+import { recordRun } from '../record/recordRun.js';
 
 import { buildingDetail, catalogueOf, type CatalogueSource } from './catalogue.js';
+import { enterFreePlay } from './enterFreePlay.js';
 import {
   FREE_PLAY_RATES,
   back,
@@ -31,6 +47,7 @@ import {
   MENU_SCREENS,
   PLAYBACK_SPEEDS,
   ROOT_SCREEN,
+  type FreePlaySelection,
   type MenuCatalogue,
 } from './types.js';
 
@@ -445,5 +462,119 @@ describe('the catalogue is derived from data/, in both directions', () => {
     // before the leaderboard tells them afterwards.
     expect(byId.get('rise-and-fall')).toBe('recommended');
     expect(byId.get('constant-iso')).toBe('cross-checking');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The opening selection, simulated — GitHub issue #99
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Two buildings and the real profile file — the run tier, bounded the way § D216 § 5 bounds the
+ * scope walk's.
+ *
+ * `garden-apartments` because `initialState` opens on `CONTRACTS[0]`'s building and a resources
+ * bundle without it would be measuring a state the shell never has; `chancery-house` because it is
+ * the building the menu opens on and therefore the run under test. Both are quick: the pair of
+ * 1 800 s runs below is under a second.
+ */
+const RUN_RESOURCES: BrowserResources = (() => {
+  const dataUrl = new URL('../../../../data/', import.meta.url);
+  const read = (path: string): unknown =>
+    JSON.parse(readFileSync(fileURLToPath(new URL(path, dataUrl)), 'utf8')) as unknown;
+  const elevatorSpecs = parseElevatorSpecs(read('elevator-specs.json'));
+  const entries = ['chancery-house', 'garden-apartments'].map((id) => {
+    const config = parseBuilding(read(`buildings/${id}.json`));
+    return { file: `${id}.json`, config, resolved: resolveBuilding(config, elevatorSpecs) };
+  });
+  const trafficProfiles = parseTrafficProfiles(read('traffic-profiles.json'));
+  return {
+    elevatorSpecs,
+    trafficProfiles,
+    dispatcherProfiles: parseDispatcherProfiles(read('dispatcher-profiles.json')),
+    buildings: entries.map((entry) => entry.resolved),
+    entries,
+    trafficProfileIds: new Set(trafficProfiles.profiles.map((profile) => profile.id)),
+    warnings: [],
+  };
+})();
+
+const RUN_CATALOGUE = catalogueOf(RUN_RESOURCES);
+
+/**
+ * The legs a Free Play selection produces, through the path Start actually takes.
+ *
+ * Legs, never a window statistic — § D177. `enterFreePlay` rather than a hand-built `ViewerState`,
+ * because the claim is about what pressing **Start** on the opening screen runs, and a helper that
+ * skipped it would be measuring the helper.
+ */
+function legsOfSelection(selection: FreePlaySelection): string {
+  const entered = enterFreePlay(
+    initialState(RUN_RESOURCES, BigInt(selection.seed)),
+    RUN_RESOURCES,
+    selection,
+    RUN_CATALOGUE,
+  );
+  if (entered === undefined) throw new Error('the selection would not start');
+  const plan = shiftRunConfigOf(RUN_RESOURCES, entered);
+  return JSON.stringify(
+    recordRun(plan.config, {
+      recordDecisions: false,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+    }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+  );
+}
+
+describe('the opening pair is chosen rather than indexed — issue #99', () => {
+  it('opens on the preferred pair, not on the catalogue’s first entries', async () => {
+    const config = await loadConfig(DATA_DIR);
+    const catalogue = catalogueOf(config as unknown as CatalogueSource);
+    const opening = initialMenuState(catalogue).freePlay;
+
+    expect(opening.buildingId).toBe('chancery-house');
+    expect(opening.dispatcherProfileId).toBe('collective');
+
+    /*
+     * The control that stops this being a change detector. `catalogue.dispatchers[0]` is what the
+     * opening state used to read, and it is still `nearest-car` — so *"not the first entry"* is a
+     * choice here rather than an absence, and the day `data/` reorders its profiles this row says
+     * what changed.
+     */
+    expect(catalogue.dispatchers[0]?.id).toBe('nearest-car');
+    expect(opening.dispatcherProfileId).not.toBe(catalogue.dispatchers[0]?.id);
+    /*
+     * The building axis is deliberately *not* asserted as "not index 0": it resolves to what file
+     * order already produced, and the guard against that being an accident is
+     * `dev/defaults.test.ts`'s prepended-id row. What is asserted here is that both come out of one
+     * answer, which is the disagreement issue #99 is really about — the Run viewer has resolved its
+     * own opening dispatcher through `PREFERRED_VIEWER_DISPATCHERS` since § D134, and the menu did
+     * not.
+     */
+    expect(opening.dispatcherProfileId).toBe(initialState(RUN_RESOURCES, 0n).dispatcherId);
+  });
+
+  it('and the pair reaches the run — the legs differ from the pair it replaced', () => {
+    /*
+     * The standing requirement, applied to a default rather than to a slider: the value has to
+     * *reach a run*, and a default nothing consults is the dead seam this repository has shipped
+     * eleven times. Everything but the dispatcher is held equal — same building, same seed, same
+     * template, same part, same rate — so the dispatcher is the only thing that moved.
+     *
+     * Neither arm may be empty: a fingerprint of zero legs equals any other fingerprint of zero
+     * legs, so an instrument that can go silent passes exactly when the default dies. Chancery
+     * House at these settings carries 360 journeys on both sides.
+     */
+    const opening = initialMenuState(RUN_CATALOGUE).freePlay;
+    const fileOrder: FreePlaySelection = {
+      ...opening,
+      dispatcherProfileId: RUN_CATALOGUE.dispatchers[0]?.id ?? '',
+    };
+    expect(fileOrder.dispatcherProfileId).toBe('nearest-car');
+
+    const chosen = legsOfSelection(opening);
+    const inherited = legsOfSelection(fileOrder);
+    expect(chosen).not.toBe('[]');
+    expect(inherited).not.toBe('[]');
+    expect(chosen).not.toBe(inherited);
   });
 });

@@ -60,7 +60,7 @@ import type { BrowserResources } from './data.js';
 import {
   PREFERRED_BATCH_BASELINE,
   PREFERRED_BATCH_CANDIDATE,
-  preferredDispatcherId,
+  preferredId,
 } from './defaults.js';
 
 export interface BatchPanelElements {
@@ -144,7 +144,7 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
   applyPreference(ui.candidate, PREFERRED_BATCH_CANDIDATE);
 
   function applyPreference(select: HTMLSelectElement, preferred: readonly string[]): void {
-    const found = preferredDispatcherId(preferred, resources.dispatcherProfiles.profiles);
+    const found = preferredId(preferred, resources.dispatcherProfiles.profiles);
     if (found !== undefined) select.value = found;
   }
 

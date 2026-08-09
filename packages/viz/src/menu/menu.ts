@@ -14,6 +14,12 @@
  * the client and the server disagreeing about what a selection meant.
  */
 
+import {
+  PREFERRED_OPENING_BUILDINGS,
+  PREFERRED_VIEWER_DISPATCHERS,
+  preferredId,
+} from '../dev/defaults.js';
+
 import { partIdOf } from './partsOfDay.js';
 import {
   DEFAULT_SETTINGS,
@@ -37,9 +43,28 @@ import {
 /**
  * The state a fresh player starts in, with Free Play pre-selected to something runnable.
  *
- * **Pre-selected from the catalogue's first entry rather than from a named default**, because a
- * named default is a sixth hard-coded list (§ D213) and would break the moment that building was
- * renamed. A catalogue with no buildings is a broken install, and {@link freePlayIssues} says so
+ * ## The opening pair is chosen, and it used to be an array index — GitHub issue #99
+ *
+ * This read `catalogue.buildings[0]` and `catalogue.dispatchers[0]`, and said so: *"pre-selected
+ * from the catalogue's first entry rather than from a named default, because a named default is a
+ * sixth hard-coded list (§ D213) and would break the moment that building was renamed"*. The
+ * objection is right and the conclusion was not — § D134 had already answered it, one door over,
+ * with a **preference list and a file-order fallback**: a rename drops to index 0 rather than
+ * breaking, and the choice is still a choice. `dev/defaults.ts` owns both lists and the reasons.
+ *
+ * What index 0 resolved to was **Chancery House and `nearest-car`** — and `nearest-car` is the
+ * profile § D134 moved the Run viewer *off*, so the two doors into the same engine disagreed and
+ * the one a player reaches from the main menu held the retired answer. Measured on that building at
+ * these settings, the same seed and the same 81 riders give AWT **146.72 s** with **87.7 %** of them
+ * over a minute under `nearest-car` and **10.34 s** with **0.0 %** under `collective`, and 2 of 6
+ * seeds under `nearest-car` suppress the mean outright — so a new player's first run was a screen
+ * that either quoted a two-and-a-half-minute average or refused to quote one at all. The building
+ * does not move; the dispatcher does, and both are now pinned rather than inherited.
+ *
+ * The issue reports the shipped default as *Midtown Office + collective*. It is not, and it never
+ * was on this tree — that is a **persisted** selection (`persist/session.ts`), not a default.
+ *
+ * A catalogue with no buildings is still a broken install, and {@link freePlayIssues} says so
  * rather than this function inventing an id that does not exist.
  *
  * *Runnable* is asserted against the real `data/` load in `menu.test.ts`, because it was not true:
@@ -54,8 +79,14 @@ export function initialMenuState(catalogue: MenuCatalogue, seed = '20260804'): M
     history: Object.freeze([]),
     settings: DEFAULT_SETTINGS,
     freePlay: Object.freeze({
-      buildingId: catalogue.buildings[0]?.id ?? '',
-      dispatcherProfileId: catalogue.dispatchers[0]?.id ?? '',
+      buildingId:
+        preferredId(PREFERRED_OPENING_BUILDINGS, catalogue.buildings) ??
+        catalogue.buildings[0]?.id ??
+        '',
+      dispatcherProfileId:
+        preferredId(PREFERRED_VIEWER_DISPATCHERS, catalogue.dispatchers) ??
+        catalogue.dispatchers[0]?.id ??
+        '',
       demandTemplateId,
       // `null` is "this building's own profile", which is the honest default: the player has not
       // yet expressed a rate, and picking one for them would pin a number `data/` may change.

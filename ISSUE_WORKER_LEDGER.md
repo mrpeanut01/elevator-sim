@@ -4,18 +4,30 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-08 · **18 open**, down from 29 · branch `feat/azure-app-deployment` at
-`53be9c8` · `npm run typecheck` **passes** · `npm test` **passes — 343 files, 6 934 tests, exit 0**
-(baseline 6 786).
+**Snapshot:** 2026-08-09 · **11 of the play-test backlog remain open**, down from 29 — plus the
+**6 filed from findings this wave**, so 17 open in total · branch `integration/issue-wave-14` ·
+`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 122 files, 2 952 tests,
+exit 0**.
 
-**Eleven issues closed with evidence** — #105, #106, #108, #109, #111, #114, #97, #112, #113, #101,
-#119 — across PRs #120 and #121, each with a comment naming what was fixed and, where the report was
-wrong, what did not survive verification.
+**Eighteen issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
+#102, #104, #92, #99 and #118** in this wave. **Seven of seven carried a claim that did not survive
+verification**, which is the wave's own headline: #104's premise (*nothing is locked*), #107's
+recommendation (*confirm-before-abandon*), #92's two (*no Run now*, *no delta anywhere*), and
+#117's lead symptom, which is now **driven and not reproduced** rather than merely unexplained; #99's
+premise, wrong twice over; and #118's, where the *requested fix* would have been worse than the
+defect if applied as written.
 
-**Shipped to production 2026-08-08.** `elevator-sim:53be9c8` is live on the Container App
-(revision `elevsim-app--0000009`), verified by run: `?building=st-jude-hospital` loads without the
-`TypeError` it used to crash on, the rail no longer prints `All N`, its retraction renders in words,
-and *Resume* no longer refuses a shift that is on the board behind it.
+**Five new issues filed from findings this wave** — #123 (a preview environment can never reach the
+API), #124 (the new change-scope notes are unverified for contrast), #125 (Free play still clobbers
+the in-memory campaign week), #126 (the report basis cannot see shift length, and the obvious proxy
+is a trap), #127 (the delta block is not in the honesty corpus, found independently by two lanes).
+
+**Shipped to production 2026-08-09.** The viewer is served from a CDN at
+`https://yellow-glacier-0ff81230f.7.azurestaticapps.net`, the API stays on the Container App, and
+the split is verified by run: page 200 in 0.59 s, `__buildings.json` 8 buildings as
+`application/json`, `/no/such/page` a real 404, and a cross-origin `fetch` carrying an
+`Authorization` header answered 200 from the permitted origin in a browser. Arming it found **four**
+deploy-path defects that reading it had not (§ D308).
 
 Legend — **Verified**: `code` traced to file:line · `run` reproduced by a recorded run ·
 `—` not yet verified.
@@ -28,19 +40,19 @@ Legend — **Verified**: `code` traced to file:line · `run` reproduced by a rec
 |---|---|---|---|---|---|---|
 | **108** | St Jude URL crashes the viewer | P1 | **code** | **Fix** | — | Union the viz type at 3 sites; add the derived-from-disk building-load guard test |
 | **106** | Typing swallows the next click | P1 | **code** | **Fix** — *issue's diagnosis corrected* | — | Stop the rebuild at `main.ts:1531-1534`. **Must land before #111.** |
-| **107** | Building switch destroys campaign progress | **P0** | — | **Fix** | — | Save slot per scenario; confirm-before-abandon. Verify first. |
+| **107** | Building switch destroys campaign progress | **P0** | **code + run** | **FIXED** — *confirm-before-abandon refuted* | — | Weeks parked per contract, persist envelope v4. § D312. The A/B/C table reproduced exactly; the *prompt* did not survive — once nothing is abandoned it guards an action with no consequence |
 | **111** | Free play refuses Start on a valid config | P1 | **code** | **Fix** — *2b mechanism corrected* | — | **Blocked by #106.** Then `input` validation + re-derive part on template change |
 | **109** | Rail publishes the result before the run | P1 | **code** | **Fix** | — | Gate `drawDrivers` on `shiftIsOver`; draw the retraction; `N of M` not `All N` |
 | **114** | Machines rail changes nothing | P1 | **code** | **Fix — mark read-only** | — | Drop `onPick`, derive highlight from building, add speed to the envelope gate |
 | **112** | Competitive loop never rendered | P2 | **code** | **Fix** | — | Drop `boardsRequested` latch; render `challenge.board.entries` |
 | **113** | Custom dispatchers can't be proved | P2 | **code** | **Fix** | — | Persist on `saved*` patch (~5 lines) **first**; Compare selects later |
 | **119** | Compare default resolves nothing | P2 | **run** | **Fix** | — | Render INDISTINGUISHABLE as an answer; draw intervals; **do not** tune the default for its verdict |
-| **117** | WHAT MOVED compares a phantom run | P2 | **code (partial)** | **Fix + investigate** | — | Split `playerHasChosen`. **Headline symptom unexplained — needs a driven repro.** |
-| **99** | Free play defaults saturate | P2 | **run** | **Fix — premise corrected** | — | Curate the opening pair. Default is Chancery + `nearest-car`, **not** Midtown + collective |
+| **117** | WHAT MOVED compares a phantom run | P2 | **code + run** | **FIXED; headline NOT REPRODUCED** | — | `closeMenu` takes a required exit reason. § D311. Driven three runs → **three different baselines**; blast radius measured at one poisoned delta, self-recovering |
+| **99** | Free play defaults saturate | P2 | **run** | **FIXED — premise corrected twice** | — | § D313. The menu still held `nearest-car`, the dispatcher **§ D134 retired from the Run viewer** — two doors, one held the old answer. Chancery stays (Garden serves 2–8 riders and both arms return identical runs); the dispatcher moves. Measured over 6 seeds |
 | **97** | "Scenarios" goes nowhere | P2 | **code** | **Rescope — premise refuted** | — | A scenario list *does* exist. Two real one-line bugs found instead |
-| **118** | Export PNG / `copy run` point away | P2 | **code (partial)** | **Fix** | — | Export the Day report card; copy a URL. **Blocked by #108** (shared link is a coin flip) |
-| **104** | No explanation for locked controls | P2 | — | **Fix** | — | Inline "locked for this shift" note. Cheapest honesty fix; also #116's named fallback |
-| **102** | Comparison mixes buildings and modes | P2 | — | **Combine → #117** | **#117** | #117 rec 2 is #102's entire ask |
+| **118** | Export PNG / `copy run` point away | P2 | **code** | **FIXED — the requested fix needed a prerequisite** | — | § D314. Copying the URL **as it stood** would have been a worse provenance claim than the CLI line — `deepLinkSearchOf` carried four axes and dropped four. The link grew first, then the button was pointed at it |
+| **104** | No explanation for locked controls | P2 | **code** | **FIXED — premise refuted** | — | **Not one note.** Nothing is disabled during a run; the rail's lists are *live and destructive*. Nine notes derived from `SCOPE_OF`, three behaviours. § D309 |
+| **102** | Comparison mixes buildings and modes | P2 | **code** | **FIXED with #117** | **#117** | `ReportBasis` checked before pairing; refusal in words on the `WITHHELD` precedent. A dispatcher swap is explicitly not refused |
 | **105** | "Completed" appears mid-playback | P3 | **code** | **Combine → #109** | **#109** | `canvas.ts:1780` reads `result.status`. **Canvas footer, not rail** — fix must cover both |
 
 ## Combines — unique scope must transfer before closure
@@ -75,7 +87,7 @@ is in scope. *Drop the basis because it is noisy* is not.
 | **115** | Nothing to watch | **BUILD — Casual-led** | Stage as the stage, people drawn. Engineer keeps the schematic view — genuinely better *for engineers*. **§ 6 is Engineer work regardless**: `LIVE METRICS` clips its own text on every building, and being drawn into the canvas no DOM check can see it |
 | **103** | No motion, doors, or people | **BUILD — its two-renderer framing is now the correct one** | Filed as a subset of #115; under § D299 its *animated-for-Casual, schematic-for-Engineer* proposal is what the decision actually calls for |
 | **119** | Compare draws no chart | **BUILD — Engineer work** | ~700 words of monospace prose per verdict and **not one drawn interval**, in a product whose central claim *is* an interval. Strictly more legible, removes nothing |
-| **92** | Editor has no "Run this" | **BUILD — Engineer work first** | A practitioner tuning weights needs the inline delta more than a casual player does. Costs the rigour nothing |
+| **92** | Editor has no "Run this" | **BUILT — two claims refuted** | § D310. A run verb has existed since #65 and the Day report already draws a delta; the real gap was the round trip. Promises **one run** and names the 50-paired-run bar. `garden-apartments` pins INDISTINGUISHABLE |
 | **113 § 5** | Only 2 of 5 families authorable | **PROMOTED to the critical path** | *"Tweak it fully"* makes this load-bearing. **Not a Casual problem** — the gap is in the shared editor and fails both products |
 | **90**, **98** | No entry point / no onboarding | **BUILD — one door per product** | There are now two products, so there are two first runs to design |
 | **116** | Point of view (design charter) | **Epic — keep open** | §2 stays deferred (§ D300). §3's *"there is no economy"* is **refuted** — `Commission the building` exists and #116 missed it twice |
@@ -144,5 +156,11 @@ Recorded so no engineer implements them. **Every one of these would have caused 
 | **#111** | Re-picking the identical option clears the refusal | **Unlikely.** A native `<select>` fires no `change` for the already-selected option. **Stickier than reported** |
 | **#97** | `?mode=scenarios`; no scenario list; menu reloads | **Refuted.** `mode` accepts only `basic`/`advanced`; 8 cards render into `#scenario-list`; a menu navigate changes no URL |
 | **#99** | Free play defaults to Midtown Office + collective | **Refuted.** It is `buildings[0]`/`dispatchers[0]` = **Chancery House + Nearest car**. The real default is *worse* than reported |
+| **#104** | The dispatcher and building controls "lock" during a run | **Refuted.** No control on any of those panels is disabled while a shift plays — the only `disabled` writes conditioned on *running* mean *a worker batch is in flight*. Worse, the rail's three lists are **live and destructive**: they write, call `runShift`, and the day on screen is discarded. One note reading "locked for this shift" would have been **false wherever it landed** |
+| **#104** | Confirm-before-abandon is what #107 needs | **Refuted by the fix.** Once the week is parked, nothing is abandoned, so a prompt guards an action with no consequence and trains dismissal |
+| **#117** | Three consecutive runs printed an identical baseline | **NOT REPRODUCED — now driven, not merely unexplained.** Three cards pressed in turn on `midtown-office` seed 424242 gave **three different baselines**. The confirmed defect poisons **one** delta and the next run recovers unaided |
+| **#92** | The editor has no "Run now" | **Refuted.** A run verb has existed since issue #65 — `runThisDispatcherStateOf`, three states, already asserted on the legs. #92 step 3 describes the panel two waves ago |
+| **#92** | There is no before/after delta anywhere | **Refuted.** The Day report has drawn one since issue #38. The real gap is the round trip: the press moves the reader to the stage and gives no account back where they were tuning |
+| **N-4** | Enter does not submit; Tab-then-Enter is broken | **No longer reproduces.** Closed by #106's fix — `implicitSubmit()` and the third `restoreFocus` branch. Tested at both tiers |
 | **#116** | The two saturating buildings are Midtown and Vertical City | **Unconfirmed at my configuration** (I measured Midtown + Mixed-Use). Shape and count confirmed; the specific pair needs reproduction on #116's own terms |
 | **#116** | "There is no economy … a shaft **is** free, and instant" | **Refuted.** *Commission the building* is a capital-budget mechanic with a fixed capital-unit ceiling, locked in before the week. **#116 missed that screen twice** — also when claiming speed is only editable behind *Save as a new building*. Rescope §3 to "surface the economy that exists" |

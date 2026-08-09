@@ -199,6 +199,15 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'The contract, the day, the streak and what has been banked. day drives grownBuilding’s 11 %/day ' +
       'and eventFor’s twist, so it is the one field that must move only when the doors open on tomorrow.',
   ),
+  'viewer.parkedWeeks': latent(
+    'viewer.buildingId',
+    'The weeks the player is not currently playing — one per assignment they have stepped away from ' +
+      '(issue #107). Latent rather than a control, and the classification is the whole of what the ' +
+      'field is for: shiftRunConfigOf never reads it, so parking a week moves no leg — and picking ' +
+      'that assignment’s building again resumes it, which moves every leg, because its day is what ' +
+      'grownBuilding’s 11 %/day is applied to. A resumed day 4 is a different run from a fresh day 1, ' +
+      'and that is the assertion issue #107’s fix is proved by.',
+  ),
 
   /* --------------------------------------------------- viewer: authored artifacts */
   'viewer.savedDispatchers': latent(

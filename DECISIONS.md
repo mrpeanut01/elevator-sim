@@ -21734,3 +21734,379 @@ identical should be read as *the strings are not identical* before it is read as
 eventually consistent*. Three of this lane's four failures were found by running it and none by
 reading it, and this one was additionally delayed by an explanation that fit the symptom and not the
 evidence.
+
+---
+
+## D309 — nothing was locked, and the panels the report treats as one hold three behaviours
+
+**Date: 2026-08-08.** GitHub issue #104 asks for one inline note — *"locked for this shift, changes
+apply to your next run"* — on the Dispatcher, Traffic, Building and Machines tabs, on the premise
+that those controls *"are simply unresponsive"* once a shift is running. **The premise did not
+survive verification, and the fix is not the note the issue asks for.** Traced against
+`feat/azure-app-deployment` at `65f899b`:
+
+- **No control on any of those panels is disabled while a shift plays.** The only `disabled` writes
+  conditioned on *running* in the whole viewer are `dev/batchPanel.ts:157-169` and
+  `dev/campaignPanel.ts:408-414`, and both mean *a worker batch is in flight*, not *a recording is
+  being played back*.
+- The right rail's three lists are **live and destructive**: `dev/rightRail.ts:1040-1041`,
+  `:1075-1076` and `:1105-1106` each write and then call `MountContext.runShift`, and
+  `dev/main.ts:2830-2864` re-simulates and calls `adopt`, which builds a **new `Playback`**
+  (`:2933`). The day being watched is not steered and not paused — it is discarded, and the playhead
+  returns to zero. Taking a car out of service (`dev/main.ts:3252-3261`) is the same.
+- The group levers, the door dwell and the weight-set selector write a field `shiftRunConfigOf`
+  really does read and call **no** `runShift` (`dev/dispatcherEditor.ts:1011`, `:1034`,
+  `dev/selectorEditor.ts:443`). **Here the reporter's wording is exactly right**, and it is drawn
+  verbatim rather than reworded.
+- The four editors' working copies are **drafts** — `latent` in `scope/surface.ts:224-251`, realised
+  by a save or a select. This is the control the report describes moving: *"nudge a weight while
+  watching a queue build"*.
+
+So one sentence over all four panels would have been wrong about at least one panel wherever it was
+drawn, which is [§ D227](#d227)'s defect with better manners. Three sentences are drawn instead, and
+the block each one sits over is **derived from `SCOPE_OF` rather than asserted**
+(`packages/viz/src/scope/commitment.ts`): `scope/surface.ts` is asserted against the state's own
+keys in both directions and every row of it is decided by `scope.test.ts` running both arms and
+comparing the legs, so a re-scoped field moves the sentence with it. Where the derivation stops
+answering, the note is **absent** rather than stale — an absent sentence is not a false one, and
+`dev/scopeNotes.test.ts` is what stops the absence becoming permanent.
+
+That test file is also the first thing in this package to **drive** `mountRightRail` and the four
+editor mounts (`dev/mountRecorder.test-helper.ts`, `resolveElements` over the real
+`ELEMENT_IDS`). It narrows finding **N-6** rather than closing it: the mounts are driven through
+*construction*, which is where their static nodes are written, and not through `render`, which is
+where the pick lists and plates still are.
+
+**What is not claimed.** The evidence tier is the document recorder, third of `docs/16` S9's four.
+Nothing here consults `index.html`'s stylesheet, so this cannot say the notes are legible — the
+distinction `dev/menuPanel.test.ts` records at 1.03:1 applies word for word.
+
+## D310 — the dispatcher editor's *Run this* promises one run, and the strip that answers *what did it do* refuses to say *better*
+
+**Date: 2026-08-08.** Issue
+[#92](https://github.com/mrpeanut01/elevator-sim/issues/92) — *"the dispatcher editor has no 'Run
+this' button and no before/after comparison"* — scheduled **BUILD, Engineer work first**, under
+[§ D299](#d299)'s test: *a change to Engineer may make it easier to use; it may not make it say
+less.*
+
+### The first half of the report is stale, and saying so is part of the fix
+
+**The editor has had a *Run this* verb since issue #65** — `dev/dispatcherEditor.ts`'s
+`runThisDispatcherStateOf`, three states, relabelled for whichever one the panel is in, wired at the
+mount and asserted on the legs. #92's step 3 (*"Save as a new dispatcher is the only action
+available"*) describes the panel as it was two waves ago. The round trip it complains about is
+therefore **half** what it says: the reader does not hunt the rail to run, but they are moved to the
+Simulation tab and get no account of the run back where they were tuning.
+
+**Also already built:** the Day report has carried *What moved since the run before this one* since
+issue #38. What #92 correctly identifies is that a practitioner tuning weights is not on that
+surface.
+
+### What the button promises: one run, said on the button
+
+The hard part of this issue is that *"see the result compared to the previous run"* is, in this
+repository, **not a subtraction of two numbers**. CLAUDE.md § Statistical discipline forbids
+declaring one dispatcher better than another without a paired-t interval that excludes zero, and
+budgets 50–200 replications. A one-click *run this and show me the difference* reporting the delta
+of two single runs would be this project's documented central failure mode — *increasing lift speed
+appearing to increase average waiting time* — shipped as a feature.
+
+The choice was made explicitly and it is the **single-run** one, because the alternative was worse
+in both directions: a 50-replication paired batch behind a button in an editor is Compare with a
+different door on it, and feeding this panel's profiles into Compare is refuted on effort (it
+crosses the Worker boundary and `runBatch.ts` **throws** for an unresolvable arm — see the #113
+verification). So:
+
+- both verbs that run now end on one shared sentence, `ONE_RUN_PROMISE`, naming the budget as a
+  checkable figure — *50 or more paired runs against the same passengers and an interval that
+  excludes zero, which is what Compare is for*;
+- *Already driving* does **not** carry it, because it is disabled and runs nothing, and a promise
+  about a press that cannot happen is a sentence a reader learns to skip;
+- the panel's foot in `index.html` has said the same thing in the same words since the design
+  refactor. That is not redundancy — it is there for a reader who never hovers anything.
+
+### What the strip draws, and why it is not a second implementation
+
+The result strip is `dev/reportPanel.ts`'s own `ReportDeltaView`, reached through the exported
+`reportViewOf`. It is **arithmetic-free by construction**: every value is a string one of the two
+sheets already published, paired by figure id, with no subtraction, no ordering, no colour and no
+sum — so a withheld mean pairs as `withheld → withheld` rather than as a hole. Its refusal travels
+with the rows. A local *what moved* here would have been two answers to one question about a run
+both surfaces are describing.
+
+**The `before` is captured at the press**, not looked up afterwards, and the two surfaces therefore
+answer two different questions rather than one question twice: `mountReport` differences against
+*the sheet before this one*; this panel differences against *the sheet that was on screen when you
+pressed*. It is a fact this panel owns and cannot be wrong about, and it survives the case a lookup
+does not — `dev/main.ts:1342` files a sheet from a **mid-run** energy-axis toggle (triage finding
+N-3), so *the latest filed sheet* is not always a sheet of the latest run.
+
+`editorRunReadOutOf` gates it in the order a reader is owed, and **the playhead outranks the filed
+sheet** — § D223 applied to a second surface. Six states, five of which are *there is nothing to
+pair, and here is which nothing*: no run started here, a run somebody else replaced, a day still
+playing (with its own clock, from `runProgressOf`, so the strip and the sheet cannot disagree about
+what time it is in the building), a day nobody filed, and a first sheet with nothing to set beside
+it.
+
+### The test that makes it more than a caption, and the case it found
+
+§ D177's rule pointed at a read-out: **move the control, require the run to change, compared on the
+legs — and require the strip to change with it.** On `midtown-office` at 900 s the legs differ and
+six figures move, `WORST WAIT` **987 s → 1628 s** among them.
+
+**And the opposite case is pinned beside it, because it is real.** On `garden-apartments` at 900 s
+the same two dispatchers produce **entirely different legs and print all eight cells identically**.
+What the strip owes there is the identity row and nothing else; a block that reached for *something*
+to show would be manufacturing a reading out of a sheet that declined to make one. It also may not
+print *Nothing moved* — that note says *"the same day simulated again … it reproduces exactly"*,
+which is false about two different dispatchers, and the selection row is what keeps the pairing on
+the correct branch. Both are asserted.
+
+The pairing is armed **only when the run id moved**: `runShift` catches its own failures and leaves
+the state alone, so an optimistic arm would pair the previous sheet against itself under a caption
+naming the press the reader just made.
+
+### What is out of scope and why
+
+#92's items 3 and 4 — an A/B strip drawn on the timeline, and a save-name suggested from the
+dominant weight — are not built here. The first is a stage/timeline change that belongs with
+[#115](https://github.com/mrpeanut01/elevator-sim/issues/115)/#103's two-renderer question; the
+second is a naming affordance on top of the #113 § 3 rename work. Neither is refused; both need
+their own issue.
+
+**A gap this work walked past and did not close:** `ReportDeltaView`'s strings have **never been in
+the honesty corpus**. `REPORT_PANEL` renders `reportViewOf(shaped)` with no `previous`, so `delta`
+is `null` on every seeded case, and the caption, both note arms and every paired row are swept by
+nothing. That was true before this change and is true after it — no corpus figure moves — but the
+block is now drawn on **two** surfaces, which makes it worth its own issue rather than a footnote.
+
+---
+
+## D311 — the day report compares a run that happened, and refuses when the two are not comparable
+
+Issues #117 and #102. #102 is a duplicate whose entire ask is #117's second recommendation, so they
+land together.
+
+### The confirmed defect, reproduced before it was fixed
+
+`dev/main.ts:1961` latched **one** flag on every exit from the menu, including *Resume* — which is
+the exit that changes nothing. So opening the menu and changing your mind marked the player as
+having chosen a configuration, and the next Day report compared the run against a baseline the
+player had never run. Driven in the shipped shell at `?building=garden-apartments&seed=424242`,
+Escape → play to end → Day report:
+
+```
+SHEET : Monday — day 1 | Garden Apartments · Conventional collective · seed 424242
+STREAK: "First clean day. Streak started."
+DELTA : … was Garden Apartments · Conventional collective → Chancery House · Nearest car
+```
+
+Split into `playerHasChosen` (the filing gate) and `menuHasBeenDismissed` (the autoplay gate).
+`closeMenu` now takes a **required** `exit: 'entered-a-mode' | 'changed-their-mind'`, so a sixth exit
+path cannot forget to answer — the type asks, rather than a comment asking.
+
+### #102's ask is a refusal, and it follows the precedent rather than inventing one
+
+`ShapedDayReport` carries a `ReportBasis` — building, subject, demand — and `reportDeltaOf` checks it
+**before** pairing. On a mismatch it draws the identity rows, **no figure rows**, a caption that stops
+promising a comparison, and a note naming each axis that differs. That is `WITHHELD` and
+`awtInvalidReason`'s shape: the figure is refused *in words*, never quietly dropped and never filled
+with a number the run itself calls invalid.
+
+A dispatcher swap is **not** refused, and that is asserted rather than assumed — it is the comparison
+the block exists for.
+
+### The headline did not reproduce, and that is the finding rather than the absence of one
+
+#117's lead claim is *three consecutive runs printed an identical baseline*. Triage recorded it as
+"not reproducible from code"; this lane drove it rather than leaving it there. The rotation lived in
+three closure `let`s in `mountReport` and was extracted into a pure reducer (`rotatedOn`,
+`SheetContinuity`, `topWritten`) precisely so it *could* be driven.
+
+Free play on `midtown-office`, seed 424242, three dispatcher cards pressed in turn, each played to
+`endedAt`, the delta block read off the DOM after each: run 1 draws no block, run 2 reads
+`Minimum estimated wait → Conventional collective, en-route pickup`, run 3 reads
+`Conventional collective, en-route pickup → Fairness first`. **Three runs, three different
+baselines.** The headline does not reproduce on this build.
+
+What does reproduce is the confirmed defect, and its blast radius is now measured rather than
+argued: **one** poisoned delta, and the next run recovers unaided. Both facts are pinned in
+`reportPanel.test.ts` — the one poisoned delta, and that it is now a refusal rather than arithmetic.
+
+### Two gaps named rather than closed
+
+**The basis cannot see a campaign day's shift length or a week-day traffic edit** (issue #126), and
+the obvious substitute is a trap worth recording: the recording's own span looks free and is not.
+`endedAt` is `max(lastEventAt, demandEndedAt)`, so it moves with the *traffic* — measured at
+`09:25 / 09:22 / 09:20` for three dispatchers on one selection. A span-keyed basis would refuse
+exactly the comparison the block exists for. The cheap fix is worse than the gap.
+
+**The delta block is not in the honesty corpus** (issue #127). `honesty/surfaces.ts` renders
+`reportViewOf(shaped)` with no `previous`, so `delta` is `null` on every seeded case and this lane's
+new refusal sentence is unswept prose on a shipped surface. True before this change and not a
+regression — and now drawn on two surfaces, since § D310's strip reuses the same view. Recorded
+because an unswept refusal is the shape § D227 rates above a stale figure.
+
+---
+
+## D312 — a week is parked per contract, and the prompt the issue asked for is the half that did not survive
+
+Issue #107, the backlog's only P0. Triage marked it **unverified**, so it was reproduced before it
+was touched.
+
+### The stated mechanism survived exactly
+
+Driving the real `withBuilding`:
+
+```
+a: { id: 'c1', day: 4, streak: 4, cleanRun: 4 }   // Garden, four days played
+b: { id: 'c2', day: 1, streak: 0, cleanRun: 0 }   // after switching to Midtown
+c: { id: 'c1', day: 1, streak: 0, cleanRun: 0 }   // after switching straight back
+```
+
+That is the reporter's own A/B/C table, including their `banked 4/1 → 0/2 → 0/1`, which is
+`cleanRun` over each contract's `needClean`. Cause in one expression: `dev/state.ts` called
+`takeContract` on **every** change of contract, and `shift/week.ts`'s `takeContract` is
+`{ ...openWeek(contractId), completed }` — a fresh week by construction. `saveSessionNow` then
+persisted it, so a reload did not recover what a switch had thrown away.
+
+The issue's own recommendation — keyed by scenario rather than one global slot — is correct, and is
+what shipped: `switchWeek(week, parked, contractId, arrival)`, a parked-week map on `ViewerState`, a
+persist envelope at **version 4** reading v1–v3 back with `parkedWeeks: []`, and the two other doors
+that called `takeContract` directly (`scenariosPanel`, `reportPanel`) changed on their *departure*
+only — the cards' own titles promise a restart on arrival and still deliver one.
+
+### The half that did not survive, and why refusing it is the honest answer
+
+The issue also asks for **confirm-before-abandon**. Once the week is parked, *nothing is abandoned* —
+so the prompt would guard an action with no consequence. A dialog that always says *"are you sure?"*
+about something safe is how a reader learns to dismiss dialogs, including the one that matters.
+
+What is genuinely owed is the second half of the issue's own sentence: switching still *shows* day 1,
+which is indistinguishable from the defect. That is answered by a told-once line in the ribbon's
+existing hint slot, not by a modal.
+
+### The acceptance test is on the legs
+
+Not on state. The resumed run must **differ** from a fresh day-1 run and **equal** the run the player
+left — and the two are distinguishable by construction, because day drives `grownBuilding`'s 11 %
+per day, so day 4 is 1.33× population. A test that compared saved fields would have passed against a
+week that was restored into a building that had not grown.
+
+### A pre-existing defect this had to fix first, flagged rather than absorbed
+
+`unknownContractsIn` tested `contractById(id) === undefined`, so **every endless and every sandbox
+week was refused on reload** as *"banked toward an assignment this build no longer has"* — both ids
+are deliberate sentinels — and `restoreSession` then cleared the slot. Verified by run before being
+fixed. It had to be fixed here because a parked sandbox week would have poisoned every session under
+the new schema, and it is named here because absorbing an unrelated defect silently into a P0 is how
+a fix becomes unreviewable.
+
+### What is not closed
+
+Issue **#94**'s residual is untouched: dispatcher portability across buildings, preservation of
+edited traffic parameters, and the persistent building-header anchor. **#125** is filed for
+`enterFreePlay`, which still clobbers the in-memory campaign week when Free play is started on the
+campaign's own building — pre-existing, and now recoverable-but-silent rather than lost outright.
+
+---
+
+## D313 — the opening pair is chosen and measured, and the menu was still holding a retired answer
+
+Issue #99. Its premise is refuted and **the correction goes further than triage's did**.
+
+### What the default actually was, and why that is the interesting part
+
+`menu/menu.ts` read `catalogue.buildings[0]` / `catalogue.dispatchers[0]` — **Chancery House + `nearest-car`**,
+not Midtown Office + `collective`. Midtown is a *persisted* selection, not a default. Triage already
+had that much.
+
+What triage did not have: **`nearest-car` is the dispatcher [§ D134](#d134) moved the Run viewer off.**
+`dev/state.ts` resolves through `dev/defaults.ts`'s preference list; the menu landed later and never
+received the correction. So the two doors into one engine disagreed, and **the door a new player
+arrives through held the retired answer** — [§ D192](#d192)'s shape, in the surface with the most
+first impressions riding on it.
+
+`honesty/surfaces.ts` held a third copy of the opening selection, which would have kept the retired
+answer alive in the corpus after the menu was fixed. Fixed in the same change, because a default
+that is correct in two of three places is the defect this repository keeps re-finding.
+
+### Measured, not asserted
+
+At Free play's own settings — `rise-and-fall`, 1800 s, each building's own profile — six seeds on
+Chancery House:
+
+| arm | AWT | over 60 s | published a mean |
+|---|---|---|---|
+| `nearest-car` (file order) | 57.5–160.9 s | 47.8–87.7 % | **4 of 6** |
+| `collective` (chosen) | 10.3–23.5 s | 0.0–3.5 % | 6 of 6 |
+
+On the shipped seed, same building, same 81 riders: **146.72 s / 87.7 % against 10.34 s / 0.0 %**,
+handling capacity 54.0 vs 81.0 offered against 86.0 vs 81.0. At seed 42 the file-order arm stops
+publishing a mean at all — which is the issue's *"SATURATED, AWT suppressed"* screen, reachable from
+the shipped default on a player's first run.
+
+### The building does not move, and that is measured too
+
+The issue suggests Garden Apartments. At these settings it serves **2 to 8 riders** across six seeds,
+`WT95` equals `AWT` on three of them, and `nearest-car` and `collective` return **identical runs**. A
+calm first screen that teaches nothing is not an improvement on an alarming one that teaches the
+wrong thing. The building stays; the dispatcher moves.
+
+### No difficulty label, and the refusal is pinned by a run
+
+The obvious follow-on is to rank the buildings *easy → hard* on the menu. Refused, and not on taste:
+population per car ranks Mixed-Use High-Rise (142.3) **easier** than Secure Tower (165.3), while at
+these settings Secure Tower publishes a mean and Mixed-Use High-Rise suppresses its own. A label
+that orders them either way is a claim the runs contradict.
+
+### The standing requirement, applied to a default
+
+A default is a control whose value is chosen once, so it gets the same test: enter Free play both
+ways and require **the legs** to differ. A test comparing the selected id would have passed against
+a default that was written and never read.
+
+---
+
+## D314 — both sharing surfaces point at the run, and the URL had to grow before it could be copied
+
+Issue #118.
+
+### Export PNG
+
+`dev/main.ts` exported `ui.stage.canvas.toBlob(...)` — the stage bitmap, which on a fresh load is an
+empty building. Replaced by `render/reportCard.ts`, a pure `Canvas2DLike` renderer drawing the
+**filed Day report** at 1200×630.
+
+A withheld figure is drawn **withheld** — pinned on a real saturated recording with the clean run as
+a control, so the card cannot quietly print a mean the run refuses. With no sheet it refuses in
+words. It files the day first, through `closeShift` itself, on [§ D223](#d223)'s guard rather than a
+second copy of it.
+
+### `copy run`, and the claim that was partly refuted
+
+The issue says the CLI line omits the traffic template. **It does not** — `provenanceLineOf` has
+emitted `--traffic`/`--template` for a shipped pattern since an earlier lane. What it genuinely
+omitted is `state.freePlay` (template *and* rate) and `state.windowStartS`, all `between-games`
+controls that `shiftRunConfigOf` reads.
+
+**And the fix the issue asks for — copy a URL — would have been worse than what it replaced.**
+`deepLinkSearchOf` carried four axes and dropped four. Shipping *copy a link* over that link would
+have traded a line that under-describes the run for a link that silently reproduces a different one,
+which is the more confident error. So the deep link grew `traffic`, `template`, `rate` and
+`windowStart` — reader and writer — **before** the button was pointed at it, and the standing
+requirement is applied to a URL parameter, compared on the legs.
+
+Three things driven rather than argued: `--part` and `--duration` are mutually exclusive (found by
+hitting the CLI's own refusal); a windowed run on an hourless template gets **no line** rather than a
+wrong one; and the windowed line rebuilds the viewer's run **leg for leg**.
+
+`copy run` now copies a link, `copy CLI` copies flags, and both refuse through `runIdentityIssues`.
+The card is the one artefact here that leaves the browser, so it has its own honesty adapter.
+
+### What still does not travel, and is not refused
+
+`viewer.commissioning` and `viewer.calendar` are `between-games`, are read by `shiftRunConfigOf`, and
+are permitted — so `runIdentityIssues` never objects — yet **neither artefact can express them**. A
+commissioned shaft or a vacation week makes `copy run` reproduce a *different* run, silently. The
+same question hangs over the leaderboard's replay verification. Filed rather than absorbed.

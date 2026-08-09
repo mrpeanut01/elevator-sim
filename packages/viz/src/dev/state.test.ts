@@ -289,6 +289,186 @@ describe('withBuilding', () => {
   });
 
   /* ---------------------------------------------------------------------- *
+   * A week per assignment — GitHub issue #107
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The reporter's own state: Garden Apartments, day 4, four cleared days and a four-day streak.
+   *
+   * Built by writing the week rather than by closing four days, because what is under test is the
+   * *transition between assignments* and nothing else. `closeDay`'s arithmetic has its own suite,
+   * and a fixture that ran it here would make this test fail for two unrelated reasons.
+   */
+  function gardenOnDayFour(): ViewerState {
+    const state = withBuilding(base(), resources, 'garden-apartments');
+    return {
+      ...state,
+      week: { ...state.week, day: 4, dayIdx: 3, streak: 4, cleanRun: 4 },
+    };
+  }
+
+  it('keeps the week you walked away from, and hands it back — issue #107', () => {
+    /*
+     * The reporter's four steps, driven. Before this, `withBuilding` called `takeContract` on every
+     * change of contract, and `takeContract` is a *fresh* week by construction — so the measured
+     * sequence was:
+     *
+     * | step | contract | day | streak | banked |
+     * |---|---|---|---|---|
+     * | Garden, four days played | `c1` | 4 | 4 | 4 |
+     * | switch to Midtown Office | `c2` | **1** | **0** | **0** |
+     * | switch straight back | `c1` | **1** | **0** | **0** |
+     *
+     * Four cleared days and a four-day streak gone through the most obvious control on the tab,
+     * with no confirmation, no warning and no undo — and `saveSessionNow` then wrote it to
+     * `localStorage`.
+     */
+    const played = gardenOnDayFour();
+    const away = withBuilding(played, resources, 'midtown-office');
+    const back = withBuilding(away, resources, 'garden-apartments');
+
+    // The first visit to a scenario is still a fresh week: taking an assignment restarts it
+    // (`design.html` :1643), and that rule is not what was broken.
+    expect(away.week.contractId).toBe(contractForBuilding('midtown-office')?.id);
+    expect(away.week.day).toBe(1);
+
+    // The second visit is a resume, which is what did not exist.
+    expect(back.week.contractId).toBe('c1');
+    expect(back.week.day).toBe(4);
+    expect(back.week.streak).toBe(4);
+    expect(back.week.cleanRun).toBe(4);
+  });
+
+  it('holds exactly one week per assignment, and never the one being played', () => {
+    /*
+     * The invariant `ViewerState.parkedWeeks` states and `switchWeek` maintains. A parked copy of
+     * the week on screen would be a second answer to *what day is it on Garden Apartments*, and the
+     * two would drift the moment a day closed.
+     */
+    const played = gardenOnDayFour();
+    const away = withBuilding(played, resources, 'midtown-office');
+    expect(away.parkedWeeks.map((week) => week.contractId)).toEqual(['c1']);
+
+    const back = withBuilding(away, resources, 'garden-apartments');
+    expect(back.parkedWeeks.map((week) => week.contractId)).toEqual(['c2']);
+
+    const third = withBuilding(back, resources, 'secure-tower');
+    expect([...third.parkedWeeks.map((week) => week.contractId)].sort()).toEqual(['c1', 'c2']);
+    for (const state of [away, back, third]) {
+      expect(
+        state.parkedWeeks.some((week) => week.contractId === state.week.contractId),
+        'the week on screen may not also be parked',
+      ).toBe(false);
+    }
+  });
+
+  it('carries what has been cleared across, in both directions', () => {
+    /*
+     * `completed` is the one field of a week that is not about that week — it is every scenario the
+     * player has ever cleared, and `closeDay` reads it to decide whether a contract may clear at
+     * all. Resuming a parked week verbatim would forget a scenario cleared while it was away, and
+     * that is not cosmetic: `!base.completed.includes(contract.id)` is what stops the same
+     * assignment being cleared and awarded twice.
+     */
+    const played = gardenOnDayFour();
+    const away = withBuilding(played, resources, 'midtown-office');
+    const clearedElsewhere: ViewerState = {
+      ...away,
+      week: { ...away.week, completed: ['c3'] },
+    };
+    const back = withBuilding(clearedElsewhere, resources, 'garden-apartments');
+    expect(back.week.completed).toContain('c3');
+  });
+
+  it('takes a resumed week to the simulator, compared on the legs', () => {
+    /*
+     * **Move the control and require the run to change** — the standing requirement, pointed at the
+     * thing this fix is actually for. Every assertion above is about a `WeekState`, and a `WeekState`
+     * nothing read would satisfy all of them while the player's four days changed nothing on screen.
+     *
+     * `week.day` drives `grownBuilding`'s 11 %/day, so a resumed day 4 is a **different building**
+     * from a fresh day 1 — 1.33× the population — and therefore a different set of legs. Both halves
+     * are asserted: the resumed run must differ from the fresh one (the fix does something) and it
+     * must match the run the player left (it does the *right* thing).
+     *
+     * Midtown Office at 1 800 s rather than Garden Apartments, for the reason
+     * `probes.test-helper.ts` records: Garden is six floors and two hydraulic cars at a residential
+     * trickle, where a third of a building's population can arrive and be answered identically.
+     */
+    const legsOf = (state: ViewerState): string =>
+      JSON.stringify(
+        recordRun(shiftRunConfigOf(resources, { ...state, shiftLengthS: 1800 }).config, {
+          recordDecisions: false,
+        }).recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+      );
+
+    const midtown = withBuilding(base(), resources, 'midtown-office');
+    const played: ViewerState = {
+      ...midtown,
+      week: { ...midtown.week, day: 4, dayIdx: 3, streak: 4, cleanRun: 4 },
+    };
+    const away = withBuilding(played, resources, 'garden-apartments');
+    const back = withBuilding(away, resources, 'midtown-office');
+
+    expect(back.week.day).toBe(4);
+    expect(
+      legsOf(back),
+      'the resumed week produced the same legs as a fresh one — the day came back on the ribbon ' +
+        'and nowhere the simulator can see it',
+    ).not.toBe(legsOf({ ...back, week: { ...back.week, day: 1 } }));
+    expect(
+      legsOf(back),
+      'the resumed run is not the run the player left',
+    ).toBe(legsOf(played));
+  }, 300_000);
+
+  it('parks the scenario week when a drawn building takes the sandbox, and gives it back', () => {
+    /*
+     * The other door onto the same loss, and the one the reporter did not walk through. A drawn
+     * building has no contract, so the week takes `SANDBOX_CONTRACT_ID` and — by `withContract`'s
+     * documented decision, which is unchanged — *carries* its day and streak, because changing
+     * building is not taking an assignment and restarting there would confiscate a week for opening
+     * the editor.
+     *
+     * What was missing is that the scenario the player left had nowhere to wait. Under one slot the
+     * week did not travel to the sandbox so much as *become* it, and coming back to Garden
+     * Apartments was a `takeContract` onto day 1. Both halves now hold at once: the sandbox week
+     * carries the day loop, and `c1` is parked exactly as the player left it.
+     */
+    const played = gardenOnDayFour();
+    const drawn: ViewerState = {
+      ...played,
+      savedBuildings: [
+        {
+          id: 'bld-1',
+          config: { ...parseBuilding(read('buildings/garden-apartments.json')), id: 'bld-1' },
+        },
+      ],
+    };
+    const sandbox = withBuilding(drawn, resources, 'bld-1');
+    expect(sandbox.week.contractId).toBe(SANDBOX_CONTRACT_ID);
+    expect(sandbox.week.day, 'the documented carry is not reversed').toBe(4);
+    expect(sandbox.parkedWeeks.map((week) => week.contractId)).toEqual(['c1']);
+
+    const back = withBuilding(sandbox, resources, 'garden-apartments');
+    expect(back.week.day).toBe(4);
+    expect(back.week.streak).toBe(4);
+    expect(back.parkedWeeks.map((week) => week.contractId)).toEqual([SANDBOX_CONTRACT_ID]);
+  });
+
+  it('does nothing at all when the building does not move', () => {
+    /*
+     * The coach select fires `change` for a re-pick of the building already running. A re-pick that
+     * parked and re-took the week would reset the day count on a control the player did not move —
+     * the same failure as the fabric one below, in the field that matters most.
+     */
+    const played = gardenOnDayFour();
+    const again = withBuilding(played, resources, 'garden-apartments');
+    expect(again.week).toBe(played.week);
+    expect(again.parkedWeeks).toBe(played.parkedWeeks);
+  });
+
+  /* ---------------------------------------------------------------------- *
    * The fabric does not travel — GitHub issue #46
    * ---------------------------------------------------------------------- */
 
