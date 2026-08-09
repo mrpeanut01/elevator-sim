@@ -21576,3 +21576,102 @@ is a cue-rule coincidence rather than a product defect: the caveat says *"a quot
 because `render/` may not import `dev/`. `leftRail.test.ts` pins the two equal at five playheads of
 a real recording, in the file whose dependency direction allows it.
 
+
+## D308 — the dispatcher editor's *Run this* promises one run, and the strip that answers *what did it do* refuses to say *better*
+
+**Date: 2026-08-08.** Issue
+[#92](https://github.com/mrpeanut01/elevator-sim/issues/92) — *"the dispatcher editor has no 'Run
+this' button and no before/after comparison"* — scheduled **BUILD, Engineer work first**, under
+[§ D299](#d299)'s test: *a change to Engineer may make it easier to use; it may not make it say
+less.*
+
+### The first half of the report is stale, and saying so is part of the fix
+
+**The editor has had a *Run this* verb since issue #65** — `dev/dispatcherEditor.ts`'s
+`runThisDispatcherStateOf`, three states, relabelled for whichever one the panel is in, wired at the
+mount and asserted on the legs. #92's step 3 (*"Save as a new dispatcher is the only action
+available"*) describes the panel as it was two waves ago. The round trip it complains about is
+therefore **half** what it says: the reader does not hunt the rail to run, but they are moved to the
+Simulation tab and get no account of the run back where they were tuning.
+
+**Also already built:** the Day report has carried *What moved since the run before this one* since
+issue #38. What #92 correctly identifies is that a practitioner tuning weights is not on that
+surface.
+
+### What the button promises: one run, said on the button
+
+The hard part of this issue is that *"see the result compared to the previous run"* is, in this
+repository, **not a subtraction of two numbers**. CLAUDE.md § Statistical discipline forbids
+declaring one dispatcher better than another without a paired-t interval that excludes zero, and
+budgets 50–200 replications. A one-click *run this and show me the difference* reporting the delta
+of two single runs would be this project's documented central failure mode — *increasing lift speed
+appearing to increase average waiting time* — shipped as a feature.
+
+The choice was made explicitly and it is the **single-run** one, because the alternative was worse
+in both directions: a 50-replication paired batch behind a button in an editor is Compare with a
+different door on it, and feeding this panel's profiles into Compare is refuted on effort (it
+crosses the Worker boundary and `runBatch.ts` **throws** for an unresolvable arm — see the #113
+verification). So:
+
+- both verbs that run now end on one shared sentence, `ONE_RUN_PROMISE`, naming the budget as a
+  checkable figure — *50 or more paired runs against the same passengers and an interval that
+  excludes zero, which is what Compare is for*;
+- *Already driving* does **not** carry it, because it is disabled and runs nothing, and a promise
+  about a press that cannot happen is a sentence a reader learns to skip;
+- the panel's foot in `index.html` has said the same thing in the same words since the design
+  refactor. That is not redundancy — it is there for a reader who never hovers anything.
+
+### What the strip draws, and why it is not a second implementation
+
+The result strip is `dev/reportPanel.ts`'s own `ReportDeltaView`, reached through the exported
+`reportViewOf`. It is **arithmetic-free by construction**: every value is a string one of the two
+sheets already published, paired by figure id, with no subtraction, no ordering, no colour and no
+sum — so a withheld mean pairs as `withheld → withheld` rather than as a hole. Its refusal travels
+with the rows. A local *what moved* here would have been two answers to one question about a run
+both surfaces are describing.
+
+**The `before` is captured at the press**, not looked up afterwards, and the two surfaces therefore
+answer two different questions rather than one question twice: `mountReport` differences against
+*the sheet before this one*; this panel differences against *the sheet that was on screen when you
+pressed*. It is a fact this panel owns and cannot be wrong about, and it survives the case a lookup
+does not — `dev/main.ts:1342` files a sheet from a **mid-run** energy-axis toggle (triage finding
+N-3), so *the latest filed sheet* is not always a sheet of the latest run.
+
+`editorRunReadOutOf` gates it in the order a reader is owed, and **the playhead outranks the filed
+sheet** — § D223 applied to a second surface. Six states, five of which are *there is nothing to
+pair, and here is which nothing*: no run started here, a run somebody else replaced, a day still
+playing (with its own clock, from `runProgressOf`, so the strip and the sheet cannot disagree about
+what time it is in the building), a day nobody filed, and a first sheet with nothing to set beside
+it.
+
+### The test that makes it more than a caption, and the case it found
+
+§ D177's rule pointed at a read-out: **move the control, require the run to change, compared on the
+legs — and require the strip to change with it.** On `midtown-office` at 900 s the legs differ and
+six figures move, `WORST WAIT` **987 s → 1628 s** among them.
+
+**And the opposite case is pinned beside it, because it is real.** On `garden-apartments` at 900 s
+the same two dispatchers produce **entirely different legs and print all eight cells identically**.
+What the strip owes there is the identity row and nothing else; a block that reached for *something*
+to show would be manufacturing a reading out of a sheet that declined to make one. It also may not
+print *Nothing moved* — that note says *"the same day simulated again … it reproduces exactly"*,
+which is false about two different dispatchers, and the selection row is what keeps the pairing on
+the correct branch. Both are asserted.
+
+The pairing is armed **only when the run id moved**: `runShift` catches its own failures and leaves
+the state alone, so an optimistic arm would pair the previous sheet against itself under a caption
+naming the press the reader just made.
+
+### What is out of scope and why
+
+#92's items 3 and 4 — an A/B strip drawn on the timeline, and a save-name suggested from the
+dominant weight — are not built here. The first is a stage/timeline change that belongs with
+[#115](https://github.com/mrpeanut01/elevator-sim/issues/115)/#103's two-renderer question; the
+second is a naming affordance on top of the #113 § 3 rename work. Neither is refused; both need
+their own issue.
+
+**A gap this work walked past and did not close:** `ReportDeltaView`'s strings have **never been in
+the honesty corpus**. `REPORT_PANEL` renders `reportViewOf(shaped)` with no `previous`, so `delta`
+is `null` on every seeded case, and the caption, both note arms and every paired row are swept by
+nothing. That was true before this change and is true after it — no corpus figure moves — but the
+block is now drawn on **two** surfaces, which makes it worth its own issue rather than a footnote.

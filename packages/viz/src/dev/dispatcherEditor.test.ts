@@ -24,11 +24,21 @@ import {
   type DispatcherSpec,
 } from '../authoring/dispatcherSpec.js';
 
-import { baseState, legsOf } from '../scope/probes.test-helper.js';
+import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
+import type { VizRecording } from '../contract/types.js';
+import { observationsAt } from '../live/observations.js';
+import { recordRun } from '../record/recordRun.js';
+import { contractById } from '../shift/contracts.js';
+import { SHIFT_EVENTS } from '../shift/events.js';
+import { goalsForDay, readGoals } from '../shift/goals.js';
+import { shiftObservationsOf } from '../shift/observations.js';
+import { dayReportOf, type ShapedDayReport } from '../shift/report.js';
+import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
 
 import {
   dwellChipsOf,
   dwellHintOf,
+  editorRunReadOutOf,
   flagRowsOf,
   humanTermName,
   leverRowsOf,
@@ -42,6 +52,8 @@ import {
   termRowsOf,
   vectorLineOf,
 } from './dispatcherEditor.js';
+import { reportViewOf } from './reportPanel.js';
+import { shiftRunConfigOf, type ViewerState } from './state.js';
 
 const DATA = new URL('../../../../data/', import.meta.url);
 const read = (path: string): unknown =>
@@ -473,5 +485,309 @@ describe('the two editors no longer disagree about what Save does', () => {
     );
     const code = editorCode();
     expect(code).toContain('if (!save({ select: true })) return;');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * And what did it do? — the result strip, GitHub issue #92
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The strip that answers *did my change help?* without hunting back to the rail — and the whole of
+ * the difficulty is that **it may not answer it**.
+ *
+ * Issue #92 asks for a one-click *run this* and *"the result compared to the previous run"*. The
+ * first half already shipped with issue #65 and is asserted above; the second half is the one
+ * CLAUDE.md § Statistical discipline constrains, because a before/after of two single runs reported
+ * as a difference is this project's documented central failure mode — *increasing lift speed
+ * appearing to increase average waiting time* — with a button on it.
+ *
+ * So the strip promises **one run** and says so, and what it draws is `reportPanel.ts`'s own
+ * `ReportDeltaView`: the two sheets' published strings, paired by figure id, with no subtraction, no
+ * ordering and no colour, carrying the 50-paired-runs refusal in its own `note`. The three suites
+ * below are the three ways that can go wrong — the read-out lying about which run it is describing,
+ * the strip inventing arithmetic, and the whole thing being inert.
+ */
+describe('the strip says which of six things it has to say', () => {
+  const SHEET = { title: 'a sheet' } as unknown as ShapedDayReport;
+  const OTHER = { title: 'another sheet' } as unknown as ShapedDayReport;
+  const filed = { runId: 'r1', playedOut: true, report: SHEET };
+
+  it('says nothing has been run from here until something has', () => {
+    expect(editorRunReadOutOf(undefined, filed)).toBe('noRun');
+  });
+
+  it('refuses the pairing when the run on screen is not the one this panel started', () => {
+    /*
+     * The case that would otherwise put a real delta under a false caption: the reader pressed here,
+     * then ran something else from the rail. The remembered *before* is still a real sheet and the
+     * filed sheet is still a real sheet — they are simply not two answers to one question.
+     */
+    expect(editorRunReadOutOf({ runId: 'r1', before: OTHER }, { ...filed, runId: 'r2' })).toBe(
+      'superseded',
+    );
+  });
+
+  it('waits for the playhead, because a part-day pairing is § D223 on a second surface', () => {
+    // Outranks the filed sheet deliberately. `dev/main.ts` can file a sheet from a mid-run toggle of
+    // the energy axis, so *a sheet exists* is not *the day is over*.
+    expect(
+      editorRunReadOutOf({ runId: 'r1', before: OTHER }, { ...filed, playedOut: false }),
+    ).toBe('watching');
+  });
+
+  it('distinguishes a day nobody filed from a day that is still playing', () => {
+    expect(
+      editorRunReadOutOf({ runId: 'r1', before: OTHER }, { ...filed, report: undefined }),
+    ).toBe('unfiled');
+  });
+
+  it('says so when its run is the first of the session and there is nothing to set beside it', () => {
+    expect(editorRunReadOutOf({ runId: 'r1', before: undefined }, filed)).toBe('firstSheet');
+  });
+
+  it('pairs only when it has both halves of a pairing it can defend', () => {
+    expect(editorRunReadOutOf({ runId: 'r1', before: OTHER }, filed)).toBe('paired');
+  });
+});
+
+describe('the press really moves the run, and the strip really reports it — § D177', () => {
+  /**
+   * One state's recording, built the way `dev/main.ts#runShift` builds it.
+   *
+   * `probes.test-helper.ts#legsOf` stays the instrument for *did the legs move* — it is the shipped
+   * comparison and restating its formula here would be a second answer to `docs/16` S2's question.
+   * This runs the same configuration a second time to get the recording the sheet is made of, which
+   * costs a second quarter-hour of simulated time and keeps one definition of a leg in the tree.
+   */
+  const runOf = (state: ViewerState): VizRecording => {
+    const plan = shiftRunConfigOf(RESOURCES, state);
+    return recordRun(plan.config, {
+      recordDecisions: false,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+    }).recording;
+  };
+
+  /** One filed sheet, on `reportPanel.test.ts`'s own fixture path: a real run, folded at its end. */
+  const sheetOf = (recording: VizRecording, day = 4): ShapedDayReport => {
+    const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
+    const goals = goalsForDay(day);
+    const opened = { ...openWeek('c2'), day, dayIdx: (day - 1) % 7 };
+    const week = closeDay(
+      opened,
+      outcomeOf({
+        day,
+        dayIdx: opened.dayIdx,
+        eventId: 'ordinary',
+        arrived: observations.arrived,
+        carried: observations.carried,
+        minutePct: observations.minutePct,
+        readings: readGoals(goals, observations),
+      }),
+    );
+    return dayReportOf({
+      recording,
+      observations,
+      goals,
+      week,
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
+    });
+  };
+
+  /** What the strip draws, reached exactly as the mount reaches it. */
+  const stripOf = (before: ShapedDayReport, after: ShapedDayReport) => {
+    const delta = reportViewOf(after, { kind: 'played-out' }, before).delta;
+    if (delta === null) throw new Error('expected the strip to have a pairing');
+    return delta;
+  };
+
+  /**
+   * The two arms one press produces, on a named building — the same seed, traffic and span, with the
+   * dispatcher as the only thing that moved.
+   *
+   * Memoised because four of the assertions below want the same pair and each miss is two
+   * simulations.
+   */
+  const arms = new Map<string, readonly [ShapedDayReport, ShapedDayReport]>();
+  const pairOn = (buildingId: string): readonly [ShapedDayReport, ShapedDayReport] => {
+    const hit = arms.get(buildingId);
+    if (hit !== undefined) return hit;
+    const base: ViewerState = { ...baseState(), buildingId };
+    const made = [
+      sheetOf(runOf({ ...base, dispatcherId: 'collective' })),
+      sheetOf(runOf({ ...base, dispatcherId: 'nearest-car' })),
+    ] as const;
+    arms.set(buildingId, made);
+    return made;
+  };
+
+  /**
+   * Midtown Office, because it is the arm where the sheet has something to say.
+   *
+   * Garden Apartments is the suite's default and is used below for the opposite case: at 900 s it
+   * carries five people and **prints every figure identically under both dispatchers** while the
+   * legs are entirely different. Both cases are real and both are asserted; pinning only the busy
+   * one would leave the quiet one to be discovered by a player.
+   */
+  const BUSY = 'midtown-office';
+  const QUIET = 'garden-apartments';
+
+  it('moves the legs, and moves what the strip prints — one press, both readings', () => {
+    /*
+     * The standing requirement, pointed at a read-out rather than at a slider. *Move the control and
+     * require the run to change, compared on the legs* is the first half and is what issue #65's
+     * suite already asserts; the half a strip can fail on its own is the second — a block that draws
+     * the same thing whatever the run did is inert, and inert with a confident caption is worse.
+     */
+    const base: ViewerState = { ...baseState(), buildingId: BUSY };
+    const control = legsOf({ ...base, dispatcherId: 'collective' });
+    const moved = legsOf({ ...base, dispatcherId: 'nearest-car' });
+    expect(JSON.parse(control)).not.toHaveLength(0);
+    expect(moved).not.toBe(control);
+
+    const [before, after] = pairOn(BUSY);
+    const strip = stripOf(before, after);
+
+    // The identity row first: the reader is owed *which dispatcher this is a run of* before they are
+    // shown anything that moved, or the strip invites them to attribute it to the weight they dragged.
+    const identity = strip.selection.find((row) => row.label === 'BUILDING & DISPATCHER');
+    expect(identity?.before).toContain('collective');
+    expect(identity?.after).toContain('nearest-car');
+
+    // And the figures moved, so the block is reporting the run rather than only the label.
+    expect(strip.figures.map((row) => row.label)).toContain('WORST WAIT');
+    expect(strip.figures.length).toBeGreaterThan(1);
+  });
+
+  it('reports no figure when no figure moved, on a run that was entirely different', () => {
+    /*
+     * **The case that decides whether this strip is honest**, and it is not a hypothetical: Garden
+     * Apartments at 900 s carries five people, and `collective` and `nearest-car` produce completely
+     * different legs while printing the same eight cells to the same digits.
+     *
+     * What the strip owes there is the identity row and nothing else. A block that reached for
+     * *something* to show — a sub-rounding difference, a percentage of a percentage — would be
+     * manufacturing a reading out of a sheet that declined to make one, which is the failure mode
+     * this whole design is arranged against.
+     */
+    const base: ViewerState = { ...baseState(), buildingId: QUIET };
+    expect(legsOf({ ...base, dispatcherId: 'nearest-car' })).not.toBe(
+      legsOf({ ...base, dispatcherId: 'collective' }),
+    );
+    const [before, after] = pairOn(QUIET);
+    expect(after.figures.map((cell) => cell.value)).toEqual(before.figures.map((cell) => cell.value));
+
+    const strip = stripOf(before, after);
+    expect(strip.figures).toEqual([]);
+    expect(strip.selection.map((row) => row.label)).toEqual(['BUILDING & DISPATCHER']);
+    // And it does **not** claim the run reproduced. The selection moved, so the pairing note is the
+    // one that says two runs are two runs — not the *nothing moved, it is the same day* line, which
+    // would be false about two different dispatchers.
+    expect(strip.note).toContain('Two runs are two runs');
+    expect(strip.note).not.toContain('Nothing moved');
+  });
+
+  it('quotes the two sheets rather than deriving anything from them', () => {
+    /*
+     * The rule `ReportDeltaView` is built around, asserted on the surface that now also draws it:
+     * every value is a string one of the two sheets published. A strip that computed `13.1 − 15.4`
+     * would be the sheet doing the reader's subtraction *and* choosing which direction is good, on a
+     * sample of one run per arm.
+     *
+     * On this building `AVERAGE WAIT` is **withheld** on both arms, which is the case worth having in
+     * the assertion: a suppressed mean pairs as the sheet's own word rather than as a hole where a
+     * difference could not be taken.
+     */
+    const [before, after] = pairOn(BUSY);
+    expect(before.figures.find((cell) => cell.label === 'AVERAGE WAIT')?.value).toBe('withheld');
+    const strip = stripOf(before, after);
+    const published = new Set([
+      ...before.figures.map((cell) => cell.value),
+      ...after.figures.map((cell) => cell.value),
+      before.title,
+      after.title,
+      ...before.metaLines,
+      ...after.metaLines,
+    ]);
+    for (const row of [...strip.selection, ...strip.figures]) {
+      expect(published.has(row.before), `${row.label}: “${row.before}” is nobody’s published string`).toBe(true);
+      expect(published.has(row.after), `${row.label}: “${row.after}” is nobody’s published string`).toBe(true);
+    }
+  });
+
+  it('carries the replication count the button promised, and no verdict', () => {
+    const [before, after] = pairOn(BUSY);
+    const strip = stripOf(before, after);
+    expect(strip.note).toContain('Two runs are two runs');
+    expect(strip.note).toContain('50 or more paired runs');
+    expect(strip.note).toContain('interval that excludes zero');
+    expect(strip.note).toContain('Compare');
+    /*
+     * No ordering word **on the rows**, which are the part a reader reads as an answer. The note is
+     * deliberately exempt and the exemption is the point: it is the one string entitled to use the
+     * word *better*, because what it says about it is that this block cannot tell you.
+     */
+    const rows = [...strip.selection, ...strip.figures]
+      .flatMap((row) => [row.label, row.before, row.after])
+      .join('\n');
+    expect(rows).not.toMatch(/\bbetter\b|\bworse\b|\bimproved\b|\bwon\b|\bbeat\b/iu);
+  });
+
+  it('says nothing moved when nothing did, rather than drawing an empty grid', () => {
+    // The inverse arm, and the one that would catch a strip fabricating movement out of a re-render:
+    // a run is identified by its building, its dispatcher and its seed, so the same selection
+    // reproduces bit-identically (§ D223).
+    const state: ViewerState = { ...baseState(), dispatcherId: 'collective' };
+    const twice = stripOf(sheetOf(runOf(state)), sheetOf(runOf(state)));
+    expect(twice.selection).toEqual([]);
+    expect(twice.figures).toEqual([]);
+    expect(twice.note).toContain('Nothing moved');
+  });
+});
+
+describe('the panel says what one press buys, on the press', () => {
+  /*
+   * `RUN_THIS_COPY` is module-private — an exported string literal here becomes an unclassified
+   * prose surface in `honesty/derive` — so the source is read, which is this suite's existing idiom
+   * for the mount and carries its caveat: weak evidence about behaviour, strong evidence about a
+   * sentence having been put back.
+   */
+  const code = editorCode();
+
+  it('promises one run on both verbs that run, and on neither that does not', () => {
+    expect(code).toContain('const ONE_RUN_PROMISE =');
+    expect(code).toContain('dispatcher by id. ${ONE_RUN_PROMISE}');
+    expect(code).toContain('building, seed and traffic. ${ONE_RUN_PROMISE}');
+    // *Already driving* is disabled and runs nothing, so a promise about a run would be a promise
+    // about a press that cannot happen.
+    const disabled = code.slice(code.indexOf('alreadyDriving: Object.freeze('));
+    expect(disabled.slice(0, disabled.indexOf('}),'))).not.toContain('ONE_RUN_PROMISE');
+  });
+
+  it('names the replication budget rather than a feeling about sample size', () => {
+    // CLAUDE.md's own figure. *Several runs* or *a few more runs* would be the same sentence with
+    // the one checkable thing removed.
+    const promise = code.slice(code.indexOf('const ONE_RUN_PROMISE ='));
+    expect(promise.slice(0, promise.indexOf(';'))).toContain('50 or more paired runs');
+  });
+
+  it('reaches the pairing through reportViewOf rather than differencing anything itself', () => {
+    /*
+     * The structural half of the arithmetic-free rule. If a later edit "improves" this strip by
+     * computing a signed change, it will not go through `reportViewOf` — so the assertion is that
+     * the shipped path is the one the Day report uses, and that no subtraction of two figures
+     * appears in the mount.
+     */
+    expect(code).toContain('reportViewOf(state.report, { kind: \'played-out\' }, caused.before).delta');
+    const mount = code.slice(code.indexOf('export function mountDispatcherEditor'));
+    expect(mount).not.toMatch(/parseFloat|Number\(|\.toFixed\(/u);
+  });
+
+  it('arms the pairing only on a press that produced a run', () => {
+    // `runShift` catches its own failures and leaves the state alone. Arming optimistically would
+    // pair the previous sheet against itself and caption it as the run the reader just asked for.
+    expect(code).toContain('if (now !== undefined && now !== wasRunId) caused = { runId: now, before };');
   });
 });
