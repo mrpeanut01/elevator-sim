@@ -682,11 +682,22 @@ function speedPhrase(lowMps: number, highMps: number): string {
  * Both destinations are pinned by `rightRail.test.ts` against the modules that author their labels,
  * so a screen renamed elsewhere turns this sentence red rather than leaving it pointing at nothing.
  * That is weaker than driving the menu and is stated rather than dressed up.
+ *
+ * ## The route was stale, and the pin is why nobody noticed
+ *
+ * It read *"Menu → Campaign"*. The row it names has been labelled **Scenarios** since GitHub issue
+ * #97 — `menu/screens.ts`'s `main.campaign`, whose own comment records that *Campaign survives in
+ * exactly one place now: the shift layer's own prose* — so this sentence has been sending readers to
+ * a word that is not on the menu, on the screen [§ D300](../../../../DECISIONS.md) says #116 missed
+ * **twice**. The paragraph above claimed the destinations were pinned, and they were: the pin held
+ * the two **labels** and said nothing about the **route**, so the half that rotted was the half
+ * nothing was watching. `rightRail.test.ts` now asserts the row label this route names, on the same
+ * rule — a wayfinding claim is pinned by the thing it points at, never by another sentence.
  */
 const MACHINES_ARE_REPORTED =
   'Nothing here is pickable, and that is deliberate: this panel reports the classes the running ' +
   'building’s cars are built to, and the choice is made on two other screens. Commission the ' +
-  'building (Menu → Campaign) sets one bank’s class and its rated speed, and reaches the next run ' +
+  'building (Menu → Scenarios) sets one bank’s class and its rated speed, and reaches the next run ' +
   'with no save; the building editor sets one class and one speed across a whole building you ' +
   'draw, behind Save as a new building. The machine editor below authors a class — it does not ' +
   'decide which cars are built to it.';

@@ -701,6 +701,149 @@ describe('the scenarios screen describes the thing its rows actually do', () => 
 });
 
 /* -------------------------------------------------------------------------- *
+ * The cold start — GitHub issues #90 and #98, under § D299
+ * -------------------------------------------------------------------------- */
+
+/** The root, as a reader of each product meets it. */
+const rootIn = (
+  viewMode: 'basic' | 'advanced',
+  overrides: Partial<MenuViewInput> = {},
+): ReturnType<typeof screenOf> => screenOf({ ...ARM, ...overrides, viewMode, state: stateAt('main') });
+
+describe('the root recommends exactly one row, and neither product loses anything for it', () => {
+  /**
+   * #90's headline, as a property rather than as a row this file names.
+   *
+   * *"There is no row that says Start here or New? Begin with this. Every option looks like the right
+   * answer."* The fix is one recommendation, and **one** is the whole of it: two recommended rows is
+   * the reported defect with a smaller `n`, and none is the defect itself.
+   */
+  it('marks one and only one row as the recommendation, in both products', () => {
+    for (const mode of ['basic', 'advanced'] as const) {
+      const recommended = rootIn(mode).rows.filter((row) => row.primary === true);
+      expect(recommended.map((row) => row.id), `${mode} does not recommend exactly one row`).toEqual([
+        'main.start-here',
+      ]);
+    }
+  });
+
+  /**
+   * It is **first**, which is the claim `FIRST_VISIT_NOTE` makes to a new player in words.
+   *
+   * A recommendation below the things it is recommending against is not one. `dev/menuPanel.test.ts`
+   * carries the other half — that the guide is drawn directly under it on the page — so between them
+   * the welcome's two wayfinding clauses are pinned by the layout rather than by care.
+   */
+  it('puts it above the rows it is recommending among', () => {
+    for (const mode of ['basic', 'advanced'] as const) {
+      expect(rootIn(mode).rows[0]?.id, `${mode} does not lead with its recommendation`).toBe(
+        'main.start-here',
+      );
+    }
+  });
+
+  /**
+   * **§ D299 § 2's constraint, as a test.** *A first run may sequence what a player meets; it may not
+   * remove what they can reach.*
+   *
+   * Derived rather than listed: the assertion is that the root **minus the new row** is byte-identical
+   * between the two products and to what it is without a recommendation at all. So a later change that
+   * hid the leaderboard from Casual, or renamed a row in one product only, fails here — which is the
+   * *"quietly caps what a player can build"* failure § D299 names as the same broken promise wearing a
+   * better layout.
+   */
+  it('adds a door and takes nothing away — the same six rows and Resume, in both products', () => {
+    const rest = (mode: 'basic' | 'advanced'): unknown =>
+      rootIn(mode)
+        .rows.filter((row) => row.id !== 'main.start-here')
+        .map((row) => ({ id: row.id, label: row.label, detail: row.detail, intent: row.intent }));
+    expect(rest('basic'), 'the two products no longer offer the same rows').toEqual(rest('advanced'));
+    // Non-vacuity: there really are rows under the recommendation, and they are the ones #90 lists.
+    const ids = rootIn('basic').rows.map((row) => row.id);
+    expect(ids).toEqual([
+      'main.start-here',
+      'main.campaign',
+      'main.free-play',
+      'main.challenge',
+      'main.leaderboard',
+      'main.account',
+      'main.settings',
+      'main.resume',
+    ]);
+  });
+
+  /**
+   * **One door per product**, and each opens the thing its own sentence names.
+   *
+   * Both intents are members the shell already performs — no new arm, so no member that compiles with
+   * nothing behind it. Casual's is `open-campaign`, which the case above proves starts **no** week, so
+   * its copy is held to the same ban that row is held to. Engineer's navigates, so the screen it names
+   * has to be one that exists.
+   */
+  it('opens the scenarios board in Casual and Free play in Engineer', () => {
+    const casual = rootIn('basic').rows[0];
+    expect(casual?.intent).toEqual({ kind: 'open-campaign' });
+    // The same ban `campaign.open` is under: this row cannot promise a week its intent never starts.
+    const casualCopy = `${casual?.label ?? ''} — ${casual?.detail ?? ''}`;
+    for (const promise of ['start the week', 'starts the week', 'starts a week']) {
+      expect(casualCopy, `Casual's door promises "${promise}" and open-campaign delivers none`).not.toContain(
+        promise,
+      );
+    }
+    expect(casualCopy, 'Casual’s door does not say what it opens').toContain('scenarios board');
+
+    const engineer = rootIn('advanced').rows[0];
+    expect(engineer?.intent).toEqual({ kind: 'navigate', to: 'free-play' });
+    expect(MENU_SCREENS, 'Engineer’s door navigates to a screen that does not exist').toContain(
+      'free-play',
+    );
+  });
+
+  /**
+   * *"six axes, then Start"* is a count, and a count in copy is what goes stale.
+   *
+   * Derived from the screen it describes rather than believed: the Free play screen's own value rows
+   * are counted, and a seventh axis — or a sixth deleted — turns this red on the sentence that names
+   * the number. `HOW_TO_PLAY` makes the same claim in *The six things Free play lets you set*, so both
+   * are pinned to one derivation.
+   */
+  it('claims the number of axes Free play actually offers', () => {
+    const axes = rowsOn('free-play').filter(
+      (row) => row.kind === 'select' || row.kind === 'text',
+    ).length;
+    expect(axes, 'Free play no longer offers six axes').toBe(6);
+    expect(rootIn('advanced').rows[0]?.detail ?? '').toContain('six axes');
+  });
+
+  /**
+   * The welcome is offered on a stated first visit, and `undefined` says nothing.
+   *
+   * `hasServer`'s precedent, and the reason is the same one: a caller that has not looked is honestly
+   * *nobody has said*, and a menu that greeted a returning player as a new one would be a false claim
+   * about them rather than a harmless flourish.
+   */
+  it('says nothing about a first visit until the shell says it is one', () => {
+    expect(rootIn('basic').notices, 'silence is not the default').toEqual([]);
+    expect(rootIn('basic', { firstVisit: false }).notices).toEqual([]);
+    const welcome = rootIn('basic', { firstVisit: true }).notices;
+    expect(welcome.length, 'a stated first visit gets no welcome').toBe(1);
+    expect(welcome[0]).toContain('Nothing was restored');
+  });
+
+  /** And it belongs to the screen a player lands on, not to every screen behind it. */
+  it('keeps the welcome on the root', () => {
+    for (const screen of MENU_SCREENS) {
+      if (screen === 'main') continue;
+      const notices = screenOf({ ...ARM, firstVisit: true, state: stateAt(screen) }).notices;
+      expect(
+        notices.join(' '),
+        `the ${screen} screen welcomes a first-time player it is not the first thing they see`,
+      ).not.toContain('Nothing was restored');
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * One door, and one question at a time — issues #30 and #31
  * -------------------------------------------------------------------------- */
 

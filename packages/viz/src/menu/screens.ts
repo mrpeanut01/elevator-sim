@@ -351,6 +351,28 @@ export interface MenuAffordance {
    * that wrote `row.id === 'free-play.seed' ? 'numeric' : undefined` would be the first one to.
    */
   readonly inputMode?: 'numeric' | undefined;
+  /**
+   * The one row this screen recommends — GitHub issue #90, and at most one per screen.
+   *
+   * ## Why the recommendation is a field here rather than a class over there
+   *
+   * *Which row a new player should press* is a decision, and a decision written inside a render call
+   * needs a document, a canvas and a click to reach — this module's founding argument (§ D214 § 2).
+   * A panel that styled `rows[0]` differently would be that decision, taken by an index, and it would
+   * go silently wrong the first time a screen grew a row above its recommendation.
+   *
+   * ## What it may and may not carry — KB-15
+   *
+   * It earns a **modifier** class, never a replacement one, on `menu-board-you`'s precedent. The
+   * recommendation is carried by the row's own words first — the label reads *Start here* — and by
+   * the tint second, so a reader on a screen reader, a monochrome display or a photocopy is told the
+   * same thing the stylesheet says. A row that were recommended *only* by colour would be the signal
+   * KB-15 forbids.
+   *
+   * `menu/screens.test.ts` asserts at most one per screen, over every screen and every state: two
+   * recommendations is no recommendation, which is the defect #90 reports about six equal rows.
+   */
+  readonly primary?: boolean | undefined;
   readonly intent: MenuIntent;
 }
 
@@ -475,6 +497,33 @@ export interface MenuViewInput {
    * is one line — see `dev/menuPanel.ts`'s {@link MenuPanelHost.hasServer}.
    */
   readonly hasServer?: boolean | undefined;
+  /**
+   * Whether this page loaded with nothing restored — GitHub issues #90 and #98, and `undefined` for
+   * *nobody has said*, on {@link MenuViewInput.hasServer}'s precedent.
+   *
+   * ## Why the shell has to answer it, and why this module could not
+   *
+   * `persist/types.ts`'s failure union has carried a dedicated `absent` arm since it was written,
+   * with a docstring saying why — *"nothing stored yet is an ordinary first visit … collapsing them
+   * would tell a first-time player their browser is broken"*. It had exactly two readers and
+   * **neither of them is a screen**: `persist/notice.ts#restoreNoticeFor` returns `undefined` for it,
+   * and `dev/main.ts` declines to clear the slot. So the product knew it was somebody's first visit,
+   * at one instant, and dropped the answer before anything could be drawn differently.
+   *
+   * This module cannot recover it: deciding it needs a `SessionStore`, and `menu/` does not depend on
+   * the persistence layer to draw a menu. `docs/16` S5 — one derivation, two consumers: the shell
+   * reads `loadSession` once during boot and hands the same answer here.
+   *
+   * ## It is a fact about the **load**, not about the store, and the copy says so
+   *
+   * A first visit stops being one the moment anything is saved, and `saveSessionNow` runs on the
+   * first setting a player touches. A flag re-read per draw would therefore make the notice vanish
+   * mid-session — the menu changing shape under somebody reading it — so the shell latches it at boot
+   * and {@link FIRST_VISIT_NOTE} is worded about what was **restored** rather than about what is
+   * stored. A sentence claiming *nothing is saved* would be false one keystroke later; a sentence
+   * claiming *nothing was restored when this page loaded* stays true for the life of the page.
+   */
+  readonly firstVisit?: boolean | undefined;
 }
 
 /** What the shell knows about this week's challenge, and how far the player has got with it. */
@@ -580,7 +629,13 @@ const empty = { notices: Object.freeze([]), issues: Object.freeze([]) };
 function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
   switch (screen) {
     case 'main':
-      return { ...empty, rows: mainRows(input.hasServer, input.hasRun) };
+      return {
+        ...empty,
+        rows: mainRows(input.hasServer, input.hasRun, input.viewMode ?? 'advanced'),
+        // `=== true`, so *nobody has said* is silence rather than a welcome. See
+        // {@link MenuViewInput.firstVisit}.
+        notices: input.firstVisit === true ? [FIRST_VISIT_NOTE] : empty.notices,
+      };
     case 'free-play':
       return freePlayBody(input);
     case 'settings':
@@ -671,7 +726,114 @@ function resumeRow(hasRun: boolean): MenuAffordance {
   };
 }
 
-function mainRows(hasServer: boolean | undefined, hasRun: boolean): readonly MenuAffordance[] {
+/**
+ * The one sentence a player who has never been here reads first — GitHub issues #90 and #98.
+ *
+ * ## What it is allowed to claim, and every clause is checked
+ *
+ * *"Nothing was restored when this page loaded"* is `persist/types.ts`'s `absent` arm in the words a
+ * player has, and it is a claim about the **load** rather than about the store — see
+ * {@link MenuViewInput.firstVisit} for why that distinction is the difference between a sentence that
+ * stays true and one that is false a keystroke later.
+ *
+ * *"the row above the rest"* and *"How to play, directly under it"* are claims about the **layout**,
+ * which is exactly the kind of sentence this repository has shipped stale — `dev/rightRail.ts` spent
+ * a wave telling readers to open *Menu → Campaign* after the row had been renamed **Scenarios**. So
+ * both are pinned by a test rather than by care: `menu/screens.test.ts` requires the recommended row
+ * to be first in `mainRows`, and `dev/menuPanel.test.ts` requires the guide entry to be drawn
+ * immediately after it, on the rendered page rather than in an argument.
+ *
+ * ## What it does not claim
+ *
+ * **No duration.** #90 proposes *"it takes about 5 minutes"*; nothing here measures how long a player
+ * takes, playback speed is a setting, and a shift's drain is an outcome rather than a prediction
+ * (`partsOfDay.ts`'s own rule about end times). An invented number would be this repository's
+ * most-tracked defect on the one screen a new player trusts most.
+ *
+ * **No promise about what a scenario or a run will show.** It says where to press and what the guide
+ * is for, and stops.
+ */
+const FIRST_VISIT_NOTE =
+  'Nothing was restored when this page loaded, so this is a first run. Start here is the row above ' +
+  'the rest, and How to play, directly under it, says what a dispatcher is before anything asks you ' +
+  'to pick one.';
+
+/**
+ * The recommended path — GitHub issue #90, and **one door per product** ([§ D299](../../../../DECISIONS.md)).
+ *
+ * ## Why there are two of these rather than one
+ *
+ * § D299 settled the positioning as *two products over one engine*, so there are two first runs to
+ * design and not one. Casual's is the narrative week; Engineer's is the run they set themselves. The
+ * row is the same row — same id, same position, same words on the label — and only the destination
+ * and the sentence under it differ, because the thing a new player needs is *one* obviously-right
+ * press and that is true in both products.
+ *
+ * ## Why it adds a row and moves none
+ *
+ * § D299 § 2's constraint is that Casual is *a different door into the same building, not a smaller
+ * building* — a first run may **sequence** what a player meets and may not **remove** what they can
+ * reach. So Scenarios, Free play, the challenge, the leaderboard, Account and Settings are all still
+ * on this screen, in the order they were in, saying what they said. What changed is that one of the
+ * six is now also recommended, in words, above them.
+ *
+ * ## Neither arm invents an intent, and that is deliberate
+ *
+ * Both dispatch a member the shell's switch already performs. A `start-here` of its own would have
+ * been a member nothing handled until somebody wrote an arm — the dead control this package has
+ * shipped eleven times — and it would have had to decide *which* scenario or *which* selection, which
+ * is § D213's hard-coded list arriving through a new door. `open-campaign` opens the board a player
+ * picks from; `navigate` opens the screen a player sets. Neither guesses on their behalf.
+ *
+ * ## What each arm claims, against what the arm actually does
+ *
+ * Casual dispatches `open-campaign`, which `dev/main.ts` performs as *select the scenarios tab and
+ * close the menu*. It starts **no** week — `campaign.open` says so in its own detail for the same
+ * reason (GitHub issue #97, whose whole subject was a row promising a week it never started) — so
+ * this sentence says the board opens and the week begins when a scenario is taken.
+ *
+ * Engineer dispatches `navigate` to `free-play`, and the sentence names what is on that screen: six
+ * axes and a Start. Six is `freePlayBody`'s own count — building, dispatcher, traffic shape, arrival
+ * rate, part of the day, seed — and it is the same six {@link HOW_TO_PLAY}'s *The six things Free
+ * play lets you set* enumerates, asserted against the rows in `menu/screens.test.ts` rather than
+ * counted by hand here.
+ */
+function startHereRow(viewMode: 'basic' | 'advanced'): MenuAffordance {
+  const casual = viewMode === 'basic';
+  return {
+    id: 'main.start-here',
+    label: 'Start here',
+    detail: casual
+      ? 'The one to press if you are new: it opens the scenarios board, and the week begins when ' +
+        'you take one.'
+      : 'The one to press if you are new: Free play is a single run you set yourself — six axes, ' +
+        'then Start.',
+    /*
+     * `commit` for Casual because it leaves the menu, `navigate` for Engineer because it goes a
+     * screen deeper. The kind names what the row *does*, and the two doors genuinely do different
+     * things — `campaign.open` carries the same `commit` for the same reason. The recommendation is
+     * {@link MenuAffordance.primary} and is carried separately, so the two arms look alike on screen
+     * without either lying about what pressing it costs.
+     */
+    kind: casual ? 'commit' : 'navigate',
+    /*
+     * Casual's arm enters a mode, so `between-games`; Engineer's only opens a screen, so
+     * `presentation`. Scoping both as the stronger of the two would claim this row destroys a day on
+     * a build where it does not, and `docs/16` S1 is about the scope being the honest one rather than
+     * the safe one.
+     */
+    scope: casual ? 'between-games' : 'presentation',
+    enabled: true,
+    primary: true,
+    intent: casual ? { kind: 'open-campaign' } : { kind: 'navigate', to: 'free-play' },
+  };
+}
+
+function mainRows(
+  hasServer: boolean | undefined,
+  hasRun: boolean,
+  viewMode: 'basic' | 'advanced',
+): readonly MenuAffordance[] {
   // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
   // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
   const note = hasServer === false ? NEEDS_A_SERVER : '';
@@ -692,6 +854,12 @@ function mainRows(hasServer: boolean | undefined, hasRun: boolean): readonly Men
   const social = (id: string, label: string, detail: string, target: MenuScreen): MenuAffordance =>
     to(id, label, `${detail}${note}`, target);
   return Object.freeze([
+    /*
+     * **First, and it is the whole of GitHub issue #90.** The six rows below are a complete set of
+     * *choices* and were an empty set of *recommendations*: every option looked like the right answer,
+     * so none of them was. See {@link startHereRow}.
+     */
+    startHereRow(viewMode),
     /*
      * **Scenarios**, not *Campaign* — `docs/17` § 5 clause 2's residue, settled by the handoff's own
      * rule rather than by taste.
@@ -943,10 +1111,32 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
     Object.freeze({
       heading: 'A first run',
       body: Object.freeze([
-        'Open Free play and set the building to Garden Apartments, the dispatcher to Conventional ' +
-          'collective, the arrival rate to this building’s own profile and the run to 30 minutes. ' +
-          'Watch one call appear at a landing, one car answer it, and one wait end — those three ' +
-          'things are what every dispatcher here is made of.',
+        'If you would rather not choose, Start here is the first row on the menu and it is this ' +
+          'paragraph as a button: it opens the scenarios board in Casual and Free play in Engineer, ' +
+          'which are the two shortest routes to watching one.',
+        /*
+         * **The number here is pinned and was right; the control it named was not.**
+         *
+         * It read *"…and the run to 30 minutes"*. The *thirty* is derived and asserted —
+         * `howToPlay.test.ts § recommends a first run the menu would actually let you start` resolves
+         * the shortest part the default traffic shape offers and requires this sentence to name its
+         * length in minutes, so the figure moves when `data/` does. Checking that assumption is what
+         * stopped this paragraph being rewritten around a staleness it did not have.
+         *
+         * What was stale is the **control**. § D286 deleted the run-length ladder and replaced it
+         * with *Part of the day*, so *"set the run to"* named a control that has not existed since
+         * issue #81 — the reader still met the number, in the option's own detail line
+         * (`partsOfDay.ts#detailOf` writes `30 min of demand — 08:30 to 09:00, then however long it
+         * takes to clear`), but had to work out which box it was in. So the control is named, the
+         * pinned figure is kept, and the tail is described the way `detailOf` describes it rather
+         * than as an end time this module is not allowed to predict.
+         */
+        'Open Free play and set the building to Garden Apartments and the dispatcher to ' +
+          'Conventional collective. Leave the arrival rate on this building’s own profile, and ' +
+          'leave Part of the day on the option it opens with — the shortest the traffic shape ' +
+          'offers, 30 minutes of demand and then however long the building takes to clear. Watch ' +
+          'one call appear at a landing, one car answer it, and one wait end — those three things ' +
+          'are what every dispatcher here is made of.',
         'Then move one axis and run it again, keeping the seed. With the building and the traffic ' +
           'held still the same seed brings the same passengers, so what moved in the numbers is ' +
           'what you moved. That is how the feel of it is learned. It is not how a difference is ' +
