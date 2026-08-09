@@ -37,14 +37,25 @@ async function bodyOf(name: string): Promise<string> {
  * -------------------------------------------------------------------------- */
 
 describe('issue #39 — nothing runs itself or counts before the player has chosen', () => {
-  it('latches the flag in closeMenu, which is the only way out of the overlay', async () => {
+  it('latches both flags in closeMenu, which is the only way out of the overlay', async () => {
     /*
-     * Three arms close the menu — **Start**, **Open the doors** and **Keep going** — and each is a
-     * mode being entered. Latching in `closeMenu` rather than in the three arms is what makes the
-     * set complete by construction: a fourth arm that closed the overlay without setting the flag
-     * would be a fourth way into the product that could not score.
+     * Five arms close the menu — **Start**, **Open the doors**, **Keep going**, the commissioning
+     * commit and **Resume**. Latching in `closeMenu` rather than in the five arms is what makes the
+     * set complete by construction: a sixth arm that closed the overlay without setting a flag
+     * would be a sixth way into the product that could not score.
+     *
+     * That property survives the issue #117 split, and this case is how: the latches are still both
+     * here, and the *distinction* is a **required parameter** with no default, so a sixth arm
+     * cannot forget to answer it — `shift/report.ts`'s own `ReportSubject` rule.
      */
-    expect(await bodyOf('closeMenu')).toContain('playerHasChosen = true');
+    const body = await bodyOf('closeMenu');
+    expect(body).toContain('menuHasBeenDismissed = true');
+    expect(body).toContain("if (exit === 'entered-a-mode') playerHasChosen = true");
+    expect(
+      body,
+      'closeMenu takes no exit argument, so a new way out of the overlay can no longer be made ' +
+        'to say whether it is a mode being entered — which is issue #117 back',
+    ).toContain("exit: 'entered-a-mode' | 'changed-their-mind'");
   });
 
   it('refuses to file a day while the menu has never been dismissed', async () => {
@@ -61,29 +72,90 @@ describe('issue #39 — nothing runs itself or counts before the player has chos
      * The other half of #39, and the visible one: the play-tester read `running · 0 arrived,
      * 0 carried` on a page they had not touched. The recording is still made and still drawn — the
      * stage shows the building at 06:00 — it simply does not start moving on its own.
+     *
+     * Gated on `menuHasBeenDismissed` since issue #117, which is § D232's own rule unchanged: a
+     * player who pressed **Resume** has left the menu on purpose and a run they re-roll should
+     * play. What moved is the *filing* gate above, not this one.
      */
     const body = await bodyOf('adopt');
     expect(body).toContain('autoplay:');
     expect(
       body,
-      'adopt no longer gates autoplay on playerHasChosen, so boot’s run plays behind the menu',
-    ).toContain('playerHasChosen &&');
+      'adopt no longer gates autoplay on the overlay having been dismissed, so boot’s run plays ' +
+        'behind the menu',
+    ).toContain('menuHasBeenDismissed &&');
   });
 
-  it('is not a vacuous guard — the flag is declared above boot’s own sequence', async () => {
+  it('is not a vacuous guard — both flags are declared above boot’s own sequence', async () => {
     /*
      * `main.test.ts` already enforces the general rule (`let` before the sequence, the TDZ guard
-     * that has now been broken four times in this package). This asserts the specific binding,
+     * that has now been broken four times in this package). This asserts the specific bindings,
      * because a `playerHasChosen` declared *below* `boot()`'s `runShift()` would throw on the line
      * that reads it and the last-resort handler would report *The viewer did not start* — which is
      * how the previous four presented.
      */
     const source = await mainSource();
-    const declared = source.indexOf('let playerHasChosen');
     const sequence = source.indexOf('\n  restoreSession();');
-    expect(declared).toBeGreaterThan(-1);
     expect(sequence).toBeGreaterThan(-1);
-    expect(declared).toBeLessThan(sequence);
+    for (const flag of ['let playerHasChosen', 'let menuHasBeenDismissed']) {
+      const declared = source.indexOf(flag);
+      expect(declared, flag).toBeGreaterThan(-1);
+      expect(declared, flag).toBeLessThan(sequence);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Issue #117 — a change of mind is not a choice
+ * -------------------------------------------------------------------------- */
+
+describe('issue #117 — pressing Resume does not let boot’s own run count', () => {
+  /*
+   * ## What was reported
+   *
+   * *"WHAT MOVED SINCE THE RUN BEFORE THIS ONE compares against a phantom run, so a real
+   * improvement reads as a catastrophe."* The baseline was a run the player never started:
+   * `was Garden Apartments · Energy aware · seed 212586776783610 · carried 39`, against a 621-rider
+   * Chancery House day.
+   *
+   * ## The seam
+   *
+   * `boot()` runs a full shift under the menu overlay — on the restored session's building,
+   * dispatcher and seed, which is where a phantom's *identity* comes from. § D232 stopped that run
+   * counting with one flag, and `closeMenu` latched that flag on **all** its arms, including the
+   * one whose own docstring says *"Resume itself starts nothing."* So Escape, then play, and boot's
+   * recording filed as a real day and rotated into the Day report's `was` column.
+   *
+   * The flag was answering two questions: *may this run play?* (yes — the player left the menu on
+   * purpose) and *may this run count?* (no — they entered no mode). They are now two flags, and
+   * this suite holds the arm that told them apart.
+   */
+  it('the close arm says it is a change of mind, and it is the only arm that does', async () => {
+    const source = await mainSource();
+    const dispatch = source.slice(source.indexOf('function dispatchMenu('));
+    const changedTheirMind = [...dispatch.matchAll(/closeMenu\('changed-their-mind'\)/g)];
+    const enteredAMode = [...dispatch.matchAll(/closeMenu\('entered-a-mode'\)/g)];
+    expect(changedTheirMind, 'exactly one way out of the menu is not a mode being entered').toHaveLength(1);
+    expect(enteredAMode.length, 'the other ways out still enter a mode').toBeGreaterThanOrEqual(3);
+    // And it is the `close` arm — the one **Resume** and Escape press (issue #40), not another.
+    const closeArm = dispatch.slice(
+      dispatch.indexOf("case 'close':"),
+      dispatch.indexOf("case 'open-campaign':"),
+    );
+    expect(closeArm).toContain("closeMenu('changed-their-mind')");
+  });
+
+  it('leaves no unqualified closeMenu() anywhere — the distinction cannot be skipped', async () => {
+    /*
+     * A text guard for a property the compiler already holds (`exit` is required), and it is here
+     * for the case the compiler cannot see: somebody re-widening the parameter with a default. The
+     * comments come out first, because this file's prose quotes the shipped form it replaced.
+     */
+    const source = (await mainSource()).replaceAll(/\/\*[\s\S]*?\*\//g, '');
+    expect(source).not.toMatch(/closeMenu\(\s*\)/);
+    expect(source, 'a default on `exit` is the one-flag bug with an extra step').not.toMatch(
+      /exit\s*:\s*'entered-a-mode'\s*\|\s*'changed-their-mind'\s*=/,
+    );
   });
 });
 
