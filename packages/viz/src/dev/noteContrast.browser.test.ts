@@ -58,26 +58,29 @@
  * could see that the node tier could not — which is this file's whole reason for existing.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-/** The provisioned headless shell — `boot.browser.test.ts`'s constant, for its reasons. */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
+import { CHROMIUM, HAS_BROWSER } from './browserTier.test-helper.js';
 
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220). ' +
-      '`dev/noteContrast.test.ts` is the always-on gate for the same property.',
-  );
-}
+/*
+ * **The gate comes from the shared module, and this file is the reason that module now exists in
+ * the form it does** — GitHub issue #142.
+ *
+ * It was written with its own copy of the constant, cargo-culted from `boot.browser.test.ts`,
+ * whose docstring said the copies were "kept identical". They were kept identical by nobody: there
+ * were six of them, and #142's guard found this one as the **seventh** the moment the two branches
+ * merged. That is the mechanism working rather than a merge conflict — `browserTier.test.ts`
+ * asserts that every file in this tier reads the same gate, so a private copy is red on the commit
+ * that introduces it and names itself in the failure.
+ *
+ * The behaviour is unchanged: same environment variable, same `existsSync`, same skip-rather-than-
+ * fail. What moves is that a tier-wide guard can now *see* this file's gate, which is precisely
+ * what it could not do while the constant was local.
+ */
 
 /** WCAG 2.2 AA 1.4.3, normal text. Both classes are under 18.66 px at every weight. */
 const AA_BODY = 4.5;
@@ -111,7 +114,23 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 0 },
+    /*
+     * A port of this file's own, and `strictPort: false` so a busy one becomes the next free one —
+     * `compareLab.browser.test.ts`'s rule, and this file is the case that proves it.
+     *
+     * It was written as `port: 0` and was green, because on its own branch it was the only new file
+     * in the tier. Integrated beside issue #142's repairs it became the **seventh** file here, and
+     * `port: 0` does not mean *an ephemeral port*: Vite resolves it to its configured default of
+     * 5173, which `boot.browser.test.ts` also asks for. Seven files start concurrently by default,
+     * so the loser got no URL at all and this suite failed in `beforeAll` with *"the dev server did
+     * not report a local URL"* — six skipped cases and a red file, for a reason with nothing to do
+     * with contrast.
+     *
+     * Found only by running the tier **after** integrating, never on either branch: each was green
+     * alone. That is the merge-finds-what-neither-branch-could shape, and it is the second time in
+     * this wave that the tier's own concurrency produced it.
+     */
+    server: { port: 5293, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
