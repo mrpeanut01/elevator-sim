@@ -239,18 +239,55 @@ export const LEVER_SURFACES: Readonly<Record<string, TabName>> = Object.freeze({
 });
 
 /**
- * One `before → after` pair — **both of them strings the sheets themselves published**.
+ * One `before → after` pair — **every string in it published by one of the two sheets**.
  *
- * There is no third field. A signed change would be arithmetic in a file that has none, and it
- * would be the sheet doing the reader's subtraction *and* choosing which direction is good. The two
- * values are what the two sheets printed, in the words they printed them in — which is what makes a
- * withheld cell survive the pairing intact: `withheld → 58.3 s` is the shift layer's own refusal,
- * copied, rather than a hole where a difference could not be taken.
+ * There is no signed change and no direction. A subtraction would be arithmetic in a file that has
+ * none, and it would be the sheet doing the reader's subtraction *and* choosing which way is good.
+ * The values are what the two sheets printed, in the words they printed them in — which is what
+ * makes a withheld cell survive the pairing intact: `withheld → 58.3 s` is the shift layer's own
+ * refusal, copied, rather than a hole where a difference could not be taken.
+ *
+ * ## The two count fields, and why they are two — GitHub issue #137
+ *
+ * This row had three fields, and the honesty sweep's R13 found what the missing fourth cost the
+ * moment the block entered the corpus: `AVERAGE WAIT was 17.8 s → 23.4 s`, **a mean with no count
+ * anywhere in its box**, on 24 of 49 always-on cases. R13 clause one is not a style rule —
+ * *`n = 5` is not a caveat on `11.3 s`, it is part of what `11.3 s` means* — and this block is
+ * where the sheet's mean travels furthest from the note that carried its denominator: on the Day
+ * report the figure grid is one block below, and on § D310's dispatcher-editor result strip, which
+ * draws this same view through `reportViewOf`, there is no grid at all.
+ *
+ * **Two runs, two counts, and they are attached per side rather than stated once for the row.** The
+ * two values are means of *different runs*, taken over different cohorts — a day that carried 1 198
+ * legs and a day that carried 1 204 — so one `n` under both would be a claim neither sheet made,
+ * and it would be wrong in exactly the case a reader is here for: a change that moved the wait by
+ * moving how many people got carried. Each count is glued to the value it is the denominator of, so
+ * the row cannot be read as one sample even by a reader who is skimming. They stay two even when
+ * the two numbers agree — collapsing them then would be indistinguishable, on screen, from a row
+ * that only ever had one, and *"they happened to match"* is itself worth seeing.
+ *
+ * **A refused figure stays refused.** {@link beforeCount} and {@link afterCount} are `null` wherever
+ * the sheet published no mean: a withheld cell has no sample, so `withheld` pairs as the bare word
+ * it always did, and the count that would have gone beside it does not appear. See
+ * {@link ReportFigure.count}, which is where that decision is made and where it is argued.
+ *
+ * Nothing here is composed: both counts are the two sheets' own notes for that cell, carried the
+ * way {@link before} and {@link after} carry their values.
  */
 export interface DeltaRowView {
   readonly label: string;
   readonly before: string;
   readonly after: string;
+  /**
+   * What the earlier sheet's value was computed over — its own note, verbatim — or `null`.
+   *
+   * `null` means *"this side is not a mean over a sample"*, which covers every observation row, the
+   * identity rows, and a side whose mean the run refused. It never means *"there is a count and it
+   * is not being shown"*: that state is the defect this field exists to end.
+   */
+  readonly beforeCount: string | null;
+  /** The same, for the later sheet's value. See {@link beforeCount}. */
+  readonly afterCount: string | null;
 }
 
 /**
@@ -870,6 +907,24 @@ function refusalNoteOf(differsOn: readonly string[]): string {
 }
 
 /**
+ * The sentence a cell already published about **what its value was computed over**, or `null`.
+ *
+ * One line, and the whole of it is a refusal to make a decision here. Whether this value is a mean
+ * over a sample is `shift/report.ts`'s answer (`ReportFigure.count`, set from the same summary as
+ * the value); *how to say so in English* is also its answer (`ReportFigure.note`, the line the
+ * figure grid draws under the figure). This module chooses neither and copies both, which is the
+ * same contract {@link DeltaRowView.before} keeps for the value itself.
+ *
+ * The two are read together on purpose. `count` alone would have to be formatted here, and a second
+ * place that decides whether an `n` is written *1204* or *1 204* is a second place for it to be
+ * written differently from the grid one block above. `note` alone would mean asking a sentence
+ * whether it contains a count, which is the parse this field exists to avoid.
+ */
+function countNoteOf(cell: ReportFigure): string | null {
+  return cell.count === undefined ? null : cell.note;
+}
+
+/**
  * What moved between two filed sheets — and nothing else.
  *
  * Pure, total, and **arithmetic-free**: every value is a string one of the two sheets already
@@ -886,6 +941,13 @@ function refusalNoteOf(differsOn: readonly string[]): string {
  * get the identity rows, no figure rows and a note that says which axis differs; see
  * {@link ReportDeltaView} and {@link ReportBasis}. It is checked ahead of the pairing rather than
  * used to filter it afterwards, because a partial pairing would be the same defect with fewer rows.
+ *
+ * **And each paired value carries the count it was taken over** — issue #137, R13 clause one. The
+ * two counts come from the two sheets, one each, because the two values do; the argument for why
+ * they are per-side rather than per-row is {@link DeltaRowView}'s. Note what the refusal branch
+ * above does *not* need doing to it: it returns no figure rows at all, so there is no value there
+ * for a count to be missing from, and § D311's refusal acquires nothing that could make it read as
+ * a figure with a caveat.
  */
 function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): ReportDeltaView {
   const lineOf = (report: ShapedDayReport, of: 'title' | 0 | 1): string =>
@@ -895,7 +957,10 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
   for (const row of SELECTION_ROWS) {
     const before = lineOf(previous, row.of);
     const after = lineOf(current, row.of);
-    if (before !== after) selection.push({ label: row.label, before, after });
+    // An identity line is a name, not a mean, so neither side has a sample. See {@link DeltaRowView}.
+    if (before !== after) {
+      selection.push({ label: row.label, before, after, beforeCount: null, afterCount: null });
+    }
   }
 
   const differsOn = basisDifferencesOf(previous.basis, current.basis);
@@ -914,13 +979,33 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     };
   }
 
-  const was = new Map(previous.figures.map((cell) => [cell.id, cell.value]));
+  /*
+   * The earlier sheet's whole **cell**, not just its value — issue #137.
+   *
+   * A pairing needs two counts and they belong to two different runs, so the earlier one can only
+   * come from the earlier sheet. Keyed by `id` rather than by `label` for the reason the pairing
+   * always was: a label is copy and an id is the contract.
+   */
+  const was = new Map(previous.figures.map((cell) => [cell.id, cell]));
   const figures: DeltaRowView[] = [];
   for (const cell of current.figures) {
-    const before = was.get(cell.id);
+    const wasCell = was.get(cell.id);
     // A figure the earlier sheet did not carry is not a change; it is a sheet of a different shape.
-    if (before === undefined || before === cell.value) continue;
-    figures.push({ label: cell.label, before, after: cell.value });
+    if (wasCell === undefined || wasCell.value === cell.value) continue;
+    figures.push({
+      label: cell.label,
+      before: wasCell.value,
+      after: cell.value,
+      /*
+       * Each side's own denominator, from each side's own sheet, and the note is carried rather
+       * than rebuilt: `ReportFigure.count` says *whether* this value is a mean over a sample and
+       * `ReportFigure.note` is how that sheet already said it in words. Asking `count` rather than
+       * looking for digits in the note is the difference between *is there a count* and *is there
+       * a number*, which is the mistake this block is being fixed out of.
+       */
+      beforeCount: countNoteOf(wasCell),
+      afterCount: countNoteOf(cell),
+    });
   }
 
   const moved = selection.length > 0 || figures.length > 0;
@@ -1543,8 +1628,21 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   });
   ui.lede.insertAdjacentElement('afterend', deltaBox);
 
-  /** One `LABEL  before → after` line. The arrow is a separator, never a direction. */
+  /**
+   * One `LABEL  before → after` line. The arrow is a separator, never a direction.
+   *
+   * The count rides **beside its own value** rather than under the row — issue #137, and the
+   * placement is the argument. R13 asks for the `n` in the same visual unit as the figure; a line
+   * under the row would satisfy that and would leave a reader to work out which of two numbers goes
+   * with which of two counts, which is the one thing a pairing of two runs cannot let them guess.
+   * Parenthesised, dimmed and set at the note size, so it reads as the sheet's own figure note —
+   * which is what it is, verbatim — rather than as part of the value.
+   */
   function deltaRow(row: DeltaRowView): HTMLElement {
+    const count = (text: string | null): readonly HTMLElement[] =>
+      text === null
+        ? []
+        : [el(doc, 'span', { text: `(${text})`, style: { color: 'var(--dim)', 'font-size': '11px' } })];
     return el(doc, 'div', {
       style: { display: 'flex', 'flex-wrap': 'wrap', gap: '4px 8px', 'font-size': '12px' },
       children: [
@@ -1554,9 +1652,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         }),
         // `was` in words as well as in position, because a bare arrow is a signal with one channel.
         el(doc, 'span', { text: `was ${row.before}`, style: { color: 'var(--dim)' } }),
+        ...count(row.beforeCount),
         // Decorative: `was` already carries the relation in words, so a screen reader hears it once.
         el(doc, 'span', { text: '→', attrs: { 'aria-hidden': 'true' }, style: { color: 'var(--dim)' } }),
         el(doc, 'span', { text: row.after }),
+        ...count(row.afterCount),
       ],
     });
   }

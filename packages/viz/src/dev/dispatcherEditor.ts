@@ -771,6 +771,19 @@ const RUN_READ_OUT_COPY: Readonly<Record<Exclude<EditorRunReadOut, 'paired'>, st
       'weight, run again from here, and the next sheet arrives paired with this one.',
   });
 
+/**
+ * One side of a pairing row: the sheet's value, and — when that value is a mean — the count it was
+ * taken over, in the sheet's own words. Issue #137.
+ *
+ * Both strings arrive from `ReportDeltaView`; nothing is composed here except the brackets. It is a
+ * function rather than two inline templates so the two sides cannot end up punctuated differently,
+ * which is the smallest version of the mistake this whole strip is arranged against: two answers to
+ * one question about one run.
+ */
+function withCount(value: string, count: string | null): string {
+  return count === null ? value : `${value} (${count})`;
+}
+
 /** The note for a strip that is not showing a pairing, with the playhead's clock where it belongs. */
 function runReadOutNoteOf(state: Exclude<EditorRunReadOut, 'paired'>, progress: RunProgress): string {
   const base = RUN_READ_OUT_COPY[state];
@@ -1420,9 +1433,27 @@ export function mountDispatcherEditor(
            * The identity rows first, then the figures — `reportDeltaOf`'s own order, and the one that
            * matters: a reader has to see that the *seed* moved before they read six figures that
            * moved, or the strip invites them to attribute the change to the weight they dragged.
+           *
+           * **And each value carries the count it was taken over, when it is a mean** — issue #137,
+           * R13 clause one, and this is the surface where it costs most. The Day report draws this
+           * same block a scroll above a figure grid that prints `over 1 204 legs in the peak-5min
+           * window` under the mean. *This strip has no grid.* It is a caption, these rows and a
+           * note, so a mean here is read with nothing around it — which is why the honesty sweep's
+           * finding was recorded against both surfaces and why the fix could not be a Day-report-
+           * only one.
+           *
+           * The counts are `ReportDeltaView`'s, decided once in `reportPanel.ts#reportDeltaOf` and
+           * drawn here rather than worked out again: two implementations of *what n is this* on one
+           * pairing is how the two surfaces come to print different denominators for the same run.
+           * One `plate-row` per figure, each count parenthesised beside its own value, so a reader
+           * is never asked which of the two counts belongs to which of the two runs.
            */
           [...paired.selection, ...paired.figures].map((row) =>
-            plateRow(doc, row.label, `${row.before}  →  ${row.after}`),
+            plateRow(
+              doc,
+              row.label,
+              `${withCount(row.before, row.beforeCount)}  →  ${withCount(row.after, row.afterCount)}`,
+            ),
           )),
     );
     setText(

@@ -67,13 +67,15 @@ verdict:
   of those were already wrong in the published row — the deep tier's surface count is **31**, not 30,
   because `campaign/judge.ts#judgeStage` speaks in no other tier, and *0 violations* had stopped
   being true of the deep half the day the temporal axis landed. The current figures, re-measured on
-  both tiers after issue #127 (a decision number is owed for that wave; the argument is in
-  `honesty/surfaces.ts` and `honesty/run.ts`):
+  both tiers after issues #127 and #137 — the second of which fixed what the first found, so the
+  strings moved a third time (a decision number is owed for each; the arguments are in
+  `honesty/surfaces.ts`, `honesty/run.ts`, `shift/types.ts#ReportFigure.count` and
+  `dev/reportPanel.ts#DeltaRowView`):
 
-  | tier | cases | strings | simulations | surfaces | verdict |
-  |---|---|---|---|---|---|
-  | always-on | 49 | **285 954** | **606** | 30 | **green** — every finding registered |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **360 945** | **4 710** | **31** | **green** — every finding registered |
+  | tier | cases | strings | simulations | surfaces | failing cases | verdict |
+  |---|---|---|---|---|---|---|
+  | always-on | 49 | **286 054** | **606** | 30 | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **361 057** | **4 710** | **31** | **1** | **green** — the one finding is registered |
 
   Measured 2026-08-09 on the integrated tree, both tiers, in one sitting — and that is the point of
   the sentence rather than a detail of it. **Three lanes in this wave each measured the corpus on a
@@ -84,23 +86,34 @@ verdict:
 
   **The verdict column says *green* rather than *0 violations*, and the difference is deliberate.**
   Both tiers pass, which means every violation the search finds is in `honesty.test.ts`'s
-  `OUTSTANDING` register with a ghost check holding it. Two findings are open there:
+  `OUTSTANDING` register with a ghost check holding it. **One finding is open**, and it is the
+  cue-rule coincidence rather than a product defect:
 
-  - **`estimate-without-n`** — the Day report's delta row publishes `AVERAGE WAIT was 17.8 s →
-    23.4 s`, a mean with no count in its own box, and § D310's editor strip draws the same row.
-    Found by the sweep on its **first run** after issue #127 put the block in the corpus, which is
-    the property working. Recorded rather than fixed on § D307's precedent, because the fix changes
-    what two shipped surfaces look like. **Issue #137.**
-  - **`suppressed-mean`** — `honesty-9100031`, deep tier only, a cue-rule coincidence rather than a
-    false claim on screen: the caveat says *"a quotable average on 6 of 20 consecutive seeds"* and
-    that run's refused `meanWaitS` also rounds to 20. It was published as *outstanding* in this file
-    and the roadmap **while being held by no register at all**, so the deep tier was genuinely red
-    on `integration/issue-wave-15` before this wave entered it. Now registered in both directions.
+  - **`suppressed-mean`** — `honesty-9100031`, deep tier only, 10 violations in one case: the caveat
+    says *"a quotable average on 6 of 20 consecutive seeds"* and that run's refused `meanWaitS` also
+    rounds to 20. It was published as *outstanding* in this file and the roadmap **while being held
+    by no register at all**, so the deep tier was genuinely red on `integration/issue-wave-15` before
+    this wave entered it. Now registered in both directions.
 
-  A count of violations is deliberately not published here. Two attempts to extract one from the
-  run's output disagreed with each other, because a finding is reported once per property that sees
-  it rather than once per string; the register names *what* is outstanding, which is what a reader
-  needs and what a run can be asked to reproduce.
+  **`estimate-without-n` was the second, and it is closed in the product** (issue **#137**). The Day
+  report's delta row published `AVERAGE WAIT was 17.8 s → 23.4 s` — a mean with **no count in its
+  own box**, on 24 of 49 always-on cases and 28 of 60 deep — and § D310's editor strip drew the same
+  row with no figure grid anywhere near it. The row now carries the count each mean was taken over,
+  **one per side**: the two values are means of two different runs, so one `n` under both would be a
+  claim neither sheet made. A refused mean carries none, because a refusal has no sample. Fixed in
+  the view (`ReportFigure.count` → `DeltaRowView.beforeCount`/`afterCount`) so both renderers draw it
+  from one decision, and **both `OUTSTANDING` entries were deleted on the commit that made the
+  finding stop reproducing** — a registered finding that has been fixed must stop being registered,
+  or the register becomes decoration. Violations went **48 → 0** always-on and **104 → 0** deep; the
+  string counts moved **+100** and **+112**, which is the counts themselves entering the corpus. A
+  decision number is owed; the argument is in the docstrings named in § D322's closing note.
+
+  The column that moved into the table is **failing cases**, which the run prints and which nobody
+  has to derive. A count of *violations* is still not published as a headline: two attempts to
+  extract one from the run's output disagreed with each other, because a finding is reported once per
+  property that sees it rather than once per string. Where a violation count appears below it is
+  quoted as *reported violation lines on a named property*, which is a thing a reader can grep the
+  run's output for — and the only violation count that needs no such care is **zero**.
 
   The surface column is corrected as well as re-measured — it published `30` for both tiers, and the
   deep tier reaches **31**, because `campaign/judge.ts#judgeStage` is silent in the always-on tier by
@@ -116,21 +129,32 @@ verdict:
   always-on and **+1 552** deep. The simulations move by exactly one per case (**+49** and **+60**)
   because a *drawn* comparison needs two runs, and the case's candidate arm is the honest second one.
 
-  **The violation counts went up too, and that is the finding rather than the cost.** The block's
-  first sweep produced one R13 violation, in 24 of 49 always-on and 28 of 60 deep cases:
-  `AVERAGE WAIT was 17.8 s → 23.4 s`, a mean with **no count anywhere in its box**. It is real rather
-  than a classification artefact — the block's rows carry no note, and on `dispatcherEditor.ts`'s
-  result strip there is no figure grid nearby either — and it is **recorded rather than fixed**, on
-  § D307's own precedent that a corpus which acquired a surface and had to be repaired first is a
-  different claim from one that acquired it and reported. The fix is a change to what two shipped
-  surfaces draw and needs its own issue.
+  **Then they went up again by a hundred each, and that is the fix rather than a second sweep.**
+  Issue #137 put a count beside each paired mean, so the corpus acquired those strings: **285 954 →
+  286 054** always-on and **360 945 → 361 057** deep, with the simulations, the cases and the
+  surfaces all unmoved. A string count that rose while nothing else did is what a fix adding words to
+  one row is supposed to look like, and saying it beside the violation count is the point — the same
+  change took `estimate-without-n` from **48 reported violations to 0** and from **104 to 0**, and
+  took the always-on tier from **24 failing cases to none**.
 
-  The deep tier's other failure is `honesty-9100031` / `suppressed-mean`, a **cue-rule coincidence
-  rather than a product defect**: the caveat says *"a quotable average on 6 of 20 consecutive
-  seeds"* and that run's refused `meanWaitS` (19.65) also rounds to 20. It has been published as
-  outstanding since the temporal axis landed **and was in no register**, so the deep tier was simply
-  red on this base; it is entered in `honesty.test.ts`'s `OUTSTANDING` now, where the ghost check
-  holds it accountable in both directions.
+  **The violation counts had gone up first, and that was the finding rather than the cost.** The
+  block's first sweep produced one R13 violation, in 24 of 49 always-on and 28 of 60 deep cases:
+  `AVERAGE WAIT was 17.8 s → 23.4 s`, a mean with **no count anywhere in its box**. It was real
+  rather than a classification artefact — the block's rows carried no note, and on
+  `dispatcherEditor.ts`'s result strip there is no figure grid nearby either — and it was **recorded
+  rather than fixed** in that lane, on § D307's own precedent that a corpus which acquired a surface
+  and had to be repaired first is a different claim from one that acquired it and reported. It is
+  fixed now, one wave later, in the view both surfaces draw from.
+
+  The deep tier's **remaining** failure — its only one — is `honesty-9100031` / `suppressed-mean`, a
+  **cue-rule coincidence rather than a product defect**: the caveat says *"a quotable average on 6 of
+  20 consecutive seeds"* and that run's refused `meanWaitS` (19.65) also rounds to 20. It has been
+  published as outstanding since the temporal axis landed **and was in no register**, so the deep
+  tier was simply red on this base; it is entered in `honesty.test.ts`'s `OUTSTANDING` now, where the
+  ghost check holds it accountable in both directions. It is also the reason issue #137's count was
+  seeded as its own string rather than spliced into the row: the row's label *is* R3's cue, and a
+  denominator set beside the word `AVERAGE` on a run whose mean is refused is that same collision,
+  manufactured on purpose.
 
   **The sweep now has a temporal axis, and it is the first thing in this verdict that did not come
   back green** ([§ D300](DECISIONS.md)'s E-4, [§ D307](DECISIONS.md)). A seventh property asks

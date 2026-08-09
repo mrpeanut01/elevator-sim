@@ -719,9 +719,17 @@ describe('the press really moves the run, and the strip really reports it — §
       ...before.metaLines,
       ...after.metaLines,
     ]);
+    // The counts issue #137 added are held to the same rule, against the notes rather than the
+    // values: a denominator composed on the way to this strip would be a second answer to *what n
+    // is this* on a run the Day report is describing at the same time.
+    const publishedNotes = new Set([...before.figures, ...after.figures].map((cell) => cell.note));
     for (const row of [...strip.selection, ...strip.figures]) {
       expect(published.has(row.before), `${row.label}: “${row.before}” is nobody’s published string`).toBe(true);
       expect(published.has(row.after), `${row.label}: “${row.after}” is nobody’s published string`).toBe(true);
+      for (const count of [row.beforeCount, row.afterCount]) {
+        if (count === null) continue;
+        expect(publishedNotes.has(count), `${row.label}: “${count}” is nobody’s published note`).toBe(true);
+      }
     }
   });
 
@@ -791,6 +799,29 @@ describe('the panel says what one press buys, on the press', () => {
     expect(code).toContain('reportViewOf(state.report, { kind: \'played-out\' }, caused.before).delta');
     const mount = code.slice(code.indexOf('export function mountDispatcherEditor'));
     expect(mount).not.toMatch(/parseFloat|Number\(|\.toFixed\(/u);
+  });
+
+  it('draws each count beside the value it belongs to — R13 on the surface with no grid', () => {
+    /*
+     * GitHub issue #137, and the assertion that keeps the two renderers of one view together.
+     *
+     * The honesty sweep drives `reportViewOf`, so a strip that received the counts and drew none of
+     * them would leave the corpus green and the screen wrong — the search would be certifying a
+     * string this surface does not print. The Day report's copy of the block at least sits above a
+     * figure grid that prints `over 1 204 legs in the peak-5min window`; **this strip has no grid**,
+     * so a mean drawn here is read with nothing around it at all.
+     *
+     * Source-read for this suite's stated reason — weak evidence about behaviour, strong evidence
+     * that a line has not been dropped — and what it pins is that both sides go through the one
+     * composer rather than through two templates that can be punctuated differently.
+     */
+    expect(code).toContain('withCount(row.before, row.beforeCount)');
+    expect(code).toContain('withCount(row.after, row.afterCount)');
+    expect(code).toContain('function withCount(value: string, count: string | null): string');
+    // Brackets, and nothing else: the count is `ReportDeltaView`'s string, not a sentence composed
+    // here. A `Number(` or a `toFixed(` in this mount is already refused by the assertion above.
+    const composer = code.slice(code.indexOf('function withCount('));
+    expect(composer.slice(0, composer.indexOf('\n}'))).toContain('`${value} (${count})`');
   });
 
   it('arms the pairing only on a press that produced a run', () => {

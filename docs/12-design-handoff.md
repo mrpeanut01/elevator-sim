@@ -535,6 +535,44 @@ applies to a *caption* the same way: it is drawn in the design's own legend comp
 under M4's, and it spends no hue the stage does not draw. Its swatches read `render/tokens.ts`
 through three new shell tokens, so the key and the canvas cannot disagree.
 
+### 4.10 The run-to-run delta rows carry an `n`, and the handoff has no block for them at all
+
+GitHub issue #137, and it is recorded here because § 4.7's rule — *a control the handoff has no row
+for still answers to this document* — applies to a **block** the same way.
+
+**The handoff has no delta block.** *What moved since the run before this one* is issue #38's
+addition, `index.html` has no slot for it, and `dev/reportPanel.ts` builds its box after the lede for
+that reason. § D310 then drew the same view a second time, as the dispatcher editor's result strip.
+So there is no handoff layout to deviate from; what there is, and what this change is answerable to,
+is the handoff's **figure component**: a value with its note directly under it, in the same cell, at
+the note size and in the dim ink (`design.html` :250–258, and § 4.2's table is its figure-by-figure
+audit).
+
+**What changed.** Each paired value that is a mean now draws the count it was taken over beside it,
+parenthesised, at 11 px in `--dim` — the sheet's own figure note, verbatim, unedited:
+
+```
+AVERAGE WAIT   was 9.7 s (over 14 legs in the peak-5min window) → 14.3 s (over 14 legs in the peak-5min window)
+```
+
+**The constraint that forced it, and why the note is not under the row.** The honesty sweep's R13 —
+*no estimate is displayed without the count it was computed from, in the same visual unit* — fired on
+this row on 24 of 49 always-on cases and 28 of 60 deep, the first time the block was swept. A note
+line under the row would satisfy *the same visual unit* and would leave a reader pairing two values
+with two counts by position. These are means of **two different runs**: one `n` for the row, or two
+`n`s a row apart, are both readings a reader can get wrong, and the one they get wrong is the case
+they came here for. Beside its own value is the only placement where the pairing cannot be misread.
+
+**What it costs the layout.** The row is a wrapping flex line and stays one; on a wide screen the
+figure rows grow by the bracketed clause, and on a narrow one they wrap to a second line rather than
+truncating. The dispatcher editor's strip draws the same two facts in its own `plate-row` idiom —
+one row, both counts in brackets — because that panel has no figure grid anywhere near it, which is
+the surface where a mean with no denominator costs most.
+
+Nothing else about the block moved: no colour, no arithmetic, no ordering, and a refused mean still
+draws the bare word `withheld` with **no** count beside it — a refusal has no sample, and a
+denominator printed next to it would read as a figure with a caveat.
+
 ---
 
 ## 5 — Definition of done

@@ -3080,18 +3080,43 @@ function reportPairingsOf(bundle: ShiftBundle): readonly ReportPairing[] {
  *
  * ## The roles are the sheet's own, and the figure rows are the argument
  *
- * `DeltaRowView` is `{ label, before, after }` and carries no classification of its own, so
- * `types.ts`'s rule would make every row `prose`. That rule has a second half — *"an adapter copies
- * the surface's classification; it never invents one"* — and a figure row **is** a figure: it is
- * matched back to the `ReportFigure` the current sheet published, by the label the row was built
- * from, and it takes that cell's role, its `gated` flag and its `axisOnly` flag. A row pairing
- * `AVERAGE WAIT` is the sheet's own estimate with a second value beside it, and calling it prose
- * because the pairing dropped the tone would be the adapter deciding a property does not apply.
+ * `DeltaRowView` carries no classification of its own, so `types.ts`'s rule would make every row
+ * `prose`. That rule has a second half — *"an adapter copies the surface's classification; it never
+ * invents one"* — and a figure row **is** a figure: it is matched back to the `ReportFigure` the
+ * current sheet published, by the label the row was built from, and it takes that cell's role, its
+ * `gated` flag and its `axisOnly` flag. A row pairing `AVERAGE WAIT` is the sheet's own estimate
+ * with a second value beside it, and calling it prose because the pairing dropped the tone would be
+ * the adapter deciding a property does not apply.
  *
- * `countShown` is therefore `false` for a gated row, and that is a **measurement rather than a
- * concession**: the block draws `LABEL was X → Y` and no count anywhere in the box, so if R13 has
- * something to say here it should say it. The alternative — reading the digits out of the *value* —
- * would be the adapter answering *is there a count?* with *is there a number?*.
+ * ## `countShown` is still a measurement, and what it measures moved — GitHub issue #137
+ *
+ * When this adapter was written the block drew `LABEL was X → Y` and no count anywhere in its box,
+ * so the flag was a flat `false` for a gated row and R13 duly reported it on 24 of 49 always-on
+ * cases and 28 of 60 deep. The row now carries each side's own count — `DeltaRowView.beforeCount`
+ * and `afterCount`, the two sheets' own figure notes — drawn beside its own value by both
+ * renderers. The flag is read off **the later side's** count string, because the later sheet is
+ * where this row's role came from, and it is read as a digit test over that string rather than as
+ * `!== null`: a count field holding a sentence with no number in it is not a count on screen.
+ *
+ * A side whose sheet refused its mean has no count, draws none and reports none, so a pairing where
+ * the current cell is `withheld` still comes back `countShown: false` — and R13 stays silent there
+ * because that row's role is `suppressed`, which is R3's business rather than R13's.
+ *
+ * ## The counts are seeded as their own strings, which is the grid's arrangement and not a dodge
+ *
+ * The figure grid one block down seeds a cell's value and its note as **two** strings and reads
+ * `countShown` off the note, because *"the sheet draws the value and the note together"*. This row
+ * is now the same shape: `dev/reportPanel.ts#deltaRow` draws the count in its own `<span>` beside
+ * the value it belongs to, so two seeds is what the DOM actually is.
+ *
+ * It also keeps a coincidence out of the corpus that inlining would have invited, and the
+ * coincidence is a real one rather than a hypothetical: R3's textual half fires on a **numeral in
+ * the same clause as a cue naming the quantity**, the row's label *is* that cue (`AVERAGE`), and a
+ * count spliced in beside it puts `waitCount` a few characters from the word `average` on runs
+ * whose mean is refused. `honesty-9100031` is that exact shape already — a refused `meanWaitS` of
+ * 19.65 colliding with a `20` that is a seed count — and it is open. Seeding the count as its own
+ * string carries no cue, so the collision cannot be manufactured here; what R13 needs from the
+ * arrangement is `countShown`, which is the flag, not the splice.
  *
  * ## The note is `prose`, deliberately, and it is the stronger choice
  *
@@ -3130,12 +3155,26 @@ function deltaSeeds(
       field: `${at}.delta.figures(${row.label})`,
       text: `${row.label} was ${row.before} → ${row.after}`,
       role: shape.role,
-      // Not `undefined`: the block prints no count beside the value, and saying so is the point.
-      countShown: shape.gated ? false : undefined,
+      // The **later** sheet's count, because the later sheet is the one this row's role came from.
+      declaredCount: shape.gated ? source?.count : undefined,
+      countShown: shape.gated ? /(\d[\d,]*)/.test(row.afterCount ?? '') : undefined,
       energyAxis: shape.energyAxis,
       gated: shape.gated,
       ...withPlayhead,
     });
+    for (const [side, note] of [
+      ['beforeCount', row.beforeCount],
+      ['afterCount', row.afterCount],
+    ] as const) {
+      if (note === null) continue;
+      seeds.push({
+        field: `${at}.delta.figures(${row.label}).${side}`,
+        text: note,
+        // A denominator is a fact about a run that happened, on either side of the pairing.
+        role: 'observation',
+        ...withPlayhead,
+      });
+    }
   }
   seeds.push({ field: `${at}.delta.note`, text: delta.note, role: 'prose', ...withPlayhead });
   return seeds;

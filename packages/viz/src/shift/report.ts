@@ -1042,6 +1042,20 @@ function figuresFor(
  * wants a handle on it. The value is `summary.meanWaitS` formatted and **nothing else**: there is
  * no fallback arithmetic, no interpolation from the away-inside-a-minute share, and no rounding to
  * a friendlier number. The mockup's `28 + (100 − pct) × 0.9` is asserted absent.
+ *
+ * ## The `n` is published twice, from one place, and the second copy is not decoration
+ *
+ * `summary.waitCount` is the denominator this mean was taken over. It goes into the note, where the
+ * grid draws it under the value, **and** into {@link ReportFigure.count}, where a consumer that
+ * carries the cell somewhere else can still find it — the run-to-run delta block being the consumer
+ * that could not, and GitHub issue #137 being what that cost. Both come off the same `summary` in
+ * the same branch of the same function, so there is no second derivation to go stale: if the mean
+ * moves, the count moves with it or neither does.
+ *
+ * The refusal above carries **no** count, and that is the rule rather than an omission. There is no
+ * mean on that branch, so there is no sample a mean was taken over, and `n = 1 204` printed beside
+ * the word `withheld` reads as a figure with a caveat rather than as a refusal. See
+ * {@link ReportFigure.count}.
  */
 export function averageWaitFigure(summary: VizSummary): ReportFigure {
   const publishable = summary.awtIsValid && !summary.saturated;
@@ -1070,6 +1084,8 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
     note: `over ${String(summary.waitCount)} legs in the ${summary.reportWindow.id} window`,
+    // The same denominator, structured, so it survives being carried off this grid. See above.
+    count: summary.waitCount,
     tone: 'plain',
     axisOnly: false,
   };
