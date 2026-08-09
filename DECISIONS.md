@@ -22513,6 +22513,16 @@ rather than fixed**, on § D307's precedent — *a corpus that grew an axis and 
 different claim from one that had to be repaired first* — and because the fix changes what two
 shipped surfaces look like, which the design handoff owns. Issue **#137**.
 
+> **Closed 2026-08-09, and this paragraph is left standing as the record of what was recorded when.**
+> Issue #137 put the count on the row: `ReportFigure.count` carries the denominator from the same
+> summary and the same function as the mean, `DeltaRowView` carries **two** of them — one per side,
+> because the two values are means of two different runs — and both renderers draw each beside its
+> own value. A refused mean carries none, and § D311's comparability refusal draws no figure rows to
+> carry one. `estimate-without-n` is **0 on both tiers** and both `OUTSTANDING` entries are deleted.
+> **A decision number is owed for it**; the argument is in `shift/types.ts#ReportFigure.count`,
+> `dev/reportPanel.ts#DeltaRowView`, `honesty/surfaces.ts#deltaSeeds` and
+> `docs/12-design-handoff.md` § 4.10.
+
 ### The deep tier was already red, and the register was the thing missing
 
 `honesty-9100031`/`suppressed-mean` was published as *outstanding* in `CLAUDE.md` and the roadmap and
