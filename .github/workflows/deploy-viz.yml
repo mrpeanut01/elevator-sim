@@ -89,10 +89,34 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Matches ci.yml's shape. Deployments are not cancelled mid-flight for the production branch —
-  # a half-uploaded site is worse than a slightly stale one — but superseded pull request builds
-  # are, because only the newest preview is of any use.
-  group: deploy-viz-${{ github.ref }}
+  # Production is its own group, named literally. Pull requests get one group each, named by number.
+  #
+  # This used to be `deploy-viz-${{ github.ref }}` with the same `cancel-in-progress` expression, and
+  # the intent was right — a half-uploaded site is worse than a slightly stale one, so production is
+  # never cancelled mid-flight, while a superseded preview is. **The mechanism did not deliver it**,
+  # and merging pull request #131 is the run that proved it:
+  #
+  #   02:07:15  Deploy viewer  integration/issue-wave-15  pull_request(closed)  success
+  #   02:07:15  Deploy viewer  main                       push                  CANCELLED  (+2 s)
+  #
+  # Two seconds, no job started. `cancel-in-progress` is read from the **arriving** run, not from the
+  # one being cancelled — so a `pull_request` run, which sets it `true`, cancels whatever it shares a
+  # group with, and the push's own `false` protects nothing. The guard assumed both runs in a group
+  # would be the same event, and on a merge they are not.
+  #
+  # The consequence is the part worth remembering: **merging a pull request silently skipped the
+  # production deploy.** The merge was green, the PR closed cleanly, the site stayed on the previous
+  # wave, and the only evidence was a cancelled run nobody had a reason to open. It was found by
+  # grepping the deployed bundle for a string the merge was supposed to have added.
+  #
+  # Naming the groups by *purpose* rather than by ref makes the collision impossible rather than
+  # unlikely: a preview can only ever cancel its own preview.
+  group: >-
+    deploy-viz-${{
+      github.event_name == 'pull_request'
+        && format('pr-{0}', github.event.number)
+        || 'production'
+    }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
