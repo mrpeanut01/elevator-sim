@@ -46,6 +46,7 @@ import {
 } from '../shift/report.js';
 import type { GoalReading, ReportFigure } from '../shift/types.js';
 import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
 import {
   diagnosisRowsOf,
@@ -1633,5 +1634,132 @@ describe('the tone map', () => {
     for (const tone of ['good', 'caution', 'hot', 'bad', 'withheld'] as const) {
       expect(toneColourOf(tone), tone).toMatch(/^var\(--[a-z0-9-]+\)$/);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Overnight — the between-day beat, GitHub issue #91
+ * -------------------------------------------------------------------------- */
+
+describe('the between-day beat is drawn, and only where it is true', () => {
+  /**
+   * A briefing shaped like the one `closeShift` builds. The strings are `shift/tomorrow.ts`'s and
+   * are asserted there; what this suite is about is *which sheets carry it*.
+   */
+  const beat: TomorrowBriefing = {
+    headline: 'Thursday is banked. Friday opens.',
+    groups: [
+      {
+        id: 'changed',
+        caption: 'What changed overnight',
+        rows: [
+          {
+            id: 'tenants',
+            label: 'TENANTS',
+            value: '1,710 → 1,898',
+            note: '188 people move in overnight.',
+          },
+        ],
+      },
+    ],
+    withheld: [],
+  };
+
+  it('appears on a week-day sheet', () => {
+    const view = reportViewOf(reportOf(clean), { kind: 'played-out' }, undefined, beat);
+    expect(view.overnight).toBe(beat);
+  });
+
+  it('is dropped on a single run, which belongs to no week', () => {
+    /*
+     * A Free Play run is one replication of one day. It has no tomorrow to have grown into, and
+     * *what changed overnight* is a sixth week-shaped statement on a sheet that drops the other
+     * five — `WeekFramingView`'s own rule, applied to the beat.
+     *
+     * The arm is read off the **sheet's** shape rather than off whether a briefing was passed, so
+     * this case passes a briefing in and requires it to be dropped rather than merely not supplied.
+     */
+    const view = reportViewOf(reportOf(clean, 4, SINGLE), { kind: 'played-out' }, undefined, beat);
+    expect(view.framing.kind).toBe('single-run');
+    expect(view.overnight).toBeNull();
+  });
+
+  it('is absent from the empty sheet', () => {
+    // No day has closed, so there is no overnight. `null`, not an empty briefing: the box carries
+    // the word *Overnight* as an authored child and would otherwise stand over three holes.
+    expect(emptyReportView().overnight).toBeNull();
+  });
+
+  it('is absent while the run it would follow is still being watched — § D223', () => {
+    /*
+     * The temporal rule, and the reason this case exists rather than being assumed: the sheet
+     * declines to be at 18:00 while the screen is at 09:14, and a beat announcing *tomorrow* over
+     * a day the player is four minutes into would be the same two-answers screen with a different
+     * caption. `watchingReportView` builds on `emptyReportView`, so the `null` is inherited — this
+     * pins that it stays inherited when somebody adds a field.
+     */
+    const watching = runProgressOf({ recording: clean, simTimeS: clean.startedAt + 60 });
+    expect(watching.kind).toBe('watching');
+    expect(reportViewOf(reportOf(clean), watching, undefined, beat).overnight).toBeNull();
+  });
+
+  it('publishes no figure the run’s own summary could refuse', () => {
+    /*
+     * Structural rather than stylistic. Every value the beat carries is a count folded at
+     * `endedAt` or a population read off a building document, so there is no figure `awtIsValid`
+     * speaks for and no path by which this box can print a mean the sheet three sections above is
+     * withholding. Asserted here as well as in `shift/tomorrow.test.ts`, because this is the file
+     * that would go red if the panel ever started composing its own strings for the box.
+     */
+    const view = reportViewOf(reportOf(clean), { kind: 'played-out' }, undefined, beat);
+    const text = (view.overnight?.groups ?? [])
+      .flatMap((group) => [group.caption, ...group.rows.flatMap((row) => [row.label, row.value, row.note])])
+      .join(' ')
+      .toLowerCase();
+    expect(text).not.toContain(WITHHELD.toLowerCase());
+    expect(text).not.toContain('average wait');
+  });
+});
+
+describe('the beat’s box is hidden whole, and every class it emits has a rule', () => {
+  const panelSource = async (): Promise<string> =>
+    readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+
+  it('hides the container rather than emptying it', async () => {
+    /*
+     * The same rule the six week-shaped slots above are pinned by, and for the same reason:
+     * `#report-overnight` carries the eyebrow *Overnight* as an authored child, so blanking the
+     * lists would leave the word standing over nothing — `docs/10` R3 at the layout's scale.
+     */
+    const panel = await panelSource();
+    expect(panel).toContain('setHidden(ui.overnight, beat === null)');
+  });
+
+  it('still does no arithmetic — the beat did not bring a formatter in with it', async () => {
+    // Re-asserted for this change specifically: the box is the first thing on this sheet that
+    // draws a count *and* a percentage, and both are formatted in `shift/tomorrow.ts`.
+    const panel = await panelSource();
+    const body = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const forbidden of ['toFixed(', 'toLocaleString(', 'Math.round(']) {
+      expect(body, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it('has a stylesheet rule for every class the box emits', async () => {
+    /*
+     * Derived from the panel source rather than listed, in `dev/surfaces.test.ts`'s idiom and for
+     * its reason: twenty-nine class names once shipped with zero rules anywhere, and nothing about
+     * unstyled markup looks broken in a screenshot of the rest of the game.
+     */
+    const panel = await panelSource();
+    const emitted = new Set<string>();
+    for (const match of panel.matchAll(/className:\s*'(overnight-[a-z-]+)'/gu)) {
+      const name = match[1];
+      if (name !== undefined) emitted.add(name);
+    }
+    expect(emitted.size, 'the derivation stopped matching').toBeGreaterThanOrEqual(5);
+    const html = await readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
+    const missing = [...emitted].filter((name) => !html.includes(`.${name}`));
+    expect(missing, 'classes the panel emits and the stylesheet never mentions').toEqual([]);
   });
 });

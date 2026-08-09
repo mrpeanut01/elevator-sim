@@ -272,6 +272,13 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   'viewer.withheld': output(
     'What the last run refused to configure, from shiftRunPatch. Shown beside the event note, never swallowed.',
   ),
+  'viewer.tomorrow': output(
+    'The between-day beat (issue #91): the day that closed, what changed overnight, and what ' +
+      'tomorrow is under. Built by closeShift from the closed day plus tomorrowFactsOf, which ' +
+      'resolves tomorrow’s building rather than multiplying today’s caption. An output and not a ' +
+      'control — nothing a player moves writes it, and it moves no leg: pressing Open the doors is ' +
+      'what advances viewer.week, and that field is where the between-days probe already lives.',
+  ),
 
   /* ------------------------------------------------------------------- settings */
   'settings.reduceMotion': control(

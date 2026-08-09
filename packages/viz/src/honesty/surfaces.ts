@@ -83,7 +83,8 @@ import { drawOverlay } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { initialState } from '../dev/state.js';
+import { initialState, tomorrowFactsOf } from '../dev/state.js';
+import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
 import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } from '../render/runSummary.js';
 import { goalReport } from '../scenario/goalReport.js';
@@ -2216,6 +2217,8 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/contracts.ts#statLineOf',
     'shift/weekLabel.ts#coachWeekLines',
     'shift/weekLabel.ts#weekKeptLine',
+    'shift/tomorrow.ts#tomorrowBriefingOf',
+    'dev/state.ts#tomorrowFactsOf',
   ],
   render(context) {
     const { recording } = context;
@@ -2423,6 +2426,77 @@ const SHIFT_REPORT: SurfaceAdapter = {
         text: line,
         role: 'observation',
       });
+    }
+
+    /* ---- the between-day beat — GitHub issue #91 ---- */
+    /*
+     * Driven through **the shipped chain**, not through hand-chosen numbers.
+     *
+     * `tomorrowFactsOf` resolves tomorrow's building the way `closeShift` does — commissioning,
+     * growth, the calendar, `parseBuilding`/`resolveBuilding` — so the population the sweep checks
+     * is the population a player would be shown, and the two figures in `TENANTS` come from two
+     * different resolved documents rather than from one multiplied by 1.11. A seed built from a
+     * literal would have swept a string this surface cannot actually produce.
+     *
+     * Both days of the bundle are driven, because the beat differs on them in a way that matters:
+     * day 1 is the building exactly as shipped and day 4 is 1.33× it, so the reveal's own delta is
+     * exercised at two magnitudes rather than at one. All three verdicts are driven for the same
+     * reason `VERDICT_VOICE` is a table — `ungraded` is the arm whose sentence a finding removed
+     * once already (§ D234), and a sweep that drove only the day's own verdict would leave two of
+     * the three unswept on any given case.
+     */
+    {
+      const shiftResources = browserResourcesOf(context);
+      for (const entry of bundle.days) {
+        const at = `day${String(entry.day)}`;
+        const facts = tomorrowFactsOf(shiftResources, {
+          ...initialState(shiftResources, 1n),
+          buildingId: context.case.buildingId,
+          week: entry.week,
+        });
+        for (const verdict of ['cleared', 'missed', 'ungraded'] as const) {
+          const beat = tomorrowBriefingOf({
+            closed: entry.week.history.at(-1) ?? null,
+            week: entry.week,
+            contract: entry.contract,
+            verdict,
+            populationToday: context.building.totalPopulation,
+            populationTomorrow: facts.population,
+            calendarLineTomorrow: facts.calendarLine,
+            withheldTomorrow: facts.withheld,
+          });
+          const where = `${at}.tomorrow(${verdict})`;
+          seeds.push({ field: `${where}.headline`, text: beat.headline, role: 'label' });
+          for (const group of beat.groups) {
+            seeds.push({
+              field: `${where}.${group.id}.caption`,
+              text: group.caption,
+              role: 'label',
+            });
+            for (const row of group.rows) {
+              seeds.push({ field: `${where}.${group.id}(${row.id}).label`, text: row.label, role: 'label' });
+              /*
+               * `observation` on both halves, for `coachWeekLines(…).progress`'s reason: every
+               * value here is a **count** — legs carried, clean days, people moving in — and a
+               * count is precisely what R13's clauses are about. Classifying the value `label`
+               * would exempt the half of the row worth checking.
+               *
+               * No `declaredCount` is passed, and that is a statement rather than an omission:
+               * none of these figures is an *estimate* over a sample. They are counts of things
+               * that happened and populations read off a building document, so there is no `n`
+               * they could carry and none is claimed.
+               */
+              seeds.push({ field: `${where}.${group.id}(${row.id}).value`, text: row.value, role: 'observation' });
+              seeds.push({ field: `${where}.${group.id}(${row.id}).note`, text: row.note, role: 'observation' });
+            }
+          }
+          for (const [index, line] of beat.withheld.entries()) {
+            // A refusal, and `reason` is the role a refusal gets — it is entitled to name what it
+            // is refusing. See the adapter's docstring on the small print.
+            seeds.push({ field: `${where}.withheld[${String(index)}]`, text: line, role: 'reason' });
+          }
+        }
+      }
     }
 
     seeds.push({ field: 'NOT_RECORDED', text: NOT_RECORDED, role: 'label' });

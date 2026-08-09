@@ -121,6 +121,7 @@ import type {
   ReportLever,
 } from '../shift/types.js';
 import { nextDay, switchWeek } from '../shift/week.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
 import type { ReportElements, TabName } from './elementMap.js';
@@ -432,6 +433,20 @@ export interface ReportView {
    */
   readonly delta: ReportDeltaView | null;
   readonly smallPrint: string;
+  /**
+   * The between-day beat, or `null` — GitHub issue #91.
+   *
+   * `null` on **four** sheets and each for its own reason: nothing filed (no day has closed), a run
+   * still being watched (§ D223 — the sheet declines to be at 18:00 while the screen is at 09:14,
+   * and so does the beat), a single run (a Free Play run belongs to no week and nothing changes
+   * overnight for it), and a day that closed in a mode that does not advance the week.
+   *
+   * The whole `TomorrowBriefing` is carried through unread and unedited, exactly as `nextStep` is:
+   * every string in it is `shift/tomorrow.ts`'s, and a caption composed here would be this module
+   * deciding what a week's progress means — which is a decision, and every decision on this surface
+   * lives in a pure module a test can reach.
+   */
+  readonly overnight: TomorrowBriefing | null;
   /** What this is a sheet **of** — and the whole of what differs between the two shapes. */
   readonly framing: FramingView;
 }
@@ -937,6 +952,9 @@ export function emptyReportView(): ReportView {
     smallPrint: '',
     // Nothing has been run, so there is no question to take anywhere yet.
     nextStep: undefined,
+    // No day has closed, so there is no overnight. The box is hidden whole rather than drawn with
+    // the word *Overnight* over three empty groups.
+    overnight: null,
     /*
      * Week-shaped, and deliberately so: nothing has been filed, so the shell is still standing in
      * the week it opens on, and the disabled *Open the doors on tomorrow* is the handoff's own
@@ -1073,6 +1091,7 @@ export function reportViewOf(
   report: ShapedDayReport | undefined,
   progress: RunProgress = { kind: 'played-out' },
   previous?: ShapedDayReport | undefined,
+  overnight?: TomorrowBriefing | undefined,
 ): ReportView {
   if (report === undefined) return emptyReportView();
   if (progress.kind === 'watching') return watchingReportView(progress);
@@ -1108,6 +1127,17 @@ export function reportViewOf(
     // the § D223 defect with a second run's numbers in it.
     delta: previous === undefined ? null : reportDeltaOf(previous, shaped),
     smallPrint: shaped.smallPrint,
+    /*
+     * The beat is **week-shaped**, so it is dropped on a single run for `WeekFramingView`'s own
+     * reason: five of the week's statements do not exist on that sheet, and *what changed
+     * overnight* is a sixth. A Free Play run is one replication of one day and has no tomorrow to
+     * have grown into.
+     *
+     * The arm is read off the *sheet's* shape rather than off whether a briefing happened to be
+     * passed, so a caller that hands one over for a single run gets it dropped rather than drawn —
+     * the same direction `framingOf` refuses in.
+     */
+    overnight: shaped.of === 'week-day' ? (overnight ?? null) : null,
     framing: framingOf(shaped),
   };
 }
@@ -1187,6 +1217,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         outOfServiceCarIds: [],
         recording: undefined,
         report: undefined,
+        tomorrow: undefined,
         withheld: [],
       });
     }
@@ -1196,9 +1227,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   /**
    * *Open the doors on tomorrow.*
    *
-   * The recording and the report are cleared in the same patch that advances the day, so that if
-   * the run refuses the reader is looking at an empty sheet for a day that has not happened rather
-   * than at yesterday's figures under today's date.
+   * The recording, the report and the between-day beat are cleared in the same patch that advances
+   * the day, so that if the run refuses the reader is looking at an empty sheet for a day that has
+   * not happened rather than at yesterday's figures under today's date. The beat goes with the
+   * sheet rather than surviving the press (issue #91): it is an account of a day that has closed,
+   * and this press opens one that has not.
    *
    * This is the **only** listener on `#report-next-day`. Until 2026-07-30 `main.ts` wired a second
    * one that applied `nextDay` again, so one press advanced two days (DR-13, § D198) — the panel
@@ -1212,6 +1245,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       week: nextDay(view.state.week),
       recording: undefined,
       report: undefined,
+      tomorrow: undefined,
       withheld: [],
     });
     context.openTab('run');
@@ -1233,6 +1267,62 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
           classes: cell.classes,
           valueColor: cell.colour,
         }),
+      ),
+    );
+  }
+
+  /**
+   * The between-day beat — GitHub issue #91.
+   *
+   * The box is hidden **whole** when there is no briefing, rather than emptied: `#report-overnight`
+   * carries the caption *Overnight* as an authored child, so blanking the lists would leave the
+   * word standing over nothing — this module's own rule, and the reason `cardOf` exists two slots
+   * up. Here the container has its own id, so no climb is needed.
+   *
+   * Nothing is composed. Every string written below is a field of `TomorrowBriefing`, and the only
+   * decision in this function is *which element does it go in*.
+   */
+  function drawOvernight(view: ReportView): void {
+    const beat = view.overnight;
+    setHidden(ui.overnight, beat === null);
+    if (beat === null) {
+      setText(ui.overnightHeadline, '');
+      fill(ui.overnightGroups);
+      fill(ui.overnightWithheld);
+      return;
+    }
+    setText(ui.overnightHeadline, beat.headline);
+    fill(
+      ui.overnightGroups,
+      ...beat.groups.map((group) =>
+        el(doc, 'div', {
+          className: 'overnight-group',
+          children: [
+            el(doc, 'div', { className: 'eyebrow', text: group.caption }),
+            ...group.rows.map((row) =>
+              el(doc, 'div', {
+                className: 'overnight-row',
+                children: [
+                  el(doc, 'span', { className: 'overnight-label', text: row.label }),
+                  el(doc, 'span', { className: 'overnight-value', text: row.value }),
+                  el(doc, 'div', { className: 'overnight-note', text: row.note }),
+                ],
+              }),
+            ),
+          ],
+        }),
+      ),
+    );
+    /*
+     * Tomorrow's refusals, drawn rather than swallowed. They are `shiftRunConfigOf`'s own words —
+     * a calendar template the shift is too short for, a bias a mix-varying template refuses — and a
+     * beat that promised the period while dropping the refusal would promise a day the run will not
+     * deliver.
+     */
+    fill(
+      ui.overnightWithheld,
+      ...beat.withheld.map((line) =>
+        el(doc, 'div', { className: 'overnight-withheld', text: line }),
       ),
     );
   }
@@ -1418,7 +1508,12 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
        * one place it is called, and the whole of the state it keeps is {@link continuity}.
        */
       continuity = rotatedOn(continuity, view.state.report, progress);
-      const drawn = reportViewOf(view.state.report, progress, continuity.previous);
+      const drawn = reportViewOf(
+        view.state.report,
+        progress,
+        continuity.previous,
+        view.state.tomorrow,
+      );
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
        * the same value, so a slot can never be left showing yesterday's sentence on a sheet that
@@ -1464,6 +1559,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       setHidden(cardOf(ui.forecastName), week === null);
       setText(ui.taught, week?.taught ?? '');
       setHidden(cardOf(ui.taught), week === null);
+      drawOvernight(drawn);
       setText(ui.smallPrint, drawn.smallPrint);
 
       // Drawn on both shapes now — see `SingleRunFramingView`. Hidden only on the empty sheet,

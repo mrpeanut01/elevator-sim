@@ -304,6 +304,7 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
       outOfServiceCarIds: [],
       recording: undefined,
       report: undefined,
+      tomorrow: undefined,
       withheld: [],
     });
     context.openTab('run');
