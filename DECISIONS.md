@@ -22235,3 +22235,58 @@ built here, because the measured cause of *no motion, no people* was not the abs
 renderer — it was the first one reaching one building. Fixing that delivers #103's *"small figures
 boarding and waiting at each landing"* to **both** products. `render/reportCard.ts` is the
 `Canvas2DLike` pattern to copy when the mode-conditional renderer is built.
+
+---
+
+## D317 — merging a pull request silently skipped the production deploy
+
+Found by grepping the **deployed bundle** for a string the merge was supposed to have added, after
+`main` had been reported deployed. It had not been.
+
+### What happened
+
+```
+02:07:15  Deploy viewer  integration/issue-wave-15  pull_request(closed)  success
+02:07:15  Deploy viewer  main                       push                  CANCELLED  (+2 s)
+```
+
+Same instant, two seconds, no job started. The site kept serving the previous wave. Everything that
+would normally be checked looked correct: the pull request merged green, its checks passed, the
+branch closed cleanly, and a deploy run for `main` existed. The only evidence was that the run's
+conclusion was `cancelled`, in a list where the eye reads the workflow name and not the verdict.
+
+### Why the guard did not guard
+
+The concurrency block was `group: deploy-viz-${{ github.ref }}` with
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, and its comment stated the right
+intent: *deployments are not cancelled mid-flight for the production branch — a half-uploaded site is
+worse than a slightly stale one — but superseded pull request builds are.*
+
+**`cancel-in-progress` is read from the arriving run, not from the run being cancelled.** So a
+`pull_request` run — which sets it `true` — cancels whatever it shares a group with, and the push's
+own `false` protects nothing. The expression encodes *"I may be cancelled"* and GitHub reads it as
+*"I may cancel"*. The guard was written assuming every run in a group is the same event, which holds
+for every day of ordinary work and fails on the one event that matters: a merge, where a
+`pull_request(closed)` and a `push` arrive together.
+
+### The fix names the group by purpose rather than by ref
+
+```yaml
+group: deploy-viz-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'production' }}
+```
+
+Production is one group, literally named. Each pull request is its own group, named by number. A
+preview can now only cancel its own preview, which makes the collision **impossible rather than
+unlikely** — the distinction this repository keeps having to relearn.
+
+### What this says about the class
+
+This is the fourth defect in this deployment lane that reading could not have found (§ D308 holds
+the first three), and it is the worst of them, because the first three *failed loudly*. This one
+succeeded at everything except the thing it was for. A deploy that is skipped looks exactly like a
+deploy that ran, from every surface except the artefact.
+
+**So the check that caught it is the one to keep**: after a deploy, assert a string the change was
+supposed to add is present in the **served bundle**, not in the build log. The build log is a claim
+about a run; the bundle is the run's result. `provision.sh --deploy-now` already does this for the
+API origin (docs/16 § 3), and the same discipline was simply not applied to ordinary merges.
