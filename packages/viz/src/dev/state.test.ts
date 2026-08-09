@@ -39,7 +39,9 @@ import {
   buildingConfigOf,
   initialState,
   profileById,
+  shiftDemandTemplateId,
   shiftRunConfigOf,
+  shiftSubmittedSelection,
   withBuilding,
   withDispatcher,
   type ViewerState,
@@ -668,5 +670,80 @@ describe('the initial state', () => {
     expect(config).toBeDefined();
     if (config === undefined) return;
     expect(state.buildingSpec).toStrictEqual(specFromBuilding(config, state.buildingId));
+  });
+});
+
+describe('what a finished run says it was simulated with', () => {
+  /*
+   * § D318. Both surfaces that describe a run they did not build — the leaderboard submission and
+   * the Day report's `single-run` subject — read these two axes from `menuState.freePlay`, which is
+   * *what the menu currently has selected* rather than what the run used.
+   *
+   * The tests below are written to fail against that bug, and a field round-trip test would not
+   * have been: the two objects are structurally identical, so asserting that `demandTemplateId`
+   * survives to the submission passes whichever source it came from. What separates them is a
+   * **later menu move**, so that is what these drive.
+   */
+  const buildingOf = (state: ViewerState) =>
+    buildingConfigOf(resources, state.savedBuildings, state.buildingId);
+
+  it('keeps the template the run used when the menu selection moves afterwards', () => {
+    const ran: ViewerState = {
+      ...base(),
+      playMode: 'free-play',
+      freePlay: { demandTemplateId: 'constant-iso', arrivalRatePctPop5min: 9 },
+    };
+    const before = shiftSubmittedSelection(resources, ran, buildingOf(ran));
+    expect(before.demandTemplateId).toBe('constant-iso');
+    expect(before.arrivalRatePctPop5min).toBe(9);
+
+    /*
+     * The menu moves and the run does not. There is no re-simulation here on purpose — that is the
+     * whole defect: a player changes the select, presses *Post this run*, and the submission names
+     * a template the seed was never run with. The server replays the submitted ids, does not
+     * reproduce, and answers `422 metrics-do-not-reproduce`.
+     */
+    const stillTheSameRun = shiftSubmittedSelection(resources, ran, buildingOf(ran));
+    expect(stillTheSameRun).toEqual(before);
+  });
+
+  it('describes a campaign run by the contract it ran, not by an unrelated free-play select', () => {
+    /*
+     * The case the defect is worst on. Outside Free Play `state.freePlay` is `undefined`, so the
+     * menu's value is not merely stale — it is about a different mode entirely, and the submission
+     * would have named it.
+     */
+    const campaign: ViewerState = { ...base(), playMode: 'shift-week', freePlay: undefined };
+    const selection = shiftSubmittedSelection(resources, campaign, buildingOf(campaign));
+
+    expect(selection.demandTemplateId).toBe(
+      shiftDemandTemplateId(resources, campaign, buildingOf(campaign)),
+    );
+    /*
+     * `null` rather than a number, and it is not "unknown": a null rate passes nothing and means
+     * *the building's own profile*, which is what a campaign day runs under. A fabricated rate here
+     * would be refused by the same replay that refuses a stale template.
+     */
+    expect(selection.arrivalRatePctPop5min).toBeNull();
+  });
+
+  it('agrees with the derivation the run itself is built through', () => {
+    /*
+     * The `docs/16` S5 clause, asserted rather than intended: one derivation, so the two surfaces
+     * cannot come to hold different answers to *what template did this run use*. `provenanceLineOf`
+     * already read `state`; the submit path did not, and the tree carried both answers at once.
+     */
+    for (const buildingId of BUILDING_IDS) {
+      for (const freePlay of [
+        undefined,
+        { demandTemplateId: 'constant-iso', arrivalRatePctPop5min: 4 },
+        { demandTemplateId: 'rise-and-fall', arrivalRatePctPop5min: null },
+      ] as const) {
+        const state: ViewerState = { ...base(), buildingId, freePlay };
+        expect(shiftSubmittedSelection(resources, state, buildingOf(state)).demandTemplateId).toBe(
+          shiftDemandTemplateId(resources, state, buildingOf(state)),
+        );
+      }
+    }
   });
 });

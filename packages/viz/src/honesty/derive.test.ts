@@ -229,6 +229,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * `MENU` adapter drives.
          */
         'dev/state.ts#shiftDemandTemplateId',
+        /*
+         * Its § D318 wrapper, excluded for the same reason and no other: it returns that same id
+         * plus a nullable number, and the scanner reads `rise-and-fall`'s hyphen as a word break.
+         *
+         * Worth saying which way the honesty question runs here, because it is the opposite of the
+         * usual one. This function exists so that the leaderboard submission and the Day report's
+         * subject describe the run **that was simulated** rather than what the menu currently has
+         * selected — so it is machinery *for* honesty rather than a surface to be swept, and what a
+         * player reads about the template it names is drawn elsewhere and driven elsewhere.
+         */
+        'dev/state.ts#shiftSubmittedSelection',
         'dev/state.ts#shiftRunConfigOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
