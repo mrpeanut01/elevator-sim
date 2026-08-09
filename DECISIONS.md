@@ -22235,3 +22235,68 @@ built here, because the measured cause of *no motion, no people* was not the abs
 renderer — it was the first one reaching one building. Fixing that delivers #103's *"small figures
 boarding and waiting at each landing"* to **both** products. `render/reportCard.ts` is the
 `Canvas2DLike` pattern to copy when the mode-conditional renderer is built.
+
+---
+
+## D318 — a finished run is described from the run, never from what the menu has selected
+
+Two surfaces described a run they did not build by reading **`menuState.freePlay`** — *what the menu
+currently has selected* — instead of `state`, which is what `shiftDemandTemplateId` reads when the
+run is actually built.
+
+1. **The leaderboard submission** (`dev/main.ts#submitScore`) sent `demandTemplateId` and
+   `arrivalRatePctPop5min` from the menu.
+2. **The Day report's `single-run` subject** read the same two fields the same way, so the sheet's
+   own description of a finished run moved when a select moved, with **no re-run**.
+
+### The consequence is the product's one accusation, aimed at the wrong person
+
+Move the *Traffic shape* or *Arrival rate* select after a run and before pressing **Post this run**,
+and the submission names a template the seed was never run with. `packages/server`'s
+`verifySubmission` replays the **submitted** ids, does not reproduce, and answers
+`422 metrics-do-not-reproduce`.
+
+`scope/runIdentity.ts`'s docstring already names that outcome exactly — *"the punishment for the
+client's bug lands on an honest player, in the one place the product accuses somebody of
+cheating"* — and describes it as what a **client/server** disagreement produces. This was narrower
+and worse: **the client disagreeing with itself.** `provenanceLineOf` has read `state` correctly all
+along, so the tree held two answers to *what template did this run use* and the wrong one was on the
+submit path.
+
+It is worse again for a campaign run, where `state.freePlay` is `undefined` entirely and the menu's
+value is not merely stale but about a different mode.
+
+### The argument was already written, four lines below the defect
+
+`submitScore`'s own comment on `windowStartS` says it: *"this is the window the run was simulated
+with, and the menu holds the window currently selected. They agree until somebody changes the
+selection after a run and before posting."* Correct, load-bearing, and **not applied to the two lines
+above it**.
+
+That is why the fix is a **function** rather than a longer comment. A sentence that explains one
+field and not its neighbours is how this repository loses a rule; `shiftSubmittedSelection` is one
+derivation both sites call, so they cannot come to disagree (`docs/16` S5).
+
+### A campaign run is not a special case
+
+No branch on play mode. The template comes from `shiftDemandTemplateId` — what `shiftRunConfigOf`
+itself resolves through — so a campaign submission names the contract's template. The rate is `null`,
+which is **not "unknown"**: a null rate passes nothing and means *the building's own profile*, which
+is what a campaign day runs under. A fabricated rate would be refused by the same replay that refuses
+a stale template.
+
+### The test that pins it, and the one that would not have
+
+**A field round-trip test passes against this bug.** The two objects are structurally identical, so
+asserting `demandTemplateId` survives to the submission proves nothing about *which source it came
+from*. What separates right from wrong is a **later menu move**, so that is what is driven.
+
+And the unit tests on `shiftSubmittedSelection` **cannot fail against the defect either** — the
+function did not exist while the bug did. They prove the derivation and say nothing about whether
+`main.ts` calls it, which is this repository's standing defect arriving inside a fix for a different
+one. So the call sites are pinned in `main.test.ts` by source, on that file's own `#legend`
+precedent: the submission and the subject may not mention `menuState.freePlay` at all.
+
+**Checked by re-introducing the defect**: three occurrences instead of one, test red, message naming
+the 422. The one legitimate reader is `enterFreePlay`, where the menu's selection *becomes* the run's
+— the only moment the arrow points that way.

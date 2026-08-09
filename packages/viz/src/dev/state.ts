@@ -156,6 +156,53 @@ export function shiftDemandTemplateId(
   return state.freePlay?.demandTemplateId ?? fromPattern;
 }
 
+/**
+ * The two demand axes a **finished run** was simulated with, for anything that has to describe it.
+ *
+ * ## Why this exists rather than two field reads at each site
+ *
+ * Two surfaces describe a run they did not build: the leaderboard submission and the Day report's
+ * `single-run` subject. Both read these two axes, and both read them from **`menuState.freePlay`** —
+ * *what the menu currently has selected* — instead of from `state`, which is what
+ * {@link shiftDemandTemplateId} reads when the run is actually built.
+ *
+ * They agree until somebody moves the *Traffic shape* or *Arrival rate* select after a run and
+ * before posting, and then only one of them describes the seed. The submission is the expensive
+ * half: `packages/server`'s `verifySubmission` replays the **submitted** ids, does not reproduce,
+ * and answers `422 metrics-do-not-reproduce` — **this product's one accusation, aimed at a player
+ * who did nothing wrong.** `scope/runIdentity.ts`'s docstring already names that exact outcome as
+ * the thing a client/server disagreement produces; this was a client disagreeing with *itself*.
+ *
+ * The argument was already written down, four lines below the defect. `submitScore`'s comment on
+ * `windowStartS` says *"this is the window the run was simulated with, and the menu holds the window
+ * currently selected"* — correct, load-bearing, and not applied to the two lines above it. A
+ * sentence that explains one field and not its neighbours is how this repository loses a rule, so
+ * the answer here is a **function** rather than a longer comment: the two sites now cannot disagree,
+ * because there is one derivation and it is this one (`docs/16` S5).
+ *
+ * ## What a campaign run carries, and why it is not a special case
+ *
+ * `state.freePlay` is `undefined` outside Free Play, and the fallbacks are not invented for this
+ * function — they are the ones the **run itself** used. The template comes from
+ * {@link shiftDemandTemplateId}, which is what `shiftRunConfigOf` resolves through, so a campaign
+ * submission names the contract's own template rather than whatever the Free Play select happens to
+ * be left on. The rate is `null`, which is not "unknown": a `null` rate passes nothing and means
+ * *the building's own profile*, which is exactly what a campaign day runs under.
+ *
+ * So there is no branch on play mode here. A run knows what it ran; the menu only knows what is
+ * selected next.
+ */
+export function shiftSubmittedSelection(
+  resources: BrowserResources,
+  state: ViewerState,
+  building: BuildingConfig | undefined,
+): { readonly demandTemplateId: string; readonly arrivalRatePctPop5min: number | null } {
+  return {
+    demandTemplateId: shiftDemandTemplateId(resources, state, building),
+    arrivalRatePctPop5min: state.freePlay?.arrivalRatePctPop5min ?? null,
+  };
+}
+
 /** A dispatcher the reader saved. */
 export interface SavedDispatcher {
   readonly id: string;
