@@ -4,7 +4,8 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-09 · **13 open**, down from 29 · branch `integration/issue-wave-14` ·
+**Snapshot:** 2026-08-09 · **13 of the play-test backlog remain open**, down from 29 — plus the
+**5 filed from findings this wave**, so 18 open in total · branch `integration/issue-wave-14` ·
 `npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 121 files, 2 917 tests,
 exit 0**.
 
