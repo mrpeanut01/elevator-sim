@@ -43,6 +43,10 @@
  * to say so is next to it.
  */
 
+import { globSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { asBuiltChoices, movedChoiceText, withBankChoice } from '../commissioning/choices.js';
@@ -312,7 +316,21 @@ describe('the repaired controls change the run, compared on the legs', () => {
       legsOf(chosen),
       'the Calendar was moved and the run produced the same legs — the control is inert',
     ).not.toBe(legsOf(ordinary));
-  });
+    /*
+     * `300_000`, the figure every other legs case in this repository passes — GitHub issue #144.
+     *
+     * This case and one in `shift/calendar.test.ts` ran two real simulations each at vitest's
+     * default **5 000 ms**. Standalone they take about 3.5 s, so the margin was 1.5 s; both timed
+     * out during a full-suite run on a machine also carrying four other agents, and both passed on
+     * a clean run of the same tree. This project runs waves of parallel agents in worktrees on one
+     * machine by design, so *under load* is the normal condition here.
+     *
+     * It matters because of what the failure *says*. A legs comparison is the standing
+     * requirement's prescribed evidence, and when one goes red it should read as *the control
+     * stopped moving the run*. `Test timed out in 5000ms` reads instead as an infrastructure
+     * hiccup — the message most likely to be dismissed, which takes the true positive with it.
+     */
+  }, 300_000);
 
   it('a fabric dimension picked in the menu changes the run — issue #42', () => {
     /*
@@ -355,7 +373,10 @@ describe('the repaired controls change the run, compared on the legs', () => {
       legsOf({ ...state, commissioning: moved }),
       'a shaft was added and the run produced the same legs — the fabric never reached it',
     ).not.toBe(legsOf({ ...state, commissioning: built }));
-  });
+    // The same two runs and the same 1.5 s of margin as the case above. Issue #144 named only its
+    // sibling; this one is the identical exposure, in the same file, twelve lines down — which is
+    // the reason the report for that issue counts the exposure rather than the two cases.
+  }, 300_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -985,5 +1006,96 @@ describe('the two halves of the menu still meet', () => {
     expect(freePlayIssues(next.freePlay, CATALOGUE)).toEqual([]);
     // …and it really did move, so this is a re-derivation rather than a value that happened to fit.
     expect(after?.value).not.toBe(before?.value);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The ids somebody else presses
+ * -------------------------------------------------------------------------- */
+
+describe('every affordance id the browser tier presses is one these screens produce', () => {
+  /*
+   * **GitHub issue #142, mechanised where it costs a millisecond instead of thirty seconds.**
+   *
+   * Three of the six `dev/*.browser.test.ts` files were red on `main` at `69bff59` because they
+   * reached menu rows by the words on them. Playwright's `hasText` is a case-insensitive substring
+   * over an element's whole `textContent`, so the moment issue #90's recommended row arrived above
+   * the Scenarios row carrying *"it opens the scenarios board"* in its detail,
+   * `hasText: 'Scenarios'` matched two buttons and `.first()` pressed the wrong one — which happens
+   * to be the arm that *closes the menu*. The tier now presses by {@link MenuAffordance.id}, which
+   * is contracted stable and which `dev/menuPanel.ts` already writes to `data-menu-control`.
+   *
+   * That trades one failure mode for another, and this case is the other one's control. An id that
+   * is renamed here turns a press into a selector matching nothing, and the browser tier reports
+   * that as `locator.click: Timeout 30000ms exceeded` after half a minute — on a tier that, until
+   * issue #142, ran nowhere at all. So the ids are held **here**, in the node tier, against the
+   * screens that produce them.
+   *
+   * This file already carries the precedent in its own prose: *"the second time an id in this
+   * directory outlived the row it named"*, about `free-play.duration` after § D286 deleted it. Two
+   * `toBeDefined` guards were the answer that time. This is the same answer pointed at a consumer
+   * that cannot afford to ask.
+   *
+   * **Both sides are derived.** The screens are walked over {@link MENU_SCREENS}, both view modes
+   * and both `hasRun` arms, because `mainRows` and `resumeRow` each branch on one of those. The ids
+   * are scraped out of whatever `*.browser.test.ts` files are on disk, by the shape of a menu id —
+   * a `MENU_SCREENS` member, a dot, and a lower-case tail — rather than from a list of the four the
+   * tier presses today.
+   */
+  const idsTheScreensProduce = (): ReadonlySet<string> => {
+    const out = new Set<string>();
+    for (const viewMode of ['basic', 'advanced'] as const) {
+      for (const hasRun of [false, true]) {
+        for (const screen of MENU_SCREENS) {
+          for (const row of screenOf({ ...ARM, viewMode, hasRun, state: stateAt(screen) }).rows) {
+            out.add(row.id);
+          }
+        }
+      }
+    }
+    return out;
+  };
+
+  /**
+   * Every menu-id-shaped literal in the browser tier, with the file it came from.
+   *
+   * The tail excludes a further dot on purpose, so a `'campaign.json'` or a `'main.ts'` — both
+   * plausible strings in a file that also drives the menu — cannot be read as an affordance.
+   * Nothing in the tier matches either today; the exclusion is here so that adding one does not
+   * produce a false red, which is how a check like this gets deleted rather than fixed.
+   */
+  const pressedIds = (): readonly { readonly file: string; readonly id: string }[] => {
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const shape = new RegExp(`'((?:${MENU_SCREENS.join('|')})\\.[a-z][a-z0-9-]*)'`, 'gu');
+    return globSync('**/*.browser.test.ts', { cwd: root })
+      .sort()
+      .flatMap((file) =>
+        [...readFileSync(join(root, file), 'utf8').matchAll(shape)].map((match) => ({
+          file,
+          id: match[1] ?? '',
+        })),
+      );
+  };
+
+  it('is not vacuous — the tier exists and really does name rows by id', () => {
+    const pressed = pressedIds();
+    expect(
+      pressed.length,
+      'no `*.browser.test.ts` file names a menu affordance id. Either the browser tier is gone — ' +
+        '`dev/browserTier.test.ts` should have said so first — or it has gone back to selecting ' +
+        'menu rows by the words on them, which is the defect issue #142 is about.',
+    ).toBeGreaterThan(3);
+    expect(new Set(pressed.map((entry) => entry.file)).size).toBeGreaterThan(1);
+  });
+
+  it('names no row these screens do not offer', () => {
+    const offered = idsTheScreensProduce();
+    const orphans = pressedIds().filter((entry) => !offered.has(entry.id));
+    expect(
+      orphans.map((entry) => `${entry.file} presses ${entry.id}`),
+      'the browser tier presses menu rows that no screen produces. Left alone that is a thirty-' +
+        'second `locator.click: Timeout` on a tier that may not be running anywhere. Renaming an ' +
+        'affordance id is fine; the presses have to move with it.',
+    ).toEqual([]);
   });
 });
