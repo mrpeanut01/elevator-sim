@@ -74,8 +74,8 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **286 054** | **606** | 30 | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **361 057** | **4 710** | **31** | **1** | **green** — the one finding is registered |
+  | always-on | 49 | **287 083** | **606** | 30 | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **362 317** | **4 710** | **31** | **1** | **green** — the one finding is registered |
 
   Measured 2026-08-09 on the integrated tree, both tiers, in one sitting — and that is the point of
   the sentence rather than a detail of it. **Three lanes in this wave each measured the corpus on a
@@ -129,13 +129,20 @@ verdict:
   always-on and **+1 552** deep. The simulations move by exactly one per case (**+49** and **+60**)
   because a *drawn* comparison needs two runs, and the case's candidate arm is the honest second one.
 
-  **Then they went up again by a hundred each, and that is the fix rather than a second sweep.**
-  Issue #137 put a count beside each paired mean, so the corpus acquired those strings: **285 954 →
-  286 054** always-on and **360 945 → 361 057** deep, with the simulations, the cases and the
-  surfaces all unmoved. A string count that rose while nothing else did is what a fix adding words to
-  one row is supposed to look like, and saying it beside the violation count is the point — the same
-  change took `estimate-without-n` from **48 reported violations to 0** and from **104 to 0**, and
-  took the always-on tier from **24 failing cases to none**.
+  **Then they went up again — by 1 129 and 1 372 — and that is two fixes rather than a second
+  sweep.** Measured on the integrated tree: **285 954 → 287 083** always-on and **360 945 → 362 317**
+  deep, with the simulations, the cases and the surfaces all unmoved.
+
+  **Two changes, not one, and the split is stated because attributing it to one would be the
+  per-branch figure again.** Issue #137 put a count beside each paired mean and measured
+  286 054 / 361 057 **on its own branch**; § D3xx's calendar seam then seeded a period's event choice
+  per day and added the rest. Neither branch's number survived the merge, which is the third time
+  this file has recorded that and the reason the measurement now happens once, after integration.
+
+  A string count that rose while nothing else did is what fixes that add words to existing rows are
+  supposed to look like, and saying it beside the violation count is the point — #137 took
+  `estimate-without-n` from **48 reported violations to 0** always-on and **104 to 0** deep, and took
+  the always-on tier from **24 failing cases to none**.
 
   **The violation counts had gone up first, and that was the finding rather than the cost.** The
   block's first sweep produced one R13 violation, in 24 of 49 always-on and 28 of 60 deep cases:

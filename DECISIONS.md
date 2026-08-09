@@ -22548,3 +22548,65 @@ something to remember — which is the shape to copy the next time an axis is ad
 supposed to add is present in the **served bundle**, not in the build log. The build log is a claim
 about a run; the bundle is the run's result. `provision.sh --deploy-now` already does this for the
 API origin (docs/16 § 3), and the same discipline was simply not applied to ordinary merges.
+
+---
+
+## D323 — the shell derived the event and the run overrode it, in four places
+
+Issues #135 and #136.
+
+### Four callers, not the two that were reported
+
+Both unreported ones were found by asking the question **mechanically** — *where does the shell answer
+"what event is this day under?"* — rather than by grepping the two names the issues gave:
+
+| caller | reported | what it published |
+|---|---|---|
+| `shift/report.ts#forecastFor` | yes | tomorrow's event, on the Tomorrow card |
+| `dev/main.ts#closeShift` | in a comment | today's event, as identity **and** keyed into `ReportBasis.demand` |
+| `dev/leftRail.ts#drawShift` | **no** | the event name and note, on screen for the whole shift |
+| `scope/runIdentity.ts#carriesState` | **no** | the sentence **and the `changesNothing` gate above it** |
+
+The fourth is the serious one. `runIdentity` is the derivation the leaderboard submit path and
+`copy run` share, so a calendar-eventful day was published as **reproducible from its own selection**
+when it was not — feeding the same false-accusation path [§ D318](#d318) closed from the other end.
+Two lanes reached this seam independently, from a card and from a comparison, which is what a
+derivation written four times looks like from the outside.
+
+`shift/calendar.ts#scheduledEventFor` is now the one composition, and seven sites route through it.
+`DayReportInput` gains a **required** `calendar`, threaded from `state` on § D322's precedent and
+never from the recording. `shift/eventSeam.test.ts` derives every `eventFor` call in
+`packages/viz/src` **from disk** and requires `calendar.ts` to be the only one — comments stripped
+first, so the two files explaining why they no longer call it can keep saying so.
+
+### #136 — refused, because the facts are not in the file
+
+Three options were open: refuse; allow and rebuild the day's facts from the recording; allow when the
+configuration matches. **Refuse**, and the argument is not about trust — a `localStorage` week has no
+threat model. It is that of the eight things `closeShift` needs, `VizRecording` carries **one**.
+
+So (b) has nothing to rebuild from, and (c) can check three axes while reporting a match it has not
+made — beside a product that already answers *is this recording trustworthy* by replaying it
+server-side ([§ D321](#d321)), deliberately not in the CDN-served client.
+
+**The draft that proved it.** The first attempt compared `runId` and **passed while letting a
+Chancery House file bank a Midtown Office day**: `runId` defaults to `building-dispatcher-seed` and
+the `viz` fixture hard-codes it to `'viz-fixture'`. That is option (c), on three axes, wearing a
+unique identifier's name — the strongest possible argument against (c), produced by trying it. It is
+object identity now, pinned by a case where a **byte-identical reload of the run on screen** is
+refused.
+
+### A third stale refusal, found on the way
+
+`runStartOfDayS`'s docstring claimed it was `undefined` for a recording restored from a file. Nothing
+cleared it, and `boot()` simulates a shift before the player can press anything — so a loaded
+recording was drawn on the **previous run's clock**, in four places. [§ D227](#d227) again: the
+sentence was the only thing enforcing the property.
+
+### What is left, and named rather than closed
+
+`runIdentity`'s day-1 gate still calls a run reproducible under a period that names **no** event and
+scales the population — `vacation` runs the building at about a quarter. That is the period's fact
+rather than the event's, and closing it needs a refusal that **names the period**: a gate opened
+without one would tell a player their run cannot be shared because of an event, when it was the
+population factor. Issue **#140**.

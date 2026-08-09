@@ -1131,6 +1131,8 @@ describe('the levers point at what this run showed — issue #55', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      calendar: null,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(one), 'add-a-car');
@@ -1148,6 +1150,8 @@ describe('the levers point at what this run showed — issue #55', () => {
       week: openWeek('c2'),
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      calendar: null,
+      plan: PLAN,
       subject: { kind: 'week-day' },
     });
     const body = leverBody(weekDay(many), 'add-a-car');
