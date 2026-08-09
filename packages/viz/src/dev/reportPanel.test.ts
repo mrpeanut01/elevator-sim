@@ -156,6 +156,7 @@ function reportOf(
     week,
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
+    calendar: null,
     subject,
     plan,
   });
@@ -233,6 +234,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
         week,
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        calendar: null,
         subject: { kind: 'week-day' },
         plan: PLAN,
       }),
@@ -1510,21 +1512,22 @@ describe('two runs that were not asked the same question — issues #117 and #10
     expect(plan).not.toMatch(/recording|endedAt|startedAt/);
   });
 
-  it('cannot see an event a calendar wrote over one day, and that gap is pinned rather than claimed shut', () => {
+  it('refuses one day number under two different events — the half that always worked', () => {
     /*
-     * § D227: a refusal is pinned by a run, never by another sentence — so the axis `ReportBasis`
-     * still cannot see gets a case of its own, exactly as the run length had one until this wave.
+     * This case was filed as *the gap the basis cannot see*, and it was misfiled: what it actually
+     * pins is the half that **works**. One day number under two different events is refused, so
+     * `demand` is carrying the event and the basis's shape was never the defect.
      *
-     * `dev/main.ts#closeShift` derives the sheet's event as `eventFor(week.day, week.dayIdx)` — the
-     * ordinary schedule — while `dev/state.ts#shiftRunConfigOf` derives the **run's** event by
-     * consulting the authored calendar first, because a period may name today's event (`moving-week`
-     * is *`move-in` every day*). Where a calendar overrides, the two disagree and two days that ran
-     * under different events pair as one question.
+     * The defect was one expression up. `dev/main.ts#closeShift` derived the sheet's event as
+     * `eventFor(week.day, week.dayIdx)` — the ordinary schedule — while
+     * `dev/state.ts#shiftRunConfigOf` built the **run** from the authored calendar's override, so
+     * where a period named today's event the two disagreed and a calendar day paired with an
+     * ordinary one as one question. GitHub issue #135 closed it by giving the question one answer,
+     * `shift/calendar.ts#scheduledEventFor`; `shift/eventSeam.test.ts` is what stops a second.
      *
-     * What this case pins is the half that **works**: one day number under two different events is
-     * refused, so `demand` is carrying the event and the gap is the shell's derivation rather than
-     * the basis's shape. Closing it is one line in `closeShift` and belongs to whoever owns the
-     * calendar seam.
+     * The case stays because the refusal it drives is what makes that fix *land*: an event that
+     * reached the basis and did not separate two days would leave `closeShift` correct and the
+     * comparison still wrong.
      */
     const booked = (event: ShiftEvent): ShapedDayReport =>
       dayReportOf({
@@ -1534,6 +1537,7 @@ describe('two runs that were not asked the same question — issues #117 and #10
         week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
         contract: contractById('c2'),
         event,
+        calendar: null,
         subject: { kind: 'week-day' },
         plan: PLAN,
       });

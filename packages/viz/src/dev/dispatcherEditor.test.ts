@@ -592,6 +592,7 @@ describe('the press really moves the run, and the strip really reports it — §
       week,
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      calendar: null,
       subject: { kind: 'week-day' },
       /*
        * One plan for both sheets the strip pairs — issue #126.

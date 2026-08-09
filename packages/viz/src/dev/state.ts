@@ -77,10 +77,16 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
-import { SHIFT_EVENTS, eventFor, shiftRunPatch, baseDemandOf } from '../shift/events.js';
+import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
-import { calendarDayFor, calendarLine, calendarPatch, type CalendarPeriod } from '../shift/calendar.js';
+import {
+  calendarDayFor,
+  calendarLine,
+  calendarPatch,
+  scheduledEventFor,
+  type CalendarPeriod,
+} from '../shift/calendar.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import {
   RETROFIT_CONSTRAINT_ID,
@@ -1027,15 +1033,18 @@ export function shiftRunConfigOf(
   /*
    * 4 — the calendar's day, then the demand, then the day's event over it.
    *
-   * `calendarDayFor` runs **before `eventFor`** because a period may name today's event —
-   * `moving-week` is *`move-in` every day* — and `shiftRunPatch` has to be handed the event the run
-   * is actually under, not the one the ordinary schedule would have produced.
+   * The event goes through `scheduledEventFor` because a period may name today's — `moving-week` is
+   * *`move-in` every day but Sunday* — and `shiftRunPatch` has to be handed the event the run is
+   * actually under, not the one the ordinary schedule would have produced.
+   *
+   * **This line used to be the ternary that function now holds**, and it was the only place in the
+   * viewer that got the question right: GitHub issue #135 is the four surfaces that answered it
+   * with `eventFor` alone. It is a call rather than a copy so that the run and the surfaces
+   * describing it cannot drift — see `shift/calendar.ts#scheduledEventFor` for the four and for the
+   * guard that stops a fifth.
    */
   const calendarDay = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
-  const event =
-    calendarDay?.shift.eventId == null
-      ? eventFor(state.week.day, state.week.dayIdx)
-      : SHIFT_EVENTS[calendarDay.shift.eventId];
+  const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
   const spec = selectedPatternSpec(resources, state, authored);
   const pattern = spec === undefined ? { demandTemplate: 'rise-and-fall' as const, demand: {} } : demandFromSpec(spec);
   /*
@@ -1202,10 +1211,14 @@ export interface TomorrowFacts {
  * re-derivation: `calendarLine` is `shiftRunConfigOf`'s own caption for the period, and `withheld`
  * is what tomorrow's configuration refuses.
  *
- * `plan.event` is deliberately **not** carried. It is the *patched* event and is therefore more
- * correct than the Day report's own *Tomorrow* card, which names `eventFor`'s unpatched schedule —
- * and putting a second, disagreeing event name on the same screen would be the two-answers defect
- * rather than a fix for it. `shift/tomorrow.ts#nextRowsOf` states what is owed instead.
+ * `plan.event` is deliberately **not** carried, and the reason has changed since it was written.
+ * It used to be that this event was the *patched* one and the Day report's *Tomorrow* card named
+ * `eventFor`'s unpatched schedule, so carrying it would have put two disagreeing event names on one
+ * screen. GitHub issue #135 closed that disagreement — the card goes through
+ * `shift/calendar.ts#scheduledEventFor` now, so the two agree by construction. What survives is the
+ * *other* half of the argument, which never depended on the defect: two names for one event on one
+ * screen is § D223's two-answers shape whether or not they happen to match, and one of them would
+ * be the one a later edit forgot. The card names it; this does not.
  *
  * ## What it costs, and why that is affordable exactly here
  *
