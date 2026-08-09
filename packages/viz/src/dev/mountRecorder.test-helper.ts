@@ -125,6 +125,33 @@ export function mountRecorder(): MountRecorder {
         if (at >= 0) node.children.splice(at, 1);
         return kid;
       },
+      /*
+       * `after` exists because a mount used it and this recorder did not have it — the dispatcher
+       * editor's result strip (§ D310) is inserted as a *sibling* of the save row rather than a
+       * child of it, and every other insert on this page is `insertBefore`. The failure was a
+       * `TypeError` inside the mount, in four cases of `scopeNotes.test.ts`, and it appeared only
+       * when the two lanes were merged: neither branch could fail alone, because one wrote the call
+       * and the other wrote the recorder.
+       *
+       * Added here rather than changed there. A stub that answers a narrower DOM than the one the
+       * shipped code uses is a test that passes for the wrong reason, and the sibling insert is
+       * correct on a real document.
+       */
+      after(...kids: Recorded[]) {
+        const parent = node.parentElement;
+        if (parent === null) return;
+        let at = parent.children.indexOf(node);
+        for (const kid of kids) {
+          const already = parent.children.indexOf(kid);
+          if (already >= 0) {
+            parent.children.splice(already, 1);
+            if (already <= at) at -= 1;
+          }
+          kid.parentElement = parent;
+          at += 1;
+          parent.children.splice(at, 0, kid);
+        }
+      },
       insertBefore(kid: Recorded, before: Recorded | null) {
         const already = node.children.indexOf(kid);
         if (already >= 0) node.children.splice(already, 1);
