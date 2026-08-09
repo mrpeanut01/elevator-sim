@@ -122,11 +122,18 @@ import { commissionableClasses } from '../commissioning/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   buildingConfigOf,
+  calendarAskInputOf,
   profileById,
   specsWithSaved,
   type ViewerState,
 } from '../dev/state.js';
-import { calendarDayFor, scheduledEventFor } from '../shift/calendar.js';
+import {
+  calendarAsks,
+  calendarDayFor,
+  scheduledEventFor,
+  type CalendarAsk,
+  type CalendarShift,
+} from '../shift/calendar.js';
 
 import { permits } from './permits.js';
 import { SCOPE_OF } from './surface.js';
@@ -211,31 +218,7 @@ type CarryCheck = (state: ViewerState, resources: BrowserResources) => string | 
  * whether the two agree.
  */
 export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze({
-  week: (state) => {
-    /*
-     * Through the calendar — GitHub issue #135's **fourth** caller, and the one where the wrong
-     * event does more than misname something. `changesNothing` is the *gate*: on `eventFor`
-     * alone, day 1 of a `moving-week` was `ordinary`, `changesNothing` was true, and this
-     * returned `undefined` — declaring a day the calendar had made a move-in reproducible from a
-     * selection that carries no calendar. The name in the sentence below was the visible half;
-     * this line was the one that let a run be published as something it was not.
-     *
-     * **The narrower hole this comment used to leave open is closed, and by the row below rather
-     * than by widening this one.** It read: *"A period that names no event still scales the
-     * population and can swap the template — `vacation` is a quarter of the building — so day 1
-     * under one is still declared reproducible by the clause below … It needs its own issue."*
-     * That issue is #129, and its answer is that the period is `calendar`'s fact and not `week`'s,
-     * so it is refused by `calendar`'s own row with `calendar`'s own sentence. Opening this gate
-     * instead would have filed a refusal naming the wrong reason, which is exactly what the
-     * paragraph declined to do and § D227 rates below the gap itself.
-     */
-    const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
-    if (state.week.day === 1 && event.effect.changesNothing) return undefined;
-    return (
-      `day ${String(state.week.day)} grows the building by ${String(Math.round((state.week.day - 1) * 11))} % ` +
-      `and schedules “${event.name}”, and neither travels with a selection`
-    );
-  },
+  week: (state) => weekCarries(state),
 
   outOfServiceCarIds: (state) =>
     state.outOfServiceCarIds.length === 0
@@ -299,14 +282,68 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
    * The message names the period, because *which* period is the thing a reader has to act on and
    * because a refusal that said only *"a calendar is set"* would send them looking at a control
    * that may well be pointed at a different week.
+   *
+   * ## Which asks reached the run, not which the period declares — GitHub issue #140
+   *
+   * **Being in effect is the gate; what actually moved is the sentence**, and the two were built by
+   * different lanes in the same wave. #129 established the gate — `calendarDayFor`, above. #140
+   * established that a refusal naming *"it scales the population and can bias the mix, swap the
+   * demand template and reserve a car"* is four claims about a period that may have made one of
+   * them: `public-holiday` scales and does nothing else, and a reader sent looking for a mix bias
+   * that never happened has been given a wrong reason in the one surface that must never accuse
+   * somebody of something they did not do.
+   *
+   * So the clauses come from {@link calendarAsks}, which shares `calendarPatch`'s **own two
+   * conditional branches** rather than restating them — a bias the engine withheld cannot appear
+   * here, and #140 measured three ways it can be withheld (a bias under `lunch-two-way`, a template
+   * over a player's own choice, a template the shift is too short for). A derivation reading the
+   * period's *declaration* would have refused all three with axes that never moved.
+   *
+   * ## Why this arm and not `week`'s
+   *
+   * #140 built the clause inside `week`'s arm, because at the time `viewer.calendar` had no arm to
+   * put it in. It is here instead: the period is the calendar's fact, and a refusal filed under
+   * `viewer.week` for something `viewer.calendar` caused points a reader at the wrong control. The
+   * two lanes agreed on this in advance and each named the other's outcome — the merge is this
+   * paragraph.
+   *
+   * `SELECTION_CARRIES_A_CALENDAR_PERIOD`, #140's stand-in for *can the artefacts express a
+   * period?*, is **deleted rather than merged**. It was a boolean asserting what
+   * {@link EXPRESSIBLE_IN_A_SELECTION} now holds as a table the wire is tested against, and keeping
+   * both would be two answers to one question with no test that they agree — the shape this
+   * repository keeps paying for, reintroduced by a merge.
    */
-  calendar: (state) => {
+  calendar: (state, resources) => {
     const today = calendarDayFor(state.calendar, state.week.day, state.week.dayIdx);
     if (today === null) return undefined;
+    /*
+     * Decided against the same four inputs `shiftRunConfigOf` hands `calendarPatch` —
+     * `calendarAskInputOf` is that one value, and this is its second caller.
+     *
+     * The building is looked up through `buildingConfigOf`, which answers `undefined` rather than
+     * throwing, because this predicate exists to describe states naming a building
+     * `data/buildings/` does not ship. `shiftRunConfigOf` throws on exactly those, which is why the
+     * run plan is not consulted here even though it knows the answer for a shipped building.
+     */
+    const clauses = calendarAsks({
+      day: today,
+      ...calendarAskInputOf(
+        resources,
+        state,
+        buildingConfigOf(resources, state.savedBuildings, state.buildingId),
+      ),
+    })
+      .map((ask) => askClause(ask, today.shift))
+      .filter((clause): clause is string => clause !== null);
+    /*
+     * A period in effect whose asks all withheld leaves the run reproducible, and saying nothing is
+     * the correct answer rather than a missed one. #140 measured it: an all-default period and an
+     * out-of-window period produce byte-identical legs.
+     */
+    if (clauses.length === 0) return undefined;
     return (
-      `${today.name} is in effect on day ${String(today.day)} (${today.weekday}) — it scales the ` +
-      'building’s population and can bias the mix, swap the demand template and reserve a car — ' +
-      'and no selection or submission carries a calendar period'
+      `the calendar’s “${today.name}” ${listOf(clauses)}, and no selection or submission carries ` +
+      'a calendar period'
     );
   },
 
@@ -342,6 +379,118 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
     );
   },
 });
+
+/**
+ * What today carries that a selection does not — the week's arm.
+ *
+ * ## Two facts, each with its own subject, because the wrong subject is the defect
+ *
+ * A day can be un-reproducible for reasons belonging to different controls, and this sentence has
+ * to attribute each to the thing that caused it:
+ *
+ * | fact | caused by | expressed by |
+ * |---|---|---|
+ * | the building has grown | `week.day` | `growth.ts`'s 11 %/day, day 1 excepted |
+ * | the day schedules an event | the week, **or** the period | `shift/calendar.ts#scheduledEventFor` |
+ *
+ * They are joined rather than merged, and each keeps its subject, because a period does not
+ * necessarily book the day's event: a fire drill inside a vacation week is the **week's** drill,
+ * and a sentence reading *"Vacation week … and schedules “Fire drill”"* would attribute it to the
+ * calendar.
+ *
+ * **A third fact used to be built here and is not any more.** Issue #140 added the calendar
+ * period's clauses to this arm, correctly for the tree it was written against — `viewer.calendar`
+ * had no arm of its own at the time. Issue #129 gave it one in the same wave, and the period moved
+ * there on the argument both lanes had already agreed: a refusal filed under `viewer.week` for
+ * something the calendar caused points a reader at the wrong control. See
+ * {@link CARRY_CHECKS}`.calendar`, which now carries #140's derivation and the reasoning for it.
+ *
+ * ## What changed, and why the old gate was wrong — GitHub issue #140
+ *
+ * The gate was `day === 1 && event.effect.changesNothing`, and the sentence named the day number
+ * and the event. Both halves were wrong for a *period*:
+ *
+ * - **The gate.** Four of the five shipped periods change the run on day 1 while naming no event
+ *   (`shift/calendar.ts#calendarAsks` tabulates them), so a run on a quarter of the building was
+ *   published as reproducible. Issue #135 found this and deliberately did not fix it, because —
+ *   - **the sentence.** It could only say *"day 1 … schedules “Ordinary day”"*, which is a refusal
+ *     giving the wrong reason: the run moved because of a population factor and the player would be
+ *     told it was an event. § D227 rates that below the gap itself, and `runIdentity` is the one
+ *     derivation the leaderboard submit path and `copy run` share — the surface that must never
+ *     accuse somebody of something they did not do.
+ *
+ * The growth clause is also **gone on day 1**, and that was a live falsehood rather than a tidy-up:
+ * under `moving-week` the shipped product printed *"day 1 grows the building by 0 % and schedules
+ * “Move-in day”"*, offering a reader a 0 % growth as a reason their run could not be posted.
+ */
+function weekCarries(state: ViewerState): string | undefined {
+  const facts: string[] = [];
+
+  if (state.week.day > 1) {
+    facts.push(
+      `day ${String(state.week.day)} grows the building by ` +
+        `${String(Math.round((state.week.day - 1) * 11))} %`,
+    );
+  }
+
+  /*
+   * The event, through `scheduledEventFor` — GitHub issue #135's **fourth** caller, and the one
+   * where the wrong event does more than misname something. On `eventFor` alone, day 1 of a
+   * `moving-week` was `ordinary` and this returned `undefined`, declaring a day the calendar had
+   * made a move-in reproducible.
+   */
+  const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
+  if (!event.effect.changesNothing) facts.push(`the day schedules “${event.name}”`);
+
+  if (facts.length === 0) return undefined;
+  return `${facts.join(', ')}, and none of that travels with a selection`;
+}
+
+/**
+ * The clause naming one of the period's asks, read off the shift the ask came from.
+ *
+ * Exhaustive over {@link CalendarAsk}, which is derived from `CalendarShift`'s own keys — so a
+ * sixth field of a period is a **compile error here** rather than an ask with no sentence. That is
+ * the half of issue #140's fix a test cannot supply: a test asserts what exists, and this asserts
+ * what must be written before the next field can ship.
+ *
+ * `null` where the shift's own value is absent. Unreachable by construction — `calendarAsks` names
+ * a field only when it reached the run, and the two nullable fields reach it only when set — and
+ * expressed as a filtered `null` rather than a non-null assertion or a throw, because the one thing
+ * this function may not do is put a placeholder in a refusal.
+ */
+function askClause(ask: CalendarAsk, shift: CalendarShift): string | null {
+  switch (ask) {
+    case 'populationFactor':
+      // The factor, not the head count: the count `calendarLine` quotes is `expandFloors`' own on
+      // the edited building, and this function has no building. A percentage is true of the ask
+      // without claiming to be a measurement of the result.
+      return `scales the building’s population to ${String(Math.round(shift.populationFactor * 100))} %`;
+    case 'splitBias':
+      return shift.splitBias === null ? null : `pulls the mix ${shift.splitBias.label}`;
+    case 'demandTemplateId':
+      return shift.demandTemplateId === null
+        ? null
+        : `runs on the ${shift.demandTemplateId} demand template`;
+    case 'goodsCars':
+      /*
+       * **No count, and the omission is the accurate half.** A period asks for a number of cars and
+       * `calendarPatch`'s `reserveCars` may reserve fewer — it never empties a bank, so
+       * `moving-week`'s Saturday asks Garden Apartments' two-car bank for two and gets one. This
+       * function has no building and cannot know which happened, and *"reserves 2 cars"* on a day
+       * that reserved one is a refusal with a false number in it. *At least one* is true of every
+       * case a shipped building can produce, and `shift/calendar.ts#calendarAsks` names the single
+       * case it would not be true of, with the assertion that pins it.
+       */
+      return 'reserves at least one car out of passenger service';
+  }
+}
+
+/** `a`, `a and b`, `a, b and c`. The list a reader would write, for a list of any length. */
+function listOf(items: readonly string[]): string {
+  if (items.length < 2) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1) ?? ''}`;
+}
 
 /**
  * Everything about this state that stops the run being reproducible in `mode`, or an empty array.

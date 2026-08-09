@@ -775,49 +775,43 @@ export function calendarPatch(input: CalendarPatchInput): CalendarPatch {
       : { before: populationOf(input.building), after: populationOf(building) };
 
   /* --- the template ---------------------------------------------------- */
-  let demandTemplateId: DemandTemplateId | null = null;
-  if (shift.demandTemplateId !== null) {
-    const wanted = shift.demandTemplateId;
-    const minimumS = declaredPeriodOf(input.demandTemplates, wanted);
-    if (input.templateChosenByPlayer === true) {
-      withheld.push(
-        `${day.name}: this period runs on the ${wanted} demand template, and you have chosen ` +
-          `${input.demandTemplateId} yourself. Your choice stands — the calendar does not overrule ` +
-          'a control you set.',
-      );
-    } else if (minimumS !== null && input.runLengthS < minimumS) {
-      withheld.push(
-        `${day.name}: this period runs on the ${wanted} demand template, which declares a ` +
-          `${String(Math.round(minimumS / 60))}-minute period; a ` +
-          `${String(Math.round(input.runLengthS / 60))}-minute shift leaves nothing to measure of ` +
-          `it. The run keeps ${input.demandTemplateId}.`,
-      );
-    } else {
-      demandTemplateId = wanted;
-    }
+  const template = templateDecision(shift, input);
+  const demandTemplateId: DemandTemplateId | null =
+    template.kind === 'applied' ? shift.demandTemplateId : null;
+  if (template.kind === 'playerChose') {
+    withheld.push(
+      `${day.name}: this period runs on the ${String(shift.demandTemplateId)} demand template, and ` +
+        `you have chosen ${input.demandTemplateId} yourself. Your choice stands — the calendar does ` +
+        'not overrule a control you set.',
+    );
+  } else if (template.kind === 'tooShort') {
+    withheld.push(
+      `${day.name}: this period runs on the ${String(shift.demandTemplateId)} demand template, ` +
+        `which declares a ${String(Math.round(template.minimumS / 60))}-minute period; a ` +
+        `${String(Math.round(input.runLengthS / 60))}-minute shift leaves nothing to measure of ` +
+        `it. The run keeps ${input.demandTemplateId}.`,
+    );
   }
   const runningTemplate = demandTemplateId ?? input.demandTemplateId;
 
   /* --- the mix --------------------------------------------------------- */
   const demand: { directionalSplit?: DirectionalSplit } = {};
-  if (shift.splitBias !== null) {
-    const record = input.demandTemplates.find((entry) => entry.id === runningTemplate);
-    if (record === undefined) {
-      withheld.push(
-        `${day.name}: this build ships no record for the ${runningTemplate} demand template, so ` +
-          'the calendar cannot tell whether that template varies the directional mix within the ' +
-          'run — and setting a mix under one that does is a run the engine refuses. The mix was ' +
-          'left as it was.',
-      );
-    } else if (record.directionalSplitAtStart !== undefined) {
-      withheld.push(
-        `${day.name}: the directional mix is set by this run’s ${runningTemplate} demand template, ` +
-          'which varies it within the run. The engine refuses both at once rather than letting one ' +
-          'win silently, so the mix is the template’s and only the building moved.',
-      );
-    } else {
-      demand.directionalSplit = biasedSplit(input.split, shift.splitBias);
-    }
+  const bias = biasDecision(shift, runningTemplate, input.demandTemplates);
+  if (bias.kind === 'noRecord') {
+    withheld.push(
+      `${day.name}: this build ships no record for the ${runningTemplate} demand template, so ` +
+        'the calendar cannot tell whether that template varies the directional mix within the ' +
+        'run — and setting a mix under one that does is a run the engine refuses. The mix was ' +
+        'left as it was.',
+    );
+  } else if (bias.kind === 'variesMix') {
+    withheld.push(
+      `${day.name}: the directional mix is set by this run’s ${runningTemplate} demand template, ` +
+        'which varies it within the run. The engine refuses both at once rather than letting one ' +
+        'win silently, so the mix is the template’s and only the building moved.',
+    );
+  } else if (bias.kind === 'applied' && shift.splitBias !== null) {
+    demand.directionalSplit = biasedSplit(input.split, shift.splitBias);
   }
 
   /* --- the goods cars -------------------------------------------------- */
@@ -844,6 +838,201 @@ export function calendarPatch(input: CalendarPatchInput): CalendarPatch {
     withheld,
     population,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Which of today's asks reach the run — GitHub issue #140
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Whether the period's demand template can be imposed today, and why not when it cannot.
+ *
+ * Extracted from {@link calendarPatch}'s own template block — **the sentences did not move**, only
+ * the branch that chooses between them — so {@link calendarAsks} can ask *did the template reach the
+ * run?* without building a patch, and cannot answer it differently. Two expressions for one
+ * decision is `scheduledEventFor`'s subject one field over, and this module already carries the
+ * case law for it.
+ *
+ * The tags are camel case rather than the hyphenated ids the rest of this directory prefers, and
+ * that is deliberate: `honesty/derive.test.ts`'s scanner reads a hyphen as a word break, so
+ * `too-short` would enter the corpus as the prose *"too short"* from a function that authors no
+ * prose at all.
+ */
+type TemplateDecision =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'applied' }
+  | { readonly kind: 'playerChose' }
+  | { readonly kind: 'tooShort'; readonly minimumS: number };
+
+function templateDecision(
+  shift: CalendarShift,
+  input: {
+    readonly demandTemplates: readonly DemandTemplate[];
+    readonly runLengthS: number;
+    readonly templateChosenByPlayer?: boolean | undefined;
+  },
+): TemplateDecision {
+  if (shift.demandTemplateId === null) return { kind: 'none' };
+  if (input.templateChosenByPlayer === true) return { kind: 'playerChose' };
+  const minimumS = declaredPeriodOf(input.demandTemplates, shift.demandTemplateId);
+  if (minimumS !== null && input.runLengthS < minimumS) return { kind: 'tooShort', minimumS };
+  return { kind: 'applied' };
+}
+
+/** Whether the period's mix bias can be applied over `runningTemplate`. {@link templateDecision}'s twin. */
+type BiasDecision =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'applied' }
+  | { readonly kind: 'noRecord' }
+  | { readonly kind: 'variesMix' };
+
+function biasDecision(
+  shift: CalendarShift,
+  runningTemplate: DemandTemplateId,
+  templates: readonly DemandTemplate[],
+): BiasDecision {
+  if (shift.splitBias === null) return { kind: 'none' };
+  const record = templates.find((entry) => entry.id === runningTemplate);
+  if (record === undefined) return { kind: 'noRecord' };
+  if (record.directionalSplitAtStart !== undefined) return { kind: 'variesMix' };
+  return { kind: 'applied' };
+}
+
+/**
+ * A field of {@link CalendarShift} that changes the run, minus the two that cannot.
+ *
+ * `eventId` is excluded because {@link scheduledEventFor} already owns *which event is today* and
+ * `scope/runIdentity.ts` already consults it — a second answer here is the whole of GitHub issue
+ * #135. `note` is excluded because it is prose: it reaches a coach ribbon and no passenger.
+ *
+ * Derived from the interface rather than written out, so a **sixth** field of `CalendarShift`
+ * widens this union and breaks every exhaustive switch over it at compile time. That is the
+ * difference between this and a hand-written list of period ids, which is what a first draft of
+ * issue #140's fix reached for: a list would have gone stale the day a sixth period landed, and
+ * gone stale *silently*, because a period id that is missing from a list looks exactly like a
+ * period that changes nothing.
+ */
+export type CalendarAsk = Exclude<keyof CalendarShift, 'eventId' | 'note'>;
+
+/** What {@link calendarAsks} decides against — {@link CalendarPatchInput}'s four decision inputs. */
+export interface CalendarAskInput {
+  /** Today, from {@link calendarDayFor}. `null` — no calendar — asks nothing and costs nothing. */
+  readonly day: CalendarDay | null;
+  /** The **pre-calendar** running template, exactly as {@link CalendarPatchInput.demandTemplateId}. */
+  readonly demandTemplateId: DemandTemplateId;
+  /** `resources.trafficProfiles.demandTemplates`. The authority on duration and on a varying mix. */
+  readonly demandTemplates: readonly DemandTemplate[];
+  /** `state.shiftLengthS`. A template the shift is too short for is not imposed. */
+  readonly runLengthS: number;
+  /** Whether the player chose the running template themselves. A period does not overrule them. */
+  readonly templateChosenByPlayer?: boolean | undefined;
+}
+
+/**
+ * **Which of today's period asks actually reach the run — GitHub issue #140.**
+ *
+ * ## The defect this exists to close
+ *
+ * `scope/runIdentity.ts#carriesState` gated day 1 on the *event*: `day === 1 && event.effect
+ * .changesNothing` returned *"this run is reproducible from its selection"*. A period that names
+ * **no** event still changes the run, and four of the five shipped periods do exactly that on
+ * day 1 — measured rather than argued, in `scope/runIdentity.test.ts`, which runs both arms and
+ * compares the legs:
+ *
+ * | period on day 1 | what it asks | legs move? | refused before #140? |
+ * |---|---|---|---|
+ * | `public-holiday` | `populationFactor` 0.25 | yes | **no** |
+ * | `vacation` | `populationFactor` 0.6, mix flatter | yes | **no** |
+ * | `quarter-end` | `populationFactor` 1.15, mix, template | yes | **no** |
+ * | `rota-week` | mix two-way, `shift-change` template | yes | **no** |
+ * | `moving-week` | mix, one goods car, **and `move-in`** | yes | yes — through the event |
+ *
+ * So a run built on a quarter of the building was published as reproducible from a selection that
+ * carries no calendar. `runIdentity` is what the leaderboard submit path and `copy run` share, and
+ * the run the server replays from those ids is not the run that was played.
+ *
+ * ## Why this returns fields rather than the sentence
+ *
+ * Issue #135 left this hole open **on purpose**, and its reason is the requirement on the fix: the
+ * sentence `carriesState` returns named the day and the event and no period, so opening the gate
+ * without a matching sentence would file a refusal that gives the *wrong reason* — telling a player
+ * their run cannot be posted because of an event, when what moved it was a population factor.
+ * § D227 rates a wrong refusal below the gap itself, and this is the one surface in the product
+ * that must never accuse somebody of something they did not do.
+ *
+ * The sentence therefore has to name **what actually moved**, which is why this returns the fields
+ * and `runIdentity.ts` authors the clauses: the prose belongs beside the other refusals, where it
+ * is read, and the *decision* belongs here, beside {@link calendarPatch}, where it is made. A
+ * clause built here would be a second description of a period, which is the drift
+ * {@link calendarLine} exists to prevent.
+ *
+ * ## What "reaches the run" means, and what it does not
+ *
+ * It means **the calendar wrote something into the configuration the run is built from** —
+ * `calendarPatch`'s own definition, shared through {@link templateDecision} and
+ * {@link biasDecision} rather than restated. It does **not** mean *this seed's legs came out
+ * different*, and the distinction is deliberate and pre-existing: `move-in` on Garden Apartments at
+ * 900 s produces byte-identical legs and has always been refused, correctly, because the refusal is
+ * about a configuration a selection cannot express rather than about an accident of one trace. Two
+ * measured instances of that accident on this tree, both recorded rather than papered over:
+ *
+ * - a `populationFactor` so close to 1 that every floor rounds back to its own population (0.999 on
+ *   Garden Apartments) is counted as an ask, because `calendarPatch` scales the fabric whenever the
+ *   factor is not exactly 1 and the building document it produces is a new value;
+ * - `office-down-peak` and `rise-and-fall` differ only in `startOfDayMin`, which nothing
+ *   statistical reads, so `quarter-end`'s template swap moves no leg at an unwindowed cell. It is
+ *   still an ask: the submission carries the **pre-calendar** template (`dev/state.ts
+ *   #shiftDemandTemplateId` deliberately does not consult the calendar), so the server would replay
+ *   a different template than the one the run was configured with.
+ *
+ * ## The one residual, named rather than left to be discovered
+ *
+ * `goodsCars` is the one ask decided without consulting the building, and it is therefore the one
+ * that can be wrong. `calendarPatch`'s `reserveCars` never empties a bank, so a period may reserve
+ * **fewer** cars than it asked for — `moving-week`'s Saturday asks Garden Apartments' two-car bank
+ * for two and gets one — and on a bank holding a single car it would reserve **none**.
+ *
+ * The first half costs nothing, because the refusal `scope/runIdentity.ts` builds from this
+ * deliberately names no count: *"reserves at least one car out of passenger service"* is true of
+ * one car and of two. The second half would be a refusal naming a reservation that did not happen,
+ * which is the § D227 shape at its smallest. No shipped building raises it — every bank in
+ * `data/buildings/` declares at least two cars, which `calendar.test.ts` asserts **from disk**
+ * rather than from memory, so a one-car bank landing tomorrow turns that assertion red rather than
+ * this paragraph stale.
+ *
+ * Pure in its input, like everything else in this module.
+ */
+export function calendarAsks(input: CalendarAskInput): readonly CalendarAsk[] {
+  const { day } = input;
+  if (day === null) return [];
+
+  const { shift } = day;
+  const template = templateDecision(shift, input);
+  const runningTemplate =
+    template.kind === 'applied' && shift.demandTemplateId !== null
+      ? shift.demandTemplateId
+      : input.demandTemplateId;
+  const bias = biasDecision(shift, runningTemplate, input.demandTemplates);
+
+  /*
+   * Exhaustive over `CalendarShift` by its type, so a sixth field is a compile error here before it
+   * is a silent omission anywhere else — and declared in the order {@link calendarLine} prints its
+   * clauses in, because the refusal and the caption describing one period should read the same way
+   * round.
+   */
+  const reaches: Readonly<Record<keyof CalendarShift, boolean>> = {
+    populationFactor: shift.populationFactor !== 1,
+    splitBias: bias.kind === 'applied',
+    demandTemplateId: template.kind === 'applied',
+    goodsCars: shift.goodsCars > 0,
+    eventId: false,
+    note: false,
+  };
+  // The cast is safe by construction: `eventId` and `note` are the two keys `CalendarAsk` excludes
+  // and the two this table pins to `false`, so nothing they key can survive the filter.
+  return Object.entries(reaches)
+    .filter(([, reached]) => reached)
+    .map(([field]) => field as CalendarAsk);
 }
 
 /**

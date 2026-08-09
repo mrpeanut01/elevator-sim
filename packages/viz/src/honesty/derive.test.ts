@@ -240,6 +240,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * player reads about the template it names is drawn elsewhere and driven elsewhere.
          */
         'dev/state.ts#shiftSubmittedSelection',
+        /*
+         * Its issue #140 sibling, and derived for the same reason as the two above and no other:
+         * it returns that same template id — `rise-and-fall` — inside a record of three other
+         * values, and the scanner reads the hyphen as a word break.
+         *
+         * It authors no sentence at all. What it produces is the four *inputs*
+         * `shift/calendar.ts#calendarAsks` decides a period's asks against, so that
+         * `scope/runIdentity.ts` and `shiftRunConfigOf` cannot disagree about whether a period's
+         * mix bias reached the run — a refusal naming a bias the engine withheld being the
+         * wrong-reason failure § D227 rates below the gap it fixes. The prose a player reads about
+         * a period is `calendarLine`'s caption, driven by the shift surfaces, and the refusal
+         * built from these fields is `runIdentityIssues`', excluded below under its own name.
+         */
+        'dev/state.ts#calendarAskInputOf',
         'dev/state.ts#shiftRunConfigOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads

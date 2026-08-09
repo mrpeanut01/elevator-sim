@@ -68,7 +68,12 @@ import {
   shareLinkOf,
 } from '../dev/main.js';
 import type { ViewerState } from '../dev/state.js';
-import { CALENDAR_PERIODS, periodOnDays } from '../shift/calendar.js';
+import {
+  CALENDAR_PERIODS,
+  periodOnDays,
+  type CalendarPeriod,
+  type CalendarShift,
+} from '../shift/calendar.js';
 import { nextDay } from '../shift/week.js';
 
 import { PROBES, baseState, legsOf, RESOURCES } from './probes.test-helper.js';
@@ -530,5 +535,228 @@ describe('one derivation, both consumers — the client’s answer is the server
     for (const absent of ['commissioning', 'calendar', 'selector']) {
       expect(digest.toLowerCase(), `configHashOf must not digest ${absent}`).not.toContain(absent);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A calendar period that names no event — GitHub issue #140
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A period that names no event still changes the run, and day 1 was calling that reproducible.**
+ *
+ * The gate was `week.day === 1 && event.effect.changesNothing`. Four of the five shipped periods
+ * change the run on day 1 while booking no event at all, so a run on **a quarter of the building**
+ * was published as reproducible from a selection that carries no calendar — and `runIdentity` is
+ * the derivation the leaderboard submit path and `copy run` share, so the server would have
+ * replayed the shipped building and answered `422 metrics-do-not-reproduce` at an honest player.
+ *
+ * Every case here is decided **on the legs** rather than on the predicate's own opinion — § D177's
+ * rule, applied to a refusal rather than to a slider — and both directions are asserted, because a
+ * fix that refused every day 1 would close the hole and open a worse one: it would tell a player
+ * their perfectly ordinary run cannot be posted.
+ *
+ * The sentence is asserted as well as the verdict, and that is issue #135's stated reason for
+ * leaving this open rather than a nicety. Its sentence named the day number and the event, so
+ * opening the gate without rewriting it would have filed a refusal giving the **wrong reason** —
+ * *"day 1 … schedules “Ordinary day”"* about a run that moved because of a population factor.
+ * § D227 rates a wrong refusal below the gap itself.
+ */
+describe('a calendar period that names no event still changes the run — issue #140', () => {
+  /** Midtown Office at 1 800 s: four cars and 1 710 people, so every axis of a period bites. */
+  function on(period: CalendarPeriod | null): ViewerState {
+    return { ...baseState(), buildingId: 'midtown-office', shiftLengthS: 1800, calendar: period };
+  }
+
+  const whole = (id: keyof typeof CALENDAR_PERIODS): CalendarPeriod =>
+    periodOnDays(CALENDAR_PERIODS[id], 1, 7);
+
+  /** A period that applies today and asks the run for nothing at all. The false-positive control. */
+  const INERT_SHIFT: CalendarShift = {
+    populationFactor: 1,
+    splitBias: null,
+    demandTemplateId: null,
+    eventId: null,
+    goodsCars: 0,
+    note: 'The doors open and today is today.',
+  };
+  const inertPeriod: CalendarPeriod = {
+    ...CALENDAR_PERIODS.vacation,
+    name: 'A week off from the calendar',
+    shift: INERT_SHIFT,
+    overrides: {},
+  };
+
+  it('refuses day 1 under every shipped period, and the legs say it had to', () => {
+    /*
+     * The two halves are the whole test. `legs` is the ground truth — the run under the period is
+     * not the run a selection would reproduce — and `issues` is what the product says about it. A
+     * period whose legs moved and whose verdict was *reproducible* is the defect; this is the
+     * assertion that had it.
+     */
+    const plain = legsOf(on(null));
+    for (const id of ['public-holiday', 'vacation', 'quarter-end', 'rota-week', 'moving-week'] as const) {
+      const state = on(whole(id));
+      expect(legsOf(state), `${id} moves no leg — this probe measures nothing`).not.toBe(plain);
+      expect(runIdentityIssues(state, RESOURCES, 'ranked').length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('names the period and what it moved, never an event it did not book', () => {
+    /*
+     * `public-holiday` is the sharpest case: `fromDay: 1, toDay: 1`, `eventId: null`, and a
+     * `populationFactor` of 0.25 — it exists *only* on the day the gate used to open, and the only
+     * thing it changes is the one thing the old sentence could not name.
+     */
+    const holiday = runIdentityIssues(on(whole('public-holiday')), RESOURCES, 'ranked');
+    /*
+     * **The key is `viewer.calendar`, and that is issue #129's half of this fix.** This assertion
+     * read `['viewer.week']` when it was written, because at that point the period's clause was
+     * built in the week's arm — the only arm there was. #129 gave `viewer.calendar` an arm in the
+     * same wave and the clause moved into it, on the argument both lanes reached independently: a
+     * refusal filed under `viewer.week` for something the calendar caused sends a reader to the
+     * wrong control, which is § D227's wrong-reason failure one field over from the one #135
+     * declined to commit.
+     */
+    expect(holiday.map((issue) => issue.key)).toEqual(['viewer.calendar']);
+    expect(holiday[0]?.message).toBe(
+      'the calendar’s “Public holiday” scales the building’s population to 25 %, and no selection ' +
+        'or submission carries a calendar period',
+    );
+    // The half § D227 is about: no event is named, because the period books none.
+    expect(holiday[0]?.message).not.toContain('schedules');
+
+    // `vacation` moves two axes, and both are named. A sentence naming one would pass a weaker
+    // assertion and still tell a player half of why their run is not theirs to share.
+    const vacation = runIdentityIssues(on(whole('vacation')), RESOURCES, 'ranked');
+    expect(vacation[0]?.message).toBe(
+      'the calendar’s “Vacation week” scales the building’s population to 60 % and pulls the mix ' +
+        'flatter, and no selection or submission carries a calendar period',
+    );
+  });
+
+  it('keeps the period and the day’s event apart, each under its own key', () => {
+    /*
+     * `moving-week` books `move-in` **and** biases the mix **and** reserves a car, so this is the
+     * one shipped period where all three facts are live at once. They are kept apart rather than
+     * merged: a period does not necessarily book the day's event — a fire drill inside a vacation
+     * week is the **week's** drill — and a single sentence reading "Moving week … and schedules X"
+     * would attribute it to the calendar.
+     *
+     * **They are now two issues rather than two clauses of one**, which is strictly the stronger
+     * form of the same claim and is what moving the period to its own arm bought. Each fact is
+     * filed under the control that caused it, so a reader is sent to the calendar for the period
+     * and to the week for the event. `runIdentityIssues` publishes *all* the reasons rather than
+     * the first, so a caller sees both — the property its own docstring states.
+     */
+    const issues = runIdentityIssues(on(whole('moving-week')), RESOURCES, 'ranked');
+    /*
+     * Sorted, because the subject here is *which control each fact is filed under* and not the
+     * order they come out in. The order is real — `viewerControls()` sorts by field name, so
+     * `calendar` precedes `week` — but pinning it here would make this test go red for a change to
+     * a sort that this test is not about, and the file already has assertions that are about the
+     * table's shape.
+     */
+    expect([...issues.map((issue) => issue.key)].sort()).toEqual([
+      'viewer.calendar',
+      'viewer.week',
+    ]);
+
+    const week = issues.find((issue) => issue.key === 'viewer.week');
+    expect(week?.message).toBe(
+      'the day schedules “Move-in day”, and none of that travels with a selection',
+    );
+    // The week's sentence says nothing about the mix or the car: those are the calendar's asks.
+    expect(week?.message).not.toContain('mix');
+
+    const calendar = issues.find((issue) => issue.key === 'viewer.calendar');
+    expect(calendar?.message).toBe(
+      'the calendar’s “Moving week” pulls the mix toward floor-to-floor and reserves at least one ' +
+        'car out of passenger service, and no selection or submission carries a calendar period',
+    );
+    // And the calendar's sentence does not claim the event, which the week booked.
+    expect(calendar?.message).not.toContain('schedules');
+  });
+
+  it('leaves day 1 reproducible with no calendar at all', () => {
+    // The negative control the fix would otherwise not need: without it, a change that refused
+    // every day 1 would pass every assertion above.
+    expect(runIdentityIssues(on(null), RESOURCES, 'ranked')).toEqual([]);
+    expect(runIdentityIssues(baseState(), RESOURCES, 'ranked')).toEqual([]);
+  });
+
+  it('leaves day 1 reproducible under a period that genuinely changes nothing', () => {
+    // A period **is** open, applies today, and asks the run for nothing — and the legs agree, which
+    // is what makes this a measurement rather than a restatement of the predicate.
+    const state = on(inertPeriod);
+    expect(legsOf(state)).toBe(legsOf(on(null)));
+    expect(runIdentityIssues(state, RESOURCES, 'ranked')).toEqual([]);
+  });
+
+  it('leaves day 1 reproducible on a day the period does not cover', () => {
+    // A window that starts later is `calendarDayFor`'s `null`, which is the whole of *no calendar*.
+    const state = on(periodOnDays(CALENDAR_PERIODS['public-holiday'], 3, 5));
+    expect(legsOf(state)).toBe(legsOf(on(null)));
+    expect(runIdentityIssues(state, RESOURCES, 'ranked')).toEqual([]);
+  });
+
+  it('names no ask the engine withheld', () => {
+    /*
+     * The other direction of the wrong-reason failure, and the reason `calendarAsks` shares
+     * `calendarPatch`'s branches instead of reading the period's declaration.
+     *
+     * `rota-week` asks for a mix bias and the `shift-change` template and scales nothing. Under a
+     * player-chosen `lunch-two-way` the calendar gets **neither**: the template is the player's
+     * (§ D215) and the engine refuses a bias under a template that varies the mix. So the run is
+     * byte-identical to the calendar-free one and must be posted, not refused — a predicate reading
+     * the period's declaration would refuse it, and would name two axes that never moved.
+     */
+    const chosen = {
+      ...on(whole('rota-week')),
+      freePlay: { demandTemplateId: 'lunch-two-way', arrivalRatePctPop5min: null },
+    } satisfies ViewerState;
+    const control = { ...chosen, calendar: null } satisfies ViewerState;
+    expect(legsOf(chosen)).toBe(legsOf(control));
+    expect(runIdentityIssues(chosen, RESOURCES, 'ranked')).toEqual([]);
+
+    // And the same period at a shift too short for its template keeps the bias, which does land —
+    // so the refusal names the mix and stays silent about the template.
+    const short = on(whole('rota-week'));
+    const message = runIdentityIssues({ ...short, shiftLengthS: 900 }, RESOURCES, 'ranked')[0]?.message;
+    expect(message).toContain('pulls the mix two-way');
+    expect(message).not.toContain('demand template');
+  });
+
+  it('does not offer a 0 % growth as a reason, which the shipped sentence did', () => {
+    // `day 1 grows the building by 0 %` was printed by the product under `moving-week`, beside a
+    // disabled **Post this run**. A refusal listing a thing that did not happen is the same defect
+    // as one naming the wrong thing, one degree milder.
+    for (const id of ['public-holiday', 'vacation', 'moving-week', 'quarter-end', 'rota-week'] as const) {
+      expect(runIdentityIssues(on(whole(id)), RESOURCES, 'ranked')[0]?.message, id).not.toContain(
+        'grows the building by 0 %',
+      );
+    }
+    // Day 2 still says it, because on day 2 it is true.
+    expect(
+      runIdentityIssues({ ...on(null), week: nextDay(baseState().week) }, RESOURCES, 'ranked')[0]
+        ?.message,
+    ).toContain('grows the building by 11 %');
+  });
+
+  it('still opens the gate for a period that names an event — #135 must not regress', () => {
+    /*
+     * `moving-week`'s day 1 is `move-in`, which `eventFor` alone reads as `ordinary`. The route
+     * through `scheduledEventFor` is what makes it visible, and it is asserted here as well as in
+     * `eventSeam.test.ts` because this arm is the one where getting it wrong publishes a run.
+     *
+     * Asserted over **every** issue rather than the first, and the change is not cosmetic: the
+     * period and the event are now filed under different keys, so an assertion on `issues[0]` is
+     * really an assertion about ordering. #135's regression would be the event going *missing*,
+     * which is what this asks.
+     */
+    const issues = runIdentityIssues(on(whole('moving-week')), RESOURCES, 'ranked');
+    expect(issues.map((issue) => issue.message).join(' | ')).toContain(
+      'the day schedules “Move-in day”',
+    );
   });
 });
