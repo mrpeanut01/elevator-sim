@@ -156,6 +156,7 @@ function reportOf(
     week,
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
+    calendar: null,
     subject,
     plan,
   });
@@ -233,6 +234,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
         week,
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
+        calendar: null,
         subject: { kind: 'week-day' },
         plan: PLAN,
       }),
@@ -1076,6 +1078,110 @@ describe('what moved since the run before this one — issue #38', () => {
     expect(wait?.before).toBe(`${clean.summary.meanWaitS.toFixed(1)} s`);
   });
 
+  /**
+   * R13 clause one on the block — GitHub issue #137, and **the test that would have caught it**.
+   *
+   * The honesty sweep found this the moment issue #127 put the block in the corpus: `AVERAGE WAIT
+   * was 17.8 s → 23.4 s`, a mean with no count anywhere in its box, on 24 of 49 always-on cases and
+   * 28 of 60 deep. Every other suite here passed while it was true, because they all asked *is the
+   * value the sheet's own string* and none asked *did the value bring its denominator with it*.
+   *
+   * So this asks the question in the form that generalises: **a paired value that is a mean over a
+   * sample carries that sample, from its own sheet.** A second gated figure added to the report is
+   * covered by the loop rather than by somebody remembering; a cell that stops declaring its count
+   * fails here rather than three tiers down in a search that takes six minutes to run.
+   */
+  it('carries the count each mean was taken over — R13 clause one, on both sides', () => {
+    const before = reportOf(clean);
+    const after = reportOf(swapped);
+    const delta = deltaOf(before, after);
+    const rows = new Map(delta.figures.map((row) => [row.label, row]));
+
+    // The premise. One cell on this sheet is a mean over a sample, and it is the one `awtIsValid`
+    // speaks for — if a second ever arrives, the loop below covers it and this line says so.
+    expect(after.figures.filter((figure) => figure.count !== undefined).map((c) => c.label)).toEqual(
+      ['AVERAGE WAIT'],
+    );
+
+    for (const figure of after.figures) {
+      const row = rows.get(figure.label);
+      if (row === undefined) continue;
+      const wasCell = before.figures.find((candidate) => candidate.id === figure.id);
+      // Each side's count is its own sheet's note, carried whole — never composed, never parsed.
+      expect(row.afterCount).toBe(figure.count === undefined ? null : figure.note);
+      expect(row.beforeCount).toBe(wasCell?.count === undefined ? null : wasCell.note);
+    }
+
+    const wait = rows.get('AVERAGE WAIT');
+    expect(wait?.before).toBe(`${clean.summary.meanWaitS.toFixed(1)} s`);
+    expect(wait?.after).toBe(`${swapped.summary.meanWaitS.toFixed(1)} s`);
+    // Each count names its own run's `n` — the number the mean beside it was actually divided by.
+    expect(wait?.beforeCount).toContain(String(clean.summary.waitCount));
+    expect(wait?.afterCount).toContain(String(swapped.summary.waitCount));
+    // And its window, because a mean over the peak five minutes is a different claim from a mean
+    // over the day even when the two counts happen to agree.
+    expect(wait?.afterCount).toContain(swapped.summary.reportWindow.id);
+  });
+
+  it('gives the two runs two counts, and keeps them two when they differ', () => {
+    /*
+     * The half of issue #137 that a single shared `n` would have got wrong. These are two means of
+     * two different runs, so they have two denominators; a row that stated one would be making a
+     * claim neither sheet made, and it would be at its most wrong in exactly the case a reader
+     * comes here for — a change that moved the wait by moving how many people got carried.
+     *
+     * `longer` is the pairing where the two really do differ: the same question at a longer run
+     * length, which `ReportBasis` compares as comparable (the suite below pins that) and which
+     * serves a different number of legs.
+     */
+    const before = reportOf(clean);
+    const after = reportOf(longer);
+    const wait = deltaOf(before, after).figures.find((row) => row.label === 'AVERAGE WAIT');
+    expect(clean.summary.waitCount).not.toBe(longer.summary.waitCount);
+    expect(wait?.beforeCount).not.toBe(wait?.afterCount);
+    expect(wait?.beforeCount).toContain(String(clean.summary.waitCount));
+    expect(wait?.afterCount).toContain(String(longer.summary.waitCount));
+  });
+
+  it('composes no count of its own — every one is a note one of the two sheets published', () => {
+    // The same rule the values keep, extended to the strings beside them. A count assembled here
+    // would be a second place that decides how an `n` is written, one block from the figure grid
+    // that already decided.
+    const before = reportOf(clean);
+    const after = reportOf(swapped);
+    const published = new Set([...before.figures, ...after.figures].map((figure) => figure.note));
+    for (const row of [...deltaOf(before, after).selection, ...deltaOf(before, after).figures]) {
+      for (const count of [row.beforeCount, row.afterCount]) {
+        if (count === null) continue;
+        expect(published.has(count), `“${count}” is nobody’s published note`).toBe(true);
+      }
+    }
+  });
+
+  it('gives a refused mean no count, because a refusal has no sample', () => {
+    /*
+     * Rule 4 of the fix, and the one that would have quietly undone it. `withheld` beside
+     * *"over 14 legs in the peak-5min window"* reads as a figure with a caveat rather than as a
+     * refusal — R3's *suppression replaces the number* applied to the denominator. The refusal keeps
+     * exactly the words it had before this change and gains nothing.
+     */
+    const refusedTwin: VizRecording = {
+      ...swapped,
+      summary: {
+        ...swapped.summary,
+        awtIsValid: false,
+        awtInvalidReason: 'the queue was still growing when the window closed',
+      },
+    };
+    const wait = deltaOf(reportOf(clean), reportOf(refusedTwin)).figures.find(
+      (row) => row.label === 'AVERAGE WAIT',
+    );
+    expect(wait?.after).toBe(WITHHELD);
+    expect(wait?.afterCount).toBeNull();
+    // The other side published a mean, so it keeps its count: one refusal does not silence both.
+    expect(wait?.beforeCount).toContain(String(clean.summary.waitCount));
+  });
+
   it('names what was run, so a change cannot be pinned on the wrong cause', () => {
     // Six numbers moving with no word about the seed invites a reader to credit the one thing they
     // touched. The identity rows are the guard, and they are the run's own meta lines.
@@ -1117,11 +1223,24 @@ describe('what moved since the run before this one — issue #38', () => {
   });
 
   it('gives no row a colour, because there is no direction to signal — KB-15 and R2', () => {
-    // Asserted structurally: `DeltaRowView` has three fields and none of them is a colour, a tone or
-    // a direction. A green *took the stairs* would be the verdict this block exists not to state.
+    /*
+     * Asserted structurally: `DeltaRowView` has five fields and none of them is a colour, a tone or
+     * a direction. A green *took the stairs* would be the verdict this block exists not to state.
+     *
+     * The list grew by two for issue #137 and the shape of the growth is the point — `beforeCount`
+     * and `afterCount`, one per side. A single `count` would have been the field this assertion
+     * should refuse next: it would read as one sample under two values that are means of two
+     * different runs.
+     */
     const delta = deltaOf(reportOf(clean), reportOf(swapped));
     for (const row of [...delta.selection, ...delta.figures]) {
-      expect(Object.keys(row).sort()).toEqual(['after', 'before', 'label']);
+      expect(Object.keys(row).sort()).toEqual([
+        'after',
+        'afterCount',
+        'before',
+        'beforeCount',
+        'label',
+      ]);
     }
   });
 
@@ -1239,6 +1358,23 @@ describe('two runs that were not asked the same question — issues #117 and #10
     const labels = delta.selection.map((row) => row.label);
     expect(labels).toContain('BUILDING & DISPATCHER');
     expect(delta.selection.length).toBeGreaterThan(0);
+  });
+
+  it('gains no count on the way through, because a refusal is not a figure with a caveat', () => {
+    /*
+     * Issue #137 put an `n` on the paired rows, and this is the surface it may not reach. A refused
+     * block has no figure rows to annotate — that is the fix for #117/#102 and it is asserted above
+     * — and the identity rows that survive are names rather than means. A `beforeCount` appearing
+     * on one of them would be this block quietly acquiring a denominator for a comparison it has
+     * just said it is not making.
+     */
+    for (const delta of [deltaOf(reportOf(saturated), reportOf(clean)), freePlayThenScenario()]) {
+      expect(delta.figures).toEqual([]);
+      for (const row of delta.selection) {
+        expect(row.beforeCount).toBeNull();
+        expect(row.afterCount).toBeNull();
+      }
+    }
   });
 
   it('stops calling itself “what moved”, because nothing here moved for a reason', () => {
@@ -1376,21 +1512,22 @@ describe('two runs that were not asked the same question — issues #117 and #10
     expect(plan).not.toMatch(/recording|endedAt|startedAt/);
   });
 
-  it('cannot see an event a calendar wrote over one day, and that gap is pinned rather than claimed shut', () => {
+  it('refuses one day number under two different events — the half that always worked', () => {
     /*
-     * § D227: a refusal is pinned by a run, never by another sentence — so the axis `ReportBasis`
-     * still cannot see gets a case of its own, exactly as the run length had one until this wave.
+     * This case was filed as *the gap the basis cannot see*, and it was misfiled: what it actually
+     * pins is the half that **works**. One day number under two different events is refused, so
+     * `demand` is carrying the event and the basis's shape was never the defect.
      *
-     * `dev/main.ts#closeShift` derives the sheet's event as `eventFor(week.day, week.dayIdx)` — the
-     * ordinary schedule — while `dev/state.ts#shiftRunConfigOf` derives the **run's** event by
-     * consulting the authored calendar first, because a period may name today's event (`moving-week`
-     * is *`move-in` every day*). Where a calendar overrides, the two disagree and two days that ran
-     * under different events pair as one question.
+     * The defect was one expression up. `dev/main.ts#closeShift` derived the sheet's event as
+     * `eventFor(week.day, week.dayIdx)` — the ordinary schedule — while
+     * `dev/state.ts#shiftRunConfigOf` built the **run** from the authored calendar's override, so
+     * where a period named today's event the two disagreed and a calendar day paired with an
+     * ordinary one as one question. GitHub issue #135 closed it by giving the question one answer,
+     * `shift/calendar.ts#scheduledEventFor`; `shift/eventSeam.test.ts` is what stops a second.
      *
-     * What this case pins is the half that **works**: one day number under two different events is
-     * refused, so `demand` is carrying the event and the gap is the shell's derivation rather than
-     * the basis's shape. Closing it is one line in `closeShift` and belongs to whoever owns the
-     * calendar seam.
+     * The case stays because the refusal it drives is what makes that fix *land*: an event that
+     * reached the basis and did not separate two days would leave `closeShift` correct and the
+     * comparison still wrong.
      */
     const booked = (event: ShiftEvent): ShapedDayReport =>
       dayReportOf({
@@ -1400,6 +1537,7 @@ describe('two runs that were not asked the same question — issues #117 and #10
         week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
         contract: contractById('c2'),
         event,
+        calendar: null,
         subject: { kind: 'week-day' },
         plan: PLAN,
       });

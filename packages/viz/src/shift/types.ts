@@ -502,6 +502,41 @@ export interface ReportFigure {
   readonly value: string;
   /** The line under it: the denominator, the window, the caveat. */
   readonly note: string;
+  /**
+   * How many observations this cell's value is a **mean over** — `undefined` on every cell that is
+   * not one, and on a cell that refused to publish a mean at all.
+   *
+   * ## Why the count is a field when the note already prints it
+   *
+   * `shift/report.ts#averageWaitFigure` writes *"over 1 204 legs in the peak-5min window"* into
+   * {@link note}, so on the figure grid the count is already on screen under the value, and
+   * `honesty/surfaces.ts` reads it back out of that sentence with a regex. That works exactly as
+   * far as the cell travels **with its note**, and the run-to-run delta block is where it stops:
+   * `dev/reportPanel.ts#reportDeltaOf` pairs two sheets by figure id, keeps their **values**, and
+   * drew `AVERAGE WAIT was 17.8 s → 23.4 s` with no count anywhere in its box — on the Day report
+   * and on the dispatcher editor's result strip, which draws the same view (GitHub issue #137,
+   * found by the honesty sweep's R13 on its first run over the block).
+   *
+   * A consumer that wanted the count back had two bad options and one good one. It could re-derive
+   * it from the recording — a second source of truth for a number this cell already has, and wrong
+   * the moment a sheet is paired against a sheet of a *different* run, which is the delta's whole
+   * job. It could parse the digits out of {@link note} — asking *is there a number?* in place of
+   * *is there a count?*. Or the cell can carry the denominator it was computed over, from the same
+   * summary and the same function as the value, three lines apart. This is the third.
+   *
+   * ## Why it is absent rather than zero on a refusal
+   *
+   * `undefined` is *"this value is not a mean over a sample"*, which is true of a count
+   * (`CARRIED`), of a maximum (`WORST WAIT`) and of the **refusal** itself: a withheld cell has no
+   * mean, so it has no sample the mean was taken over, and a count printed beside the word
+   * `withheld` would make a refusal look like a figure with a caveat. R3's rule that suppression
+   * replaces the number rather than softening it applies to the denominator too.
+   *
+   * The share cells (`AWAY INSIDE A MINUTE`, the per-leg energy figure) deliberately do **not**
+   * declare one. They are observations, never suppressed, and R13 is a rule about estimates; their
+   * denominators stay where they already are, in their own notes, on the grid that draws them.
+   */
+  readonly count?: number | undefined;
   readonly tone: FigureTone;
   /**
    * Whether this figure is an **axis** that may not be ranked against anything or folded into

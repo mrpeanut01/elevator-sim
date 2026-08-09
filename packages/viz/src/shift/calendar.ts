@@ -98,9 +98,10 @@ import {
   type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 
+import { SHIFT_EVENTS, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
 import { carsToDerate, type CarRef } from './incidents.js';
-import { weekdayOf, type ShiftEventId, type Weekday } from './types.js';
+import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * A bias on the directional mix
@@ -555,6 +556,57 @@ export function calendarDayFor(
     shift: override === undefined ? period.shift : { ...period.shift, ...override },
     overridden: override !== undefined,
   };
+}
+
+/**
+ * **Which event a day is under — the one answer, and the only caller of `events.ts#eventFor`.**
+ *
+ * ## The defect this exists to make unrepeatable — GitHub issue #135
+ *
+ * `eventFor(day, dayIdx)` is the *ordinary schedule*, and a period may overrule it:
+ * {@link CALENDAR_PERIODS}`['moving-week']` books `move-in` on six of its seven days. So *"what
+ * event is this day under?"* has two answers, and until this function every surface that asked it
+ * picked one for itself. `dev/state.ts#shiftRunConfigOf` — the code that builds the run — consulted
+ * the calendar. **Four other callers did not**, and each of them told a player something the run
+ * would contradict:
+ *
+ * | caller | what it said | under `moving-week` |
+ * |---|---|---|
+ * | `shift/report.ts#forecastFor` | tomorrow's event, on the Day report's *Tomorrow* card | day 5 read *Fire drill*; the run was a move-in |
+ * | `dev/main.ts#closeShift` | today's event, printed by `report.ts#bookedLine` **and** keyed into `ReportBasis.demand` | a calendar day paired with an ordinary one as one question |
+ * | `dev/leftRail.ts#drawShift` | today's event name and note, on the rail, all day | the rail named an event the cars were not running |
+ * | `scope/runIdentity.ts#carriesState` | *"day N … schedules X"*, and the **`changesNothing` gate above it** | a day the calendar made eventful was cleared as reproducible |
+ *
+ * Two lanes found this independently at two different callers, which is what says the shape is
+ * general rather than local. It is one seam: *the shell derives the event and the run overrides it*.
+ *
+ * ## Why the fix is a function and not four corrections
+ *
+ * Four corrections leave five expressions that must agree, and this repository has the case law:
+ * § D223 and issue #53 are one screen giving two answers to one question, and § D227 is a
+ * *sentence* that stopped agreeing with the seam it described. The derivation existed in two places
+ * and had in fact been written a **fifth** time; the guard that stops a sixth is not this docstring
+ * but `eventSeam.test.ts`, which derives every `eventFor` caller in `packages/viz/src` from disk and
+ * requires that this is the only one outside `events.ts` itself.
+ *
+ * ## What `null` means, in both arguments
+ *
+ * A `null` **period** is *no calendar* and a `null` `shift.eventId` is *this period does not name
+ * today's event* — `moving-week`'s Sunday override is exactly that, because the movers do not work
+ * Sunday and the week's own schedule is meant to stand. Both fall through to {@link eventFor}, and
+ * they have to be the same fall-through: a period that hands a day back is handing back the ordinary
+ * day, not a third kind of day.
+ *
+ * Pure in `(period, day, dayIdx)`, like everything else in this module.
+ */
+export function scheduledEventFor(
+  period: CalendarPeriod | null,
+  day: number,
+  dayIdx: number,
+): ShiftEvent {
+  const today = calendarDayFor(period, day, dayIdx);
+  const booked = today?.shift.eventId;
+  return booked == null ? eventFor(day, dayIdx) : SHIFT_EVENTS[booked];
 }
 
 /* -------------------------------------------------------------------------- *

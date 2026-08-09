@@ -99,7 +99,7 @@ import type { SimTime } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
 
-import { eventFor } from './events.js';
+import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
 import { readGoals } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
@@ -283,20 +283,22 @@ export interface ShiftPlan {
  * issue rather than an implementation note — see {@link ShiftPlan} for the span that looks free and
  * is not.
  *
- * ## What this still cannot see, said here rather than left to be discovered
+ * ## The gap this used to name is closed, and the shape of it is worth keeping
  *
- * The **event an authored calendar writes over a day**. {@link demand}'s week-day arm names the
- * day's `event.id`, and it names the one the *sheet* was handed: `dev/main.ts#closeShift` derives it
- * as `eventFor(week.day, week.dayIdx)`, the ordinary schedule. `dev/state.ts#shiftRunConfigOf`
- * derives the event the **run** was under differently — it consults `calendarDayFor(state.calendar,
- * …)` first, because a period may name today's event (`moving-week` is *`move-in` every day*). Where
- * a calendar overrides, the two disagree, and two days that ran under different events pair as one
+ * It read: *the basis cannot see the event an authored calendar writes over a day*. {@link demand}'s
+ * week-day arm names the day's `event.id`, and it named the one the **sheet** was handed —
+ * `dev/main.ts#closeShift` derived it as `eventFor(week.day, week.dayIdx)`, the ordinary schedule,
+ * while `dev/state.ts#shiftRunConfigOf` built the run from the calendar's override. Where a period
+ * overruled, the two disagreed and two days that ran under *different* events paired as one
  * question.
  *
- * Two ordinary days under two different events **are** refused, which is the half that works and is
- * asserted in `reportPanel.test.ts`. The gap is one file wide and it is the shell's: `closeShift`
- * would have to be handed the event the run actually used. Named here and pinned by a case rather
- * than claimed shut — § D227, a limitation described only in prose is a limitation that goes stale.
+ * **The basis was never the defect**, and that is the part worth keeping: two ordinary days under
+ * two different events have always been refused, and `reportPanel.test.ts` has always asserted it.
+ * The gap was one expression wide and it was the shell's. GitHub issue #135 closed it by giving
+ * that question exactly one answer — `shift/calendar.ts#scheduledEventFor`, which `closeShift` and
+ * four other callers now go through, with `eventSeam.test.ts` deriving from disk that there is no
+ * sixth. A limitation described only in prose is a limitation that goes stale (§ D227), so this
+ * paragraph is pinned by that test rather than by its own confidence.
  */
 export interface ReportBasis {
   /** `VizRecording.buildingId` — the tower, not its display name. */
@@ -412,12 +414,49 @@ export interface DayReportInput {
   /** `undefined` for a building the reader built, which is graded but belongs to no scenario. */
   readonly contract: ScenarioContract | undefined;
   /**
-   * What was booked against **today** — not tomorrow, which the forecast card derives itself.
+   * What was booked against **today**, as the run had it — `dev/main.ts#closeShift` derives it
+   * through `shift/calendar.ts#scheduledEventFor`, which is the same expression the run itself is
+   * built from.
    *
    * Read by {@link bookedLine}, and for a long time by nothing at all: see that function for what
    * the sheet was missing while this field sat unread.
+   *
+   * **Tomorrow's is not this field and is not derived from it** — see {@link calendar}.
    */
   readonly event: ShiftEvent;
+  /**
+   * The calendar period the week is under, or `null` for an ordinary week. **Required** — GitHub
+   * issue #135.
+   *
+   * ## What it is for, which is one card and one card only
+   *
+   * {@link forecastFor}. The *Tomorrow* card names the event tomorrow will be under, and tomorrow
+   * is a day this sheet has to work out for itself — {@link event} is today's. Until this field the
+   * card called `eventFor(day + 1, nextIdx)`, the **ordinary schedule**, while the run it was
+   * predicting would be built by `dev/state.ts#shiftRunConfigOf` from the calendar's override. On a
+   * `moving-week` the two disagree on five of seven days: the card said *Fire drill* for a day the
+   * cars spent moving furniture.
+   *
+   * ## Why the period and not the resolved event
+   *
+   * A `tomorrowEvent: ShiftEvent` would have been smaller and it would have put `(week.dayIdx + 1)
+   * % 7` at the caller — a third site holding the arithmetic that decides which day *tomorrow* is,
+   * next to the two that already do. The period is the input the derivation is missing; the day is
+   * this module's own and stays here.
+   *
+   * ## Required, and `null` written out
+   *
+   * {@link subject}'s rule and {@link plan}'s, for the third time: the defect each of those fields
+   * closed was a caller that forgot to say. An optional field defaulting to `null` would read
+   * exactly the same at every call site that has a calendar and does not pass it, which is the
+   * defect rather than a guard against it.
+   *
+   * **Not derivable from {@link recording}**, and that is the trap both #135 and #126 record rather
+   * than an implementation note. A recording knows what happened; a period is what was *scheduled*,
+   * and a card that reported tomorrow from today's events would be a different claim in the same
+   * words.
+   */
+  readonly calendar: CalendarPeriod | null;
   /**
    * Whether this run is a day of a week or a run on its own. **Required** — see the module
    * docstring: the defect this field closes was a caller that forgot to say.
@@ -521,7 +560,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
  * ## The finding this closes
  *
  * The field was destructured and read by **nothing**. The forecast card names *tomorrow's* event,
- * derived independently through `eventFor(day + 1, …)`, and the sheet named today's nowhere — so a
+ * derived independently through `forecastFor`, and the sheet named today's nowhere — so a
  * player who had just run a move-in day, with a car derated to two thirds for the whole shift, read
  * a sheet that described the day's figures and never mentioned the thing that shaped them. Every
  * line was individually true and the account was missing its subject.
@@ -708,7 +747,7 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     streakLine: streakLineFor(judgement.verdict, week.streak),
     contractLine: contractLineFor(contract, week),
     cleared: week.cleared,
-    forecast: forecastFor(week.day, nextIdx),
+    forecast: forecastFor(input.calendar, week.day, nextIdx),
     taught: taughtFor(contract, week),
     nextDayName: weekdayOf(nextIdx),
   };
@@ -1042,6 +1081,20 @@ function figuresFor(
  * wants a handle on it. The value is `summary.meanWaitS` formatted and **nothing else**: there is
  * no fallback arithmetic, no interpolation from the away-inside-a-minute share, and no rounding to
  * a friendlier number. The mockup's `28 + (100 − pct) × 0.9` is asserted absent.
+ *
+ * ## The `n` is published twice, from one place, and the second copy is not decoration
+ *
+ * `summary.waitCount` is the denominator this mean was taken over. It goes into the note, where the
+ * grid draws it under the value, **and** into {@link ReportFigure.count}, where a consumer that
+ * carries the cell somewhere else can still find it — the run-to-run delta block being the consumer
+ * that could not, and GitHub issue #137 being what that cost. Both come off the same `summary` in
+ * the same branch of the same function, so there is no second derivation to go stale: if the mean
+ * moves, the count moves with it or neither does.
+ *
+ * The refusal above carries **no** count, and that is the rule rather than an omission. There is no
+ * mean on that branch, so there is no sample a mean was taken over, and `n = 1 204` printed beside
+ * the word `withheld` reads as a figure with a caveat rather than as a refusal. See
+ * {@link ReportFigure.count}.
  */
 export function averageWaitFigure(summary: VizSummary): ReportFigure {
   const publishable = summary.awtIsValid && !summary.saturated;
@@ -1070,6 +1123,8 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
     note: `over ${String(summary.waitCount)} legs in the ${summary.reportWindow.id} window`,
+    // The same denominator, structured, so it survives being carried off this grid. See above.
+    count: summary.waitCount,
     tone: 'plain',
     axisOnly: false,
   };
@@ -1525,9 +1580,25 @@ function contractLineFor(contract: ScenarioContract | undefined, week: WeekState
  * today, because growth is linear (`1 + 0.11 × (day − 1)`) — so on day 5 tomorrow is 7.6 % busier
  * than today, not 11 %. The true figure is computed rather than the constant repeated: a number on
  * a forecast card is a claim, and this one is checkable against `growthFactor`.
+ *
+ * ## The name is a claim too, and it was the wrong one — GitHub issue #135
+ *
+ * This was `eventFor(day + 1, nextIdx)`, the ordinary schedule, on a card whose whole job is to say
+ * what tomorrow will be. The run tomorrow gets is built by `dev/state.ts#shiftRunConfigOf`, which
+ * lets the calendar overrule that schedule, so under `moving-week` the card named an event the
+ * player would not meet. It goes through `shift/calendar.ts#scheduledEventFor` now — the same
+ * expression the run is built from, rather than a second one that agrees on ordinary weeks.
+ *
+ * The percentage was already measured through the shipped chain and the name now is too, which is
+ * the property worth stating in one place: **every claim on this card is derived the way the thing
+ * it predicts is derived.**
  */
-function forecastFor(day: number, nextIdx: number): ReportForecast {
-  const event = eventFor(day + 1, nextIdx);
+function forecastFor(
+  calendar: CalendarPeriod | null,
+  day: number,
+  nextIdx: number,
+): ReportForecast {
+  const event = scheduledEventFor(calendar, day + 1, nextIdx);
   const increase = (growthFactor(day + 1) / growthFactor(day) - 1) * 100;
   return {
     name: event.name,

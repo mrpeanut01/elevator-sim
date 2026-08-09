@@ -39,7 +39,7 @@ the shape of all three, and **Phase 9's ✅ is the one that must not be read alo
 - **Phase 9** — **ACCEPTED WITH NAMED GAPS (2026-07-30)** against [§ D163](../DECISIONS.md), whose
   own rule is that the status row and the verdict land together or neither does. Both load-bearing
   clauses are met **by a run rather than by an argument**: the honesty tiers run at **49 cases,
-  285 954 strings, 606 simulations, 30 surfaces** (always-on) and **60 cases, 360 945 strings,
+  287 083 strings, 606 simulations, 30 surfaces** (always-on) and **60 cases, 362 317 strings,
   4 710 simulations, 31 surfaces** (deep), re-measured 2026-08-09 — neither is at zero violations,
   and both open findings are recorded in `honesty.test.ts`'s `OUTSTANDING` rather than argued away
   (the delta block's missing `n`, issue #127; and `honesty-9100031`'s cue collision). The superseded

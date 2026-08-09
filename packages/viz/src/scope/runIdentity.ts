@@ -37,7 +37,7 @@
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import type { BrowserResources } from '../dev/data.js';
 import type { ViewerState } from '../dev/state.js';
-import { eventFor } from '../shift/events.js';
+import { scheduledEventFor } from '../shift/calendar.js';
 
 import { permits } from './permits.js';
 import { SCOPE_OF } from './surface.js';
@@ -68,7 +68,23 @@ function viewerControls(): readonly { readonly key: SurfaceKey; readonly field: 
 function carriesState(state: ViewerState, field: string): string | undefined {
   switch (field) {
     case 'week': {
-      const event = eventFor(state.week.day, state.week.dayIdx);
+      /*
+       * Through the calendar — GitHub issue #135's **fourth** caller, and the one where the wrong
+       * event does more than misname something. `changesNothing` is the *gate*: on `eventFor`
+       * alone, day 1 of a `moving-week` was `ordinary`, `changesNothing` was true, and this
+       * returned `undefined` — declaring a day the calendar had made a move-in reproducible from a
+       * selection that carries no calendar. The name in the sentence below was the visible half;
+       * this line was the one that let a run be published as something it was not.
+       *
+       * **A narrower hole is left open on purpose and named rather than patched here.** A period
+       * that names *no* event still scales the population and can swap the template — `vacation` is
+       * a quarter of the building — so day 1 under one is still declared reproducible by the
+       * clause below. That is the *period*'s fact and not the *event*'s, and closing it means a
+       * sentence that says which period, which this one does not: a gate opened without the
+       * sentence to match would file a refusal that names the wrong reason, which § D227 rates
+       * below the gap itself. It needs its own issue.
+       */
+      const event = scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx);
       if (state.week.day === 1 && event.effect.changesNothing) return undefined;
       return (
         `day ${String(state.week.day)} grows the building by ${String(Math.round((state.week.day - 1) * 11))} % ` +

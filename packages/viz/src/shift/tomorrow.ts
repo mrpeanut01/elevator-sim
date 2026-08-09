@@ -352,19 +352,23 @@ function tenantsNoteOf(today: number, delta: number): string {
 /**
  * What tomorrow is under.
  *
- * ## Tomorrow's **event** is deliberately not here, and the reason is a defect this found
+ * ## Tomorrow's **event** is deliberately not here, and the reason has changed underneath it
  *
  * The Day report's own *Tomorrow* card already names it — `shift/report.ts#forecastFor`, the card
  * `docs/design/elevator-sim-reimagined.dc.html` :360 draws — so a second name on the same screen
  * would be two answers to one question, which is the failure § D223 and issue #53 both closed.
  *
- * The card's name is **`eventFor(day + 1, nextIdx)`, the unpatched schedule**, and
- * `dev/state.ts#shiftRunConfigOf` overrides that with `calendarDayFor(...)?.shift.eventId` before
- * it runs — so on a `moving-week` period, which books `move-in` every day, the card already names
- * an event the run will not have. That is **pre-existing and not fixed here**: correcting it means
- * `dayReportOf` taking tomorrow's *resolved* event, which is a required new field on
- * `DayReportInput` and a change at every one of its callers. It is reported rather than absorbed,
- * because absorbing an unrelated defect into a feature is how a fix becomes unreviewable.
+ * **That was one of two reasons and the weaker one has gone.** When this beat was written the
+ * card's name was `eventFor(day + 1, nextIdx)`, the unpatched schedule, while
+ * `dev/state.ts#shiftRunConfigOf` overrode it from the calendar — so under `moving-week` the card
+ * named an event the run would not have, and restating a wrong name would have doubled it. GitHub
+ * issue #135 closed that: `forecastFor` takes the period and goes through
+ * `shift/calendar.ts#scheduledEventFor`, so the card is now correct on every period.
+ *
+ * **Restating it here is therefore a design change and not a bug fix, and it is not taken.** The
+ * § D223 argument never depended on the card being wrong: one screen, one answer, and the card is
+ * where a reader looks for what tomorrow is. Adding a second copy would buy nothing and would leave
+ * two places for a later edit to correct one of.
  *
  * What is left is the period itself, which the card cannot say at all. It is present only when the
  * week is in one — the single case on this surface where absence is right, because *no period* is

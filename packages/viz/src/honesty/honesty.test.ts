@@ -244,9 +244,13 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Four entries and two findings** — each
- * finding entered once per tier it reproduces in, because the second direction below is asked per
- * tier and a finding recorded in one corpus is a ghost in the other.
+ * What the search **found**, pinned in both directions. **Two entries and one finding** — entered
+ * once per tier it reproduces in, because the second direction below is asked per tier and a
+ * finding recorded in one corpus is a ghost in the other.
+ *
+ * It was four entries and two findings until GitHub issue #137 closed R13 on the delta block in the
+ * product. Both of that finding's entries are gone; the argument for what it was and what closed it
+ * stays below, as prose, on the same footing as every other closed finding in this file.
  *
  * A found violation is a result before it is a patch, so a finding is recorded here rather than
  * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
@@ -268,8 +272,10 @@ describe('a counterexample shrinks', () => {
  *
  * That mechanism was kept while the register was empty *"because the next finding will arrive in one
  * tier or the other, and rebuilding it at that point means rebuilding it in a hurry"*. It did, in
- * both: R13 on the delta block reproduces in the always-on tier, and the R3 cue collision on
- * `honesty-9100031` reproduces only in the deep one.
+ * both: R13 on the delta block reproduced in **both** tiers, and the R3 cue collision on
+ * `honesty-9100031` reproduces only in the deep one. R13's entries are now deleted with the defect,
+ * and the surviving finding is a deep-tier-only one — so the marker is again the only thing standing
+ * between the always-on half of the ghost check and an assertion over nothing.
  *
  * ## The entry that was missing, and what its absence cost
  *
@@ -428,68 +434,53 @@ const OUTSTANDING: readonly {
 
   /*
    * ## 1. R13 on the Day report's delta block — **found on the first run of GitHub issue #127's
-   * pairing, and it is a real gap rather than a classification artefact**
+   * pairing, and now CLOSED in the product (GitHub issue #137)**
    *
-   * `honesty/surfaces.ts` rendered `reportViewOf(shaped)` with no `previous`, so `ReportView.delta`
-   * was `null` on every seeded case and the block's caption, both arms of its note and every paired
-   * row had never been in the corpus. Issue #127 built the pairing; the corpus answered on its first
-   * run, on **24 of 49** always-on cases:
+   * Two entries stood here, one per tier, and both are deleted rather than kept: *"a finding that is
+   * fixed … is also red, with a message saying to delete the entry"* is this register's own rule,
+   * and an entry outliving what it recorded is the ghost the second direction exists to catch.
+   *
+   * What was found, on **24 of 49** always-on cases and **28 of 60** deep, the first time the block
+   * was swept:
    *
    * > `AVERAGE WAIT was 17.8 s → 23.4 s`
    *
    * One row, one figure, one property. `AVERAGE WAIT` is the only cell on the sheet that
    * `summary.awtIsValid` speaks for, and R13 clause one is *"an estimate string must carry a count,
-   * in the same visual unit"*. The block draws `LABEL was X → Y` and **no count anywhere in its
-   * box** — `dev/reportPanel.ts#deltaRow` is a label, a `was` value, a decorative arrow and a value,
-   * and `deltaBox` is its own bordered region with a caption above and one sentence below.
+   * in the same visual unit"*. The block drew `LABEL was X → Y` and **no count anywhere in its
+   * box** — `dev/reportPanel.ts#deltaRow` was a label, a `was` value, a decorative arrow and a
+   * value, and `deltaBox` is its own bordered region with a caption above and one sentence below.
    *
-   * **Why it is not the harness's defect, which is the question this adapter has been wrong about
+   * **It was never the harness's defect, which is the question this adapter has been wrong about
    * before.** The figure-grid loop in `REPORT_PANEL` seeds a cell's value with `countShown` read off
    * that cell's **note**, and its comment records why: seeding the value alone *"asked R13 a question
-   * about a string nobody draws"*, because the sheet draws the value and the note together. Here the
-   * opposite holds — the row is drawn exactly as it is seeded, with nothing beside it. The seed is
-   * the string.
+   * about a string nobody draws"*, because the sheet draws the value and the note together. That was
+   * not true here — the row was drawn exactly as it was seeded, with nothing beside it — and the
+   * fix is precisely to make it true: the row now has a note, drawn beside the value, and the adapter
+   * seeds it and reads `countShown` off it exactly as the grid does.
    *
-   * **And the surface where it costs most is not the sheet.** On the Day report the block sits above
-   * a figure grid that does print `mean over N waits · peak-5min window`, one block away. On
-   * `dev/dispatcherEditor.ts`'s result strip — the second surface § D310 pointed at the same
-   * `reportViewOf` — there is no sheet at all: the strip is a caption, these rows and the block's
-   * note. That is `REPORT_CARD`'s argument in miniature (*"a claim on it is read with none of that
-   * around it"*), and it is why this is recorded as a finding rather than argued away.
+   * **The surface where it cost most was not the sheet.** On the Day report the block sits above a
+   * figure grid that does print the mean's `n`, one block away. On `dev/dispatcherEditor.ts`'s
+   * result strip — the second surface § D310 pointed at the same `reportViewOf` — there is no sheet
+   * at all: the strip is a caption, these rows and the block's note. That is `REPORT_CARD`'s
+   * argument in miniature (*"a claim on it is read with none of that around it"*), and it is why the
+   * fix had to be in the **view** rather than in either renderer.
    *
-   * **Recorded rather than fixed, on § D307's own precedent** — the two temporal findings were left
-   * standing in the lane that found them *"because a corpus that grew an axis and stayed green is a
-   * different claim from one that had to be repaired first"*. The same holds for a corpus that
-   * acquired a surface. The fix is a product decision this lane does not own: `DeltaRowView` would
-   * carry the current sheet's own `note` for a paired figure — a string the sheet already published,
-   * so the block stays arithmetic-free — and both renderers would draw it, which is a change to what
-   * two shipped surfaces look like and belongs with the handoff. It needs its own issue.
+   * **What closed it.** `ReportFigure` carries the denominator its value was computed over
+   * (`shift/report.ts#averageWaitFigure`, from the same `summary` as the mean and three lines from
+   * it); `DeltaRowView` carries **two** counts, one per side, because the two values are means of
+   * two different runs and one `n` under both would be a claim neither sheet made; both renderers
+   * draw each count beside its own value. A refused mean carries none — a refusal has no sample —
+   * and § D311's comparability refusal draws no figure rows at all, so neither acquires a
+   * denominator that would make it read as a figure with a caveat. Pinned in `reportPanel.test.ts`
+   * (five cases, including the two-runs-two-counts one and the refusal) and in
+   * `dispatcherEditor.test.ts` (the strip really draws them). The always-on tier's
+   * `estimate-without-n` count went **48 → 0** and the deep tier's **104 → 0**.
+   *
+   * The entries were deleted **on the commit that made the finding stop reproducing**, which is the
+   * rule the closed findings above were left here to state: deleting one any earlier or any later is
+   * the same defect twice.
    */
-  Object.freeze({
-    property: 'estimate-without-n',
-    surfaceId: 'dev/reportPanel.ts#reportViewOf',
-    tier: 'standard' as const,
-    /*
-     * Pinned to the **row**, not to a value: every case prints a different pair of seconds, and the
-     * claim is about `AVERAGE WAIT` travelling out of the unit that carried its `n`. A second gated
-     * figure added to the sheet would be a new finding here rather than an inherited pass.
-     */
-    fieldContains: 'delta.figures(AVERAGE WAIT)',
-    finding: 'the delta block pairs the sheet’s mean with no count in its own box — issue #127',
-  }),
-  /*
-   * The same finding in the deep tier, entered separately because {@link expectStillFound} runs the
-   * ghost check per tier. Two entries rather than one with a widened `tier`, so that a finding which
-   * stops reproducing in *one* corpus is still red — which is the whole point of the second
-   * direction.
-   */
-  Object.freeze({
-    property: 'estimate-without-n',
-    surfaceId: 'dev/reportPanel.ts#reportViewOf',
-    tier: 'deep' as const,
-    fieldContains: 'delta.figures(AVERAGE WAIT)',
-    finding: 'the delta block pairs the sheet’s mean with no count in its own box — issue #127',
-  }),
 
   /*
    * ## 2. R3's cue collision on `honesty-9100031` — **the entry the documents already claimed was

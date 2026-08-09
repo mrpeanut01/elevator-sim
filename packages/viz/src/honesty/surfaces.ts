@@ -200,7 +200,8 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { baseDemandOf, eventFor, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
+import { LOADED_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -254,6 +255,7 @@ import {
   calendarLine,
   calendarPatch,
   periodOnDays,
+  scheduledEventFor,
 } from '../shift/calendar.js';
 import { asBuiltChoices, movedChoiceText, movedChoices, withBankChoice } from '../commissioning/choices.js';
 import { reviewCommissioning } from '../commissioning/refusals.js';
@@ -1376,10 +1378,32 @@ const CONTROLS: SurfaceAdapter = {
 
 const REPLAY: SurfaceAdapter = {
   id: 'record/document.ts#verifyReplay',
-  covers: ['record/document.ts#verifyReplay'],
+  covers: [
+    'record/document.ts#verifyReplay',
+    'shift/banking.ts#bankingRefusalFor',
+    'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
+  ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
-    return singleRun(this.id, [{ field: 'verifyReplay.message', text: verdict.message, role: 'observation' }]);
+    return singleRun(this.id, [
+      { field: 'verifyReplay.message', text: verdict.message, role: 'observation' },
+      /*
+       * What a loaded recording may not do — GitHub issue #136, and it belongs on this surface
+       * rather than beside `NO_SHEET_YET` because both sentences here are about the standing of a
+       * run that arrived from somewhere else.
+       *
+       * `reason` for `NO_SHEET_YET`'s reason: it explains a refusal and names what to do instead,
+       * which is the shape R3 judges. `authored` because it is a constant rather than a reading —
+       * nothing about this run produced it, and classifying it `single-run` would let a figure into
+       * it without the count rules noticing.
+       */
+      {
+        field: 'loadedRunCannotBank',
+        text: LOADED_RUN_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+    ]);
   },
 };
 
@@ -2053,7 +2077,18 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
     const contract = own ? undefined : contractById(contractId);
     const goals = goalsForDay(day);
     const readings = readGoals(goals, observations);
-    const event = eventFor(day, dayIdx);
+    /*
+     * Through `scheduledEventFor` with **no period**, which is the shape every other axis on this
+     * bundle takes: one ordinary week, varied one field at a time.
+     *
+     * `null` rather than a period on purpose, and said rather than left to look like an oversight —
+     * GitHub issue #135. The strings a calendar can put on this sheet are `SHIFT_EVENTS`' own names
+     * and notes, seeded below and swept on every shipped period by `CALENDAR_AND_FABRIC`, so a
+     * third bundle day under `moving-week` would multiply six sheets across two surfaces to sweep a
+     * vocabulary already in the corpus. What a period changes is *which* of those the card picks,
+     * and that is a `report.test.ts` case rather than an R-property.
+     */
+    const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
       day,
       dayIdx,
@@ -2077,6 +2112,10 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       week: banked,
       contract,
       event,
+      // The same `null` the event above was resolved against, and it has to be the same one: a
+      // bundle whose today came from no period and whose tomorrow came from one would put two
+      // weeks on one sheet.
+      calendar: null,
       dispatcherName,
       dayStartS: DAY_START_S,
     };
@@ -3080,18 +3119,43 @@ function reportPairingsOf(bundle: ShiftBundle): readonly ReportPairing[] {
  *
  * ## The roles are the sheet's own, and the figure rows are the argument
  *
- * `DeltaRowView` is `{ label, before, after }` and carries no classification of its own, so
- * `types.ts`'s rule would make every row `prose`. That rule has a second half — *"an adapter copies
- * the surface's classification; it never invents one"* — and a figure row **is** a figure: it is
- * matched back to the `ReportFigure` the current sheet published, by the label the row was built
- * from, and it takes that cell's role, its `gated` flag and its `axisOnly` flag. A row pairing
- * `AVERAGE WAIT` is the sheet's own estimate with a second value beside it, and calling it prose
- * because the pairing dropped the tone would be the adapter deciding a property does not apply.
+ * `DeltaRowView` carries no classification of its own, so `types.ts`'s rule would make every row
+ * `prose`. That rule has a second half — *"an adapter copies the surface's classification; it never
+ * invents one"* — and a figure row **is** a figure: it is matched back to the `ReportFigure` the
+ * current sheet published, by the label the row was built from, and it takes that cell's role, its
+ * `gated` flag and its `axisOnly` flag. A row pairing `AVERAGE WAIT` is the sheet's own estimate
+ * with a second value beside it, and calling it prose because the pairing dropped the tone would be
+ * the adapter deciding a property does not apply.
  *
- * `countShown` is therefore `false` for a gated row, and that is a **measurement rather than a
- * concession**: the block draws `LABEL was X → Y` and no count anywhere in the box, so if R13 has
- * something to say here it should say it. The alternative — reading the digits out of the *value* —
- * would be the adapter answering *is there a count?* with *is there a number?*.
+ * ## `countShown` is still a measurement, and what it measures moved — GitHub issue #137
+ *
+ * When this adapter was written the block drew `LABEL was X → Y` and no count anywhere in its box,
+ * so the flag was a flat `false` for a gated row and R13 duly reported it on 24 of 49 always-on
+ * cases and 28 of 60 deep. The row now carries each side's own count — `DeltaRowView.beforeCount`
+ * and `afterCount`, the two sheets' own figure notes — drawn beside its own value by both
+ * renderers. The flag is read off **the later side's** count string, because the later sheet is
+ * where this row's role came from, and it is read as a digit test over that string rather than as
+ * `!== null`: a count field holding a sentence with no number in it is not a count on screen.
+ *
+ * A side whose sheet refused its mean has no count, draws none and reports none, so a pairing where
+ * the current cell is `withheld` still comes back `countShown: false` — and R13 stays silent there
+ * because that row's role is `suppressed`, which is R3's business rather than R13's.
+ *
+ * ## The counts are seeded as their own strings, which is the grid's arrangement and not a dodge
+ *
+ * The figure grid one block down seeds a cell's value and its note as **two** strings and reads
+ * `countShown` off the note, because *"the sheet draws the value and the note together"*. This row
+ * is now the same shape: `dev/reportPanel.ts#deltaRow` draws the count in its own `<span>` beside
+ * the value it belongs to, so two seeds is what the DOM actually is.
+ *
+ * It also keeps a coincidence out of the corpus that inlining would have invited, and the
+ * coincidence is a real one rather than a hypothetical: R3's textual half fires on a **numeral in
+ * the same clause as a cue naming the quantity**, the row's label *is* that cue (`AVERAGE`), and a
+ * count spliced in beside it puts `waitCount` a few characters from the word `average` on runs
+ * whose mean is refused. `honesty-9100031` is that exact shape already — a refused `meanWaitS` of
+ * 19.65 colliding with a `20` that is a seed count — and it is open. Seeding the count as its own
+ * string carries no cue, so the collision cannot be manufactured here; what R13 needs from the
+ * arrangement is `countShown`, which is the flag, not the splice.
  *
  * ## The note is `prose`, deliberately, and it is the stronger choice
  *
@@ -3130,12 +3194,26 @@ function deltaSeeds(
       field: `${at}.delta.figures(${row.label})`,
       text: `${row.label} was ${row.before} → ${row.after}`,
       role: shape.role,
-      // Not `undefined`: the block prints no count beside the value, and saying so is the point.
-      countShown: shape.gated ? false : undefined,
+      // The **later** sheet's count, because the later sheet is the one this row's role came from.
+      declaredCount: shape.gated ? source?.count : undefined,
+      countShown: shape.gated ? /(\d[\d,]*)/.test(row.afterCount ?? '') : undefined,
       energyAxis: shape.energyAxis,
       gated: shape.gated,
       ...withPlayhead,
     });
+    for (const [side, note] of [
+      ['beforeCount', row.beforeCount],
+      ['afterCount', row.afterCount],
+    ] as const) {
+      if (note === null) continue;
+      seeds.push({
+        field: `${at}.delta.figures(${row.label}).${side}`,
+        text: note,
+        // A denominator is a fact about a run that happened, on either side of the pairing.
+        role: 'observation',
+        ...withPlayhead,
+      });
+    }
   }
   seeds.push({ field: `${at}.delta.note`, text: delta.note, role: 'prose', ...withPlayhead });
   return seeds;
@@ -4983,6 +5061,13 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
     'shift/calendar.ts#calendarPatch',
     'shift/calendar.ts#CALENDAR_PERIODS',
     'shift/calendar.ts#CALENDAR_PERIOD_IDS',
+    /*
+     * `scheduledEventFor` is deliberately **not** claimed here, and `derive.test.ts` is why: it
+     * returns a `ShiftEvent`, not prose, so it is no more a text producer than `calendarDayFor` is.
+     * A `covers` entry for it would be a coverage claim for nothing — which that suite refuses in
+     * those words, and did, on the first draft of this line. Its *output* is swept below, because
+     * the name and note the override picks are strings a player reads.
+     */
     'commissioning/types.ts#CONSTRAINTS',
     'commissioning/types.ts#constraintById',
     'commissioning/types.ts#DIMENSION_LABELS',
@@ -5029,6 +5114,19 @@ const CALENDAR_AND_FABRIC: SurfaceAdapter = {
           text: today === null ? '' : calendarLine(patch),
           role: 'observation',
         });
+        /*
+         * The event the day is actually under — GitHub issue #135's fix, swept on every shipped
+         * period rather than only on the ordinary week the shift bundle drives.
+         *
+         * These are `SHIFT_EVENTS`' own name and note, which `SHIFT_REPORT` already seeds for the
+         * schedule's answer; what is new here is the **override's** answer, and it is a different
+         * pair on five of `moving-week`'s seven days. `label` and `prose` match the roles those two
+         * strings carry everywhere else, so a period cannot smuggle a figure onto a surface by
+         * booking an event with one in its note.
+         */
+        const booked = scheduledEventFor(placed, day, (day - 1) % 7);
+        seeds.push({ field: `period.${id}.day${String(day)}.event.name`, text: booked.name, role: 'label' });
+        seeds.push({ field: `period.${id}.day${String(day)}.event.note`, text: booked.note, role: 'prose' });
         for (const [index, withheld] of patch.withheld.entries()) {
           seeds.push({
             field: `period.${id}.day${String(day)}.withheld[${String(index)}]`,

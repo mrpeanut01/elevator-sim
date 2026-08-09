@@ -124,6 +124,7 @@ describe('the budget does not reach a results page', () => {
       week,
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
+      calendar: null,
       subject: { kind: 'week-day' },
       // Issue #126's required field. Nothing here reads the basis; the sheet is built for its
       // figures, and the plan says what those figures are figures of.
