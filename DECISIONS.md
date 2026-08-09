@@ -22008,3 +22008,105 @@ Issue **#94**'s residual is untouched: dispatcher portability across buildings, 
 edited traffic parameters, and the persistent building-header anchor. **#125** is filed for
 `enterFreePlay`, which still clobbers the in-memory campaign week when Free play is started on the
 campaign's own building — pre-existing, and now recoverable-but-silent rather than lost outright.
+
+---
+
+## D313 — the opening pair is chosen and measured, and the menu was still holding a retired answer
+
+Issue #99. Its premise is refuted and **the correction goes further than triage's did**.
+
+### What the default actually was, and why that is the interesting part
+
+`menu/menu.ts` read `catalogue.buildings[0]` / `catalogue.dispatchers[0]` — **Chancery House + `nearest-car`**,
+not Midtown Office + `collective`. Midtown is a *persisted* selection, not a default. Triage already
+had that much.
+
+What triage did not have: **`nearest-car` is the dispatcher [§ D134](#d134) moved the Run viewer off.**
+`dev/state.ts` resolves through `dev/defaults.ts`'s preference list; the menu landed later and never
+received the correction. So the two doors into one engine disagreed, and **the door a new player
+arrives through held the retired answer** — [§ D192](#d192)'s shape, in the surface with the most
+first impressions riding on it.
+
+`honesty/surfaces.ts` held a third copy of the opening selection, which would have kept the retired
+answer alive in the corpus after the menu was fixed. Fixed in the same change, because a default
+that is correct in two of three places is the defect this repository keeps re-finding.
+
+### Measured, not asserted
+
+At Free play's own settings — `rise-and-fall`, 1800 s, each building's own profile — six seeds on
+Chancery House:
+
+| arm | AWT | over 60 s | published a mean |
+|---|---|---|---|
+| `nearest-car` (file order) | 57.5–160.9 s | 47.8–87.7 % | **4 of 6** |
+| `collective` (chosen) | 10.3–23.5 s | 0.0–3.5 % | 6 of 6 |
+
+On the shipped seed, same building, same 81 riders: **146.72 s / 87.7 % against 10.34 s / 0.0 %**,
+handling capacity 54.0 vs 81.0 offered against 86.0 vs 81.0. At seed 42 the file-order arm stops
+publishing a mean at all — which is the issue's *"SATURATED, AWT suppressed"* screen, reachable from
+the shipped default on a player's first run.
+
+### The building does not move, and that is measured too
+
+The issue suggests Garden Apartments. At these settings it serves **2 to 8 riders** across six seeds,
+`WT95` equals `AWT` on three of them, and `nearest-car` and `collective` return **identical runs**. A
+calm first screen that teaches nothing is not an improvement on an alarming one that teaches the
+wrong thing. The building stays; the dispatcher moves.
+
+### No difficulty label, and the refusal is pinned by a run
+
+The obvious follow-on is to rank the buildings *easy → hard* on the menu. Refused, and not on taste:
+population per car ranks Mixed-Use High-Rise (142.3) **easier** than Secure Tower (165.3), while at
+these settings Secure Tower publishes a mean and Mixed-Use High-Rise suppresses its own. A label
+that orders them either way is a claim the runs contradict.
+
+### The standing requirement, applied to a default
+
+A default is a control whose value is chosen once, so it gets the same test: enter Free play both
+ways and require **the legs** to differ. A test comparing the selected id would have passed against
+a default that was written and never read.
+
+---
+
+## D314 — both sharing surfaces point at the run, and the URL had to grow before it could be copied
+
+Issue #118.
+
+### Export PNG
+
+`dev/main.ts` exported `ui.stage.canvas.toBlob(...)` — the stage bitmap, which on a fresh load is an
+empty building. Replaced by `render/reportCard.ts`, a pure `Canvas2DLike` renderer drawing the
+**filed Day report** at 1200×630.
+
+A withheld figure is drawn **withheld** — pinned on a real saturated recording with the clean run as
+a control, so the card cannot quietly print a mean the run refuses. With no sheet it refuses in
+words. It files the day first, through `closeShift` itself, on [§ D223](#d223)'s guard rather than a
+second copy of it.
+
+### `copy run`, and the claim that was partly refuted
+
+The issue says the CLI line omits the traffic template. **It does not** — `provenanceLineOf` has
+emitted `--traffic`/`--template` for a shipped pattern since an earlier lane. What it genuinely
+omitted is `state.freePlay` (template *and* rate) and `state.windowStartS`, all `between-games`
+controls that `shiftRunConfigOf` reads.
+
+**And the fix the issue asks for — copy a URL — would have been worse than what it replaced.**
+`deepLinkSearchOf` carried four axes and dropped four. Shipping *copy a link* over that link would
+have traded a line that under-describes the run for a link that silently reproduces a different one,
+which is the more confident error. So the deep link grew `traffic`, `template`, `rate` and
+`windowStart` — reader and writer — **before** the button was pointed at it, and the standing
+requirement is applied to a URL parameter, compared on the legs.
+
+Three things driven rather than argued: `--part` and `--duration` are mutually exclusive (found by
+hitting the CLI's own refusal); a windowed run on an hourless template gets **no line** rather than a
+wrong one; and the windowed line rebuilds the viewer's run **leg for leg**.
+
+`copy run` now copies a link, `copy CLI` copies flags, and both refuse through `runIdentityIssues`.
+The card is the one artefact here that leaves the browser, so it has its own honesty adapter.
+
+### What still does not travel, and is not refused
+
+`viewer.commissioning` and `viewer.calendar` are `between-games`, are read by `shiftRunConfigOf`, and
+are permitted — so `runIdentityIssues` never objects — yet **neither artefact can express them**. A
+commissioned shaft or a vacation week makes `copy run` reproduce a *different* run, silently. The
+same question hangs over the leaderboard's replay verification. Filed rather than absorbed.
