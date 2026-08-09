@@ -1498,6 +1498,155 @@ describe('an empty leaderboard shows what a board is', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * A board a reader can act on — GitHub issue #93
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One configuration board, as `GET /api/board` answers it.
+ *
+ * Two rows differing **only in seed**, which is the only axis a board leaves open: `configHashOf`
+ * digests the other six fields, so two rows that differed in any of them could not be on one board.
+ * Ada is second, so *which of these is mine* and *how far behind the top* have answers to find that
+ * are not simply "the first row".
+ */
+const LEADERBOARD_BOARD = (): BoardPage =>
+  ({
+    configHash: 'abcdef0123456789',
+    metric: 'awtS',
+    note: 'Ranked on the named metric alone. The others are shown beside it and never combined.',
+    entries: [
+      {
+        id: 'e1',
+        displayName: 'Grace Hopper',
+        run: {
+          buildingId: 'midtown-office',
+          dispatcherProfileId: 'collective',
+          demandTemplateId: 'rise-and-fall',
+          arrivalRatePctPop5min: 3,
+          durationS: 1800,
+          windowStartS: null,
+          seed: '1001',
+        },
+        measured: { awtS: 21.5, wt95S: 44.2, ttdMeanS: 60.1, pctOverLongWait: 6.4, awtIsValid: true },
+        submittedAtMs: 0,
+      },
+      {
+        id: 'e2',
+        displayName: 'Ada Lovelace',
+        run: {
+          buildingId: 'midtown-office',
+          dispatcherProfileId: 'collective',
+          demandTemplateId: 'rise-and-fall',
+          arrivalRatePctPop5min: 3,
+          durationS: 1800,
+          windowStartS: null,
+          seed: '1002',
+        },
+        measured: { awtS: 25.0, wt95S: 49.8, ttdMeanS: 66.3, pctOverLongWait: 9.2, awtIsValid: true },
+        submittedAtMs: 0,
+      },
+    ],
+  }) as unknown as BoardPage;
+
+/** The *run this row* control for one named player, as it reached the page. `commit` draws it. */
+const beatControl = (root: Recorded, player: string): Recorded | undefined =>
+  byClass(root, 'menu-start').find((node) =>
+    textUnder(node).startsWith(`Run this row’s configuration — ${player}`),
+  );
+
+const openBoard = (page: BoardPage): Partial<MenuPanelHost> => ({
+  leaderboard: () => ({
+    boards: [{ configHash: page.configHash, entries: page.entries.length }],
+    selected: page.configHash,
+    page,
+    notice: undefined,
+  }),
+});
+
+describe('an open leaderboard can be acted on — GitHub issue #93', () => {
+  it('names what every row ran, once, and offers each row’s own configuration', async () => {
+    /*
+     * The *"how did they do it"* half. The dispatcher is in the board's key — `http/api.ts`: *"one
+     * configuration — dispatcher included — across seeds"* — so it is named above the table rather
+     * than repeated on every row, where repeating it would say it varies when it cannot.
+     */
+    const loaded = await catalogue();
+    const { root, asked } = render(
+      { ...initialMenuState(loaded), screen: 'leaderboard' },
+      loaded,
+      openBoard(LEADERBOARD_BOARD()),
+    );
+    const text = textUnder(root);
+    expect(text, 'the dispatcher behind the board is not named').toContain('Conventional collective');
+    expect(text).toContain('Midtown Office');
+    // The clause that keeps the name a report rather than a claim about this build's own copy.
+    expect(text).toContain('this build’s own');
+    // The control, once per row, and pressing it asks for **that** row's run rather than a board.
+    const adas = beatControl(root, 'Ada Lovelace');
+    expect(adas, 'no control was drawn for Ada’s row').toBeDefined();
+    adas?.listeners.get('click')?.();
+    expect(asked.at(-1)).toEqual({
+      kind: 'beat-score',
+      run: LEADERBOARD_BOARD().entries[1]?.run,
+    });
+  });
+
+  it('marks the reader’s own row and names its gap, as the challenge board already did', async () => {
+    // #93 § 3, and it is an omission rather than a design question: `boardRow`'s `mine` parameter was
+    // written for both boards and set by one of them.
+    const loaded = await catalogue();
+    const { root } = render({ ...initialMenuState(loaded), screen: 'leaderboard' }, loaded, {
+      ...openBoard(LEADERBOARD_BOARD()),
+      account: () => SIGNED_IN_AS_ADA,
+    });
+    const mine = byClass(root, 'menu-board-row menu-board-you');
+    expect(mine.length, 'no row was marked as the reader’s own').toBe(1);
+    expect(textUnder(mine[0] as Recorded)).toContain('Ada Lovelace — you');
+    // 25.0 − 21.5 on `awtS`, the metric this board declares.
+    expect(textUnder(root)).toContain('3.5 s behind the top row');
+  });
+
+  it('marks nobody when nobody is signed in — the negative control', async () => {
+    const loaded = await catalogue();
+    const { root } = render(
+      { ...initialMenuState(loaded), screen: 'leaderboard' },
+      loaded,
+      openBoard(LEADERBOARD_BOARD()),
+    );
+    expect(byClass(root, 'menu-board-row menu-board-you').length).toBe(0);
+    expect(textUnder(root)).not.toContain('behind the top row');
+  });
+
+  it('refuses a row whose dispatcher this build does not ship, rather than offering it', async () => {
+    /*
+     * The honesty-critical case. The server resolved that id against **its** `data/` and replayed the
+     * run; this browser cannot, and the two are separately deployed (§ D308). So the row is disabled
+     * with the reason and the reveal declines to put a name on the id.
+     */
+    const loaded = await catalogue();
+    const page = LEADERBOARD_BOARD();
+    const first = page.entries[0];
+    if (first === undefined) throw new Error('fixture has no rows');
+    const unknown = {
+      ...page,
+      entries: [{ ...first, run: { ...first.run, dispatcherProfileId: 'not-shipped-here' } }],
+    } as unknown as BoardPage;
+    const { root } = render(
+      { ...initialMenuState(loaded), screen: 'leaderboard' },
+      loaded,
+      openBoard(unknown),
+    );
+    const text = textUnder(root);
+    expect(text).toContain('not-shipped-here');
+    expect(text).toContain('will not invent a name');
+    const button = beatControl(root, 'Grace Hopper');
+    expect(button?.attrs.get('disabled'), 'an unrunnable row was still offered').toBe('disabled');
+    // Disabled **and** explained, on the rule this panel has carried since it landed.
+    expect(textUnder(button as Recorded)).toContain('No dispatcher');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * The challenge board is drawn — GitHub issue #112
  * -------------------------------------------------------------------------- */
 

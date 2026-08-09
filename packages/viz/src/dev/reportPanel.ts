@@ -107,6 +107,14 @@
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
 import {
+  CASUAL_LEVERS_HEADING,
+  CASUAL_REACH_NOTE,
+  CASUAL_SMALL_PRINT_LEAD,
+  casualFigureOrderOf,
+  casualNoteFor,
+} from '../mode/casualDay.js';
+import type { ViewMode } from '../mode/types.js';
+import {
   clockOf,
   type ReportBasis,
   type ReportNextStep,
@@ -121,6 +129,7 @@ import type {
   ReportLever,
 } from '../shift/types.js';
 import { nextDay, switchWeek } from '../shift/week.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
 import type { ReportElements, TabName } from './elementMap.js';
@@ -424,6 +433,21 @@ export interface ReportView {
   readonly diagnosisHeading: string;
   readonly levers: readonly LeverRowView[];
   /**
+   * What the lever section is headed, or `undefined` for *keep what `index.html` authored*.
+   *
+   * The one field on this view whose `undefined` means *do not write* rather than *there is
+   * nothing to say*, and the asymmetry is the point: Engineer's heading is the markup's
+   * (`<h3>Levers you actually have</h3>`) and stays there, so this package holds no second copy of
+   * a string `index.html` owns. Casual's is `mode/casualDay.ts#CASUAL_LEVERS_HEADING`, which
+   * reframes the section from the controls a player may move to the question those controls answer.
+   *
+   * `diagnosisHeading` above is the opposite arrangement — always written, because issue #56 was a
+   * fixed *Where it went wrong* standing over a shift where nothing did, and that heading is a
+   * claim about the run. This one is not: the four cards are the same four cards whatever the day
+   * did.
+   */
+  readonly leversHeading: string | undefined;
+  /**
    * What moved since the sheet before this one, or `null` when there is nothing to say.
    *
    * `null` on the first filed sheet of a session — there is no earlier run — and on **both** sheets
@@ -432,6 +456,20 @@ export interface ReportView {
    */
   readonly delta: ReportDeltaView | null;
   readonly smallPrint: string;
+  /**
+   * The between-day beat, or `null` — GitHub issue #91.
+   *
+   * `null` on **four** sheets and each for its own reason: nothing filed (no day has closed), a run
+   * still being watched (§ D223 — the sheet declines to be at 18:00 while the screen is at 09:14,
+   * and so does the beat), a single run (a Free Play run belongs to no week and nothing changes
+   * overnight for it), and a day that closed in a mode that does not advance the week.
+   *
+   * The whole `TomorrowBriefing` is carried through unread and unedited, exactly as `nextStep` is:
+   * every string in it is `shift/tomorrow.ts`'s, and a caption composed here would be this module
+   * deciding what a week's progress means — which is a decision, and every decision on this surface
+   * lives in a pure module a test can reach.
+   */
+  readonly overnight: TomorrowBriefing | null;
   /** What this is a sheet **of** — and the whole of what differs between the two shapes. */
   readonly framing: FramingView;
 }
@@ -500,12 +538,27 @@ function toneClassesOf(tone: FigureTone): readonly string[] {
  * energy cell that somehow arrived carrying `tone: 'good'` still draws with no ranking colour and
  * no warning class, and `reportPanel.test.ts` asserts exactly that case.
  */
-export function figureViewOf(cell: ReportFigure): FigureView {
+export function figureViewOf(cell: ReportFigure, mode: ViewMode = 'advanced'): FigureView {
+  /*
+   * The **note** is the only thing the mode touches, and that is the whole of the discipline —
+   * GitHub issues #110 and #100, `mode/casualDay.ts`.
+   *
+   * Not the value: a Casual retelling of `16.0 s` would be a second copy of a figure, and this
+   * file has no formatter to make one with. Not the tone or the classes: a refused cell is drawn
+   * as refused in both modes, because *plain language* is permission to word a refusal for the
+   * reader who met it and is not permission to make it look like a figure. Not `axisOnly`: § D106
+   * is not a disclosure decision, and an energy cell that acquired a ranking colour in one mode
+   * would be that decision reversed by a view preference.
+   *
+   * So `casualNoteFor` **leads** the cell's own note and never replaces it, and everything below
+   * this line is the same in both modes.
+   */
+  const note = mode === 'basic' ? casualNoteFor(cell) : cell.note;
   if (cell.axisOnly) {
     return {
       label: cell.label,
       value: cell.value,
-      note: cell.note,
+      note,
       // `figure-axis` styles nothing. It is a marker so a reviewer reading the DOM can see that
       // the absence of colour here is deliberate rather than an omission.
       classes: ['figure-observation', 'figure-axis'],
@@ -515,7 +568,7 @@ export function figureViewOf(cell: ReportFigure): FigureView {
   return {
     label: cell.label,
     value: cell.value,
-    note: cell.note,
+    note,
     classes: toneClassesOf(cell.tone),
     colour: toneColourOf(cell.tone),
   };
@@ -748,6 +801,22 @@ const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.fr
   buildingId: 'in a different building',
   subject: 'in a different mode',
   demand: 'against different traffic',
+  /*
+   * The two GitHub issue #126 added, and the table's exhaustiveness is what made adding them a
+   * compile error rather than an edit somebody had to remember. Both are clauses of the same
+   * sentence as the three above, so a refusal naming all five still reads as English.
+   *
+   * *A different stretch* rather than *a different length*: the axis is one string over a length
+   * **and** a window start (`shift/report.ts#extentLineOf`), so a phrase naming only the length
+   * would be wrong about a reader who moved the run to the afternoon and kept it half an hour long.
+   *
+   * *Built from* rather than *against*, so the pattern reads as a different question from `demand`'s
+   * *against different traffic* on a screen that can carry both at once. `demand` is what the day
+   * asked for — its day number and event, or a Free Play selection line; `patternId` is which
+   * authored arrival pattern the day was built out of.
+   */
+  extent: 'over a different stretch of the day',
+  patternId: 'built from a different arrival pattern',
 });
 
 /**
@@ -916,11 +985,17 @@ export function emptyReportView(): ReportView {
     // Nothing to head. The heading is hidden with its empty list rather than left standing over one.
     diagnosisHeading: '',
     levers: [],
+    // No cards, so nothing to head — and `undefined` here means *leave the markup alone*, which is
+    // the right answer for a heading that is about to be hidden with its own empty list.
+    leversHeading: undefined,
     // Nothing has been filed, so there is no earlier sheet and no later one to move from it.
     delta: null,
     smallPrint: '',
     // Nothing has been run, so there is no question to take anywhere yet.
     nextStep: undefined,
+    // No day has closed, so there is no overnight. The box is hidden whole rather than drawn with
+    // the word *Overnight* over three empty groups.
+    overnight: null,
     /*
      * Week-shaped, and deliberately so: nothing has been filed, so the shell is still standing in
      * the week it opens on, and the disabled *Open the doors on tomorrow* is the handoff's own
@@ -1057,10 +1132,13 @@ export function reportViewOf(
   report: ShapedDayReport | undefined,
   progress: RunProgress = { kind: 'played-out' },
   previous?: ShapedDayReport | undefined,
+  overnight?: TomorrowBriefing | undefined,
+  mode: ViewMode = 'advanced',
 ): ReportView {
   if (report === undefined) return emptyReportView();
   if (progress.kind === 'watching') return watchingReportView(progress);
   const shaped: ShapedDayReport = report;
+  const casual = mode === 'basic';
   return {
     filed: true,
     // Both shapes carry it — see {@link SingleRunFramingView}.
@@ -1068,7 +1146,23 @@ export function reportViewOf(
     title: shaped.title,
     metaLines: shaped.metaLines,
     lede: shaped.lede,
-    figures: shaped.figures.map(figureViewOf),
+    /*
+     * **The order is the reframing; the membership is not** — issues #110 and #100.
+     *
+     * `casualFigureOrderOf` is a permutation, so the Casual grid carries every cell the Engineer
+     * grid carries. What moves is which one a reader meets first: `shift/report.ts#figuresFor`
+     * puts the two cohort statistics third and fourth, which is where an engineer wants them and
+     * which puts the one cell a run may refuse ahead of every count of people. See
+     * `mode/casualDay.ts`.
+     *
+     * The map is applied **after** the reorder rather than before it, so `figureViewOf` sees the
+     * cell rather than a position — the two are independent, and a reorder that had to be kept in
+     * step with a per-index lookup is the shape of coupling that goes wrong when a ninth figure
+     * lands.
+     */
+    figures: (casual ? casualFigureOrderOf(shaped.figures) : shaped.figures).map((cell) =>
+      figureViewOf(cell, mode),
+    ),
     verdictLine: shaped.verdictLine,
     /*
      * Three verdicts, three colours — and the third is **neutral**, not a warning.
@@ -1087,11 +1181,36 @@ export function reportViewOf(
     diagnosis: diagnosisRowsOf(shaped.diagnosis),
     diagnosisHeading: shaped.diagnosisHeading,
     levers: leverRowsOf(shaped.levers),
+    leversHeading: casual ? CASUAL_LEVERS_HEADING : undefined,
     // Issue #38. `undefined` on the first sheet of a session, and on the two sheets above that
     // return before this expression is reached — a delta of a day that is still running would be
     // the § D223 defect with a second run's numbers in it.
     delta: previous === undefined ? null : reportDeltaOf(previous, shaped),
-    smallPrint: shaped.smallPrint,
+    /*
+     * The beat is **week-shaped**, so it is dropped on a single run for `WeekFramingView`'s own
+     * reason: five of the week's statements do not exist on that sheet, and *what changed
+     * overnight* is a sixth. A Free Play run is one replication of one day and has no tomorrow to
+     * have grown into.
+     *
+     * The arm is read off the *sheet's* shape rather than off whether a briefing happened to be
+     * passed, so a caller that hands one over for a single run gets it dropped rather than drawn —
+     * the same direction `framingOf` refuses in.
+     */
+    overnight: shaped.of === 'week-day' ? (overnight ?? null) : null,
+    /*
+     * **The engineer's paragraph, led into and followed out of** — never edited, and never cut.
+     *
+     * The small print carries the two terms issue #100 names for this surface — *the peak-5min
+     * window* and *a confidence interval that excludes zero* — and both are load-bearing: the first
+     * is the basis of every mean on the grid and the second is the bar this repository holds. So
+     * Casual translates them in front (`CASUAL_SMALL_PRINT_LEAD`) and says what the two views
+     * differ in behind (`CASUAL_REACH_NOTE`), and `shaped.smallPrint` sits between them byte for
+     * byte. § D299's test binds here: a mode may make this easier to read and may not make it say
+     * less.
+     */
+    smallPrint: casual
+      ? `${CASUAL_SMALL_PRINT_LEAD} ${shaped.smallPrint} ${CASUAL_REACH_NOTE}`
+      : shaped.smallPrint,
     framing: framingOf(shaped),
   };
 }
@@ -1117,6 +1236,20 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
    */
   const diagnosisHeading = headingOf(ui.diagnosis);
   const leversHeading = headingOf(ui.levers);
+  /**
+   * *Levers you actually have* — `index.html`'s own words, captured once, at mount.
+   *
+   * The reason this is read off the DOM rather than written in this file is the reason
+   * {@link ReportView.leversHeading} is `string | undefined`: a second copy of a string the markup
+   * owns is two strings that agree today. The reason it is **captured** rather than simply left
+   * alone is a defect this arrangement has and a one-directional write does not — the mode
+   * selector moves **both** ways. Writing Casual's heading and then, on the way back, writing
+   * nothing leaves *What would make tomorrow better* standing over an Engineer sheet, which is the
+   * stale-sentence defect § D227 records, produced by the fix for a different one.
+   *
+   * `''` if the markup has no heading to climb to, which is `headingOf`'s own degraded case.
+   */
+  const authoredLeversHeading = leversHeading?.textContent ?? '';
   /** `.sheet` — the element `index.html` gives `overflow: auto`. Issue #62. */
   const scroller = ui.title.closest('.sheet');
   /**
@@ -1171,6 +1304,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         outOfServiceCarIds: [],
         recording: undefined,
         report: undefined,
+        tomorrow: undefined,
         withheld: [],
       });
     }
@@ -1180,9 +1314,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   /**
    * *Open the doors on tomorrow.*
    *
-   * The recording and the report are cleared in the same patch that advances the day, so that if
-   * the run refuses the reader is looking at an empty sheet for a day that has not happened rather
-   * than at yesterday's figures under today's date.
+   * The recording, the report and the between-day beat are cleared in the same patch that advances
+   * the day, so that if the run refuses the reader is looking at an empty sheet for a day that has
+   * not happened rather than at yesterday's figures under today's date. The beat goes with the
+   * sheet rather than surviving the press (issue #91): it is an account of a day that has closed,
+   * and this press opens one that has not.
    *
    * This is the **only** listener on `#report-next-day`. Until 2026-07-30 `main.ts` wired a second
    * one that applied `nextDay` again, so one press advanced two days (DR-13, § D198) — the panel
@@ -1196,6 +1332,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       week: nextDay(view.state.week),
       recording: undefined,
       report: undefined,
+      tomorrow: undefined,
       withheld: [],
     });
     context.openTab('run');
@@ -1217,6 +1354,62 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
           classes: cell.classes,
           valueColor: cell.colour,
         }),
+      ),
+    );
+  }
+
+  /**
+   * The between-day beat — GitHub issue #91.
+   *
+   * The box is hidden **whole** when there is no briefing, rather than emptied: `#report-overnight`
+   * carries the caption *Overnight* as an authored child, so blanking the lists would leave the
+   * word standing over nothing — this module's own rule, and the reason `cardOf` exists two slots
+   * up. Here the container has its own id, so no climb is needed.
+   *
+   * Nothing is composed. Every string written below is a field of `TomorrowBriefing`, and the only
+   * decision in this function is *which element does it go in*.
+   */
+  function drawOvernight(view: ReportView): void {
+    const beat = view.overnight;
+    setHidden(ui.overnight, beat === null);
+    if (beat === null) {
+      setText(ui.overnightHeadline, '');
+      fill(ui.overnightGroups);
+      fill(ui.overnightWithheld);
+      return;
+    }
+    setText(ui.overnightHeadline, beat.headline);
+    fill(
+      ui.overnightGroups,
+      ...beat.groups.map((group) =>
+        el(doc, 'div', {
+          className: 'overnight-group',
+          children: [
+            el(doc, 'div', { className: 'eyebrow', text: group.caption }),
+            ...group.rows.map((row) =>
+              el(doc, 'div', {
+                className: 'overnight-row',
+                children: [
+                  el(doc, 'span', { className: 'overnight-label', text: row.label }),
+                  el(doc, 'span', { className: 'overnight-value', text: row.value }),
+                  el(doc, 'div', { className: 'overnight-note', text: row.note }),
+                ],
+              }),
+            ),
+          ],
+        }),
+      ),
+    );
+    /*
+     * Tomorrow's refusals, drawn rather than swallowed. They are `shiftRunConfigOf`'s own words —
+     * a calendar template the shift is too short for, a bias a mix-varying template refuses — and a
+     * beat that promised the period while dropping the refusal would promise a day the run will not
+     * deliver.
+     */
+    fill(
+      ui.overnightWithheld,
+      ...beat.withheld.map((line) =>
+        el(doc, 'div', { className: 'overnight-withheld', text: line }),
       ),
     );
   }
@@ -1402,7 +1595,20 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
        * one place it is called, and the whole of the state it keeps is {@link continuity}.
        */
       continuity = rotatedOn(continuity, view.state.report, progress);
-      const drawn = reportViewOf(view.state.report, progress, continuity.previous);
+      /*
+       * The reader's disclosure level, read off the same `ViewerState` the header's `view` selector
+       * writes — issues #110 and #100. It is threaded rather than looked up because every decision
+       * this surface makes lives in `reportViewOf`, which a test can reach and a mount cannot: a
+       * Casual branch inside this closure would be a branch no suite in this package can drive, in
+       * a repository whose vitest projects are all `environment: 'node'`.
+       */
+      const drawn = reportViewOf(
+        view.state.report,
+        progress,
+        continuity.previous,
+        view.state.tomorrow,
+        view.state.mode,
+      );
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
        * the same value, so a slot can never be left showing yesterday's sentence on a sheet that
@@ -1440,7 +1646,19 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         setText(diagnosisHeading, drawn.diagnosisHeading);
         setHidden(diagnosisHeading, drawn.diagnosis.length === 0);
       }
-      if (leversHeading !== undefined) setHidden(leversHeading, drawn.levers.length === 0);
+      if (leversHeading !== undefined) {
+        /*
+         * The view's words, or the markup's own — and it is written on **every** frame rather than
+         * only when the view has some, because the mode selector moves both ways. See
+         * {@link authoredLeversHeading}: writing Casual's question and then leaving it there would
+         * put *What would make tomorrow better* over an Engineer sheet.
+         *
+         * Hidden with its list either way, for the reason the diagnosis heading is: a caption over
+         * an empty box reads as a surface that failed to load.
+         */
+        setText(leversHeading, drawn.leversHeading ?? authoredLeversHeading);
+        setHidden(leversHeading, drawn.levers.length === 0);
+      }
 
       setText(ui.forecastName, week?.forecast.name ?? '');
       setText(ui.forecastNote, week?.forecast.note ?? '');
@@ -1448,6 +1666,7 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       setHidden(cardOf(ui.forecastName), week === null);
       setText(ui.taught, week?.taught ?? '');
       setHidden(cardOf(ui.taught), week === null);
+      drawOvernight(drawn);
       setText(ui.smallPrint, drawn.smallPrint);
 
       // Drawn on both shapes now — see `SingleRunFramingView`. Hidden only on the empty sheet,

@@ -32,6 +32,7 @@ import type { VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
 import { contractById } from '../shift/contracts.js';
 import { SHIFT_EVENTS } from '../shift/events.js';
+import type { ShiftEvent } from '../shift/types.js';
 import { GOAL_GLYPHS, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
@@ -40,10 +41,12 @@ import {
   dayReportOf,
   type ReportSubject,
   type ShapedDayReport,
+  type ShiftPlan,
   type WeekDayReport,
 } from '../shift/report.js';
 import type { GoalReading, ReportFigure } from '../shift/types.js';
 import { closeDay, openWeek, outcomeOf } from '../shift/week.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
 import {
   diagnosisRowsOf,
@@ -114,11 +117,22 @@ function runOf(
     .recording;
 }
 
+/**
+ * What the day was set to run — issue #126's required field, and the constant every sheet below
+ * shares unless a case is *about* moving one of its axes.
+ *
+ * Held once rather than inlined so a suite that varies an axis says so in one visible place: two
+ * sheets built from two silently different plans would be incomparable for a reason no test chose,
+ * which is the failure mode the comparability gate itself exists to make visible.
+ */
+const PLAN: ShiftPlan = { shiftLengthS: 900, windowStartS: null, patternId: 'building' };
+
 /** The same fixture path `shift/report.test.ts` takes: one real run, folded at its own end. */
 function reportOf(
   recording: VizRecording,
   day = 4,
   subject: ReportSubject = { kind: 'week-day' },
+  plan: ShiftPlan = PLAN,
 ): ShapedDayReport {
   const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
   const goals = goalsForDay(day);
@@ -143,6 +157,7 @@ function reportOf(
     contract: contractById('c2'),
     event: SHIFT_EVENTS.ordinary,
     subject,
+    plan,
   });
 }
 
@@ -164,6 +179,9 @@ function weekDayReport(report: ShapedDayReport): WeekDayReport {
   if (report.of !== 'week-day') throw new Error(`expected a week-day sheet, got "${report.of}"`);
   return report;
 }
+
+/** A day of a week — named so a case that varies the *plan* does not have to spell the subject. */
+const WEEK: ReportSubject = { kind: 'week-day' };
 
 /** The Free Play selection the shape suite runs from. */
 const SINGLE: ReportSubject = {
@@ -216,6 +234,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
         contract: contractById('c2'),
         event: SHIFT_EVENTS.ordinary,
         subject: { kind: 'week-day' },
+        plan: PLAN,
       }),
     );
   }
@@ -1277,21 +1296,115 @@ describe('two runs that were not asked the same question — issues #117 and #10
     expect(delta.caption).toBe('What moved since the run before this one');
   });
 
-  it('cannot see a campaign day’s run length, and that gap is pinned here rather than claimed shut', () => {
+  it('refuses two days run over different stretches of the day — issue #126', () => {
     /*
-     * § D227: a refusal is pinned by a run, never by another sentence. `DayReportInput` carries no
-     * shift length, and the recording's own span is unusable as a basis because `endedAt` is
-     * `max(lastEventAt, demandEndedAt)` and therefore moves with the **dispatcher** — keying on it
-     * would refuse the one comparison the block is for.
+     * The gap this suite used to **pin open**, closed. Two campaign days of one day number, one run
+     * for half an hour and one for an hour, are not the same question: a `CARRIED` that doubled
+     * because the day was twice as long says nothing about the dispatcher.
      *
-     * So two campaign days of one day number, run at different lengths, still pair. This case
-     * exists so that gap is a measured fact with a name, and so a reader of `ReportBasis`' docstring
-     * can check the paragraph against a run. Closing it means a required field on `DayReportInput`,
-     * which is wider than either issue asks for.
+     * Note what is varied and what is not. **One recording, two plans** — so the refusal cannot be
+     * coming from the runs having produced different figures, which is the confound a two-recording
+     * case would carry. `ShiftPlan` is the only difference between the two sheets.
      */
-    expect(reportOf(longer).basis).toEqual(reportOf(clean).basis);
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, shiftLengthS: 1800 }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['over a different stretch of the day']);
+    expect(delta.figures).toEqual([]);
+    expect(delta.note).toContain('over a different stretch of the day');
+  });
+
+  it('refuses two days run over the same length from a different part of the day — issue #126', () => {
+    /*
+     * The half of the axis a length alone would have missed, and it is not hypothetical: § D286
+     * splits one control into `shiftLengthS` and `windowStartS` precisely because a *part* of a day
+     * may not travel as a duration, and `menu/partsOfDay.ts` derives its parts from a template's own
+     * phase boundaries — nothing stops two of them being equally long. A 30-minute morning peak and
+     * a 30-minute lunch dip are different questions with one number.
+     */
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, windowStartS: 1800 }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['over a different stretch of the day']);
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('refuses two days built from different arrival patterns — issue #126', () => {
+    // The axis the reporter of #126 could edit between two days of one week without the sheet
+    // noticing: the pattern select writes `ViewerState.pattern`, and the basis now carries it.
+    const delta = deltaOf(reportOf(clean, 4, WEEK, { ...PLAN, patternId: 'office-standard' }), reportOf(clean));
+    expect(delta.refused?.differsOn).toEqual(['built from a different arrival pattern']);
+    expect(delta.figures).toEqual([]);
+  });
+
+  it('reads the stretch off the plan and never off the recording — issue #126’s trap, pinned', () => {
+    /*
+     * **The case that makes the two above a fix rather than a cheaper defect.**
+     *
+     * `endedAt` is `max(lastEventAt, demandEndedAt)`, so a recording's own span moves with the
+     * *dispatcher*: #126 measured `09:25 / 09:22 / 09:20` for three dispatchers on one selection. A
+     * basis keyed on the span would have refused all three of those comparisons — the one comparison
+     * the block exists to draw — while looking, from the outside, exactly like this fix.
+     *
+     * So: two recordings whose spans genuinely differ, one plan, and the basis must be **equal**.
+     * The span difference is asserted rather than assumed, because a case whose two recordings
+     * happened to end at the same second would pass this while proving nothing.
+     */
     expect(longer.endedAt - longer.startedAt).toBeGreaterThan(clean.endedAt - clean.startedAt);
+    expect(reportOf(longer).basis).toEqual(reportOf(clean).basis);
     expect(deltaOf(reportOf(clean), reportOf(longer)).refused).toBeNull();
+  });
+
+  it('is threaded from the state the run was started from, not from the recording — the shell’s half', async () => {
+    /*
+     * **The standing requirement's second half, and the half a pure test cannot reach.**
+     *
+     * `scope/scope.test.ts` already pins the first: `viewer.shiftLengthS`, `viewer.windowStartS` and
+     * `viewer.pattern` each *move the legs*, driven through `shiftRunConfigOf`, which is the shipped
+     * path that turns a `ViewerState` into a run. The cases above pin the third: a plan that differs
+     * on any of them makes the block refuse. What neither can see is the wiring between them —
+     * `closeShift` needs a `document`, a canvas and a played-out run, and there is no jsdom here — so
+     * the wiring is pinned at the source, exactly as DR-13's two button bindings are.
+     *
+     * Both directions, because only one of them is about a missing line. A plan assembled from the
+     * **recording** would compile, would pass every case above, and would refuse the dispatcher swap
+     * on a real screen — issue #126's trap, arriving through the one file the trap tests cannot
+     * reach.
+     */
+    const shell = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const plan = /plan:\s*\{([^}]*)\}/.exec(shell)?.[1] ?? '';
+    expect(plan, 'closeShift must name the day’s own length').toContain('state.shiftLengthS');
+    expect(plan, 'and which part of the day it ran').toContain('state.windowStartS');
+    expect(plan, 'and the pattern it was built from').toContain('state.pattern');
+    // The trap, refused at the shell: nothing in the plan may come off the run that happened.
+    expect(plan).not.toMatch(/recording|endedAt|startedAt/);
+  });
+
+  it('cannot see an event a calendar wrote over one day, and that gap is pinned rather than claimed shut', () => {
+    /*
+     * § D227: a refusal is pinned by a run, never by another sentence — so the axis `ReportBasis`
+     * still cannot see gets a case of its own, exactly as the run length had one until this wave.
+     *
+     * `dev/main.ts#closeShift` derives the sheet's event as `eventFor(week.day, week.dayIdx)` — the
+     * ordinary schedule — while `dev/state.ts#shiftRunConfigOf` derives the **run's** event by
+     * consulting the authored calendar first, because a period may name today's event (`moving-week`
+     * is *`move-in` every day*). Where a calendar overrides, the two disagree and two days that ran
+     * under different events pair as one question.
+     *
+     * What this case pins is the half that **works**: one day number under two different events is
+     * refused, so `demand` is carrying the event and the gap is the shell's derivation rather than
+     * the basis's shape. Closing it is one line in `closeShift` and belongs to whoever owns the
+     * calendar seam.
+     */
+    const booked = (event: ShiftEvent): ShapedDayReport =>
+      dayReportOf({
+        recording: clean,
+        observations: shiftObservationsOf(observationsAt(clean, clean.endedAt)),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), day: 4, dayIdx: 3 },
+        contract: contractById('c2'),
+        event,
+        subject: { kind: 'week-day' },
+        plan: PLAN,
+      });
+    const delta = deltaOf(booked(SHIFT_EVENTS.ordinary), booked(SHIFT_EVENTS['move-in']));
+    expect(delta.refused?.differsOn).toEqual(['against different traffic']);
   });
 });
 
@@ -1521,5 +1634,269 @@ describe('the tone map', () => {
     for (const tone of ['good', 'caution', 'hot', 'bad', 'withheld'] as const) {
       expect(toneColourOf(tone), tone).toMatch(/^var\(--[a-z0-9-]+\)$/);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Overnight — the between-day beat, GitHub issue #91
+ * -------------------------------------------------------------------------- */
+
+describe('the between-day beat is drawn, and only where it is true', () => {
+  /**
+   * A briefing shaped like the one `closeShift` builds. The strings are `shift/tomorrow.ts`'s and
+   * are asserted there; what this suite is about is *which sheets carry it*.
+   */
+  const beat: TomorrowBriefing = {
+    headline: 'Thursday is banked. Friday opens.',
+    groups: [
+      {
+        id: 'changed',
+        caption: 'What changed overnight',
+        rows: [
+          {
+            id: 'tenants',
+            label: 'TENANTS',
+            value: '1,710 → 1,898',
+            note: '188 people move in overnight.',
+          },
+        ],
+      },
+    ],
+    withheld: [],
+  };
+
+  it('appears on a week-day sheet', () => {
+    const view = reportViewOf(reportOf(clean), { kind: 'played-out' }, undefined, beat);
+    expect(view.overnight).toBe(beat);
+  });
+
+  it('is dropped on a single run, which belongs to no week', () => {
+    /*
+     * A Free Play run is one replication of one day. It has no tomorrow to have grown into, and
+     * *what changed overnight* is a sixth week-shaped statement on a sheet that drops the other
+     * five — `WeekFramingView`'s own rule, applied to the beat.
+     *
+     * The arm is read off the **sheet's** shape rather than off whether a briefing was passed, so
+     * this case passes a briefing in and requires it to be dropped rather than merely not supplied.
+     */
+    const view = reportViewOf(reportOf(clean, 4, SINGLE), { kind: 'played-out' }, undefined, beat);
+    expect(view.framing.kind).toBe('single-run');
+    expect(view.overnight).toBeNull();
+  });
+
+  it('is absent from the empty sheet', () => {
+    // No day has closed, so there is no overnight. `null`, not an empty briefing: the box carries
+    // the word *Overnight* as an authored child and would otherwise stand over three holes.
+    expect(emptyReportView().overnight).toBeNull();
+  });
+
+  it('is absent while the run it would follow is still being watched — § D223', () => {
+    /*
+     * The temporal rule, and the reason this case exists rather than being assumed: the sheet
+     * declines to be at 18:00 while the screen is at 09:14, and a beat announcing *tomorrow* over
+     * a day the player is four minutes into would be the same two-answers screen with a different
+     * caption. `watchingReportView` builds on `emptyReportView`, so the `null` is inherited — this
+     * pins that it stays inherited when somebody adds a field.
+     */
+    const watching = runProgressOf({ recording: clean, simTimeS: clean.startedAt + 60 });
+    expect(watching.kind).toBe('watching');
+    expect(reportViewOf(reportOf(clean), watching, undefined, beat).overnight).toBeNull();
+  });
+
+  it('publishes no figure the run’s own summary could refuse', () => {
+    /*
+     * Structural rather than stylistic. Every value the beat carries is a count folded at
+     * `endedAt` or a population read off a building document, so there is no figure `awtIsValid`
+     * speaks for and no path by which this box can print a mean the sheet three sections above is
+     * withholding. Asserted here as well as in `shift/tomorrow.test.ts`, because this is the file
+     * that would go red if the panel ever started composing its own strings for the box.
+     */
+    const view = reportViewOf(reportOf(clean), { kind: 'played-out' }, undefined, beat);
+    const text = (view.overnight?.groups ?? [])
+      .flatMap((group) => [group.caption, ...group.rows.flatMap((row) => [row.label, row.value, row.note])])
+      .join(' ')
+      .toLowerCase();
+    expect(text).not.toContain(WITHHELD.toLowerCase());
+    expect(text).not.toContain('average wait');
+  });
+});
+
+describe('the beat’s box is hidden whole, and every class it emits has a rule', () => {
+  const panelSource = async (): Promise<string> =>
+    readFile(fileURLToPath(new URL('./reportPanel.ts', import.meta.url)), 'utf8');
+
+  it('hides the container rather than emptying it', async () => {
+    /*
+     * The same rule the six week-shaped slots above are pinned by, and for the same reason:
+     * `#report-overnight` carries the eyebrow *Overnight* as an authored child, so blanking the
+     * lists would leave the word standing over nothing — `docs/10` R3 at the layout's scale.
+     */
+    const panel = await panelSource();
+    expect(panel).toContain('setHidden(ui.overnight, beat === null)');
+  });
+
+  it('still does no arithmetic — the beat did not bring a formatter in with it', async () => {
+    // Re-asserted for this change specifically: the box is the first thing on this sheet that
+    // draws a count *and* a percentage, and both are formatted in `shift/tomorrow.ts`.
+    const panel = await panelSource();
+    const body = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const forbidden of ['toFixed(', 'toLocaleString(', 'Math.round(']) {
+      expect(body, forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it('has a stylesheet rule for every class the box emits', async () => {
+    /*
+     * Derived from the panel source rather than listed, in `dev/surfaces.test.ts`'s idiom and for
+     * its reason: twenty-nine class names once shipped with zero rules anywhere, and nothing about
+     * unstyled markup looks broken in a screenshot of the rest of the game.
+     */
+    const panel = await panelSource();
+    const emitted = new Set<string>();
+    for (const match of panel.matchAll(/className:\s*'(overnight-[a-z-]+)'/gu)) {
+      const name = match[1];
+      if (name !== undefined) emitted.add(name);
+    }
+    expect(emitted.size, 'the derivation stopped matching').toBeGreaterThanOrEqual(5);
+    const html = await readFile(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
+    const missing = [...emitted].filter((name) => !html.includes(`.${name}`));
+    expect(missing, 'classes the panel emits and the stylesheet never mentions').toEqual([]);
+  });
+});
+
+/**
+ * Casual asks a different question of the same sheet — GitHub issues #110 and #100.
+ *
+ * The measurement this suite exists to keep from coming back: `reportViewOf` took no mode, so the
+ * Day report was **byte-identical** in Casual and Engineer. #110 reports a 221-character delta on
+ * this tab; driven on this branch, that delta is the left rail's *hide the maths* block, which
+ * shares the tab and is not this sheet.
+ *
+ * Five claims, and the last three are the ones that keep the first two honest:
+ *
+ * 1. **The sheet moves.** Something a player reads is different.
+ * 2. **It leads with people.** Every count of people is drawn before the one cell a run may refuse.
+ * 3. **It loses nothing.** Same cells, same values, same colours, same levers, same goals —
+ *    § D299 § 2's *an entry point, never a ceiling*, asserted as an equality rather than argued.
+ * 4. **It refuses just as hard.** On a really saturating run the withheld cell still says
+ *    `withheld`, still carries no digit, still carries `core`'s own sentence, and is not softened
+ *    into a description of a busy day.
+ * 5. **Engineer is untouched.** Its grid order and its small print are asserted whole, so a change
+ *    that made Casual better by making Engineer say less would be red — § D299 § 1's test.
+ */
+describe('Casual asks a different question of the same day — issues #110 and #100', () => {
+  const both = (report: ShapedDayReport) =>
+    [
+      reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'basic'),
+      reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'advanced'),
+    ] as const;
+
+  it('is not byte-identical any more — the defect #110 measured', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    expect(JSON.stringify(casual)).not.toBe(JSON.stringify(engineer));
+    /*
+     * And specifically on the two things #100's checklist names for this tab. A test that only
+     * compared the whole view would pass a change that moved a heading and nothing a reader reads.
+     */
+    expect(casual.figures.map((cell) => cell.note)).not.toEqual(
+      engineer.figures.map((cell) => cell.note),
+    );
+    expect(casual.smallPrint).not.toBe(engineer.smallPrint);
+  });
+
+  it('draws every count of people before the cell a run may refuse', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    const at = (view: ReportView, label: string): number =>
+      view.figures.findIndex((cell) => cell.label === label);
+    for (const people of ['CARRIED', 'TOOK THE STAIRS', 'WORST WAIT', 'DEEPEST QUEUE']) {
+      expect(at(casual, people), people).toBeLessThan(at(casual, 'AVERAGE WAIT'));
+    }
+    // Engineer's own order is untouched, which is the half that makes this a reframing rather than
+    // a change of mind about what the grid should say. § D299 § 1.
+    expect(engineer.figures.map((cell) => cell.label)).toEqual([
+      'CARRIED',
+      'AWAY INSIDE A MINUTE',
+      'AVERAGE WAIT',
+      'WORST WAIT',
+      'DEEPEST QUEUE',
+      'TOOK THE STAIRS',
+      'WORK DONE',
+      'WORK PER DELIVERED LEG',
+    ]);
+  });
+
+  it('withholds nothing — same cells, same values, same colours, same levers', () => {
+    for (const recording of [clean, saturated]) {
+      const [casual, engineer] = both(reportOf(recording));
+      const cells = (view: ReportView) =>
+        [...view.figures]
+          .map(
+            (cell) => `${cell.label}=${cell.value}|${cell.colour ?? '-'}|${cell.classes.join(',')}`,
+          )
+          .sort();
+      expect(cells(casual)).toEqual(cells(engineer));
+      expect(casual.levers).toEqual(engineer.levers);
+      expect(casual.goals).toEqual(engineer.goals);
+      expect(casual.diagnosis).toEqual(engineer.diagnosis);
+      expect(casual.verdictLine).toBe(engineer.verdictLine);
+    }
+  });
+
+  it('keeps the engineer’s own sentence under every cell, byte for byte', () => {
+    for (const recording of [clean, saturated]) {
+      const [casual, engineer] = both(reportOf(recording));
+      for (const cell of engineer.figures) {
+        const drawn = casual.figures.find((candidate) => candidate.label === cell.label);
+        expect(drawn, cell.label).toBeDefined();
+        expect(drawn?.note.endsWith(cell.note), cell.label).toBe(true);
+      }
+      // The same rule one section down: the small print is led into and out of, never edited.
+      expect(casual.smallPrint).toContain(engineer.smallPrint);
+    }
+  });
+
+  it('refuses a mean just as hard in plain language, on a really saturating run', () => {
+    const [casual, engineer] = both(reportOf(saturated));
+    const cell = (view: ReportView) =>
+      view.figures.find((candidate) => candidate.label === 'AVERAGE WAIT');
+    const casualCell = cell(casual);
+    const engineerCell = cell(engineer);
+    expect(casualCell?.value).toBe(WITHHELD);
+    expect(casualCell?.value).toMatch(/^\D*$/);
+    expect(casualCell?.colour).toBe(engineerCell?.colour);
+    expect(casualCell?.classes).toEqual(engineerCell?.classes);
+    // Worded for the reader who met it, with `core`'s own reason still following it.
+    expect(casualCell?.note).toContain('There is no number here');
+    expect(casualCell?.note.endsWith(engineerCell?.note ?? '')).toBe(true);
+    // And not softened into a description of the day. `SATURATED` is the run saying the building
+    // could not cope; *a busy day* is a weaker and different claim.
+    expect(casualCell?.note.toLowerCase()).not.toContain('busy day');
+  });
+
+  it('translates the two engineer terms #100 names, without deleting either', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    for (const term of ['peak-5min', 'confidence interval']) {
+      expect(engineer.smallPrint, term).toContain(term);
+      expect(casual.smallPrint, term).toContain(term);
+    }
+    expect(casual.smallPrint).toMatch(/busiest\s+five\s+minutes/);
+  });
+
+  it('heads the levers with the question in Casual and leaves the markup’s words in Engineer', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    expect(casual.leversHeading).toBe('What would make tomorrow better');
+    expect(engineer.leversHeading).toBeUndefined();
+  });
+
+  it('defaults to Engineer, so a caller describing a run gets the engineer’s words', () => {
+    const report = reportOf(clean);
+    expect(JSON.stringify(reportViewOf(report))).toBe(
+      JSON.stringify(reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'advanced')),
+    );
+  });
+
+  it('says the two views differ in wording and not in reach — § D299 § 2', () => {
+    const [casual] = both(reportOf(clean));
+    expect(casual.smallPrint).toMatch(/every figure the engineer’s view carries/);
   });
 });

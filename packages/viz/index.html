@@ -913,6 +913,30 @@
       .report-cleared[hidden] { display: none; }
       .small-print { margin: 16px 0 0; padding: 14px 16px; border: 1px dashed var(--edge-strong); border-radius: 10px; }
 
+      /* --- Overnight: the between-day beat, GitHub issue #91 --- */
+      #report-overnight[hidden] { display: none; }
+      .overnight-group { display: grid; gap: 7px; }
+      .overnight-row {
+        display: grid; grid-template-columns: 148px 1fr; column-gap: 12px; row-gap: 3px;
+        align-items: baseline;
+        padding: 9px 12px; border-radius: 9px; background: var(--raised);
+        border-left: 2px solid var(--edge);
+      }
+      .overnight-label {
+        font: 600 10px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+        color: var(--dimmer);
+      }
+      .overnight-value { font-size: 14px; font-weight: 600; }
+      /* The basis, under both columns: KB-15's second channel is the words, so they are never
+         clipped to a column width. */
+      .overnight-note {
+        grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--dim);
+      }
+      .overnight-withheld { font: 500 11px var(--mono); color: var(--warn); }
+      @media (max-width: 720px) {
+        .overnight-row { grid-template-columns: 1fr; }
+      }
+
       /* --- Scenario cards, § 1.3 M7 --- */
       .scenario {
         display: flex; gap: 0; text-align: left; cursor: pointer; width: 100%;
@@ -1864,6 +1888,21 @@
                     <div class="eyebrow">What this taught</div>
                     <div style="font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-top: 5px" id="report-taught"></div>
                   </div>
+                </div>
+
+                <!--
+                  Overnight — the between-day beat, GitHub issue #91.
+
+                  Below the two cards and above the small print, which is where it belongs in the
+                  reading order: a player has read the verdict, the figures and the levers, and the
+                  next thing they do is press the button under it. Every string in here comes from
+                  `shift/tomorrow.ts`; the panel writes text and nothing else.
+                -->
+                <div id="report-overnight" style="margin: 22px 0 0; padding: 14px 16px; border: 1px solid var(--edge); border-radius: 10px; background: var(--card)" hidden>
+                  <div class="eyebrow" style="letter-spacing: 0.08em; color: var(--dim)">Overnight</div>
+                  <div style="font-size: 15px; font-weight: 600; margin-top: 6px" id="report-overnight-headline"></div>
+                  <div style="display: grid; gap: 13px; margin-top: 12px" id="report-overnight-groups"></div>
+                  <div style="display: grid; gap: 5px; margin-top: 11px" id="report-overnight-withheld"></div>
                 </div>
 
                 <div class="small-print">

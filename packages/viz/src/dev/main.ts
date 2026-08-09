@@ -145,10 +145,11 @@ import { contractById, statLineOf } from '../shift/contracts.js';
 import { eventFor } from '../shift/events.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
-import { dayReportOf, type DayReportInput } from '../shift/report.js';
+import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
 import { HISTORY_DAYS, outcomeOf } from '../shift/week.js';
+import { tomorrowBriefingOf, type TomorrowBriefing } from '../shift/tomorrow.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
-import { weekdayOf } from '../shift/types.js';
+import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
@@ -201,6 +202,7 @@ import {
   profileById,
   resolvedBuildingOf,
   shiftRunConfigOf,
+  tomorrowFactsOf,
   weeksForSession,
   withBuilding,
   type PatternSelection,
@@ -1557,6 +1559,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
             : { ...boardView, selected: hash, page: undefined, notice: result.detail };
           drawMenu();
         });
+        return;
+      }
+
+      case 'beat-score': {
+        /*
+         * A board row, run — GitHub issue #93 § 1.
+         *
+         * **Through `applyIntent` and `enterFreePlay`, and not through a second path.** The
+         * selection is written into `menuState.freePlay` by the reducer, exactly as if the player had
+         * moved all six Free Play selects to the row's values, and the run is entered by the same
+         * function **Start** uses. A shortcut that built a `ViewerState` here would be a second way
+         * to begin a free-play run, and the first thing the second one would stop doing is resetting
+         * the week — which is `docs/16` § 5 clause 3, the defect `enterFreePlay` exists to have
+         * ended.
+         *
+         * The selection is written **even when the run cannot start**, which is why the two lines are
+         * in this order. `enterFreePlay` returns `undefined` for a row this build cannot resolve, and
+         * leaving the selection behind means the player can press *Free play* and read
+         * `freePlayIssues`' own sentence with the offending field named — rather than pressing a row
+         * and watching nothing happen. `menu/screens.ts` disables the row with that same sentence, so
+         * this is the backstop rather than the notice.
+         */
+        menuState = applyIntent(menuState, intent, menuCatalogue);
+        const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
+        if (entered === undefined) {
+          drawMenu();
+          return;
+        }
+        state = entered;
+        menuState = navigate(menuState, 'main');
+        closeMenu('entered-a-mode');
+        runShift();
         return;
       }
 
@@ -3046,7 +3080,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // The template's own hour, moved on by the window when the run is a part of a day. Absent for
       // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
       runStartOfDayS = recorded.result.trace.startOfDayS;
-      state = { ...state, recording: recorded.recording, report: undefined, withheld: plan.withheld };
+      // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
+      // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
+      // under today's date, which is the stale-sheet defect § D223 closed one field over.
+      state = {
+        ...state,
+        recording: recorded.recording,
+        report: undefined,
+        tomorrow: undefined,
+        withheld: plan.withheld,
+      };
       adopt(recorded.recording);
       renderAll();
     } catch (error) {
@@ -3208,6 +3251,43 @@ function boot(ui: Elements, resources: BrowserResources): void {
     return runProgressOf(viewAt()).kind === 'played-out';
   }
 
+  /**
+   * The between-day beat for a week that has just closed a day — GitHub issue #91.
+   *
+   * Split out of {@link closeShift} so the *mapping* is readable and so the two population figures
+   * are visibly measured on two different buildings: today's is the one the run that just ended
+   * actually resolved to (`building`, written by `runShift` from `shiftRunConfigOf`), and
+   * tomorrow's is `tomorrowFactsOf`'s, which resolves tomorrow's document through the same chain.
+   * Neither is a multiplier on the other, which is the whole of the honesty claim this beat makes.
+   *
+   * `building` rather than a fresh resolve, and that is a consistency property rather than a
+   * saving: `drawHeader` reads the same binding for its `N tenants` line, so the beat's *from*
+   * figure is the number already on the screen. A second resolve here could disagree with the
+   * header the moment anything moved between the run and the close — which is the two-answers
+   * defect this sheet has been repaired for twice.
+   *
+   * It is `undefined` only before the first run, and a day cannot close before one — the `0`
+   * fallback is a total-function guard rather than a reachable state, and it is a fallback for a
+   * *count* rather than for a rate, so it cannot become a plausible-looking statistic.
+   */
+  function briefingFor(
+    week: WeekState,
+    closed: DayOutcome,
+    verdict: ShapedDayReport['verdict'],
+  ): TomorrowBriefing {
+    const facts = tomorrowFactsOf(resources, { ...state, week });
+    return tomorrowBriefingOf({
+      closed,
+      week,
+      contract: contractById(week.contractId),
+      verdict,
+      populationToday: building?.totalPopulation ?? 0,
+      populationTomorrow: facts.population,
+      calendarLineTomorrow: facts.calendarLine,
+      withheldTomorrow: facts.withheld,
+    });
+  }
+
   function closeShift(): void {
     const recording = state.recording;
     if (recording === undefined || filedRunId === recording.runId) return;
@@ -3287,6 +3367,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
               },
             }
           : { kind: 'week-day' as const },
+      /*
+       * What the day was set to run — GitHub issue #126, and **the one caller that knows**.
+       *
+       * All three fields are read off `state`, which is where `shiftRunConfigOf` reads them from
+       * eighty lines up: `shiftLengthS` and `windowStartS` are the two halves § D286 split one
+       * control into, and `pattern` is the arrival pattern the run resolved against. Not one of them
+       * is available from `recording` — `ShiftPlan`'s docstring measures the span that looks like it
+       * would do and does not, and the reason it does not is that a dispatcher swap moves it.
+       *
+       * Read here rather than at `runShift` for `dayStartS`'s reason one field down: this is the
+       * value the run on screen was started from, and the mid-run energy-axis refile above spreads
+       * this same input rather than rebuilding it, so a sheet redrawn for a preference cannot
+       * silently acquire a plan the run never had.
+       */
+      plan: {
+        shiftLengthS: state.shiftLengthS,
+        windowStartS: state.windowStartS,
+        patternId: state.pattern,
+      },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
@@ -3309,12 +3408,33 @@ function boot(ui: Elements, resources: BrowserResources): void {
     };
     const report = dayReportOf(filedReportInput);
     /*
+     * The between-day beat — GitHub issue #91.
+     *
+     * Built here rather than in the panel, and from the same closing of the same day the sheet is
+     * built from, so the two cannot be accounts of different days. Three things about the wiring
+     * are deliberate:
+     *
+     * 1. **Only a mode that owns a week gets one.** The condition is `week !== state.week`, which
+     *    is `closedWeekOf`'s own answer to *did a day actually close* — § D231's guard read off its
+     *    result rather than re-tested against `playMode`, so a ninth play mode cannot acquire a
+     *    between-day beat by forgetting to be listed here. A Free Play run's sheet drops every
+     *    week-shaped statement, and the beat is one.
+     * 2. **The closed day is `history`'s last entry, not `outcome`.** They are the same value
+     *    today, and `closeDay` is the thing entitled to say which day the week ended up holding —
+     *    a retry *replaces* the last entry rather than appending, so reading the state is what
+     *    keeps the beat right on the fourth attempt at Monday.
+     * 3. **`tomorrowFactsOf` runs once, here.** It resolves tomorrow's building; see its docstring
+     *    for why that is affordable exactly on this path and nowhere near a render.
+     */
+    const closedDay = week === state.week ? null : (week.history.at(-1) ?? null);
+    const tomorrow = closedDay === null ? undefined : briefingFor(week, closedDay, report.verdict);
+    /*
      * The tab is **not** forced here. `closeShift` is reached two ways — the playhead reaching the
      * end, and the reader opening the sheet — and the second one has already set the tab. Setting
      * it again inside a handler that `openTab` called would be the same write twice, which is how a
      * navigation ends up fighting itself.
      */
-    state = { ...state, week, report };
+    state = { ...state, week, report, tomorrow };
     /*
      * **The sheet opens itself only over a reader who is not doing something else** — § D233,
      * issue #67.
@@ -3423,6 +3543,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       dayStartS: runStartOfDayS ?? DAY_START_S,
       filteredBankId: bank.filtered ? bankFilter : undefined,
+      /*
+       * The reader's disclosure level, for the live-metrics panel — GitHub issue #100, whose first
+       * checklist item is that panel and which measured it identical in the two modes. It reaches
+       * `render/overlay.ts` and nothing else on this canvas; see `SceneInput.mode` for why the
+       * header band's refusal is deliberately not wordable from here.
+       */
+      mode: state.mode,
     });
     carBadgeHits = hits.carBadges;
 
@@ -3774,7 +3901,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
         ui.transport.error.focus();
         return;
       }
-      state = { ...state, recording: loaded.recording, report: undefined };
+      // The beat goes with the sheet: a recording read off disk is not a day of anybody's week,
+      // and an overnight reveal left standing beside it would describe a building the loaded run
+      // has nothing to do with.
+      state = { ...state, recording: loaded.recording, report: undefined, tomorrow: undefined };
       adopt(loaded.recording);
       renderAll();
     } catch (error) {

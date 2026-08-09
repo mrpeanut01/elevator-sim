@@ -167,6 +167,73 @@ export type ReportSubject =
   | { readonly kind: 'single-run'; readonly selection: SingleRunSelection };
 
 /**
+ * What the **day** was set to run — GitHub issue #126, and the field the trap in that issue is
+ * about.
+ *
+ * ## Why this exists, and why it could not be derived
+ *
+ * {@link ReportBasis} could see the building, the shape of run and the demand, and it could not see
+ * two things that make two days incomparable just as thoroughly: **how much of the day was run**,
+ * and **which arrival pattern it was built from**. Two campaign days of one day number, one at 55
+ * minutes and one at 25, compared as though they were the same question; so did two days either side
+ * of a pattern edit.
+ *
+ * The obvious substitute is a trap, and it is worth stating rather than leaving to be rediscovered.
+ * The recording's own span looks free: `VizRecording` already carries `startedAt` and `endedAt`, and
+ * a basis keyed on the difference needs no new field anywhere. But `endedAt` is
+ * `max(lastEventAt, demandEndedAt)` (`sim/simulation.ts`), so it moves with the **dispatcher** —
+ * driven in the shipped shell on Midtown Office at seed 20 260 804, three dispatchers back to back
+ * on one selection printed spans of `08:30–09:25`, `08:30–09:22` and `08:30–09:20`. A span-keyed
+ * basis would have refused all three of those comparisons, which is the one comparison the delta
+ * block exists to draw. **The cheap fix is worse than the gap**: it converts the common case into a
+ * refusal while leaving the rare one uncaught.
+ *
+ * So this is a **required** field on {@link DayReportInput}, carrying what the *state* asked for
+ * rather than what the *run* happened to produce. Required for {@link ReportSubject}'s reason: the
+ * defect a required field closes is a caller that forgot to say, and a plan defaulted to *"whatever
+ * the last one was"* would make two sheets compare as one question by omission.
+ *
+ * The repository had already written down why this matters, one layer away and unconnected to the
+ * sheet: `scope/surface.ts` describes `viewer.shiftLengthS` as *"Comparability depends on it: every
+ * published figure in this repository was measured over a stated window, and a run of a different
+ * length is a different claim."* That sentence was true and the Day report could not act on it,
+ * which is the gap rather than a restatement of it.
+ *
+ * ## Why the window start travels with the length
+ *
+ * § D286 split one control into two fields: a whole day travels as `durationS`, and a *part* of one
+ * travels as `windowStartS`/`windowEndS`, because a `durationS` override refits the template's
+ * geometry while a window selects from it as authored. Two parts of one day can therefore have the
+ * same length and different starts — `menu/partsOfDay.ts` derives them from the template's own
+ * phase boundaries, and nothing stops two of them being equally long. Carrying the length alone
+ * would have closed the axis for the case a reader meets first and left it open for the case that is
+ * harder to notice.
+ */
+export interface ShiftPlan {
+  /** `ViewerState.shiftLengthS` — what was asked for, never `endedAt − startedAt`. */
+  readonly shiftLengthS: number;
+  /**
+   * Where in the authored schedule the run started, or `null` for *from the top*.
+   *
+   * `ViewerState.windowStartS`. `null` is a distinct selection rather than a missing one — the same
+   * rule {@link SingleRunSelection.arrivalRatePctPop5min} follows for *the building's own rate*.
+   */
+  readonly windowStartS: number | null;
+  /**
+   * Which arrival pattern the run was built from — `ViewerState.pattern`.
+   *
+   * `'building'` is the building's own `trafficProfile`, which is the comparable default and the
+   * demand every published figure in this repository was measured under; anything else is a shipped
+   * profile's id or the id of a pattern the reader saved. The id is enough, and that is a fact about
+   * the shipped writer rather than an assumption: `dev/trafficEditor.ts#savePattern` mints a fresh id
+   * through `nextSavedId` on every save and never edits a saved spec in place, so within a session a
+   * pattern id names one set of numbers. A second writer that edited a spec under its own id would
+   * make this field lie, which is why that property is named here rather than assumed.
+   */
+  readonly patternId: string;
+}
+
+/**
  * What two sheets must agree about before the difference between them is a difference **in**
  * anything — GitHub issues #117 and #102.
  *
@@ -188,11 +255,11 @@ export type ReportSubject =
  * (`metaLinesFor`'s first entry is `${buildingName} · ${dispatcherName}`) and a dispatcher change is
  * exactly the comparison the block exists for. So the sheet publishes the axes themselves.
  *
- * ## The three axes, and why the dispatcher is deliberately not one of them
+ * ## The five axes, and why the dispatcher is deliberately not one of them
  *
  * A dispatcher swap on one building, one day and one seed is the retry loop the whole block was
  * built for (issue #38): it is the *only* thing this product lets a player change and re-run against
- * the same passengers, and refusing it would leave the block with nothing to say. The three that are
+ * the same passengers, and refusing it would leave the block with nothing to say. The five that are
  * here are the ones that change **what was asked**, not **how it was answered**:
  *
  * - {@link buildingId} — a different tower has a different population, a different core and a
@@ -206,21 +273,30 @@ export type ReportSubject =
  *   {@link SingleRunSelection.durationS}, which is minutes *of demand* rather than minutes of run).
  *   On a day of a week it is the day number and the day's event, which are the two things that move
  *   a campaign day's demand.
+ * - {@link extent} — how much of the day was run, and which part of it. A 55-minute day and a
+ *   25-minute day are different questions for reasons that have nothing to do with the dispatcher.
+ * - {@link patternId} — which arrival pattern the day was built from. The pattern can be edited
+ *   between days, and a sheet that could not tell would difference two days of different traffic.
  *
- * ## What this cannot see, said here rather than left to be discovered
+ * The last two arrived with GitHub issue #126 and are {@link ShiftPlan}'s, threaded from the state
+ * that already knows both. **Neither is derived from the recording**, and that is the whole of the
+ * issue rather than an implementation note — see {@link ShiftPlan} for the span that looks free and
+ * is not.
  *
- * A campaign day's **shift length** and its **traffic pattern** are not on this input at all —
- * `DayReportInput` carries neither, and inventing them from the recording's own span is not
- * available. That last part is measured rather than assumed: `endedAt` is
- * `max(lastEventAt, demandEndedAt)` (`sim/simulation.ts`), so it moves with the **dispatcher**.
- * Driven in the shipped shell on Midtown Office at seed 20 260 804, three dispatchers back to back
- * on one selection printed spans of `08:30–09:25`, `08:30–09:22` and `08:30–09:20` — so a basis
- * keyed on the span would have refused every one of the three comparisons the block exists for.
+ * ## What this still cannot see, said here rather than left to be discovered
  *
- * So two campaign days of the same day number, run at different lengths, compare as though they
- * were the same question. That is a **named gap**, pinned by a case in `reportPanel.test.ts` rather
- * than by this paragraph — § D227: a refusal is pinned by a run, never by another sentence. Closing
- * it means a required field on `DayReportInput`, which is wider than either issue asks for.
+ * The **event an authored calendar writes over a day**. {@link demand}'s week-day arm names the
+ * day's `event.id`, and it names the one the *sheet* was handed: `dev/main.ts#closeShift` derives it
+ * as `eventFor(week.day, week.dayIdx)`, the ordinary schedule. `dev/state.ts#shiftRunConfigOf`
+ * derives the event the **run** was under differently — it consults `calendarDayFor(state.calendar,
+ * …)` first, because a period may name today's event (`moving-week` is *`move-in` every day*). Where
+ * a calendar overrides, the two disagree, and two days that ran under different events pair as one
+ * question.
+ *
+ * Two ordinary days under two different events **are** refused, which is the half that works and is
+ * asserted in `reportPanel.test.ts`. The gap is one file wide and it is the shell's: `closeShift`
+ * would have to be handed the event the run actually used. Named here and pinned by a case rather
+ * than claimed shut — § D227, a limitation described only in prose is a limitation that goes stale.
  */
 export interface ReportBasis {
   /** `VizRecording.buildingId` — the tower, not its display name. */
@@ -236,6 +312,19 @@ export interface ReportBasis {
    * the refusal can find the difference on the identity rows above it.
    */
   readonly demand: string;
+  /**
+   * How much of the day was run, and which part of it — {@link ShiftPlan}'s two halves, as one
+   * string.
+   *
+   * One string for {@link demand}'s reason, and it is the same reason twice: the only question ever
+   * asked of a basis field is *are these two the same?*, and a record would invite a caller to
+   * compare the parts and report *"a different length"* about two runs that differ only in where in
+   * the schedule they started. {@link extentLineOf} composes it, once, so the refusal and the axis
+   * cannot disagree about what a stretch of the day is.
+   */
+  readonly extent: string;
+  /** {@link ShiftPlan.patternId}, unaltered — the pattern the day's demand was built from. */
+  readonly patternId: string;
 }
 
 /**
@@ -334,6 +423,14 @@ export interface DayReportInput {
    * docstring: the defect this field closes was a caller that forgot to say.
    */
   readonly subject: ReportSubject;
+  /**
+   * What the day was set to run — length, part, and arrival pattern. **Required**, GitHub issue
+   * #126, and {@link ShiftPlan} carries the argument for both halves of that word.
+   *
+   * The short version: it is required for {@link subject}'s reason, and it may not be derived from
+   * {@link recording} because the recording's own span moves with the dispatcher.
+   */
+  readonly plan: ShiftPlan;
   /** The dispatcher's display name. Defaults to the recording's profile id. */
   readonly dispatcherName?: string | undefined;
   /** The simulated second the shift clock calls 06:00. See {@link DAY_START_S}. */
@@ -477,6 +574,26 @@ function selectionLines(selection: SingleRunSelection): readonly string[] {
 }
 
 /**
+ * How much of the day was run, and which part of it — {@link ReportBasis.extent}'s one composer.
+ *
+ * Minutes rather than seconds because the two things a reader can move are both authored in minutes
+ * (`menu/partsOfDay.ts` derives its parts from a template's `startOfDayMin` and `durationMin`), and
+ * because a basis that distinguished 1 800 s from 1 801 s would refuse a comparison over a rounding
+ * nobody chose. Nothing rounds *into* equality here that a reader could have chosen apart: the
+ * shipped controls write whole minutes.
+ *
+ * `null` prints nothing rather than `from 0 min in`, because *the whole day* and *the first part of
+ * the day* are different selections — § D286 — and a string that spelled the first as the second
+ * would make them compare equal.
+ */
+function extentLineOf(plan: ShiftPlan): string {
+  const minutes = `${String(Math.round(plan.shiftLengthS / 60))} min`;
+  return plan.windowStartS === null
+    ? minutes
+    : `${minutes} from ${String(Math.round(plan.windowStartS / 60))} min in`;
+}
+
+/**
  * What this sheet may be differenced against — issues #117 and #102, and see {@link ReportBasis}.
  *
  * Exhaustive over the subject, so a third shape of run is a compile error here rather than a sheet
@@ -486,9 +603,13 @@ function selectionLines(selection: SingleRunSelection): readonly string[] {
  * campaign day's demand: `growth.ts` adds 11 % of tenants per day, and `shiftRunPatch` writes the
  * event over the pattern. It does not name the dispatcher, the seed or the attempt — a retry with a
  * different dispatcher on one day is the comparison this block exists to draw.
+ *
+ * **The last two axes come off {@link DayReportInput.plan} and nothing else** — issue #126. Reading
+ * them off `recording.endedAt − recording.startedAt` would have been free and would have refused the
+ * dispatcher swap; see {@link ShiftPlan} for the three spans that measure it.
  */
 function basisOf(input: DayReportInput): ReportBasis {
-  const { recording, subject, week, event } = input;
+  const { recording, subject, week, event, plan } = input;
   return {
     buildingId: recording.buildingId,
     subject: subject.kind,
@@ -496,6 +617,8 @@ function basisOf(input: DayReportInput): ReportBasis {
       subject.kind === 'single-run'
         ? demandLineOf(subject.selection)
         : `day ${String(week.day)} · ${event.id}`,
+    extent: extentLineOf(plan),
+    patternId: plan.patternId,
   };
 }
 
@@ -932,6 +1055,13 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
         'the queues never settled, so there is no cohort to take a mean over — see the small print',
       tone: 'withheld',
       axisOnly: false,
+      /*
+       * Read off the summary, never re-derived from the prose above it. `undefined` on a recording
+       * older than schema 8, and on a run refused by `saturated` alone where `core` wrote no code:
+       * the consumer's fallback is a ground-free sentence, which is what every consumer had before
+       * codes existed. See {@link ReportFigure.suppressionGround}.
+       */
+      suppressionGround: summary.awtInvalidGround,
     };
   }
   return {

@@ -39,6 +39,7 @@ export { checkAll, PROPERTY_CHECKS } from './properties.js';
 
 export {
   batchRequestFor,
+  comparisonConfigFor,
   contextFor,
   evaluateCase,
   isFailure,

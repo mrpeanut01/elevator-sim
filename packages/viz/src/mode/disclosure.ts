@@ -315,6 +315,23 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
  * The shell is shared and the clause is per ground, so R3's *"a suppression is a result, not a
  * gap"* framing is written once and cannot go missing from one of the four.
  *
+ * ## Exported, and the decision it reverses is stated rather than quietly dropped
+ *
+ * {@link SUPPRESSION_CLAUSE_BY_GROUND} above still says it is *"not exported, deliberately"*, and
+ * that stays true of the **table**. This function is exported because a **second** surface refuses
+ * a mean and had no wording for it: the Day report printed `core`'s own statistics prose —
+ * *"Queue length rose by 268.0 persons (53.59/min, 12.0× the queue's own scatter) … AWT is not
+ * approximately normal and its confidence interval must be suppressed"* — to a Casual reader, in
+ * both modes identically, because `shift/report.ts` had no mode and no ground to key on. That is
+ * GitHub issue #100's own example, and the fix that would have been wrong is a second per-ground
+ * table in `mode/casualDay.ts`.
+ *
+ * Two copies of *how a refusal is worded to a Casual reader* is the duplication `mode/glossary.ts`
+ * exists to remove — issue #22's lane found three of them, one of them inside the module § D240
+ * built. So the wording moves through this function and the table stays private: the honesty
+ * search reaches it through `disclosureItems` and now also through
+ * `dev/reportPanel.ts#reportViewOf`, and both drive the same sentence.
+ *
  * **The parameter is `string` and not `AwtInvalidGround`, and that is the load-bearing part.**
  * `VizSummary.awtInvalidGround` is the union — schema version 8 carries `core`'s own type — so a
  * signature that took the union would make {@link SUPPRESSION_CLAUSE_BY_GROUND}'s lookup total and
@@ -325,7 +342,7 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
  * field's *value*, so a file that declares schema 8 and carries a ground this build has no wording
  * for reaches this function in the shipped path.
  */
-function suppressionLeadFor(ground: string | undefined): string {
+export function suppressionLeadFor(ground: string | undefined): string {
   if (ground === undefined) return SUPPRESSION_LEAD;
   const clause = (SUPPRESSION_CLAUSE_BY_GROUND as Readonly<Record<string, string | undefined>>)[
     ground

@@ -352,3 +352,58 @@ describe('issue #112 — a board is re-read, and the screen is not latched shut'
     expect(await bodyOf('drawMenu')).not.toContain('loadBoards');
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The between-day beat — GitHub issue #91
+ * -------------------------------------------------------------------------- */
+
+describe('issue #91 — the beat is built where the day closes, and nowhere else', () => {
+  /*
+   * Text guards, in this file's own idiom and with its own caveat: weak evidence about behaviour,
+   * strong evidence about a line having been deleted. What they protect is a *cost* property that
+   * no unit test can see — `tomorrowFactsOf` resolves a building document, and the shell redraws at
+   * 60 Hz during playback, so the difference between calling it once per closed day and once per
+   * frame is the difference between a feature and a stall.
+   *
+   * The behaviour itself is asserted where it can be: `shift/tomorrow.test.ts` drives the briefing
+   * and requires its population to equal the one the next run actually resolves to, and
+   * `dev/reportPanel.test.ts` pins which sheets carry it.
+   */
+  it('resolves tomorrow exactly once, from the day-closing path', async () => {
+    const source = await mainSource();
+    expect(
+      (source.match(/tomorrowFactsOf\(/g) ?? []).length,
+      'tomorrowFactsOf is called more than once — a second call is either a second answer to ' +
+        'what tomorrow holds, or a document resolve on the render path',
+    ).toBe(1);
+    // And it is inside `briefingFor`, which `closeShift` is the only caller of.
+    const body = await bodyOf('briefingFor');
+    expect(body).toContain('tomorrowFactsOf(resources,');
+  });
+
+  it('carries the sheet’s own verdict rather than re-deriving one', async () => {
+    /*
+     * *Carried from the Day report rather than recomputed.* The beat's streak sentence is keyed on
+     * the verdict, and two computations of one judgement is the defect issue #53 closed — it put
+     * *"A day it could handle"* over *"Shift missed"* on one screen.
+     */
+    const body = await bodyOf('closeShift');
+    expect(body).toContain('report.verdict');
+    expect(body, 'the beat must not re-derive the verdict from allMet').not.toMatch(
+      /verdict:\s*[^,]*allMet/u,
+    );
+  });
+
+  it('clears the beat wherever it clears the sheet', async () => {
+    /*
+     * Both are accounts of a **closed** day, so they live and die together. A beat left standing
+     * after `runShift` would put yesterday's overnight reveal under today's date, which is § D223's
+     * stale-sheet defect one field over — and the two clear sites are the two the report already
+     * had.
+     */
+    const source = await mainSource();
+    const sheetCleared = (source.match(/report:\s*undefined/g) ?? []).length;
+    const beatCleared = (source.match(/tomorrow:\s*undefined/g) ?? []).length;
+    expect(beatCleared, 'every place the sheet is cleared clears the beat too').toBe(sheetCleared);
+  });
+});

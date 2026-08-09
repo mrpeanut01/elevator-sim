@@ -593,6 +593,14 @@ describe('the press really moves the run, and the strip really reports it — §
       contract: contractById('c2'),
       event: SHIFT_EVENTS.ordinary,
       subject: { kind: 'week-day' },
+      /*
+       * One plan for both sheets the strip pairs — issue #126.
+       *
+       * The strip's whole subject is a **dispatcher** swap, which is the one change `ReportBasis`
+       * deliberately does not refuse. Varying the plan between the two sheets here would refuse the
+       * pairing and quietly turn every assertion below into an assertion about a refusal.
+       */
+      plan: { shiftLengthS: 900, windowStartS: null, patternId: 'building' },
     });
   };
 
