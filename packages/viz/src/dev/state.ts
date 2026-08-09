@@ -87,7 +87,8 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, closeDay, openWeek, switchWeek } from '../shift/week.js';
+import { SANDBOX_CONTRACT_ID, closeDay, nextDay, openWeek, switchWeek } from '../shift/week.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
 import type { PlayMode } from '../scope/types.js';
@@ -369,6 +370,16 @@ export interface ViewerState {
   readonly report: ShapedDayReport | undefined;
   /** What the last run refused to configure, from `shiftRunPatch`. Shown, never swallowed. */
   readonly withheld: readonly string[];
+  /**
+   * The between-day beat — GitHub issue #91. `undefined` until a day has been closed.
+   *
+   * An **output**, on exactly {@link report}'s footing and for the same reason: it is built by
+   * `closeShift` from the whole recording plus the two buildings, and no control writes it. It is
+   * held on the state rather than derived in the panel because deriving it costs a
+   * `parseBuilding`/`resolveBuilding` of *tomorrow's* building, which a render running at 60 Hz may
+   * not do — see {@link tomorrowFactsOf}.
+   */
+  readonly tomorrow: TomorrowBriefing | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -742,6 +753,10 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     recording: undefined,
     report: undefined,
     withheld: [],
+    // No day has closed, so there is no overnight to reveal. `undefined` rather than an empty
+    // briefing: an empty one would draw the captions *Tomorrow* and *Yesterday* over nothing,
+    // which is `docs/10` R3's blank-where-a-number-should-be at the layout's scale.
+    tomorrow: undefined,
   };
 }
 
@@ -1106,6 +1121,69 @@ export function shiftRunConfigOf(
        */
       onTimeout: 'report',
     },
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Tomorrow — GitHub issue #91
+ * -------------------------------------------------------------------------- */
+
+/** What the between-day beat states about tomorrow. Every field is measured, none is a caption. */
+export interface TomorrowFacts {
+  /** `ResolvedBuilding.totalPopulation` — the floor sum `core` counts arrivals against. */
+  readonly population: number;
+  /** `calendarLine`, or `''` when the week is under no period. */
+  readonly calendarLine: string;
+  /** What tomorrow's configuration refuses, verbatim. */
+  readonly withheld: readonly string[];
+}
+
+/**
+ * Tomorrow, measured — by building tomorrow's run plan and reading it.
+ *
+ * ## Why it goes all the way through `shiftRunConfigOf` rather than calling `growthFactor`
+ *
+ * `shift/growth.ts`'s own docstring names the alternative and calls it a lying seam: *"a growth
+ * factor that only reached the tenant count in the header would be the twelfth dead seam, and it
+ * would be a lying one"*. The population a player is shown for tomorrow has to be the population
+ * tomorrow's kernel counts arrivals against, which means the same `commissionedBuilding` →
+ * `grownBuilding` → `calendarPatch` → `parseBuilding`/`resolveBuilding` chain the run uses, in the
+ * same order, with the same rounding. Anything cheaper is a number that agrees with the run until
+ * a calendar period is open or a bank has been commissioned, and then quietly does not.
+ *
+ * The other two facts come free from the same call and would otherwise each need their own partial
+ * re-derivation: `calendarLine` is `shiftRunConfigOf`'s own caption for the period, and `withheld`
+ * is what tomorrow's configuration refuses.
+ *
+ * `plan.event` is deliberately **not** carried. It is the *patched* event and is therefore more
+ * correct than the Day report's own *Tomorrow* card, which names `eventFor`'s unpatched schedule —
+ * and putting a second, disagreeing event name on the same screen would be the two-answers defect
+ * rather than a fix for it. `shift/tomorrow.ts#nextRowsOf` states what is owed instead.
+ *
+ * ## What it costs, and why that is affordable exactly here
+ *
+ * Two `parseBuilding`/`resolveBuilding` passes — no simulation, no RNG, no kernel. It is called
+ * **once per closed day**, from `closeShift`, and never from a render: the shell redraws at 60 Hz
+ * during playback and a resolve on that path would be a per-frame document parse. That is the
+ * reason {@link ViewerState.tomorrow} is a stored output rather than something the report panel
+ * derives when it draws.
+ *
+ * ## `nextDay`, not `day + 1`
+ *
+ * The week is advanced through `shift/week.ts#nextDay`, so the weekday index wraps the way the
+ * shipped transition wraps and the beat cannot describe a Saturday the button will not open on.
+ * Reconstructing `{ ...week, day: week.day + 1 }` here would be a second implementation of the one
+ * transition this whole feature is a preview of.
+ */
+export function tomorrowFactsOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): TomorrowFacts {
+  const plan = shiftRunConfigOf(resources, { ...state, week: nextDay(state.week) });
+  return {
+    population: plan.building.totalPopulation,
+    calendarLine: plan.calendarLine,
+    withheld: plan.withheld,
   };
 }
 

@@ -426,6 +426,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'which capital constraint the commissioning screen judges against. Presentation — it decides what that screen offers and refuses, and moves no leg — so it belongs with the settings rather than with the game, and the settings that *are* persisted are the four `menu.settings` carries. Out for the same reason `viewer.railSegment` is: it is where the reader was looking, not what they were playing',
   'viewer.withheld':
     'what the last run refused to configure; it belongs to that run and printing it beside a different one would be a caption about a run underneath it that is not there',
+  'viewer.tomorrow':
+    'the between-day beat (issue #91). Out for `viewer.report`’s reason and one of its own. It is a function of the week that is restored, the run that is not, and **tomorrow’s resolved building** — so a stored copy would announce an overnight against a run nobody has. The one of its own is that it is cheap to rebuild and expensive to have wrong: it is rebuilt by the next `closeShift`, which resolves tomorrow’s document rather than trusting a number from a previous session, and a session restored across a change to `data/` would otherwise show a growth reveal measured on a building that no longer ships',
 
   /* --- the menu’s own navigation ------------------------------------------ */
   'menu.screen':

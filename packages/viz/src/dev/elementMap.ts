@@ -261,6 +261,11 @@ export interface ReportElements {
   readonly forecastNote: HTMLElement;
   readonly forecastDemand: HTMLElement;
   readonly taught: HTMLElement;
+  /** The between-day beat's own box — hidden whole when no day has closed. Issue #91. */
+  readonly overnight: HTMLElement;
+  readonly overnightHeadline: HTMLElement;
+  readonly overnightGroups: HTMLElement;
+  readonly overnightWithheld: HTMLElement;
   readonly smallPrint: HTMLElement;
   readonly nextDay: HTMLButtonElement;
   readonly back: HTMLButtonElement;
@@ -619,6 +624,10 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     forecastNote: 'report-forecast-note',
     forecastDemand: 'report-forecast-demand',
     taught: 'report-taught',
+    overnight: 'report-overnight',
+    overnightHeadline: 'report-overnight-headline',
+    overnightGroups: 'report-overnight-groups',
+    overnightWithheld: 'report-overnight-withheld',
     smallPrint: 'report-small-print',
     nextDay: 'report-next-day',
     back: 'report-back',
