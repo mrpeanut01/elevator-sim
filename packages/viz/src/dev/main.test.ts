@@ -1495,28 +1495,40 @@ describe('which freePlay a finished run is described by — § D318', () => {
    * submission and the Day report's subject may not mention `menuState.freePlay` at all. This test
    * fails against the defect — three occurrences before, one after.
    *
-   * ## The one occurrence that is correct, and why it is not an exception
+   * ## The reads that are correct, and the rule that admits them
    *
-   * `enterFreePlay(state, resources, menuState.freePlay, …)` reads the menu **on purpose**: entering
-   * Free Play is the moment the menu's selection becomes the run's, and it is the only moment the
-   * arrow points that way. Everything after it describes a run that already exists, and a run knows
-   * what it ran. If a second legitimate reader ever appears, this test should be widened
-   * deliberately rather than loosened to a count.
+   * `enterFreePlay(state, resources, menuState.freePlay, …)` reads the menu **on purpose**: that
+   * call is the moment the menu's selection *becomes* the run's, and it is the only moment the arrow
+   * points that way. Everything after it describes a run that already exists, and a run knows what
+   * it ran.
+   *
+   * So the rule is not a count — it is a **boundary**: every read of `menuState.freePlay` must be an
+   * argument to `enterFreePlay`. This started as `toHaveLength(1)` and was widened, deliberately and
+   * exactly as this docstring instructed, when § D3xx's *run this row's configuration* added a
+   * second legitimate caller: it writes the row into `menuState.freePlay` through the reducer and
+   * then enters Free Play with it, which is the same boundary reached by a different door.
+   *
+   * Widening it to *"an argument to `enterFreePlay`"* rather than to *"two occurrences"* is the
+   * difference between a rule and a tally. A tally would have admitted the next wrong read as
+   * readily as the next right one.
    */
   it('reads the menu only where the menu becomes the run', async () => {
     const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
-    const lines = source.split('\n');
-    const reads = lines
+    const reads = source
+      .split('\n')
       .map((line, index) => ({ line: line.trim(), number: index + 1 }))
-      .filter(({ line }) => line.includes('menuState.freePlay') && !line.startsWith('//'));
+      .filter(({ line }) => line.includes('menuState.freePlay') && !line.startsWith('//'))
+      .filter(({ line }) => !line.startsWith('*'));
+
+    const outsideTheBoundary = reads.filter(({ line }) => !line.includes('enterFreePlay('));
 
     expect(
-      reads.map(({ line, number }) => `${String(number)}: ${line}`),
+      outsideTheBoundary.map(({ line, number }) => `${String(number)}: ${line}`),
       'A finished run is described from `state`, never from what the menu currently has selected. ' +
         'The leaderboard submission is the expensive half: the server replays the submitted ids, ' +
         'fails to reproduce, and answers 422 — this product\'s one accusation, aimed at a player ' +
         'who only moved a select. See `shiftSubmittedSelection`.',
-    ).toHaveLength(1);
-    expect(reads[0]?.line).toContain('enterFreePlay(');
+    ).toEqual([]);
+    expect(reads.length, 'the derivation stopped matching anything').toBeGreaterThan(0);
   });
 });

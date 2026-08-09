@@ -52,7 +52,7 @@
  * *reason* survives to the screen.
  */
 
-import type { DirectionalSplit, SimTime } from '@elevator-sim/core/browser';
+import type { AwtInvalidGround, DirectionalSplit, SimTime } from '@elevator-sim/core/browser';
 
 /* -------------------------------------------------------------------------- *
  * The week's calendar
@@ -508,6 +508,30 @@ export interface ReportFigure {
    * anything. `true` on the two energy cells, `false` everywhere else. See {@link FigureTone}.
    */
   readonly axisOnly: boolean;
+  /**
+   * Which `awtIsValid` ground refused this cell, when one did — `undefined` on every cell that
+   * carries a figure, and on a refusal whose recording predates the ground code.
+   *
+   * ## Why the ground rides on the cell rather than being re-derived from the note
+   *
+   * `core` emits the refusal as prose **and** as a code (`metrics/awtValidity.ts`), and
+   * `mode/disclosure.ts`'s docstring gives the argument for reading the code rather than the prose
+   * at length: deciding *which* ground fired by re-reading `saturated`, `waitCount`,
+   * `unservedCount` and the service verdict is a second source of truth about a question `core`
+   * has already answered, and it is wrong in exactly the case the fourth and fifth grounds exist
+   * for — a run that looks unsaturated and uncensored and is refused anyway.
+   *
+   * The Day report already carried the prose (`awtInvalidReason`, quoted whole) and dropped the
+   * code, so `mode/casualDay.ts` had no way to word *this* refusal without re-deriving it. It is
+   * carried here, on the one cell that can be refused, rather than on the report: a second cell
+   * that could be refused would need its own ground, and a report-level field would quietly make
+   * the first refusal's ground the second's.
+   *
+   * It decides **wording and never the refusal**. Whether the cell is withheld at all is still
+   * `summary.awtIsValid && !summary.saturated`, read in one place — see
+   * `shift/report.ts#averageWaitFigure`.
+   */
+  readonly suppressionGround?: AwtInvalidGround | undefined;
 }
 
 /** One row of *Where it went wrong* (`design.html` :309–318). */

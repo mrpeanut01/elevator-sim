@@ -70,10 +70,43 @@ verdict:
   both tiers after issue #127 (a decision number is owed for that wave; the argument is in
   `honesty/surfaces.ts` and `honesty/run.ts`):
 
-  | tier | cases | strings | surfaces | simulations | violations |
+  | tier | cases | strings | simulations | surfaces | verdict |
   |---|---|---|---|---|---|
-  | always-on | 49 | **261 176** | 30 | **606** | **48, 24 cases** |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **329 357** | 31 | **4 710** | **66, 29 cases** |
+  | always-on | 49 | **285 954** | **606** | 30 | **green** — every finding registered |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **360 945** | **4 710** | **31** | **green** — every finding registered |
+
+  Measured 2026-08-09 on the integrated tree, both tiers, in one sitting — and that is the point of
+  the sentence rather than a detail of it. **Three lanes in this wave each measured the corpus on a
+  different base and reported three different pairs of numbers**, every one of them correct where it
+  was taken and none of them correct here. A figure re-measured per branch is a figure that is stale
+  the moment the branch merges, so the measurement now happens once, after integration, or not at
+  all.
+
+  **The verdict column says *green* rather than *0 violations*, and the difference is deliberate.**
+  Both tiers pass, which means every violation the search finds is in `honesty.test.ts`'s
+  `OUTSTANDING` register with a ghost check holding it. Two findings are open there:
+
+  - **`estimate-without-n`** — the Day report's delta row publishes `AVERAGE WAIT was 17.8 s →
+    23.4 s`, a mean with no count in its own box, and § D310's editor strip draws the same row.
+    Found by the sweep on its **first run** after issue #127 put the block in the corpus, which is
+    the property working. Recorded rather than fixed on § D307's precedent, because the fix changes
+    what two shipped surfaces look like. **Issue #137.**
+  - **`suppressed-mean`** — `honesty-9100031`, deep tier only, a cue-rule coincidence rather than a
+    false claim on screen: the caveat says *"a quotable average on 6 of 20 consecutive seeds"* and
+    that run's refused `meanWaitS` also rounds to 20. It was published as *outstanding* in this file
+    and the roadmap **while being held by no register at all**, so the deep tier was genuinely red
+    on `integration/issue-wave-15` before this wave entered it. Now registered in both directions.
+
+  A count of violations is deliberately not published here. Two attempts to extract one from the
+  run's output disagreed with each other, because a finding is reported once per property that sees
+  it rather than once per string; the register names *what* is outstanding, which is what a reader
+  needs and what a run can be asked to reproduce.
+
+  The surface column is corrected as well as re-measured — it published `30` for both tiers, and the
+  deep tier reaches **31**, because `campaign/judge.ts#judgeStage` is silent in the always-on tier by
+  construction (`STANDARD_SPACE` sets `stageProbability: 0`, a stage being 50 replications) and loud
+  in the deep one. `honesty.test.ts` asserts that silence in one tier and that noise in the other, so
+  *30* was never the deep tier's number.
 
   **Both string counts went up, and both for the same reason**: issue #127 put the Day report's
   **run-to-run delta block** into the corpus, which had never been in it — `honesty/surfaces.ts`
@@ -117,7 +150,10 @@ verdict:
   docstrings naming callers that do not call; the verdict itself is unchanged. Also named in the
   verdict: `Escape` does not dismiss the drawer *(closed in wave 12, [§ D188](DECISIONS.md))*, the
   honesty sweep's `mode` axis has one value *(closed in wave 12, [§ D194](DECISIONS.md) — the
-  second value produced zero new strings, a measured null)*,
+  second value produced zero new strings, **and that measured null has since stopped being true**:
+  the Day report and the live-metrics panel became mode-aware for GitHub issues #110 and #100, and
+  both adapters now render **both** registers on every case, which is where the always-on tier's
+  string count moved to 278 756. A null is a measurement of a tree, not a property of the axis)*,
   three DOM panels are statically swept rather than driven, and **U6**, **U7's rider models** and
   **Basic's curated three-dimension subset** are unbuilt.
 

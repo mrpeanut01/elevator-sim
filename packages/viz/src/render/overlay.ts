@@ -21,6 +21,7 @@
 
 import type { OverlayMetrics } from '../frame/overlay.js';
 import type { Frame, VizRecording } from '../contract/types.js';
+import type { ViewMode } from '../mode/types.js';
 import type { Canvas2DLike, Theme } from './canvas.js';
 import type { Layout } from './layout.js';
 
@@ -100,7 +101,115 @@ export interface OverlayInput {
   readonly metrics: OverlayMetrics;
   readonly layout: Layout;
   readonly theme: Theme;
+  /**
+   * The reader's disclosure level — GitHub issue
+   * [#100](https://github.com/mrpeanut01/elevator-sim/issues/100), whose first checklist item is
+   * this panel.
+   *
+   * Defaulting to `advanced`, so every caller that is describing a run rather than serving a reader
+   * — the honesty sweep, `overlayRender.test.ts`, an export — gets the engineer's words. That is
+   * `DayReportInput.showEnergyAxis`'s rule and the argument transfers: a default that quietly
+   * simplified would have the search measuring a panel the product does not draw.
+   *
+   * **It moves words and it does not move a refusal.** See {@link CASUAL_WORDS} and
+   * {@link CASUAL_REFUSAL}: a suppressed statistic is still replaced by a refusal, still in
+   * `theme.warning`, still with no number beside it.
+   */
+  readonly mode?: ViewMode | undefined;
 }
+
+/**
+ * The panel's labels in the two registers — issue #100.
+ *
+ * ## Why this is a table and not four ternaries at the draw sites
+ *
+ * Every string here is drawn into a **fixed-width column**: the observation rows are
+ * `label` padded out to a column the value starts in, and this file has no `measureText` (see
+ * {@link ADVANCE_PX}). A wording change is therefore a *layout* change, and issue #115 § 6 is what
+ * happens when this panel's widths are decided one draw site at a time — four strings overhanging
+ * the border on the viewer's own canvas, invisible to every DOM check because the panel is drawn
+ * into the bitmap.
+ *
+ * So the two registers sit side by side where the padding can be read off them, and
+ * `overlayRender.test.ts` asserts **every** Casual string fits {@link MIN_OVERLAY_WIDTH_PX}'s
+ * content width rather than the ones somebody remembered to check.
+ *
+ * ## The one label that is the same in both, and the one that could have been made false
+ *
+ * `longest wait` is byte-identical in the two registers, and it is in this table anyway: a reader
+ * of this file should be able to see the whole panel's vocabulary in one place, including the part
+ * that needed no translating. Leaving it out would have made the table read as *the words that
+ * differ*, which is a different and smaller claim than *the words the panel draws*.
+ *
+ * `boarded (window)` is the one that could have been made plainer by making it wrong. It is a count
+ * over the rolling window, so Casual keeps the basis — *(5min)* — rather than dropping it: a count
+ * over five minutes drawn as a count over the day would be a false figure, not a friendlier one.
+ * The same restraint decides the window caption below.
+ */
+const CASUAL_WORDS = Object.freeze({
+  title: 'RIGHT NOW',
+  waiting: 'people waiting  ',
+  longest: 'longest wait    ',
+  boarded: 'got a car (5min)',
+  rollingMean: 'average wait so far',
+  byBank: 'BY LIFT GROUP',
+  carLoad: 'HOW FULL EACH CAR IS',
+  bankSuppressed: 'no average',
+  nothingYet: 'nobody carried yet',
+});
+
+/** The same nine, as the engineer's panel has always drawn them. */
+const ENGINEER_WORDS = Object.freeze({
+  title: 'LIVE METRICS',
+  waiting: 'waiting now     ',
+  longest: 'longest wait    ',
+  boarded: 'boarded (window)',
+  rollingMean: 'rolling mean wait',
+  byBank: 'BY BANK',
+  carLoad: 'CAR LOAD',
+  bankSuppressed: 'suppressed',
+  nothingYet: 'nothing served yet',
+});
+
+/**
+ * What Casual says where the engineer's panel says `SUPPRESSED` — and the two things it may not be.
+ *
+ * It may not be **softer**. `SATURATED` is not jargon to be smoothed away; it is the run telling a
+ * reader the building could not cope, and *a busy day* is a different and weaker claim. Every
+ * candidate here says there is **no average**, in those words, before it says anything else.
+ *
+ * It may not be **narrower than the ground**. `awtIsValid` has five grounds and only one of them is
+ * saturation — an empty window and an abandonment rate above 2 % refuse a mean on a run that coped
+ * perfectly well — so a line reading *the building could not cope* would be false on three of the
+ * five. This one is ground-free by construction, and the ground-specific sentence is the one the
+ * status line under the canvas carries (`dev/main.ts#transportStatusOf`, which is already
+ * mode-aware and already reads `mode/disclosure.ts`'s per-ground wording).
+ *
+ * Ordered longest-first for {@link longestThatFits}, which is this file's own idiom: a sentence
+ * that has to lose words loses the ones chosen here rather than the ones that fall past the edge.
+ */
+const CASUAL_REFUSAL: readonly string[] = Object.freeze([
+  'NO AVERAGE — A RESULT',
+  'NO AVERAGE',
+]);
+
+/**
+ * The reason Casual prints in the panel, in place of `core`'s statistics prose.
+ *
+ * `docs/10` R3 lets a mode **shorten** a reason and forbids it to remove one, and this is the
+ * shortening: the full sentence — *"Queue length rose by 268.0 persons (53.59/min, 12.0× the
+ * queue's own scatter) … AWT is not approximately normal and its confidence interval must be
+ * suppressed"* — is on the status line under the canvas, verbatim, in both modes, and this
+ * sentence says so rather than leaving a reader to find it.
+ *
+ * It is **ground-free**, for {@link CASUAL_REFUSAL}'s reason. It states no number, so R3's textual
+ * half cannot be tripped by it. And it says *refuse* rather than *cannot*: the mean exists as an
+ * arithmetic mean of something — `1 334 s` on the run `shift/report.test.ts` pins — and what the
+ * run declines is to stand behind it, which is a result rather than a gap.
+ */
+const CASUAL_REASON =
+  'This run’s own statistics refuse an average here. That is a result, not a gap — the reason ' +
+  'in full is on the line below the canvas.';
 
 /**
  * Draw the panel into {@link Layout.overlay}. A no-op when no room was reserved.
@@ -142,18 +251,37 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  line('LIVE METRICS', theme.text);
-  line(`window ${formatSpan(metrics.windowStartS, metrics.simTimeS)}`, theme.textDim, FONT_SMALL);
+  /* Issue #100. One lookup, at the top, so no draw site below chooses a register of its own. */
+  const casual = (input.mode ?? 'advanced') === 'basic';
+  const words = casual ? CASUAL_WORDS : ENGINEER_WORDS;
+
+  line(words.title, theme.text);
+  /*
+   * The window, in each register's own way of saying the same span.
+   *
+   * Engineer gets the bounds — `window 358–658 s` — because a bound is what a reader checks a
+   * figure against. Casual gets the **length**, which is the same fact said the way a person asks
+   * it, and it is subtracted rather than assumed: the window is `[max(startedAt, t − windowS), t]`,
+   * so early in a run it is genuinely shorter than `windowS` and printing *the last 300 s* there
+   * would be a caption describing a window the panel is not showing.
+   */
+  line(
+    casual
+      ? `the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`
+      : `window ${formatSpan(metrics.windowStartS, metrics.simTimeS)}`,
+    theme.textDim,
+    FONT_SMALL,
+  );
   y += 4;
 
   /* Observations. Facts about the recording, shown on every run including a saturated one —
      they are how a reader *sees* a queue diverging. */
-  line(`waiting now      ${String(metrics.waitingNow)}`, theme.text);
+  line(`${words.waiting} ${String(metrics.waitingNow)}`, theme.text);
   line(
-    `longest wait     ${metrics.longestCurrentWaitS === undefined ? '—' : `${metrics.longestCurrentWaitS.toFixed(0)} s`}`,
+    `${words.longest} ${metrics.longestCurrentWaitS === undefined ? '—' : `${metrics.longestCurrentWaitS.toFixed(0)} s`}`,
     theme.text,
   );
-  line(`boarded (window) ${String(metrics.boardedInWindow)} legs`, theme.text);
+  line(`${words.boarded} ${String(metrics.boardedInWindow)} legs`, theme.text);
   y += 4;
 
   /*
@@ -203,10 +331,18 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   }
 
   if (metrics.suppressed) {
-    line('rolling mean wait', theme.textDim);
-    line('SUPPRESSED', theme.warning);
+    line(words.rollingMean, theme.textDim);
+    /*
+     * The refusal, in each register — and it is a refusal in both. Casual's line is chosen by
+     * width from {@link CASUAL_REFUSAL} rather than fixed, because this panel can be 210 px wide
+     * and a clipped refusal is the one string on the screen that may not be clipped.
+     */
+    line(
+      casual ? longestThatFits(CASUAL_REFUSAL, contentWidth, ADVANCE_PX) : 'SUPPRESSED',
+      theme.warning,
+    );
     const reason = wrap(
-      metrics.suppressionReason ?? 'no reason given',
+      casual ? CASUAL_REASON : (metrics.suppressionReason ?? 'no reason given'),
       contentWidth,
       ADVANCE_SMALL_PX,
     );
@@ -234,7 +370,7 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
     }
   } else {
     line(
-      `rolling mean wait${metrics.rollingMeanWaitS === undefined ? '  —' : ''}`,
+      `${words.rollingMean}${metrics.rollingMeanWaitS === undefined ? '  —' : ''}`,
       theme.textDim,
     );
     if (metrics.rollingMeanWaitS !== undefined) {
@@ -254,10 +390,20 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
    * banks and thirty-five cars, where both sections wanted more than the panel had.
    */
   if (banks > 0 && bankRows === 0) {
-    const count = `${String(banks)} bank${banks === 1 ? '' : 's'}`;
+    /*
+     * *lift group* rather than *bank* in Casual, and the count keeps the same noun as the heading
+     * — a collapsed section that named a different thing from the one it is collapsing would be
+     * two vocabularies on one line, which is worse than either.
+     */
+    const noun = casual ? 'lift group' : 'bank';
+    const count = `${String(banks)} ${noun}${banks === 1 ? '' : 's'}`;
     line(
       longestThatFits(
-        [`BY BANK  ${count} — no room here`, `BY BANK  ${count} — no room`, `BY BANK  ${count}`],
+        [
+          `${words.byBank}  ${count} — no room here`,
+          `${words.byBank}  ${count} — no room`,
+          `${words.byBank}  ${count}`,
+        ],
         contentWidth,
         ADVANCE_SMALL_PX,
       ),
@@ -265,12 +411,13 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
       FONT_SMALL,
     );
   } else {
-    line('BY BANK', theme.textDim, FONT_SMALL);
+    line(words.byBank, theme.textDim, FONT_SMALL);
     if (banks === 0) {
-      line('nothing served yet', theme.textDim, FONT_SMALL);
+      line(words.nothingYet, theme.textDim, FONT_SMALL);
     }
     for (const bank of metrics.banks.slice(0, bankRows)) {
-      const mean = bank.meanWaitS === undefined ? 'suppressed' : `${bank.meanWaitS.toFixed(1)} s`;
+      const mean =
+        bank.meanWaitS === undefined ? words.bankSuppressed : `${bank.meanWaitS.toFixed(1)} s`;
       /*
        * The **id** yields, never the figures beside it.
        *
@@ -287,7 +434,11 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
       line(`${id}${tail}`, theme.text, FONT_SMALL);
     }
     if (bankRows < banks) {
-      line(`showing ${String(bankRows)} of ${String(banks)} banks`, theme.warning, FONT_SMALL);
+      line(
+        `showing ${String(bankRows)} of ${String(banks)} ${casual ? 'groups' : 'banks'}`,
+        theme.warning,
+        FONT_SMALL,
+      );
     }
   }
   y += GAP;
@@ -307,7 +458,7 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
    * The bank list keeps its collapsed line because that one **is** reachable, and was seen on
    * screen on Mixed-Use High-Rise and Midtown Office.
    */
-  line('CAR LOAD', theme.textDim, FONT_SMALL);
+  line(words.carLoad, theme.textDim, FONT_SMALL);
   const trackMax = loadTrackMax(frame.cars);
   const trackWidth = Math.max(20, panel.width - 90);
   const shown = carRows;

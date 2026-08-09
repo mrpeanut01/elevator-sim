@@ -3543,6 +3543,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       dayStartS: runStartOfDayS ?? DAY_START_S,
       filteredBankId: bank.filtered ? bankFilter : undefined,
+      /*
+       * The reader's disclosure level, for the live-metrics panel — GitHub issue #100, whose first
+       * checklist item is that panel and which measured it identical in the two modes. It reaches
+       * `render/overlay.ts` and nothing else on this canvas; see `SceneInput.mode` for why the
+       * header band's refusal is deliberately not wordable from here.
+       */
+      mode: state.mode,
     });
     carBadgeHits = hits.carBadges;
 

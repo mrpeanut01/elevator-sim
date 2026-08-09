@@ -1763,3 +1763,140 @@ describe('the beat’s box is hidden whole, and every class it emits has a rule'
     expect(missing, 'classes the panel emits and the stylesheet never mentions').toEqual([]);
   });
 });
+
+/**
+ * Casual asks a different question of the same sheet — GitHub issues #110 and #100.
+ *
+ * The measurement this suite exists to keep from coming back: `reportViewOf` took no mode, so the
+ * Day report was **byte-identical** in Casual and Engineer. #110 reports a 221-character delta on
+ * this tab; driven on this branch, that delta is the left rail's *hide the maths* block, which
+ * shares the tab and is not this sheet.
+ *
+ * Five claims, and the last three are the ones that keep the first two honest:
+ *
+ * 1. **The sheet moves.** Something a player reads is different.
+ * 2. **It leads with people.** Every count of people is drawn before the one cell a run may refuse.
+ * 3. **It loses nothing.** Same cells, same values, same colours, same levers, same goals —
+ *    § D299 § 2's *an entry point, never a ceiling*, asserted as an equality rather than argued.
+ * 4. **It refuses just as hard.** On a really saturating run the withheld cell still says
+ *    `withheld`, still carries no digit, still carries `core`'s own sentence, and is not softened
+ *    into a description of a busy day.
+ * 5. **Engineer is untouched.** Its grid order and its small print are asserted whole, so a change
+ *    that made Casual better by making Engineer say less would be red — § D299 § 1's test.
+ */
+describe('Casual asks a different question of the same day — issues #110 and #100', () => {
+  const both = (report: ShapedDayReport) =>
+    [
+      reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'basic'),
+      reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'advanced'),
+    ] as const;
+
+  it('is not byte-identical any more — the defect #110 measured', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    expect(JSON.stringify(casual)).not.toBe(JSON.stringify(engineer));
+    /*
+     * And specifically on the two things #100's checklist names for this tab. A test that only
+     * compared the whole view would pass a change that moved a heading and nothing a reader reads.
+     */
+    expect(casual.figures.map((cell) => cell.note)).not.toEqual(
+      engineer.figures.map((cell) => cell.note),
+    );
+    expect(casual.smallPrint).not.toBe(engineer.smallPrint);
+  });
+
+  it('draws every count of people before the cell a run may refuse', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    const at = (view: ReportView, label: string): number =>
+      view.figures.findIndex((cell) => cell.label === label);
+    for (const people of ['CARRIED', 'TOOK THE STAIRS', 'WORST WAIT', 'DEEPEST QUEUE']) {
+      expect(at(casual, people), people).toBeLessThan(at(casual, 'AVERAGE WAIT'));
+    }
+    // Engineer's own order is untouched, which is the half that makes this a reframing rather than
+    // a change of mind about what the grid should say. § D299 § 1.
+    expect(engineer.figures.map((cell) => cell.label)).toEqual([
+      'CARRIED',
+      'AWAY INSIDE A MINUTE',
+      'AVERAGE WAIT',
+      'WORST WAIT',
+      'DEEPEST QUEUE',
+      'TOOK THE STAIRS',
+      'WORK DONE',
+      'WORK PER DELIVERED LEG',
+    ]);
+  });
+
+  it('withholds nothing — same cells, same values, same colours, same levers', () => {
+    for (const recording of [clean, saturated]) {
+      const [casual, engineer] = both(reportOf(recording));
+      const cells = (view: ReportView) =>
+        [...view.figures]
+          .map(
+            (cell) => `${cell.label}=${cell.value}|${cell.colour ?? '-'}|${cell.classes.join(',')}`,
+          )
+          .sort();
+      expect(cells(casual)).toEqual(cells(engineer));
+      expect(casual.levers).toEqual(engineer.levers);
+      expect(casual.goals).toEqual(engineer.goals);
+      expect(casual.diagnosis).toEqual(engineer.diagnosis);
+      expect(casual.verdictLine).toBe(engineer.verdictLine);
+    }
+  });
+
+  it('keeps the engineer’s own sentence under every cell, byte for byte', () => {
+    for (const recording of [clean, saturated]) {
+      const [casual, engineer] = both(reportOf(recording));
+      for (const cell of engineer.figures) {
+        const drawn = casual.figures.find((candidate) => candidate.label === cell.label);
+        expect(drawn, cell.label).toBeDefined();
+        expect(drawn?.note.endsWith(cell.note), cell.label).toBe(true);
+      }
+      // The same rule one section down: the small print is led into and out of, never edited.
+      expect(casual.smallPrint).toContain(engineer.smallPrint);
+    }
+  });
+
+  it('refuses a mean just as hard in plain language, on a really saturating run', () => {
+    const [casual, engineer] = both(reportOf(saturated));
+    const cell = (view: ReportView) =>
+      view.figures.find((candidate) => candidate.label === 'AVERAGE WAIT');
+    const casualCell = cell(casual);
+    const engineerCell = cell(engineer);
+    expect(casualCell?.value).toBe(WITHHELD);
+    expect(casualCell?.value).toMatch(/^\D*$/);
+    expect(casualCell?.colour).toBe(engineerCell?.colour);
+    expect(casualCell?.classes).toEqual(engineerCell?.classes);
+    // Worded for the reader who met it, with `core`'s own reason still following it.
+    expect(casualCell?.note).toContain('There is no number here');
+    expect(casualCell?.note.endsWith(engineerCell?.note ?? '')).toBe(true);
+    // And not softened into a description of the day. `SATURATED` is the run saying the building
+    // could not cope; *a busy day* is a weaker and different claim.
+    expect(casualCell?.note.toLowerCase()).not.toContain('busy day');
+  });
+
+  it('translates the two engineer terms #100 names, without deleting either', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    for (const term of ['peak-5min', 'confidence interval']) {
+      expect(engineer.smallPrint, term).toContain(term);
+      expect(casual.smallPrint, term).toContain(term);
+    }
+    expect(casual.smallPrint).toMatch(/busiest\s+five\s+minutes/);
+  });
+
+  it('heads the levers with the question in Casual and leaves the markup’s words in Engineer', () => {
+    const [casual, engineer] = both(reportOf(clean));
+    expect(casual.leversHeading).toBe('What would make tomorrow better');
+    expect(engineer.leversHeading).toBeUndefined();
+  });
+
+  it('defaults to Engineer, so a caller describing a run gets the engineer’s words', () => {
+    const report = reportOf(clean);
+    expect(JSON.stringify(reportViewOf(report))).toBe(
+      JSON.stringify(reportViewOf(report, { kind: 'played-out' }, undefined, undefined, 'advanced')),
+    );
+  });
+
+  it('says the two views differ in wording and not in reach — § D299 § 2', () => {
+    const [casual] = both(reportOf(clean));
+    expect(casual.smallPrint).toMatch(/every figure the engineer’s view carries/);
+  });
+});

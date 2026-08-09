@@ -1055,6 +1055,13 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
         'the queues never settled, so there is no cohort to take a mean over — see the small print',
       tone: 'withheld',
       axisOnly: false,
+      /*
+       * Read off the summary, never re-derived from the prose above it. `undefined` on a recording
+       * older than schema 8, and on a run refused by `saturated` alone where `core` wrote no code:
+       * the consumer's fallback is a ground-free sentence, which is what every consumer had before
+       * codes existed. See {@link ReportFigure.suppressionGround}.
+       */
+      suppressionGround: summary.awtInvalidGround,
     };
   }
   return {

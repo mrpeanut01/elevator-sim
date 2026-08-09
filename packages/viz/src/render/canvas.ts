@@ -35,6 +35,7 @@ import type { Layout, ShaftColumn } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
 import type { BuildingMood } from './mood.js';
+import type { ViewMode } from '../mode/types.js';
 import {
   BAND_GLYPH,
   MAX_INDIVIDUAL_GLYPHS,
@@ -456,6 +457,21 @@ export interface SceneInput {
    */
   readonly mood?: BuildingMood | undefined;
   /**
+   * The reader's disclosure level, for the one thing on this canvas that has two registers.
+   *
+   * **It reaches `render/overlay.ts` and nothing else here, deliberately.** The live-metrics panel
+   * is GitHub issue #100's first checklist item and it is a panel of *labels*; the rest of this
+   * canvas is a picture, a header band whose banner is a **refusal** (`SATURATED — AWT
+   * suppressed`), and a mood line whose sentence `render/mood.ts` already words per mode from the
+   * one place that holds the mood's vocabulary. Wording the banner from here would be a second
+   * place that decides how this run's refusal is said, and `frame/overlay.ts`'s docstring records
+   * what three copies of that rule cost the last time.
+   *
+   * Defaults to `advanced` for {@link OverlayInput.mode}'s reason: a caller describing a run rather
+   * than serving a reader gets the engineer's words.
+   */
+  readonly mode?: ViewMode | undefined;
+  /**
    * Simulated seconds from midnight to `simTimeS === 0` — `docs/12` § 4.1.
    *
    * The stage's sky and its lit windows are keyed on the hour, and the hour is
@@ -608,7 +624,15 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): SceneHits {
   drawNotices(ctx, input, theme);
   drawFooter(ctx, recording, frame, layout, theme);
   if (input.overlay !== undefined) {
-    drawOverlay(ctx, { recording, frame, layout, theme, metrics: input.overlay });
+    drawOverlay(ctx, {
+      recording,
+      frame,
+      layout,
+      theme,
+      metrics: input.overlay,
+      /* Issue #100 — the one field on this canvas that has two registers. See `SceneInput.mode`. */
+      mode: input.mode,
+    });
   }
   ctx.restore();
   return { carBadges, alarm };
