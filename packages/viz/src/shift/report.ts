@@ -1240,11 +1240,28 @@ function leverPointersFor(
    */
   const outrun: string[] = [];
   if (summary.saturated) outrun.push('the backlog was still growing when the window closed');
+  /*
+   * Both clauses pluralise, and the singular is the case that was wrong — issue #134. They read
+   * `1 legs never boarded at all` and `1 riders gave up and took the stairs`, which is the count a
+   * *good* day produces and therefore the day this sheet most needs to be believed on.
+   *
+   * It matters more than a typo because of what these two clauses are about. A leg that never
+   * boarded and a rider who gave up are **two of the four outcomes this product refuses to fold
+   * together** (§ D266) — they are not "served fewer people", and they are printed here precisely so
+   * a reader cannot mistake one for the other. A sentence that reads as an unfilled template teaches
+   * the reader that this line is boilerplate, at the moment it is carrying a real and unusual fact.
+   *
+   * The `${n === 1 ? '' : 's'}` form is this file's own, used by the clean-shift line below rather
+   * than imported: `mode/disclosure.ts`'s `plural` is module-private, and exporting it to spend two
+   * words here would add a `shift/` → `mode/` edge for nothing.
+   */
   if (summary.unservedCount > 0) {
-    outrun.push(`${String(summary.unservedCount)} legs never boarded at all`);
+    const legs = summary.unservedCount;
+    outrun.push(`${String(legs)} leg${legs === 1 ? '' : 's'} never boarded at all`);
   }
   if (observations.abandoned > 0) {
-    outrun.push(`${String(observations.abandoned)} riders gave up and took the stairs`);
+    const gaveUp = observations.abandoned;
+    outrun.push(`${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} gave up and took the stairs`);
   }
   if (outrun.length > 0) pointers.set('add-a-car', listOf(outrun));
 
