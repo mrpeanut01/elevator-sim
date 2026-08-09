@@ -420,14 +420,49 @@ const MIN_GUTTER_LEFT_PX = 40;
 const MIN_GUTTER_RIGHT_PX = 44;
 
 /**
+ * Narrowest live-metrics panel that holds its own longest mandatory line — GitHub issue #115 § 6.
+ *
+ * `render/overlay.ts` draws its rows with a left inset and no width budget, so every line it
+ * writes is as wide as its own text. The longest of the fixed ones is
+ * `boarded (window) NNN legs` — 25 characters at the 12 px monospace face, 180 px — plus the
+ * panel's own 10 px inset on each side. **210 px, therefore, and not a number anybody picked.**
+ * `render/overlayRender.test.ts` asserts the two agree by drawing the panel at exactly this width
+ * and measuring every string that lands in it, which is the same way {@link MIN_RIDER_LANE_PX}
+ * is kept in step with `render/riderFigures.ts`.
+ */
+const MIN_OVERLAY_WIDTH_PX = 210;
+
+/**
  * Shrink the two gutters and the overlay until the plot has {@link MIN_PLOT_SHARE} of the canvas.
  *
- * In request order of what yields first, which is the order of how much each is *asking* for
- * beyond its own minimum: the overlay panel is a whole surface and goes first (it is
- * supplementary — `RX-05` already drops it below 900 px of canvas), then the right gutter, then
- * the left. Each stops at its own floor rather than at zero, because a gutter that cannot hold a
- * floor id is not a smaller gutter, it is a missing label.
+ * In request order of what yields first, which is the order of how much each *degrades* rather
+ * than how much it is asking for. The right gutter goes first: its landing rows aggregate, and
+ * `render/canvas.ts#drawQueueRow` already draws a shortened bar rather than dropping a count, so
+ * a narrower one says the same thing in less room. Then the overlay, then the left gutter. Each
+ * stops at its own floor rather than at zero, because a gutter that cannot hold a floor id is not
+ * a smaller gutter, it is a missing label.
+ *
+ * ## The overlay used to go first, and it went to *any* width
+ *
+ * That is issue #115 § 6, and it is one line of arithmetic. At the viewer's own 910 × 547 canvas
+ * — the one a 1600 × 1000 viewport produces — the requested 250 px panel was cut to **135.3 px**,
+ * against content up to 230 px wide. Measured, every one of these clipped at the panel's right
+ * edge: `boarded (window) 75 legs` (173 px), `main  75 legs  suppressed` (180 px),
+ * `… (full reason below the canvas)` (211 px), and `waiting now      70` (137 px). It is drawn
+ * into the canvas, so no DOM overflow check could ever have seen it.
+ *
+ * **A panel narrower than its content is not a smaller panel; it is an illegible one.** So the
+ * overlay now has a floor like everything else here, and below that floor it goes to zero rather
+ * than to something in between — `RX-05` already drops it below 900 px of canvas, and no panel is
+ * a better answer than a clipped one. Reordering is what keeps that from firing at 910: the plot
+ * still gets exactly {@link MIN_PLOT_SHARE}, so **no shaft moves and `hiddenShaftCount` is
+ * unchanged at every width** — only the split between the right gutter and the panel does.
  */
+function requestedOverlayPx(asked: number | undefined): number {
+  const width = Math.max(0, asked ?? 0);
+  return width >= MIN_OVERLAY_WIDTH_PX ? width : 0;
+}
+
 function fitGutters(
   inner: number,
   requested: { readonly left: number; readonly right: number; readonly overlay: number },
@@ -437,10 +472,12 @@ function fitGutters(
   const shortfall = (): number => want - (inner - left - right - overlay);
   if (shortfall() <= 0) return { left, right, overlay };
 
-  overlay = Math.max(0, overlay - shortfall());
+  right = Math.max(MIN_GUTTER_RIGHT_PX, right - shortfall());
   if (shortfall() <= 0) return { left, right, overlay };
 
-  right = Math.max(MIN_GUTTER_RIGHT_PX, right - shortfall());
+  // All-or-nothing under its floor. `Math.max(0, …)` alone is what produced the 135 px panel.
+  const squeezed = overlay - shortfall();
+  overlay = squeezed >= MIN_OVERLAY_WIDTH_PX ? squeezed : 0;
   if (shortfall() <= 0) return { left, right, overlay };
 
   left = Math.max(MIN_GUTTER_LEFT_PX, left - shortfall());
@@ -502,7 +539,12 @@ export function buildLayout(options: LayoutOptions): Layout {
     {
       left: options.gutterLeftPx ?? DEFAULTS.gutterLeftPx,
       right: options.gutterRightPx ?? DEFAULTS.gutterRightPx,
-      overlay: Math.max(0, options.overlayWidthPx ?? 0),
+      // Clamped on the way in as well as on the way down, so {@link Layout.overlay} carries one
+      // invariant rather than one-and-a-caveat: it is `undefined`, or it is at least
+      // {@link MIN_OVERLAY_WIDTH_PX}. A caller asking for a panel too narrow to hold its own rows
+      // is asking for the clipping the floor exists to prevent — the argument
+      // {@link LayoutOptions.headerPx} already makes one axis over.
+      overlay: requestedOverlayPx(options.overlayWidthPx),
     },
   );
 
@@ -584,9 +626,11 @@ export function buildLayout(options: LayoutOptions): Layout {
   const capacity = capacityAt(shaftGap);
   const count = Math.min(total, capacity);
   const shown = options.shafts.slice(0, count);
-  const rawWidth = count === 0 ? 0 : (available - shaftGap * (count - 1)) / count;
-  const shaftWidth = Math.max(MIN_SHAFT_WIDTH_PX, Math.min(MAX_SHAFT_WIDTH_PX, rawWidth));
-  const totalWidth = count * shaftWidth + Math.max(0, count - 1) * shaftGap;
+  const gapsWidth = Math.max(0, count - 1) * shaftGap;
+  const widthIn = (room: number): number =>
+    count === 0
+      ? 0
+      : Math.max(MIN_SHAFT_WIDTH_PX, Math.min(MAX_SHAFT_WIDTH_PX, (room - gapsWidth) / count));
 
   /*
    * Where the bank sits, and whether there is a lobby beside it.
@@ -596,9 +640,51 @@ export function buildLayout(options: LayoutOptions): Layout {
    * goes are the same question. When the answer is *no lane*, the bank goes back to being centred
    * and the whole of this is inert — which is the case every existing test in this package runs
    * through, and why none of their column coordinates move.
+   *
+   * ## The lane is *reserved*, not left over — GitHub issue #115 § 2
+   *
+   * It used to be left over, and that made the crowd unreachable on almost every building the
+   * project ships. `shaftWidth` spreads the shafts across the whole plot up to
+   * {@link MAX_SHAFT_WIDTH_PX}, so `available − totalWidth` is ~0 for any bank of three shafts or
+   * more, and the lane was therefore `undefined` on **7 of the 8 shipped buildings** at the
+   * viewer's own 910 × 547 canvas. The one that had a lane was Garden Apartments — two cars, the
+   * only bank narrow enough to leave 114 px behind — and Garden Apartments is the building whose
+   * landings are empty at every instant a reader is likely to look at. So `riderFigures.ts` was
+   * configured correctly, wired correctly, tested correctly and drew a person on **no shipped
+   * configuration that had a person to draw**. That is the shape `CLAUDE.md`'s standing
+   * requirement is about, arriving through geometry rather than through a missing call.
+   *
+   * The fix is an ordering, not a new number: ask for the bank at its natural width first, and
+   * only if that leaves no lane, ask again inside a plot that has already had
+   * {@link MIN_RIDER_LANE_PX} taken out of it.
+   *
+   * **The lane never costs a shaft, and never takes one below {@link MIN_SHAFT_WIDTH_PX}.** `count`
+   * is decided above, against the *whole* plot, and is not revisited here; the second attempt is
+   * accepted only when the same `count` shafts still stand at a legible width inside the smaller
+   * room. Mixed-Use High-Rise (16 shafts at 21 px) and Vertical City (35) fail that test and keep
+   * the picture they have — the shafts are the subject and the crowd is not allowed to hide one.
    */
-  const slack = available - totalWidth - BANK_INSET_PX - RIDER_LANE_GAP_PX;
-  const laneWidth = slack >= MIN_RIDER_LANE_PX ? Math.min(MAX_RIDER_LANE_PX, slack) : 0;
+  const naturalWidth = widthIn(available);
+  const naturalTotal = count * naturalWidth + gapsWidth;
+  const laneOverheadPx = BANK_INSET_PX + RIDER_LANE_GAP_PX;
+  const naturalSlack = available - naturalTotal - laneOverheadPx;
+
+  let shaftWidth = naturalWidth;
+  let totalWidth = naturalTotal;
+  let laneWidth = naturalSlack >= MIN_RIDER_LANE_PX ? Math.min(MAX_RIDER_LANE_PX, naturalSlack) : 0;
+  if (laneWidth === 0 && count > 0) {
+    const funded = widthIn(available - laneOverheadPx - MIN_RIDER_LANE_PX);
+    const fundedTotal = count * funded + gapsWidth;
+    const fundedSlack = available - fundedTotal - laneOverheadPx;
+    // `widthIn` clamps up to `MIN_SHAFT_WIDTH_PX`, so a bank that does not fit comes back *wider*
+    // than its room and `fundedSlack` goes short. Testing the slack rather than the width is what
+    // makes the two conditions one condition.
+    if (fundedSlack >= MIN_RIDER_LANE_PX) {
+      shaftWidth = funded;
+      totalWidth = fundedTotal;
+      laneWidth = Math.min(MAX_RIDER_LANE_PX, fundedSlack);
+    }
+  }
   const originX =
     laneWidth > 0 ? plot.x + BANK_INSET_PX : plot.x + Math.max(0, (available - totalWidth) / 2);
   const riderLane: Rect | undefined =
@@ -655,8 +741,27 @@ export function buildLayout(options: LayoutOptions): Layout {
     const isForced = forced[index] === true;
     const roomBehind = Math.abs(y - lastLabelledY) >= MIN_LABEL_PITCH_PX;
     const roomAhead = Math.abs(y - (nextForcedY[index] ?? Number.POSITIVE_INFINITY)) >= MIN_LABEL_PITCH_PX;
+    /*
+     * `roomBehind` binds a **forced** row too — GitHub issue #115 § 4.
+     *
+     * It did not, and the omission put two labels through each other on the flagship building.
+     * Vertical City's paired lobbies are forced twice over — `isTransferFloor`, and one of them
+     * `isEntrance` — and a lower/upper deck pair sits **4.4 px apart** at the viewer's own
+     * 910 × 547 canvas. Four such pairs, so `Ground lobby lower level (street entrance, lower deck
+     * boarding)` and `Ground lobby upper level (upper deck boarding)` were drawn on top of each
+     * other, and so were sky lobbies A, B and C. Measured, not inferred: the layout reported 23
+     * labelled rows of 100 and four of the gaps between consecutive ones were 4.4 px against a
+     * 14 px line box.
+     *
+     * A forced row still wins against a *strided* one — that is `roomAhead`, above, and it is
+     * untouched. What is added is that it cannot win against a row already drawn, because
+     * overstriking is not a way of showing two labels. The one that yields keeps its row, its
+     * line, its shaft and its car, and keeps {@link FloorRow.label} for the text alternative and
+     * the hover — the degradation this field's own docstring already promises, applied to the one
+     * case that was skipping it.
+     */
     const labelled =
-      stride === 1 || isForced || (index % stride === 0 && roomBehind && roomAhead);
+      stride === 1 || (roomBehind && (isForced || (index % stride === 0 && roomAhead)));
     if (labelled) lastLabelledY = y;
     return {
       floorId: floor.id,

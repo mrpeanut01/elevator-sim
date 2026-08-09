@@ -37,7 +37,7 @@ import {
   type Canvas2DLike,
 } from './canvas.js';
 import { MIN_HEADER_PX, buildLayout } from './layout.js';
-import { LOAD_ALARM, LOAD_FULL, loadColour, loadTrackMax } from './overlay.js';
+import { LOAD_ALARM, LOAD_FULL, drawOverlay, loadColour, loadTrackMax } from './overlay.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording 2D context
@@ -755,7 +755,17 @@ describe('floor rows', () => {
     expect(single.texts).not.toContain('main');
   });
 
-  it('clips a column header to its column — RV-06 at sixteen shafts', () => {
+  /**
+   * Sixteen shafts whose labels differ only at the very end — the shape that produced issue
+   * #115 § 4's `Z…`, in a fixture.
+   *
+   * Two claims, and the second is the one the issue is about. **Nothing overhangs what it names**:
+   * a per-column label is budgeted by its column and a bank heading by the span of the columns it
+   * covers. And **no two columns say the same thing**, which is the claim `fitLabel` alone could
+   * not keep: clipping `car-number-0` … `car-number-15` to a 29 px column gives sixteen copies of
+   * `car…`, and a picture of sixteen identical labels is a picture with no labels in it.
+   */
+  it('keeps sixteen column headers distinct, and inside what they name — RV-06, issue #115 § 4', () => {
     // Found by running the viewer on Mixed-Use High-Rise: sixteen shafts give each column about
     // 30 px, and `shuttle` / `office-low` ran into their neighbours into an unreadable band.
     const many = Array.from({ length: 16 }, (_, index) => ({
@@ -773,13 +783,30 @@ describe('floor rows', () => {
       layout,
       theme: DEFAULT_THEME,
     });
-    const headers = ctx.texts.filter(
-      (text) => text.startsWith('car-') || text.startsWith('shuttle') || text.startsWith('office'),
-    );
-    expect(headers.length).toBeGreaterThan(0);
+
+    // The shaft row: one text per column, at the column's own centre, inside the column's width.
     const columnWidth = layout.columns[0]?.width ?? 0;
-    for (const text of headers) {
-      expect(text.length * 7.2).toBeLessThanOrEqual(columnWidth);
+    expect(columnWidth).toBeGreaterThan(0);
+    const shaftRow = ctx.calls.filter(
+      (call) => call.op === 'fillText' && call.args[2] === layout.header.shaftY,
+    );
+    expect(shaftRow).toHaveLength(16);
+    for (const call of shaftRow) {
+      expect(String(call.args[0]).length * 7.2).toBeLessThanOrEqual(columnWidth);
+    }
+    // The point of the change: sixteen labels, sixteen different strings.
+    expect(new Set(shaftRow.map((call) => String(call.args[0]))).size).toBe(16);
+
+    // The bank row: one heading per contiguous bank, budgeted by that bank's span and not by one
+    // column — and it carries the elided prefix back, so `car-number-13` is still on the picture.
+    const bankRow = ctx.calls.filter(
+      (call) => call.op === 'fillText' && call.args[2] === layout.header.bankY,
+    );
+    expect(bankRow).toHaveLength(2);
+    const spanPx = 8 * columnWidth + 7 * 10;
+    for (const call of bankRow) {
+      expect(String(call.args[0]).length * 7.2).toBeLessThanOrEqual(spanPx);
+      expect(String(call.args[0])).toContain('car-number-*');
     }
   });
 
@@ -962,5 +989,174 @@ describe('the overlay never overlaps the plot', () => {
     if (panel === undefined) throw new Error('expected a panel');
     expect(panel.x).toBeGreaterThanOrEqual(withPanel.plot.x + withPanel.plot.width);
     expect(panel.x + panel.width).toBeLessThanOrEqual(withPanel.width);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The panel's width — GitHub issue #115 § 6
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A context that keeps the face each string was drawn at, which the shared one above does not.
+ *
+ * The panel mixes a 12 px and an 11 px monospace face, and a bound computed at the wider one is
+ * 9 % too generous for every small line — which is exactly the error `render/overlay.ts#wrap`
+ * shipped with. Measuring each string at its own face is the only way this file can claim a string
+ * fits without repeating the mistake it is here to catch.
+ */
+class FacedContext implements Canvas2DLike {
+  readonly drawn: { readonly text: string; readonly x: number; readonly advancePx: number }[] = [];
+  fillStyle = '';
+  strokeStyle = '';
+  lineWidth = 1;
+  font = '';
+  textAlign: Canvas2DLike['textAlign'] = 'start';
+  textBaseline: Canvas2DLike['textBaseline'] = 'alphabetic';
+  globalAlpha = 1;
+  save(): void {}
+  restore(): void {}
+  clearRect(): void {}
+  fillRect(): void {}
+  strokeRect(): void {}
+  beginPath(): void {}
+  closePath(): void {}
+  moveTo(): void {}
+  lineTo(): void {}
+  quadraticCurveTo(): void {}
+  arc(): void {}
+  fill(): void {}
+  stroke(): void {}
+  fillText(text: string, x: number): void {
+    // `ui-monospace` advances at 0.6 em, which is where `canvas.ts`'s 7.2 at 12 px comes from.
+    this.drawn.push({ text, x, advancePx: (Number.parseFloat(this.font) || 12) * 0.6 });
+  }
+}
+
+describe('the live metrics panel is never narrower than its own content — issue #115 § 6', () => {
+  /**
+   * The narrowest panel the layout will hand over, **found rather than transcribed**.
+   *
+   * `render/layout.ts` owns the floor; this file owns the claim that the floor is wide enough. A
+   * literal here would be a second copy of the number and the two would drift the first time the
+   * panel grew a row. The canvas is wide enough that nothing is squeezed, so what comes back is
+   * the request unchanged or nothing at all.
+   */
+  function narrowestPanelPx(): number {
+    for (let asked = 1; asked <= 600; asked += 1) {
+      const layout = buildLayout({
+        width: 2400,
+        height: 900,
+        floors: RECORDING.floors,
+        shafts: RECORDING.shafts,
+        overlayWidthPx: asked,
+      });
+      if (layout.overlay !== undefined) return layout.overlay.width;
+    }
+    throw new Error('the layout refused every panel width up to 600 px');
+  }
+
+  it('drops the panel rather than handing over a strip too narrow to read', () => {
+    const floor = narrowestPanelPx();
+    expect(floor).toBeGreaterThan(120);
+    const justUnder = buildLayout({
+      width: 2400,
+      height: 900,
+      floors: RECORDING.floors,
+      shafts: RECORDING.shafts,
+      overlayWidthPx: floor - 1,
+    });
+    expect(justUnder.overlay).toBeUndefined();
+  });
+
+  it('is what a 910 px canvas gets, which is where the clipping was measured', () => {
+    /*
+     * The failure, in one number. A 1600 × 1000 viewport gives the stage a 910 × 547 canvas, and
+     * `dev/main.ts` asks for a 250 px panel there. `fitGutters` used to shrink the **overlay**
+     * first and to any value at all, so the panel arrived **135.3 px** wide with content up to
+     * 230 px — `boarded (window) 75 legs`, `main  75 legs  suppressed` and
+     * `… (full reason below the canvas)` all clipped at its right edge, on a surface drawn into
+     * the canvas where no DOM overflow check could see them.
+     */
+    const layout = buildLayout({
+      width: 910,
+      height: 547,
+      floors: RECORDING.floors,
+      shafts: RECORDING.shafts,
+      gutterRightPx: 280,
+      overlayWidthPx: 250,
+    });
+    expect(layout.overlay?.width).toBe(250);
+    // And the plot still gets exactly the share it got before, so no shaft moved for this.
+    expect(layout.plot.width).toBeCloseTo((910 - 24) * 0.45, 6);
+  });
+
+  it('draws nothing past its own right edge, at the narrowest width it can be', () => {
+    const floor = narrowestPanelPx();
+    /*
+     * The two longest strings the panel can be asked to draw, together: a saturated run (so the
+     * suppression reason is wrapped and the "full reason below" pointer appears) on a building
+     * whose bank ids are as long as any shipped one — `mixed-use-high-rise` authors
+     * `office-low-rise`, fifteen characters.
+     */
+    const legs: readonly VizLeg[] = Array.from({ length: 30 }, (_ignored, index) => ({
+      passengerId: `p${String(index)}`,
+      originFloorId: 'G',
+      destinationFloorId: '3',
+      direction: 'up' as const,
+      arrivedAt: 10 + index,
+      boardedAt: 20 + index,
+      carId: 'office-low-rise-A',
+      bankId: 'office-low-rise-express',
+    }));
+    const saturated: VizRecording = {
+      ...RECORDING,
+      legs,
+      summary: {
+        ...RECORDING.summary,
+        saturated: true,
+        awtIsValid: false,
+        awtInvalidReason:
+          'Queue length rose by 125.7 persons (25.15/min, 21.1x the queue own scatter) over the ' +
+          '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
+          'saturated, AWT is not approximately normal and its confidence interval must be ' +
+          'suppressed.',
+      },
+    };
+    const layout = buildLayout({
+      width: 2400,
+      height: 900,
+      floors: saturated.floors,
+      shafts: saturated.shafts,
+      overlayWidthPx: floor,
+    });
+    const panel = layout.overlay;
+    if (panel === undefined) throw new Error('expected a panel');
+
+    const ctx = new FacedContext();
+    // `drawOverlay` rather than `drawScene`: the header's own right-aligned counters are drawn
+    // past `panel.x` by design and are not this panel's rows, so going through the scene would
+    // measure the wrong strings against the wrong edge.
+    drawOverlay(ctx, {
+      recording: saturated,
+      frame: frame({
+        cars: Array.from({ length: 4 }, (_ignored, index) =>
+          car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.25 * index }),
+        ),
+      }),
+      metrics: overlayAt(saturated, 100),
+      layout,
+      theme: DEFAULT_THEME,
+    });
+
+    const inPanel = ctx.drawn.filter((entry) => entry.x >= panel.x);
+    expect(inPanel.length).toBeGreaterThan(8);
+    // The pointer has to be one of them, or the reason was short enough that this proves nothing.
+    expect(inPanel.some((entry) => entry.text.startsWith('…'))).toBe(true);
+    for (const entry of inPanel) {
+      expect(
+        entry.x + entry.text.length * entry.advancePx,
+        `"${entry.text}" runs past the panel`,
+      ).toBeLessThanOrEqual(panel.x + panel.width);
+    }
   });
 });
