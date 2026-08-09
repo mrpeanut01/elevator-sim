@@ -442,9 +442,16 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
     /*
      * `quarter-end` rather than `vacation`, and Midtown rather than Garden Apartments, because both
      * choices are about the probe having something to measure: quarter-end raises the population
-     * *and* names `evening-egress`, so it moves the legs through two independent routes, and a
-     * probe that could only fail if both were broken at once is a better guard than one that
+     * **and** pulls the mix toward the lobby, so it moves the legs through two independent routes,
+     * and a probe that could only fail if both were broken at once is a better guard than one that
      * depends on a single field.
+     *
+     * **This comment said `evening-egress` and named a third route, and both halves were wrong.**
+     * § D263 moved this period onto `office-down-peak` and left the ballroom to `evening-egress`;
+     * and the template swap is not a route at all at this cell, because `office-down-peak` differs
+     * from the run's own `rise-and-fall` in nothing but `startOfDayMin`, which nothing statistical
+     * reads. Measured while closing GitHub issue #140: a period whose *only* ask is that swap
+     * produces byte-identical legs here. The two routes above are the two that bite.
      */
     states: [
       (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, calendar: null }),

@@ -30,7 +30,6 @@
  * exactly the shape of thing this repository keeps finding in its own tree.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type ConsoleMessage } from 'playwright-core';
@@ -38,36 +37,17 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * The provisioned headless shell.
+ * The gate, from the one module that owns it — GitHub issue #142.
  *
- * Named rather than downloaded: `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set in this environment and a
- * test that fetched a browser would be a test that fails behind a firewall for a reason unrelated to
- * the product.
+ * It used to be declared here and copied into five sibling files, each carrying a docstring saying
+ * it was *"kept identical"*. They were, and nothing checked. It now lives in
+ * `browserTier.test-helper.ts`, whose header carries the whole argument: the browser is **named**
+ * rather than downloaded (§ D220), a missing one **skips** rather than fails, and the skip is no
+ * longer allowed to be silent — `browserTier.test.ts`, in the always-on `viz` project, derives which
+ * registered project is wholly gated by asking which project's every file imports that module, and
+ * turns an unexpectedly gated tier in CI into a red run.
  */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-/**
- * Whether this machine has one — and what happens when it does not.
- *
- * **Skipped, not failed.** A missing browser is not a defect in this repository, and a CI job that
- * went red on a machine without one would train its owner to ignore the tier. `ELEVATOR_SIM_CHROMIUM`
- * points it somewhere else.
- *
- * A silently-skipping tier reports nothing, though, which § D220 § 4 warns about in the same breath
- * as flake. Two things stop that here: the skip prints the path it looked for, and
- * `dev/main.test.ts` — which always runs — asserts that this project is still registered in
- * `vitest.config.ts`. So the tier can be *absent* on a given machine and cannot be *deleted*
- * without a node-tier failure saying so.
- */
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
-  );
-}
+import { CHROMIUM, HAS_BROWSER } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -167,10 +147,20 @@ async function load(): Promise<Loaded> {
 
   const status = (await page.locator('#status').first().textContent()) ?? '';
   /*
-   * Read off the overlay the load left up, by the attribute the panel writes rather than by
-   * anything this file recomputes — `menuPanel.ts` puts the affordance's own id in
-   * `data-menu-control`, and drops the attribute from a row it has refused, so *is Resume in the
-   * focus ring* and *is Resume pressable* are one fact with one writer.
+   * Read off the overlay the load left up — and this comment used to describe a mechanism the code
+   * below does not use, which GitHub issue #142 found while converting the rest of the tier onto
+   * that very mechanism. It said the row was located *"by the attribute the panel writes …
+   * `data-menu-control`"*. It never was: the two lines below match on `textContent`.
+   *
+   * The correction is not to switch the code, because the attribute **cannot** answer this
+   * question. `menuPanel.ts` deliberately drops `data-menu-control` from a row it has refused — a
+   * disabled button must not be in the Tab ring — and the whole point of this reading is the
+   * refused state, `hasRun === false` on a cold load. Selecting by the attribute would find nothing
+   * and the assertion below would be about an absent row.
+   *
+   * So the text match stays, with the reason stated, and it is the one place in this tier where the
+   * words are the handle. `menu/screens.test.ts` holds every id the rest of the tier presses; this
+   * row is not among them, and that is deliberate rather than an omission.
    */
   const resume = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.menu-overlay button')];

@@ -28,28 +28,14 @@
  * button's own activation, because the arm called `preventDefault()` unconditionally.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-/**
- * The provisioned headless shell — `boot.browser.test.ts`'s constant and its reasoning, kept
- * identical so a machine that can run one tier can run both.
- */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
-  );
-}
+/** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
+import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -88,6 +74,11 @@ afterAll(async () => {
  * Through the menu rather than around it: since § D232 nothing autoplays and nothing files until
  * the overlay has been dismissed, so a test that poked the transport on a cold load would be
  * driving a state no player is ever in.
+ *
+ * The two presses are by **affordance id**, not by the row's words. Written as
+ * `hasText: 'Scenarios'` this function pressed *Start here* on every call from the wave issue #90
+ * landed in — one press, the wrong row, the overlay gone, and thirty seconds of silence on the next
+ * line. `pressMenuRow`'s docstring carries the measurement.
  */
 async function openPausedRun(): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -95,8 +86,8 @@ async function openPausedRun(): Promise<Page> {
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
-  await page.locator('.menu-overlay button', { hasText: 'Scenarios' }).first().click();
-  await page.locator('.menu-overlay button', { hasText: 'Pick a scenario' }).first().click();
+  await pressMenuRow(page, 'main.campaign');
+  await pressMenuRow(page, 'campaign.open');
   await page.locator('#tab-run').first().click();
   await page.locator('#run').first().click();
   await page.waitForTimeout(1_200);

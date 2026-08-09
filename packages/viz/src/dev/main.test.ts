@@ -1532,3 +1532,57 @@ describe('which freePlay a finished run is described by — § D318', () => {
     expect(reads.length, 'the derivation stopped matching anything').toBeGreaterThan(0);
   });
 });
+
+describe('the submit path asks the predicate its own docstring names — GitHub issue #129', () => {
+  /*
+   * A source assertion, for the reason the block above states in full and this one inherits:
+   * *"driving `submitScore` needs a mounted shell, a server double and a recorded run; that is
+   * worth building and is not this change."* Still true. What is asserted here is the one property
+   * that separates the fixed shape from the broken one, and it fails against the defect — the
+   * matched call count was **zero** before this test was written.
+   *
+   * ## What the defect was, and why an affordance is not a gate
+   *
+   * `submitScore`'s docstring has always said *"what it must not do is send a run the server cannot
+   * reproduce. `runIdentityIssues` is that predicate"*. The handler did not ask it. The only place
+   * the question was asked was `menuHost.runState`, which `menu/screens.ts` turns into a disabled
+   * row and a `rankingRefusal` sentence beside it — the right home for the *affordance*, and issue
+   * #21's own argument says so while also saying what has to sit underneath: *"this is the backstop
+   * for every route that reaches the handler anyway"*. Three of the four refusals had that backstop
+   * and the load-bearing one did not.
+   *
+   * It is load-bearing now in a way it was not. Issue #129 moved a commissioned fabric and a
+   * calendar period from *posted in silence and refused as a forgery* to *refused here by name*, so
+   * this call is what stands between two shipped features and the one accusation this product
+   * makes. A refusal that lives only in a disabled button is one keyboard route from not existing.
+   *
+   * ## Why the order is asserted and not just the presence
+   *
+   * A `runIdentityIssues` call **after** `client.submit` would satisfy a presence check and refuse
+   * nothing — the request is already gone. The ordering is the property; the presence is a
+   * precondition for stating it.
+   */
+  it('calls runIdentityIssues before it posts, not beside it', async () => {
+    const source = await readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    const start = source.indexOf('async function submitScore()');
+    const end = source.indexOf('const menuHost: MenuPanelHost', start);
+    expect(start, 'submitScore is not declared the way this test reads it').toBeGreaterThan(0);
+    expect(end, 'the end anchor moved').toBeGreaterThan(start);
+
+    const body = source.slice(start, end);
+    const asked = body.indexOf('runIdentityIssues(');
+    const posted = body.indexOf('client.submit(');
+
+    expect(
+      asked,
+      'submitScore must ask runIdentityIssues itself. `menuHost.runState` disables the button, ' +
+        'which is an affordance and not a gate — issue #21\'s own words about the refusals beside ' +
+        'this one: "this is the backstop for every route that reaches the handler anyway".',
+    ).toBeGreaterThan(-1);
+    expect(posted, 'submitScore no longer posts').toBeGreaterThan(-1);
+    expect(
+      asked,
+      'the predicate is asked after the request has already gone, which refuses nothing',
+    ).toBeLessThan(posted);
+  });
+});

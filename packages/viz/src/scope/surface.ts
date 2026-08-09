@@ -206,7 +206,10 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'field is for: shiftRunConfigOf never reads it, so parking a week moves no leg — and picking ' +
       'that assignment’s building again resumes it, which moves every leg, because its day is what ' +
       'grownBuilding’s 11 %/day is applied to. A resumed day 4 is a different run from a fresh day 1, ' +
-      'and that is the assertion issue #107’s fix is proved by.',
+      'and that is the assertion issue #107’s fix is proved by. Two writers now reach it and not one ' +
+      '(issue #125): Free Play’s Start parks the week it displaces too, through ' +
+      'dev/state.ts#withFreePlayWeek, so the same resume applies to a campaign week a free-play run ' +
+      'was started over.',
   ),
 
   /* --------------------------------------------------- viewer: authored artifacts */

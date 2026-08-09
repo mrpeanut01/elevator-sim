@@ -12,7 +12,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { contractById } from './contracts.js';
-import { ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID, openEndless, openWeek } from './week.js';
+import {
+  ENDLESS_CONTRACT_ID,
+  FREE_PLAY_CONTRACT_ID,
+  SANDBOX_CONTRACT_ID,
+  openEndless,
+  openWeek,
+} from './week.js';
 import { coachWeekLines, weekKeptLine } from './weekLabel.js';
 
 const HALF_HOUR_S = 1800;
@@ -91,6 +97,45 @@ describe('a building the reader drew', () => {
      */
     expect(coachWeekLines(openWeek('c2'), HALF_HOUR_S).label).not.toBe('Sandbox');
     expect(coachWeekLines(openWeek('vanished'), HALF_HOUR_S).label).toBe('Sandbox');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A Free Play run — GitHub issue #125
+ * -------------------------------------------------------------------------- */
+
+describe('a free play run', () => {
+  it('is named as itself rather than as the scenario whose building it borrowed', () => {
+    /*
+     * The defect this branch closes. `enterFreePlay` opened its week on
+     * `contractForBuilding(buildingId)?.id`, so a free-play run on Midtown Office carried `c2`,
+     * `contractById` resolved it, and the ribbon read **Scenario · day 1 · 0 clean shifts banked**
+     * over a run that belongs to no week and banks nothing. It is the same shape as the sandbox
+     * defect one describe up, arriving through a different writer.
+     */
+    const lines = coachWeekLines(openWeek(FREE_PLAY_CONTRACT_ID), HALF_HOUR_S);
+    expect(lines.label).toBe('Free play');
+    expect(lines.progress).toBe('30 min of demand · nothing to bank');
+    // Not the scenario branch, and not the sandbox one either.
+    expect(lines.label).not.toContain('Scenario');
+    expect(lines.label).not.toBe('Sandbox');
+    expect(contractById(FREE_PLAY_CONTRACT_ID)).toBeUndefined();
+  });
+
+  it('does not claim to start a week, because it has none to start', () => {
+    /*
+     * `weekKeptLine`'s arrival clause. *"starts a new week"* is what every other arrival says and it
+     * is the wrong claim here: `advancesTheWeek` refuses to close a day into a free-play run, so the
+     * week it would be starting can never reach day 2.
+     */
+    const line = weekKeptLine(
+      { ...openWeek('c2'), day: 4, streak: 4 },
+      openWeek(FREE_PLAY_CONTRACT_ID),
+    );
+    expect(line).toContain('Scenario 2 is kept on day 4');
+    expect(line).toContain('pick that building again and it carries on from there');
+    expect(line).toContain('Your free-play run is one run and banks nothing.');
+    expect(line).not.toContain('starts a new week');
   });
 });
 

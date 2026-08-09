@@ -34,6 +34,9 @@ import type { FloorQueue, QueuedRider, WaitBand } from '../frame/overlay.js';
 import { MOOD_GLYPH, type BuildingMood } from './mood.js';
 import { BAND_GLYPH } from './riderQueue.js';
 import { windowClause } from './runSummary.js';
+import { NO_AVERAGE_LEAD, suppressionBannerFor } from '../mode/disclosure.js';
+import { AWT_INVALID_GROUNDS } from '@elevator-sim/core/browser';
+import { VIEW_MODES, type ViewMode } from '../mode/types.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording context
@@ -1438,5 +1441,169 @@ describe('the stage is drawn in whichever palette was resolved', () => {
       (colour) => /^#[0-9a-f]{6}$/.test(colour) && luminance(colour) > 0x80 && !named.has(colour),
     );
     expect(strayBright, 'a bright fill on the dark stage that no token declares').toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The header band in Casual — GitHub issue #100, the panel the issue calls the
+ * simulation header
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What the header band is allowed to say to a Casual reader, and what it may not stop saying to an
+ * engineer.
+ *
+ * ## The measurement
+ *
+ * Driven on `vertical-city` at § D260's stated 16 %, before this lane: the whole header band was
+ * **byte-identical in both modes** — `waiting 355   boarded 1671 legs   mean wait suppressed` and
+ * `SATURATED — AWT suppressed` — while `drawOverlay`, eighty pixels below on the same bitmap, drew
+ * `RIGHT NOW … NO AVERAGE — A RESULT`. Issue #100 quotes those exact two pieces of jargon, and the
+ * wave that made the panel mode-aware left the louder line alone on a stated argument that has
+ * since gone stale. See `SceneInput.mode`.
+ *
+ * ## Four rules, and the last two are what make the first two safe
+ *
+ * 1. **The words move**, and the refusal names its ground.
+ * 2. **A refusal stays a refusal** — no number appears where one was withheld, in either register.
+ * 3. **The refusal is not softened**, and it is not narrowed to one ground either: `awtIsValid` has
+ *    five and *the building could not cope* is false on three of them (§ D319).
+ * 4. **Engineer is untouched, byte for byte**, and the default is Engineer.
+ */
+describe('the header band speaks a player’s words in Casual — issue #100', () => {
+  /** The scene's text calls, in order, at one mode. */
+  const textsOf = (recording: VizRecording, f: Frame, mode?: ViewMode): readonly string[] => {
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording,
+      frame: f,
+      layout,
+      theme: DEFAULT_THEME,
+      ...(mode === undefined ? {} : { mode }),
+    });
+    return ctx.calls
+      .filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0] ?? ''));
+  };
+
+  /** A run whose summary refuses its mean on a named ground. */
+  const refused = (ground: (typeof AWT_INVALID_GROUNDS)[number]): VizRecording => ({
+    ...RECORDING,
+    summary: {
+      ...RECORDING.summary,
+      saturated: ground === 'saturated',
+      awtIsValid: false,
+      awtInvalidGround: ground,
+      awtInvalidReason: `core’s own sentence about ${ground}`,
+    },
+  });
+
+  it('is not a vacuous sweep: the fixture really is refused, on more than three grounds', () => {
+    expect(AWT_INVALID_GROUNDS.length).toBeGreaterThan(3);
+    for (const ground of AWT_INVALID_GROUNDS) expect(meansAreSuppressed(refused(ground))).toBe(true);
+    expect(meansAreSuppressed(RECORDING)).toBe(false);
+  });
+
+  it('draws the engineer’s two refusals byte for byte, and draws them by default', () => {
+    /*
+     * § D299 § 1's test, in the file it is about: a change may make Engineer easier to use and may
+     * not make it say less. Both engineer strings are pinned as literals here — not derived from
+     * anything this lane can also edit — so a future register that "simplified" them goes red.
+     */
+    const saturated = textsOf(refused('saturated'), frame({ runningMeanWaitS: 87.7 }), 'advanced');
+    expect(saturated).toContain('SATURATED — AWT suppressed');
+    expect(saturated.some((text) => text.includes('mean wait suppressed'))).toBe(true);
+
+    const censored = textsOf(refused('censored'), frame({ runningMeanWaitS: 87.7 }), 'advanced');
+    expect(censored).toContain('AWT suppressed');
+    expect(censored).not.toContain('SATURATED — AWT suppressed');
+
+    // The default is the engineer's header, byte for byte — `OverlayInput.mode`'s rule, applied to
+    // the band above it, so an export or a describing caller gets the engineer's words.
+    for (const recording of [RECORDING, refused('saturated'), refused('abandoned')]) {
+      expect(textsOf(recording, frame())).toEqual(textsOf(recording, frame(), 'advanced'));
+    }
+  });
+
+  it('replaces both of them in Casual, and says which ground refused the mean', () => {
+    for (const ground of AWT_INVALID_GROUNDS) {
+      const casual = textsOf(refused(ground), frame({ runningMeanWaitS: 87.7 }), 'basic').join('\n');
+      // The jargon the issue names is gone…
+      expect(casual, ground).not.toContain('AWT suppressed');
+      expect(casual, ground).not.toContain('SATURATED');
+      expect(casual, ground).not.toContain('mean wait');
+      // …and what replaces it is the refusal for *this* ground, from the one table that holds it.
+      expect(casual, ground).toContain(suppressionBannerFor(ground));
+      expect(casual, ground).toContain(NO_AVERAGE_LEAD.toLowerCase());
+    }
+  });
+
+  it('tells the five grounds apart on the banner, which the engineer’s line does not', () => {
+    /*
+     * Casual says **more** here, and that is allowed and deliberate: `SATURATED — AWT suppressed`
+     * against `AWT suppressed` separates saturation from the other four and stops. Nothing was
+     * taken off the engineer's line to pay for it — the test above pins both of its strings.
+     */
+    const banners = AWT_INVALID_GROUNDS.map((ground) =>
+      textsOf(refused(ground), frame(), 'basic').find((text) => text.startsWith(NO_AVERAGE_LEAD)),
+    );
+    for (const banner of banners) expect(banner).toBeDefined();
+    expect(new Set(banners).size).toBe(AWT_INVALID_GROUNDS.length);
+  });
+
+  it('refuses just as hard: no mean is drawn in either register, on any ground', () => {
+    // The defect this header already had once, asked again of the new register. `87.7` is the
+    // running mean the frame carries; a mode may not become the surface that leaks it.
+    for (const ground of AWT_INVALID_GROUNDS) {
+      for (const mode of VIEW_MODES) {
+        const text = textsOf(refused(ground), frame({ runningMeanWaitS: 87.7 }), mode).join('\n');
+        expect(text, `${ground}/${mode}`).not.toContain('87.7');
+      }
+    }
+  });
+
+  it('never softens the refusal into a mood, and never claims a ground the run may not have', () => {
+    // § D319's finding, at banner width. *The building could not cope* is true of one ground in
+    // five, so no line drawn for all five may say it — and *a busy day* is weaker than any of them.
+    for (const ground of AWT_INVALID_GROUNDS) {
+      const casual = textsOf(refused(ground), frame(), 'basic').join('\n');
+      expect(casual, ground).not.toMatch(/busy day|could not cope|no big deal/i);
+    }
+  });
+
+  it('keeps every count the engineer’s header carries, and keeps `legs` a leg', () => {
+    /*
+     * Casual removes nothing. The two counters are the same numbers in the same order; only the
+     * word in front of the first moves. `legs` stays in both registers on
+     * `render/overlay.ts#CASUAL_WORDS`' own precedent — a rider who transfers boards twice, so
+     * drawing the count as *people* would be a false figure rather than a friendlier one.
+     */
+    const f = frame({ totalWaiting: 41, boardedLegs: 137 });
+    const casual = textsOf(RECORDING, f, 'basic').join('\n');
+    const engineer = textsOf(RECORDING, f, 'advanced').join('\n');
+    for (const text of [casual, engineer]) {
+      expect(text).toContain('41');
+      expect(text).toContain('boarded 137 legs');
+    }
+    expect(casual).toContain('people waiting 41');
+    expect(engineer).toContain('waiting 41');
+    // The quotable mean survives the translation, to the same decimal.
+    expect(engineer).toContain('mean wait so far 18.3 s');
+    expect(casual).toContain('average wait so far 18.3 s');
+  });
+
+  it('leaves the rest of the scene alone — the mode moves the header and the panel, nothing else', () => {
+    /*
+     * The scope claim on `SceneInput.mode`, checked rather than asserted. Without an overlay the
+     * only mode-sensitive strings on this canvas are the three in the header band, so the two
+     * transcripts must differ by exactly the lines this lane wrote and by no floor label, no car
+     * badge and no footer.
+     */
+    const f = frame({ totalWaiting: 41, boardedLegs: 137 });
+    const casual = textsOf(refused('saturated'), f, 'basic');
+    const engineer = textsOf(refused('saturated'), f, 'advanced');
+    expect(casual.length).toBe(engineer.length);
+    const moved = casual.filter((text, index) => text !== engineer[index]);
+    expect(moved.length).toBe(2);
   });
 });

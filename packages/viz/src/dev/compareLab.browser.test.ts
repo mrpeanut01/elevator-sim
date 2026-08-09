@@ -48,25 +48,14 @@
  * re-baselining, which is a control that trains its owner to override it.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-/** The provisioned headless shell — `boot.browser.test.ts`'s rule, and its default path. */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
-  );
-}
+/** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
+import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -109,11 +98,19 @@ beforeAll(async () => {
   );
   /*
    * The main menu covers the page on load, and the tester's own first step was dismissing it —
-   * *Scenarios → Open the doors*. Walked here rather than hidden with a style, because a test that
-   * reached past the overlay would be asserting about a page no player can be looking at.
+   * Scenarios, then the row that opens the board. Walked here rather than hidden with a style,
+   * because a test that reached past the overlay would be asserting about a page no player can be
+   * looking at.
+   *
+   * By affordance id since issue #142. This pair was green, and green for a reason that was about to
+   * stop being true: `.menu-row` happened to exclude the recommended row that broke three sibling
+   * files, because a `commit` affordance draws as `.menu-start`, and `.menu-start` happened to have
+   * the row this wants first on the campaign screen. Both are positions rather than names. The
+   * second half of the comment above was also already stale — *Open the doors* has been *Pick a
+   * scenario* since issue #97.
    */
-  await page.locator('.menu-row', { hasText: 'Scenarios' }).first().click();
-  await page.locator('.menu-start').first().click();
+  await pressMenuRow(page, 'main.campaign');
+  await pressMenuRow(page, 'campaign.open');
   await page.waitForFunction(
     () => (document.querySelector('.menu-overlay') as HTMLElement | null)?.hidden === true,
     undefined,

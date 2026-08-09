@@ -4,10 +4,30 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-09 · **9 of the play-test backlog remain open**, down from 29 — plus the
-**8 filed from findings**, so 17 open in total · branch `integration/issue-wave-15` ·
-`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 124 files, 2 980 tests,
-exit 0**.
+**Snapshot:** 2026-08-09, after **wave 18** · branch `integration/issue-wave-18` ·
+`npm run typecheck` **clean** · `--project viz` **131 files, 3 213 passed, 1 skipped** ·
+`--project core --project server --project cli` **128 files, 2 809 passed** ·
+`--project viz-browser` **7 files, 44 passed**, run twice — a tier that was **8 red and running
+nowhere** when the wave opened · honesty **both tiers green**, 335 950 always-on / 426 662 deep,
+measured once on the integrated tree.
+
+**Wave 18 closed #100, #124, #125, #129, #140 and #143**, and filed **six** from findings —
+#142–#147. Wave 17 closed #135, #136, #137 before it.
+
+**The wave's headline is the same one the last three had, and it is getting hard to call it a
+coincidence: five of six lanes found the issue's own claim to be wrong.** #100's two quoted
+symptoms both pointed at the wrong surface; #124's premise (*this tier cannot check contrast*) was
+false and both classes already passed; #125's prescribed mechanism was a **no-op** and the lane said
+so rather than substituting silently; #129's boundary check came back the opposite of what the issue
+assumed and the shape was decided by a **measurement** instead; #140's list of affected periods was
+half the real set; #142's diagnosis (*copy drift*) was right about the symptom and wrong about the
+cause in 7 of 8 cases.
+
+**Two defects existed only in the merge, and neither branch could have seen them** — both files were
+green alone. `noteContrast.browser.test.ts` carried the seventh private copy of a gate that #142 had
+just consolidated (the guard caught it by design, naming the file), and its `port: 0` collided with
+`boot.browser.test.ts` on Vite's default 5173 once the tier had seven concurrent files. That is why
+the suite is re-run after every **merge**, not after every branch.
 
 **Twenty issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
 #102, #104, #92, #99 and #118** in wave 14, and **#90, #115 and #103** in wave 15. **Seven of seven carried a claim that did not survive
@@ -168,3 +188,40 @@ Recorded so no engineer implements them. **Every one of these would have caused 
 | **N-4** | Enter does not submit; Tab-then-Enter is broken | **No longer reproduces.** Closed by #106's fix — `implicitSubmit()` and the third `restoreFocus` branch. Tested at both tiers |
 | **#116** | The two saturating buildings are Midtown and Vertical City | **Unconfirmed at my configuration** (I measured Midtown + Mixed-Use). Shape and count confirmed; the specific pair needs reproduction on #116's own terms |
 | **#116** | "There is no economy … a shaft **is** free, and instant" | **Refuted.** *Commission the building* is a capital-budget mechanic with a fixed capital-unit ceiling, locked in before the week. **#116 missed that screen twice** — also when claiming speed is only editable behind *Save as a new building*. Rescope §3 to "surface the economy that exists" |
+
+---
+
+## Wave 18 — claims that did NOT survive verification
+
+Same table as above, kept separate because the wave is recent and the entries are dense. **Every one
+of these would have caused wasted or harmful work**, and three would have shipped a new defect.
+
+| issue | claim | finding |
+|---|---|---|
+| **#100** | The live-metrics header still prints `SATURATED` / `AWT suppressed` in Casual | **Half wrong, and the half matters.** That panel has been Casual since `21a0c17`. The surface still printing it is `render/canvas.ts#drawHeader`'s **header band** — a different function, drawn into the bitmap. Fixing "the panel" would have changed a surface that was already correct |
+| **#100** | The dispatcher cards show `cost = 1.00 times wait` | **Not reproduced on the rail, in either mode, on any of 13 profiles.** The string is real and lives in the dispatcher **editor** (`authoring/dispatcherSpec.ts#weightSummaryOf`). Misattributed, not false — filed as **#146** |
+| **#100** | (implied by § D319) the panels cannot see the mode, so the gap is structural | **False here.** `mountRightRail` has had `state.mode` for waves and `SceneInput.mode` reached `drawOverlay`. Nobody had written the other register. The § D319 precedent did not transfer |
+| **#124** | A document-tier test has no stylesheet to resolve, so this needs a browser | **False.** Joining a static stylesheet parse to a mount-driven run of the shipped panels produces real ratios with no browser. The browser was worth having as *confirmation*, not as the only option |
+| **#124** | The nine change-scope notes are unverified and may fail contrast | **Unfounded for both classes.** `.advice` 7.21 dark / 8.25 light, `.rail-prose` 6.35 / 5.92 — § D235 had already raised the ink ladder past AA. Nothing in the product changed. What was missing was anything that would *notice* if one of them stopped |
+| **#125** | Park the week "exactly as `withBuilding`'s `switchWeek(…, 'resume')` already does" | **Not implementable as written** — that call is a **no-op** on the same contract id (first line returns). Worse, a hand-rolled park under the borrowed id breaks § D312's invariant and drops the campaign week on the next building change. The free-play week needed an id of its own |
+| **#125** | `enterFreePlay` lives in `dev/state.ts` | Wrong file — `menu/enterFreePlay.ts` |
+| **#129** | `permits` is what lets the two fields through | **Two routes, not one.** `viewer.selectorSpec` is `within-day`, which `ranked` already forbids, and it still reached the submit button because the `switch` had no arm and fell to `default: return undefined`. A third field with the same defect, found by the exhaustiveness assertion |
+| **#129** | `runIdentity.ts`'s docstring: *"`runIdentity.test.ts` asserts the two agree"* | **No such assertion existed.** Nothing in `packages/viz` referred to `carriesState` at all. The mechanism that should have caught #129 on the day the fields landed was a sentence |
+| **#129** | (assumed) the `server → viz` boundary forbids carrying the fields | **Permissive** — § D214 § 3 says so, and it was measured by wiring it up (`tsc -b` exit 0, import in 73 ms). So the shape was decided by **soundness** instead: a commissioning choice is a building edit on the wire, and 16 shafts turn a 23.00 s mean wait into **6.58 s** with nothing objecting |
+| **#140** | `vacation` and `public-holiday` are the affected periods | **Four of five**, not two. `quarter-end` and `rota-week` are unmentioned and equally affected |
+| **#140** | Reuse `calendarLine` for the sentence | **Does not work as stated** — it needs a `CalendarPatch`, which needs a building, and the only owner throws on a building `data/buildings/` does not ship, which is the exact state the predicate exists to describe |
+| **#140** | Periods swap the demand template, so that axis is live | **Not always.** `office-down-peak` differs from `rise-and-fall` only in `startOfDayMin`, which nothing statistical reads, so `quarter-end`'s swap moves no leg at an unwindowed cell. Filed as a data question |
+| **#142** | The failures are copy drift — the labels changed | **Right about the symptom, wrong about the cause in 7 of 8.** `'Pick a scenario'` still exists verbatim. The real fault is that Playwright's `hasText` is a case-insensitive substring over the whole `textContent`, and issue #90's recommended row reads *"it opens the scenarios board"* — so `.first()` pressed **Start here**, which closes the menu. Updating the string literals would have fixed nothing |
+| **#142** | (2 of 8) a menu label changed | **Stale ordinal, product correct.** `#dispatcher-list .pick` `nth(2)` is now `collective`, which § D134 made the opening dispatcher, so the panel correctly answered with a **disabled** *Already driving* button |
+| **#143** | `role="status"` suggests the note should be quieter than a warning | **Refuted, and by the other surface.** The role governs how an assistive technology *interrupts*; the class governs the register it *reads* in. The editor's `#ed-access-note` carries `warn` alone and has always drawn in `--warn`, so the two surfaces § 10.3 requires were rendering one fact in two registers |
+
+## Wave 18 — findings recorded rather than fixed
+
+| id | finding | disposition |
+|---|---|---|
+| **W18-1** | `dispatcherPlateOf`'s help said the library declares **twelve** terms beside a value reading `1 of 13` | Fixed in the #100 lane |
+| **W18-2** | `keyedPlate` hashed key+value only, so **a mode toggle never redrew** a plate whose Casual lead lives in `help` — true of `buildingPlateOf` since issue #71, meaning Casual's building-plate text has been shipping unreachable | Fixed in the #100 lane. **Worth confirming in a browser** |
+| **W18-3** | `boot.browser.test.ts`'s comment claimed the Resume row is found *"by the attribute the panel writes"*. It never was — and it must keep matching text, because `menuPanel.ts` deliberately drops the attribute from a refused row and the refused state is what that reading is about | Comment fixed in place; the code was right. CLAUDE.md's *stated mechanism goes stale* in a test file |
+| **W18-4** | ~80 more legs tests across 23 files run real simulations at vitest's default 5 s | #144 fixed the three known sites. The general static check is **not honestly buildable** — a name-level call graph gave **1 881** false positives, and even a correct one asks the wrong question, since most simulations run at module scope. The total alternative is `testTimeout` on the `viz` project, a repo-wide config decision |
+| **W18-5** | `PROVISIONED_FALLBACK` points at a path that exists on no machine this repo has been measured on | Kept, with its status stated as documentation rather than a usable default |
+| **W18-6** | Two `.primary` buttons in one `.editor-actions` row, so the run verb must be located by exclusion | Left alone — giving it an id is a product change, and this was a test-repair lane |

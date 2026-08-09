@@ -30,7 +30,41 @@ const alias = {
   '@elevator-sim/viz': src('viz'),
 };
 
-const project = (name: string) => ({
+/**
+ * How long a test in a simulating project may take — GitHub issue #144.
+ *
+ * **A default rather than an annotation, because the annotation is a list and the list is the
+ * defect.** Vitest's own default is 5 000 ms, and a test that runs a real simulation does not fit
+ * in it under load: two were reported flaking, a third with identical exposure sat twelve lines
+ * from one of them, and a static survey found roughly **82 more** across 23 files that call
+ * `recordRun`, `runSimulation` or `legsOf` and pass no timeout. Annotating all of them is total by
+ * *inspection* — it fixes today's 82 and not the 83rd, which is written tomorrow by somebody who
+ * has never read this paragraph.
+ *
+ * **The number is measured, not chosen.** Over a full `--project viz` run, 3 193 of 3 213 tests
+ * finish inside 2.4 s and only ten exceed the old 5 s default at all; the slowest legitimate test
+ * is **49.4 s**. So 300 000 ms is about six times the observed maximum, which is the headroom this
+ * suite actually needs — it runs on a machine hosting several parallel worktrees by design, so
+ * *under load* is the normal condition here rather than the exceptional one. It is also the value
+ * **113 sites in `packages/viz` had already converged on** independently, so the default is what
+ * the suite was telling us it wanted, rather than a new opinion.
+ *
+ * **What it costs, stated rather than glossed.** A genuinely hung pure-function test now takes five
+ * minutes to fail instead of five seconds. That is the real price and it is worth paying: a hang is
+ * a bug you find once and fix, while a 5 s ceiling under load is a false red that recurs forever and
+ * trains people to re-run the suite instead of reading it.
+ *
+ * **The 113 explicit annotations are deliberately left in place.** They are now redundant, and
+ * removing them would be 113 edits whose only effect is to make those sites depend silently on a
+ * line in another file. A site that knows it runs a simulation is allowed to say so.
+ *
+ * A per-test static check was **considered and rejected as the mechanism** — see § D331. A
+ * name-level call graph produced 1 881 false positives, and even a correct one cannot tell a test
+ * that runs a simulation from one that reads a recording module scope already ran.
+ */
+const SIMULATING_TIMEOUT_MS = 300_000;
+
+const project = (name: string, timeoutMs?: number) => ({
   resolve: { alias },
   test: {
     name,
@@ -41,6 +75,7 @@ const project = (name: string) => ({
     environment: 'node' as const,
     // Packages legitimately have no tests until their phase lands.
     passWithNoTests: true,
+    ...(timeoutMs === undefined ? {} : { testTimeout: timeoutMs, hookTimeout: timeoutMs }),
   },
 });
 
@@ -49,11 +84,19 @@ export default defineConfig({
   test: {
     passWithNoTests: true,
     projects: [
+      /*
+       * `core` measures the same way `viz` does — 8 tests over 5 s, slowest **39.2 s** — so it has
+       * the same exposure and is covered today only by its own explicit annotations. It is left on
+       * vitest's default **deliberately and not by oversight**: issue #144 reported flakes in `viz`
+       * and the survey that justified the number above was taken over `packages/viz/src`, so
+       * widening to `core` here would be a change nobody has evidence for yet. Filed rather than
+       * done, so the next person meets a decision instead of a divergence.
+       */
       project('core'),
       project('experiments'),
       project('server'),
       project('cli'),
-      project('viz'),
+      project('viz', SIMULATING_TIMEOUT_MS),
       /*
        * The browser tier — `DECISIONS.md` § D220, and the only project here that is not hermetic.
        *

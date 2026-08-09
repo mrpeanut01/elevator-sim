@@ -873,6 +873,15 @@
       .segmented button[aria-selected='true'] { background: var(--raised); color: var(--text); }
       .rail-panel[hidden] { display: none; }
       .rail-prose { font-size: 11.5px; color: var(--dimmer); line-height: 1.5; margin: 0 0 10px; }
+      /* Two classes, so it wins on specificity rather than on source order — GitHub issue #143.
+         `#rail-access-note` is authored `class="rail-prose warn"`, and `.warn` is declared ~400
+         lines above `.rail-prose`. Both are single-class selectors, so they tied at (0,1,0) and the
+         later rule took it: the one note docs/10 § 10.3 calls a *warning* rendered as ordinary dim
+         prose, while the editor's counterpart `#ed-access-note` — `class="warn"` alone, nothing to
+         tie with — rendered the same fact in `--warn`. One fact, two surfaces, two registers.
+         Written as a compound rather than by moving `.warn` later, because moving it would fix this
+         pairing by luck and re-break on the next class declared below it. */
+      .rail-prose.warn { color: var(--warn); }
 
       /* --- The report sheet, § 1.3 M6 --- */
       .report { max-width: 760px; }
@@ -2491,7 +2500,22 @@
             <!-- docs/10 § 10.3 — the dispatcher compatibility note, stated BEFORE Run rather than
                  diagnosed after it. `role="status"` and not `role="alert"`: it is a fact about the
                  pairing on screen, not an error, and Run stays enabled (ED-15). Empty when there is
-                 nothing to say, which is every building that declares no access zone. -->
+                 nothing to say, which is every building that declares no access zone.
+
+                 `warn` is deliberate and `role="status"` is not evidence against it — GitHub issue
+                 #143. They answer different questions: the role sets how an assistive technology
+                 *interrupts* (politely, because nothing has gone wrong), and the class sets the
+                 register the sentence *reads* in. Choosing `status` over `alert` says the note must
+                 not barge in; it says nothing about whether it should look like a caution. Four
+                 things say it should: docs/10 § 10.3 is titled "the dispatcher compatibility
+                 **warning**" and calls it "a warning rather than a block";
+                 `access/dispatcherCredentials.ts` returns the sentence in a field named `warning`;
+                 the editor's counterpart `#ed-access-note` has always rendered it in `--warn`; and
+                 the fact itself is that some riders cannot be carried at all.
+
+                 Until #143 the class was inert — see the `.rail-prose.warn` rule for the tie it
+                 lost — so this paragraph claimed a register the screen did not deliver, which is
+                 § D227's shape living in a stylesheet. -->
             <p class="rail-prose warn" id="rail-access-note" role="status"></p>
             <button type="button" class="ghost" id="rail-open-dispatcher">Open dispatcher editor →</button>
           </div>

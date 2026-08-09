@@ -29,13 +29,33 @@
  * It is also what makes a free-play run **postable at all**. The leaderboard verifies by replaying
  * the submitted selection on the server's own `data/`, and a run carrying growth or an event cannot
  * reproduce — so before this, an honest submission would have been rejected as a forgery.
+ *
+ * ## Reset, and the week it replaced is **put down rather than dropped** — GitHub issue #125
+ *
+ * The reset above is unchanged and is not the defect. What was wrong is what happened to the week it
+ * displaced: this function wrote `week:` in its own returned object, *after* `withBuilding` had
+ * already decided one, so the departing week went nowhere. `dev/state.ts#withFreePlayWeek` now owns
+ * that transition and carries the whole argument, including why the obvious one-line repair is a
+ * measured no-op.
+ *
+ * **Two sentences that used to be here are withdrawn rather than moved**, because both are now
+ * false of the code:
+ *
+ * - *"`contractForBuilding` keeps the scenario label honest for a building that has one"* — it did
+ *   the opposite. A free-play run on `midtown-office` carried `c2`, so `contractById` resolved,
+ *   the coach ribbon read **Scenario · day 1** and the rail read **0/3 banked this scenario** over a
+ *   run that banks nothing and belongs to no week. A free-play week now carries
+ *   `shift/week.ts#FREE_PLAY_CONTRACT_ID`, which resolves to no contract, and both surfaces say so.
+ * - *"`openWeek` rather than `{ ...week, day: 1 }`"* — the distinction is kept and the function is
+ *   not. `switchWeek`'s `restart` arrival is `takeContract`, which is `openWeek` plus one field:
+ *   `completed`, every scenario the player has ever cleared. Carrying it is a **fix** rather than a
+ *   side effect — `openWeek` emptied it, so a player who entered free play and then took a scenario
+ *   card had their clearing record wiped in memory by `takeContract`'s own carry-across.
  */
 
 import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
-import { openWeek } from '../shift/week.js';
-import { contractForBuilding } from '../shift/contracts.js';
 import type { BrowserResources } from '../dev/data.js';
-import { withBuilding, type ViewerState } from '../dev/state.js';
+import { withBuilding, withFreePlayWeek, type ViewerState } from '../dev/state.js';
 
 import { canStart } from './menu.js';
 import type { FreePlaySelection, MenuCatalogue } from './types.js';
@@ -60,15 +80,31 @@ export function enterFreePlay(
    * week to the building's own scenario, and re-seeding the building editor's draft only when that
    * draft is pristine. Re-implementing either here would be the second answer to a question
    * `dev/state.ts` has already answered.
+   *
+   * Then `withFreePlayWeek`, which is the same sentence applied to the week — GitHub issue #125.
+   * This line was `week: openWeek(contractForBuilding(selection.buildingId)?.id)` in the object
+   * below, and a spread that overwrites what `withBuilding` just decided is a second answer wearing
+   * the first one's clothes: on the campaign's **own** building it discarded the week the player had
+   * been banking against, and on any other it discarded the destination week `switchWeek` had just
+   * resumed. Both are now put down rather than dropped, and the whole argument is in
+   * `dev/state.ts#withFreePlayWeek`.
    */
-  const withNewBuilding = withBuilding(state, resources, selection.buildingId);
+  const withNewBuilding = withFreePlayWeek(withBuilding(state, resources, selection.buildingId));
 
   return {
     ...withNewBuilding,
     /*
-     * Named, not inferred. The week this returns keeps the building's contract id — `openWeek`
-     * below — so *"no contract"* has never meant *"no week"*, and the report's own defect was
-     * exactly that inference. `docs/16` S1.
+     * Named, not inferred — `docs/16` S1, and the reason it is named survived issue #125 while its
+     * evidence did not.
+     *
+     * It read: *"the week this returns keeps the building's contract id, so 'no contract' has never
+     * meant 'no week', and the report's own defect was exactly that inference."* The first clause is
+     * no longer true — a free-play week carries `FREE_PLAY_CONTRACT_ID` and resolves to nothing — and
+     * the rule it was arguing for is now **more** load-bearing rather than less: with the contract
+     * gone, a consumer could derive *single run* from *no contract* and be right for every case that
+     * exists today, then be silently wrong the first time a sandbox run needs a sheet of its own.
+     * `shift/report.ts` makes the same argument about `ReportSubject` at more length: a required
+     * field cannot be forgotten by the next mode that arrives.
      */
     playMode: 'free-play',
     /*
@@ -103,15 +139,6 @@ export function enterFreePlay(
       demandTemplateId: selection.demandTemplateId,
       arrivalRatePctPop5min: selection.arrivalRatePctPop5min,
     },
-    /*
-     * Day one, and a fresh week — S6.
-     *
-     * `openWeek` rather than `{ ...week, day: 1 }`: the streak, the banked count and the seven-day
-     * history belong to a campaign week, and carrying them into a free-play run would put somebody
-     * else's sparkline under a run that is not part of that week. `contractForBuilding` keeps the
-     * scenario label honest for a building that has one, and leaves it alone for one the reader drew.
-     */
-    week: openWeek(contractForBuilding(selection.buildingId)?.id),
     /*
      * The two `within-day` fields Free Play does not offer — and the argument for clearing them is
      * *not* S6, which is worth stating because the obvious reading gets it backwards.

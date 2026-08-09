@@ -240,6 +240,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * player reads about the template it names is drawn elsewhere and driven elsewhere.
          */
         'dev/state.ts#shiftSubmittedSelection',
+        /*
+         * Its issue #140 sibling, and derived for the same reason as the two above and no other:
+         * it returns that same template id — `rise-and-fall` — inside a record of three other
+         * values, and the scanner reads the hyphen as a word break.
+         *
+         * It authors no sentence at all. What it produces is the four *inputs*
+         * `shift/calendar.ts#calendarAsks` decides a period's asks against, so that
+         * `scope/runIdentity.ts` and `shiftRunConfigOf` cannot disagree about whether a period's
+         * mix bias reached the run — a refusal naming a bias the engine withheld being the
+         * wrong-reason failure § D227 rates below the gap it fixes. The prose a player reads about
+         * a period is `calendarLine`'s caption, driven by the shift surfaces, and the refusal
+         * built from these fields is `runIdentityIssues`', excluded below under its own name.
+         */
+        'dev/state.ts#calendarAskInputOf',
         'dev/state.ts#shiftRunConfigOf',
         /*
          * § D231's three, here for `enterFreePlay`'s reason above and no other: the scanner reads
@@ -254,6 +268,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#advancesTheWeek',
         'dev/state.ts#closedWeekOf',
         'dev/state.ts#weeksForSession',
+        /*
+         * The fourth of the same shape — GitHub issue #125. `FREE_PLAY_CONTRACT_ID` is the string
+         * `free-play`, and it is derived for the one reason every id above it is: the hyphen reads
+         * as a word break. Its two siblings in the same file, `ENDLESS_CONTRACT_ID` and
+         * `SANDBOX_CONTRACT_ID`, are not derived at all, because `endless` and `sandbox` carry no
+         * separator — which is the whole of the difference between them.
+         *
+         * What a player *reads* about a week carrying it is `coachWeekLines`' fourth branch —
+         * **Free play** on the eyebrow — and that is driven rather than excused: `surfaces.ts`
+         * renders `coachWeekLines` on a free-play week beside the scenario, endless and sandbox
+         * ones, for the reason that sweep already states about the branches nothing could print.
+         */
+        'shift/week.ts#FREE_PLAY_CONTRACT_ID',
       ],
     },
     {
@@ -301,6 +328,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'scope/permits.ts#permits',
         'scope/commitment.ts#COMMITMENTS',
         'scope/commitment.ts#commitmentOf',
+        /*
+         * GitHub issue #129's two, and both are the `SCOPE_OF` case above rather than a new one.
+         *
+         * `EXPRESSIBLE_IN_A_SELECTION` names the `between-games` fields a `RunSubmission` and a deep
+         * link carry, one row per field, and its values are **developer** prose in exactly
+         * `SCOPE_OF.why`'s sense: each is the argument for why that field travels, addressed to
+         * whoever changes the wire, and it reaches no screen. `runIdentity.test.ts` decides whether
+         * a row is true by reading `packages/server/src/leaderboard/submission.ts`'s own source,
+         * which is a stronger check than a string search over a sentence no player reads.
+         *
+         * `fieldsAnsweredFor` returns `SurfaceKey`s and field names — `viewer.commissioning`,
+         * `outOfServiceCarIds` — and authors no sentence at all. It is derived only because the
+         * hyphen and the dot read as word breaks, which is the same false positive `commitmentOf`
+         * is excluded for two lines up.
+         */
+        'scope/runIdentity.ts#EXPRESSIBLE_IN_A_SELECTION',
+        'scope/runIdentity.ts#fieldsAnsweredFor',
       ],
     },
     {
@@ -311,8 +355,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'directly above it and inherits its limitation too: swept statically, not driven, which is ' +
         'weaker and is said rather than dressed up. What changed is that the better fix got ' +
         'cheaper — these sentences are now produced by a pure function of a state and the loaded ' +
-        'resources, so the adapter that exclusion has been asking for no longer needs a document.',
-      ids: ['scope/runIdentity.ts#runIdentityIssues'],
+        'resources, so the adapter that exclusion has been asking for no longer needs a document. ' +
+        '`CARRY_CHECKS` is the same sentences and not a second set: GitHub issue #129 moved the ' +
+        'body of `runIdentityIssues`’ `switch` into a table keyed by field, so that the key set ' +
+        'became a value a test could compare against the fields the walk visits — the assertion ' +
+        'this module’s docstring claimed and did not have. Every string in it is returned by ' +
+        '`runIdentityIssues` and by nothing else, so it reaches a reader by exactly the route above ' +
+        'and is accounted for by exactly the same limitation.',
+      ids: ['scope/runIdentity.ts#runIdentityIssues', 'scope/runIdentity.ts#CARRY_CHECKS'],
     },
     {
       reason:

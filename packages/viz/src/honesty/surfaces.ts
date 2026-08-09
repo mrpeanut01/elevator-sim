@@ -183,6 +183,7 @@ import {
 import {
   buildingPlateOf,
   dispatcherBlurbOf,
+  dispatcherCardOf,
   dispatcherFamilyOf,
   dispatcherNoteOf,
   dispatcherPlateOf,
@@ -264,7 +265,14 @@ import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/no
 import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
-import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
+import {
+  FREE_PLAY_CONTRACT_ID,
+  closeDay,
+  nextDay,
+  openEndless,
+  openWeek,
+  outcomeOf,
+} from '../shift/week.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
@@ -755,6 +763,15 @@ const CANVAS: SurfaceAdapter = {
     'render/canvas.ts#fitLabel',
     'render/overlay.ts#drawOverlay',
     /*
+     * The header banner's Casual refusal — GitHub issue #100. Declared in `mode/disclosure.ts`
+     * beside the per-ground table it reads, and **driven from here**, because `drawHeader` is its
+     * only caller and a surface is covered by whoever renders it. `suppressionLeadFor`, the long
+     * projection of the same row, is covered by the `MODE` adapter for the same reason: it is driven
+     * by the two surfaces that draw *it*. One table, two projections, two drivers.
+     */
+    'mode/disclosure.ts#suppressionBannerFor',
+    'mode/disclosure.ts#NO_AVERAGE_LEAD',
+    /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
      *
@@ -791,26 +808,43 @@ const CANVAS: SurfaceAdapter = {
                 : { answeredByCarId: bundle.assignments[0].answeredByCarId }),
               waiting: bundle.assignments[0].waiting,
             };
-      const ctx = textCapturingContext();
-      drawScene(ctx, {
-        recording,
-        frame: bundle.frame,
-        layout,
-        overlay: bundle.metrics,
-        ...(selection === undefined ? {} : { selection }),
-        unservedFloorIds: unservedFloors(recording),
-        unansweredCallFloorIds: bundle.unanswered,
-        lockedOutLandings: bundle.lockedOut,
-        queues: bundle.queues,
-        mood: bundle.mood,
-      });
-      for (const [index, text] of ctx.texts.entries()) {
-        seeds.push({
-          field: `drawScene(@${at.toFixed(0)}s).fillText[${String(index)}]`,
-          text,
-          role: 'prose',
-          playhead: atPlayhead(recording, at),
+      /*
+       * **`drawScene` in both registers, and the claim that used to stand here is retired.**
+       *
+       * It read: *"`drawScene` above is left at its default, and that is a claim rather than an
+       * oversight: `render/canvas.ts` passes `input.mode` to `drawOverlay` and to nothing else, so
+       * every mode-sensitive string it can emit is emitted here, twice."* True when it was written
+       * and false the moment GitHub issue #100's second panel landed — the header band's refusal,
+       * its running mean and the word in front of the waiting count all move with the mode now. A
+       * corpus that swept one register of a two-register surface would have been sweeping half a
+       * screen while reporting a whole one, which is the failure the temporal axis was grown to stop
+       * one dimension over.
+       *
+       * Both passes carry every non-mode input, so the two differ by the mode and by nothing else.
+       */
+      for (const mode of VIEW_MODES) {
+        const ctx = textCapturingContext();
+        drawScene(ctx, {
+          recording,
+          frame: bundle.frame,
+          layout,
+          overlay: bundle.metrics,
+          ...(selection === undefined ? {} : { selection }),
+          unservedFloorIds: unservedFloors(recording),
+          unansweredCallFloorIds: bundle.unanswered,
+          lockedOutLandings: bundle.lockedOut,
+          queues: bundle.queues,
+          mood: bundle.mood,
+          mode,
         });
+        for (const [index, text] of ctx.texts.entries()) {
+          seeds.push({
+            field: `drawScene(${mode}@${at.toFixed(0)}s).fillText[${String(index)}]`,
+            text,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
       }
       /*
        * **Both registers, on every case** — GitHub issue #100, and `honesty/types.ts#HONESTY_MODES`
@@ -824,9 +858,12 @@ const CANVAS: SurfaceAdapter = {
        * never sees, and the panel's Casual words include the one string on it that may never be
        * wrong — the refusal.
        *
-       * `drawScene` above is left at its default, and that is a claim rather than an oversight:
-       * `render/canvas.ts` passes `input.mode` to `drawOverlay` and to nothing else, so every
-       * mode-sensitive string it can emit is emitted here, twice.
+       * `drawScene` above draws the panel too, and this loop draws it again at every sampled
+       * playhead. That is deliberate duplication rather than waste: `drawOverlay` is a shipped entry
+       * point in its own right — `render/canvas.ts` is not its only caller — and seeding it under its
+       * own `field` is what makes a violation report name the panel instead of the scene it happened
+       * to be composited into. Identical strings cost the search nothing; a misattributed one costs
+       * a reader the fix.
        */
       for (const mode of VIEW_MODES) {
         const overlayCtx = textCapturingContext();
@@ -2446,6 +2483,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
       ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }],
       ['endless', { ...openEndless(), day: 12, cleanRun: 5 }],
       ['sandbox', openWeek('no-such-contract')],
+      /*
+       * The fourth branch, added with GitHub issue #125 and added for this loop's founding reason.
+       * A free-play week used to carry the *building's* contract id, so it reached the **scenario**
+       * branch and a run that banks nothing was labelled *Scenario · day 1 · 0 clean shifts banked*.
+       * It now carries `FREE_PLAY_CONTRACT_ID` and has a branch of its own — and a branch nothing
+       * drives is a claim nobody checks, which is what this loop exists to say.
+       */
+      ['free play', openWeek(FREE_PLAY_CONTRACT_ID)],
     ] as const) {
       const lines = coachWeekLines(week, 1800);
       seeds.push({ field: `coachWeekLines(${name}).label`, text: lines.label, role: 'label' });
@@ -2481,6 +2526,18 @@ const SHIFT_REPORT: SurfaceAdapter = {
         'scenario→sandbox',
         { ...openWeek('c1'), day: 4, cleanRun: 1 },
         { ...openWeek('no-such-contract'), day: 4 },
+      ],
+      /*
+       * The fifth pair, and the one whose line a player now reads on every **Start** — issue #125.
+       * `dev/main.ts`'s `start` arm prints this the way the building select does, because a parked
+       * week and a destroyed one look identical from the ribbon, and this sentence is what tells
+       * them apart. It is also the only pair that reaches the arrival clause *"is one run and banks
+       * nothing"*, which replaces *"starts a new week"* for a mode that has no week to start.
+       */
+      [
+        'scenario→free play',
+        { ...openWeek('c2'), day: 4, streak: 4, cleanRun: 2 },
+        openWeek(FREE_PLAY_CONTRACT_ID),
       ],
     ] as const) {
       const line = weekKeptLine(left, arrived);
@@ -3652,6 +3709,14 @@ const RIGHT_RAIL: SurfaceAdapter = {
     'dev/rightRail.ts#buildingPlateOf',
     'dev/rightRail.ts#dispatcherPlateOf',
     'dev/rightRail.ts#dispatcherBlurbOf',
+    /*
+     * GitHub issue #100's second panel. `dispatcherCardOf` composes the two registers and
+     * `dispatcherBehaviourOf` derives the one that is new, so both are seeded below — in **both**
+     * modes, over every profile the case carries, which is what makes the Casual sentence's counts
+     * (*"only 3 of the 13 cards here"*) searchable rather than merely written.
+     */
+    'dev/rightRail.ts#dispatcherCardOf',
+    'dev/rightRail.ts#dispatcherBehaviourOf',
     'dev/rightRail.ts#dispatcherFamilyOf',
     'dev/rightRail.ts#dispatcherNoteOf',
     'dev/rightRail.ts#trafficPlateOf',
@@ -3663,7 +3728,14 @@ const RIGHT_RAIL: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     const specs = context.elevatorSpecs as ElevatorSpecs;
 
-    /* R2 — the dispatcher list, every shipped profile. */
+    /*
+     * R2 — the dispatcher list, every shipped profile, **both registers** (GitHub issue #100).
+     *
+     * The peer set handed to `dispatcherCardOf` is `context.profiles`, which is the list the rail
+     * itself draws from. That is load-bearing rather than convenient: the Casual sentence counts the
+     * cards (*"of the 13 cards here"*), so a corpus that passed a different set would be searching a
+     * sentence the product never says.
+     */
     for (const profile of context.profiles) {
       seeds.push({
         field: `dispatcherFamilyOf(${profile.id})`,
@@ -3680,30 +3752,54 @@ const RIGHT_RAIL: SurfaceAdapter = {
         text: dispatcherNoteOf(context.profiles, profile.id),
         role: 'label',
       });
-      for (const row of dispatcherPlateOf(profile)) {
+      for (const mode of VIEW_MODES) {
+        const card = dispatcherCardOf(profile, context.profiles, mode);
         seeds.push({
-          field: `dispatcherPlateOf(${profile.id}).${row.k}`,
-          text: `${row.k}: ${row.v}`,
-          role: 'label',
+          field: `dispatcherCardOf(${mode}, ${profile.id}).sub`,
+          text: card.sub,
+          role: 'prose',
         });
-        if (row.help !== undefined) {
+        seeds.push({
+          field: `dispatcherCardOf(${mode}, ${profile.id}).help`,
+          text: card.help,
+          role: 'prose',
+        });
+        for (const row of dispatcherPlateOf(profile, mode)) {
           seeds.push({
-            field: `dispatcherPlateOf(${profile.id}).${row.k}.help`,
-            text: row.help,
-            role: 'prose',
+            field: `dispatcherPlateOf(${mode}, ${profile.id}).${row.k}`,
+            text: `${row.k}: ${row.v}`,
+            role: 'label',
           });
+          if (row.help !== undefined) {
+            seeds.push({
+              field: `dispatcherPlateOf(${mode}, ${profile.id}).${row.k}.help`,
+              text: row.help,
+              role: 'prose',
+            });
+          }
         }
       }
     }
 
-    /* R3 — the building plate, with a run and without one. */
-    for (const [label, recording] of [
-      ['with-run', context.recording],
-      ['no-run', undefined],
+    /*
+     * R3 — the building plate, with a run and without one, in both registers.
+     *
+     * The Casual arm was **never swept**: `buildingPlateOf` has taken a mode since GitHub issue #71
+     * and this adapter has always called it at the default, so the plain-language lead on
+     * `handling capacity` and on the withheld `achieved interval` — the second of which precedes
+     * `core`'s own refusal — has sat outside the corpus the whole time. Added here because issue
+     * #100's lane is in this adapter anyway and a mode axis that covers one of the two functions on
+     * a panel is the § D194 null wearing a different number.
+     */
+    for (const [label, recording, mode] of [
+      ['with-run', context.recording, 'advanced'],
+      ['no-run', undefined, 'advanced'],
+      ['with-run', context.recording, 'basic'],
+      ['no-run', undefined, 'basic'],
     ] as const) {
-      for (const row of buildingPlateOf(context.building, recording)) {
+      for (const row of buildingPlateOf(context.building, recording, mode)) {
         seeds.push({
-          field: `buildingPlateOf(${label}).${row.k}`,
+          field: `buildingPlateOf(${mode}, ${label}).${row.k}`,
           text: `${row.k}: ${row.v}`,
           /*
            * `achieved interval` is the plate's one mean, and the plate has already asked
@@ -3719,7 +3815,7 @@ const RIGHT_RAIL: SurfaceAdapter = {
         });
         if (row.help !== undefined) {
           seeds.push({
-            field: `buildingPlateOf(${label}).${row.k}.help`,
+            field: `buildingPlateOf(${mode}, ${label}).${row.k}.help`,
             text: row.help,
             // A withheld row's help quotes `core`'s own refusal.
             role: row.k === 'achieved interval' && row.v === 'withheld' ? 'reason' : 'prose',
@@ -4497,6 +4593,30 @@ const MENU: SurfaceAdapter = {
      * of the same strings. What is needed is that **every string the root can emit** is reached, and
      * one Casual arm plus one first-visit arm reaches all of them.
      */
+    /*
+     * **The `unrankable` arm's refusal is produced rather than quoted — GitHub issue #140.**
+     *
+     * It was a hand-copied literal: *"day 7 grows the building by 66 % and schedules “Move-in
+     * day”, and neither travels with a selection"*. Two things were wrong with it and only one of
+     * them was ever going to be noticed. It was a **copy of another module's sentence**, so it went
+     * stale the moment `runIdentity` reworded — § D227's subject exactly, and #140 is the reword.
+     * And it was **not a sentence the product could produce for the state it described**:
+     * `eventFor(7, dayIdx)` is `ordinary` on a weekday of day 7 and `weekend` on its Sunday, so a
+     * day 7 that books a move-in needs a calendar period the fixture named nowhere. A corpus seeded
+     * with a refusal no reader can meet sweeps wording no reader will ever see.
+     *
+     * Six `nextDay`s rather than `{ ...week, day: 7 }`, for `tomorrowFactsOf`'s reason: the weekday
+     * index wraps the way the shipped transition wraps, so this is a week a player can actually be
+     * standing in.
+     */
+    const menuResources = browserResourcesOf(context);
+    const day1 = initialState(menuResources, 1n);
+    const [grownDay] = runIdentityIssues(
+      { ...day1, week: [1, 2, 3, 4, 5, 6].reduce((week) => nextDay(week), day1.week) },
+      menuResources,
+      'ranked',
+    );
+
     const menuStates: readonly {
       readonly label: string;
       readonly selection: typeof whole;
@@ -4513,8 +4633,7 @@ const MENU: SurfaceAdapter = {
         selection: whole,
         canPost: true,
         hasRun: true,
-        refusal:
-          'day 7 grows the building by 66 % and schedules \u201cMove-in day\u201d, and neither travels with a selection',
+        refusal: grownDay?.message,
       },
       {
         label: 'casual',

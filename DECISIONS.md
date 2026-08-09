@@ -22603,10 +22603,508 @@ cleared it, and `boot()` simulates a shift before the player can press anything 
 recording was drawn on the **previous run's clock**, in four places. [§ D227](#d227) again: the
 sentence was the only thing enforcing the property.
 
-### What is left, and named rather than closed
+### What was left, and named rather than closed — now closed by issue #140
 
-`runIdentity`'s day-1 gate still calls a run reproducible under a period that names **no** event and
-scales the population — `vacation` runs the building at about a quarter. That is the period's fact
-rather than the event's, and closing it needs a refusal that **names the period**: a gate opened
-without one would tell a player their run cannot be shared because of an event, when it was the
-population factor. Issue **#140**.
+`runIdentity`'s day-1 gate called a run reproducible under a period that names **no** event and
+scales the population. That is the period's fact rather than the event's, and closing it needed a
+refusal that **names the period**: a gate opened without one would tell a player their run cannot be
+shared because of an event, when it was the population factor. Issue **#140**, and it is closed —
+*a decision number is owed; the argument is in `shift/calendar.ts#calendarAsks`,
+`scope/runIdentity.ts#weekCarries`, `scope/runIdentity.ts#SELECTION_CARRIES_A_CALENDAR_PERIOD` and
+`dev/state.ts#calendarAskInputOf`.*
+
+**The figure in this paragraph's first draft was wrong, and the correction is the shape of the
+defect rather than a typo.** It read *"`vacation` runs the building at about a quarter"*.
+`vacation`'s `populationFactor` is **0.6**; the quarter is **`public-holiday`**'s 0.25, which is
+also the sharper case — `fromDay: 1, toDay: 1`, so it exists *only* on the day the gate opened. The
+hole was wider than this paragraph said, too: measured on the legs, **four** of the five shipped
+periods move a day-1 run while booking no event (`public-holiday`, `vacation`, `quarter-end`,
+`rota-week`), and only `moving-week` was refused, through its event.
+
+---
+
+## D324 — what a submission can express, and the boundary check that did not decide it
+
+Issue #129. The product's one accusation, aimed at a player who used a shipped feature.
+
+### The defect, driven rather than argued
+
+`viewer.commissioning` and `viewer.calendar` are correctly `between-games`, and
+`permits('ranked', 'between-games')` is true, so nothing between the commissioning screen and the
+submit button objected. But `RunSubmission` is seven fields and carries neither, and
+`leaderboard/verify.ts` resolves the building **by id from the server's own `data/`**. Built through
+the shipped path and fed to the real `verifySubmission`:
+
+| state | client refused? | server |
+|---|---|---|
+| control | no | **accepted** |
+| +1 shaft on Midtown's main bank | **no** | `metrics-do-not-reproduce` |
+| `vacation` / `public-holiday` / `quarter-end` / `rota-week` | **no** | `metrics-do-not-reproduce` |
+
+`copy run` was the same defect one artefact over: `shareLinkOf` returned `ok`, the address was
+identical for the commissioned and the ordinary run, and reopening it produced **different legs**.
+
+### The boundary check came back permissive, so it decided nothing
+
+The issue framed the choice as *refuse* versus *carry*, and expected the module boundary to settle
+it. It does not: § D214 § 3 already recorded that `packages/server` may depend on `core`, and
+invariant 6 forbids only `core → viz`. Measured rather than read off — `@elevator-sim/viz` added to
+the server's manifest, `tsc -b` exit 0, `import()` resolving in 73 ms with both symbols present.
+
+**So the decision was made on soundness instead, and that is the durable half.** `submission.ts`
+already states the property the board rests on: *"A submission that carried its own building would
+let a player invent a two-floor tower with sixteen cars and post a superb wait."* A commissioning
+choice **is** a building edit on the wire. At `midtown-office`/`collective`/`rise-and-fall`, with
+nothing objecting to any of them:
+
+| fabric | mean wait |
+|---|---|
+| as built — 4 × `geared-traction` @ 2.5 m/s | 23.00 s |
+| 4 × `gearless-traction` @ 8 m/s | 14.76 s |
+| **16 shafts** | **6.58 s** |
+
+The gate that would refuse that is `reviewCommissioning` against a capital constraint — and the
+*player* picks the constraint, so a cheat declares `new-build`. Closing it means the server deciding
+which constraint a ranked run sits under, which is a game-design decision nobody has made.
+
+The calendar fails a second, independent way: `CALENDAR_PERIODS` is a **code table**, not `data/`, so
+it has no digest and no provenance. A carried period would stop stored calendared scores
+re-verifying the day someone edits a period — the § D205 / § D213 defect `configHashOf` exists to
+prevent.
+
+**Refuse, in both consumers. The difference was not split.**
+
+### What the fix actually replaced, which is worse than the missing arms
+
+`runIdentity.ts`'s docstring claimed the gap was already mechanised: *"A field the table declares a
+control and this function does not know is a **red test**, not a silent pass — `runIdentity.test.ts`
+asserts the two agree."* **No such assertion existed**, and nothing in `packages/viz` referred to
+`carriesState` at all. The `switch` had `default: return undefined`, so an unknown field was a silent
+pass, and the sentence saying otherwise is why nobody looked.
+
+`CARRY_CHECKS` makes the key set a **value**, `EXPRESSIBLE_IN_A_SELECTION` names the artefact behind
+every field that may travel, and `runIdentity.test.ts` drives every control's own probe arms: arm one
+accepted, arm two refused **naming that key**. A field added tomorrow is red the day it lands.
+
+**A third field had the same defect by the other route.** `viewer.selectorSpec` is `within-day`, which
+`ranked` already forbids — so `permits` was never what let it through; the switch simply had no arm.
+Two routes into one accusation, and the exhaustiveness assertion is indifferent to which.
+
+---
+
+## D325 — which of a period's asks reached the run, and why it is filed under the calendar
+
+Issue #140, and the merge with § D324, which two lanes built in parallel and each anticipated.
+
+### The hole, and it was wider than the issue said
+
+The gate was `week.day === 1 && event.effect.changesNothing`. Measured on the legs, **four** of five
+shipped periods move a day-1 run while booking no event — `public-holiday` (population 0.25),
+`vacation` (0.6 plus a flatter split), `quarter-end`, `rota-week`. The issue named two.
+
+Issue #135 found this and deliberately left it, because the sentence `carriesState` returned named
+the day number and the event: opening the gate without rewriting it would have filed a refusal giving
+the **wrong reason** — *"day 1 … schedules 'Ordinary day'"* about a run moved by a population factor.
+§ D227 rates that below the gap itself.
+
+### The decision: ask what reached the run, not what the period declares
+
+`shift/calendar.ts#calendarAsks` shares `calendarPatch`'s **own two conditional branches** rather than
+restating them, so an ask the engine withheld cannot appear in a refusal. Three ways it can be
+withheld were measured: a bias under `lunch-two-way`, a template over a player's own choice, and a
+template the shift is too short for. A derivation reading the declaration would have refused all
+three with axes that never moved.
+
+Two coincidences are deliberately **not** exempted — `populationFactor: 0.999` rounds back to the same
+populations, and `office-down-peak` produces legs identical to `rise-and-fall`. Both still count as
+asks, because the refusal is about a configuration a selection cannot express, not about whether one
+seed's legs happen to coincide. That is the abstraction level the old gate already used.
+
+The goods-car clause names **no count**: `reserveCars` never empties a bank, so `moving-week`'s
+Saturday asks Garden Apartments' two-car bank for two and gets one, and *"reserves 2 cars"* would be a
+refusal with a false number in it.
+
+### The merge, and the one place it is recorded
+
+§ D324 chose *refuse* and gave `viewer.calendar` an arm; this decision supplies what that arm says.
+The clause moved out of `week`'s arm, where #140 had built it because that was the only arm there
+was. **A refusal filed under `viewer.week` for something the calendar caused points a reader at the
+wrong control** — the same wrong-reason failure, one field over.
+
+`moving-week` day 1 now files **two** issues rather than one sentence with two clauses:
+`viewer.calendar` for the mix bias and the reserved car, `viewer.week` for the scheduled move-in.
+Each fact under the control that caused it.
+
+#140's `SELECTION_CARRIES_A_CALENDAR_PERIOD` — a boolean standing in for *can the artefacts express a
+period?* — was **deleted rather than merged**, because § D324's `EXPRESSIBLE_IN_A_SELECTION` holds
+exactly that, as a table asserted against the server's own wire text. Two answers to one question,
+with no test that they agree, is the shape this repository keeps paying for; a merge is a new way to
+acquire one.
+
+### Two false sentences corrected in passing
+
+`runIdentity.ts`'s own note said *"`vacation` is a quarter of the building"*. It is 0.6; the quarter
+is `public-holiday`'s. The same error was in § D323 and is corrected there. And the shipped product
+printed *"day 1 grows the building by 0 %"* under `moving-week` — a reason that did not happen,
+offered to a player whose run could not be posted.
+
+---
+
+## D326 — free play parks the campaign week, under an id of its own
+
+Issue #125. **(a)** of the issue's three, and the mechanism is not the one the brief prescribed.
+
+Driven on `midtown-office` at day 4: `enterFreePlay` left `week c2 day 1` in memory while
+`weeksForSession` still returned day 4 from disk, and the building select could not recover it —
+the day-4 week was nowhere in memory to resume. Confirmed **pre-existing** by checking out the commit
+before § D312 and re-running: identical. § D312 fixed the other door.
+
+**The prescribed fix was a no-op, and the lane said so rather than substituting silently.**
+`switchWeek(…, 'resume')` returns immediately when the contract id has not changed, so calling it on
+the campaign's own building does nothing. Worse, a hand-rolled park under the *borrowed* id puts a
+parked `c2` beside a live `c2`, breaking § D312's invariant — and `switchWeek`'s `kept` filter then
+drops the campaign week on the next building change and parks the free-play scaffold instead. The
+week would come back only until the player touched a control.
+
+So free play needed a contract id of its own: `FREE_PLAY_CONTRACT_ID`, a third sentinel on
+`SANDBOX_CONTRACT_ID`'s recorded argument. Then parking means something.
+
+**Two false sentences were shipping and neither was reported.** `enterFreePlay`'s docstring claimed
+`contractForBuilding` *"keeps the scenario label honest"*; it did the opposite — a free-play run on
+`midtown-office` carried `c2`, so the coach ribbon read *"Scenario · day 1 · 0 clean shifts banked"*
+and the rail read *"0/3 banked this scenario"* over a run that banks nothing. And `openWeek` on entry
+emptied `week.completed`, so entering free play and then taking a scenario card wiped the player's
+cleared-scenario record.
+
+The recovery path is **a sentence on the Start arm**, not a hidden state: *"Scenario 2 is kept on day
+4 … pick that building again and it carries on from there."*
+
+Asserted on the legs, as the issue demanded: after the round trip the resumed run must equal the run
+the player left and differ from a fresh day 1, distinguishable because `GROWTH_PER_DAY = 0.11` makes
+day 4 1.33× population. Watched failing on the pre-fix composition.
+
+---
+
+## D327 — the change-scope notes measure clean, and the one class that claimed a register it did not deliver
+
+Issues #124 and #143.
+
+### #124 — the concern was unfounded, and that is the result
+
+Both classes clear WCAG 2.2 AA 1.4.3 at 4.5:1, against the grounds they actually sit on:
+
+| class | ink | ground | dark | light |
+|---|---|---|---|---|
+| `.advice` 12 px | `--dim` | `--card` (`.editor-panel`) | **7.21** | **8.25** |
+| `.rail-prose` 11.5 px | `--dimmer` | `--rail` (`aside.rail`) | **6.35** | **5.92** |
+
+**Nothing in the product changed**, and no change was manufactured to have shipped one — § D235 had
+already raised the ink ladder past the bar. What did not exist was anything that would notice if one
+of them stopped, and that is what was built.
+
+**The issue's premise was false in a useful way.** It said a document-tier test *"has no stylesheet to
+resolve"*, implying a browser. Joining a static stylesheet parse to a mount-driven run of the shipped
+panels produces real numbers with no browser; the browser tier confirms them to two decimals and is
+worth having as confirmation rather than as the only option. The re-implemented cascade hedges twice:
+**every** ink any matching rule proposes is held to the bar, not only the elected one, and the four
+figures are pinned rather than bounded.
+
+The first draft measured the **wrong background** — a spread of the host gave each virtual note the
+host's parent, one box too high, putting four editor notes on `.sheet`'s `--panel`. Plausible numbers,
+green against the bar, about a box the sentence is not drawn on. Caught only by the pinned figures,
+which is the argument for pinning them.
+
+### #143 — a class named `warn` that did not warn
+
+`#rail-access-note` is `class="rail-prose warn"`. Both are single-class selectors, they tie at
+(0,1,0), and the later rule took it: the paragraph docs/10 § 10.3 calls *the dispatcher compatibility
+warning* rendered as ordinary dim prose. Confirmed in a browser: `rgb(139, 152, 169)`.
+
+Never a contrast defect — both inks clear AA. It is § D227's stale-refusal shape **in a stylesheet**:
+the markup claimed a register the screen did not deliver.
+
+**`role="status"` is not evidence for the quieter reading**, and that was the trap. The role governs
+how an assistive technology *interrupts*; the class governs the register the sentence *reads* in.
+Four things say caution, and the fourth settles it: § 10.3 calls it a warning outright,
+`checkAccessCompatibility` returns it in a field named `warning`, the fact is that some riders cannot
+be carried at all — and **the editor's `#ed-access-note` carries `warn` alone and has always drawn in
+`--warn`**. One fact, the two surfaces § 10.3 requires, two registers.
+
+Fixed with `.rail-prose.warn` at (0,2,0) rather than by moving `.warn` later, because a move fixes
+this pairing by luck and re-breaks on the next of the **eighty** single-class rules that set `color`.
+
+**The general check, and the rule it had to be narrowed to.** The sweep asserts no element's ink is
+decided by source order. Its first draft went red on `#copy-cli` — which is *correct code*:
+`#copy-run, #copy-cli` sets `--dim`, then `#copy-cli` sets `--dimmer` below it with a comment saying
+why. Same selector twice is an override written on purpose. So the property is *no tie between rules
+naming **different** subjects*, and `#copy-cli` is the control proving the exemption is not vacuous.
+
+---
+
+## D328 — Casual's register reaches the header and the cards, derived from the vector
+
+Issue #100, extending § D319 to the two panels it did not reach.
+
+**Both of the issue's quoted symptoms pointed at the wrong surface, and one at the wrong product
+area.** The live-metrics *panel* has been Casual since `21a0c17`; what still printed `SATURATED — AWT
+suppressed` is `render/canvas.ts#drawHeader`'s **header band**, drawn into the bitmap. And
+`cost = 1.00 times wait` appears on **no rail card**, in either mode, on any of thirteen profiles —
+it is the dispatcher **editor** (`weightSummaryOf`), now issue #146. Misattributed, not false.
+
+§ D319's structural finding did **not** transfer: `mountRightRail` has had `state.mode` for waves.
+Nobody had written the other register.
+
+### The behaviour sentence is derived, and an authored field was refused
+
+What a dispatcher does *differently in the building* comes from `profile.weights` joined to
+`CostTermSpec.measures` — one row per term in `data/dispatcher-profiles.json` — plus the profile's own
+authored constraint, auction, diversion and pooling fields, contrasted against the card list actually
+on screen. No prose per profile id.
+
+An authored `blurb` field in `data/` was **refused**, reversing `dispatcherBlurbOf`'s own stated wish:
+a weight vector is the one object here that a **search** writes, so authored prose beside it is stale
+on the first optimisation round that improves it.
+
+`serves` is deliberately unused: every value in it (`AWT`, `WT95`, `TTD`) is an `ESTIMATE_CUES` token,
+and beside a count like *"3 of 13"* that manufactures `honesty-9100031`'s collision on purpose.
+
+**One clause could not be derived honestly and was not written.** A plain-language name for
+`noDirectionReversal` exists only as optimizer-schema prose, addressed to a search. The card says what
+a hard constraint *is* — a filter no weight can buy past — and names the id verbatim, which is true of
+any id including one this build has never seen. Issue #147; the fix belongs in `core` beside the
+constraint, not in a renderer taxonomy.
+
+### Nothing removed, and Engineer pinned
+
+`sub` and `help` **swap places rather than trade content**: for all thirteen profiles, both registers
+carry the vector blurb *and* the behaviour sentence, asserted in both modes. Every plate key and value
+stays byte-identical, and Casual's help must *contain* the engineer help verbatim. Thirteen literal
+engineer blurbs are pinned against the shipped id set, and the canvas header's Casual arm must keep
+every count the engineer's carries. § D299 § 1's test, in the files it is about.
+
+`SATURATED` is not softened. Casual names **which of the five grounds** refused the mean — Engineer's
+line only separates saturation from the rest — via `suppressionLeadFor`'s table, now projected two
+ways from one row rather than copied.
+
+**Two live defects found by driving it.** `dispatcherPlateOf`'s help said the library declares
+*twelve* terms beside a value reading `1 of 13`. And `keyedPlate` hashed key and value only, so a mode
+toggle never redrew a plate whose Casual lead lives in `help` — true of `buildingPlateOf` since issue
+#71, which means Casual's building-plate text has been shipping **unreachable** for eleven waves.
+
+---
+
+## D329 — a test tier that ran nowhere, and the timeout whose general form could not be earned
+
+Issues #142 and #144.
+
+### The tier was red, and skipping is why nobody knew
+
+`viz-browser` was **8 tests red across 3 files**, and executed by nothing: `ELEVATOR_SIM_CHROMIUM` is
+unset in CI (the workflow mentions neither it nor playwright) and unset by default locally, so the
+project registers and skips in both places a skip is indistinguishable from a pass.
+`dev/main.test.ts` asserted the project was still *registered*, which catches deletion and not rot.
+
+**§ D220 § 4 had already warned about exactly this**, in prose, mechanised by nothing. The deliverable
+was therefore the mechanism, not the eight repairs.
+
+### All eight were stale selectors — and the issue's diagnosis was wrong about 7 of them
+
+Not label drift. `'Pick a scenario'` still exists verbatim. Playwright's `hasText` is a
+**case-insensitive substring over the whole `textContent`**, and issue #90's recommended row reads
+*"it opens the scenarios board"* — so `hasText: 'Scenarios'` matched two buttons and `.first()`
+pressed **Start here**, whose Casual arm closes the menu. Two more were a stale **ordinal**: § D134
+made `collective` the opening dispatcher, so `nth(2)` correctly answered with a disabled *Already
+driving* button. Updating the string literals would have fixed nothing.
+
+The tier now presses by `data-menu-control` id. `menu/screens.test.ts` scrapes every
+affordance-shaped literal out of whatever `*.browser.test.ts` files exist and requires each to be an
+id `screenOf` produces — turning a future rename from a 30-second timeout on a tier that may not be
+running into a millisecond node failure.
+
+### The mechanism: one gate, four clauses, derived from the config
+
+`browserTier.test.ts` runs in the **always-on** project and imports `vitest.config.ts`'s own project
+array. It asserts: some project is gated (non-vacuity); every file of that tier imports the one gate
+module and none reads `process.env` itself; **in CI a gated tier may not be gated off**, with no
+opt-out variable; and off CI the skip is published with a file count and the fix command. Counts are
+derived, never literal.
+
+It works. Integrating this branch with § D327's made it go **red on the merge commit**, naming
+`noteContrast.browser.test.ts` as a seventh private copy of the gate and quoting the replacement.
+Six copies had each claimed in a docstring to be "kept identical"; they were kept identical by nobody.
+
+**A second merge-only defect followed**: that file asked for `port: 0`, which Vite resolves to its
+configured default 5173 — the port `boot.browser.test.ts` also asks for — so with seven concurrent
+files the loser got no URL and failed in `beforeAll`. `compareLab.browser.test.ts` had written this
+rule down after hitting it; the new file had no reason to know. Both defects were unreachable from
+either branch: each file was green alone.
+
+Tier now **7 files, 44 tests, green twice**, and CI installs Chromium and exports the path on both
+matrix legs.
+
+### #144, and the general form that was refused with measurements
+
+Three legs tests ran real simulations at vitest's default 5 s — the issue named two and a third sat
+twelve lines below one of them. All three now carry the `300_000` the rest of the suite uses.
+
+**A static check for the general case is not honestly buildable**, and this is measured rather than
+asserted. A name-level call graph seeded at the runners gives **1 881 false positives**, because
+`map`, `day`, `at` and `run` are locals in dozens of files. Even a correct graph asks the wrong
+question: most simulations in this suite run at **module scope**, where the cost is charged to file
+collection rather than to a test's timeout, and statically you cannot tell `legsOf(state)` — which
+runs two simulations — from `reportOf(clean)`, which reads one already run. The narrow version works
+as a detector and finds **82 cases across 23 files**, but it is blind to a helper reached through a
+value, so it would *look* total and not be.
+
+The alternative that **is** total is `testTimeout` on the `viz` project, one line, no list. It costs
+failure latency across 130 files and makes ~120 existing annotations redundant. Recorded as a
+repo-wide decision that is open, not taken here.
+
+> **Taken, later the same day — § D331.** The `viz` project sets `testTimeout: 300_000`, the number
+> chosen from a measured duration distribution rather than copied, and a guard in
+> `dev/browserTier.test.ts` fails the commit that removes it. This paragraph is left standing as the
+> record of what was open when.
+
+---
+
+## D330 — two product calls: the tab gate is mode-aware, and the preview allowlist widens to one deployment
+
+Issues #130 and #123. Both decided by the project owner on 2026-08-09; recorded here with the
+reasoning so neither is re-litigated.
+
+### #130 — keep the gate, persist the reveal, and never gate Engineer
+
+Four editor tabs sit behind `revealedTabs`, hidden until the right rail opens one, not persisted, and
+unannounced. #130 and #110 pull in **opposite directions** and both are right: #130 says a hidden tab
+and an absent feature look identical; #110 says Compare, Lab and Parameters being fully exposed in
+Casual is itself the defect, because Parameters opens on *"58 dimensions, 38 live"*. Dropping the gate
+fixes #130 by shipping #110's complaint; leaving it fixes neither.
+
+**Mode-aware resolves it rather than splitting it.** Engineer has no gate at all — an engineer who
+cannot find Compare is the product saying less, which § D299 § 1 forbids. Casual keeps sequencing, and
+sequencing is not a ceiling: § D299's *entry point, never a ceiling* is satisfied when nothing is
+unreachable, not when everything is shown first.
+
+Three binding conditions: the reveal **survives a reload**, or it is re-hiding a surface the player
+already found; the affordance's claim is **derived from the same source the gate reads**, so a count
+in a sentence cannot drift (§ D227); and Engineer's absence of a gate is **asserted**, pinned the way
+§ D319 pinned Engineer's grid.
+
+### #123 — widen the allowlist to this Static Web App's own preview pattern
+
+Preview deploys render and every API surface dead-ends on CORS, because `ELEVATOR_SIM_ALLOW_ORIGIN`
+holds exactly one origin and previews get a per-PR hostname. So the half of the product most likely to
+break is the half a preview cannot exercise.
+
+Option 1 (document it) is honest and buys nothing, and leaves *"the leaderboard is empty on this
+preview"* permanently ambiguous between a known limitation and a finding about the change under
+review — the worst state for a review surface. Option 3 (a second Container App and database) is
+correct and disproportionate.
+
+**Option 2, bounded by a deployment we control.** The invariant in `docs/16` § 3 is not deleted but
+**re-expressed at the right generality**: today it is `ELEVATOR_SIM_ALLOW_ORIGIN == ELEVATOR_SIM_ORIGIN`,
+enforced at boot on the argument that *a rule that holds for one of two values that must match is not
+a rule*. That argument survives; the relation changes to **membership**. The allowlist may contain the
+production origin and one preview pattern bound to the same Static Web App, and a configuration
+permitting an origin the deployment cannot mint must still refuse to boot.
+
+Conditions: the boot refusal is kept and **pinned by a run** that starts the server with a wrong
+allowlist, not by a unit test over a predicate; the pattern is derived from the deployment's own name
+rather than hard-coded, because a stale allowlist fails closed and looks exactly like this issue
+again; and the honest failure message does not regress — it still says the server *could not be
+reached* rather than that it is down, and the seeded board stays labelled *"These are not real runs
+and nobody posted them."*
+
+---
+
+## D331 — the simulating project gets a timeout, because the annotation is a list and the list is the defect
+
+Issue #144's general form, left open by § D329 and taken here.
+
+### The choice
+
+Two candidates, and they differ in *what kind* of total they are:
+
+1. **Annotate the ~82 remaining cases** with `, 300_000`, matching the 113 sites in `packages/viz`
+   that already do. Total by **inspection**.
+2. **Set `testTimeout` on the `viz` project.** One line. Total by **construction**.
+
+**(2).** The argument is the standing requirement in a different costume. Option 1 fixes today's 82
+and not the 83rd, which is written tomorrow by somebody who has never read this section — and this
+repository has now paid for a hand-maintained list often enough to name the shape: a list of three
+panels passes while a fourth goes unchecked, a list of five entry points misses the sixth, a list of
+week fixtures misses the state a free-play player can produce. 82 edits across 23 files, in a wave
+running six parallel worktrees, would also have been the largest merge surface of the wave in
+exchange for the weaker guarantee.
+
+### The number is measured, not chosen, and that is the part worth keeping
+
+Over a full `--project viz` run:
+
+| | |
+|---|---|
+| tests with a printed duration | 3 213 |
+| finishing inside 2.4 s | 3 193 |
+| exceeding the old 5 000 ms default | **10** |
+| slowest legitimate test | **49.4 s** |
+
+So `300_000` is roughly **six times the observed maximum**. It is also the value **113 sites had
+already converged on independently**, which is the strongest thing that can be said for it: the
+default is what the suite was already telling us it wanted, not a fresh opinion. The headroom is not
+excessive for this repository specifically — it runs several parallel worktrees on one machine by
+design, so *under load* is the normal condition here, and the reported flakes were tests that pass in
+3.5 s alone.
+
+### What it costs, stated rather than glossed
+
+A genuinely hung pure-function test now takes five minutes to fail instead of five seconds. That is
+the real price. It is worth paying because the two failures are not comparable: a hang is a bug found
+once and fixed, while a 5 s ceiling under load is a **false red that recurs forever** and teaches
+people to re-run the suite rather than read it. 3 193 of 3 213 tests were never within 2× of the old
+ceiling anyway, so what the 5 s default was protecting was almost entirely hypothetical.
+
+### The 113 explicit annotations stay
+
+Redundant now, and deliberately kept. Removing them is 113 edits whose only effect is to make those
+sites depend silently on a line in another file, and a site that knows it runs a simulation is
+allowed to say so. They are not a *list* that has to be complete — they are local reinforcement at
+sites that need it, which is a different thing from the enumeration option 1 would have created.
+
+### The guard, and why a config line needs one
+
+Delete `testTimeout` from the project and ninety-odd tests silently return to a ceiling they do not
+fit under; nothing goes red until somebody's machine is busy. **That is a config line whose removal
+is invisible, which is precisely what § D329 / issue #142 was about**, so shipping the line without a
+guard would have been that decision's own lesson unlearned one section later.
+
+`dev/browserTier.test.ts` gains the clause, because it already imports `vitest.config.ts`'s **own
+project array** — a second file asking the same config the same question through a second reader is
+the two-answers shape. The floor is **120 000 ms**, about 2.4× the measured maximum, deliberately
+*below* the 300 000 the config sets: the two answer different questions, and pinning the floor to the
+config's own number would make it a tautology that fails only when somebody edits the digits and
+would go red for a well-argued reduction to 200 000.
+
+Verified by mutation, both ways: removing the option reports `expected 5000 to be greater than or
+equal to 120000`, and lowering it to 30 000 — under the slowest real test — reports the same failure
+with `30000`. The list of simulating projects is hand-written (it is the one thing that could not be
+derived, being exactly the question the rejected static check could not answer), so a second case
+asserts every name in it is still a registered project, or the first would pass by iterating nothing.
+
+### `core` has the same exposure and is deliberately left alone
+
+Measured the same way: **8 tests over 5 s, slowest 39.2 s**. So `core` is covered today only by its
+own explicit annotations and has the identical latent defect.
+
+It is **not** changed here, and the omission is recorded rather than silent. Issue #144 reported
+flakes in `viz`, and the survey justifying the number above was taken over `packages/viz/src`;
+widening to `core` would be a change nobody has evidence for yet, made on the strength of a
+measurement taken for a different question. The comment in `vitest.config.ts` says so at the call
+site, so the next person meets a decision rather than a divergence.
+
+### What was rejected as the mechanism, and stays rejected
+
+A per-test static check. A global name-level call graph produced **1 881 false positives** — `map`,
+`day`, `at` and `run` are locals in dozens of files — and even a correct call graph cannot separate
+*runs a simulation* from *reads a recording module scope already ran*, which is what most of
+`shift/report.test.ts` does. The narrow file-local version finds 82 cases across 23 files and is
+blind to a helper reached through a value, so it would **look** total and not be. Do not ship one.
