@@ -20935,3 +20935,802 @@ result and copy calling it a fault would be the repository contradicting its own
   each. Seed **9068** (`vertical-city` / `destination-panel`, 840 s) fires at **9 of 11** and is now
   pinned, with that measurement beside it. The corpus was extended rather than the adapter declared
   silent, because *silent* is a claim `judgeStage` earns structurally and this surface had not.
+
+## D293 — the rail withholds the whole day until the playhead reaches it, and `All N` is retired
+
+`recordRun` simulates the whole day up front, and four of the five mood drivers read that finished
+summary. So on a cold load with zero clicks the rail published the run's ending — *"All 34 people
+got where they were going"*, *"the longest wait was 76 s"* — beside a footer reading
+`paused · 0 arrived, 0 carried`. The Day report has refused this since § D223; the rail did not
+apply the rule to itself.
+
+`drawDrivers` now gates on `shiftIsOver`, **the predicate the rail already owned and did not use**
+(`leftRail.ts:894-896`, used by `basisAt` for the mood and honesty cards). `MoodDriver` carries a
+`basis` reusing `live/types.ts`'s `WaitBandBasis` rather than a new union.
+
+**The retraction is now words.** `mood.test.ts:325-330` has always asserted it — *"A flag no
+renderer is obliged to read is not a retraction"* — against `BuildingMood.headline`, **a field the
+only shipped renderer drops**. The surviving signal was `.mood-provisional { font-style: italic }`:
+typography alone, on a card whose own docstring is a KB-15 table promising every signal a second
+channel. That is a test passing on a property nothing renders, and it is the honesty-harness
+analogue of a dead seam.
+
+**`All N` is gone, and the reason is a fourth outcome.** The sentence branched on
+`undelivered > 0`, but the conservation identity is
+`generated === delivered + undelivered + abandoned + accessRefused`, and a refused rider is in
+**neither** bucket (§ D265, § D266). Seven of eight shipped buildings declare `accessZones`.
+Measured on `secure-tower`: **252 generated, 247 delivered, 0 undelivered, 5 turned away for want
+of a credential** — so the old branch asserted *All 247* over five people refused at the door.
+`${delivered} of ${generated}` is printed unconditionally instead. It never lies. Carrying
+`accessRefused` into `VizSummary` is a schema-version change and is **not** done here; the interim
+form needs none.
+
+**The honesty corpus shrank by 588 strings** (`RAIL_VIEW` 1 225 → 637), because four of five sample
+instants now yield two rows instead of five. That is a published figure moving for a correct
+reason, and it is recorded rather than regenerated. **The sweep is green at 0 violations, and it
+does not cover temporal honesty at all**: `honesty/surfaces.ts:427-430` samples `t=0`, which *is*
+`startedAt`, so the offending string was already in the corpus and already passing. Phase 9's
+verdict is unchanged; this is a gap in what it covers, named here.
+
+## D294 — the canvas footer is scoped rather than gated, because a bitmap has no later
+
+The strip under the stage read `completed · N generated · window …` from the moment the recording
+existed, because `recording.status` is `result.status` — the whole-run simulation result, not the
+playback state. Issue #105 read it as the shift being over; issue #109 attributed it to the left
+rail, which it is not (`render/canvas.ts:1780`), so a rail-only fix would have left it on screen.
+
+It is **scoped, not gated**: `simulation completed · 200 arrivals generated over the whole day ·
+window peak-5min 60–360 s`. Gating would strip § 7.4's window clause off every PNG exported
+mid-run — one honesty rule spending another. The rail may withhold because the reader still has the
+screen; a bitmap has no later. `recording.status` is still printed verbatim, so `timed-out` is not
+rounded off.
+
+## D295 — the machines rail draws what the building runs, and issue #114's fix was refused
+
+The rail drew six machine classes as `pick` cards in the identical form as the three live selectors
+above it, and selecting one changed nothing: `onPick` wrote `editingClassId`, which
+`shiftRunConfigOf` never reads.
+
+**This was not an undiscovered seam, and that is the point.** `scope/surface.ts:244-247` already
+declares the field `presentation`, and `scope/scope.test.ts:61-77` already runs the standing
+"move the control" harness against it **in the negative direction**, requiring byte-identical legs.
+The harness verifies that a state field is inert. **It does not verify that an inert field is drawn
+as inert** — `mountRightRail` sits on the undriven-mount exemption list
+(`honesty/derive.test.ts:72`) and no test invoked it. The same gap is open for
+`editingDispatcherId`, `editingPatternId` and `editingBuildingId`.
+
+So this is § D227's rule in its first direction — *a control that writes nothing must say so* — and
+the fix is to stop drawing a pointer as a control, not to wire the pointer up. **Issue #114 asked
+for the opposite** (*"add the legs test — today that test would fail"*); that test exists, passes,
+and making the panel live would have turned the suite red. A class is an envelope, not a thing a run
+has, and `Commission the building` already answers the question properly — per bank, live, with the
+speed inside the band.
+
+Two symptoms closed with it. The rail no longer disagrees with the building editor's chip list,
+because both now derive from the building's own cars; and the pre-selection is no longer
+`classes[2]`, a positional index seeded once at boot and never re-derived, which read *Geared
+traction* on every building forever. `machineWarningOf` now compares rated speed against the class
+band — it was gated on rise and floor count only, which is why it called Chancery House *"inside
+this class's envelope"* for Ultra high-speed while its cars run at 5 m/s, contradicting the
+nameplate two rows above it.
+
+## D296 — the viewer carries core's traversal-time union, and a breadth claim was checked
+
+`?building=st-jude-hospital` crashed to a bare `TypeError` on a URL the application writes itself.
+`core` declares `traversalTimeS` as a union — a `number` for an escalator, `{ upS, downS }` for
+stairs, because climbing costs more than descending — and the viewer narrowed it to `number` at
+three sites. `st-jude-hospital` is the only shipped building on the stairs arm.
+
+The label is **`26.0 s up / 19.0 s down`**, not the issue's `26.0 / 19.0 s`: the asymmetry *is* the
+modelling content, and two numbers without a word for which is the climb hands back the symmetric
+stair the schema refuses to let anyone author. A stair gets **no** EN 115-1 derivation — that
+arithmetic describes a belt on a 30° incline and printing it beside a stair's pair would be a
+stated mechanism that is false. The editor's seconds control **refuses** three ways rather than
+half-writing the pair: disabled, the write declined a second time, and said in the panel. `downS`
+is never dropped.
+
+Two further sites were broken more quietly and are fixed with it. `validateSpec`'s traversal guard
+tested `{ upS, downS } > 0` — `NaN > 0` is `false`, so a good stair fell **through** the guard and
+was reported as taking `[object Object] s`. Its dead-end warning raised *"neither is a transfer
+level"* against a stair, which `traffic/route.ts` filters out of the routing graph entirely: a true
+fact about floors welded to a false claim about the mechanism.
+
+**Why nothing caught it is the finding worth keeping.** `authoring/authoring.test.ts` already
+round-tripped *"every shipped building"* — over a **hand-written five-name list**, where eight
+ship, omitting exactly `chancery-house`, `crown-hotel` and `st-jude-hospital`. Not a seam nothing
+calls: **a breadth claim nothing checks.** The new guard derives its ids from `readdirSync` and
+asserts against the pinned list both ways; stashing the source fix turns it red with the exact
+reported `TypeError`.
+
+
+## D297 — the editor's floor vocabulary has a below-lobby half, and a basement's name is data
+
+`BuildingSpec` numbered floors `0 … floors` with the lobby at the bottom, so `specFromBuilding`
+gave a basement the first slot **above** the lobby, and `floorIdOf` — `floor === 0 ? 'G' :
+String(floor + 1)` — printed every floor one too high. **Three of the eight shipped buildings were
+affected, all silently**, and the trip that does it is opening the building in the editor and
+saving it untouched.
+
+- `crown-hotel`'s `back-of-house` zone named `B1` going in and `2` coming out, moving
+  `housekeeping`, `engineering` and `security` onto a guest bedroom floor. That is a credential
+  fact that is **wrong**, not coarse.
+- `st-jude-hospital`'s stair went from `G↔1` over 4.00 m to `G↔3` over 8.80 m, and its `clinical`
+  zone from `2, 3` to `4, 5`.
+- `midtown-office`, which nothing had named, **lost `P1` outright**: it is flagged `isEntrance` and
+  every entrance was folded onto floor 0.
+
+**This is not a dead seam and it is not a stale refusal. It is a third shape**, and it is
+[§ D296](#d296)'s defect one field over: a vocabulary that was live, correct, and **narrower than
+the data it read**. A type or a numbering that cannot express what ships does not protect anything
+— it relocates the failure. The rule that follows is the standing requirement in a new direction:
+**a round trip is pinned by the documents it round-trips, over the directory rather than over a
+list.**
+
+The vocabulary now runs `-belowLobby.length … 0 … floors`, and the two vocabularies stay apart:
+every *reference* to a floor is still a number, so nothing goes stale when the floor slider moves.
+What a number cannot carry is the floor's **name**, and only below the lobby — the three shipped
+basements are `B1`, `P1` and `LG`, **three names for one position**, so any minting rule would
+rename two of them. `belowLobby` therefore holds names and only names, and its own length is the
+count, so there is no second number to drift. `firstFloorNumber` carries the other half: seven
+shipped buildings have no floor `1`, and `st-jude-hospital` does. Defaults (`[]`, `2`) reproduce
+the old behaviour bit-for-bit on basement-free buildings.
+
+**Three further defects were found underneath it, and two were never about basements at all.**
+Floor pitch was averaged over all non-entrance floors, so the drop to a basement counted as a
+storey — `st-jude-hospital` came back at **4.4 m** against its authored 4.0 (that is the 8.80 m in
+the stair symptom) and `crown-hotel` at **3.3 m** against 3.1. `validateSpec`'s orphan branch
+minted its own id, `String(floor)`, one line below a branch that used `floorIdOf`, so the same
+floor was `6` in one sentence, `7` in the next, and `7` in the document — **wrong on every
+building, basement or not**. And `skyFloors` positions were shifted by a basement, latent only
+because no shipped building declares both.
+
+**The claim this file made about `accessZonesOf` was false and is corrected rather than
+preserved.** It said the function was *"the translation, and it is the only place the two
+vocabularies meet"*. `transportModesOf`, `buildingFromSpec` and four `validateSpec` messages
+crossed too. The true global claim is that **`floorIdOf` is the one function that turns a floor
+number into an id, and the only place arithmetic on an id happens** — made true by routing the two
+id-minting sites through it, and pinned **behaviourally** (the orphan warning must name the id the
+document carries) rather than by reading the source.
+
+**What stays lossy is stated and pinned by a run.** A tower whose floor numbers are not a
+contiguous run above the lobby — no thirteenth floor — comes back renumbered. No shipped building
+has a gap, so a **synthetic** building holds the docstring to it. `index` still moves, as it always
+did; the **id** is what is held exact, because the id is what `servesFloors`, `accessZones` and
+`transportModes.connects` name a floor by.
+
+
+## D298 — the setup fields validate the keystroke they are on, and one stated caret mechanism is withdrawn
+
+Four defects and a correction, and **the correction is the part to read**.
+
+`change` on a text input fires on **blur**, so the menu's state lagged its own fields and `canStart`
+was computed from the lag. A player who typed `abc` kept a live Start; one who then typed a valid
+`777` kept a dead one, under a message describing a value no longer on screen. `textRow` now
+commits on `input` as well.
+
+**That is only safe because [§ D295](#d295)'s retention landed first**, and it was established by
+*forcing* the retainer to rebuild a fresh element every draw and watching two browser cases go red —
+not by argument. Before retention, an `input` listener would have fired a full `replaceChildren` per
+keystroke, which is the failure mode issue #106's reporter believed already existed.
+
+### The mechanism that was invented, and is now withdrawn
+
+`textRow` guards its write with `if (input.value !== spec.value)`, and four sites said the guard
+existed because **assigning `value` moves the text-entry cursor to the end even when the string is
+unchanged**. That is false. **Measured in Chromium**: an `<input>` holding `202604` with the caret
+at 4, re-assigned the identical `'202604'`, keeps the caret at **4**; assigned a different
+`'999999'`, it moves to **6**. HTML's value setter moves the cursor only when the value *differs*.
+
+Deleting the comparison is **observationally inert on every path this menu has**, because a commit
+is synchronous and neither reducer rewrites its own input. The guard is kept — it protects the day a
+reducer normalises a value — but its reason is now the measured one, and the four sites restating
+the invented one are corrected. This repository's rule is that a stated mechanism is either measured
+or called unmeasured; **this one was asserted in a docstring, repeated into a task brief, and
+repeated again in a status report before anybody ran it.**
+
+### The other three
+
+`applyIntent` takes the catalogue — **required, not optional** — so a template change re-derives its
+part instead of stranding the select on a value it cannot represent. The old behaviour was not a lag
+but a permanent disagreement: the box showed *Morning rush* while the model held a part the new
+template does not offer, and the refusal named four options of which the first was already selected.
+The stale-part refusal narrows to **restored** selections, and is asserted from both sides — a
+refusal nothing reaches is dead, and a refusal a live control reaches is the bug.
+
+`isSeedText` is now the single seed rule for the menu, the transport field and the deep link, **at
+the menu's bound**. The loose side was the one that needed to move, not the strict one: the
+transport's `/^\d+$/` was unbounded, and a run started there can be posted to a board, so an
+over-long seed was accepted, run, drawn, and then refused at post time by a rule that screen never
+mentioned. No `maxlength` — it truncates a paste in silence, which is the coercion § D198 removed.
+
+And `boot()` redraws the menu after its own `runShift()`. The overlay was painted before the first
+shift existed and repainted by nothing, so **Resume refused a shift that was on the board behind
+it** — which is what issue #97 saw and reported as a missing scenario list. The list was never
+missing.
+
+
+## D299 — two products, one engine: Engineer is frozen, Casual is a door not a subset
+
+**Date: 2026-08-08 · The positioning decision, taken by the product owner, and the parent of every
+design issue in the #90–#119 backlog.**
+
+The playtest report ended on the question no issue had asked: *"is this primarily a teaching tool
+and research sandbox … or a mass-market management-sim game that happens to be built on real traffic
+engineering?"* Eight open issues were downstream of the answer and unactionable without it.
+
+**The answer is neither of the two the report offered. It is an explicit split: two products over
+one engine.**
+
+### 1. Engineer's **rigour** is protected. Engineer's **playability is not frozen**
+
+> **Correction, same day.** An earlier draft of this section said *"Engineer is frozen as-is"* and
+> built a standing constraint on that word. **That was this document mis-transcribing the decision,
+> not the decision.** The owner's position is that Engineer should get playability improvements
+> too — Casual is what drives the mass-market reach, and Engineer is still a product somebody uses
+> all day. The wrong sentence is corrected here rather than left standing, because an engineer
+> reading *"frozen"* would refuse a good fix on the strength of it, and a decision record that
+> forbids improvement is worse than no record.
+
+What is protected is the **rigour**, and it is protected absolutely. Everything expensive in this
+repository lives in Engineer: CIBSE and ISO 8100-32 reference data, paired-t intervals under common
+random numbers, saturation suppression on five grounds, the resolution limit measured per cell,
+server-side replay verification. Phase 6c was **refused three times** on the ground that the effect
+sat below what the apparatus can resolve ([§ D145](#d145), [§ D156](#d156)) — a reflex no
+mass-market product has, and the single hardest thing here to have earned.
+
+**The standing constraint, stated as a test rather than a prohibition:**
+
+> A change to Engineer may make it **easier to use**. It may not make it **say less**.
+
+So a change is in scope if it improves how a practitioner reaches, reads or acts on a figure — and
+out of scope if it removes a number, widens a threshold, hides a qualifier, softens a refusal, or
+puts a figure out of Engineer's reach. *Draw the confidence interval* is in scope. *Stop printing
+the interval* is not. *Put the basis on the figure* is in scope. *Drop the basis because it is
+noisy* is not.
+
+**This materially widens the buildable backlog**, because several issues filed as game-design
+complaints are Engineer playability items that cost the rigour nothing:
+
+| issue | why it is Engineer work, not only Casual work |
+|---|---|
+| **#119** | Compare produces ~700 words of monospace prose per verdict and **never draws an interval**, in a product whose central claim *is* an interval. Drawing it is strictly more legible, and removes nothing |
+| **#92** | The dispatcher editor has no *Run this* and no inline delta. A practitioner tuning weights needs the delta more than a casual player does |
+| **#117**, **#102** | The *what moved* panel is the only place the product answers *"did that help?"* — the tuning loop's core, and it is Engineer's loop first |
+| **#115** § 6 | `LIVE METRICS` clips its own text on every building, and because it is drawn into the canvas no DOM check can see it. A defect, not a preference |
+| **#104** | Saying *why* a control is locked is information, not simplification |
+
+### 2. Casual is a different door into the same building, not a smaller building
+
+This is the half that is easy to get wrong, and [§ #110](https://github.com/mrpeanut01/elevator-sim/issues/110)'s
+own recommendation gets it wrong: it proposes the thirteen dispatchers *become* four or five named
+play styles. **They may not.** The decision is explicit that Casual carries **full capability** —
+every parameter that can be edited is editable there, a Casual player can author their own
+dispatcher and tune it completely, and nothing is withheld on the grounds that the audience would
+not want it.
+
+What differs is **vocabulary, layout and the order things are met in** — not what can be reached.
+Named play styles are an *entry point* and never a ceiling; the full weight vector is one
+disclosure away and the disclosure is a door rather than a wall. The measured failure this replaces
+is Casual differing by **44 words out of 919** with three surfaces byte-identical, which is a
+promise the product does not keep. **A mode that quietly caps what a player can build would be the
+same broken promise wearing a better layout.**
+
+This also promotes a defect the backlog had rated minor: only **two of five** advertised dispatcher
+families are authorable — auction, zoning and destination have no controls
+([§ #113](https://github.com/mrpeanut01/elevator-sim/issues/113) § 5). Under *"tweak it fully"* that
+is no longer cosmetic, and it is not a Casual problem: **the authoring gap is in the shared editor
+and it fails both products.**
+
+### 3. What this decides, per issue
+
+| issue | disposition under this decision |
+|---|---|
+| #110, #100 | **Build.** Casual becomes a real layout with a real vocabulary — not a copy register, and not a capped subset |
+| #103, #115 | **Build for Casual.** A second renderer with motion, doors and drawn people, and the stage as the stage. Engineer keeps the schematic view, which is genuinely better *for engineers* |
+| #113 § 5 | **Promoted.** Authoring the other three families is now on the critical path |
+| #90, #98 | **Build.** A first-run door per product, since there are now two |
+| #96, #116 § 2 | **Still deferred**, and see [§ D300](#d300): the agency gap is smaller than #116 argued, because `Commission the building` exists and #116 missed it twice |
+
+### 4. What is not decided here
+
+Whether the two products share one build, one URL and one toggle, or diverge further, is **not**
+settled by this and should not be assumed from it. The toggle is the shipped mechanism and stays
+until something measured argues otherwise.
+
+
+## D300 — the remaining escalations, decided: seeded boards are real runs, and the honesty sweep grows an axis
+
+**Date: 2026-08-08.** Three smaller decisions taken with [§ D299](#d299), recorded so the reasoning
+does not have to be reconstructed from a batch plan.
+
+### E-1 — intraday intervention stays deferred, and the reason changed
+
+[§ #116](https://github.com/mrpeanut01/elevator-sim/issues/116) § 2 proposes making a run
+`(seed, config, [{atS, change}, …])` and re-simulating from `t = 0` on each intervention. It is
+argued from a real measurement — 181 ms, 828 ms and 1 521 ms per full simulation — and the
+affordability claim survives.
+
+**What does not survive is its premise.** #116 states *"There is no economy … a shaft **is** free,
+and instant."* `Commission the building` is a capital-budget mechanic with a fixed capital-unit
+ceiling, locked in before the week starts, and it writes per-bank machine class **and** rated speed
+live with no save. #116 missed that screen **twice** — once here, and once when claiming speed is
+only editable behind *Save as a new building*.
+
+So the agency gap is narrower than argued: there is a pre-run agency layer, and it is not surfaced.
+**Ship the honesty note (#104) and surface commissioning first**, and re-ask the intervention
+question against a product where the existing agency is visible. Deferred, not refused; the
+measurement stands and is worth keeping.
+
+### E-3 — the boards are seeded, and the rows are genuine
+
+A board with nothing on it reads as a product with no players, next to a sign-in prompt. It is
+seeded — **and this is not fabrication, which is why it is allowed.** Every posted score is
+re-simulated by the server before it is accepted (a forged submission returns
+`422 metrics-do-not-reproduce`), so a reference row posted through the ordinary path is verified by
+exactly the mechanism a player's row is. Publishing the shipped baseline dispatchers' own figures is
+what `benchmark/published.ts` already does elsewhere in this project.
+
+Two constraints: the rows are labelled **reference**, never as players, so nobody is invented; and
+they are posted **through the normal path**, never written into the store directly, so the claim
+*"every score on this board was re-simulated"* stays true without an exception clause.
+
+### E-4 — the gap is named *and* the sweep grows the axis that would have caught it
+
+Phase 9's honesty property held under search — 60 cases, 271 985 strings, 0 violations. It samples
+playheads at `[0, .25, .5, .75, 1]`, and **`0` is `startedAt`**, so *"All 34 people got where they
+were going"* was in the corpus at the cold-load instant **and passing**. The property never asked
+whether a surface may publish a whole-run figure at a playhead short of `endedAt`.
+
+Both halves are done rather than one: the gap is named against Phase 9's *accepted with named gaps*
+verdict per [§ D163](#d163)'s rule that the status row and the verdict land together, **and** the
+sweep grows a temporal axis so the property covers what it was assumed to cover. Naming alone would
+leave an uncovered property that happens to pass, which is the shape this repository's standing
+requirement is written about.
+
+**This may surface further violations, and that is the point of doing it.** Any it finds are
+reported rather than quietly fixed, because a corpus that grows an axis and stays green is a
+different claim from one that grew an axis and had to be fixed first.
+
+
+## D301 — Casual's mass-market draw is the depth made legible, not the depth removed
+
+**Date: 2026-08-08 · The product owner's design thesis for Casual, and it inverts the usual one.**
+
+[§ D299](#d299) established that Casual carries full capability. This states *why that is the
+commercial argument rather than a constraint on it*:
+
+> **The mass-market draw is the non-dumbification of the settings and parameters — finding a way to
+> make them understandable and playable by the masses, trying different things and increasing
+> scores.**
+
+### 1. What this rejects
+
+The default move for a "casual mode" is subtraction: fewer controls, rounder numbers, a curated
+subset. Every issue in the #90–#119 backlog that touches Casual assumes it —
+[#110](https://github.com/mrpeanut01/elevator-sim/issues/110) proposes the thirteen dispatchers
+*become* four or five play styles, and [#100](https://github.com/mrpeanut01/elevator-sim/issues/100)
+reads as "hide AWT". **Both are refused.** A subtracted Casual would be a worse version of a product
+whose entire value is that it is not approximate — and it would compete with a hundred lighter sims
+on their ground rather than on its own.
+
+The thesis is the opposite: **the depth is the product, and the design work is comprehension.**
+`bypassLoadThreshold` does not become a slider called *Speed*. It becomes a control whose effect a
+player can see, name, and want to move again.
+
+### 2. What this makes the work
+
+Not simplification. **Legibility, and a fast loop between a change and its consequence.** Four
+things, in this order:
+
+1. **Naming.** Every parameter says what it *does to the building*, not what it is called in the
+   engine. The rail currently describes all thirteen dispatchers as camelCase engine identifiers —
+   *"1 of 13 terms weighted; heaviest `waitTime` 1.00"* — and nowhere says what any of them does
+   differently to a queue.
+2. **Cause and effect, visible.** A player moves one thing and sees what it did. This is the
+   product's own standing requirement — *move the control and require the run to change* — turned
+   from a test into a feature.
+3. **A score that moves and is understood.** *Trying things and increasing scores* is the loop, and
+   it needs a number that responds, is comparable run to run, and whose movement is attributable.
+4. **Low friction to try.** The current loop is change → save → navigate → run → an ambiguous
+   number. Every step removed is a hypothesis a player will actually test.
+
+### 3. The convergence, which is the useful discovery
+
+**Casual's mass-market work and Engineer's playability work are largely the same work**, and this is
+what makes the two-product decision affordable rather than a doubling.
+
+Making cause and effect legible is what
+[#92](https://github.com/mrpeanut01/elevator-sim/issues/92) asks for (a *Run this* and an inline
+delta), what [#117](https://github.com/mrpeanut01/elevator-sim/issues/117) and
+[#102](https://github.com/mrpeanut01/elevator-sim/issues/102) ask for (a *what moved* panel that
+compares comparable runs), and what
+[#119](https://github.com/mrpeanut01/elevator-sim/issues/119) asks for (draw the interval instead of
+describing it in seven hundred words). **A practitioner tuning a weight vector wants exactly what a
+newcomer trying things wants: to see what changed and why.** They differ in vocabulary and in how
+much is on screen at once — not in what the loop is.
+
+So those four issues are built **once**, for both products, and § D299 § 1's test governs:
+*a change may make Engineer easier to use; it may not make it say less.*
+
+### 4. What must not be traded away for it
+
+The honesty. A score that responds to everything is easy to build and is a lie; this product's
+suppression rules exist because *"increasing lift speed appearing to increase average waiting time"*
+is the documented failure mode of the whole field. **A Casual score may be simpler to read and may
+not be less true.** Where one run cannot support a claim, Casual says so in its own words rather
+than saying something weaker that sounds stronger — and the words are the design work, not an
+exemption from it.
+
+
+## D302 — the competitive loop was three client-side omissions, and none was the fix either issue named
+
+**Date: 2026-08-08.** Issues [#112](https://github.com/mrpeanut01/elevator-sim/issues/112),
+[#113](https://github.com/mrpeanut01/elevator-sim/issues/113), and
+[#101](https://github.com/mrpeanut01/elevator-sim/issues/101) folded in.
+
+**#113 § 2's inference is wrong, and the truth is cheaper.** It reported custom dispatchers
+vanishing on reload and inferred two storage paths from the custom *building* surviving. There is
+**one writer** and **one reader** for all four shelves; the defect is *when*. `saveSessionNow` had
+two call sites and neither was a save button, so a dispatcher saved via *"Save it and run it"*
+survived — that runs a shift, which closes a day, which writes — and one saved via *"Save as a new
+dispatcher"* did not.
+
+`MountContext.update` now persists on a patch touching a library shelf, keyed on
+`patchTouchesLibrary`, **which reads the same table `libraryOf` does** — so a fifth shelf cannot be
+added to the library without also being watched for saves. The two facts cannot disagree because
+they are one table. **No debounce, and that was measured rather than assumed:** the shelf keys are
+written from seven sites, none on an input handler, while the hot patches (`dispatcherSpec`,
+`buildingSpec`, `levers`) touch no shelf. The predicate *is* the debounce. A **seventh write outside
+the choke point** was found doing it — `adoptEditedBuilding` assigns `state` directly because the
+JSON editor returns a whole `BuildingConfig` — and now saves itself.
+
+**#112's posted score returned 201 while the screen said *"No scores have been posted yet."*** A
+one-shot latch, never reset, plus a `submitScore` that did not refetch. Both closed — and **the
+identical latch on the challenge fetch went with them, with a worse consequence**: `state`,
+`opensInMs` and `closesInMs` are *server* measurements, so a challenge that opened while the reader
+was elsewhere stayed drawn as *not open yet* until reload — a **stopped countdown**, on the one
+screen [§ D218](#d218) § 3 forbids the client to compute one on.
+
+The optimistic insert #112 asks for was **declined with a reason**: the board a row belongs on is
+keyed by a digest the *server* computes over the run and its loaded `data/`, which the browser does
+not compute. Splicing would be guessing which board, and **a row on the wrong board is worse than a
+row a round-trip late.**
+
+**And `ChallengeBoardPage.entries` was fetched, threaded to the view model, and read by no
+renderer** — so *Order the board on* fired a real re-fetch whose only visible effect was a
+sentence's wording. That is the inert-control defect arriving from the **rendering** end rather than
+the state end. It survived because the document tier's fixture passed `challenge: () => undefined`
+for every case: **a screen nobody renders draws whatever it likes**, which is the standing
+requirement's blind spot restated for tests.
+
+## D303 — two editors disagreeing about Save is one defect, and the one that moves is the one whose indirection is not load-bearing
+
+The dispatcher editor's Save selected what it filed; the building editor's did not, so *"Save as a
+new building"* left the next run on the **old** building — the exact false negative the standing
+requirement exists to catch. Both were defensible alone, which is why the defect is the
+*disagreement*.
+
+The building editor's selection goes through `stateRunningSaved`, whose docstring documents a
+**week-contract forgery** a bare `buildingId` write reintroduces — a drawn tower banked against a
+real scenario assignment. That indirection is load-bearing, so the **dispatcher editor moved to its
+shape rather than the building editor moving to a bare write**: Save files it and says so in a
+`role="status"` line, and a second named verb carries the whole selection. A test asserts the
+building editor still has **no** bare `buildingId` write, so a later "fix" in the wrong direction
+goes red.
+
+That independently closes #113 § 3's *"each save auto-selects, so repeatedly pressing Save silently
+changes who is driving"*. Save now refuses empty and duplicate names, case- and space-folded against
+shipped **and** saved profiles, before minting an id; rename keeps the id, because `dispatcherId`,
+recordings and the challenge select all hold it.
+
+**#113 § 5's "read-only" is too weak, in a way the issue did not reach.** Copying an auction,
+zoning or destination profile round-trips its mechanism block **silently** — the reader gets a
+multi-round auction back without the word *auction* appearing anywhere. The panel now says a
+profile carries blocks it cannot author. § D227's rule, pointed at the gap between what a document
+holds and what a panel can reach.
+
+## D304 — a rate limit is only as good as the premise in its docstring
+
+`LINKS_PER_EMAIL` was three, justified by *"an address may have three unexpired links
+outstanding"*. **Against a client that holds its session token in memory by choice
+([§ D257](#d257)'s neighbour decision, unchanged here), that premise is false**: a reload spends the
+*session*, not the link — the link is already `DELETE`d by `consumeLoginToken` — so the budget is a
+**reload budget**, and three locked a player out of their own account on the third reload inside a
+quarter hour. Compounded by issue #106, where the first sign-in click was always swallowed, so
+reloading is exactly what a player did.
+
+Raised to ten. `LINKS_PER_CALLER` is untouched at thirty, so one sender's **total** output does not
+move; what rises is distributed concentration on a single victim, 12/hr → 40/hr, and that is stated
+in the docstring rather than waved at.
+
+**The right fix is not this number, and it is filed rather than done.** A *redeemed* link is not
+outstanding, so redemption should hand its budget back — unattackable without reading the victim's
+mail, and zero cost to the bound. It needs a release on `FixedWindowLimiter`, and inlining a second
+fixed-window counter beside the one next door would be two implementations of one policy.
+
+The two tests that pinned the old number were rewritten to pin **that there is a low ceiling**,
+looping until refused. A test that fails whenever a bounded policy is retuned trains its reader to
+edit the assertion, which is how a bound stops meaning anything.
+
+
+## D305 — Compare draws its interval, and its default was chosen for reportability rather than for a verdict
+
+**Date: 2026-08-08.** Issue [#119](https://github.com/mrpeanut01/elevator-sim/issues/119) found the
+shipped batch answering **none of eight measures**: one saturated replication in fifty nullified the
+three headline metrics under the complete-case rule. **That rule is unchanged.** Three things moved.
+
+**The interval is drawn.** This is a product whose central claim is an interval that excludes zero,
+and it had never drawn one — ~700 words of monospace prose per verdict instead. A bar clear of zero
+is **filled**; one that straddles is **hollow with the zero line drawn through it**; every bar
+carries its caption in words and an `aria-label` with the whole row. Strip every colour and the two
+states are still told apart by whether a line crosses a box. `IntervalPlot.ranks` is **copied from
+the verdict, never inferred from `upper < 0`** — otherwise an energy axis and a
+[§ D171](#d171) under-budget interval would both draw as wins. The prose is **all kept**, moved
+beside the row it justifies.
+
+**The report leads with its answer** — the verdict, the drop count, and `packages/cli`'s own
+capacity framing, which already said the useful thing the viewer did not: *"A diverges at this load
+and B does not. That is a finding about capacity, and it does not need a mean to be true."*
+
+**The default runs the building's own profile at its declared `min`** — and the selection procedure
+is the part that matters. The criterion was written down and applied **before a single interval was
+read**: *the largest arrival rate on a 1 %-step grid at which all fifty paired replications stand
+behind a mean on both reference arms.* Swept 16 → 3; 16 loses one replication, 15 and below lose
+none. It returns **15**, which is `office-prestige`'s own declared floor. It ships as a **band
+select** (`min`/`typical`/`max`) rather than the number, so the *level* survives the panel
+inheriting a different building where a literal rate would not.
+
+**The shipped default now answers 8 of 8**, and its single separating row —
+ΔTTD **+3.933 s [+1.626, +6.241]** — names the **baseline** (`collective`) ahead. That a
+tuned-for-demonstration default would not have produced is the strongest available evidence this one
+was not.
+
+**The resolution limit was re-probed rather than inherited**, per [§ D151](#d151): at that cell, on
+TTD, at a **disjoint seed**, n = 50, 80 % power against a two-sided 95 % paired-t — near-neighbour
+**2.499 s**, structural **2.417 s**. The 3.933 s effect clears both. **The interval's lower bound of
+1.626 s does not, and that is stated in the code rather than smoothed over.**
+
+**Three of the issue's claims did not survive.** Its dispatcher-slug complaint is stale — both
+selects have read `Name (slug)` since § D236. Its implied "pick a better building" remedy does not
+exist: swept at their own traffic, **all eight shipped buildings suppress all three wait rows**, and
+Garden Apartments and St Jude reach only 47 of 50 quotable while saturating in **0** of 50 — other
+`awtIsValid` grounds. Demand really is the only lever. And `min` does not rescue every building —
+Midtown Office is 0 of 50 either way, and the panel says so.
+
+## D306 — the twelfth dead seam: `BatchPanelHandle.prefill`
+
+`mountBatchPanel` has returned a handle with `prefill()` since it was written, reading a live
+`inherit()` callback that reads the viewer's real state — and **nothing in the tree ever called
+either**. `dev/main.ts` discards the handle. So opening Compare while playing Garden Apartments
+offered Chancery House, and the mechanism to fix it had been sitting in the module the whole time.
+
+By the standing requirement's own test — *name the non-test caller* — this is the **twelfth**
+instance in code. The existing ordinals do not move: *the ninth* names § D114's instance and *the
+eleventh* names § D131's, and renumbering them would break every reference for a running total.
+
+Closed by giving it a caller **inside the module**, driven by the panel's own `[role=tabpanel]`
+visibility rather than by the shell, because the shell is another lane's file. An `isRunning()`
+added to the handle for the tab-steal fix was **deliberately not added**: an export with no non-test
+caller is the exact defect this entry is about, and the fix that needs it is sequenced onto the lane
+that owns `dev/main.ts`.
+
+**Still open from #119**, both blocked on `dev/main.ts`: the tab steal (a finishing run force-
+switches the centre column mid-batch), and the **dispatcher** half of the inheritance.
+
+
+## D307 — the stage banner counts the people in the building, not the ones the run ended with
+
+**Date: 2026-08-08.** Found by the new temporal property R6 ([§ D300](#d300)'s E-4) **on its first
+run**, and recorded rather than fixed in the lane that found it — so that a corpus which grew an
+axis and stayed green stayed distinguishable from one that had to be repaired first.
+
+`render/canvas.ts`'s banner led with `` `${status} — ${summary.undelivered} undelivered` `` on
+**every painted frame**. `summary.undelivered` is *how many people were still in the building when
+the run ended*, and `recordRun` simulates the whole day before the first paint, so the clause was
+never about the playhead. On `honesty-9100032` it read **127 at 00:00**, when nobody was undelivered
+yet, and **127 at 704 s, when the live figure was 376** — not merely early, but **smaller than the
+truth on the same image by a factor of three**, in the clause `UX.md`'s RV-16 makes lead the banner.
+
+### Closed with a live figure, and with neither precedent
+
+Both were weighed on paper before either was written:
+
+- **[§ D293](#d293)'s gate** is right for a card the reader can come back to. Here it would take
+  RV-16's lead off the bitmap for the whole of the run it is about — **the exact trade
+  [§ D294](#d294) refused on this same canvas**, because a bitmap has no later.
+- **§ D294's scoping** (*"127 undelivered when the run ended"*) is honest, and still not enough
+  while the reader is watching 376 people stack up beside it. **Scoping rescues a figure with no
+  live counterpart. This one has one.**
+
+So `undeliveredAt` publishes `arrived − carried` at the playhead, and the run's own figure once the
+playhead reaches `endedAt` — **worded differently, because they are different quantities.** The live
+count is not a synonym for *undelivered* and is not worded as one: it includes riders who took the
+stairs and riders the door turned away ([§ D265](#d265), [§ D266](#d266)).
+
+**And it is exactly the quantity R6 reads back**, so the product and the oracle cannot hold two
+definitions of it — which makes a coincidental match provably impossible rather than merely
+unlikely. `recording.status` is still drawn verbatim at every playhead: § D294's ruling on this same
+header, left standing.
+
+### The same defect was on the text alternative, twice
+
+`render/describeFrame.ts` joined **every** `MoodDriver` where § D293 gated the rail — 196
+violations across 49 of 49 always-on cases — and separately printed the banner's whole-run count
+through a branch needing none of the adapter's optional input, **reachable from `dev/main.ts` today
+at both call sites**. Both fixed, with `mood.retraction` taking the withheld rows' place exactly as
+on the rail.
+
+### Neither corpus moved, and that is measured rather than assumed
+
+**246 875 always-on and 312 104 deep, both unchanged.** § D293's rail lost 588 strings because it
+withheld *rows*; a gate inside one joined paragraph and one joined banner line changes what a string
+*says* and not how many there are. **A published figure asserted to have stayed still is the same
+discipline as one recorded moving.**
+
+Always-on is back to **0 violations**. The deep tier's single remaining failure —
+`honesty-9100031`, `suppressed-mean`, 10 violations — is unchanged in case, property and count, and
+is a cue-rule coincidence rather than a product defect: the caveat says *"a quotable average on 6 of
+20 consecutive seeds"* and the run's refused `meanWaitS` also rounds to 20.
+
+`render/canvas.ts#playheadHasReachedEnd` is a **second copy** of `dev/leftRail.ts#shiftIsOver`,
+because `render/` may not import `dev/`. `leftRail.test.ts` pins the two equal at five playheads of
+a real recording, in the file whose dependency direction allows it.
+
+
+---
+
+## D308 — the federated credential's subject names the environment, and the branch pin moved out of Azure
+
+`docs/16` § 9 listed six things this lane had reasoned about and never run, and named the first as
+*"the most likely first failure"*: no Azure resource had been created, the federated credential had
+never been exchanged, and whether `listSecrets` alone suffices was read from a documentation table
+rather than measured. It has now been run end to end. **Two of the six were wrong, both in the
+provisioning path, and neither was found by reading.**
+
+### The first: two credentials on one identity cannot be written at once
+
+`what-if` approved six resources; the deploy created zero:
+
+```
+ConcurrentFederatedIdentityCredentialsWritesForSingleManagedIdentity
+"Concurrent Federated Identity Credentials writes under the same managed identity are not supported."
+```
+
+`parent: deployIdentity` makes both credentials depend on the identity and neither on each other, so
+ARM writes them in parallel — which the resource provider refuses outright. Not a race that
+sometimes loses: it is deterministic, it fails the whole deployment, and there is no batching or
+retry knob on the credential resource. Closed with `dependsOn: [pushCredential]`.
+
+### The second, and the one worth reading: the subject was for a ref, and GitHub sends an environment
+
+With the resources created, the first real token exchange was refused:
+
+```
+AADSTS700213: No matching federated identity record found for presented assertion subject
+'repo:mrpeanut01/elevator-sim:environment:viz-production'
+```
+
+The credentials named `repo:OWNER/REPO:ref:refs/heads/main` and `repo:OWNER/REPO:pull_request`, and
+the template's own comment asserted the first was *"the exact subject GitHub puts in the token for a
+push to this branch."* It is not. **When a job declares `environment:`, GitHub replaces the
+ref-based subject with `repo:OWNER/REPO:environment:NAME`** — it does not add to it — and every
+deploying job in `deploy-viz.yml` declares one, because that is how the deployment URL and the
+protection rules work at all.
+
+So **neither credential could ever have matched**. The failure was not an artefact of the
+`workflow_dispatch` that found it; a push to `main` would have been refused with the same message,
+on the first merge, with the site provisioned and the API already pointed at it.
+
+This is [§ D112](#d112)'s shape in infrastructure clothing — a configuration that was authored,
+reviewed, schema-checked, deployed, and could not reach the thing it named. What let it survive
+review is what always lets it survive: **its untested parts read exactly like its tested ones**, and
+the sentence asserting the subject was more confident than anything that had run.
+
+### What the correction costs, stated rather than implied
+
+A ref-pinned subject refuses a deploy dispatched from any other branch. An environment-pinned one
+does not, because the subject carries no ref. **That restriction is real and it has moved rather
+than been dropped** — to the `viz-production` environment's deployment branch policy, set to exactly
+`main`, with `custom_branch_policies` rather than `protected_branches` because the latter means
+*whatever happens to be protected right now*, a different rule on a repository that later protects a
+second branch.
+
+The move is recorded because it is a genuine change of venue: the half that now lives in GitHub can
+be changed without touching a template, and the audit trail for it is GitHub's, not Azure's.
+`provision.sh` **sets** it rather than documenting it — a restriction in a runbook holds until the
+first person who has not read the runbook — and then reads it back and refuses to arm if it names
+anything other than the one branch. `--deploy-now` refuses from a non-production branch for the same
+reason, with the reason in the message, because a policy working correctly and a deploy broken look
+identical in a run log.
+
+### The dead parameter the correction created, and why it is routed rather than deleted
+
+Moving the subject off the ref left `productionBranch` declared, documented, present in every
+example parameter file, and **feeding no Azure resource** — which Bicep's linter said out loud
+(`no-unused-params`). That is this repository's most-repeated defect wearing infrastructure clothes,
+and the fix is not deletion, because the branch restriction is real. It is routed: the template
+emits `productionBranchName`, `productionEnvironmentName` and `previewEnvironmentName` as outputs,
+and `provision.sh` reads all three back from the deployment instead of keeping its own copies. The
+two environment names are literally half of a credential's subject, so a second copy of them in the
+script is a second place for them to be wrong — and the failure that produces is an AADSTS700213
+that names the string and not which of the two places authored it.
+
+### What is now verified by running it, and what is still not
+
+Verified: both templates deploy; six resources exist; the site answers; the app boots with
+`ELEVATOR_SIM_ORIGIN` and `ELEVATOR_SIM_ALLOW_ORIGIN` naming the site and agreeing with each other
+(it refuses to start otherwise, so a 200 from `/api/wake` is the assertion); the armed build emits
+the tag and widens the CSP, asserted on the runner; `provision.sh` runs, refuses to arm before the
+API is pointed at the site, and arms after.
+
+**Still unverified, and the list is shorter rather than empty:** no page has been served
+cross-origin to a browser, so the CORS round trip — preflight, `Authorization`, a real sign-in —
+remains reasoned about; `listSecrets` has still not been exercised, because the token exchange that
+precedes it failed first; the absent `navigationFallback` has not met a live site; and **still no
+mail has ever been sent**.
+
+Re-running `infra/azure/main.bicep` needed both `@secure()` parameters again, and they were **read
+back off the deployed Container App** rather than regenerated — the round trip through
+`uriComponent` checked before deploying, because a password that fails to decode identically would
+reset the server's administrator credential to something its own connection string does not carry.
+Regenerating `appSecret` would have invalidated every session and every in-flight sign-in link, and
+that is a cost this lane had no reason to pay.
+
+### D308 addendum — the job that authenticates and declares no environment
+
+Pruning the orphaned credentials exposed a third instance of the same defect, in the workflow rather
+than the template. `close-preview` uses `azure/login` and declared **no `environment:`**, so it
+would have presented the ref-based subject — the one that had just been deleted for naming a shape
+GitHub does not send. It would have failed on every pull request close, and the visible symptom
+would not have been an authentication error: preview environments are torn down by that job, Free
+allows three, and the failure surfaces as **the fourth open pull request hitting a quota error that
+names neither the three holding the slots nor the login that never ran**.
+
+Fixed by declaring `environment: viz-preview` on it — the environment it is tearing down, so the
+line is also the honest description of what the job touches.
+
+**The check that would have caught it now runs.** The template cannot see the workflow, and the
+workflow is the thing that presents a subject, so agreement between them was asserted by nobody.
+`provision.sh` now requires every `azure/login` step to be matched by a job-level `environment:`,
+and both environment names to appear in the workflow. It is **a proxy and is documented as one**: it
+counts rather than parses, and it would miss two logins inside one job. It would have caught this,
+which is the bar — the alternative was a YAML parse depending on a library the script does not have.
+
+### D308 addendum 2 — the subject was immutable, and "propagation delay" was the wrong diagnosis for twenty minutes
+
+Correcting the subject from a ref to an environment did not fix the token exchange. It kept failing:
+
+```
+AADSTS700213: No matching federated identity record found for presented assertion subject
+'repo:mrpeanut01@31497414/elevator-sim@1312422339:environment:viz-preview'
+```
+
+against a credential whose subject was `repo:mrpeanut01/elevator-sim:environment:viz-preview`. Issuer
+matched, audience matched, client id matched the identity holding the credential. **The working
+hypothesis was Entra propagation delay, and it was wrong** — it was believed for twenty minutes and
+three retries, because it is the explanation the internet offers for this error code and because the
+two strings look like the same string with the error message decorating it.
+
+They are not the same string. GitHub now issues an **immutable subject claim**, and
+`GET /repos/OWNER/REPO/actions/oidc/customization/sub` says so outright:
+
+```json
+{"use_default":true,"use_immutable_subject":false,"sub_claim_prefix":"repo:mrpeanut01@31497414/elevator-sim@1312422339"}
+```
+
+The numeric account and repository ids are **in the claim**, so that renaming a repository cannot
+hand a live trust relationship to whoever registers the old name next. That is a better property
+than the documented `repo:OWNER/REPO` form. It is also invisible in exactly the way that costs time:
+the ids appear in no documentation anyone would copy from, and the error prints the enriched subject
+in a position where it reads as Entra annotating its own message rather than as the literal claim.
+
+So `provision.sh` **reads the prefix** and passes it to the template as `githubSubjectPrefix`,
+falling back to the documented form when the endpoint offers none. Same discipline as the API's
+origin, same reason: a value typed twice is a value wrong once, and this one is wrong in a way that
+imitates a transient.
+
+**The lesson is about the diagnosis rather than the defect.** An error naming two strings that look
+identical should be read as *the strings are not identical* before it is read as *the system is
+eventually consistent*. Three of this lane's four failures were found by running it and none by
+reading it, and this one was additionally delayed by an explanation that fit the symptom and not the
+evidence.

@@ -19,6 +19,9 @@
  *    Vertical City run.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import {
   loadConfig,
   type DispatcherProfile,
@@ -47,6 +50,7 @@ import {
   nameplateOf,
   nameplateVisibleIn,
   patternOptionsOf,
+  runningClassesOf,
   trafficPlateOf,
 } from './rightRail.js';
 
@@ -475,17 +479,195 @@ describe('machineWarningOf', () => {
   });
 
   it('says nothing alarming when the building is inside the envelope', () => {
+    /*
+     * `hydraulic` on Garden Apartments, which is the class its two cars are actually built to:
+     * 15 m of rise and 6 floors against 18 m and 6, at 0.63 m/s inside a 0.50–0.75 band.
+     *
+     * This case used to be `ultra-high-speed` on the same building, and it passed for a reason
+     * that was a defect rather than a fact — see the speed case below.
+     */
     const line = machineWarningOf(
-      machineClass('ultra-high-speed'),
+      machineClass('hydraulic'),
       requireBuilding(config, 'garden-apartments'),
     );
     expect(line).not.toContain('⚠');
     expect(line).toContain('Garden Apartments');
   });
 
+  it('checks the speed band, not only the rise and the floor count', () => {
+    /*
+     * **The expectation this case carried before issue #114 was the bug.** It asserted that
+     * *Ultra high-speed* — a class banded 10.00–20.50 m/s — raised nothing about Garden
+     * Apartments, whose cars run at 0.63, and named it *"says nothing alarming when the building
+     * is inside the envelope"*. The building is not inside that class's envelope; the envelope was
+     * checked on rise and floors and never on speed, so the line said so anyway. The nameplate two
+     * rows above it has always said *"A car outside the band is not a car of this class"*, and
+     * `config/parse.ts` has always raised `speed-outside-class-range` for it.
+     */
+    const ultra = machineClass('ultra-high-speed');
+    const line = machineWarningOf(ultra, requireBuilding(config, 'garden-apartments'));
+    expect(line.startsWith('⚠')).toBe(true);
+    expect(line).not.toContain("is inside this class's envelope");
+    // Both sides of the comparison, so the reader can see which number is being objected to.
+    expect(line).toContain('0.63 m/s');
+    expect(line).toContain(
+      `${ultra.speedMinMps.toFixed(2)}–${ultra.speedMaxMps.toFixed(2)} m/s`,
+    );
+    // Still an advisory: the loader raises this one as a warning too, and builds the bank.
+    expect(line).toContain('advisory rather than a refusal');
+    expect(line.toLowerCase()).not.toContain('refuses');
+  });
+
+  it('measures the cars built to the class, not every car in the building', () => {
+    /*
+     * Vertical City runs 27 gearless-traction cars and 8 ultra high-speed ones. Comparing all 35
+     * against the gearless band (2.50–7.00) raises a ⚠ about the sky-lobby shuttle, which is
+     * correctly an ultra car correctly running at 10 m/s — a false alarm in place of the false
+     * *inside the envelope* this fix removed. `config/parse.ts` scopes its own envelope checks the
+     * same way: once per class in the bank, over the classes the bank actually uses.
+     */
+    const city = requireBuilding(config, 'vertical-city');
+    const speeds = city.banks.flatMap((bank) => bank.cars.map((car) => car.ratedSpeedMps));
+    const gearless = machineClass('gearless-traction');
+    expect(Math.max(...speeds)).toBeGreaterThan(gearless.speedMaxMps);
+    expect(machineWarningOf(gearless, city)).not.toContain('m/s against a class banded');
+  });
+
   it('makes no claim about a building it has not been given', () => {
     const line = machineWarningOf(machineClass('hydraulic'), undefined);
     expect(line).not.toContain('⚠');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Machines: what is running, and the refusal that says so — issue #114
+ * -------------------------------------------------------------------------- */
+
+describe('runningClassesOf', () => {
+  it('reads the class off the cars, on a building the rail used to be wrong about', () => {
+    /*
+     * The regression pin. `editingClassId` is seeded from `classes[2]` — *Geared traction* — and
+     * `withBuilding` never re-derives it, so the rail highlighted that class on every building in
+     * the catalogue. Chancery House runs six gearless cars and not one geared one.
+     */
+    const running = runningClassesOf(requireBuilding(config, 'chancery-house'), classes);
+    expect(running.map((entry) => entry.id)).toEqual(['gearless-traction']);
+    expect(running[0]?.machineClass?.name).toBe('Gearless traction');
+    expect(running[0]?.cars).toBe(6);
+    expect(running[0]?.speedMinMps).toBe(5);
+    expect(running[0]?.speedMaxMps).toBe(5);
+  });
+
+  it('disagrees with itself across buildings, which the pointer it replaced never did', () => {
+    const first = (id: string): string | undefined =>
+      runningClassesOf(requireBuilding(config, id), classes)[0]?.id;
+    expect(first('garden-apartments')).toBe('hydraulic');
+    expect(first('midtown-office')).toBe('geared-traction');
+    expect(first('chancery-house')).toBe('gearless-traction');
+    expect(new Set([first('garden-apartments'), first('chancery-house')]).size).toBe(2);
+  });
+
+  it('lists every class a building runs, largest fleet first', () => {
+    // 27 gearless locals against 8 ultra high-speed shuttle cars: the nameplate follows the first.
+    const running = runningClassesOf(requireBuilding(config, 'vertical-city'), classes);
+    expect(running.map((entry) => entry.id)).toEqual(['gearless-traction', 'ultra-high-speed']);
+    expect(running[0]?.cars).toBe(27);
+    expect(running[1]?.cars).toBe(8);
+    expect(running[0]?.banks.length).toBeGreaterThan(1);
+    expect(running[1]?.banks).toEqual(['Double-deck sky lobby shuttle']);
+  });
+
+  it('separates two classes sharing one bank, and bands their speeds', () => {
+    const running = runningClassesOf(requireBuilding(config, 'crown-hotel'), classes);
+    expect(running).toHaveLength(2);
+    for (const entry of running) expect(entry.banks).toEqual(['Main bank']);
+    const all = running.flatMap((entry) => [entry.speedMinMps, entry.speedMaxMps]);
+    expect(new Set(all)).toEqual(new Set([1.75, 3]));
+  });
+
+  it('keeps the row when the library cannot name the class, rather than dropping it', () => {
+    // A `spec` no class record carries is a misconfiguration; a panel that stayed quieter about it
+    // than about a working building would be the wrong way round.
+    const running = runningClassesOf(requireBuilding(config, 'midtown-office'), []);
+    expect(running.map((entry) => entry.id)).toEqual(['geared-traction']);
+    expect(running[0]?.machineClass).toBeUndefined();
+  });
+
+  it('has nothing to say before a building resolves', () => {
+    expect(runningClassesOf(undefined, classes)).toEqual([]);
+  });
+});
+
+describe('the Machines segment says it writes nothing — § D227', () => {
+  /*
+   * `mountRightRail` is DOM-bound and on `honesty/derive.test.ts`'s undriven-mount list, so the
+   * panel itself cannot be rendered under Node. What is asserted instead is the pure paragraph the
+   * panel puts in its prose slot — `machineWarningOf` is the whole of it — plus the two things a
+   * sentence alone cannot establish: that no write survives in the module for it to be wrong
+   * about, and that the three segments which *do* write make no such claim. That is weaker than
+   * driving the mount and is said rather than dressed up.
+   */
+  const REFUSAL = 'Nothing here is pickable';
+
+  const sourceOf = (path: string): string =>
+    readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
+
+  /** Comments blanked, so a docstring *about* a write does not read as one. `derive`'s idiom. */
+  const code = (text: string): string =>
+    text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  it('carries the refusal in every state the paragraph has', () => {
+    const inside = machineWarningOf(
+      machineClass('hydraulic'),
+      requireBuilding(config, 'garden-apartments'),
+    );
+    const over = machineWarningOf(
+      machineClass('hydraulic'),
+      requireBuilding(config, 'vertical-city'),
+    );
+    const none = machineWarningOf(machineClass('hydraulic'), undefined);
+    for (const line of [inside, over, none]) expect(line).toContain(REFUSAL);
+  });
+
+  it('names the two surfaces that really do write, in their own words', () => {
+    /*
+     * A refusal is pinned by the thing it points at, never by another sentence. Both labels are
+     * asserted against the module that authors them, so renaming either screen turns this red
+     * rather than leaving the rail pointing at a door that is no longer there.
+     */
+    const line = machineWarningOf(machineClass('hydraulic'), undefined);
+    expect(sourceOf('../menu/screens.ts')).toContain("label: 'Commission the building'");
+    expect(sourceOf('../../index.html')).toContain('Save as a new building');
+    expect(line).toContain('Commission the building');
+    expect(line).toContain('Save as a new building');
+  });
+
+  it('is true: nothing in the rail writes the pointer the six cards used to write', () => {
+    // The other half of § D227. A sentence saying a panel writes nothing is worth what the code
+    // behind it is worth, and `editingClassId` was exactly one `context.update` away from making
+    // this claim false.
+    expect(code(sourceOf('./rightRail.ts'))).not.toContain('editingClassId');
+  });
+
+  it('is confined to the segment it is true of', () => {
+    /*
+     * § D227 binds both ways: a control that writes something may not claim it writes nothing. The
+     * dispatcher, traffic and building lists each call `runShift` after their write, so none of
+     * them may carry this sentence.
+     */
+    const live = [
+      dispatcherNoteOf(config.dispatcherProfiles.profiles, 'collective'),
+      ...config.dispatcherProfiles.profiles.map((entry) => dispatcherBlurbOf(entry)),
+      ...patternOptionsOf(
+        resourcesWith(config.trafficProfiles),
+        [],
+        requireBuilding(config, 'midtown-office'),
+      ).flatMap((option) => [option.sub, option.help]),
+      ...buildingPlateOf(requireBuilding(config, 'midtown-office'), undefined).map(
+        (row) => `${row.v} ${row.help ?? ''}`,
+      ),
+    ];
+    for (const text of live) expect(text).not.toContain(REFUSAL);
   });
 });
 

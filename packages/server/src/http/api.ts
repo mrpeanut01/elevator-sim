@@ -187,18 +187,43 @@ function cooldownForSeeds(seedCount: number): number {
 }
 
 /**
- * How many live sign-in links one **address** may have at a time.
- *
- * The window is deliberately {@link LOGIN_TTL_MS}, so the rule reads as a fact about the world
- * rather than as a tuned number: an address may have three unexpired links outstanding, and asking
- * for a fourth while three still work is not a thing an honest player needs to do.
+ * How many sign-in links one **address** may ask for in a {@link LOGIN_TTL_MS} window.
  *
  * This is the budget that decides whether the endpoint is a weapon. Without it, anyone who can type
  * an address can make this server mail a stranger as fast as it will go — an email-bombing gadget
  * aimed at somebody who has never used the product, and an Azure Communication Services quota spent
- * in an afternoon.
+ * in an afternoon. That is why there is a number here at all, and it is not negotiable.
+ *
+ * ## Why the number moved from three, and what moved was the *reason* rather than the appetite
+ *
+ * It was three, and the sentence justifying three was: *"an address may have three unexpired links
+ * outstanding, and asking for a fourth while three still work is not a thing an honest player needs
+ * to do."* **That premise is false against this client**, which is GitHub issue #112 § 3. The viewer
+ * holds its session token in memory and never writes it to storage — `menu/account.ts` and
+ * `dev/main.ts` both document that as a deliberate security choice — so **a reload spends the
+ * session, not the link**, and the link it would replay is already consumed (`consumeLoginToken` is
+ * a `DELETE`). A player who reloads the page therefore *must* ask again, and on the third reload
+ * inside a quarter of an hour the server locked them out of their own account.
+ *
+ * So the budget is a **reload** budget rather than an outstanding-link budget, and ten is that
+ * number: more reloads than an honest session has, and still a bound.
+ *
+ * ## What the widening does and does not cost, stated rather than waved at
+ *
+ * {@link LINKS_PER_CALLER} is untouched at thirty, so **one sender's total output is unchanged** —
+ * the widening redistributes it (three victims at ten rather than ten victims at three) and does not
+ * increase it. What it does raise is what a *distributed* sender can concentrate on one victim: 12
+ * messages an hour becomes 40. That is a real cost, it is bounded, and it is the price of not
+ * locking a player out of their own account.
+ *
+ * **The better fix is one this lane could not reach, and it is not this number.** A link that has
+ * been *redeemed* is not outstanding, so the redemption should hand its budget back — which cannot
+ * be attacked without reading the victim's mail, and so would fix the lockout at zero cost to the
+ * bound above. `FixedWindowLimiter` has no release, `accounts/rateLimit.ts` is outside this lane's
+ * files, and inlining a second fixed-window counter here would be a second implementation of the
+ * one next door. It is proposed in this lane's report instead.
  */
-const LINKS_PER_EMAIL = { maxRequests: 3, windowMs: LOGIN_TTL_MS } as const;
+const LINKS_PER_EMAIL = { maxRequests: 10, windowMs: LOGIN_TTL_MS } as const;
 
 /**
  * How many sign-in links one **caller** may ask for, for any addresses at all.

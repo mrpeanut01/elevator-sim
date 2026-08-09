@@ -162,6 +162,7 @@ import {
   runFiguresOf,
   servedCaptionFor,
   servedTitleFor,
+  shiftIsOver,
   statRowsOf,
   streakLineOf,
 } from '../dev/leftRail.js';
@@ -257,7 +258,9 @@ import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore }
 import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
 import { coachWeekLines } from '../shift/weekLabel.js';
 
-import type { HonestyCase, RenderedText, TextProvenance, TextRole } from './types.js';
+import type { WaitBandBasis } from '../live/types.js';
+
+import type { HonestyCase, RenderedText, TextProvenance, TextRole, TextPlayhead } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The context an adapter is handed
@@ -444,6 +447,32 @@ interface TextSeed {
   readonly countShown?: boolean | undefined;
   readonly energyAxis?: boolean | undefined;
   readonly gated?: boolean | undefined;
+  /** When the surface said it, for a surface driven at a playhead — see {@link atPlayhead}. */
+  readonly playhead?: TextPlayhead | undefined;
+}
+
+/**
+ * The window seed for a surface driven at `at` — the one place a playhead becomes a declaration.
+ *
+ * `basis` is passed only by a caller that has a shipped type carrying it. Everything else gets the
+ * clock and nothing more, which is what puts it on the textual half of the temporal property
+ * without claiming a declaration it never made.
+ */
+function atPlayhead(recording: VizRecording, at: number, basis?: WaitBandBasis): TextPlayhead {
+  return { atS: at, endedAt: recording.endedAt, ...(basis === undefined ? {} : { basis }) };
+}
+
+/**
+ * The basis the **rail** chooses at this playhead, asked of the rail rather than recomputed.
+ *
+ * `dev/leftRail.ts#shiftIsOver` is exported for exactly this, and says so: *"a probe that recomputed
+ * `t >= endedAt` would assert its own arithmetic and say nothing about the rail."* `basisAt` — the
+ * rail's private one-liner over it — is what `drawMood` and `drawHonesty` pass to `waitBandsAt` and
+ * `honestyAt`, so a sweep that took those functions' **defaults** was rendering the live copy at
+ * `endedAt` where the screen shows the retrospective one. It did, until this axis landed.
+ */
+function railBasisAt(recording: VizRecording, at: number): WaitBandBasis {
+  return shiftIsOver(recording, at) ? 'whole-run' : 'now';
 }
 
 function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly RenderedText[] {
@@ -459,6 +488,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       countShown: seed.countShown,
       energyAxis: seed.energyAxis,
       gated: seed.gated,
+      playhead: seed.playhead,
     }));
 }
 
@@ -630,6 +660,13 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
           mood: bundle.mood,
         }),
         role: 'prose',
+        /*
+         * On the temporal axis with no `basis`, and that is the honest declaration: `describeFrame`
+         * composes one paragraph out of live frame data, live queues, run-level status and — when a
+         * caller passes one — the mood's drivers, and it declares nothing about which of those folds
+         * which window. So the structural half cannot reach it and the textual half is what does.
+         */
+        playhead: atPlayhead(context.recording, at),
       });
     }
     return singleRun(this.id, seeds);
@@ -648,6 +685,7 @@ const OVERLAY: SurfaceAdapter = {
           field: `overlayAt(@${at.toFixed(0)}s).suppressionReason`,
           text: metrics.suppressionReason,
           role: 'reason',
+          playhead: atPlayhead(context.recording, at),
         });
       }
       /*
@@ -667,6 +705,7 @@ const OVERLAY: SurfaceAdapter = {
             text: `rolling mean wait ${metrics.rollingMeanWaitS.toFixed(1)} s`,
             role: 'estimate',
             gated: true,
+            playhead: atPlayhead(context.recording, at),
           });
         }
         for (const [index, bank] of metrics.banks.entries()) {
@@ -676,6 +715,7 @@ const OVERLAY: SurfaceAdapter = {
             text: `${bank.bankId} mean wait ${bank.meanWaitS.toFixed(1)} s`,
             role: 'estimate',
             gated: true,
+            playhead: atPlayhead(context.recording, at),
           });
         }
       }
@@ -743,7 +783,12 @@ const CANVAS: SurfaceAdapter = {
         mood: bundle.mood,
       });
       for (const [index, text] of ctx.texts.entries()) {
-        seeds.push({ field: `drawScene(@${at.toFixed(0)}s).fillText[${String(index)}]`, text, role: 'prose' });
+        seeds.push({
+          field: `drawScene(@${at.toFixed(0)}s).fillText[${String(index)}]`,
+          text,
+          role: 'prose',
+          playhead: atPlayhead(recording, at),
+        });
       }
       const overlayCtx = textCapturingContext();
       drawOverlay(overlayCtx, {
@@ -754,16 +799,27 @@ const CANVAS: SurfaceAdapter = {
         theme: DEFAULT_THEME,
       });
       for (const [index, text] of overlayCtx.texts.entries()) {
-        seeds.push({ field: `drawOverlay(@${at.toFixed(0)}s).fillText[${String(index)}]`, text, role: 'prose' });
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).fillText[${String(index)}]`,
+          text,
+          role: 'prose',
+          playhead: atPlayhead(recording, at),
+        });
       }
       if (selection !== undefined) {
-        seeds.push({ field: `describeSelection(@${at.toFixed(0)}s)`, text: describeSelection(selection), role: 'prose' });
+        seeds.push({
+          field: `describeSelection(@${at.toFixed(0)}s)`,
+          text: describeSelection(selection),
+          role: 'prose',
+          playhead: atPlayhead(recording, at),
+        });
       }
       for (const [index, assignment] of bundle.assignments.slice(0, 4).entries()) {
         seeds.push({
           field: `landingOptionLabel(@${at.toFixed(0)}s)[${String(index)}]`,
           text: landingOptionLabel(assignment),
           role: 'label',
+          playhead: atPlayhead(recording, at),
         });
       }
     }
@@ -771,6 +827,29 @@ const CANVAS: SurfaceAdapter = {
   },
 };
 
+/**
+ * The mood gauge — `render/mood.ts#buildingMood`, **as a renderer is obliged to draw it.**
+ *
+ * ## Why the drivers are gated here rather than listed whole
+ *
+ * `BuildingMood.drivers` is *every observation consulted*, and four of the five carry
+ * `basis: 'whole-run'` — `recordRun` simulates the day up front, so `summary.saturated`,
+ * `summary.serviceLevel`, `summary.delivered` and `summary.handlingCapacity` are the end of the
+ * shift by the first frame of it. The producer publishing them in its return value is correct; a
+ * renderer drawing them at a part-way playhead is issue #109, and `dev/leftRail.ts` gates them
+ * (§ D293).
+ *
+ * This adapter used to seed **all five at all five playheads**, which made the corpus claim a player
+ * reads four sentences the product deliberately withholds — and `RenderedText`'s own docstring is
+ * *"one string a player would actually see."* It now drives `moodDriverRowsOf`, which is
+ * `moodDriverPanelOf` reached through its exported door and whose docstring names *"the honesty
+ * sweep, chiefly"* as the caller it exists for. So the retraction row enters the corpus for the
+ * first time, the four withheld sentences leave it at the four early playheads, and both are still
+ * checked in full at `endedAt` where the card actually publishes them.
+ *
+ * The basis travels with the row: `MoodDriverRow` drops it, so it is looked back up on the driver
+ * whose label the row carries — the same join the rail makes when it styles a row by its level.
+ */
 const MOOD: SurfaceAdapter = {
   id: 'render/mood.ts#buildingMood',
   covers: ['render/mood.ts#buildingMood'],
@@ -778,15 +857,29 @@ const MOOD: SurfaceAdapter = {
     const seeds: TextSeed[] = [];
     for (const at of sampleTimes(context.recording)) {
       const { mood } = context.bundleAt(at);
-      seeds.push({ field: `mood(@${at.toFixed(0)}s).headline`, text: mood.headline, role: 'observation' });
+      const stamp = at.toFixed(0);
+      seeds.push({
+        field: `mood(@${stamp}s).headline`,
+        text: mood.headline,
+        role: 'observation',
+        playhead: atPlayhead(context.recording, at),
+      });
       if (mood.caveat !== '') {
-        seeds.push({ field: `mood(@${at.toFixed(0)}s).caveat`, text: mood.caveat, role: 'prose' });
+        seeds.push({ field: `mood(@${stamp}s).caveat`, text: mood.caveat, role: 'prose' });
       }
-      for (const [index, driver] of mood.drivers.entries()) {
+      const basisOf = new Map(mood.drivers.map((driver) => [driver.label, driver] as const));
+      for (const [index, row] of moodDriverRowsOf(mood).entries()) {
+        const driver = basisOf.get(row.label);
         seeds.push({
-          field: `mood(@${at.toFixed(0)}s).drivers[${String(index)}](${driver.id})`,
-          text: `${driver.label}: ${driver.text}`,
-          role: 'observation',
+          field: `mood(@${stamp}s).drivers[${String(index)}](${driver?.id ?? 'retraction'})`,
+          text: `${row.label}: ${row.text}`,
+          /*
+           * The retraction is not one of the drivers, and it is a `reason` rather than an
+           * `observation`: it names what the card has stopped showing. R6's own remedy may not be
+           * the thing R6 refuses.
+           */
+          role: driver === undefined ? 'reason' : 'observation',
+          playhead: atPlayhead(context.recording, at, driver?.basis),
         });
       }
     }
@@ -841,24 +934,53 @@ const LIVE_RAIL: SurfaceAdapter = {
 
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
-      const mood = moodAt(recording, at);
-      seeds.push({ field: `mood(@${stamp}s).headline`, text: mood.headline, role: 'observation' });
-      seeds.push({ field: `mood(@${stamp}s).sub`, text: mood.sub, role: 'observation' });
+      /*
+       * **The basis the rail picks, not the parameter's default** — and the default is what this
+       * adapter took until the temporal axis landed.
+       *
+       * `waitBandsAt`, `moodAt` and `honestyAt` all default to `'now'` *"so every caller written
+       * before the second basis existed keeps the reading it had"*, and `dev/leftRail.ts` is not
+       * such a caller: `drawMood` and `drawHonesty` both pass `basisAt(recording, t)`. So at
+       * `endedAt` the screen has been drawing the retrospective banding, the retrospective face and
+       * the retrospective honesty card, and this sweep has been rendering the live copy of all
+       * three — a whole class of player-facing sentence that had never been in the corpus. Asking
+       * `shiftIsOver` is asking the rail's own question; see {@link railBasisAt}.
+       */
+      const basis = railBasisAt(recording, at);
+      const mood = moodAt(recording, at, basis);
+      seeds.push({
+        field: `mood(${basis}, @${stamp}s).headline`,
+        text: mood.headline,
+        role: 'observation',
+        playhead: atPlayhead(recording, at, mood.basis),
+      });
+      seeds.push({
+        field: `mood(${basis}, @${stamp}s).sub`,
+        text: mood.sub,
+        role: 'observation',
+        playhead: atPlayhead(recording, at, mood.basis),
+      });
 
-      const bands = waitBandsAt(recording, at);
+      const bands = waitBandsAt(recording, at, basis);
       for (const entry of bands.counts) {
         seeds.push({
-          field: `bands(@${stamp}s).${entry.band.id}`,
+          field: `bands(${basis}, @${stamp}s).${entry.band.id}`,
           text: `${entry.band.label} ${String(entry.count)}`,
           role: 'observation',
           declaredCount: bands.total,
           countShown: true,
+          playhead: atPlayhead(recording, at, bands.basis),
         });
       }
 
       const segment = phaseAt(recording, at);
       if (segment !== undefined) {
-        seeds.push({ field: `phaseAt(@${stamp}s)`, text: segment.title, role: 'observation' });
+        seeds.push({
+          field: `phaseAt(@${stamp}s)`,
+          text: segment.title,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
       }
 
       for (const [index, row] of decisionRowsAt(recording, at).entries()) {
@@ -866,26 +988,47 @@ const LIVE_RAIL: SurfaceAdapter = {
           field: `decision(@${stamp}s)[${String(index)}].head`,
           text: row.head,
           role: 'label',
+          playhead: atPlayhead(recording, at),
         });
         seeds.push({
           field: `decision(@${stamp}s)[${String(index)}].why`,
           text: row.why,
           role: 'observation',
+          playhead: atPlayhead(recording, at),
         });
       }
 
       for (const mode of ['casual', 'engineer'] as const) {
-        const card = honestyAt(recording, at, mode);
-        seeds.push({ field: `honesty(${mode}, @${stamp}s).title`, text: card.title, role: 'prose' });
-        seeds.push({ field: `honesty(${mode}, @${stamp}s).plain`, text: card.plain, role: 'prose' });
+        const card = honestyAt(recording, at, mode, basis);
+        /*
+         * `HonestyCard.basis` speaks for **the casual card only**, in its own words: *"the engineer
+         * card reads a verdict about the whole run on either."* So it is carried as a declaration on
+         * the casual copy and withheld on the engineer one, where it would be a declaration about a
+         * different string. An adapter that copied it onto both would be inventing a classification,
+         * which is the one thing this file's header says an adapter must never do.
+         */
+        const declared = mode === 'casual' ? card.basis : undefined;
+        seeds.push({
+          field: `honesty(${mode}, ${basis}, @${stamp}s).title`,
+          text: card.title,
+          role: 'prose',
+          playhead: atPlayhead(recording, at, declared),
+        });
+        seeds.push({
+          field: `honesty(${mode}, ${basis}, @${stamp}s).plain`,
+          text: card.plain,
+          role: 'prose',
+          playhead: atPlayhead(recording, at, declared),
+        });
         if (card.maths !== undefined) {
           seeds.push({
-            field: `honesty(${mode}, @${stamp}s).maths`,
+            field: `honesty(${mode}, ${basis}, @${stamp}s).maths`,
             text: card.maths,
             // The refusal's own words when there is one; counts and thresholds otherwise.
             role: card.suppressed ? 'reason' : 'observation',
             declaredCount: recording.summary.waitCount,
             countShown: true,
+            playhead: atPlayhead(recording, at, declared),
           });
         }
       }
@@ -910,6 +1053,7 @@ const RIDER_QUEUE: SurfaceAdapter = {
           field: `describeQueue(@${at.toFixed(0)}s, ${queue.floorId})`,
           text: describeQueue(queue),
           role: 'observation',
+          playhead: atPlayhead(context.recording, at),
         });
         /*
          * Both bands of § 6.2's degradation: a row wide enough for individual glyphs, and one
@@ -922,12 +1066,14 @@ const RIDER_QUEUE: SurfaceAdapter = {
             field: `planQueueRow(@${at.toFixed(0)}s, ${queue.floorId}, ${mode}).text`,
             text: plan.text,
             role: 'observation',
+            playhead: atPlayhead(context.recording, at),
           });
           if (plan.reliefText !== undefined) {
             seeds.push({
               field: `planQueueRow(@${at.toFixed(0)}s, ${queue.floorId}, ${mode}).reliefText`,
               text: plan.reliefText,
               role: 'observation',
+              playhead: atPlayhead(context.recording, at),
             });
           }
         }
@@ -963,6 +1109,7 @@ const PINNED_QUEUES: SurfaceAdapter = {
           field: `describePinnedQueues(@${at.toFixed(0)}s, short=${String(short)})`,
           text: describePinnedQueues(pinned, { short }),
           role: 'observation',
+          playhead: atPlayhead(context.recording, at),
         });
       }
     }
@@ -996,6 +1143,7 @@ const ACCESS: SurfaceAdapter = {
           field: `describeLockedOut(@${at.toFixed(0)}s, short=${String(short)})`,
           text: describeLockedOut(lockedOut, { short }),
           role: 'observation',
+          playhead: atPlayhead(context.recording, at),
         });
       }
     }
@@ -2444,24 +2592,29 @@ const RAIL_VIEW: SurfaceAdapter = {
 
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
-      const bands = waitBandsAt(recording, at);
+      /* The rail's own choice at this playhead, not the parameter default — see {@link railBasisAt}. */
+      const basis = railBasisAt(recording, at);
+      const bands = waitBandsAt(recording, at, basis);
       const view = moodViewOf(bands, moodOf(bands));
-      seeds.push({ field: `moodViewOf(@${stamp}s).headline`, text: view.headline, role: 'observation' });
-      seeds.push({ field: `moodViewOf(@${stamp}s).sub`, text: view.sub, role: 'observation' });
+      const banded = atPlayhead(recording, at, bands.basis);
+      seeds.push({ field: `moodViewOf(${basis}, @${stamp}s).headline`, text: view.headline, role: 'observation', playhead: banded });
+      seeds.push({ field: `moodViewOf(${basis}, @${stamp}s).sub`, text: view.sub, role: 'observation', playhead: banded });
       seeds.push({
-        field: `moodViewOf(@${stamp}s).barLabel`,
+        field: `moodViewOf(${basis}, @${stamp}s).barLabel`,
         text: view.barLabel,
         role: 'observation',
         declaredCount: bands.total,
         countShown: true,
+        playhead: banded,
       });
       for (const entry of view.legend) {
         seeds.push({
-          field: `moodViewOf(@${stamp}s).legend(${entry.bandId})`,
+          field: `moodViewOf(${basis}, @${stamp}s).legend(${entry.bandId})`,
           text: `${entry.label} ${String(entry.count)}`,
           role: 'observation',
           declaredCount: bands.total,
           countShown: true,
+          playhead: banded,
         });
       }
 
@@ -2471,17 +2624,20 @@ const RAIL_VIEW: SurfaceAdapter = {
           field: `statRowsOf(@${stamp}s).${row.label}.value`,
           text: `${row.label}: ${row.value}`,
           role: 'observation',
+          playhead: atPlayhead(recording, at),
         });
         seeds.push({
           field: `statRowsOf(@${stamp}s).${row.label}.title`,
           text: row.title,
           role: 'prose',
+          playhead: atPlayhead(recording, at),
         });
       }
       seeds.push({
         field: `servedCaptionFor(@${stamp}s)`,
         text: servedCaptionFor(live.longWaitThresholdS),
         role: 'label',
+        playhead: atPlayhead(recording, at),
       });
       seeds.push({
         field: `servedTitleFor(@${stamp}s)`,
@@ -2489,33 +2645,43 @@ const RAIL_VIEW: SurfaceAdapter = {
         role: 'prose',
         declaredCount: live.servedCount,
         countShown: true,
+        playhead: atPlayhead(recording, at),
       });
 
-      for (const driver of moodDriverRowsOf(context.bundleAt(at).mood)) {
+      const mood = context.bundleAt(at).mood;
+      const driverOf = new Map(mood.drivers.map((driver) => [driver.label, driver] as const));
+      for (const row of moodDriverRowsOf(mood)) {
+        const driver = driverOf.get(row.label);
         seeds.push({
-          field: `moodDriverRowsOf(@${stamp}s).${driver.label}`,
-          text: `${driver.label}: ${driver.glyph} ${driver.text}`,
-          role: 'observation',
+          field: `moodDriverRowsOf(@${stamp}s).${row.label}`,
+          text: `${row.label}: ${row.glyph} ${row.text}`,
+          // The retraction row carries no driver, and it withholds rather than reports. See MOOD.
+          role: driver === undefined ? 'reason' : 'observation',
+          playhead: atPlayhead(recording, at, driver?.basis),
         });
       }
 
       for (const mode of ['casual', 'engineer'] as const) {
         for (const showMaths of [false, true]) {
-          const disclosure = mathsDisclosureOf(honestyAt(recording, at, mode), showMaths, mode);
+          const card = honestyAt(recording, at, mode, basis);
+          const declared = mode === 'casual' ? card.basis : undefined;
+          const disclosure = mathsDisclosureOf(card, showMaths, mode);
           seeds.push({
-            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, @${stamp}s).toggleLabel`,
+            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, ${basis}, @${stamp}s).toggleLabel`,
             text: disclosure.toggleLabel,
             role: 'label',
+            playhead: atPlayhead(recording, at, declared),
           });
           if (disclosure.mathsHidden || disclosure.maths === '') continue;
           seeds.push({
-            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, @${stamp}s).maths`,
+            field: `mathsDisclosureOf(${mode}, showMaths=${String(showMaths)}, ${basis}, @${stamp}s).maths`,
             text: disclosure.maths,
             // `honestyAt` already asked `meansAreSuppressed`; a suppressed card's maths is the
             // refusal's own arithmetic, and everything else in that slot is a count or a threshold.
             role: context.suppressed ? 'reason' : 'observation',
             declaredCount: recording.summary.waitCount,
             countShown: true,
+            playhead: atPlayhead(recording, at, declared),
           });
         }
       }
@@ -2745,12 +2911,65 @@ const REPORT_PANEL: SurfaceAdapter = {
      */
     const filed = bundle.days[0]?.report;
     if (filed !== undefined) {
-      const running = reportViewOf(
-        filed,
-        runProgressOf({ recording: context.recording, simTimeS: context.recording.startedAt }),
-      );
-      seeds.push({ field: 'runningReportView.title', text: running.title, role: 'label' });
-      seeds.push({ field: 'runningReportView.lede', text: running.lede, role: 'prose' });
+      /*
+       * **Driven at every sampled playhead, and on the temporal axis** — because this surface is
+       * the rule the axis exists to generalise, and driving it at one instant was checking one
+       * branch of a decision that has two.
+       *
+       * `runProgressOf` returns `watching` short of `endedAt` and `played-out` at it, so the same
+       * two lines below carry the refusal at the four early playheads and the filed sheet's own
+       * title and lede at the fifth. That is *"this surface obeys § D223"* stated as a run: the
+       * property sees the whole-day figures appear exactly when the playhead earns them, and would
+       * see them appear early.
+       */
+      for (const at of sampleTimes(context.recording)) {
+        const stamp = at.toFixed(0);
+        const running = reportViewOf(
+          filed,
+          runProgressOf({ recording: context.recording, simTimeS: at }),
+        );
+        seeds.push({
+          field: `runningReportView(@${stamp}s).title`,
+          text: running.title,
+          role: 'label',
+          playhead: atPlayhead(context.recording, at),
+        });
+        seeds.push({
+          field: `runningReportView(@${stamp}s).lede`,
+          text: running.lede,
+          role: 'prose',
+          playhead: atPlayhead(context.recording, at),
+        });
+        for (const [index, cell] of running.figures.entries()) {
+          const source = filed.figures[index];
+          const shape = source === undefined
+            ? { role: 'observation' as TextRole, gated: false, energyAxis: false }
+            : reportFigureShape(source);
+          seeds.push({
+            field: `runningReportView(@${stamp}s).figures[${String(index)}](${cell.label})`,
+            text: `${cell.label}: ${cell.value}`,
+            role: shape.role,
+            /*
+             * The `n` comes off the cell's own note, exactly as the loop above reads it. Seeding the
+             * value without it made R13 fire on this surface — the harness's defect, not the
+             * panel's: the note is where the sheet prints the count and dropping it from the seed
+             * asked R13 a question about a string nobody draws.
+             */
+            declaredCount: shape.gated ? context.recording.summary.waitCount : undefined,
+            countShown: shape.gated ? /(\d[\d,]*)/.test(cell.note) : undefined,
+            energyAxis: shape.energyAxis,
+            gated: shape.gated,
+            playhead: atPlayhead(context.recording, at),
+          });
+          seeds.push({
+            field: `runningReportView(@${stamp}s).figures[${String(index)}](${cell.label}).note`,
+            text: cell.note,
+            role: shape.role === 'suppressed' ? 'reason' : 'observation',
+            energyAxis: shape.energyAxis,
+            playhead: atPlayhead(context.recording, at),
+          });
+        }
+      }
     }
 
     return singleRun(this.id, seeds);

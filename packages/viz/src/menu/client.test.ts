@@ -588,6 +588,28 @@ describe('the account form', () => {
     expect(updateForm(noticed, { email: 'a@b.test' }).notice).toBeUndefined();
   });
 
+  it('does not count a commit that changes nothing as typing — GitHub issue #106', () => {
+    /*
+     * The other direction, and it is a defect rather than a nicety. The panel commits a field on
+     * `change`, and a browser fires `change` on blur **and** on Enter — so the same string arrives
+     * here two and three times for one edit: tabbing away, pressing Enter, and the blur that
+     * follows the button that was pressed. Under the old rule the third of those took *"a link is
+     * on its way"* off the screen a beat after the request that earned it, about an address nobody
+     * had touched, which is the deception the rule above exists to prevent with its sign flipped.
+     */
+    const sent = linkRequested(updateForm(SIGNED_OUT, { email: 'ada@example.test' }), {
+      detail: 'If that address can receive mail…',
+      expiresInMs: 900_000,
+    });
+    const again = updateForm(sent, { email: 'ada@example.test' });
+    expect(again.notice, 'a re-commit of the same address took back the server’s own 202').toBe(
+      sent.notice,
+    );
+    expect(again, 'a commit that changed nothing still built a new state').toBe(sent);
+    // …and a real edit still clears it, which is what stops the guard above swallowing the rule.
+    expect(updateForm(sent, { email: 'ada@example.tes' }).notice).toBeUndefined();
+  });
+
   it('signs out to a clean state, optionally with a word about why', () => {
     expect(signedOut().token).toBeUndefined();
     expect(signedOut('That sign-in link has already been used.').notice).toBe(

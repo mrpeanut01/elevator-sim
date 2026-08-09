@@ -3,12 +3,20 @@
 One Container App serving the viewer and the API from a single origin, a PostgreSQL flexible server
 behind it, and Communication Services for the one mail this product sends.
 
-> **There is now a second, optional lane.** The page can be served from a CDN instead of from this
-> container, which removes a **32.2 s** cold first load — see
+> **There is now a second lane, and as of 2026-08-08 it is switched on.** The page is served from a
+> CDN instead of from this container, which removes a **32.2 s** cold first load — see
 > [`docs/16-static-site-deployment.md`](../docs/16-static-site-deployment.md) and
-> `infra/azure/swa/`. **It is not switched on**, nothing in it has ever been deployed, and this
-> document describes the deployment that exists. The one thing it adds here is the `viewerOrigin`
-> parameter in § 3.5, which is empty by default and changes nothing when it is.
+> `infra/azure/swa/`. The sentence here used to read *"It is not switched on, nothing in it has ever
+> been deployed"*, and that was accurate until it was not; a refusal that has gone stale is worse
+> than a figure that has, because it tells the reader not to touch a live control ([§ D227](../DECISIONS.md)).
+>
+> What that means for **this** document: `viewerOrigin` (§ 3.5) is **no longer empty**. It is
+> `https://yellow-glacier-0ff81230f.7.azurestaticapps.net`, which moves `ELEVATOR_SIM_ORIGIN` and
+> `ELEVATOR_SIM_ALLOW_ORIGIN` together — so the app below still serves the API, still serves its own
+> copy of the page, and is no longer where a player is sent or where a sign-in link points. Any
+> re-run of the app template that omits `viewerOrigin` silently reverts that and breaks the site's
+> every authenticated surface with no failing status code anywhere. Arming it found two defects that
+> reading it had not; [§ D308](../DECISIONS.md) is the account.
 
 ---
 
@@ -300,12 +308,16 @@ is not repeated here.
    replicas are sound in principle, but nothing has run two.
 7. **No CI deploys this.** Deployment is `az` from your own machine with `az login`, so there is no
    stored credential in this repository because there is no automation to hold one. When that
-   changes, the right credential is a federated one on a Microsoft Entra app
-   (`subject: repo:OWNER/elevator-sim:ref:refs/heads/main`) rather than a stored secret — add it
-   when you automate the deployment, not before. *(The **viewer's** deployment is automated:
+   changes, the right credential is a federated one rather than a stored secret — add it when you
+   automate the deployment, not before. **Do not copy the subject from a tutorial**, and this
+   paragraph used to: it said `repo:OWNER/elevator-sim:ref:refs/heads/main`, which is the documented
+   form and is not what GitHub sends. A job declaring an `environment:` gets
+   `…:environment:NAME` instead of a ref, and the prefix carries the numeric account and repository
+   ids (`repo:owner@123/repo@456`). Read it from
+   `GET /repos/OWNER/REPO/actions/oidc/customization/sub` — [§ D308](../DECISIONS.md) is what
+   getting this wrong cost. *(The **viewer's** deployment is automated:
    `.github/workflows/deploy-viz.yml` federates into a user-assigned managed identity and stores no
-   secret. It is inert until armed, and it deploys the page only — never this app or this
-   database.)*
+   secret. It deploys the page only — never this app or this database.)*
 8. **A cold first page load takes 32.2 seconds**, measured on the live deployment against 0.13 s
    warm. `minReplicas: 0` is what makes this deployment cheap and it is also what makes the first
    visitor wait, because `serve.ts` serves the page out of the container that is asleep.

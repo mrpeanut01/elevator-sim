@@ -107,6 +107,16 @@ if [ "$REPO_IN_PARAMS" != "$REPO_ACTUAL" ]; then
     "  this checkout is : $REPO_ACTUAL")"
 fi
 
+# The literal prefix GitHub puts in the token's `sub` claim. Read rather than constructed, because
+# it is NOT `repo:OWNER/REPO` — GitHub issues an immutable subject carrying the numeric account and
+# repository ids (`repo:owner@123/repo@456`), so that renaming a repository cannot hand a trust
+# relationship to whoever claims the old name. Nothing you would copy from a tutorial contains those
+# ids, and a credential built the documented way is refused with AADSTS700213 — which reads as a
+# propagation delay and is not one. Falls back to the documented form if the endpoint says nothing.
+SUBJECT_PREFIX=$(gh api "repos/$REPO_ACTUAL/actions/oidc/customization/sub" \
+  --jq '.sub_claim_prefix // empty' 2>/dev/null || true)
+[ -n "$SUBJECT_PREFIX" ] || SUBJECT_PREFIX="repo:$REPO_ACTUAL"
+
 SUBSCRIPTION=$(az account show --query name -o tsv)
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
@@ -115,6 +125,7 @@ cat <<SUMMARY
   Subscription   : $SUBSCRIPTION ($SUBSCRIPTION_ID)
   Resource group : $RESOURCE_GROUP  (region $LOCATION)
   Repository     : $REPO_ACTUAL
+  Token subject  : $SUBJECT_PREFIX:environment:… (read from GitHub, not constructed — see § D308)
   Template       : $TEMPLATE
 
   Creates: a Static Web App on the FREE plan (\$0), a user-assigned managed identity,
@@ -140,7 +151,8 @@ az deployment group what-if \
   --resource-group "$RESOURCE_GROUP" \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$TEMPLATE" \
-  --parameters "@$PARAMETERS" || fail "what-if failed — nothing has been created"
+  --parameters "@$PARAMETERS" \
+  --parameters githubSubjectPrefix="$SUBJECT_PREFIX" || fail "what-if failed — nothing has been created"
 
 if [ "$ASSUME_YES" != true ]; then
   read -r -p "Apply the above? [y/N] " reply
@@ -153,6 +165,7 @@ az deployment group create \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$TEMPLATE" \
   --parameters "@$PARAMETERS" \
+  --parameters githubSubjectPrefix="$SUBJECT_PREFIX" \
   --output none
 echo "ok"
 
@@ -238,6 +251,124 @@ fi
 echo "ok: the API permits $SITE_ORIGIN and mails sign-in links there"
 
 # ---------------------------------------------------------------------------
+# The GitHub environments, and the branch restriction that now lives on one of them.
+#
+# The federated credentials are keyed on `repo:OWNER/REPO:environment:NAME`, because a job that
+# declares `environment:` gets that subject instead of a ref-based one (main.bicep says why, and it
+# is a correction a failed run made). Two consequences, and neither is optional:
+#
+#   1. The environments have to EXIST with exactly these names, or the subject GitHub presents names
+#      an environment Entra has never heard of.
+#   2. The subject carries no ref, so Entra no longer pins production to a branch. That pin moves
+#      here, as a deployment branch policy — set rather than documented, because a restriction in a
+#      runbook is a restriction until the first person who has not read it.
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Orphaned federated credentials.
+#
+# ARM's incremental mode does not delete what a template stops declaring, and a credential is
+# addressed by NAME. So renaming one — which is exactly what moving the subject from a ref to an
+# environment did (§ D308) — leaves the old one in place, trusted, and matching a subject GitHub no
+# longer sends. That is dead configuration on the security boundary, which is the one place this
+# repository's most-repeated defect is not merely untidy.
+#
+# Scoped to this identity, which exists for this workflow and nothing else, so "not declared by the
+# template" and "should not exist" are the same statement here. What is removed is printed.
+# ---------------------------------------------------------------------------
+say "Federated credentials"
+
+PRODUCTION_ENVIRONMENT=$(out productionEnvironmentName)
+PREVIEW_ENVIRONMENT=$(out previewEnvironmentName)
+PRODUCTION_BRANCH=$(out productionBranchName)
+IDENTITY_NAME=$(out deployIdentityName)
+
+# All four come back from the deployment rather than from defaults here, and that is the point: two
+# of them are literally half of a federated credential's subject, so a copy in this script is a
+# second place for them to be wrong — and the failure that produces is an AADSTS700213 naming the
+# string but not which of the two places authored it.
+[ -n "$PRODUCTION_ENVIRONMENT" ] && [ -n "$PREVIEW_ENVIRONMENT" ] &&
+  [ -n "$PRODUCTION_BRANCH" ] && [ -n "$IDENTITY_NAME" ] ||
+  fail "the deployment did not return the environment names — is the template up to date?"
+
+WANTED=$(printf '%s:environment:%s\n%s:environment:%s\n' \
+  "$SUBJECT_PREFIX" "$PRODUCTION_ENVIRONMENT" "$SUBJECT_PREFIX" "$PREVIEW_ENVIRONMENT" | sort)
+
+while IFS=$'\t' read -r fic_name fic_subject; do
+  [ -n "$fic_name" ] || continue
+  printf '%s\n' "$WANTED" | grep -Fqx "$fic_subject" && continue
+  echo "removing orphan: $fic_name ($fic_subject)"
+  az identity federated-credential delete \
+    --identity-name "$IDENTITY_NAME" -g "$RESOURCE_GROUP" --name "$fic_name" --yes --output none
+done < <(az identity federated-credential list --identity-name "$IDENTITY_NAME" \
+           -g "$RESOURCE_GROUP" --query "[].[name,subject]" -o tsv)
+
+ACTUAL=$(az identity federated-credential list --identity-name "$IDENTITY_NAME" \
+  -g "$RESOURCE_GROUP" --query "[].subject" -o tsv | sort)
+[ "$ACTUAL" = "$WANTED" ] || fail "$(printf '%s\n' \
+  "the identity's federated credentials are not the two this template declares." \
+  "  wanted: $(echo "$WANTED" | tr '\n' ' ')" \
+  "  actual: $(echo "$ACTUAL" | tr '\n' ' ')")"
+echo "ok: exactly 2 credentials, both environment-scoped"
+
+# ---------------------------------------------------------------------------
+# The workflow is the thing that presents a subject, so it is the thing that has to agree.
+#
+# A credential is trusted for `repo:OWNER/REPO:environment:NAME`, and NAME comes from a job's
+# `environment:` key. A job that authenticates and declares no environment presents a ref-based
+# subject instead, which nothing trusts — and this repository shipped exactly that: `close-preview`
+# used `azure/login` with no `environment:`, so it would have failed on every pull request close,
+# leaving preview environments standing until the fourth open pull request hit a quota error naming
+# neither cause.
+#
+# The check below is a proxy rather than a parse — every `azure/login` step is matched against every
+# job-level `environment:` key, and the two environment names must both appear. It is stated as a
+# proxy because it is one: it counts rather than understands, and it would miss two logins in one
+# job. It would have caught the defect that motivated it, which is the bar.
+# ---------------------------------------------------------------------------
+say "The workflow's environments agree with the credentials"
+
+WORKFLOW="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/.github/workflows/deploy-viz.yml"
+[ -f "$WORKFLOW" ] || fail "workflow not found: $WORKFLOW"
+
+LOGINS=$(grep -c 'uses: azure/login@' "$WORKFLOW" || true)
+ENVS=$(grep -cE '^    environment:' "$WORKFLOW" || true)
+[ "$LOGINS" = "$ENVS" ] || fail "$(printf '%s\n' \
+  "$WORKFLOW has $LOGINS azure/login steps and $ENVS jobs declaring an environment." \
+  "A job that authenticates without one presents a ref-based subject, which no credential trusts.")"
+
+for wanted_env in "$PRODUCTION_ENVIRONMENT" "$PREVIEW_ENVIRONMENT"; do
+  grep -q "'$wanted_env'\|name: $wanted_env" "$WORKFLOW" ||
+    fail "the template declares environment '$wanted_env' and the workflow never names it"
+done
+echo "ok: $LOGINS authenticating jobs, $ENVS environments, both names present"
+
+say "GitHub environments"
+
+# Preview takes any branch: a pull request's head is by definition not the production branch.
+gh api -X PUT "repos/$REPO_ACTUAL/environments/$PREVIEW_ENVIRONMENT" --silent
+echo "ok: $PREVIEW_ENVIRONMENT (any branch — a pull request head is never $PRODUCTION_BRANCH)"
+
+# Production takes exactly one branch. `custom_branch_policies` rather than `protected_branches`,
+# because the latter means "whatever happens to be protected right now" — which is a different rule
+# on a repository that later protects a second branch.
+#
+# `--input -` rather than `-f`/`--raw-field`: `deployment_branch_policy` is a nested object and both
+# of those send a string, which the API rejects with a 422 naming the type.
+gh api -X PUT "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT" --input - --silent <<JSON
+{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
+JSON
+# Idempotent: the create 422s if the policy is already there, and that is a success for our purposes.
+gh api -X POST "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT/deployment-branch-policies" \
+  -f "name=$PRODUCTION_BRANCH" -f 'type=branch' --silent 2>/dev/null || true
+
+POLICY=$(gh api "repos/$REPO_ACTUAL/environments/$PRODUCTION_ENVIRONMENT/deployment-branch-policies" \
+  --jq '[.branch_policies[].name] | join(",")')
+[ "$POLICY" = "$PRODUCTION_BRANCH" ] || fail "$(printf '%s\n' \
+  "$PRODUCTION_ENVIRONMENT permits branches [$POLICY], expected exactly [$PRODUCTION_BRANCH]." \
+  "The federated credential no longer pins a branch, so this policy is the only thing that does.")"
+echo "ok: $PRODUCTION_ENVIRONMENT deploys from $POLICY and nothing else"
+
+# ---------------------------------------------------------------------------
 # Arm. Order matters: AZURE_SWA_NAME last, because it is the switch.
 # ---------------------------------------------------------------------------
 say "Arming the workflow"
@@ -255,6 +386,18 @@ echo "ok: 6 variables set"
 # Deploy
 # ---------------------------------------------------------------------------
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$DEPLOY_NOW" = true ] && [ "$BRANCH" != "$PRODUCTION_BRANCH" ]; then
+  fail "$(printf '%s\n' \
+    "--deploy-now can only deploy '$PRODUCTION_BRANCH', and this checkout is on '$BRANCH'." \
+    "" \
+    "$PRODUCTION_ENVIRONMENT's deployment branch policy permits one branch, and the deploy job runs" \
+    "in that environment — so a dispatch from here is refused by GitHub before it authenticates," \
+    "which reads as a failed deploy rather than as the restriction working." \
+    "" \
+    "Everything else is done: the site exists, the API permits it, and the workflow is armed." \
+    "Merge to $PRODUCTION_BRANCH and the push deploys.")"
+fi
 
 if [ "$DEPLOY_NOW" = true ]; then
   say "Dispatching a deploy of '$BRANCH'"

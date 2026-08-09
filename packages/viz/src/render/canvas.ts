@@ -30,6 +30,7 @@ import { STATE_GLYPHS } from '../access/zoning.js';
 import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
+import { observationsAt } from '../live/observations.js';
 import type { Layout, ShaftColumn } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
@@ -680,6 +681,97 @@ export function doorGlyph(phase: DoorPhase): string {
   }
 }
 
+/**
+ * Has the playhead reached the run's last instant? — the stage's copy of `shiftIsOver`.
+ *
+ * `dev/leftRail.ts#shiftIsOver` is the same comparison and says why it is `>=` rather than `===`.
+ * It is **not imported**: `render/` may not depend on `dev/`, and `dev/leftRail.ts` already imports
+ * `render/mood.js`, so the arrow points this way or it points into a cycle. The duplication is held
+ * shut by a test rather than by an argument — `leftRail.test.ts` pins this function equal to the
+ * rail's at five playheads of a real recording, which is the pattern that file already uses for
+ * `moodDriverRowsOf` against `mood.provisional`. It is pinned *there* because the dependency runs
+ * that way round.
+ *
+ * `recording.status` is deliberately not consulted, for `shiftIsOver`'s stated reason: a
+ * `timed-out` run is finished too, and it is the one whose terminal frame matters most.
+ */
+export function playheadHasReachedEnd(recording: VizRecording, frame: Frame): boolean {
+  return frame.simTimeS >= recording.endedAt;
+}
+
+/** How many people the run has not got where they were going, and whose window that is. */
+export interface UndeliveredReading {
+  /**
+   * `true` once the playhead has reached `endedAt`, when {@link count} is `summary.undelivered` —
+   * the run's own figure, which is only true of the finished run.
+   */
+  readonly wholeRun: boolean;
+  /**
+   * The count a surface may print **at this playhead**.
+   *
+   * Before the end it is `arrived - carried` off {@link observationsAt}: everybody whose call had
+   * been registered and who had not yet reached their destination. Not a synonym for *undelivered*
+   * and never worded as one — it includes the riders who gave up on the lift and the riders the
+   * door turned away (§ D265, § D266), which is the honest reading of *still in the building and
+   * not where they were going*, and it is exactly the quantity `honesty/properties.ts`'s R6 reads
+   * back, so the product and the oracle cannot hold two definitions of it.
+   */
+  readonly count: number;
+}
+
+/**
+ * RV-16's lead clause, **dated** — the fix for the temporal finding property R6 opened with.
+ *
+ * ## What was wrong, and why nothing had asked *at what playhead*
+ *
+ * `summary.undelivered` is *how many people were still in the building when the run ended*.
+ * `record/recordRun.ts` simulates the whole day up front, so it exists before the first paint, and
+ * both the stage banner and `describeFrame`'s status sentence printed it at **every** playhead. On
+ * `honesty-9100032` (Vertical City, 2 817 s) that is `TIMED-OUT — 127 undelivered` at 00:00, when
+ * nobody is undelivered yet, and the same `127` at 704 s, when the live figure is **376**. Not
+ * merely early: wrong by a factor of three, in the one clause `UX.md`'s RV-16 makes lead the banner
+ * because *"it is the fact that decides how much of the rest means anything"* — and the rest it
+ * qualifies is the picture at that instant, which a whole-run fold cannot qualify.
+ *
+ * ## Why a live figure, and not § D293's gate or § D294's scoping
+ *
+ * Both precedents were available and both were tried on paper first.
+ *
+ * - **§ D293's gate** — withhold the whole-run reading and retract in words, as
+ *   `dev/leftRail.ts#moodDriverPanelOf` does — is right for a card the reader can come back to.
+ *   Here it would take RV-16's lead off the bitmap for the whole of the run it is about, and
+ *   § D294 already refused that trade **on this same canvas**: gating the footer would have
+ *   stripped § 7.4's window clause off every PNG exported mid-run, *one honesty rule spending
+ *   another*, because a bitmap has no later.
+ * - **§ D294's scoping** — `127 undelivered when the run ended` — keeps the clause on the bitmap
+ *   and is honest. It is what the footer does, and it is not enough here: the reader is watching
+ *   376 people stack up on the same image, and a correctly-scoped 127 beside them is still two
+ *   answers to one question. Scoping rescues a figure a surface has no live counterpart for. The
+ *   banner has one.
+ *
+ * So the banner publishes a **true number at the playhead** and the run's own figure once the
+ * playhead has earned it, and the two are worded differently — *still in the building* against
+ * *undelivered* — because they are different quantities and a shared noun would invite the reader
+ * to watch one turn into the other. `recording.status` is still printed verbatim at every playhead,
+ * which is § D294's ruling on this same header and is left standing: `timed-out` is the status a
+ * friendlier vocabulary would round off, and a mid-run export that dropped it would be RV-16's
+ * defect back again.
+ *
+ * ## Cost
+ *
+ * `observationsAt` is one pass over `recording.legs` plus a queue sweep, and `drawScene` runs per
+ * painted frame. It is called only on the branch that needs it — a run whose status is not
+ * `completed`, at a playhead short of the end — so a completed run pays nothing and the rail, which
+ * calls it every frame regardless, remains the surface that sets the budget.
+ */
+export function undeliveredAt(recording: VizRecording, frame: Frame): UndeliveredReading {
+  if (playheadHasReachedEnd(recording, frame)) {
+    return { wholeRun: true, count: recording.summary.undelivered };
+  }
+  const live = observationsAt(recording, frame.simTimeS);
+  return { wholeRun: false, count: live.arrived - live.carried };
+}
+
 function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, frame, layout } = input;
   ctx.textAlign = 'left';
@@ -721,10 +813,16 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   //
   // A run that did not deliver everybody leads the banner (`RV-16`): it is the fact that decides
   // how much of the rest means anything, and until wave 2 it lived only in the DOM status line.
+  //
+  // The count beside it is read **at the playhead** — see {@link undeliveredAt}. Until R6 measured
+  // it, this was `summary.undelivered` on every frame: the run's ending drawn over its middle.
   const banner: string[] = [];
   if (recording.status !== 'completed') {
+    const undelivered = undeliveredAt(recording, frame);
     banner.push(
-      `${recording.status.toUpperCase()} — ${String(recording.summary.undelivered)} undelivered`,
+      `${recording.status.toUpperCase()} — ${String(undelivered.count)} ${
+        undelivered.wholeRun ? 'undelivered' : 'still in the building'
+      }`,
     );
   }
   /*
@@ -1776,10 +1874,45 @@ function drawFooter(
   // header quotes a mean without saying which 300 seconds it covers will be read as covering the
   // whole run. The clause is produced by `render/runSummary.ts` rather than formatted here, so
   // the panel and the picture cannot word the same window differently.
-  ctx.fillText(
-    `${recording.status} · ${String(recording.summary.generated)} generated · ${windowClause(recording.summary)}`,
-    12,
-    layout.foot.statusY,
+  ctx.fillText(footerStatusLine(recording), 12, layout.foot.statusY);
+}
+
+/**
+ * The footer caption — issue #105, and the reason it is **scoped rather than gated**.
+ *
+ * ## The defect
+ *
+ * This line read `` `${recording.status} · ${generated} generated · ${windowClause(…)}` ``, and
+ * `recording.status` is `result.status` off `record/recordRun.ts` — the outcome of the **whole-day
+ * simulation**, which finishes before the first frame is painted. Directly above it sits the
+ * playback progress bar. So a viewer four minutes into a fifteen-minute shift read **completed**
+ * with the bar a quarter full: one word, one bar, two answers. `generated` has the same shape — it
+ * is the day's whole arrival count, printed unchanged at every playhead.
+ *
+ * ## Why not the gate `dev/leftRail.ts#moodDriverPanelOf` uses
+ *
+ * Because the two surfaces are owed different things, and the difference is this file's own stated
+ * reason for having a footer at all: **Export PNG** bakes this bitmap into a file that leaves the
+ * building, and § 7.4 requires every figure on it to carry its window. Withholding the caption
+ * until the playhead reaches the end would strip the window clause off every PNG exported mid-run —
+ * a rule about honesty, spending the one sentence that keeps another rule about honesty. The rail
+ * can withhold because the rail is on a screen the reader still has; a bitmap has no later.
+ *
+ * So every term is scoped to what it is actually true of. `simulation completed` cannot be read as
+ * *playback finished* — it names the thing that finished. `arrivals generated over the whole day`
+ * is #105's own suggestion, and it says which window the count covers, which is the sentence the
+ * rest of this footer already exists to make. Nothing is hidden, no figure moves, and the exported
+ * PNG keeps everything § 7.4 asks of it.
+ *
+ * `recording.status` is still printed verbatim rather than mapped through a word list: `timed-out`
+ * is the status that matters most and is the one a friendlier vocabulary would round off. It is
+ * also drawn a second time, larger, by `drawHeader`'s banner when it is not `completed`.
+ */
+function footerStatusLine(recording: VizRecording): string {
+  return (
+    `simulation ${recording.status} · ` +
+    `${String(recording.summary.generated)} arrivals generated over the whole day · ` +
+    windowClause(recording.summary)
   );
 }
 

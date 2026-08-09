@@ -42,7 +42,9 @@ import {
   canStart,
   freePlayIssues,
   navigate,
+  openingPart,
   partsFor,
+  SEED_MAX_DIGITS,
   updateChallenge,
   updateFreePlay,
   updateSettings,
@@ -330,6 +332,25 @@ export interface MenuAffordance {
   readonly disabledWhy?: string | undefined;
   readonly options?: readonly CatalogueEntry[] | undefined;
   readonly value?: string | undefined;
+  /**
+   * What an empty `text` field should read as. `text` rows only — GitHub issue #111(c).
+   *
+   * Decided here rather than in the panel for this module's founding reason: *what a blank box means*
+   * is a claim about the field, and the two seed fields in this product mean **different** things by
+   * blank. The transport's is always showing the seed that is running, so a blank there is a gesture
+   * — *draw me another* — and its placeholder says `random`. This one is naming a run that does not
+   * exist yet and has no generator to answer with; a placeholder reading `random` here would promise
+   * a draw nothing performs. So it states the shape instead.
+   */
+  readonly placeholder?: string | undefined;
+  /**
+   * The keyboard a phone should offer a `text` row. `text` rows only.
+   *
+   * The same class of fact as `type: 'email'` on the account field, and it is here rather than keyed
+   * on an id in the panel because `dev/dom.ts`'s rule is that no renderer keys on an id — a panel
+   * that wrote `row.id === 'free-play.seed' ? 'numeric' : undefined` would be the first one to.
+   */
+  readonly inputMode?: 'numeric' | undefined;
   readonly intent: MenuIntent;
 }
 
@@ -604,9 +625,9 @@ const NEEDS_A_SERVER = ' · needs a server, and this one has none';
  *
  * The root is the one screen with no `back`, so before this it offered six navigations and no exit:
  * a player who pressed **Menu** over a running shift to check a setting had to *start something* to
- * get back to the shift they were already watching. Every existing way out of the overlay is a mode
- * being entered — Start, Open the doors, Keep going — which is a complete set of *choices* and an
- * empty set of *changes of mind*.
+ * get back to the shift they were already watching. Every other way out of the overlay commits the
+ * player to something — Start and Keep going enter a mode, Pick a scenario opens the board they
+ * choose one from — which is a complete set of *choices* and an empty set of *changes of mind*.
  *
  * **Disabled and explained when there is nothing behind the menu**, which is `docs/16` S7's rule and
  * not a courtesy: a *Resume* that closed the overlay onto an empty shell would be a button that
@@ -614,9 +635,20 @@ const NEEDS_A_SERVER = ' · needs a server, and this one has none';
  * state a `hasRun: false` caller describes rather than a state a player normally reaches — and
  * saying so is cheaper than the one time they do.
  *
- * It is first because it is the only row that does not commit the player to anything, and last is
- * where a reader looks for *cancel*. This overlay has no cancel: leaving it changes nothing, which
- * is what the detail says.
+ * ## It is **last**, and the docstring that said otherwise is GitHub issue #97's second half
+ *
+ * This paragraph read *"It is first because it is the only row that does not commit the player to
+ * anything, and last is where a reader looks for cancel"* — an argument for both positions, over
+ * code that has only ever emitted it last. The refusal below then said *"pick a scenario or a
+ * free-play selection **below**"*, and there is nothing below this row: {@link mainRows} ends with
+ * it, and the only thing the panel appends after it is the how-to-play disclosure. So a reader who
+ * did as they were told looked at the bottom of the screen and found the guide.
+ *
+ * The word moved rather than the row, and the reason is not taste. The two rows the sentence names
+ * — Scenarios and Free play — are the **first two** on the list, so *above* is true of them and
+ * *below* was never true of anything. And Resume is disabled on a cold boot, so putting it first
+ * would open the product on a greyed control; last is where a reader looks for the way out, which
+ * is the half of the old sentence that was always right.
  */
 function resumeRow(hasRun: boolean): MenuAffordance {
   return {
@@ -633,7 +665,7 @@ function resumeRow(hasRun: boolean): MenuAffordance {
       : {
           disabledWhy:
             'There is no shift on screen to go back to yet. Pick a scenario or a free-play ' +
-            'selection below and the menu closes onto it.',
+            'selection above and the menu closes onto it.',
         }),
     intent: { kind: 'close' },
   };
@@ -1013,10 +1045,30 @@ function freePlayBody(input: MenuViewInput): Body {
     {
       id: 'free-play.seed',
       label: 'Seed',
+      /*
+       * **Said before it is broken, not after** — GitHub issue #111(c).
+       *
+       * The rule reached the screen only as a refusal: type a letter, lose Start, and read *"A seed
+       * is 1–20 digits"* in the issue list. A player who has not typed anything wrong has been told
+       * nothing, and a player who has is being taught the rule by breaking it. The line is short
+       * enough to sit under the box permanently, so the refusal is a reminder rather than a lesson.
+       *
+       * The second sentence is the one that says what the field is *for*, and it is the same claim
+       * `HOW_TO_PLAY`'s *A first run* makes: with the building and the traffic held still, the same
+       * seed brings the same passengers. That is invariant 5 in the words a player has.
+       */
+      detail:
+        `Digits only, up to ${String(SEED_MAX_DIGITS)}. It names the run rather than measuring it — ` +
+        'the same seed brings the same passengers.',
       kind: 'text',
       scope: 'between-games',
       enabled: true,
       value: selection.seed,
+      // Not `random`. The transport's field says that and can honour it; this one has no generator
+      // behind it, and a placeholder promising a draw nothing performs is the inert control with its
+      // polarity reversed. See {@link MenuAffordance.placeholder}.
+      placeholder: `1–${String(SEED_MAX_DIGITS)} digits`,
+      inputMode: 'numeric',
       intent: { kind: 'set-free-play', field: 'seed', value: selection.seed },
     },
     {
@@ -1142,9 +1194,28 @@ const CALENDAR_OPTIONS: readonly CatalogueEntry[] = Object.freeze([
 function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
   return Object.freeze([
     {
+      /*
+       * **The label names what the arm does, which is open a screen** — GitHub issue #97.
+       *
+       * It read *"Open the doors — Take the current scenario and start the week"*, and
+       * `dev/main.ts`'s `open-campaign` arm sets `tab: 'scenarios'` and closes the menu. No week is
+       * started, nothing is taken, and there is no *current scenario* in `ViewerState` for it to
+       * take: a scenario becomes current by being pressed on the Scenarios surface, which is where
+       * `scenariosPanel.ts#take` restarts the week.
+       *
+       * The **copy** moved rather than the behaviour, and the choice is forced rather than
+       * preferred. Making the row start a week would need it to decide *which* scenario, on a screen
+       * that offers no scenario control — so the row would either invent a default (a sixth
+       * hard-coded list, § D213) or start whichever week the shell happened to be sitting on, which
+       * is the *"dropped the player on whatever tab the shell happened to be on"* defect § 5 clause
+       * 6 already fixed here once, wearing a different hat.
+       *
+       * `kind` stays `commit` because it is still the row that leaves the menu, and `Keep going`
+       * below it — which really does start something — keeps its own words.
+       */
       id: 'campaign.open',
-      label: 'Open the doors',
-      detail: 'Take the current scenario and start the week',
+      label: 'Pick a scenario',
+      detail: 'Opens the Scenarios board behind this menu — the week starts when you take one',
       kind: 'commit',
       scope: 'between-games',
       enabled: true,
@@ -1838,15 +1909,32 @@ const NAMING_NOTE =
  * decision each. Spread across the panel it would be three copies, and the one that matters —
  * `null` meaning a real selection rather than a missing one — has already been argued for twice in
  * this directory.
+ *
+ * ## Why it takes the catalogue — GitHub issue #111(b)
+ *
+ * Because one field's new value decides another field's, and this is the only layer that may know
+ * it. Changing the template changes **which parts exist**, and the part held from the old template
+ * is then a value the new select cannot represent: the box falls back to its first option and the
+ * model keeps the old pair, permanently, because a `<select>` fires no `change` for the option it is
+ * already on. `menu.ts#openingPart` already knew the right answer and needed a catalogue to give it,
+ * so the catalogue is threaded here rather than the answer being written a second time.
+ *
+ * **Required, not optional.** An optional catalogue would let a caller silently opt out of the fix
+ * and keep the defect, which is exactly the shape of the *"barrel re-export looks like a caller"*
+ * mistake CLAUDE.md's standing requirement is about.
  */
-export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
+export function applyIntent(
+  state: MenuState,
+  intent: MenuIntent,
+  catalogue: MenuCatalogue,
+): MenuState {
   switch (intent.kind) {
     case 'navigate':
       return navigate(state, intent.to);
     case 'back':
       return back(state);
     case 'set-free-play':
-      return updateFreePlay(state, freePlayPatch(intent.field, intent.value));
+      return updateFreePlay(state, freePlayPatch(intent.field, intent.value, catalogue));
     case 'set-setting':
       return updateSettings(state, settingsPatch(intent.field, intent.value));
     case 'set-challenge':
@@ -1881,14 +1969,34 @@ export function applyIntent(state: MenuState, intent: MenuIntent): MenuState {
   }
 }
 
-function freePlayPatch(field: keyof FreePlaySelection, value: string): Partial<FreePlaySelection> {
+function freePlayPatch(
+  field: keyof FreePlaySelection,
+  value: string,
+  catalogue: MenuCatalogue,
+): Partial<FreePlaySelection> {
   switch (field) {
     case 'buildingId':
       return { buildingId: value };
     case 'dispatcherProfileId':
       return { dispatcherProfileId: value };
     case 'demandTemplateId':
-      return { demandTemplateId: value };
+      /*
+       * **Two fields, because the second cannot survive the first** — GitHub issue #111(b).
+       *
+       * This arm wrote `demandTemplateId` alone. `freePlayBody` then rebuilt the *Part of the day*
+       * select with the new template's options and the old template's value, no option matched, and
+       * the browser selected index 0 — so the box read `Morning rush` while `windowStartS`/`durationS`
+       * still held `rise-and-fall`'s whole thirty minutes. Not a lag: a state a select **cannot
+       * represent**, and one it cannot get out of either, since re-picking the option already shown
+       * fires no `change`.
+       *
+       * `openingPart` is the answer a fresh player gets, and it is the same question — the shortest
+       * part of this template that fits inside a single run. Deriving it here rather than clamping in
+       * the panel keeps the reducer the one place a selection is decided, and keeps the refusal in
+       * {@link freePlayIssues} reachable for the case that *is* still reachable: a restored or
+       * persisted selection whose part belongs to a template `data/` has since changed.
+       */
+      return { demandTemplateId: value, ...openingPart(catalogue, value) };
     case 'arrivalRatePctPop5min':
       // `"null"` is *this building's own profile*, which is a distinct selection and has to survive
       // as one — resolving it to a number here would pin a rate `data/` is free to change.

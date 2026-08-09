@@ -46,6 +46,7 @@ import {
   shrinkCase,
   type HonestyCampaignResult,
   type HonestyResources,
+  type HonestyShrinkResult,
 } from './index.js';
 import { loadHonestyResources } from './resources.test-helper.js';
 import { FAULTS } from './faults.js';
@@ -111,6 +112,52 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
     // corpus that checked it.
     expect(standard.stats.suppressedCases).toBeGreaterThan(0);
     expect(standard.stats.suppressedCases).toBeLessThan(standard.stats.evaluated);
+  });
+
+  it('the corpus reaches both ends of the playhead, so R6 has something to check', () => {
+    /*
+     * **The false-negative shape this property has and the other six do not.**
+     *
+     * `whole-run-figure-early` is answerable only about a string a surface said *at a playhead*,
+     * and only interesting about one it said **short of `endedAt`**. A corpus that stopped seeding
+     * `TextPlayhead` — an adapter refactored, a helper renamed — would leave the property
+     * iterating an empty set and reporting zero violations, which is byte-identical to the
+     * property holding. `sampleTimes` is the thing that must not quietly stop having an early half.
+     */
+    const { temporal } = standard.stats;
+    expect(temporal.atPlayhead).toBeGreaterThan(10_000);
+    expect(temporal.early).toBeGreaterThan(0);
+    expect(temporal.early).toBeLessThan(temporal.atPlayhead);
+
+    /*
+     * And **both values of the declaration**, which is the structural half's own version of the
+     * same risk. The shipped surfaces declare `'whole-run'` only where the rail asks them to — at
+     * `endedAt`, through `basisAt` — so a sweep that took `waitBandsAt`'s and `honestyAt`'s
+     * *defaults* would produce `declaredWholeRun === 0` and assert a gate over nothing. It did,
+     * until this axis landed: the retrospective copy of the mood card, the banding and the honesty
+     * card had never been rendered by this search at all.
+     */
+    expect(temporal.declaredNow).toBeGreaterThan(0);
+    expect(temporal.declaredWholeRun).toBeGreaterThan(0);
+  });
+
+  it('a whole-run declaration is drawn only where the playhead has earned it', () => {
+    /*
+     * The structural half, stated as a fact about the corpus rather than left to the property.
+     *
+     * Every string a surface declared `'whole-run'` was said **at `endedAt`**. That is the same
+     * claim `checkWholeRunFigureEarly` makes, reached from the other side — the property reports a
+     * violation, this counts the population — and it is here because a reader of the verdict should
+     * be able to see the number rather than infer it from an empty failure list.
+     */
+    const { temporal } = standard.stats;
+    const early = standard.failures.flatMap((failure) =>
+      failure.minimal.violations.filter(
+        (found) => found.property === 'whole-run-figure-early' && !matchesOutstanding(found),
+      ),
+    );
+    expect(early).toEqual([]);
+    expect(temporal.declaredWholeRun).toBeGreaterThan(0);
   });
 
   it('the corpus reaches every shipped building and every generated mode', () => {
@@ -197,8 +244,9 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Currently empty — and that is a state,
- * not an absence.**
+ * What the search **found**, pinned in both directions. **Empty — and it has been empty three
+ * times, for three different reasons, which is the only thing that makes an empty register worth
+ * reading.**
  *
  * A found violation is a result before it is a patch, so a finding is recorded here rather than
  * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
@@ -207,6 +255,20 @@ describe('a counterexample shrinks', () => {
  * - nothing outside it may fail — a new violation is red;
  * - everything in it must still be found — a finding that is fixed, or that the search stops
  *   being able to see, is also red, with a message saying to delete the entry.
+ *
+ * ## Why an entry names its tier, and why the field survives an empty register
+ *
+ * The second half of that rule needs a corpus the finding actually reproduces in, and until the
+ * temporal axis every recorded finding reproduced in the always-on tier — so the assertion could
+ * read `standard.failures` and nothing said so. The canvas banner finding fired only on a run whose
+ * `status` is not `completed`, which needs a horizon `STANDARD_SPACE` does not reach: **0 of 49
+ * always-on cases, 2 of 60 deep**. Marking the tier is what let the ghost check stay exact for
+ * both — the deep tier runs its own half, which it did not before — rather than being softened to
+ * *"found somewhere"* for the one entry that would otherwise have been a ghost.
+ *
+ * The field and both `expectStillFound` calls stay now the register is empty, for the reason the
+ * empty-corpus negative control below stays: the next finding will arrive in one tier or the other,
+ * and rebuilding the mechanism at that point means rebuilding it in a hurry.
  *
  * ## The two entries that were here, and what closed each
  *
@@ -258,6 +320,8 @@ describe('a counterexample shrinks', () => {
 const OUTSTANDING: readonly {
   readonly property: string;
   readonly surfaceId: string;
+  /** The corpus this finding reproduces in, and where its ghost check runs. See above. */
+  readonly tier: 'standard' | 'deep';
   /** A fragment of the offending **string**, when the finding is about particular words. */
   readonly contains?: string;
   /**
@@ -294,24 +358,132 @@ const OUTSTANDING: readonly {
    * **twenty-five**. The sentence keeps its force and the sheet stops carrying an invented figure
    * in the voice it reports real ones in.
    *
-   * The register is empty, and it is asserted empty in both directions — an entry that no longer
-   * reproduces is as much a defect as a finding that is not recorded.
+   * That entry is gone, and the register stayed empty until the temporal axis ran — an entry that
+   * no longer reproduces is as much a defect as a finding that is not recorded. That is the whole
+   * reason the two entries below are prose and not rows: each was deleted **on the commit that
+   * made it stop reproducing**, and deleting it any earlier or later is the same defect twice.
+   */
+  /*
+   * ## The two findings the **temporal axis** produced on its first run — both **closed**, in the
+   * product, and left here as the record of what the axis is for
+   *
+   * They were recorded rather than fixed in the lane that found them, so the corpus claim stayed
+   * honest for a wave; both are now gone from the search, and this is what closed each.
+   *
+   * ### 1. `render/describeFrame.ts#describeFrame` — 196 violations, 49 of 49 always-on cases
+   *
+   * The canvas's text alternative (KB-13) joined **every** driver of a `BuildingMood`:
+   *
+   * > `mood.drivers.map((driver) => driver.text).join(' ')`
+   *
+   * Four of those five carry `basis: 'whole-run'`, so at 0 s of a 16:29 run the paragraph read
+   * *"…334 of 334 people got where they were going"* — the finished day's `summary.delivered`
+   * beside a clock reading the start, where the count at that playhead is **0**. Issue #109's
+   * defect on the surface a screen-reader user gets: § D293 closed it on the rail only, where
+   * `dev/leftRail.ts#moodDriverPanelOf` filters on `basis`, and this join was not gated with it.
+   * The paragraph *did* carry `mood.headline`'s *"So far — the run has not finished, so this can
+   * still change"*, which is exactly the retraction § D293 measured as **insufficient**.
+   *
+   * Closed by the gate, not by a deletion — the comment above the join (*"a reader who is told only
+   * the maximum cannot tell which observation produced it"*) still holds, and every driver the
+   * playhead has earned is still spoken. `mood.retraction` takes the withheld ones' place, as it
+   * does on the rail. The paragraph also carried the **same defect a second time**, in a clause the
+   * adapter's optional `mood` was never needed to reach: *"Run status timed-out, with 127 passengers
+   * undelivered"*, which `dev/main.ts` produces today at both call sites. That is fixed with it.
+   *
+   * ### 2. `render/canvas.ts#drawScene` — 2 of 60 deep cases, 0 of 49 always-on
+   *
+   * The stage banner, drawn on every frame `dev/main.ts` paints:
+   *
+   * > `TIMED-OUT — 127 undelivered`
+   *
+   * `summary.undelivered` is *how many people were still in the building **when the run ended***.
+   * The banner drew it at every playhead, and on `honesty-9100032` (2 817 s) it said **127** at 0 s
+   * — when nobody was undelivered yet — and **127** at 704 s, when the live figure was **376**. The
+   * part worth reading twice: not merely early, but *smaller than the truth on screen by a factor of
+   * three*, in the one clause `RV-16` makes lead the banner because *"it is the fact that decides
+   * how much of the rest means anything."*
+   *
+   * Closed by publishing a **live** figure at the playhead and the run's own figure once the
+   * playhead reaches `endedAt` — `render/canvas.ts#undeliveredAt`, whose docstring is the argument
+   * for that over § D293's gate and § D294's scoping. `recording.status` is still drawn verbatim at
+   * every playhead, which is § D294's ruling on this same header.
+   *
+   * It reproduced only in the deep tier because the branch needs `recording.status !== 'completed'`
+   * and `STANDARD_SPACE`'s horizons all complete. The opt-in tier earned its cost here, which is
+   * worth recording about the tier as much as about the banner.
    */
 ]);
 
-function matchesOutstanding(found: {
+interface FoundViolation {
   property: string;
   surfaceId: string;
   field: string;
   text: string;
-}): boolean {
-  return OUTSTANDING.some(
-    (known) =>
-      known.property === found.property &&
-      known.surfaceId === found.surfaceId &&
-      ((known.contains !== undefined && found.text.includes(known.contains)) ||
-        (known.fieldContains !== undefined && found.field.includes(known.fieldContains))),
+  /** Optional so a hand-written `OUTSTANDING` probe can be compared without inventing one. */
+  message?: string;
+}
+
+/** Whether this entry is the one that finding is about. One place, so the two directions agree. */
+function entryMatches(known: (typeof OUTSTANDING)[number], found: FoundViolation): boolean {
+  return (
+    known.property === found.property &&
+    known.surfaceId === found.surfaceId &&
+    ((known.contains !== undefined && found.text.includes(known.contains)) ||
+      (known.fieldContains !== undefined && found.field.includes(known.fieldContains)))
   );
+}
+
+function matchesOutstanding(found: FoundViolation): boolean {
+  return OUTSTANDING.some((known) => entryMatches(known, found));
+}
+
+/**
+ * Everything a failing case violated — **the original's findings as well as the shrunk one's.**
+ *
+ * ## The reporting hole this closes, found by adding a seventh property
+ *
+ * `shrink.ts`'s honesty rule is that a candidate is accepted *"only if it still violates **a**
+ * property the original violated"* — deliberately *a*, not *all*, so a reduction cannot wander from
+ * an R3 leak to an unrelated R10 hit. The consequence nobody had met until now: on a case that
+ * violates **two** properties, a reduction that keeps only the second is a legal step, and the
+ * first then disappears from `minimal.violations` — which is the only list these assertions read.
+ *
+ * That is not hypothetical and it is not this axis's doing. `honesty-9100031` (deep tier) has been
+ * failing R3's textual half on `mood.caveat` — *"a quotable average on 6 of 20 consecutive seeds"*,
+ * where the run's refused `meanWaitS` also rounds to **20** — and the moment the same case acquired
+ * a `whole-run-figure-early` finding, the shrinker was free to reduce toward the new one and drop
+ * the old one from the report. A property arriving would have *silenced* an unrelated open finding,
+ * with nothing red to say so.
+ *
+ * So the register is asked about the union. Deduplicated by the tuple a finding is identified by,
+ * because an unshrunk failure has `original === minimal` and would otherwise report everything
+ * twice.
+ */
+function violationsOf(failure: HonestyShrinkResult): readonly FoundViolation[] {
+  const seen = new Map<string, FoundViolation>();
+  for (const found of [...failure.original.violations, ...failure.minimal.violations]) {
+    seen.set(`${found.property}|${found.surfaceId}|${found.field}|${found.text}`, found);
+  }
+  return [...seen.values()];
+}
+
+/**
+ * The register's second direction, run against whichever corpus the entry says it reproduces in.
+ *
+ * Shared by the always-on and deep tiers rather than written twice, because *"a register of ghosts
+ * is a suppression list"* is one rule and two copies of it drift. See the `tier` field's docstring
+ * for why the marker exists at all.
+ */
+function expectStillFound(tier: 'standard' | 'deep', seen: readonly FoundViolation[]): void {
+  for (const known of OUTSTANDING.filter((entry) => entry.tier === tier)) {
+    expect(
+      seen.some((found) => entryMatches(known, found)),
+      `the ${tier} search no longer finds ${known.property} on ${known.surfaceId}. If it was ` +
+        'fixed, delete the OUTSTANDING entry; if the search stopped being able to see it, that is ' +
+        'the defect this assertion exists to catch.',
+    ).toBe(true);
+  }
 }
 
 describe('§ D163 clause 1 — no player-facing string asserts what the run refuses', () => {
@@ -323,38 +495,26 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
       );
     }
     const unexpected = standard.failures.flatMap((failure) =>
-      failure.minimal.violations
+      violationsOf(failure)
         .filter((found) => !matchesOutstanding(found))
-        .map((found) => `${failure.minimal.case.caseId}: ${found.property} @ ${found.surfaceId} · ${found.field} — ${found.message}`),
+        .map((found) => `${failure.minimal.case.caseId}: ${found.property} @ ${found.surfaceId} · ${found.field}`),
     );
     expect(unexpected).toEqual([]);
   });
 
   it('still finds every violation recorded as outstanding — a register of ghosts is a suppression list', () => {
-    const seen = standard.failures.flatMap((failure) => failure.minimal.violations);
-    for (const known of OUTSTANDING) {
-      expect(
-        seen.some(
-          (found) =>
-            found.property === known.property &&
-            found.surfaceId === known.surfaceId &&
-            ((known.contains !== undefined && found.text.includes(known.contains)) ||
-              (known.fieldContains !== undefined && found.field.includes(known.fieldContains))),
-        ),
-        `the search no longer finds ${known.property} on ${known.surfaceId}. If it was fixed, ` +
-          'delete the OUTSTANDING entry; if the search stopped being able to see it, that is the ' +
-          'defect this assertion exists to catch.',
-      ).toBe(true);
-    }
+    expectStillFound('standard', standard.failures.flatMap((failure) => violationsOf(failure)));
   });
 
   it('negative control: the empty register accepts nothing — an injected violation is unexpected', () => {
     /*
-     * **The assertion that stops an empty `OUTSTANDING` from being decoration.** Both entries
-     * were deleted when § D171 resolved them, and an empty register makes the two assertions
-     * above cheap in opposite ways: the second iterates nothing, and the first would pass on a
-     * `matchesOutstanding` that had silently become a wildcard. So a real violation is produced
-     * — by fault, on a real case over the shipped data — and asserted **not** matched.
+     * **The assertion that stops `OUTSTANDING` from quietly becoming a wildcard.** It was written
+     * when the register was empty, because an empty register makes the two assertions above cheap
+     * in opposite ways: the second iterates nothing, and the first would pass on a
+     * `matchesOutstanding` that matched everything. Neither reason has gone away now the register
+     * has two entries — a predicate that returned `true` for every violation would satisfy both
+     * directions at once. So a real violation is produced — by fault, on a real case over the
+     * shipped data, on a property and a surface **no** entry names — and asserted **not** matched.
      */
     const faulted: HonestyResources = { ...resources, corruptTexts: FAULTS['probability-word'][0]?.fault };
     const outcome = evaluateCase(caseFromSeed(9013, { space: STANDARD_SPACE }), faulted);
@@ -364,8 +524,9 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
 
   it('shrinks a counterexample to a case a reader can re-run', () => {
     /*
-     * Driven with a fault, because the shipped surfaces now have nothing to shrink — which is
-     * itself the point of the assertion above. The fault is configuration-independent (it
+     * Driven with a fault rather than with the register's own findings, because both of those are
+     * configuration-*dependent* — one needs a `mood` argument, the other a run that timed out — and
+     * the claim here is about the **shrinker**. The fault is configuration-independent (it
      * rewrites the first prose string every case renders), so its minimal case is the smallest
      * the reducers can reach: the smallest building, the shortest horizon, two replications, one
      * arm, no demand override. That is a claim about the **shrinker**, and it was worth keeping
@@ -400,12 +561,23 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
       if (deep.failures.length > 0) {
         console.log(deep.failures.map((failure) => formatFailure(failure)).join('\n\n'));
       }
+      const seen = deep.failures.flatMap((failure) => violationsOf(failure));
       const unexpected = deep.failures.flatMap((failure) =>
-        failure.minimal.violations
+        violationsOf(failure)
           .filter((found) => !matchesOutstanding(found))
-          .map((found) => `${failure.minimal.case.caseId}: ${found.property} @ ${found.surfaceId} · ${found.field} — ${found.message}`),
+          .map((found) => `${failure.minimal.case.caseId}: ${found.property} @ ${found.surfaceId} · ${found.field} — ${found.message ?? ''}`),
       );
       expect(unexpected).toEqual([]);
+      /*
+       * And the register's **other** direction, which this tier never ran before.
+       *
+       * The always-on tier asserts it for the entries that reproduce there; the canvas banner
+       * reproduces only here, because it needs a run whose `status` is not `completed` and
+       * `STANDARD_SPACE` has no horizon long enough to produce one. Without this line that entry
+       * would be a ghost nobody checked — which is the exact thing the register's docstring calls
+       * a suppression list.
+       */
+      expectStillFound('deep', seen);
     },
     1_800_000,
   );

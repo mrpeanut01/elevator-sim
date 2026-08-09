@@ -1,5 +1,5 @@
 /**
- * The six properties, as predicates over rendered strings and the run's own statistics.
+ * The seven properties, as predicates over rendered strings and the run's own statistics.
  *
  * Each derives from a rule in [`docs/10`](../../../../docs/10-experience-layer-contract.md) § 1
  * and is quoted from it here rather than paraphrased, because a property that restates a rule
@@ -16,17 +16,20 @@
  * words that two test-local copies already exist and that quietly adding a third is how a guard's
  * meaning erodes.
  *
- * ## Why two of the six are checked structurally *and* textually
+ * ## Why three of the seven are checked structurally *and* textually
  *
- * R3 and R13 are both rules about a **pairing**: a value and its licence, a value and its `n`.
- * The structural check catches the surface classifying wrongly (`kind: 'estimate'` on a run whose
- * summary refuses one); the textual check catches a surface classifying correctly and printing
- * the number anyway, somewhere else. Neither subsumes the other, and `faults.ts` injects one of
- * each.
+ * R3, R13 and R6 are all rules about a **pairing**: a value and its licence, a value and its `n`, a
+ * value and the window it is true of. The structural check catches the surface classifying wrongly
+ * (`kind: 'estimate'` on a run whose summary refuses one; `basis: 'whole-run'` drawn at a part-way
+ * playhead); the textual check catches a surface classifying correctly — or declaring nothing at all
+ * — and printing the number anyway, somewhere else. Neither subsumes the other, and `faults.ts`
+ * injects one of each.
  */
 
 import { MIN_REPLICATION_BUDGET } from '../batch/report.js';
 import { probabilityWordIn } from '../campaign/words.js';
+import { observationsAt } from '../live/observations.js';
+import type { LiveObservations } from '../live/types.js';
 import { GOAL_JUDGEMENT, GOAL_KINDS } from '../scenario/goals.js';
 import { MIN_SEEDS_PER_GOAL } from '../scenario/published.js';
 import type { HonestyContext } from './surfaces.js';
@@ -260,14 +263,22 @@ function numberTokens(text: string): readonly { readonly value: string; readonly
   return tokens;
 }
 
-/** Whether `text` states `numeral` as the value `cue` names, rather than nearby by luck. */
-function claimsNear(
+/**
+ * The clause in which `text` states `numeral` as the value `cue` names — `undefined` when it does
+ * not, which is the case where the numeral and the cue are near each other by luck.
+ *
+ * Returns the clause rather than a boolean so that a caller which needs to ask a **second** question
+ * of the same words can ask it of exactly the words the first question was answered on. R6 does: a
+ * whole-run figure that names its own window is not R6's defect, and *"names its own window"* has to
+ * be read in the numeral's own clause or it becomes a per-string allow-phrase.
+ */
+function claimClause(
   text: string,
   numeral: string,
   spans: readonly { readonly from: number; readonly to: number }[],
   tokens: readonly { readonly value: string; readonly at: number }[],
   cue: RegExp,
-): boolean {
+): string | undefined {
   for (const token of tokens) {
     // A **whole** number, never a substring of one. See NUMBER_TOKEN.
     if (token.value !== numeral) continue;
@@ -282,9 +293,20 @@ function claimsNear(
       Math.max(span.from, at - CLAIM_PROXIMITY),
       Math.min(span.to, end + CLAIM_PROXIMITY),
     );
-    if (cue.test(clause)) return true;
+    if (cue.test(clause)) return clause;
   }
-  return false;
+  return undefined;
+}
+
+/** Whether `text` states `numeral` as the value `cue` names, rather than nearby by luck. */
+function claimsNear(
+  text: string,
+  numeral: string,
+  spans: readonly { readonly from: number; readonly to: number }[],
+  tokens: readonly { readonly value: string; readonly at: number }[],
+  cue: RegExp,
+): boolean {
+  return claimClause(text, numeral, spans, tokens, cue) !== undefined;
 }
 
 /**
@@ -829,6 +851,204 @@ function checkGoalWithoutRate(
 }
 
 /* -------------------------------------------------------------------------- *
+ * R6 / § D223 — no whole-run figure at a playhead short of `endedAt`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The counts a run only knows once it has finished, each paired with **the shipped function that
+ * knows the same quantity at a playhead**.
+ *
+ * ## Why every row needs the live counterpart, and what a row without one would cost
+ *
+ * The rule is *this figure can only be true of the whole run*, and the decidable form of that is
+ * *the surface printed the finished-day value where the value at this playhead is a different
+ * number*. Without the second half the check is a coincidence detector: `carried` reaches
+ * `summary.delivered` the instant the last rider alights, which on a quiet building happens well
+ * before `endedAt`, and a perfectly honest live row reading **CARRIED 34** would be reported for
+ * agreeing with the end of the day. The live value is read from `live/observations.ts#observationsAt`
+ * — the same function the rail's stat rows are drawn from — so the comparison is against the number
+ * the product itself would have shown, not against one computed here.
+ *
+ * ## Why the cue is per quantity, and not one list
+ *
+ * {@link ESTIMATE_CUES} records what a flat list cost R3: a numeral matching *one* quantity beside a
+ * cue naming *another* is a coincidence, not evidence about either. The same reasoning applies
+ * harder here, because these are small integers — a building can easily generate 120 people and have
+ * 120 seconds of something else on screen. The cue must name the quantity whose value is being
+ * looked for, within the numeral's own clause ({@link claimsNear}).
+ *
+ * **Known limit, stated rather than discovered.** `summary.serviceLevel` and
+ * `summary.handlingCapacity` are whole-run folds too — the mood card's *demand answered* driver
+ * prints both rates — and they are **not** here, because `observationsAt` publishes no rate to
+ * compare them against and a row with no live counterpart could only be a coincidence detector. They
+ * are reached by the structural half instead, which is exactly where a declared figure belongs; a
+ * surface that printed a handling-capacity rate early **without** declaring its basis would be
+ * missed. That is a real narrowing and it is the same trade R3's cue map makes.
+ */
+/**
+ * A clause that **names its own window** — and therefore is not the defect R6 describes.
+ *
+ * ## The first false positive this rule produced, and why it was corrected here rather than in the
+ * product
+ *
+ * `render/canvas.ts`'s footer band draws, at every playhead:
+ *
+ * > `simulation completed · 1018 arrivals generated over the whole day · window peak-5min 240–540 s`
+ *
+ * That is `summary.generated` at 00:00 of a 16:29 run, and the first version of this check reported
+ * it on **49 of 49** cases. It is also the honest form of exactly what § D293 asked for. The rail's
+ * defect was *"All 34 people got where they were going"* — a whole-day count in the present tense
+ * with **no window on it at all**, whose only retraction was `font-style: italic`, and § D293's
+ * finding was that a signal no renderer is obliged to read is not a retraction: *the words carry
+ * it too*. A string that says **over the whole day** in the same breath as the number has carried it
+ * in words. Refusing that string would be refusing the remedy.
+ *
+ * Read in the numeral's **own clause**, never in the whole string, for {@link CLAIM_PROXIMITY}'s
+ * reason: `describeFrame` returns eight sentences, and a phrase anywhere in the paragraph would
+ * excuse a figure four sentences away from it. Compare `render/runSummary.ts#windowClause`, which is
+ * the shipped surface's own name for this idea.
+ *
+ * **What it costs, stated rather than glossed.** A surface that wrote *"over the whole day"* while
+ * showing a figure it had not folded over the whole day would pass here. That is a lie about a
+ * window rather than a whole-run figure drawn early, and it is not this property's defect — it is
+ * the class § D227 records, a stated description going stale, and a run is what pins one of those.
+ */
+const NAMES_ITS_OWN_WINDOW =
+  /\b(?:over|across|for|during|in)\s+the\s+(?:whole|entire|full)\s+(?:day|run|shift|simulation)\b|\bwhole[- ](?:day|run|shift)\b|\bby the end of the (?:day|run|shift)\b|\bwhen the run ended\b|\bin total\b/i;
+
+const WHOLE_RUN_COUNTS: readonly {
+  readonly name: string;
+  readonly summary: (summary: HonestyContext['recording']['summary']) => number;
+  readonly live: (live: LiveObservations) => number;
+  readonly cue: RegExp;
+}[] = Object.freeze([
+  {
+    name: 'summary.delivered',
+    summary: (s) => s.delivered,
+    /* `LiveObservations.carried` is *legs that had alighted by `t`* — delivery, not boarding. */
+    live: (live) => live.carried,
+    cue: /\b(?:carried|delivered|got where|arrived where|reached their)\b/i,
+  },
+  {
+    name: 'summary.generated',
+    summary: (s) => s.generated,
+    /* `arrived` is *legs whose call had been registered by `t`* — the same population, so far. */
+    live: (live) => live.arrived,
+    cue: /\b(?:turned up|showed up|of\s+\d[\d,]*\s+people|people arrived|generated)\b/i,
+  },
+  {
+    name: 'summary.undelivered',
+    summary: (s) => s.undelivered,
+    /*
+     * Nobody publishes *undelivered so far*, because before `endedAt` it is not a thing that has
+     * happened — a rider still in transit is not undelivered. `arrived - carried` is the widest
+     * honest reading of the same question at a playhead (everybody who turned up and has not got
+     * there yet), and using the **widest** one is the conservative direction: it makes the live
+     * value larger, so the check fires only where the finished figure is genuinely unreachable.
+     */
+    live: (live) => live.arrived - live.carried,
+    cue: /\b(?:undelivered|never (?:boarded|arrived|got)|still in the building|stranded)\b/i,
+  },
+]);
+
+/**
+ * R6 — *"an outcome evaluated before the playhead reaches `endedAt` is a preview"* — and § D223's
+ * rule for what a surface does about that: **it withholds the figure and says so.**
+ *
+ * Two checks, and neither subsumes the other. The split is R3's and R13's, for R3's and R13's
+ * reason: the structural half catches a renderer that stops gating a figure whose producer declared
+ * it whole-run, and the textual half catches a surface that declares nothing and prints the day's
+ * count anyway. `faults.ts` injects one of each.
+ *
+ * 1. **Structural.** A string whose surface declared {@link TextPlayhead.basis} `'whole-run'` may not
+ *    be rendered at a playhead short of `endedAt`. The declaration is `MoodDriver.basis`,
+ *    `WaitBands.basis` or `HonestyCard.basis` — the shipped types' own, copied by the adapter —
+ *    and the gate under test is `dev/leftRail.ts#moodDriverPanelOf`, which filters exactly this.
+ * 2. **Textual.** At a playhead short of `endedAt`, no string may print a {@link WHOLE_RUN_COUNTS}
+ *    value beside a cue naming that quantity **while the same quantity read at that playhead is a
+ *    different number**. That last clause is what makes it a check rather than a coincidence
+ *    detector, and it is why the live value comes from `observationsAt` rather than from arithmetic
+ *    written here.
+ *
+ * ## The one role that is exempt, and why it is the opposite of a loophole
+ *
+ * `role === 'reason'`. A refusal published early **withholds** a figure; R6 is a rule about
+ * publishing an outcome, and a retraction is the absence of one. The rail's own retraction row —
+ * *"the readings that fold the whole shift … are withheld until the playhead reaches the end"* — is
+ * drawn **only** while the shift is unfinished, so a property that refused it would forbid the fix
+ * § D293 landed. `role === 'label'` is exempt on the textual half alone, for R3's reason: a caption
+ * carries a threshold, not a result.
+ */
+function checkWholeRunFigureEarly(
+  context: HonestyContext,
+  texts: readonly RenderedText[],
+): readonly HonestyViolation[] {
+  const found: HonestyViolation[] = [];
+  const { summary } = context.recording;
+  /* One `observationsAt` scan per distinct early playhead, not one per string. */
+  const liveAt = new Map<number, LiveObservations>();
+
+  for (const text of texts) {
+    const at = text.playhead;
+    if (at === undefined) continue;
+    // The rule is *short of `endedAt`*, and it is the run's own comparison — see TextPlayhead.
+    if (at.atS >= at.endedAt) continue;
+    // A refusal is the absence of a claim. See the docstring: this is § D293's own fix.
+    if (text.role === 'reason') continue;
+
+    if (at.basis === 'whole-run') {
+      found.push(
+        violation(
+          'whole-run-figure-early',
+          text,
+          `the surface declares this figure folded over the whole shift and drew it at ` +
+            `${at.atS.toFixed(0)} s of ${at.endedAt.toFixed(0)} s. R6 / § D223: a whole-day reading ` +
+            'beside a clock this early is two answers to one question — withhold it and say so.',
+        ),
+      );
+      continue;
+    }
+
+    if (text.role === 'label') continue;
+    let live = liveAt.get(at.atS);
+    if (live === undefined) {
+      live = observationsAt(context.recording, at.atS);
+      liveAt.set(at.atS, live);
+    }
+    const spans = clauseSpans(text.text);
+    const tokens = numberTokens(text.text);
+    for (const quantity of WHOLE_RUN_COUNTS) {
+      const whole = quantity.summary(summary);
+      if (!Number.isFinite(whole)) continue;
+      // The number is reachable at this playhead, so printing it claims nothing about the end.
+      if (quantity.live(live) === whole) continue;
+      let hit: string | undefined;
+      for (const form of renderings(whole)) {
+        const clause = claimClause(text.text, form, spans, tokens, quantity.cue);
+        if (clause === undefined) continue;
+        // A figure that says what window it is folded over has kept R6 in words. See above.
+        if (NAMES_ITS_OWN_WINDOW.test(clause)) continue;
+        hit = form;
+        break;
+      }
+      if (hit === undefined) continue;
+      found.push(
+        violation(
+          'whole-run-figure-early',
+          text,
+          `prints ${quantity.name} (${hit}) beside a cue that names it, at ${at.atS.toFixed(0)} s ` +
+            `of ${at.endedAt.toFixed(0)} s, where the same quantity at this playhead is ` +
+            `${String(quantity.live(live))}. R6 / § D223: that figure can only be true of the whole ` +
+            'run, and the run has not finished.',
+        ),
+      );
+      break;
+    }
+  }
+  return found;
+}
+
+/* -------------------------------------------------------------------------- *
  * The whole check
  * -------------------------------------------------------------------------- */
 
@@ -842,9 +1062,10 @@ export const PROPERTY_CHECKS: Readonly<
   'estimate-without-n': checkEstimateWithoutN,
   'energy-wait-blend': checkEnergyWaitBlend,
   'goal-without-rate': checkGoalWithoutRate,
+  'whole-run-figure-early': checkWholeRunFigureEarly,
 });
 
-/** Check all six against one case's rendered strings. */
+/** Check all seven against one case's rendered strings. */
 export function checkAll(
   context: HonestyContext,
   texts: readonly RenderedText[],

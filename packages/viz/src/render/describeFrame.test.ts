@@ -16,8 +16,10 @@ import {
   suppressedConfig,
   timedOutConfig,
 } from '../fixtures.test-helper.js';
+import type { VizRecording } from '../contract/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { overlayAt, queueAt } from '../frame/overlay.js';
+import { playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
 import { buildingMood, moodObservationsOf } from './mood.js';
 import { recordRun } from '../record/recordRun.js';
@@ -116,6 +118,32 @@ describe('the description carries the two facts a picture must not hide', () => 
     const text = describeFrame({ recording, frame: frameAt(recording, recording.endedAt) });
     expect(text).toContain(`Run status ${recording.status}`);
     expect(text).toContain(`${String(recording.summary.undelivered)} passengers undelivered`);
+  }, 300_000);
+
+  /*
+   * R6, on the fully reachable half of the same sentence — `dev/main.ts` passes `recording` and
+   * `frame` at both call sites, so this one is on screen readers today.
+   *
+   * `summary.undelivered` is the count **when the run ended**. Until R6 measured it, this sentence
+   * printed that count at every playhead, so a paragraph read at 00:00 announced the ending of a run
+   * that had not started serving anybody. Reverting `describeFrame.ts`'s status branch turns the
+   * third assertion below red: the whole-run figure comes back at a mid-run playhead.
+   */
+  it('does not announce the run’s ending at a playhead short of it', () => {
+    const { recording } = recordRun(timedOutConfig(config));
+    const t = recording.endedAt * 0.5;
+    const frame = frameAt(recording, t);
+    const text = describeFrame({ recording, frame });
+    const reading = undeliveredAt(recording, frame);
+
+    expect(reading.wholeRun).toBe(false);
+    expect(reading.count).not.toBe(recording.summary.undelivered);
+    expect(text).not.toContain(`${String(recording.summary.undelivered)} passengers undelivered`);
+    expect(text).toContain(
+      `${String(reading.count)} people still in the building and not yet where they were going`,
+    );
+    // The status word itself is never withheld — § D294 on this same header. RV-16's lead survives.
+    expect(text).toContain(`Run status ${recording.status}`);
   }, 300_000);
 
   it('says OVERLOADED for a car over the alarm, and not for one merely full', () => {
@@ -242,18 +270,78 @@ describe('the queue reaches a reader who cannot see the glyphs', () => {
 });
 
 describe('the mood is spoken, on the run whose statistics are refused', () => {
-  it('says the headline, every driver and the caveat', () => {
+  /** The mood as a caller builds it: at the playhead, off the queues at that playhead. */
+  function moodAt(recording: VizRecording, t: number): ReturnType<typeof buildingMood> {
+    return buildingMood(moodObservationsOf(recording, queueAt(recording, t), t));
+  }
+
+  it('says the headline, every driver and the caveat once the run has finished', () => {
     const { recording } = recordRun(breadthConfig(config, 'midtown-office'));
     expect(recording.summary.awtIsValid).toBe(false);
-    const t = recording.endedAt / 2;
+    const t = recording.endedAt;
     const queues = queueAt(recording, t);
-    const mood = buildingMood(moodObservationsOf(recording, queues, t));
+    const mood = moodAt(recording, t);
     const text = describeFrame({ recording, frame: frameAt(recording, t), queues, mood });
 
     expect(text).toContain(mood.headline);
     for (const driver of mood.drivers) expect(text, driver.id).toContain(driver.text);
     expect(text).toContain(mood.caveat);
+    // Nothing is being withheld, so nothing says it is.
+    expect(mood.retraction).toBe('');
+    expect(text).not.toContain('So far');
+  }, 300_000);
+
+  /*
+   * ## R6 on the surface a screen-reader user gets — § D293's gate, on the join it did not reach
+   *
+   * The version of this block that shipped before R6 measured it asserted the **defect**: it drove the
+   * paragraph at `endedAt / 2` and required *every* driver's sentence to be in it. Four of the five
+   * carry `basis: 'whole-run'`, so at half past the day the text alternative read *"…334 of 334
+   * people got where they were going"* beside a clock reading 08:14 — the finished day's
+   * `summary.delivered`, where the count at that playhead is a different number. Found by the
+   * honesty sweep's temporal axis on 49 of 49 always-on cases; `dev/leftRail.ts#moodDriverPanelOf`
+   * has gated the same rows since § D293 and this join was not gated with it.
+   *
+   * Reverting `describeFrame.ts`'s mood branch to the ungated join turns the two assertions below
+   * red: the whole-run sentences come back and the retraction that replaced them goes.
+   */
+  it('withholds the whole-run drivers mid-run, and puts the retraction where they were', () => {
+    const { recording } = recordRun(breadthConfig(config, 'midtown-office'));
+    const t = recording.endedAt / 2;
+    const queues = queueAt(recording, t);
+    const mood = moodAt(recording, t);
+    const text = describeFrame({ recording, frame: frameAt(recording, t), queues, mood });
+
+    // The fixture has to reach both sides of the gate, or this test passes on an empty set.
+    const wholeRun = mood.drivers.filter((driver) => driver.basis === 'whole-run');
+    const live = mood.drivers.filter((driver) => driver.basis === 'now');
+    expect(wholeRun.length).toBeGreaterThan(0);
+    expect(live.length).toBeGreaterThan(0);
+
+    for (const driver of live) expect(text, driver.id).toContain(driver.text);
+    for (const driver of wholeRun) expect(text, driver.id).not.toContain(driver.text);
+    // The retraction is a sentence, not a flag — § D293. It names the rows it is standing in for.
+    expect(mood.retraction).not.toBe('');
+    expect(text).toContain(mood.retraction);
+    for (const driver of wholeRun) expect(text).toContain(driver.label);
+    expect(text).toContain(mood.headline);
+    expect(text).toContain(mood.caveat);
     // R6, in the sentence a screen reader hears: mid-run is a preview and says so.
     expect(text).toContain('So far');
+  }, 300_000);
+
+  it('gates on the frame, and the mood built at that frame agrees — the two doors of one rule', () => {
+    /*
+     * `render/canvas.ts#playheadHasReachedEnd` reads the frame; `BuildingMood.provisional` is
+     * `atS < endedAt` computed by `buildingMood`. Two doors onto one comparison, pinned equal
+     * rather than argued — the pattern `leftRail.test.ts` uses for `moodDriverRowsOf`.
+     */
+    const { recording } = recordRun(breadthConfig(config, 'midtown-office'));
+    for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+      const t = recording.startedAt + (recording.endedAt - recording.startedAt) * fraction;
+      expect(playheadHasReachedEnd(recording, frameAt(recording, t)), String(fraction)).toBe(
+        !moodAt(recording, t).provisional,
+      );
+    }
   }, 300_000);
 });

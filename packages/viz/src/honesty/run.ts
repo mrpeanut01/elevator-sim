@@ -52,7 +52,7 @@ import {
   type HonestyContext,
   type StageBundle,
 } from './surfaces.js';
-import type { HonestyCase, HonestyOutcome, RenderedText } from './types.js';
+import type { HonestyCase, HonestyOutcome, RenderedText, TemporalReach } from './types.js';
 
 /**
  * Everything a case needs that is not the case.
@@ -100,6 +100,37 @@ function requireProfile(resources: HonestyResources, id: string): DispatcherProf
 /** A case the shipped data cannot express. A generator defect, never a finding. */
 export class UnrunnableCase extends Error {
   override readonly name = 'UnrunnableCase';
+}
+
+/** What a case that rendered nothing reached on the temporal axis. Zero, not absent. */
+const NO_TEMPORAL_REACH: TemporalReach = Object.freeze({
+  atPlayhead: 0,
+  early: 0,
+  declaredNow: 0,
+  declaredWholeRun: 0,
+});
+
+/**
+ * How far the temporal axis reached into this case's strings — measured, never assumed.
+ *
+ * Counted **after** `corruptTexts`, from the same array the properties are handed, so a fault that
+ * moved a string onto or off the axis is visible in the same numbers the check saw. See
+ * {@link TemporalReach} for why the counts are reported at all.
+ */
+function temporalReachOf(texts: readonly RenderedText[]): TemporalReach {
+  let atPlayhead = 0;
+  let early = 0;
+  let declaredNow = 0;
+  let declaredWholeRun = 0;
+  for (const text of texts) {
+    const at = text.playhead;
+    if (at === undefined) continue;
+    atPlayhead += 1;
+    if (at.atS < at.endedAt) early += 1;
+    if (at.basis === 'now') declaredNow += 1;
+    if (at.basis === 'whole-run') declaredWholeRun += 1;
+  }
+  return { atPlayhead, early, declaredNow, declaredWholeRun };
 }
 
 /** The stage a case names, with its published row. `undefined` when the case names none. */
@@ -257,7 +288,7 @@ export function contextFor(honestyCase: HonestyCase, resources: HonestyResources
 }
 
 /**
- * Run one case, render every surface, and check all six properties against what it said.
+ * Run one case, render every surface, and check all seven properties against what it said.
  *
  * Never throws for a case-level problem: every failure mode becomes a field on the outcome, so a
  * campaign of hundreds reports hundreds of verdicts rather than stopping at the first interesting
@@ -277,6 +308,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
         surfacesExercised: [],
         simulations: 0,
         suppressed: false,
+        temporal: NO_TEMPORAL_REACH,
       };
     }
     return {
@@ -287,6 +319,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       surfacesExercised: [],
       simulations: 0,
       suppressed: false,
+      temporal: NO_TEMPORAL_REACH,
     };
   }
 
@@ -305,6 +338,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       surfacesExercised: Object.freeze(surfaces),
       simulations,
       suppressed: context.suppressed,
+      temporal: temporalReachOf(texts),
     };
   } catch (error) {
     return {
@@ -315,6 +349,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       surfacesExercised: [],
       simulations,
       suppressed: context.suppressed,
+      temporal: NO_TEMPORAL_REACH,
     };
   }
 }

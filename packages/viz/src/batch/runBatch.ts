@@ -63,10 +63,12 @@
  */
 
 import type {
+  DemandLevel,
   DispatcherProfile,
   PassengerTrace,
   RunSummary,
   SimulationConfig,
+  SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 import { collectSearchSpace, metricOf, replicationSeed, traceKeyOf } from '@elevator-sim/experiments/browser';
 
@@ -214,6 +216,7 @@ export function runBatch(
     seed: request.seed,
     durationS: request.durationS,
     arrivalRatePctPop5min: request.arrivalRatePctPop5min,
+    ...(request.demandLevel === undefined ? {} : { demandLevel: request.demandLevel }),
     arms,
     crn,
     elapsedMs: (options.clock?.now() ?? 0) - startedMs,
@@ -250,10 +253,27 @@ function baseConfigFor(
     dispatcherProfiles: resources.dispatcherProfiles,
     durationS: request.durationS,
     onTimeout: 'report',
+    /*
+     * **One `demand` block or none**, rather than two spreads that would let the second delete the
+     * first. `demandLevel` and `arrivalRatePctPop5min` are independent fields of one options object
+     * and core reads them together — `config.arrivalRatePctPop5min ?? profile.arrivalRatePctPop5min[level]`
+     * — so a batch may carry a level, a rate, both, or neither. Omitting `demand` entirely when it
+     * would be empty keeps `traceKeyOf`'s canonical form byte-identical to what it was before the
+     * level existed, which is what keeps every figure this repository has published reproducing.
+     */
+    ...demandOptionsFor(request),
+  };
+}
+
+/** `{ demand: … }`, or `{}` when the request overrides nothing. See the call site. */
+function demandOptionsFor(request: BatchRequest): { demand?: SimulationDemandOptions } {
+  const demand: { demandLevel?: DemandLevel; arrivalRatePctPop5min?: number } = {
+    ...(request.demandLevel === undefined ? {} : { demandLevel: request.demandLevel }),
     ...(request.arrivalRatePctPop5min === null
       ? {}
-      : { demand: { arrivalRatePctPop5min: request.arrivalRatePctPop5min } }),
+      : { arrivalRatePctPop5min: request.arrivalRatePctPop5min }),
   };
+  return Object.keys(demand).length === 0 ? {} : { demand };
 }
 
 /**

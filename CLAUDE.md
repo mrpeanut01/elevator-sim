@@ -53,11 +53,36 @@ verdict:
   wrote the rule that *the status row and the verdict land together or neither does*. All nine units
   are built. The two clauses that decide the phase are the two the product **failed** when the
   criterion was written, and both are now met **by a run rather than by an argument**: the honesty
-  property holds under *search* — 60 cases, **271 985 strings**, 4 650 simulations, 23 surfaces,
-  **0 violations** — and it **found two violations first**, one real and one a check accepting the
-  wrong branch, so [§ D172](DECISIONS.md)'s *"the refinement relation, not a run"* had to be
-  corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved against a
-  fail state the product deliberately does not ship. **Say the gaps in the same breath.** Clause 4 —
+  property holds under *search* — and it **found two violations first**, one real and one a check
+  accepting the wrong branch, so [§ D172](DECISIONS.md)'s *"the refinement relation, not a run"* had
+  to be corrected ([§ D186](DECISIONS.md)); and mode parity is **derived from the code**, proved
+  against a fail state the product deliberately does not ship.
+
+  **The figures this row published were stale, and three of five had moved before anybody
+  re-measured them.** It read *"60 cases, 271 985 strings, 4 650 simulations, 23 surfaces, 0
+  violations"*. Measured 2026-08-08 **before** any of that day's work: 60 cases, **311 384**
+  strings, 4 650 simulations, **30** surfaces, and **1 failing case** — so *0 violations* had
+  already stopped being true. The current figures, after [§ D307](DECISIONS.md):
+
+  | tier | cases | strings | surfaces | violations |
+  |---|---|---|---|---|
+  | always-on | 49 | **246 875** | 30 | **0** |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **312 104** | 30 | **10, one case** |
+
+  The deep tier's one failure is `honesty-9100031` / `suppressed-mean`, a **cue-rule coincidence
+  rather than a product defect**: the caveat says *"a quotable average on 6 of 20 consecutive
+  seeds"* and that run's refused `meanWaitS` also rounds to 20. It is outstanding and it is not a
+  false claim on screen.
+
+  **The sweep now has a temporal axis, and it is the first thing in this verdict that did not come
+  back green** ([§ D300](DECISIONS.md)'s E-4, [§ D307](DECISIONS.md)). A seventh property asks
+  whether a surface publishes, at a playhead short of `endedAt`, a figure that can only be true of
+  the whole run. It found two on its first run — `render/canvas.ts`'s stage banner reading **127
+  undelivered at 00:00 and still 127 at 704 s while 376 people were standing**, and
+  `render/describeFrame.ts` joining every mood driver ungated where § D293 gated the rail. **Both
+  are now fixed**; both were deliberately *recorded rather than fixed* in the lane that found them,
+  because a corpus that grew an axis and stayed green is a different claim from one that had to be
+  repaired first. **Say the gaps in the same breath.** Clause 4 —
   *every unit names its non-test caller* — is **satisfied in prose and mechanised by nothing**: all
   **19** `packages/viz/src` directories sit outside every `AUDITED_MODULES`, the four dead-code
   audits cover 7 of 49, and the evidence is a hand-written table plus one prose line per unit. It is

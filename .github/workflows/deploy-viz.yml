@@ -11,19 +11,19 @@
 # one, because the page is the thing being waited on — there is no app on screen yet to apologise.
 # So the page goes to a CDN and the API stays where it is. § D257.
 #
-# ## Nothing here is switched on
+# ## This is armed — it was not, and this paragraph said so for as long as that was true
 #
-# Every deploying job is guarded by `if: vars.AZURE_SWA_NAME != ''`, and **unset is the shipped
-# state**. With no repository variable, this workflow still runs on every push and pull request,
-# still builds the site, and still uploads it as a build artifact — and deploys nothing, because
-# there is nowhere to deploy to. Merging this changes what CI *checks* (the viewer now has to
-# build) and does not change what CI *does*.
+# Every deploying job is guarded by `if: vars.AZURE_SWA_NAME != ''`. **That variable is now set**
+# (2026-08-08), so the deploying jobs run. Unset, this workflow still runs on every push and pull
+# request, still builds the site, still asserts the artifact, and deploys nothing — which is why
+# `gh variable delete AZURE_SWA_NAME` is a complete rollback rather than half of one.
 #
-# That split is deliberate, and it is the same shape `infra/README.md` § 0 uses: the useful half is
-# on from the first commit, the half that spends money and touches an external system waits for a
-# human to provision it. It also means the build is exercised on every pull request from the day
-# this lands, so the deploy path cannot rot unnoticed while unarmed — which is the failure mode a
-# `workflow_dispatch`-only deploy job would have.
+# The split is still deliberate and is still the shape `infra/README.md` § 0 uses: the useful half
+# ran from the first commit, the half that touches an external system waited for a human. It also
+# means the build was exercised on every pull request from the day this landed, so the deploy path
+# could not rot unnoticed while unarmed — the failure mode a `workflow_dispatch`-only deploy job
+# would have had. What it did *not* protect against is the deploy path being wrong in a way only a
+# real token exchange can show, and it was, twice (§ D308).
 #
 # Arm it:    ./infra/azure/swa/provision.sh          (sets six variables, in an enforced order)
 # Disarm it: gh variable delete AZURE_SWA_NAME       (instant, and this is the rollback)
@@ -127,8 +127,9 @@ jobs:
 
       - name: Build the static site
         env:
-          # Empty when unarmed, which is the shipped state and produces a bundle with no tag —
-          # identical to what the container image builds, and correct for it.
+          # Empty when unarmed, which produces a bundle with no tag — identical to what the
+          # container image builds, and correct for it. Set since 2026-08-08; the unarmed branch is
+          # still exercised by every fork pull request, so it is live code rather than a fallback.
           ELEVATOR_SIM_API_ORIGIN: ${{ vars.ELEVATOR_SIM_API_ORIGIN }}
           # The switch that turns absence into a failure. Absence is *correct* for the container and
           # catastrophic for a CDN, and only this file knows which build this is — so it says. Armed
@@ -314,6 +315,15 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # Required, and not for protection rules — this environment has none. The federated credential's
+    # subject is `repo:OWNER/REPO:environment:NAME` (§ D308), and a job that declares no environment
+    # presents the ref-based subject instead, which no credential now trusts. Without this line the
+    # login below fails with AADSTS700213 on every pull request close, and the failure is a preview
+    # environment that is never torn down — so the fourth open pull request hits a quota error
+    # naming neither cause. It is the same environment this job is tearing down, so naming it here
+    # is also the honest description of what the job touches.
+    environment:
+      name: viz-preview
     steps:
       # Free allows three concurrent preview environments. Without this job the fourth open pull
       # request fails to deploy with a quota error naming neither the three that are holding the

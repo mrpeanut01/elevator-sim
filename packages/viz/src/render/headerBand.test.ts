@@ -219,6 +219,10 @@ const MOOD: BuildingMood = {
   headline: 'The queues never stopped growing — the building could not keep up.',
   drivers: [],
   provisional: true,
+  // Issue #109. The header band draws `glyph` and `headline` and nothing else off this record, so
+  // the retraction is here to satisfy the type and is deliberately not asserted on: the surface
+  // that draws it is the left rail's driver block.
+  retraction: 'The run has not finished.',
   caveat: 'One run of one seed.',
 };
 

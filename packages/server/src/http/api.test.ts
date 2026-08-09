@@ -200,17 +200,28 @@ describe('asking for a sign-in link', () => {
   it('rate-limits one address, so the endpoint is not an email bomb', async () => {
     const victim = 'victim@example.test';
     const statuses: number[] = [];
-    // Six in a row from six different callers — the per-caller budget cannot be what stops this, so
-    // what stops it is the per-address budget, which is the one that decides whether this endpoint
-    // can be pointed at a stranger.
-    for (let index = 0; index < 6; index += 1) {
+    /*
+     * From a different caller each time — `call` mints a fresh `clientIp` unless a test says
+     * otherwise — so the per-caller budget cannot be what stops this. What stops it is the
+     * per-address budget, which is the one that decides whether this endpoint can be pointed at a
+     * stranger.
+     *
+     * The loop runs **until it is refused**, with a ceiling far above the shipped budget rather than
+     * exactly at it. This test used to spend six requests and require at most three to succeed,
+     * which pinned § D242's *number* — and issue #112 § 3 then had to move that number, because
+     * three was justified by a premise about *outstanding links* that is false against a client
+     * holding its session in memory (see `LINKS_PER_EMAIL`). The property worth pinning is **that
+     * there is a ceiling and it is low**, not what it is this month; a test that fails when a
+     * bounded policy is retuned trains its reader to edit the assertion.
+     */
+    const CEILING = 40;
+    for (let index = 0; index < CEILING && !statuses.includes(429); index += 1) {
       statuses.push((await call('POST', '/api/auth/request-link', { body: { email: victim } })).status);
     }
-    expect(statuses).toContain(429);
-    expect(statuses.filter((status) => status === 202).length).toBeLessThanOrEqual(3);
-
-    const refused = statuses.lastIndexOf(429);
-    expect(refused).toBeGreaterThanOrEqual(0);
+    expect(statuses, 'one address can be mailed without limit').toContain(429);
+    // And the ceiling is a real bound rather than a formality — nowhere near what a bomber wants
+    // out of a quarter of an hour.
+    expect(statuses.filter((status) => status === 202).length).toBeLessThan(CEILING / 2);
   });
 
   it('rate-limits one caller across many addresses, which the per-address budget cannot', async () => {
@@ -231,7 +242,9 @@ describe('asking for a sign-in link', () => {
   it('says how long to wait, and does not say which budget was spent', async () => {
     const shared = '203.0.113.8';
     let limited: ApiResponse | undefined;
-    for (let index = 0; index < 8 && limited === undefined; index += 1) {
+    // Bounded above both budgets rather than at one of them — see the per-address test above for
+    // why a loop pinned to the shipped number is the wrong instrument.
+    for (let index = 0; index < 40 && limited === undefined; index += 1) {
       const response = await call('POST', '/api/auth/request-link', {
         body: { email: 'repeat@example.test' },
         ip: shared,
