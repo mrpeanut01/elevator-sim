@@ -22110,3 +22110,128 @@ The card is the one artefact here that leaves the browser, so it has its own hon
 are permitted — so `runIdentityIssues` never objects — yet **neither artefact can express them**. A
 commissioned shaft or a vacation week makes `copy run` reproduce a *different* run, silently. The
 same question hangs over the leaderboard's replay verification. Filed rather than absorbed.
+
+---
+
+## D315 — one recommended door per product, and nothing removed to make room for it
+
+Issue #90. #98 stays open: its per-panel first-run tooltips were not built, and closing it on this
+would be closing an issue on a third of its ask.
+
+### Three of the report's claims did not survive, and one of them was already fixed
+
+- *"the menu presents **five** equally-weighted options"* — **wrong on count.** Six navigations plus
+  Resume plus the guide is eight entries, and #90's own body lists seven, contradicting its title.
+- *"Scenarios' first option is **Keep going**, which silently enters endless mode"* — **refuted.**
+  First is *Pick a scenario*; *Keep going* is fourth and last, fixed under #97.
+- #98's *"no tooltip"* — **refuted.** Twenty-eight `title=` tooltips ship in `index.html` plus four
+  programmatic ones. What is absent is **first-run** tooltips, which is a narrower and truer claim.
+
+What **is** confirmed: every root row is built by one helper with an identical kind and class, so
+nothing is recommended; and *How to play* is pushed after every row including Resume.
+
+### The row, and why it invents no intent
+
+`main.start-here` is drawn first and carries `MenuAffordance.primary`. Casual routes to the scenarios
+board; Engineer routes to Free play. **Both are members the shell's exhaustive switch already
+performs**, so the recommendation adds no new intent and therefore no new seam to leave dead — and
+neither has to name a building or a dispatcher, which would be [§ D213](#d213)'s hard-coded default
+arriving through a menu row.
+
+Auto-selecting a beginner scenario was refused for that reason, and because curating the opening pair
+is [§ D313](#d313)'s job, done there on measurement.
+
+### § D299 § 2 is honoured as a test rather than as an intention
+
+*Named play styles are an entry point, never a ceiling.* So `screens.test.ts` asserts the root
+**minus the new row** is byte-identical between the two products, and pins the full eight-id order.
+A future change that quietly gives Casual a shorter menu turns that test red.
+
+KB-15 holds: the recommendation is in the **label text** first — *Start here* — and the tint second.
+
+### The first-visit note is worded about what was restored, not what is stored
+
+`persist/types.ts` has had a dedicated `absent` arm for a missing session, and **both** its readers
+discarded it. It now reaches a screen. The wording matters: a save happens on the first setting a
+player touches, so a note claiming *nothing is stored* would be false within seconds. It says what
+was restored.
+
+No duration claim is made. #90 asks for *"about 5 minutes"*; nothing measures it, playback speed is a
+setting, and the drain is an outcome.
+
+### Two stale strings, found by looking
+
+`rightRail.ts` said **"Menu → Campaign"** after #97 relabelled that row *Scenarios* — on the exact
+screen [§ D300](#d300) records #116 as having missed twice. Its test pinned the two **labels** and
+nothing about the **route**, which is the gap: a wayfinding string is a claim about a path, and
+pinning the destination's name does not pin the path to it.
+
+The guide said *"set the run to 30 minutes"*, naming a control [§ D286](#d286) deleted. The **number
+was derived and correct**, and an initial judgement that the whole sentence was stale was caught by
+its own test. Only the control was renamed. Recorded because over-correcting a stale claim is a way
+to lose a true one.
+
+---
+
+## D316 — the rider lane was reserved by nobody, so the figures reached one building
+
+Issues #115 and #103.
+
+### #103's premise is refuted at HEAD, and the real defect is worse
+
+Cars already move continuously off `layout.yForHeight(car.heightM)`, doors already open continuously
+off `car.doorFraction` (`render/canvas.ts`), and **people are already drawn** — `render/riderFigures.ts`
+is complete, correct, and wired.
+
+`drawRiderLanes` draws nothing without `Layout.riderLane`, and that lane was whatever remained after
+the bank had been sized across the whole plot — approximately zero for any bank of three shafts or
+more. Measured at the 910×547 canvas #115's own table reports: **`riderLane` was `undefined` on 7 of
+the 8 shipped buildings.** The one exception is Garden Apartments, whose landings are empty at 5 s,
+15 s, 30 s, 60 s, 120 s and 300 s of its own shipped run.
+
+So a complete, unit-tested, correctly wired renderer reached **no shipped configuration that had a
+person to draw**. That is the standing requirement's defect arriving through **geometry** rather than
+through a missing call — and every check this repository runs passed. It is the eleventh dead seam's
+lesson with a new delivery mechanism, and worth adding to the list of ways this failure can look.
+
+### Reserved, never taken from a shaft
+
+The lane is now reserved before the bank is sized (`layout.ts`), and six of eight buildings put a
+crowd on the stage. It **cannot cost a shaft**: the count is still decided against the whole plot,
+and the reservation is taken only if the same shafts still stand at `MIN_SHAFT_WIDTH_PX` in what
+remains. Mixed-Use High-Rise and Vertical City keep their picture unchanged.
+
+### Three legibility defects, one of which #115 does not report
+
+- **The barcode.** A bank's shared label prefix is drawn once over the group; each column keeps its
+  own letter. The elision is **refused** when the group's span cannot carry it, so nothing leaves the
+  picture rather than being silently shortened.
+- **`LIVE METRICS` clipped its own text on every building** — #115 § 6, and Engineer work regardless.
+  The 250 px panel was arriving at **135.3 px** with 230 px of content. `wrap` also assumed a 6.0 px
+  advance for an 11 px face, 9 % narrow.
+- **Forced floor rows overprinting** — including an instance the issue misses: `crown-hotel` at
+  750 px draws *Back of house* and *Reception* **7.0 px apart**.
+
+### The corpus moved, and the direction is the point
+
+**255 156 → 252 704 strings**, 49 cases, 30 surfaces, **0 violations either way**, re-measured on this
+base in both directions. The −2 452 is rows the canvas no longer *repeats* — one bank heading per
+group instead of thirty-three, three fewer labelled floor rows — which is [§ D293](#d293)'s shape,
+where withheld rows cost 588 strings. A figure that moved down because a surface stopped saying the
+same thing thirty-three times is not a loss of disclosure.
+
+**The deep tier has not been re-run**, so Phase 9's deep row in `CLAUDE.md` and `docs/05-roadmap.md`
+is owed a re-measurement and was deliberately **not** edited: updating the always-on half while the
+deep half went stale would leave the table half-true, which is worse than a table known to be old.
+
+### What was refused on the merits
+
+**Demand at run t = 0** (#115 § 3). Garden Apartments really has nobody in its first minute at its
+shipped arrival rate. Making the first call land within seconds would falsify the traffic model, and
+the simulator wins every disagreement about what a number means.
+
+**A separate Casual renderer** (#103's two-renderer framing) is still owed under § D299 and was not
+built here, because the measured cause of *no motion, no people* was not the absence of a second
+renderer — it was the first one reaching one building. Fixing that delivers #103's *"small figures
+boarding and waiting at each landing"* to **both** products. `render/reportCard.ts` is the
+`Canvas2DLike` pattern to copy when the mode-conditional renderer is built.

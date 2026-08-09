@@ -4,13 +4,13 @@ One row per open issue. Dispositions are evidence-backed; the evidence lives in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) and the batch reasoning in
 [`ISSUE_TRIAGE_PLAN.md`](ISSUE_TRIAGE_PLAN.md).
 
-**Snapshot:** 2026-08-09 · **11 of the play-test backlog remain open**, down from 29 — plus the
-**6 filed from findings this wave**, so 17 open in total · branch `integration/issue-wave-14` ·
-`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 122 files, 2 952 tests,
+**Snapshot:** 2026-08-09 · **9 of the play-test backlog remain open**, down from 29 — plus the
+**8 filed from findings**, so 17 open in total · branch `integration/issue-wave-15` ·
+`npm run typecheck` **passes** · `npx vitest run --project viz` **passes — 124 files, 2 980 tests,
 exit 0**.
 
-**Eighteen issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
-#102, #104, #92, #99 and #118** in this wave. **Seven of seven carried a claim that did not survive
+**Twenty issues closed with evidence** — the eleven from PRs #120 and #121, plus **#107, #117,
+#102, #104, #92, #99 and #118** in wave 14, and **#90, #115 and #103** in wave 15. **Seven of seven carried a claim that did not survive
 verification**, which is the wave's own headline: #104's premise (*nothing is locked*), #107's
 recommendation (*confirm-before-abandon*), #92's two (*no Run now*, *no delta anywhere*), and
 #117's lead symptom, which is now **driven and not reproduced** rather than merely unexplained; #99's
@@ -122,6 +122,10 @@ These were surfaced by verification, not by a reporter. Each needs its own issue
 | **N-2** | **`VizSummary` cannot see `accessRefused` or `abandoned`.** `describeSummary` (`recordRun.ts:487-489`) copies only 3 of 5 conservation fields, so the viz layer *cannot* phrase "All N" correctly even if it wanted to. 7 of 8 buildings declare `accessZones` | findings § J |
 | **N-3** | **Stale sheet resurrection.** Toggling *show energy axis* mid-run resurrects the previous run's filed sheet. `main.ts:585-588` documents an invariant that is false | findings § J |
 | **N-4** | **Enter does not submit, and Tab-then-Enter is broken.** No `<form>`, no `submit` handler; `restoreFocus` yanks focus back to the field. No keyboard path around #106 | findings § E |
+| **#90** | The menu presents *five* equally-weighted options | **Wrong on count.** Six navigations + Resume + the guide = **eight**; #90's own body lists seven and contradicts its title |
+| **#90** | Scenarios' first option is *Keep going*, silently entering endless mode | **Refuted.** First is *Pick a scenario*; *Keep going* is fourth and last — fixed under #97 |
+| **#98** | No tutorial prompt, **no tooltip** | **Refuted.** 28 `title=` tooltips ship plus four programmatic. What is absent is *first-run* tooltips, which is a narrower and truer claim |
+| **#103** | The building has no motion and no door animation | **Refuted at HEAD.** Cars move continuously off `yForHeight`, doors off `doorFraction` — wave 10. And people *are* drawn: `riderFigures.ts` is complete and wired. The defect was that `Layout.riderLane` was `undefined` on **7 of 8** buildings |
 | **N-5** | **Boot menu is painted stale and never refreshed.** `drawMenu()` precedes `runShift()` in `boot()`; neither `renderAll` nor `runShift` redraws it. Root cause of #97's quoted string | findings § I |
 | **N-6** | **The honesty harness cannot see a presentation pointer drawn as a live control.** `mountRightRail` is on the undriven-mount exemption list. Generalises to `editingDispatcherId`, `editingPatternId`, `editingBuildingId` | findings § F |
 | **N-7** | **`walk.test.ts` cannot see cross-select invalidation.** `:283-327` re-reads only the same row, so one select breaking another's validity is invisible. The exact hole #111 § 2b falls through | findings § I |

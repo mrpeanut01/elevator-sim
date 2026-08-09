@@ -1297,6 +1297,26 @@
          inverts with the fill rather than with the page — 6.58:1 dark, 4.77:1 light. The hierarchy
          against `.menu-row-name` is carried by weight and size, which survive a photocopier. */
       .menu-start .menu-row-detail { color: var(--accent-ink); }
+      /* The recommended row — GitHub issue #90. Six rows of equal weight are a complete set of
+         choices and an empty set of recommendations, so this one is drawn heavier than its
+         neighbours.
+
+         KB-15: the tint is the **second** signal and never the only one. `menuPanel.ts#startHereRow`
+         puts the recommendation in the row's own label — it reads "Start here" — so a reader on a
+         screen reader, a monochrome display or a photocopy is told exactly what this rule says.
+
+         It is a *modifier*, so the row keeps `.menu-row`'s padding, border, focus ring and disabled
+         handling and differs only in emphasis. The two arms of the door carry different base
+         classes — Casual's leaves the menu and is `.menu-start`, Engineer's goes a screen deeper and
+         is `.menu-row` — and this rule has to lift both, which is why the accent lands on the border
+         and the rail rather than on the fill: on `.menu-start` the fill is already the accent, and a
+         second one there would be invisible. */
+      .menu-row-primary {
+        border-color: var(--accent);
+        box-shadow: inset 3px 0 0 0 var(--accent);
+        padding-left: 17px;
+      }
+      .menu-row-primary .menu-row-name { font-size: 15px; }
       .menu-back { background: transparent; margin-top: 4px; }
       /* `flex-wrap` so a row may carry a third child on its own line — `.menu-hint` below. The
          label and its control still share the first line, because both have a `flex` basis and the

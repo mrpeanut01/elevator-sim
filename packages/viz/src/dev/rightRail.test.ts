@@ -642,6 +642,22 @@ describe('the Machines segment says it writes nothing — § D227', () => {
     expect(line).toContain('Save as a new building');
   });
 
+  it('names the route in the word that is actually on the menu — the half the pin above missed', () => {
+    /*
+     * The sentence read *"Menu → Campaign"* for every wave after GitHub issue #97 relabelled that
+     * row **Scenarios**, and the test above did not notice because it pinned the two *labels* and
+     * said nothing about the *route*. A pin that covers half a claim is how the other half rots.
+     *
+     * Derived from the row rather than repeated: the assertion reads the label off `mainRows`'
+     * `main.campaign` affordance and requires the rail's route to name that word, so relabelling the
+     * row again turns this red on the same run instead of a wave later.
+     */
+    const label = /to\('main\.campaign',\s*'([^']+)'/u.exec(sourceOf('../menu/screens.ts'))?.[1];
+    expect(label, 'the label `mainRows` gives the row this route names').toBeDefined();
+    const line = machineWarningOf(machineClass('hydraulic'), undefined);
+    expect(line).toContain(`Menu → ${label ?? ''}`);
+  });
+
   it('is true: nothing in the rail writes the pointer the six cards used to write', () => {
     // The other half of § D227. A sentence saying a panel writes nothing is worth what the code
     // behind it is worth, and `editingClassId` was exactly one `context.update` away from making
