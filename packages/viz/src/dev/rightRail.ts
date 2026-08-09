@@ -72,6 +72,7 @@
  */
 
 import {
+  COST_TERMS_BY_ID,
   DECLARED_TERM_IDS,
   DispatchError,
   resolveDispatchConfig,
@@ -198,6 +199,332 @@ export function dispatcherBlurbOf(profile: DispatcherProfile): string {
   return `${clauses.join('; ')}.`;
 }
 
+/* -------------------------------------------------------------------------- *
+ * What a dispatcher does differently in the building — GitHub issues #100, #110
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The card as one register draws it: the line under the name, and what a disclosure reveals.
+ *
+ * Two fields rather than one string because the whole design is that **the registers swap places
+ * rather than trade content** — see {@link dispatcherCardOf}.
+ */
+export interface DispatcherCard {
+  /** The blurb under the profile's name in the list. */
+  readonly sub: string;
+  /** What `dom.ts#pick` puts behind the card's disclosure. */
+  readonly help: string;
+}
+
+/**
+ * One dispatcher's card, in the reader's register — GitHub issue
+ * [#100](https://github.com/mrpeanut01/elevator-sim/issues/100) and
+ * [#110](https://github.com/mrpeanut01/elevator-sim/issues/110).
+ *
+ * ## What was measured, and what the issues got wrong about it
+ *
+ * #100 says the cards *"show raw weighted-cost notation such as `cost = 1.00 times wait`"*. Driven
+ * over all thirteen shipped profiles, **no card on this rail has ever printed that**: the string it
+ * describes is `authoring/dispatcherSpec.ts#weightSummaryOf`'s `cost = 1.00·wait + 0.30·starvation`,
+ * which belongs to the dispatcher **editor**. Recorded as not reproduced rather than fixed here.
+ *
+ * #110's quotation is exact, and it is this file's:
+ * *"Conventional collective / BASELINE / 1 of 13 terms weighted; heaviest waitTime 1.00; hard
+ * constraint noDirectionReversal"*. Both halves of its complaint survived driving — the vocabulary
+ * is the engine's identifiers, and **nowhere in the product does it say what a dispatcher does
+ * differently to a queue** (§ D301 § 2's first named piece of work).
+ *
+ * The third finding is the one that decides the shape of the fix, and it is the opposite of
+ * § D319's: the Day report could not be given a register because `DayReportInput` had no mode
+ * field and `reportViewOf` took no mode parameter, so **no input could carry one**. Here the mode
+ * was already in hand — `mountRightRail` has `state.mode` and has been passing it to
+ * {@link buildingPlateOf} and `disclosureOf` for waves. Nothing structural was in the way. What
+ * was in the way was that nobody had written the other register.
+ *
+ * ## Nothing is hidden, and nothing is added on one side only
+ *
+ * Both modes carry **both** strings; only which one is on the face and which one is behind the
+ * disclosure moves. That is § D299 § 2 stated as an equality a test can run — `rightRail.test.ts`
+ * requires `sub + help` to contain the vector blurb, the behaviour sentence *and* the profile id in
+ * **both** registers, and pins Engineer's `sub` byte-for-byte against
+ * {@link dispatcherBlurbOf} over every shipped profile. A change that made Casual read better by
+ * trimming Engineer therefore goes red, which is § D299 § 1's test in the file it is about.
+ *
+ * It also means Engineer **gains** the behaviour sentence rather than being left with the vector,
+ * which § D299 § 1 permits explicitly (*easier to use, never saying less*) and § D301 § 3 predicts:
+ * a practitioner reading thirteen weight vectors wants *"only three of the thirteen cards here price
+ * metres of travel added"* every bit as much as a newcomer does.
+ *
+ * #110's own recommendation — that the thirteen dispatchers *become* four or five play styles —
+ * stays refused (§ D299 § 2, § D319). Thirteen cards, thirteen full weight vectors, one disclosure
+ * away in either register.
+ */
+export function dispatcherCardOf(
+  profile: DispatcherProfile,
+  cards: readonly DispatcherProfile[],
+  mode: ViewMode = 'advanced',
+): DispatcherCard {
+  const vector = dispatcherBlurbOf(profile);
+  const behaviour = dispatcherBehaviourOf(profile, cards);
+  const identity = `Profile id \`${profile.id}\`.`;
+  return mode === 'basic'
+    ? { sub: behaviour, help: `${vector} ${identity}` }
+    : { sub: vector, help: `${behaviour} ${identity}` };
+}
+
+/**
+ * What this dispatcher does differently in the building — **derived from its weight vector and from
+ * the other cards on the list, never authored per id.**
+ *
+ * ## Why there is no sentence-per-dispatcher, and why an authored `blurb` field is not the fix
+ *
+ * {@link dispatcherBlurbOf}'s docstring ends by wishing for one: *"a short authored player-facing
+ * blurb would be better copy than any of this … that needs a new field in
+ * `data/dispatcher-profiles.json`"*. That wish is **withdrawn here rather than granted**, and the
+ * reason is the one CLAUDE.md's invariant 7 exists for pointed one step further on.
+ *
+ * A per-id sentence in this module would be `if (strategy === 'nearest-car')` wearing prose. A
+ * per-id sentence in `data/` would clear invariant 7 on a technicality and fail the thing invariant
+ * 7 is *for*: a dispatcher's weight vector is the one object in this repository that a **search**
+ * writes — Phase 7's optimizer emits weight vectors, `tuning/` emits weight vectors, and § D145's
+ * learned arm emits weight vectors. Authored prose beside a searched vector is stale on the first
+ * round it improves, and nothing would notice. `TrafficProfile.blurb` is the precedent for authored
+ * copy and it is a precedent about a *pattern*, which nothing tunes.
+ *
+ * So every clause below is computed, and the vocabulary comes from the two places that already
+ * declare it:
+ *
+ * | clause | source | goes stale when |
+ * |---|---|---|
+ * | which terms it ranks on | `profile.weights` | never — it *is* the vector |
+ * | what a term means | `CostTermSpec.measures`, via `core`'s `COST_TERMS_BY_ID` | never — one row per term in `data/dispatcher-profiles.json → terms` |
+ * | what it prices that the others do not | the `cards` argument | never — it is recomputed against the list on screen |
+ * | the hard constraint, the auction, the pooling | the profile's own authored fields | never — `mechanismClausesOf`'s rule, and its reason |
+ *
+ * ## `serves` is deliberately not used, and the reason is a property rather than a preference
+ *
+ * `data/dispatcher-profiles.json → terms` gives every term a `serves` as well as a `measures`, and
+ * `serves` is the more interesting half — *"AWT"*, *"WT95, % > 60s"*, *"TTD"*. Every one of those is
+ * a token in `honesty/properties.ts#ESTIMATE_CUES`. A card that said *"serves AWT"* beside
+ * *"only 3 of the 13 cards"* would be an estimate cue in the same clause as a small integer, and on
+ * any run whose refused `meanWaitS` rounds to 3 or 13 that is R3's `suppressed-mean` — the
+ * coincidence § D186 spent a whole lane on, manufactured on purpose. `measures` carries no cue.
+ *
+ * ## It is long on the cards that are complicated, and that is the choice rather than an oversight
+ *
+ * Measured over the shipped thirteen: 72 characters for `eta`, 203 for `collective`, and **668 for
+ * `predictive-balanced`**, which weights ten of the thirteen terms. The obvious trim — name the
+ * leaders on the face and put the rest behind the disclosure — was **refused**, on § D301 § 1:
+ * subtraction is the default move for a casual mode and it is the one this product does not make.
+ * The card is long because that dispatcher is complicated, and a card that hid nine tenths of what
+ * a dispatcher weighs would be describing a simpler dispatcher.
+ *
+ * `docs/12` § 1.5 B1's *"casual gets a lever, not a lecture"* is not an argument against it and is
+ * named here so the next reader does not have to re-decide: {@link nameplateVisibleIn}'s docstring
+ * already scopes that clause to the `NAMEPLATE` plate — *"a door-dwell reference value and a jerk
+ * limit are a lecture"* — which is reference data a run never touches. A dispatcher's own weight
+ * vector is the thing the reader is choosing between.
+ *
+ * The length is **bounded by the term library** rather than by an author's patience, which is the
+ * property {@link dispatcherBlurbOf} was rewritten to have: a reader's own profile weighting all
+ * thirteen terms is the worst case and it is a known one.
+ *
+ * ## What is *not* derived, and is therefore not said
+ *
+ * There is no plain-language name for `noDirectionReversal`. `core` declares one —
+ * `dispatch/parameters.ts`'s `constraints.noDirectionReversal` carries a 350-character description
+ * under CLAUDE.md invariant 8 — and it is engineer prose written for an optimizer's schema, not a
+ * card. Translating it here would be a taxonomy maintained in a renderer, which
+ * {@link dispatcherFamilyOf} refuses two functions up for exactly this reason. So the card says what
+ * a hard constraint **is** — a filter no weight can buy past — and names the id verbatim, which is
+ * true of every id including one this build has never heard of. A player-facing name per constraint
+ * belongs beside the constraint, in `core`'s parameter schema, and is not invented here.
+ */
+export function dispatcherBehaviourOf(
+  profile: DispatcherProfile,
+  cards: readonly DispatcherProfile[],
+): string {
+  const weighted = weightedTermsOf(profile.weights);
+  const sentences = [rankingSentenceOf(weighted)];
+  sentences.push(...contrastSentencesOf(profile, weighted, cards));
+  sentences.push(...mechanismSentencesOf(profile));
+  return sentences.join(' ');
+}
+
+/**
+ * What the scorer is trying to make small, in the term library's own English.
+ *
+ * **Half the heaviest weight** is the line between *what it ranks on* and *what it also prices*, and
+ * it is a statement about an `argmin` rather than a rounding: weights apply to terms normalised into
+ * `[0, 1]` (`data/dispatcher-profiles.json → normalization`, `required: true`), so a term at 0.10
+ * against a 1.00 can move the winner only where the leaders are within a tenth of each other. Naming
+ * it in the same breath as the leader would tell a player the two matter alike, and on
+ * `capacity-aware` — 0.70, 0.20, 0.10 — they do not.
+ *
+ * The empty case is the one shipped profiles never reach and a reader's own can: a vector of zeros
+ * scores every car identically, and `core`'s policy then decides by car id. Saying so is
+ * {@link dispatcherBlurbOf}'s existing *"no term weighted — every car prices the same"* as a
+ * sentence.
+ */
+function rankingSentenceOf(weighted: readonly (readonly [string, number])[]): string {
+  const heaviest = weighted[0];
+  if (heaviest === undefined) {
+    return (
+      'It puts weight on nothing at all, so every car costs it the same and the choice falls ' +
+      'through to the group’s tie-break.'
+    );
+  }
+  const leaders = weighted.filter(([, weight]) => weight >= heaviest[1] / 2);
+  const rest = weighted.slice(leaders.length);
+  const tail =
+    rest.length === 0 ? '' : `, and more lightly on ${termList(rest.map(([id]) => id))}`;
+  return `It ranks the cars on ${termList(leaders.map(([id]) => id))}${tail} — lowest wins.`;
+}
+
+/**
+ * The clauses that answer *differently from what?* — computed against the list the reader is looking
+ * at, never against a remembered one.
+ *
+ * `cards` is the rail's own `allDispatchers(...)`, so it carries the reader's saved profiles too and
+ * *"of the 15 cards here"* counts fifteen cards that are really there. That is the whole reason the
+ * peer set is a parameter instead of a constant: a count of *the shipped thirteen* would be a
+ * sentence about a list nobody is looking at the moment somebody saves a fourteenth.
+ *
+ * Two clauses, and they are different questions rather than one question twice:
+ *
+ * 1. **A term it prices that few others do.** The rarest of its own weighted terms, emitted only
+ *    when at most a third of the cards price it — the threshold is a third because a term half the
+ *    list prices is not a distinguishing fact and a sentence claiming it were would be filler.
+ * 2. **A term almost everything else prices and it does not.** `nearest-car` is the case this exists
+ *    for: twelve of the thirteen shipped cards weight `waitTime` and it is the one that does not,
+ *    which is the single most useful thing anyone can be told about it and which clause 1 cannot
+ *    reach, because clause 1 only looks at terms the profile *has*.
+ *
+ * Both may fire, and on `nearest-car` both do. Neither fires for `eta`, whose whole character is
+ * that it prices the ordinary thing and nothing else — and the sentence for that is the absence of
+ * these two, plus {@link rankingSentenceOf}'s *"lowest wins"* with no tail.
+ */
+function contrastSentencesOf(
+  profile: DispatcherProfile,
+  weighted: readonly (readonly [string, number])[],
+  cards: readonly DispatcherProfile[],
+): readonly string[] {
+  const total = cards.length;
+  if (total < 2) return [];
+  const priced = (id: string): number =>
+    cards.filter((card) => (card.weights[id] ?? 0) !== 0).length;
+
+  const sentences: string[] = [];
+
+  const rarest = [...weighted]
+    .map(([id]) => ({ id, count: priced(id) }))
+    .sort((a, b) => a.count - b.count || a.id.localeCompare(b.id))[0];
+  if (rarest !== undefined && rarest.count * 3 <= total) {
+    sentences.push(
+      rarest.count === 1
+        ? `Of the ${String(total)} cards here it is the only one that prices ${termName(rarest.id)}.`
+        : `Of the ${String(total)} cards here only ${String(rarest.count)} price ` +
+          `${termName(rarest.id)}, and this is one.`,
+    );
+  }
+
+  const missed = DECLARED_TERM_IDS.map((id) => ({ id, count: priced(id) }))
+    .filter(({ id, count }) => count * 2 > total && (profile.weights[id] ?? 0) === 0)
+    .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))[0];
+  if (missed !== undefined) {
+    const without = total - missed.count;
+    sentences.push(
+      without === 1
+        ? `It is the only card here that puts no weight on ${termName(missed.id)} at all.`
+        : `It is one of only ${String(without)} cards here that put no weight on ` +
+          `${termName(missed.id)} at all.`,
+    );
+  }
+  return sentences;
+}
+
+/**
+ * A term id as the library describes it, or as itself when the library does not carry it.
+ *
+ * `CostTermDefinition.measures` mirrors `data/dispatcher-profiles.json → terms[].measures` — `core`
+ * pins the two together in both directions (`policy.test.ts`) — so this is the data file's own
+ * English reaching a card without a renderer re-authoring it.
+ *
+ * The fallback is not decoration. `DECLARED_TERM_IDS` is deliberately a *superset* of the
+ * implemented terms so that *"declared but pending"* and *"not a term at all"* stay different
+ * things; a pending term has no `CostTermDefinition` and therefore no `measures`. It is empty today
+ * and the branch is reachable the day it is not, and a card that silently dropped a weighted term
+ * would be describing a dispatcher nobody configured.
+ */
+function termName(id: string): string {
+  const measures = COST_TERMS_BY_ID.get(id)?.measures;
+  if (measures === undefined) return `\`${id}\``;
+  // Only the first character, and only when the second is not also upper case: `measures` strings
+  // are sentences in the data file and are being spliced mid-sentence here, but a term whose
+  // description opened on an acronym must not be lower-cased into a different word.
+  const second = measures[1] ?? '';
+  return second !== second.toLowerCase()
+    ? measures
+    : `${(measures[0] ?? '').toLowerCase()}${measures.slice(1)}`;
+}
+
+/** `a`, `a and b`, `a, b and c` — the Oxford-free join the rest of this file uses. */
+function termList(ids: readonly string[]): string {
+  const names = ids.map(termName);
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+}
+
+/**
+ * The declared behaviour a weight vector cannot carry, as sentences.
+ *
+ * The same four authored facts {@link mechanismClausesOf} lists, plus the pooling branch, said in
+ * full rather than as a semicolon-separated tail. It reads the profile **as authored** for
+ * {@link mechanismClausesOf}'s stated reason — nothing here invents a description, so nothing here
+ * can be wrong about the code — with the consequence that a profile relying on a stage default
+ * contributes no sentence about it. That is the honest direction: the default is what every other
+ * card does too, so it is not something this one does differently.
+ *
+ * The pooling clause is the one this function has that {@link mechanismClausesOf} does not, and it
+ * is here because it is the **third** fact of the kind that docstring names — *"two shipped facts
+ * are not weights and still separate two profiles the vector cannot"*. It is a third:
+ * `destination-eta` and `destination-panel` weight the same two terms and differ in the building by
+ * whether the landing panel names a car. Without it the two cards differ only in the order two
+ * identical weights sort in, which is a distinction no player can act on. The two renderings come
+ * off one branch — see {@link poolingReadingOf} — so the plate row and this sentence cannot come to
+ * disagree about which case a profile is in.
+ */
+function mechanismSentencesOf(profile: DispatcherProfile): readonly string[] {
+  const sentences: string[] = [];
+  const constraints = [...(profile.hardConstraints ?? [])].sort((a, b) => a.localeCompare(b));
+  if (constraints.length > 0) {
+    sentences.push(
+      `Before any of that it throws out every car the hard rule${constraints.length === 1 ? '' : 's'} ` +
+        `${constraints.map((id) => `\`${id}\``).join(' and ')} rule${constraints.length === 1 ? 's' : ''} ` +
+        'out — a filter, so no weight can buy past it.',
+    );
+  }
+  const auction = profile.auction;
+  if (auction !== undefined) {
+    const rounds = auction.rounds ?? 1;
+    sentences.push(
+      `The cars bid for the call and the group takes the best bid — \`${auction.aggregation ?? 'central-argmin'}\`, ` +
+        `over ${String(rounds)} bidding round${rounds === 1 ? '' : 's'} — rather than the group ` +
+        'scoring them itself.',
+    );
+  }
+  if (profile.eligibility?.enRouteDiversion === true) {
+    sentences.push('A car already on its way will stop for a call it is about to fly past.');
+  }
+  const pooling = poolingReadingOf(
+    profile.dispatch?.passengerAssignment ?? 'none',
+    profile.dispatch?.assignmentMode ?? 'single-car',
+    profile.dispatch?.splitThresholdPassengers ?? 0,
+  ).sentence;
+  if (pooling !== undefined) sentences.push(pooling);
+  return sentences;
+}
+
 /**
  * The declared behaviour a weight vector cannot carry, in the file's own words.
  *
@@ -257,8 +584,27 @@ export function dispatcherNoteOf(
  * A profile this engine refuses — an unknown weight, an engine it does not implement — has no
  * resolved configuration to describe, and the plate says exactly that rather than falling back to
  * defaults it would not run with. `credentialCapabilityOf` takes the same line for the same reason.
+ *
+ * ## The two registers — GitHub issue #100
+ *
+ * **Every `k` and every `v` is byte-identical in both modes, and only the `help` moves.** That is
+ * {@link buildingPlateOf}'s pattern six functions down, adopted here rather than re-argued, and it
+ * is what lets `rightRail.test.ts` state *Casual removes nothing* as a string equality over the rows
+ * instead of as a paragraph. A plate is a table of measured facts; the vocabulary problem is in the
+ * *explanation*, and the explanation is exactly what `help` is.
+ *
+ * The Casual lead obeys `mode/disclosure.ts`'s three rules the way § D71's does: it **restates no
+ * number**, it **makes no claim the source does not**, and the engineer's sentence follows it
+ * **verbatim**. Four rows take one — the four that carry a vocabulary a reader would have to already
+ * have. `profile` and `family` are a name and a word, and get none.
  */
-export function dispatcherPlateOf(profile: DispatcherProfile): readonly PlateEntry[] {
+export function dispatcherPlateOf(
+  profile: DispatcherProfile,
+  mode: ViewMode = 'advanced',
+): readonly PlateEntry[] {
+  /* {@link buildingPlateOf}'s own helper, in the same words, for the same reason. */
+  const lead = (casual: string, sentence: string): string =>
+    mode === 'basic' ? `${casual} ${sentence}` : sentence;
   let resolved: ResolvedDispatchConfig;
   try {
     resolved = resolveDispatchConfig(profile);
@@ -290,16 +636,28 @@ export function dispatcherPlateOf(profile: DispatcherProfile): readonly PlateEnt
     {
       k: 'terms weighted',
       v: `${String(weighted.length)} of ${String(DECLARED_TERM_IDS.length)}`,
-      help:
-        'The cost-term library declares twelve terms; this counts the ones this profile gives a ' +
-        'non-zero weight. A term weighted zero reaches the scorer and changes no decision.',
+      /*
+       * The count was the word **twelve**, spelled out, against a value that has read `1 of 13`
+       * since the thirteenth term landed. Prose about a number, wrong about the number, on the row
+       * that prints it — this repository's own recurring defect, found by driving this plate rather
+       * than by reading it. It is derived now, so the sentence and the value move together.
+       */
+      help: lead(
+        'A dispatcher scores every car and sends the cheapest. These are the things it is allowed ' +
+          'to count.',
+        `The cost-term library declares ${String(DECLARED_TERM_IDS.length)} terms; this counts the ` +
+          'ones this profile gives a non-zero weight. A term weighted zero reaches the scorer and ' +
+          'changes no decision.',
+      ),
     },
     {
       k: 'heaviest',
       v: heaviest === '' ? 'none' : heaviest,
-      help:
+      help: lead(
+        'What it cares about most, and by how much against the rest.',
         'The three largest weights, as authored. Weights are applied to normalised terms, so ' +
-        'they are comparable with one another and carry no unit.',
+          'they are comparable with one another and carry no unit.',
+      ),
     },
     {
       k: 'load sensor',
@@ -307,16 +665,24 @@ export function dispatcherPlateOf(profile: DispatcherProfile): readonly PlateEnt
         eligibility.maxLoadFactorForAssignment,
         resolved.answer.allowBypassIfSoleEligibleCar,
       ),
-      help:
+      help: lead(
+        'How full a car has to be before the group stops sending it to new calls.',
         '`eligibility.maxLoadFactorForAssignment` — the group\'s own load filter, which is not ' +
-        "the car's bypass threshold. At 1.0 it is inert and the car's load cell is the only filter.",
+          "the car's bypass threshold. At 1.0 it is inert and the car's load cell is the only filter.",
+      ),
     },
     {
       k: 'pooling',
-      v: poolingPhrase(dispatch.passengerAssignment, dispatch.assignmentMode, dispatch.splitThresholdPassengers),
-      help:
+      v: poolingReadingOf(
+        dispatch.passengerAssignment,
+        dispatch.assignmentMode,
+        dispatch.splitThresholdPassengers,
+      ).short,
+      help: lead(
+        'Whether one call gets one car, or a crowded landing gets more than one.',
         '`dispatch.passengerAssignment` and `dispatch.assignmentMode`. A landing panel pools by ' +
-        'destination; `split-demand` sends a second car to a landing deeper than the threshold.',
+          'destination; `split-demand` sends a second car to a landing deeper than the threshold.',
+      ),
     },
     {
       k: 'zoning',
@@ -324,14 +690,19 @@ export function dispatcherPlateOf(profile: DispatcherProfile): readonly PlateEnt
         zoneAffinity > 0
           ? `zone affinity weighted ${zoneAffinity.toFixed(2)}`
           : 'none — the group is undivided',
-      help:
+      help: lead(
+        'Whether cars are given their own patch of the building to look after.',
         'Operational zoning is the `zoneAffinity` cost term, not a building fact. Service zoning ' +
-        "is the bank's `servesFloors` and access zoning is the credential; the three are distinct.",
+          "is the bank's `servesFloors` and access zoning is the credential; the three are distinct.",
+      ),
     },
     {
       k: 'parking',
       v: PARKING_WORDS[resolved.idle.parkingStrategy] ?? resolved.idle.parkingStrategy,
-      help: '`idle.parkingStrategy` — where a car with nothing to do goes.',
+      help: lead(
+        'Where a car waits when nobody has called it.',
+        '`idle.parkingStrategy` — where a car with nothing to do goes.',
+      ),
     },
   ];
 }
@@ -351,14 +722,50 @@ function loadSensorPhrase(maxLoadFactor: number, soleEligibleOverride: boolean):
   return soleEligibleOverride ? `${base} · sole-eligible override on` : base;
 }
 
-function poolingPhrase(
+/** The pooling case, in the plate's words and in a card's. */
+interface PoolingReading {
+  /** The plate's value cell — byte-identical in both registers, as every `v` on that plate is. */
+  readonly short: string;
+  /**
+   * What it does to a landing, as a sentence, or `undefined` for the case that does nothing.
+   *
+   * `none` is the default every other card also has, so it is not something *this* card does
+   * differently and {@link dispatcherBehaviourOf} says nothing about it — the same direction
+   * {@link mechanismSentencesOf} takes with every unstated stage default.
+   */
+  readonly sentence: string | undefined;
+}
+
+/**
+ * Which of the three pooling cases a resolved configuration is in — **decided once, rendered twice.**
+ *
+ * The plate row and the Casual card's mechanism sentence both need this branch, and two copies of it
+ * is the shape § D227 names: a row saying *split above 12 waiting* beside a sentence that had drifted
+ * into saying something else about the same profile. One function, two projections, and the
+ * projections cannot disagree about the case because there is one `if`.
+ */
+function poolingReadingOf(
   passengerAssignment: string,
   assignmentMode: string,
   splitThreshold: number,
-): string {
-  if (passengerAssignment === 'panel') return 'by destination, at the panel';
-  if (assignmentMode === 'split-demand') return `split above ${String(splitThreshold)} waiting`;
-  return 'none';
+): PoolingReading {
+  if (passengerAssignment === 'panel') {
+    return {
+      short: 'by destination, at the panel',
+      sentence:
+        'Riders say which floor they want at the landing, so a queue here is people waiting for ' +
+        'the car they were promised rather than for whichever one turns up.',
+    };
+  }
+  if (assignmentMode === 'split-demand') {
+    return {
+      short: `split above ${String(splitThreshold)} waiting`,
+      sentence:
+        `Once more than ${String(splitThreshold)} people are waiting at one landing it sends a ` +
+        'second car there rather than making them all fit in one.',
+    };
+  }
+  return { short: 'none', sentence: undefined };
 }
 
 /** Term ids with a non-zero weight, heaviest first, ties by id so the order is stable. */
@@ -1078,15 +1485,26 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
       const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
       setText(ui.dispatcherNote, dispatcherNoteOf(profiles, state.dispatcherId));
       dispatcherList(
-        profiles.map((entry) => `${entry.id}${entry.id === state.dispatcherId ? '*' : ''}`).join('|'),
+        /*
+         * The mode joins the signature — issue #100. `keyedList` rebuilds only when this string
+         * moves, and both of a card's strings move with the register, so a rail that kept the old
+         * key would go on drawing the engineer's cards after the toggle until something else
+         * happened to change the list. Found by reading {@link mountRightRail}'s own docstring
+         * about why the lists are keyed rather than by watching it fail — which is also the honest
+         * account of the evidence: see {@link keyedPlate} for why neither key can be driven here.
+         */
+        `${state.mode}|${profiles
+          .map((entry) => `${entry.id}${entry.id === state.dispatcherId ? '*' : ''}`)
+          .join('|')}`,
         () =>
-          profiles.map((entry) =>
-            pick(doc, {
+          profiles.map((entry) => {
+            const card = dispatcherCardOf(entry, profiles, state.mode);
+            return pick(doc, {
               title: entry.name,
-              sub: dispatcherBlurbOf(entry),
+              sub: card.sub,
               tag: dispatcherFamilyOf(entry).toUpperCase(),
               selected: entry.id === state.dispatcherId,
-              help: `Profile id \`${entry.id}\`.`,
+              help: card.help,
               onPick: () => {
                 /*
                  * The whole transition, not the id — issue #65. `withDispatcher` takes the editor's
@@ -1102,10 +1520,10 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
                 context.update(withDispatcher(state, resources, entry.id));
                 context.runShift();
               },
-            }),
-          ),
+            });
+          }),
       );
-      dispatcherPlate(dispatcherPlateOf(profile));
+      dispatcherPlate(dispatcherPlateOf(profile, state.mode));
       setText(
         ui.accessNote,
         building === undefined
@@ -1340,11 +1758,33 @@ function keyedList(host: Element): (key: string, build: () => readonly Node[]) =
   };
 }
 
-/** The same, for a plate, keyed on the rows it would draw. */
+/**
+ * The same, for a plate, keyed on the rows it would draw.
+ *
+ * **`help` is in the key, and leaving it out was a live defect.** The key was `k` and `v` only, and
+ * {@link buildingPlateOf} has drawn its Casual lead into `help` since GitHub issue #71 — so toggling
+ * the mode moved two rows' explanations and the plate, seeing the same keys and the same values,
+ * drew nothing. A reader who switched to Casual kept the engineer's sentences until some *other*
+ * change happened to move a value. Issue #100 puts a Casual lead on six more rows of the dispatcher
+ * plate, which is how this surfaced; the building plate has had it the whole time.
+ *
+ * {@link mountRightRail}'s docstring calls the keying *"a correctness measure with a performance
+ * side effect, not the other way round"*. A key missing a field the renderer reads is that sentence
+ * inverted.
+ *
+ * **This is not driven.** `mountRightRail` is DOM-bound and on `honesty/derive.test.ts`'s
+ * undriven-mount list, and `dev/mountRecorder.test-helper.ts` reaches construction rather than
+ * `render` — so nothing under Node can flip the toggle and read the plate back. What
+ * `rightRail.test.ts` asserts instead is that this key **reads `help` at all**, over the module's
+ * own source with comments stripped, which is the idiom the Machines segment's refusal is held to
+ * three functions up. It is weaker than driving the mount and is said rather than dressed up.
+ */
 function keyedPlate(host: Element): (rows: readonly PlateEntry[]) => void {
   let last: string | undefined;
   return (rows) => {
-    const key = rows.map((entry) => `${entry.k}\u0000${entry.v}`).join('\u0001');
+    const key = rows
+      .map((entry) => `${entry.k}\u0000${entry.v}\u0000${entry.help ?? ''}`)
+      .join('\u0001');
     if (key === last) return;
     last = key;
     fillPlate(host, rows);

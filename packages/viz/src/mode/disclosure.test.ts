@@ -50,7 +50,13 @@ import { meansAreSuppressed } from '../frame/overlay.js';
 import { readRecordingDocument } from '../record/document.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { SUPPRESSION_LEAD, disclosureItems } from './disclosure.js';
+import {
+  NO_AVERAGE_LEAD,
+  SUPPRESSION_LEAD,
+  disclosureItems,
+  suppressionBannerFor,
+  suppressionLeadFor,
+} from './disclosure.js';
 import {
   FICTIONAL_SUPPRESSION_GROUND,
   FICTIONAL_SUPPRESSION_REASON,
@@ -465,4 +471,94 @@ describe('Casual and Engineer differ on every figure Casual keeps', () => {
       }
     }
   }, 600_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The banner projection — GitHub issue #100's header band
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One row per ground, two lengths of it — and the test that it really is one row.
+ *
+ * `render/canvas.ts`'s header banner is a clipped single line and cannot carry the lead sentence, so
+ * `suppressionBannerFor` publishes the same table's `cause` half. The obvious wrong fix was a second
+ * per-ground table at banner length: two sets of five sentences that must agree about which ground
+ * is which, with nothing checking that they do — § D227's shape. The check that makes the
+ * single-table claim real is *the lead contains the banner's tail*, below; every other assertion
+ * here is about the shortening being a shortening.
+ */
+describe('the refusal has a banner length, and it is the same row — issue #100', () => {
+  /** What the banner says after the shared head. The `cause` half of the ground's own row. */
+  const causeOf = (ground: string | undefined): string =>
+    suppressionBannerFor(ground).slice(`${NO_AVERAGE_LEAD} — `.length);
+
+  it('is not a vacuous sweep: core ships more than three grounds', () => {
+    expect(AWT_INVALID_GROUNDS.length).toBeGreaterThan(3);
+  });
+
+  for (const ground of AWT_INVALID_GROUNDS) {
+    it(`${ground} reaches the banner as a projection of its own lead, not as a second sentence`, () => {
+      /*
+       * **The load-bearing assertion in this file.** If the banner is ever given a table of its
+       * own, the two tables agree on the day it is written and drift on the day one of them is
+       * edited. Requiring the long form to *contain* the short one makes that drift impossible to
+       * commit: there is one string and one of the two projections is a prefix of the other's
+       * middle.
+       */
+      expect(suppressionLeadFor(ground)).toContain(causeOf(ground));
+    });
+  }
+
+  it('leads with the head every Casual refusal leads with', () => {
+    for (const ground of [undefined, ...AWT_INVALID_GROUNDS, FICTIONAL_SUPPRESSION_GROUND]) {
+      expect(suppressionBannerFor(ground).startsWith(NO_AVERAGE_LEAD)).toBe(true);
+    }
+  });
+
+  it('names the ground — no two grounds get the same banner', () => {
+    const banners = AWT_INVALID_GROUNDS.map((ground) => suppressionBannerFor(ground));
+    expect(new Set(banners).size).toBe(banners.length);
+    // …and none of them is the fallback, which is what a copied row would look like.
+    for (const banner of banners) expect(banner).not.toBe(suppressionBannerFor(undefined));
+  });
+
+  it('is short enough to be a banner — under half of its own ground’s lead, every time', () => {
+    // Not a style note. The banner is right-aligned against the building name and clipped from the
+    // right by `fitLabel`; the lead is three sentences and would arrive as an ellipsis. Compared
+    // against the lead for the *same* ground rather than against the longest one, so a ground whose
+    // clause grows cannot be rescued by a different ground's length.
+    for (const ground of [undefined, ...AWT_INVALID_GROUNDS]) {
+      expect(
+        suppressionBannerFor(ground).length * 2,
+        `the banner for ${ground ?? 'no ground'}`,
+      ).toBeLessThan(suppressionLeadFor(ground).length);
+    }
+  });
+
+  it('says there is no average before it says anything else, on every ground', () => {
+    // § D319's rule, at banner width: plain language may not soften a refusal. The word `SATURATED`
+    // is *true* on one ground of five, so it may not appear on a line drawn for all five either.
+    for (const ground of [undefined, ...AWT_INVALID_GROUNDS, FICTIONAL_SUPPRESSION_GROUND]) {
+      const banner = suppressionBannerFor(ground);
+      expect(banner.indexOf(NO_AVERAGE_LEAD)).toBe(0);
+      expect(banner).not.toMatch(/busy day|could not cope/i);
+      expect(banner).not.toMatch(/\bAWT\b|SATURATED/);
+    }
+  });
+
+  it('states no number, so it can never be an estimate standing beside one', () => {
+    // `honesty/properties.ts` R3 pairs an estimate cue with a printed figure. A refusal that quoted
+    // a numeral would be that pairing on the one line that exists to say there is no figure.
+    for (const ground of [undefined, ...AWT_INVALID_GROUNDS, FICTIONAL_SUPPRESSION_GROUND]) {
+      expect(suppressionBannerFor(ground)).not.toMatch(/\d/);
+    }
+  });
+
+  it('treats an unrecognised ground and an absent one identically', () => {
+    // The same widening `suppressionLeadFor` takes, and for the same reason: `record/document.ts`
+    // casts a loaded document without checking any field's value, so a ground this build has never
+    // heard of reaches this function in the shipped path.
+    expect(suppressionBannerFor(FICTIONAL_SUPPRESSION_GROUND)).toBe(suppressionBannerFor(undefined));
+    expect(causeOf(undefined)).not.toContain(FICTIONAL_SUPPRESSION_GROUND);
+  });
 });

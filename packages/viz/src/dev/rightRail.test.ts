@@ -28,6 +28,7 @@ import {
   type LoadedConfig,
   type TrafficProfiles,
 } from '@elevator-sim/core';
+import { DECLARED_TERM_IDS } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
@@ -42,7 +43,9 @@ import type { BrowserResources } from './data.js';
 import type { PlateEntry } from './dom.js';
 import {
   buildingPlateOf,
+  dispatcherBehaviourOf,
   dispatcherBlurbOf,
+  dispatcherCardOf,
   dispatcherFamilyOf,
   dispatcherNoteOf,
   dispatcherPlateOf,
@@ -752,4 +755,323 @@ describe('a suppressed run yields no mean anywhere in the right rail', () => {
     }
     expect(found).toEqual([]);
   }, 600_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The dispatcher cards in Casual — GitHub issues #100 and #110
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **What Engineer says, pinned whole.**
+ *
+ * Thirteen literals, in `data/dispatcher-profiles.json`'s own order, and they are literals on
+ * purpose: a pin derived from {@link dispatcherBlurbOf} would move whenever that function moved,
+ * which is the one thing a pin exists to stop. § D299 § 1 — *a change to Engineer may make it easier
+ * to use; it may not make it say less* — is otherwise a sentence nothing enforces, and the specific
+ * failure it guards against is real and cheap to commit: making Casual read well by taking the
+ * weight vector off the engineer's card and calling that a simplification.
+ *
+ * `1 of 13` and not `1 of 12`: the cost-term library declares thirteen terms. The plate's own `help`
+ * said *twelve* in words until this lane derived it — prose about a number, wrong about the number,
+ * beside the row that prints it.
+ */
+const ENGINEER_BLURBS: Readonly<Record<string, string>> = Object.freeze({
+  'nearest-car': '1 of 13 terms weighted; heaviest distanceTravelled 1.00.',
+  eta: '1 of 13 terms weighted; heaviest waitTime 1.00.',
+  collective:
+    '1 of 13 terms weighted; heaviest waitTime 1.00; hard constraint noDirectionReversal.',
+  'collective-enroute':
+    '2 of 13 terms weighted; heaviest waitTime 1.00, detourPenalty 0.20; hard constraint ' +
+    'noDirectionReversal; stops en route for calls it passes.',
+  'energy-aware':
+    '3 of 13 terms weighted; heaviest waitTime 0.60, stopCount 0.30, distanceTravelled 0.10.',
+  'fairness-first': '2 of 13 terms weighted; heaviest starvation 0.50, waitTime 0.50.',
+  'capacity-aware':
+    '3 of 13 terms weighted; heaviest waitTime 0.70, loadFactor 0.20, crowding 0.10.',
+  'predictive-balanced':
+    '10 of 13 terms weighted; heaviest waitTime 1.00, directionReversal 0.80, starvation 0.70.',
+  auction:
+    '3 of 13 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
+    'contract-net over 1 bidding round.',
+  'auction-multi-round':
+    '3 of 13 terms weighted; heaviest waitTime 1.00, existingCallDelay 0.40, loadFactor 0.30; ' +
+    'contract-net over 3 bidding rounds.',
+  'zoned-uppeak': '2 of 13 terms weighted; heaviest waitTime 0.70, zoneAffinity 0.30.',
+  'destination-eta': '2 of 13 terms weighted; heaviest waitTime 1.00, rideTime 0.50.',
+  'destination-panel': '2 of 13 terms weighted; heaviest rideTime 1.00, waitTime 1.00.',
+});
+
+describe('Engineer is pinned whole — § D299 § 1, in the file it is about', () => {
+  it('draws exactly the blurb it has always drawn, on every shipped profile', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    // Both ways, so the pin cannot go vacuous by a profile being renamed out from under it.
+    expect(profiles.map((entry) => entry.id).sort((a, b) => a.localeCompare(b))).toEqual(
+      Object.keys(ENGINEER_BLURBS).sort((a, b) => a.localeCompare(b)),
+    );
+    for (const entry of profiles) {
+      expect(dispatcherBlurbOf(entry), entry.id).toBe(ENGINEER_BLURBS[entry.id]);
+      // …and it is what the card actually puts on the engineer's face, not merely what the
+      // function returns.
+      expect(dispatcherCardOf(entry, profiles, 'advanced').sub, entry.id).toBe(
+        ENGINEER_BLURBS[entry.id],
+      );
+    }
+  });
+
+  it('keeps the profile id reachable in both registers, which is what `help` was for', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    for (const entry of profiles) {
+      for (const mode of ['basic', 'advanced'] as const) {
+        expect(dispatcherCardOf(entry, profiles, mode).help, `${entry.id}/${mode}`).toContain(
+          `Profile id \`${entry.id}\``,
+        );
+      }
+    }
+  });
+
+  it('defaults to the engineer’s card', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    for (const entry of profiles) {
+      expect(dispatcherCardOf(entry, profiles)).toEqual(
+        dispatcherCardOf(entry, profiles, 'advanced'),
+      );
+    }
+  });
+});
+
+describe('Casual removes nothing — the registers swap places, issue #100', () => {
+  it('carries the vector *and* the behaviour sentence in both registers', () => {
+    /*
+     * § D319's *"there is no `CASUAL_HIDES`"* as an equality a test can run, and the strongest form
+     * available on a card: the two strings are the same two strings in both modes, and only which
+     * one is on the face moves. So a change that gave Casual the plain sentence by taking the
+     * weight vector away goes red here, and so does the mirror image.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    for (const entry of profiles) {
+      const vector = dispatcherBlurbOf(entry);
+      const behaviour = dispatcherBehaviourOf(entry, profiles);
+      expect(behaviour.length, entry.id).toBeGreaterThan(0);
+      for (const mode of ['basic', 'advanced'] as const) {
+        const card = dispatcherCardOf(entry, profiles, mode);
+        const whole = `${card.sub} ${card.help}`;
+        expect(whole, `${entry.id}/${mode} vector`).toContain(vector);
+        expect(whole, `${entry.id}/${mode} behaviour`).toContain(behaviour);
+      }
+      // …and they really do swap, or the equality above would hold for a card that never moved.
+      expect(dispatcherCardOf(entry, profiles, 'basic').sub).toBe(behaviour);
+      expect(dispatcherCardOf(entry, profiles, 'advanced').sub).toBe(vector);
+    }
+  });
+
+  it('keeps every plate key and every plate value byte-identical, and only leads the help', () => {
+    for (const entry of config.dispatcherProfiles.profiles) {
+      const casual = dispatcherPlateOf(entry, 'basic');
+      const engineer = dispatcherPlateOf(entry, 'advanced');
+      expect(casual.map((row) => row.k), entry.id).toEqual(engineer.map((row) => row.k));
+      expect(casual.map((row) => row.v), entry.id).toEqual(engineer.map((row) => row.v));
+      let led = 0;
+      for (const [index, row] of casual.entries()) {
+        const engineerHelp = engineer[index]?.help;
+        if (engineerHelp === undefined) {
+          expect(row.help, `${entry.id}/${row.k}`).toBeUndefined();
+          continue;
+        }
+        // The engineer's sentence survives inside Casual's, verbatim and at the end — a lead, never
+        // a replacement. `mode/disclosure.ts`'s three rules, and `buildingPlateOf`'s own idiom.
+        expect(row.help ?? '', `${entry.id}/${row.k}`).toContain(engineerHelp);
+        if ((row.help ?? '') !== engineerHelp) led += 1;
+      }
+      expect(led, `${entry.id} took no Casual lead at all`).toBeGreaterThan(3);
+    }
+  });
+
+  it('defaults the plate to the engineer’s, and derives the term count rather than spelling it', () => {
+    const collective = profile('collective');
+    expect(dispatcherPlateOf(collective)).toEqual(dispatcherPlateOf(collective, 'advanced'));
+    const help = dispatcherPlateOf(collective, 'advanced').find(
+      (row) => row.k === 'terms weighted',
+    )?.help;
+    // The defect: the sentence said `twelve` while the value beside it said `1 of 13`.
+    expect(help).toContain(`declares ${String(DECLARED_TERM_IDS.length)} terms`);
+    expect(help).not.toContain('twelve');
+  });
+});
+
+describe('what a dispatcher does differently is derived, never authored per id', () => {
+  it('says something different about every shipped profile', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    const sentences = profiles.map((entry) => dispatcherBehaviourOf(entry, profiles));
+    expect(new Set(sentences).size).toBe(sentences.length);
+  });
+
+  it('never renders a profile’s `$comment`, and never names a profile id', () => {
+    /*
+     * The two routes by which authored prose reaches a card, both closed. `$comment` is § D186's
+     * defect — 5 082 characters of seeds and confidence intervals on `destination-eta` alone — and
+     * a per-id branch is CLAUDE.md invariant 7's `if (strategy === 'nearest-car')` wearing prose.
+     * The second is checked against the module's **code**, comments stripped, because a docstring
+     * naming `nearest-car` as an example is not a branch on it.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    const code = readFileSync(fileURLToPath(new URL('./rightRail.ts', import.meta.url)), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    for (const entry of profiles) {
+      const sentence = dispatcherBehaviourOf(entry, profiles);
+      const opening = (entry.$comment ?? '').slice(0, 24);
+      if (opening !== '') expect(sentence.includes(opening), entry.id).toBe(false);
+      expect(code.includes(`'${entry.id}'`), `rightRail.ts branches on ${entry.id}`).toBe(false);
+    }
+  });
+
+  it('moves when a weight moves — the standing requirement, pointed at a card', () => {
+    /*
+     * *Move the control and require the output to change.* An authored blurb would not move, which
+     * is the whole argument for deriving one: a dispatcher's weight vector is the object in this
+     * repository that a **search** writes, and prose beside a searched vector is stale on the first
+     * round that improves it.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    const before = dispatcherBehaviourOf(profile('eta'), profiles);
+    const retuned = { ...profile('eta'), weights: { waitTime: 0.4, starvation: 1 } };
+    const after = dispatcherBehaviourOf(retuned, profiles);
+    expect(after).not.toBe(before);
+    expect(after).toContain('escalating penalty on the longest-waiting call');
+  });
+
+  it('counts the cards on the list rather than a remembered thirteen', () => {
+    // `mountRightRail` passes `allDispatchers(...)`, which carries the reader's saved profiles. A
+    // sentence saying *"of the 13 cards here"* to somebody looking at fourteen would be false.
+    const profiles = config.dispatcherProfiles.profiles;
+    expect(dispatcherBehaviourOf(profile('nearest-car'), profiles)).toContain(
+      `Of the ${String(profiles.length)} cards here`,
+    );
+    const mine = { ...profile('eta'), id: 'mine', name: 'Mine', weights: { crowding: 1 } };
+    const grown = [...profiles, mine];
+    expect(dispatcherBehaviourOf(profile('nearest-car'), grown)).toContain(
+      `Of the ${String(grown.length)} cards here`,
+    );
+    // …and the counts themselves move, not only the total.
+    expect(dispatcherBehaviourOf(profile('capacity-aware'), profiles)).toContain(
+      'only 2 price hall queue length',
+    );
+    expect(dispatcherBehaviourOf(profile('capacity-aware'), grown)).toContain(
+      'only 3 price hall queue length',
+    );
+  });
+
+  it('names the term in the data file’s words, never in the engine’s', () => {
+    // #110's complaint verbatim: the rail described every dispatcher in camelCase engine
+    // identifiers. `CostTermSpec.measures` is the field the data file declares for saying what a
+    // term is, and `core` mirrors it onto `COST_TERMS_BY_ID`.
+    const profiles = config.dispatcherProfiles.profiles;
+    const sentence = dispatcherBehaviourOf(profile('nearest-car'), profiles);
+    expect(sentence).not.toContain('distanceTravelled');
+    for (const term of config.dispatcherProfiles.terms) {
+      if (term.id !== 'distanceTravelled') continue;
+      expect(sentence).toContain(term.measures.toLowerCase());
+    }
+  });
+
+  it('answers *differently from what* — the contrast is against the other cards', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    // The single most useful thing about `nearest-car`, and the one no per-profile sentence would
+    // think to say: twelve of the thirteen cards price the wait and it is the one that does not.
+    expect(dispatcherBehaviourOf(profile('nearest-car'), profiles)).toContain(
+      'the only card here that puts no weight on estimated wait for the new passenger',
+    );
+    // `eta` prices the ordinary thing and nothing else, so there is no contrast to draw and none
+    // is drawn — a filler sentence claiming distinction would be worse than silence.
+    const eta = dispatcherBehaviourOf(profile('eta'), profiles);
+    expect(eta).not.toContain('cards here');
+    expect(eta).toBe('It ranks the cars on estimated wait for the new passenger — lowest wins.');
+  });
+
+  it('keeps apart the pairs a weight vector cannot separate', () => {
+    /*
+     * Three pairs, and the third is the one this lane had to add a clause for.
+     * `destination-eta` and `destination-panel` weight the same two terms; what separates them in
+     * the building is the landing panel, which is a `dispatch` field rather than a weight.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    const say = (id: string): string => dispatcherBehaviourOf(profile(id), profiles);
+    expect(say('collective')).toContain('`noDirectionReversal`');
+    expect(say('eta')).not.toContain('noDirectionReversal');
+    expect(say('auction')).toContain('over 1 bidding round');
+    expect(say('auction-multi-round')).toContain('over 3 bidding rounds');
+    expect(say('destination-panel')).toContain('Riders say which floor they want at the landing');
+    expect(say('destination-eta')).not.toContain('at the landing');
+  });
+
+  it('carries no estimate cue, so R3’s textual half has nothing to match', () => {
+    /*
+     * `honesty/properties.ts`'s ESTIMATE_CUES, restated because they are module-private there, and
+     * this sentence carries **counts** — *"only 3 of the 13 cards here"* — so a cue beside one of
+     * them on a run whose refused `meanWaitS` rounds to 3 is `suppressed-mean`. It is also why the
+     * term library's `serves` column is not used: every value in it (*AWT*, *WT95*, *TTD*) is a cue.
+     */
+    const cues =
+      /\b(?:average|mean|awt|typical|95th|wt95|percentile|one in twenty|1 in 20|time to destination|ttd)\b/i;
+    const profiles = config.dispatcherProfiles.profiles;
+    for (const entry of profiles) {
+      const sentence = dispatcherBehaviourOf(entry, profiles);
+      expect(cues.test(sentence), `${entry.id}: ${sentence}`).toBe(false);
+    }
+    // Not vacuous: the column that *would* trip it is in the data file and really does carry cues.
+    expect(config.dispatcherProfiles.terms.some((term) => cues.test(term.serves))).toBe(true);
+  });
+
+  it('rebuilds when the register changes — both cache keys read what the register moves', () => {
+    /*
+     * The mount cannot be driven under Node (`dev/mountRecorder.test-helper.ts` reaches
+     * construction, not `render`), so this is a source assertion and is said as one. It is worth
+     * having because the defect is silent and was **live**: `keyedPlate` hashed `k` and `v` only,
+     * and `buildingPlateOf` has put its Casual lead in `help` since GitHub issue #71 — so a reader
+     * who flipped to Casual kept the engineer's sentences until some unrelated value moved. Issue
+     * #100 puts a lead on six more rows of the dispatcher plate and a whole second register on the
+     * cards, which is how it surfaced.
+     */
+    const code = readFileSync(fileURLToPath(new URL('./rightRail.ts', import.meta.url)), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    const plateKey = /const key = rows[\s\S]{0,200}?;/.exec(code)?.[0] ?? '';
+    expect(plateKey, 'the plate cache key').toContain('entry.help');
+    // …and the dispatcher list's signature carries the mode, or the cards never redraw either.
+    expect(code).toContain('`${state.mode}|${profiles');
+  });
+
+  it('is as long as the dispatcher is complicated, and the docstring’s figures are pinned', () => {
+    /*
+     * `dispatcherBehaviourOf`'s docstring quotes three lengths to justify refusing a trim, and a
+     * quoted number that nothing re-derives is the defect CLAUDE.md names outright. Pinned to the
+     * character, so a wording change either keeps the figures true or turns this red.
+     *
+     * The bound is the term library rather than an author's patience, which is the property the
+     * whole derivation exists to have: the worst case is a profile that weights all thirteen terms.
+     */
+    const profiles = config.dispatcherProfiles.profiles;
+    const lengthOf = (id: string): number => dispatcherBehaviourOf(profile(id), profiles).length;
+    expect(lengthOf('eta')).toBe(72);
+    expect(lengthOf('collective')).toBe(203);
+    expect(lengthOf('predictive-balanced')).toBe(668);
+    // The longest shipped card is the one that weights the most terms — the claim, not a coincidence.
+    const byLength = [...profiles].sort(
+      (a, b) =>
+        dispatcherBehaviourOf(b, profiles).length - dispatcherBehaviourOf(a, profiles).length,
+    );
+    expect(byLength[0]?.id).toBe('predictive-balanced');
+    expect(Object.values(profile('predictive-balanced').weights).filter((w) => w !== 0)).toHaveLength(
+      10,
+    );
+  });
+
+  it('says something honest about a vector that weights nothing', () => {
+    const profiles = config.dispatcherProfiles.profiles;
+    const inert = { ...profile('eta'), id: 'inert', weights: {} };
+    const sentence = dispatcherBehaviourOf(inert, profiles);
+    // `core`'s own consequence: every car scores zero and the group decides by car id.
+    expect(sentence).toContain('every car costs it the same');
+    expect(sentence).toContain('tie-break');
+  });
 });
