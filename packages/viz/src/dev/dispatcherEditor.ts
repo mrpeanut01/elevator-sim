@@ -26,6 +26,28 @@
  * page loaded, and `authoring/authoring.test.ts`'s run-identity test is the only thing that caught
  * it — the page looked right and the dispatcher was not the one named in the rail.
  *
+ * ## What the run button promises — GitHub issue #92
+ *
+ * **One run, and the screen says so.** The panel's run verb re-simulates the same building, the same
+ * seed and the same traffic with a different dispatcher in charge; it does not run a comparison, and
+ * it may not be read as one. So the result strip built below is a **pairing of two sheets**, drawn
+ * from `reportPanel.ts`'s own `ReportDeltaView` — which is arithmetic-free by construction: every
+ * value in it is a string one of the two sheets already published, paired by figure id, with no
+ * subtraction, no ordering and no colour. Its refusal travels with it: *"Two runs are two runs …
+ * which setting is better needs 50 or more paired runs against the same passengers and an interval
+ * that excludes zero, which is what Compare is for."*
+ *
+ * That number is CLAUDE.md's *"budget 50–200 replications"*, and it is why this strip does **not**
+ * try to answer the question the issue asks in its title. A one-click *run this and show me the
+ * difference* that reported the delta of two single runs would be this project's documented central
+ * failure mode — *increasing lift speed appearing to increase average waiting time* — shipped as a
+ * feature. The delta is worth putting in front of a practitioner anyway, because *what did this
+ * dispatcher do today* is a real question with a real answer; what it is not is evidence.
+ *
+ * The strip is the **same** `reportDeltaOf` the Day report draws, reached through the exported
+ * `reportViewOf`, rather than a second implementation. Two answers to *what moved* is how the two
+ * surfaces come to disagree about a run they are both describing.
+ *
  * ## Why the term rows are built once and updated in place
  *
  * A `<input type="range">` drag is held by the element the pointer went down on. Replacing that
@@ -54,10 +76,12 @@ import {
 } from '../authoring/dispatcherSpec.js';
 
 import { commitmentOf } from '../scope/commitment.js';
+import type { ShapedDayReport } from '../shift/report.js';
 
-import { chip, el, fill, pick, setHidden, setStyle, setText, slider, toggle } from './dom.js';
+import { chip, el, fill, pick, plateRow, setHidden, setStyle, setText, slider, toggle } from './dom.js';
 import type { DispatcherEditorElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import { reportViewOf, runProgressOf, type RunProgress } from './reportPanel.js';
 import { allDispatchers, profileById } from './state.js';
 
 /* -------------------------------------------------------------------------- *
@@ -447,6 +471,80 @@ export function runThisDispatcherStateOf(
 }
 
 /* -------------------------------------------------------------------------- *
+ * "And what did it do?" — the result strip, GitHub issue #92
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The run this panel's own press started, and the sheet that press replaced.
+ *
+ * ## Why the *before* is captured at the press rather than looked up afterwards
+ *
+ * `mountReport` keeps a `previousSheet` of its own and differences against *"the sheet before this
+ * one"*. That is the right relation for a sheet, and it is the wrong one here: this panel is not
+ * describing a sequence of sheets, it is describing **the press the reader just made**. The sheet
+ * that was on screen at that moment is a fact this panel owns and cannot be wrong about, and saying
+ * so on the strip means the two surfaces are not two answers to one question — they are answers to
+ * two questions, each naming its own.
+ *
+ * It also survives the one case a lookup does not. `dev/main.ts` files a sheet from a *mid-run*
+ * toggle of the energy axis (the stale-sheet resurrection recorded in triage as N-3), so *the latest
+ * filed sheet* is not always a sheet of the latest run. {@link editorRunReadOutOf} gates on the
+ * playhead as well as on the run id, and refuses rather than pairs whenever either disagrees.
+ *
+ * `runId` is `building-profile-seed`, so re-running one selection reproduces bit-identically
+ * (§ D223) and the id is stable across a retry — which is correct here: the reader pressed once, and
+ * a second run of the same selection is the same run.
+ */
+export interface EditorRunPairing {
+  readonly runId: string;
+  /** The filed sheet at the moment of the press, or `undefined` when nothing had been filed. */
+  readonly before: ShapedDayReport | undefined;
+}
+
+/**
+ * Which of six things the strip has to say. Prose-free on purpose — see {@link RunThisState}.
+ *
+ * The five that are not `paired` are all *"there is nothing to pair yet, and here is why"*, and each
+ * names a different why. A single "no data" arm would have collapsed a day that is still playing
+ * (wait), a day nobody filed (open the sheet) and a run somebody else started (press again) into one
+ * shrug, which is the class of message a reader learns to stop reading.
+ */
+export type EditorRunReadOut =
+  | 'noRun'
+  | 'superseded'
+  | 'watching'
+  | 'unfiled'
+  | 'firstSheet'
+  | 'paired';
+
+/**
+ * What the strip may say, given what this panel started and what is on screen now.
+ *
+ * The order of the tests is the order of what a reader is owed, and it is the same order
+ * `reportViewOf` uses one surface over: *nothing has been run here* outranks everything, because a
+ * strip cannot be about a press that never happened; *this is not that run any more* comes next,
+ * because pairing a sheet of somebody else's run against this panel's remembered *before* would be a
+ * delta between two runs that were never asked the same question; and **the playhead outranks the
+ * filed sheet**, which is § D223 applied to a second surface — a whole-day pairing drawn while the
+ * day is at 09:14 is two answers on one screen, and this panel is not entitled to a different answer
+ * from the sheet it is quoting.
+ */
+export function editorRunReadOutOf(
+  caused: EditorRunPairing | undefined,
+  at: {
+    readonly runId: string | undefined;
+    readonly playedOut: boolean;
+    readonly report: ShapedDayReport | undefined;
+  },
+): EditorRunReadOut {
+  if (caused === undefined) return 'noRun';
+  if (at.runId !== caused.runId) return 'superseded';
+  if (!at.playedOut) return 'watching';
+  if (at.report === undefined) return 'unfiled';
+  return caused.before === undefined ? 'firstSheet' : 'paired';
+}
+
+/* -------------------------------------------------------------------------- *
  * Naming a dispatcher — GitHub issue #113 § 3
  * -------------------------------------------------------------------------- */
 
@@ -583,6 +681,26 @@ export function unauthorableBlocksOf(
 }
 
 /*
+ * The sentence both run verbs end on — GitHub issue #92, and the one clause on this panel that is
+ * not about what the press *does*.
+ *
+ * Written once and shared, rather than said twice in two ways. It is the promise the button is
+ * making, and a promise stated in two wordings is two promises: the day one of them is edited, the
+ * button says one thing on the label a reader hovers and another on the label they do not.
+ *
+ * The figure is CLAUDE.md's own — *budget 50–200 replications; ten is not enough* — and the shape of
+ * the claim is `reportPanel.ts`'s, which is the wording every other refusal on this subject in the
+ * product already uses. The panel's foot in `index.html` says the same thing in the same words, and
+ * that is not redundancy: it is there for a reader who never hovers anything.
+ */
+const ONE_RUN_PROMISE =
+  'This is one run, not a comparison: same building, same seed, same passengers, a different ' +
+  'dispatcher in charge. A difference between two single runs is not evidence that one dispatcher ' +
+  'is better than another — that needs 50 or more paired runs against the same passengers and an ' +
+  'interval that excludes zero, which is what Compare is for. What one run tells you is what this ' +
+  'dispatcher did today, and the strip below the buttons says what moved.';
+
+/*
  * The *now use this* copy. Module-private for the reason stated above, and for the one
  * `TRANSPORT_LANDING_TITLE` states in `buildingEditor.ts`: an exported string literal here becomes
  * an unclassified prose surface in `honesty/derive`.
@@ -595,7 +713,7 @@ const RUN_THIS_COPY: Readonly<
     title:
       'Files these weights as a dispatcher of your own and makes it the one driving, then runs the ' +
       'shift again. A weight vector that has not been saved cannot drive: the run resolves a ' +
-      'dispatcher by id.',
+      `dispatcher by id. ${ONE_RUN_PROMISE}`,
   }),
   alreadyDriving: Object.freeze({
     label: 'Already driving',
@@ -606,9 +724,59 @@ const RUN_THIS_COPY: Readonly<
     label: 'Run this dispatcher',
     title:
       'Makes the dispatcher shown here the one the shift runs, and runs it again on the same ' +
-      'building, seed and traffic.',
+      `building, seed and traffic. ${ONE_RUN_PROMISE}`,
   }),
 });
+
+/** The strip's heading. Constant across all six states, so the block is findable when it is empty. */
+const RESULT_EYEBROW = 'What your run moved';
+
+/**
+ * Which two sheets the rows are, said above them.
+ *
+ * The direction has to be on the screen rather than inferred from the arrow, because the rows carry
+ * no sign and no colour — `ReportDeltaView`'s whole design — so *which column is which* is the only
+ * thing a reader needs and cannot work out.
+ */
+const RESULT_PAIRING_LINE =
+  'Left is what the sheet on screen said when you pressed; right is what the sheet your run filed ' +
+  'says. Both columns are those two sheets’ own words, unedited.';
+
+/**
+ * The five states that are not a pairing, each saying which one it is.
+ *
+ * `watching` is a template rather than a sentence because it names the playhead, and a clock in a
+ * fixed string is a clock that stops being true. It is built by {@link runReadOutNoteOf} from
+ * `runProgressOf`'s own two strings — the same two `reportPanel.ts` puts on the running sheet, so
+ * the strip and the sheet cannot disagree about what time it is in the building.
+ */
+const RUN_READ_OUT_COPY: Readonly<Record<Exclude<EditorRunReadOut, 'paired'>, string>> =
+  Object.freeze({
+    noRun:
+      'Nothing to put side by side yet. Run a dispatcher from this panel and what its sheet printed ' +
+      'lands here, beside what the sheet before it printed.',
+    superseded:
+      'The run this panel started is no longer the one on screen — a different building, dispatcher ' +
+      'or seed has been run since. Run again from here and the pairing starts from the sheet that ' +
+      'is filed now.',
+    watching:
+      'This strip reports a whole day at once and waits for the playhead: a part-day average is not ' +
+      'an average of the day. Play it through on the Simulation tab, or click the far end of the ' +
+      'timeline, and the two sheets land here.',
+    unfiled:
+      'The day has played out and no sheet has been filed for it. Opening the Day report closes the ' +
+      'day and files one; this strip fills in when you come back.',
+    firstSheet:
+      'This is the first sheet filed this session, so there is nothing to set beside it. Move a ' +
+      'weight, run again from here, and the next sheet arrives paired with this one.',
+  });
+
+/** The note for a strip that is not showing a pairing, with the playhead's clock where it belongs. */
+function runReadOutNoteOf(state: Exclude<EditorRunReadOut, 'paired'>, progress: RunProgress): string {
+  const base = RUN_READ_OUT_COPY[state];
+  if (state !== 'watching' || progress.kind !== 'watching') return base;
+  return `The day is still running — ${progress.atClock} of a shift that runs to ${progress.endsAtClock}. ${base}`;
+}
 
 /** The refusals {@link saveNameRefusalOf} returns, said where the reader typed the name. */
 const NAME_REFUSAL_COPY: Readonly<Record<NameRefusal, string>> = Object.freeze({
@@ -780,9 +948,45 @@ export function mountDispatcherEditor(
     className: 'helpful',
     style: { color: 'var(--warn)', 'font-size': '11.5px', margin: '4px 0 0' },
   });
+  /*
+   * The result strip — GitHub issue #92. Four nodes, built here on the same precedent as the three
+   * above, and placed **after** `.editor-actions` rather than inside it: it is an account of a run,
+   * not a verb, and a paragraph inside a row of buttons would be laid out as one.
+   *
+   * The heading is drawn in every state, including the one where there is nothing to report, for
+   * `emptyReportView`'s reason one surface over: a block that appears only when it has something to
+   * say is a block a reader does not know exists, and *"press this and nothing appears"* is the
+   * reading it replaces.
+   */
+  const resultEyebrow = el(doc, 'div', {
+    className: 'eyebrow',
+    text: RESULT_EYEBROW,
+    style: { 'margin-bottom': '6px' },
+  });
+  const resultPairing = el(doc, 'p', {
+    className: 'helpful',
+    style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
+  });
+  const resultRows = el(doc, 'div', { className: 'plate' });
+  /*
+   * `role="status"` for the same reason the save confirmation carries one: the strip changes without
+   * the reader having moved focus into it — a run they started minutes ago finishes filing — and a
+   * screen reader that is never told is a second channel this panel does not have.
+   */
+  const resultNote = el(doc, 'p', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '8px 0 0', 'line-height': '1.5' },
+  });
+  const resultStrip = el(doc, 'div', {
+    style: { 'margin-top': '16px', 'padding-top': '14px', 'border-top': '1px solid var(--hairline)' },
+    children: [resultEyebrow, resultPairing, resultRows, resultNote],
+  });
+
   setHidden(savedNote, true);
   setHidden(unauthorable, true);
   elements.save.parentElement?.append(runThis, rename, savedNote);
+  elements.save.parentElement?.after(resultStrip);
   elements.summary.parentElement?.append(unauthorable);
 
   /*
@@ -803,6 +1007,17 @@ export function mountDispatcherEditor(
   };
   scopeNote(elements.terms, DRAFT_NOTE);
   scopeNote(elements.levers, LEVERS_NOTE);
+
+  /**
+   * The run this panel started, and the sheet it replaced — see {@link EditorRunPairing}.
+   *
+   * A mount-local rather than a `ViewerState` field, and the reason is `mountReport`'s about its own
+   * `previousSheet` plus one this panel has of its own: `scope/surface.ts` derives its table from the
+   * state's keys, so a field here would be a new row in the change-scope surface for something no
+   * control writes and no run reads. It is lost on reload, which is honest — so is the reader's
+   * memory of which press this was.
+   */
+  let caused: EditorRunPairing | undefined;
 
   rename.addEventListener('click', () => {
     const at = view;
@@ -842,6 +1057,18 @@ export function mountDispatcherEditor(
       at.state.editingDispatcherId,
     );
     if (action === 'alreadyDriving') return;
+    /*
+     * The two halves of the pairing, read **before** anything is written — GitHub issue #92.
+     *
+     * `before` is the sheet on screen at the instant of the press, which is the relation the strip
+     * claims and the only one this panel can be certain of. `wasRunId` is what the strip is
+     * measured against below: `runShift` catches its own failures and leaves the state alone, so a
+     * run that did not happen leaves the recording where it was, and the pairing must not be armed
+     * on it — the reader would be shown a delta of the previous sheet against itself, captioned as
+     * the run they just asked for.
+     */
+    const before = at.state.report;
+    const wasRunId = at.recording?.runId;
     if (action === 'saveFirst') {
       /*
        * The **one** path that still selects, and it says so on its own label: *Save it and run it*.
@@ -855,6 +1082,13 @@ export function mountDispatcherEditor(
       context.openTab('run');
     }
     context.runShift();
+    /*
+     * `runShift` re-renders synchronously, so `view` is the state the press produced by the time it
+     * returns. Arming here rather than optimistically before the call is what keeps the strip's
+     * claim — *this is the run you started* — true of a press that failed.
+     */
+    const now = view?.recording?.runId;
+    if (now !== undefined && now !== wasRunId) caused = { runId: now, before };
   });
 
   /**
@@ -1155,6 +1389,51 @@ export function mountDispatcherEditor(
     setText(runThis, RUN_THIS_COPY[action].label);
     runThis.title = RUN_THIS_COPY[action].title;
     runThis.disabled = action === 'alreadyDriving';
+
+    /*
+     * The result strip — GitHub issue #92, and the whole of what the run verb now owes the reader
+     * who stayed here.
+     *
+     * The pairing is `reportPanel.ts`'s, reached through the exported `reportViewOf` rather than
+     * rebuilt: `ReportDeltaView` pairs the two sheets' **published strings** by figure id, takes no
+     * difference and states no direction, and it carries its own refusal in `note` — the 50-paired-
+     * runs sentence this panel's foot in `index.html` also says. A second implementation here would
+     * be a second answer to *what moved* on a run both surfaces are describing.
+     */
+    const progress = runProgressOf(at);
+    const readOut = editorRunReadOutOf(caused, {
+      runId: at.recording?.runId,
+      playedOut: progress.kind === 'played-out',
+      report: state.report,
+    });
+    const paired =
+      readOut === 'paired' && state.report !== undefined && caused?.before !== undefined
+        ? reportViewOf(state.report, { kind: 'played-out' }, caused.before).delta
+        : null;
+    setText(resultPairing, paired === null ? '' : RESULT_PAIRING_LINE);
+    setHidden(resultPairing, paired === null);
+    fill(
+      resultRows,
+      ...(paired === null
+        ? []
+        : /*
+           * The identity rows first, then the figures — `reportDeltaOf`'s own order, and the one that
+           * matters: a reader has to see that the *seed* moved before they read six figures that
+           * moved, or the strip invites them to attribute the change to the weight they dragged.
+           */
+          [...paired.selection, ...paired.figures].map((row) =>
+            plateRow(doc, row.label, `${row.before}  →  ${row.after}`),
+          )),
+    );
+    setText(
+      resultNote,
+      paired === null
+        ? // `readOut` is not `paired` here in every case but one: the arm above can still fall to
+          // `null` if the report went away between the two reads, and the read-out's own note is the
+          // honest thing to print then rather than an empty box.
+          runReadOutNoteOf(readOut === 'paired' ? 'unfiled' : readOut, progress)
+        : paired.note,
+    );
 
     /* Your dispatchers. */
     fill(
