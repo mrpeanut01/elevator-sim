@@ -385,7 +385,23 @@ describe('one answer to what event a day is under — issue #135', () => {
       );
     };
     expect(legs({ ...friday, calendar: CALENDAR_PERIODS['moving-week'] })).not.toBe(legs(friday));
-  });
+    /*
+     * `300_000`, the figure every other legs case in this repository passes — GitHub issue #144.
+     *
+     * This case and one in `menu/screens.test.ts` were the only two that ran real simulations at
+     * vitest's default **5 000 ms**. Two runs of `garden-apartments` take about 3.5 s standalone, so
+     * the margin was 1.5 s; both timed out during a full-suite run on a machine that was also
+     * carrying four other agents, and both passed on a clean run of the same tree. This project runs
+     * waves of parallel agents in worktrees on one machine **by design**, so *under load* is the
+     * normal condition here rather than the exceptional one.
+     *
+     * Worth the line rather than tolerated because of what the failure *says*. A legs comparison is
+     * the standing requirement's prescribed evidence; when one goes red it should be read as *the
+     * control stopped moving the run*, and `Test timed out in 5000ms` reads instead as an
+     * infrastructure hiccup — which is the message most likely to be dismissed, and the true
+     * positive is the one that gets dismissed with it.
+     */
+  }, 300_000);
 });
 
 /* -------------------------------------------------------------------------- *

@@ -33,28 +33,14 @@
  * the presence or absence of a filed sheet.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-/**
- * The provisioned headless shell — `boot.browser.test.ts`'s constant and its reasoning, kept
- * identical so a machine that can run one tier can run all of them.
- */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
-  );
-}
+/** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
+import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -164,8 +150,17 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
      * a door that means *I am playing this*.
      */
     const page = await coldLoad();
-    await page.locator('.menu-overlay button', { hasText: 'Scenarios' }).first().click();
-    await page.locator('.menu-overlay button', { hasText: 'Open the doors' }).first().click();
+    /*
+     * By id, and this line is the one that rotted **twice** — GitHub issue #142.
+     *
+     * It read `hasText: 'Scenarios'` then `hasText: 'Open the doors'`. The second string is honest
+     * drift: issue #97 renamed that row to *Pick a scenario* because the old words claimed the press
+     * started a week and it only opens a board (`menu/screens.ts#campaignRows`). The first is the
+     * subtler one and is the reason a fresh string would not have been a fix — see `pressMenuRow`.
+     * Two independent rots on two adjacent lines, both silent, because the tier ran nowhere.
+     */
+    await pressMenuRow(page, 'main.campaign');
+    await pressMenuRow(page, 'campaign.open');
     await page.locator('#tab-run').first().click();
     await page.locator('#run').first().click();
     await page.waitForTimeout(500);

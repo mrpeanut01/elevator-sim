@@ -110,5 +110,50 @@ jobs:
       - name: Typecheck and build
         run: npm run build
 
+      # ── The browser tier ────────────────────────────────────────────────────
+      #
+      # Until GitHub issue #142 the `viz-browser` project ran NOWHERE. It is gated on
+      # `ELEVATOR_SIM_CHROMIUM`, this file named neither that variable nor Playwright, and the
+      # variable is unset by default on a developer's machine too — so thirty-eight cases skipped in
+      # both places they could have run, and a skip is indistinguishable from a pass in the summary
+      # line. Pointed at a local shell and run directly it came back 3 files and 8 tests red, and
+      # nobody could date it.
+      #
+      # **Both legs, not one.** The issue asked for "at least one platform" and one leg would have
+      # been cheaper — but a one-leg tier needs the guard in
+      # `packages/viz/src/dev/browserTier.test.ts` to carry a per-leg exemption, and an exemption is
+      # where this class of problem goes to be forgotten (`dispatch/deadCode.test.ts` says the same
+      # thing about its own allowlist). With a browser on both legs the rule is unconditional: in
+      # CI, a gated tier that would skip is a red run. The tier is ~157 s against a suite that runs
+      # for ~40 minutes.
+      #
+      # The download is Playwright's own, by `playwright-core` — already a devDependency, so no new
+      # package — and the path is read back from `chromium.executablePath()` rather than assembled
+      # from a revision number, because pinning `chromium_headless_shell-1228` here would go stale
+      # on the next Playwright bump with the tier silently skipping again, which is the whole defect.
+      # `--with-deps` is what installs the shared libraries the Linux runner does not ship; it is a
+      # no-op on macOS.
+      #
+      # This sits after `npm run build` deliberately: the browser tier serves the viewer through
+      # Vite, `packages/viz` imports `@elevator-sim/core/browser`, and that subpath resolves through
+      # `packages/core/dist`. On a tree that has never been built, every page in the tier loads with
+      # `Failed to resolve import` and draws nothing — measured while reproducing #142, where it
+      # turned 8 real failures into 14 misleading ones.
+      - name: Install the Chromium the browser tier drives
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Point the browser tier at it
+        run: |
+          shell="$(node --input-type=module -e "import { chromium } from 'playwright-core'; process.stdout.write(chromium.executablePath());")"
+          if [ ! -x "$shell" ]; then
+            echo "::error title=No Chromium for the viz-browser tier::playwright-core reports '$shell', which is not executable. The tier would skip, and packages/viz/src/dev/browserTier.test.ts will fail the run rather than let it."
+            exit 1
+          fi
+          echo "browser tier: $shell"
+          echo "ELEVATOR_SIM_CHROMIUM=$shell" >> "$GITHUB_ENV"
+
       - name: Test suite
+        # Every registered project, `viz-browser` included — it is registered in `vitest.config.ts`
+        # and gated on the variable the step above exported, so no extra invocation is needed and
+        # none should be added: a second command is a second place for the tier to be dropped from.
         run: npm test

@@ -28,25 +28,14 @@
  * is whether an overlay is up.
  */
 
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-/** The provisioned headless shell — `boot.browser.test.ts`'s constant, kept identical. */
-const CHROMIUM =
-  process.env['ELEVATOR_SIM_CHROMIUM'] ??
-  '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
-
-const HAS_BROWSER = existsSync(CHROMIUM);
-if (!HAS_BROWSER) {
-  console.warn(
-    `[viz-browser] skipped: no Chromium at ${CHROMIUM}. ` +
-      'Set ELEVATOR_SIM_CHROMIUM to run the browser tier (DECISIONS.md § D220).',
-  );
-}
+/** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
+import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, pressMenuRow } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -73,14 +62,23 @@ afterAll(async () => {
   await server?.close();
 });
 
-/** The Free play screen, reached the way a player reaches it: through the menu. */
+/**
+ * The Free play screen, reached the way a player reaches it: through the menu.
+ *
+ * By affordance id since issue #142. These two presses were green on `main` and were **one setting
+ * away from the three files that were not**: `hasText: 'Free play'` matches whatever the overlay's
+ * whole `textContent` happens to contain, and in Engineer mode the recommended row above this one
+ * reads *"Free play is a single run you set yourself — six axes, then Start"*. Casual is the shipped
+ * default (`dev/state.ts`), so this file passed on the arm that does not collide and would have gone
+ * red the day a test — or a remembered preference — opened the menu in the other one.
+ */
 async function openFreePlay(): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(`${origin}?seed=20260807`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
-  await page.locator('.menu-overlay button', { hasText: 'Free play' }).first().click();
+  await pressMenuRow(page, 'main.free-play');
   await page.locator('.menu-overlay .menu-text input').first().waitFor({ timeout: 10_000 });
   return page;
 }
@@ -108,7 +106,7 @@ describe.skipIf(!HAS_BROWSER)('a field commit does not swallow the press beside 
     await seed.type('20260106');
     expect(await menuIsUp(page), 'typing a seed closed the menu on its own').toBe(true);
 
-    await page.locator('.menu-overlay button', { hasText: 'Start' }).first().click();
+    await pressMenuRow(page, 'free-play.start');
     await page.waitForTimeout(1_500);
 
     expect(
@@ -199,12 +197,21 @@ describe.skipIf(!HAS_BROWSER)('a field commit does not swallow the press beside 
     await page.keyboard.press('Tab');
     await page.waitForTimeout(300);
 
-    const landed = await page.evaluate(() => document.activeElement?.textContent ?? '');
+    /*
+     * The affordance's own id rather than the label it wears. `.toContain('Start')` was satisfied by
+     * *Start here* as much as by *Start* — two different rows on two different screens — so the
+     * looser reading could have passed on focus landing somewhere nobody asked for. It is issue
+     * #142's lesson one line over, applied to an assertion instead of to a selector.
+     */
+    const landed = await page.evaluate(
+      (attribute: string) => document.activeElement?.getAttribute(attribute) ?? '',
+      MENU_CONTROL_ATTR,
+    );
     expect(
       landed,
       'Tab out of the seed field did not reach Start — the commit its blur caused took the focus ' +
         'back to the top of the screen',
-    ).toContain('Start');
+    ).toBe('free-play.start');
 
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1_500);
