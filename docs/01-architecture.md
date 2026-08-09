@@ -371,14 +371,13 @@ packages/
 > line above in the same commit. The prediction held for the fourth time running: the `core` suite
 > reddened on the directory before a single `viz` test was written.
 >
-<<<<<<< HEAD
 > **And so did W6, for the fifth time.** `viz/mode/` — § 4's Basic/Advanced split and the parity
 > check [`DECISIONS.md` § D163](../DECISIONS.md) clause 2 measures Phase 9 against — was added on
 > 2026-07-29 with its line above in the same commit. The prediction held again, and the sequence is
 > now long enough to be a procedure rather than an anecdote: **write the directory, watch `core` go
 > red, add the line.**
-=======
-> **Fifth, and it reddened on the same run as `viz/boundaries.test.ts`.** `viz/honesty/` — the
+>
+> **Sixth, and it reddened on the same run as `viz/boundaries.test.ts`.** `viz/honesty/` — the
 > generated search that [`DECISIONS.md` § D163](../DECISIONS.md) clause 1 requires over every
 > player-facing string — was added on 2026-07-29, and the first full-suite run after it reddened
 > **two** guards at once, neither of them in `viz/honesty/`: this one, for the undocumented
@@ -387,7 +386,18 @@ packages/
 > says the finding it was written for was *"a method parameter named `document` shadowing the
 > global"*, and it caught the same shape again in a directory whose whole purpose is catching
 > things.
->>>>>>> feat/t78-honesty-search
+>
+> **Both paragraphs above sat behind literal conflict markers on `main` for two weeks, and the
+> ordinal is why.** `<<<<<<< HEAD` / `=======` / `>>>>>>> feat/t78-honesty-search` were committed
+> unresolved: two lanes each added a directory on 2026-07-29 and each correctly called its own the
+> **fifth**, so the merge had no textual winner and neither half was wrong about its own subject.
+> Resolved here by asking git rather than by choosing a side — `viz/mode/` landed in `16268b3` at
+> 12:47 and `viz/honesty/` in `6e56a5b` at 13:40, so the order is *mode, then honesty*, and both
+> notes are kept. It is the same lesson this file keeps recording one level up: **a running total
+> is a shared resource, and two lanes incrementing it in parallel is the collision, not the
+> tie-break.** The tree itself was never wrong — `moduleTree.test.ts` compares it against disk in
+> both directions and stayed green throughout, which is exactly why nothing noticed for two weeks:
+> the guard watches the list, and this was the prose beside it.
 >
 > **The guard is now scoped to packages present on disk, and C28 is closed.** It used to name
 > `viz/*` directories unconditionally, so deleting `packages/viz` turned them into phantoms and
