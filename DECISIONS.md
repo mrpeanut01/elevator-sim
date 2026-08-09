@@ -22960,6 +22960,11 @@ The alternative that **is** total is `testTimeout` on the `viz` project, one lin
 failure latency across 130 files and makes ~120 existing annotations redundant. Recorded as a
 repo-wide decision that is open, not taken here.
 
+> **Taken, later the same day — § D331.** The `viz` project sets `testTimeout: 300_000`, the number
+> chosen from a measured duration distribution rather than copied, and a guard in
+> `dev/browserTier.test.ts` fails the commit that removes it. This paragraph is left standing as the
+> record of what was open when.
+
 ---
 
 ## D330 — two product calls: the tab gate is mode-aware, and the preview allowlist widens to one deployment
@@ -23009,3 +23014,97 @@ rather than hard-coded, because a stale allowlist fails closed and looks exactly
 again; and the honest failure message does not regress — it still says the server *could not be
 reached* rather than that it is down, and the seeded board stays labelled *"These are not real runs
 and nobody posted them."*
+
+---
+
+## D331 — the simulating project gets a timeout, because the annotation is a list and the list is the defect
+
+Issue #144's general form, left open by § D329 and taken here.
+
+### The choice
+
+Two candidates, and they differ in *what kind* of total they are:
+
+1. **Annotate the ~82 remaining cases** with `, 300_000`, matching the 113 sites in `packages/viz`
+   that already do. Total by **inspection**.
+2. **Set `testTimeout` on the `viz` project.** One line. Total by **construction**.
+
+**(2).** The argument is the standing requirement in a different costume. Option 1 fixes today's 82
+and not the 83rd, which is written tomorrow by somebody who has never read this section — and this
+repository has now paid for a hand-maintained list often enough to name the shape: a list of three
+panels passes while a fourth goes unchecked, a list of five entry points misses the sixth, a list of
+week fixtures misses the state a free-play player can produce. 82 edits across 23 files, in a wave
+running six parallel worktrees, would also have been the largest merge surface of the wave in
+exchange for the weaker guarantee.
+
+### The number is measured, not chosen, and that is the part worth keeping
+
+Over a full `--project viz` run:
+
+| | |
+|---|---|
+| tests with a printed duration | 3 213 |
+| finishing inside 2.4 s | 3 193 |
+| exceeding the old 5 000 ms default | **10** |
+| slowest legitimate test | **49.4 s** |
+
+So `300_000` is roughly **six times the observed maximum**. It is also the value **113 sites had
+already converged on independently**, which is the strongest thing that can be said for it: the
+default is what the suite was already telling us it wanted, not a fresh opinion. The headroom is not
+excessive for this repository specifically — it runs several parallel worktrees on one machine by
+design, so *under load* is the normal condition here, and the reported flakes were tests that pass in
+3.5 s alone.
+
+### What it costs, stated rather than glossed
+
+A genuinely hung pure-function test now takes five minutes to fail instead of five seconds. That is
+the real price. It is worth paying because the two failures are not comparable: a hang is a bug found
+once and fixed, while a 5 s ceiling under load is a **false red that recurs forever** and teaches
+people to re-run the suite rather than read it. 3 193 of 3 213 tests were never within 2× of the old
+ceiling anyway, so what the 5 s default was protecting was almost entirely hypothetical.
+
+### The 113 explicit annotations stay
+
+Redundant now, and deliberately kept. Removing them is 113 edits whose only effect is to make those
+sites depend silently on a line in another file, and a site that knows it runs a simulation is
+allowed to say so. They are not a *list* that has to be complete — they are local reinforcement at
+sites that need it, which is a different thing from the enumeration option 1 would have created.
+
+### The guard, and why a config line needs one
+
+Delete `testTimeout` from the project and ninety-odd tests silently return to a ceiling they do not
+fit under; nothing goes red until somebody's machine is busy. **That is a config line whose removal
+is invisible, which is precisely what § D329 / issue #142 was about**, so shipping the line without a
+guard would have been that decision's own lesson unlearned one section later.
+
+`dev/browserTier.test.ts` gains the clause, because it already imports `vitest.config.ts`'s **own
+project array** — a second file asking the same config the same question through a second reader is
+the two-answers shape. The floor is **120 000 ms**, about 2.4× the measured maximum, deliberately
+*below* the 300 000 the config sets: the two answer different questions, and pinning the floor to the
+config's own number would make it a tautology that fails only when somebody edits the digits and
+would go red for a well-argued reduction to 200 000.
+
+Verified by mutation, both ways: removing the option reports `expected 5000 to be greater than or
+equal to 120000`, and lowering it to 30 000 — under the slowest real test — reports the same failure
+with `30000`. The list of simulating projects is hand-written (it is the one thing that could not be
+derived, being exactly the question the rejected static check could not answer), so a second case
+asserts every name in it is still a registered project, or the first would pass by iterating nothing.
+
+### `core` has the same exposure and is deliberately left alone
+
+Measured the same way: **8 tests over 5 s, slowest 39.2 s**. So `core` is covered today only by its
+own explicit annotations and has the identical latent defect.
+
+It is **not** changed here, and the omission is recorded rather than silent. Issue #144 reported
+flakes in `viz`, and the survey justifying the number above was taken over `packages/viz/src`;
+widening to `core` would be a change nobody has evidence for yet, made on the strength of a
+measurement taken for a different question. The comment in `vitest.config.ts` says so at the call
+site, so the next person meets a decision rather than a divergence.
+
+### What was rejected as the mechanism, and stays rejected
+
+A per-test static check. A global name-level call graph produced **1 881 false positives** — `map`,
+`day`, `at` and `run` are locals in dozens of files — and even a correct call graph cannot separate
+*runs a simulation* from *reads a recording module scope already ran*, which is what most of
+`shift/report.test.ts` does. The narrow file-local version finds 82 cases across 23 files and is
+blind to a helper reached through a value, so it would **look** total and not be. Do not ship one.

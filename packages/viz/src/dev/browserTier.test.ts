@@ -116,6 +116,8 @@ interface Registered {
   readonly root: string;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
+  /** `undefined` where the project takes vitest's own 5 000 ms — see the timeout suite below. */
+  readonly testTimeout: number | undefined;
 }
 
 /**
@@ -144,6 +146,7 @@ async function registeredProjects(): Promise<readonly Registered[]> {
       root: String(test['root'] ?? ''),
       include: (test['include'] as readonly string[] | undefined) ?? [],
       exclude: (test['exclude'] as readonly string[] | undefined) ?? [],
+      testTimeout: test['testTimeout'] as number | undefined,
     };
   });
   for (const project of list) {
@@ -344,5 +347,89 @@ describe('a registered vitest project that runs nowhere — GitHub issue #142', 
     );
     expect(SKIP_REASON).toContain(CHROMIUM_ENV);
     expect(SKIP_REASON).toContain(CHROMIUM);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The simulating project's timeout — GitHub issue #144
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A project that runs real simulations may not sit on vitest's 5 000 ms default.**
+ *
+ * A `DECISIONS.md` number is owed; the argument is § D331 and `vitest.config.ts`'s
+ * `SIMULATING_TIMEOUT_MS` docstring.
+ *
+ * ## Why this clause lives in this file
+ *
+ * It is a different subject from the browser tier, and it is here anyway because this file already
+ * imports `vitest.config.ts`'s **own project array** — the real one vitest runs, with `name`,
+ * `root`, `include` and now `testTimeout` resolved. A second file asking the same config the same
+ * question through a second reader is the two-answers shape this repository keeps paying for, and
+ * the cost of avoiding it is one `describe` in a file whose true subject is *what
+ * `vitest.config.ts` declares, and whether the declaration is honest*.
+ *
+ * ## Why a guard at all, when the fix is one config line
+ *
+ * Because a config line whose removal is invisible is exactly what issue #142 was about. Delete
+ * `testTimeout` from the `viz` project and roughly ninety tests silently return to a ceiling they do
+ * not fit under, and nothing goes red until somebody's machine is busy — which is the definition of
+ * a flake and the reason #144 was filed in the first place. The floor below turns that deletion into
+ * a failure on the commit that makes it.
+ *
+ * ## Where the floor comes from
+ *
+ * Measured, not chosen. Over a full `--project viz` run: 3 193 of 3 213 tests finish inside 2.4 s,
+ * ten exceed the old 5 s default, and the slowest legitimate test is **49.4 s**. The floor is
+ * 120 000 ms — about 2.4× that maximum — rather than the 300 000 the config actually sets, because
+ * the two numbers answer different questions. The config's value is *how much headroom this suite
+ * wants on a machine hosting several parallel worktrees*; the floor is *the point below which the
+ * value has stopped being defensible at all*. Pinning the floor to the config's own number would
+ * make this a tautology that fails only when somebody edits the digits, and would go red for a
+ * deliberate, well-argued reduction to 200 000.
+ *
+ * ## What it does not claim
+ *
+ * That every test in the project needs it, or that the annotated sites are redundant. 113 sites in
+ * `packages/viz` set `300_000` explicitly and are deliberately left alone: a site that knows it runs
+ * a simulation is allowed to say so, and removing them would make them depend silently on a line in
+ * another file.
+ */
+describe('a project that simulates declares a timeout a simulation fits in', () => {
+  /**
+   * The floor, in milliseconds. See the docstring above for its provenance — it is 2.4× the slowest
+   * test measured over a full run, and deliberately below the value the config sets.
+   */
+  const FLOOR_MS = 120_000;
+
+  /** The projects whose tests run real simulations. `viz` today; `core` is § D331's open question. */
+  const SIMULATING = ['viz'];
+
+  it('gives every simulating project room for its slowest test, and not the 5 s default', async () => {
+    const projects = await registeredProjects();
+    for (const name of SIMULATING) {
+      const project = projects.find((entry) => entry.name === name);
+      expect(project, `vitest.config.ts registers no project named ${name}`).toBeDefined();
+      expect(
+        (project as Registered).testTimeout ?? 5_000,
+        `the ${name} project runs real simulations and its tests must not inherit vitest's 5 000 ms ` +
+          'default. Roughly ninety of them call recordRun, runSimulation or legsOf and pass no ' +
+          'timeout of their own, so removing `testTimeout` from this project does not fail here — ' +
+          'it fails later, on somebody else’s busy machine, as a flake. See § D331.',
+      ).toBeGreaterThanOrEqual(FLOOR_MS);
+    }
+  });
+
+  it('names a project that exists, so the list above cannot rot into a no-op', async () => {
+    /*
+     * The non-vacuity control, and it is not ceremony: `SIMULATING` is a hand-written list — the one
+     * thing § D331 could **not** derive, because "does this project run simulations?" is the
+     * question a static check was rejected for being unable to answer. A list that names a renamed
+     * or deleted project would pass the case above by iterating nothing, which is precisely how a
+     * guard becomes decoration.
+     */
+    const names = (await registeredProjects()).map((entry) => entry.name);
+    expect(SIMULATING.length).toBeGreaterThan(0);
+    for (const name of SIMULATING) expect(names, `${name} is no longer a registered project`).toContain(name);
   });
 });
