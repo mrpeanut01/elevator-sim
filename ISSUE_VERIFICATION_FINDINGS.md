@@ -656,7 +656,7 @@ correct precedent (§ D223) is well covered at `reportPanel.test.ts:445-520`.
 
 ## K. The tester report — provenance for wave B, and two corrections
 
-Source: `elevator-sim-playtest-report.md`, tester "Claude (Cowork)". **Read after the wave-B issues
+Source: `docs/elevator-sim-playtest-report.md`, tester "Claude (Cowork)". **Read after the wave-B issues
 were triaged**, and it changes two dispositions.
 
 ### It is the source document for #99–#105
