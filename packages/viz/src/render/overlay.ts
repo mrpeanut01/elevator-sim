@@ -21,6 +21,7 @@
 
 import type { OverlayMetrics } from '../frame/overlay.js';
 import type { Frame, VizRecording } from '../contract/types.js';
+import { NO_AVERAGE_LEAD } from '../mode/disclosure.js';
 import type { ViewMode } from '../mode/types.js';
 import type { Canvas2DLike, Theme } from './canvas.js';
 import type { Layout } from './layout.js';
@@ -187,10 +188,18 @@ const ENGINEER_WORDS = Object.freeze({
  *
  * Ordered longest-first for {@link longestThatFits}, which is this file's own idiom: a sentence
  * that has to lose words loses the ones chosen here rather than the ones that fall past the edge.
+ *
+ * ## The head is imported, not spelled — GitHub issue #100's second panel is why
+ *
+ * Both entries used to spell `NO AVERAGE` out. `render/canvas.ts`'s header banner now refuses in the
+ * same words one row up, so the phrase had two homes on one bitmap and nothing requiring them to
+ * agree — § D227's shape, in eleven characters. It comes from
+ * `mode/disclosure.ts#NO_AVERAGE_LEAD` now, which is where the refusal's per-ground wording already
+ * lives, and the two lines cannot drift apart without the constant moving under both of them.
  */
 const CASUAL_REFUSAL: readonly string[] = Object.freeze([
-  'NO AVERAGE — A RESULT',
-  'NO AVERAGE',
+  `${NO_AVERAGE_LEAD} — A RESULT`,
+  NO_AVERAGE_LEAD,
 ]);
 
 /**

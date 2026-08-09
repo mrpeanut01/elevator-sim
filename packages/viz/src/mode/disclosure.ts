@@ -275,39 +275,96 @@ export const SUPPRESSION_LEAD =
   'would be a second answer to the same question.';
 
 /**
- * The clause that names *this* refusal, per ground.
+ * One ground's refusal, split at the seam a shorter surface has to cut on.
+ *
+ * ## Why this is a pair and not a sentence — and why splitting it is not a second table
+ *
+ * It **was** a sentence, `${cause}, so ${consequence}.`, and {@link suppressionLeadFor} still
+ * composes exactly that string from these two halves: the Day report's Casual lead is byte-identical
+ * to what it was before the split, which `disclosure.test.ts` pins.
+ *
+ * The split exists because GitHub issue #100 names a **third** surface, and it is one line wide.
+ * `render/canvas.ts`'s header banner is right-aligned against the building name and clipped from the
+ * right by `fitLabel`; the lead sentence is 150–190 characters and would arrive there as an ellipsis.
+ * The wrong fix is the one § D227 is written about and the one {@link suppressionLeadFor}'s docstring
+ * already refused once: **a second per-ground table, at banner length, that has to agree with this
+ * one and has no test that it does.** So the table gains a field instead of gaining a sibling, and
+ * both registers are projections of one row —
+ * {@link suppressionLeadFor} joins the halves, {@link suppressionBannerFor} takes the first.
+ *
+ * The seam is *cause* against *consequence* rather than an arbitrary truncation, because the banner
+ * needs the half a reader can act on. *"the queues never settled during this run"* tells a player
+ * what happened to their building; *"no one number describes what the wait was"* tells them what
+ * happened to a statistic, which is the half the panel beside it and the status line below it are
+ * both already saying.
  *
  * Not exported, deliberately: a new exported prose declaration is an unclassified surface to
  * `honesty/derive.test.ts`, and this reaches the honesty search through `disclosureItems` — which
  * `honesty/surfaces.ts` already covers — by the transitive clause that derivation is built on.
  *
- * `Record<AwtInvalidGround, string>` is **total**, so a fifth ground in `core`'s
+ * `Record<AwtInvalidGround, …>` is **total**, so a sixth ground in `core`'s
  * `AWT_INVALID_GROUND_SPECS` is a compile error here until somebody writes the sentence for it. That
  * is `disclosureClassOf`'s exhaustive-switch discipline applied to wording instead of to
- * classification: the point is not that a fifth ground breaks the build, it is that it cannot
- * silently acquire the wording of a different one.
+ * classification: the point is not that a sixth ground breaks the build, it is that it cannot
+ * silently acquire the wording of a different one — and now that both registers read this row, it
+ * cannot acquire one of them and not the other either.
  *
  * Each clause says what the *reader* lost, never what the statistic is. None of them restates a
  * number — `core`'s sentence carries every figure, and a second copy of a figure is a second figure.
  */
-const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> = Object.freeze({
-  saturated:
-    'the queues never settled during this run, so no one number describes what the wait was.',
-  'empty-window':
-    'nobody finished waiting inside the stretch of the run being measured, so there is nothing ' +
-    'to average.',
-  censored:
-    'too many riders were still waiting when the clock stopped, so an average of the rest ' +
-    'flatters this run.',
-  // The fifth ground, and the wording has to distinguish it from `censored` rather than echo it:
-  // there, the riders were still standing at the landing when the clock stopped; here they had
-  // already gone home, which is why the queue looks like it cleared.
-  abandoned:
-    'too many riders gave up and left, so the average describes the ones who stayed.',
-  starved:
-    'somebody waited far longer than any average could admit to, so the average describes a run ' +
-    'nobody had.',
-});
+interface SuppressionClause {
+  /** What happened, in the building. The half the banner carries. */
+  readonly cause: string;
+  /** What that costs the statistic. Never printed without {@link cause} in front of it. */
+  readonly consequence: string;
+}
+
+const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, SuppressionClause>> =
+  Object.freeze({
+    saturated: {
+      cause: 'the queues never settled during this run',
+      consequence: 'no one number describes what the wait was',
+    },
+    'empty-window': {
+      cause: 'nobody finished waiting inside the stretch of the run being measured',
+      consequence: 'there is nothing to average',
+    },
+    censored: {
+      cause: 'too many riders were still waiting when the clock stopped',
+      consequence: 'an average of the rest flatters this run',
+    },
+    // The fifth ground, and the wording has to distinguish it from `censored` rather than echo it:
+    // there, the riders were still standing at the landing when the clock stopped; here they had
+    // already gone home, which is why the queue looks like it cleared.
+    abandoned: {
+      cause: 'too many riders gave up and left',
+      consequence: 'the average describes the ones who stayed',
+    },
+    starved: {
+      cause: 'somebody waited far longer than any average could admit to',
+      consequence: 'the average describes a run nobody had',
+    },
+  });
+
+/**
+ * The row for a ground, or `undefined` for a ground this build has no wording for.
+ *
+ * **The parameter is `string` and not `AwtInvalidGround`, and that is the load-bearing part.**
+ * `VizSummary.awtInvalidGround` is the union — schema version 8 carries `core`'s own type — so a
+ * signature that took the union would make the lookup total and every caller's fallback
+ * **unreachable by construction**, which is § D152's *"a list that looks derived only because the
+ * shipped schema happens to fit it"* pointed at a default branch. Widened here, on the consumer,
+ * exactly as {@link FailStateDisclosure} widens `state` (§ D166) — and it is not hypothetical:
+ * `record/document.ts` casts a loaded document to `VizRecording` without checking any field's
+ * *value*, so a file that declares schema 8 and carries a ground this build has no wording for
+ * reaches both projections below in the shipped path.
+ */
+function suppressionClauseFor(ground: string | undefined): SuppressionClause | undefined {
+  if (ground === undefined) return undefined;
+  return (
+    SUPPRESSION_CLAUSE_BY_GROUND as Readonly<Record<string, SuppressionClause | undefined>>
+  )[ground];
+}
 
 /**
  * The Basic lead for a refused statistic: ground-specific where the ground is known.
@@ -332,26 +389,73 @@ const SUPPRESSION_CLAUSE_BY_GROUND: Readonly<Record<AwtInvalidGround, string>> =
  * search reaches it through `disclosureItems` and now also through
  * `dev/reportPanel.ts#reportViewOf`, and both drive the same sentence.
  *
- * **The parameter is `string` and not `AwtInvalidGround`, and that is the load-bearing part.**
- * `VizSummary.awtInvalidGround` is the union — schema version 8 carries `core`'s own type — so a
- * signature that took the union would make {@link SUPPRESSION_CLAUSE_BY_GROUND}'s lookup total and
- * the fallback below **unreachable by construction**, which is § D152's *"a list that looks derived
- * only because the shipped schema happens to fit it"* pointed at a default branch. Widened here, on
- * the consumer, exactly as {@link FailStateDisclosure} widens `state` (§ D166) — and it is not
- * hypothetical: `record/document.ts` casts a loaded document to `VizRecording` without checking any
- * field's *value*, so a file that declares schema 8 and carries a ground this build has no wording
- * for reaches this function in the shipped path.
+ * The parameter is widened to `string` for {@link suppressionClauseFor}'s reason, which also owns
+ * the fallback branch this function takes when the lookup misses.
  */
 export function suppressionLeadFor(ground: string | undefined): string {
-  if (ground === undefined) return SUPPRESSION_LEAD;
-  const clause = (SUPPRESSION_CLAUSE_BY_GROUND as Readonly<Record<string, string | undefined>>)[
-    ground
-  ];
+  const clause = suppressionClauseFor(ground);
   if (clause === undefined) return SUPPRESSION_LEAD;
   return (
-    `There is no number here, and that is a result rather than a gap: ${clause} ` +
-    'The measurement’s reason follows, in its own words.'
+    `There is no number here, and that is a result rather than a gap: ${clause.cause}, so ` +
+    `${clause.consequence}. The measurement’s reason follows, in its own words.`
   );
+}
+
+/**
+ * The head every Casual refusal leads with, wherever it is drawn.
+ *
+ * Exported because three surfaces say it and one of them chooses between two lengths of it:
+ * {@link suppressionBannerFor} below, `render/overlay.ts#CASUAL_REFUSAL`'s width-ordered pair, and —
+ * through the first — `render/canvas.ts`'s header banner. `overlayRender.test.ts` already requires
+ * the panel's line to say there is **no average** before it says anything else; this is that
+ * requirement made a constant rather than a coincidence, so a fourth surface cannot invent a fourth
+ * way to say it and a rename cannot leave two of the three behind.
+ *
+ * Upper case because both of its two drawing sites are: the panel's refusal replaces the engineer's
+ * `SUPPRESSED`, and the banner's sits in a row whose other clauses are `SATURATED` and `TIMED-OUT`.
+ * A sentence-cased refusal in that row would read as the quietest thing on the line.
+ */
+export const NO_AVERAGE_LEAD = 'NO AVERAGE';
+
+/**
+ * The same refusal at banner width — one line, per ground, for `render/canvas.ts`'s header.
+ *
+ * ## What this is for, and the claim it retires
+ *
+ * `SceneInput.mode`'s docstring used to say the banner was deliberately left in one register,
+ * because *"wording the banner from here would be a second place that decides how this run's refusal
+ * is said"*. That argument was right about the danger and wrong about the conclusion, and it is the
+ * shape § D227 calls the more dangerous half of a stale claim: a refusal that tells the next reader
+ * not to touch the control. The banner does not need a second place to decide the wording — it needs
+ * **this** place to offer a second length. So the ground table above gained a seam and the canvas
+ * gained an import, and there is still exactly one row per ground.
+ *
+ * ## Plain, and still five-ways specific
+ *
+ * `SATURATED — AWT suppressed` is two pieces of jargon in four words, and GitHub issue #100 names
+ * both. It is also, on four of the five grounds, **not what happened**: `awtIsValid` fails on an
+ * empty window, on censoring, on abandonment and on a starved leg, and only one of those is a
+ * building that could not cope. So the Casual banner says which one, from the run's own
+ * `awtInvalidGround`, and the plain-language rule this repository keeps rediscovering holds —
+ * *plain language is not licence to collapse a distinction the figure depends on*.
+ *
+ * That makes Casual's banner **more** specific than the engineer's, which distinguishes only
+ * saturation from everything else. Nothing was taken off the engineer's line to pay for it: its two
+ * strings are byte-identical and `canvas.test.ts` pins them. § D299 § 1 permits Engineer to be made
+ * easier to use and forbids making it say less; widening the engineer banner to five grounds is a
+ * separate change with its own blast radius (five test files quote those four words) and is left
+ * unmade rather than smuggled in here.
+ *
+ * ## The fallback is short too, and that is the whole reason it exists
+ *
+ * {@link SUPPRESSION_LEAD} is the ground-free lead and is three sentences long; on a clipped row it
+ * would arrive as *"There is no number here, and that is a result rath…"*. The banner's own
+ * ground-free tail is below. It is not a second per-ground table — there is nothing per-ground about
+ * it — and `disclosure.test.ts` asserts an unknown ground and an absent one reach the same string.
+ */
+export function suppressionBannerFor(ground: string | undefined): string {
+  const clause = suppressionClauseFor(ground);
+  return `${NO_AVERAGE_LEAD} — ${clause?.cause ?? 'this run’s own statistics refuse one'}`;
 }
 
 /**

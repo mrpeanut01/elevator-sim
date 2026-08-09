@@ -31,6 +31,7 @@ import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '..
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
+import { NO_AVERAGE_LEAD, suppressionBannerFor } from '../mode/disclosure.js';
 import type { Layout, ShaftColumn } from './layout.js';
 import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
@@ -457,15 +458,36 @@ export interface SceneInput {
    */
   readonly mood?: BuildingMood | undefined;
   /**
-   * The reader's disclosure level, for the one thing on this canvas that has two registers.
+   * The reader's disclosure level, for the strings on this canvas that have two registers.
    *
-   * **It reaches `render/overlay.ts` and nothing else here, deliberately.** The live-metrics panel
-   * is GitHub issue #100's first checklist item and it is a panel of *labels*; the rest of this
-   * canvas is a picture, a header band whose banner is a **refusal** (`SATURATED — AWT
-   * suppressed`), and a mood line whose sentence `render/mood.ts` already words per mode from the
-   * one place that holds the mood's vocabulary. Wording the banner from here would be a second
-   * place that decides how this run's refusal is said, and `frame/overlay.ts`'s docstring records
-   * what three copies of that rule cost the last time.
+   * ## It reached `render/overlay.ts` and nothing else, and that claim has been retired
+   *
+   * This field's docstring used to say the header band was deliberately left out: *"wording the
+   * banner from here would be a second place that decides how this run's refusal is said"*. The
+   * danger was real and the conclusion was not, and the sentence outlived the thing it was true of
+   * — which is § D227's more dangerous half, a **stale refusal**, on the surface GitHub issue #100
+   * actually names. Driven on `vertical-city` at § D260's stated 16 %, the header printed
+   * `SATURATED — AWT suppressed` and `mean wait suppressed` **byte-identically in both modes**,
+   * while the panel eighty pixels below it said `NO AVERAGE — A RESULT`. One bitmap, two registers,
+   * and the jargon on the louder line.
+   *
+   * The fix is not a second wording site. `mode/disclosure.ts` holds the refusal's per-ground words
+   * already; it now offers them at **banner length** as well
+   * (`mode/disclosure.ts#suppressionBannerFor`), and this file imports rather than re-writes. There
+   * is still exactly one row per ground and it is still in the module that owns the vocabulary.
+   *
+   * ## What it reaches, and what it deliberately still does not
+   *
+   * `drawOverlay`, and — since issue #100 — {@link drawHeader}'s three suppression-bearing strings:
+   * the banner's refusal, the counters line's running mean, and the word in front of the waiting
+   * count. Everything else on this canvas is a picture, a status verbatim from `recording.status`
+   * (§ D294), or a mood line whose sentence `render/mood.ts` already words per mode from the one
+   * place that holds the mood's vocabulary.
+   *
+   * `boarded N legs` keeps the word **legs** in both registers, and that is the same restraint
+   * `render/overlay.ts#CASUAL_WORDS` records about `got a car (5min)`: a leg is not a person — a
+   * rider who transfers boards twice — so drawing the count as *people* would be a false figure
+   * rather than a friendlier one.
    *
    * Defaults to `advanced` for {@link OverlayInput.mode}'s reason: a caller describing a run rather
    * than serving a reader gets the engineer's words.
@@ -798,6 +820,9 @@ export function undeliveredAt(recording: VizRecording, frame: Frame): Undelivere
 
 function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, frame, layout } = input;
+  /* Issue #100. One lookup at the top, so no line below chooses a register of its own — the idiom
+     `render/overlay.ts#drawOverlay` established for the panel this header sits above. */
+  const casual = (input.mode ?? 'advanced') === 'basic';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = FONT_BOLD;
@@ -822,10 +847,9 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const metaPx = 12 + meta.length * CHAR_ADVANCE_PX + 16;
   ctx.fillText(
     fitLabel(
-      `waiting ${String(frame.totalWaiting)}   boarded ${String(frame.boardedLegs)} legs   ${meanClause(
-        recording,
-        frame,
-      )}`,
+      `${casual ? 'people waiting' : 'waiting'} ${String(frame.totalWaiting)}   boarded ${String(
+        frame.boardedLegs,
+      )} legs   ${meanClause(recording, frame, casual)}`,
       layout.width - 12 - metaPx,
     ),
     layout.width - 12,
@@ -880,7 +904,25 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     { short: true },
   );
   if (pinned !== '') banner.push(pinned);
-  if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
+  /*
+   * The refusal, in the reader's own register — GitHub issue #100's first named string.
+   *
+   * The engineer's two strings are **byte-identical to what they have always been**, and that is
+   * asserted rather than assumed: `canvas.test.ts` pins both, on both grounds, and drives the
+   * default. Making Casual legible may not be paid for out of Engineer (§ D299 § 1).
+   *
+   * The gate is `meansAreSuppressed` on the Casual arm and the engineer's own two-branch test on
+   * the other, and the two agree by construction: `meansAreSuppressed` **is** `saturated ||
+   * !awtIsValid`, which is the disjunction of the branches below. Written this way rather than
+   * factored into one condition because the engineer arm's *first* branch is not a suppression
+   * test — it reports saturation, which is a fact about the queues — and collapsing them would
+   * make the two lines look like one decision when they are two.
+   */
+  if (casual) {
+    if (meansAreSuppressed(recording)) {
+      banner.push(suppressionBannerFor(recording.summary.awtInvalidGround));
+    }
+  } else if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
   else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
   // `D10` — a call no car answered is never left to the landing selector alone. See
   // {@link SceneInput.unansweredCallFloorIds}.
@@ -966,11 +1008,26 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
  *
  * The word rather than an em dash, because `—` already means *nobody has been served yet* — a
  * different fact, and one the reader can act on.
+ *
+ * ## The two registers, and the one thing that does not move between them
+ *
+ * `mean wait` is the engineer's phrase and `average wait so far` is
+ * `render/overlay.ts#CASUAL_WORDS.rollingMean`'s, taken from there rather than invented so the
+ * header and the panel under it name one quantity one way. The **suppressed** branch is
+ * `mode/disclosure.ts#NO_AVERAGE_LEAD`, lower-cased: this line sits in the counters row, not in the
+ * warning-coloured banner, and shouting on a dim row is a second emphasis nothing decided.
+ *
+ * What does not move is the **gate**. Both registers ask `meansAreSuppressed`, so a mode cannot
+ * become the surface that shows a mean the summary refuses — the defect this function exists to
+ * have closed, one register later.
  */
-function meanClause(recording: VizRecording, frame: Frame): string {
-  if (meansAreSuppressed(recording)) return 'mean wait suppressed';
+function meanClause(recording: VizRecording, frame: Frame, casual = false): string {
+  if (meansAreSuppressed(recording)) {
+    return casual ? NO_AVERAGE_LEAD.toLowerCase() : 'mean wait suppressed';
+  }
   const mean = frame.runningMeanWaitS;
-  return `mean wait so far ${mean === undefined ? '—' : `${mean.toFixed(1)} s`}`;
+  const label = casual ? 'average wait so far' : 'mean wait so far';
+  return `${label} ${mean === undefined ? '—' : `${mean.toFixed(1)} s`}`;
 }
 
 /**
