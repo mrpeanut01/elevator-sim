@@ -51,7 +51,7 @@
  */
 
 import { contractById } from './contracts.js';
-import { ENDLESS_CONTRACT_ID, SANDBOX_CONTRACT_ID } from './week.js';
+import { ENDLESS_CONTRACT_ID, FREE_PLAY_CONTRACT_ID, SANDBOX_CONTRACT_ID } from './week.js';
 import type { WeekState } from './types.js';
 
 /** The ribbon's two lines, decided together because they answer the same question. */
@@ -92,12 +92,35 @@ export function coachWeekLines(week: WeekState, shiftLengthS: number): CoachWeek
     };
   }
 
+  /*
+   * **Free play, which used to reach the first branch and print *Scenario*** — GitHub issue #125.
+   *
+   * `enterFreePlay` opened its week on the *building's* contract id, so `contractById` resolved and
+   * a run that banks nothing was labelled **Scenario · day 1 · 0 clean shifts banked**. That week now
+   * carries {@link FREE_PLAY_CONTRACT_ID}, which resolves to nothing — the same shape as the two
+   * sentinels above, for the same reason, and it needs its own branch here for the reason the
+   * comment below states: reaching the sandbox line would restore the words that comment removed.
+   *
+   * The progress line is deliberately the sandbox's, word for word. The two states differ in what
+   * the player *did*, which is what the label says; they do not differ in what there is to report
+   * about the run, and a second phrasing of one fact is how two lines come to disagree.
+   */
+  if (week.contractId === FREE_PLAY_CONTRACT_ID) {
+    return {
+      label: 'Free play',
+      progress: `${String(Math.round(shiftLengthS / 60))} min of demand · nothing to bank`,
+    };
+  }
+
   return {
     label: 'Sandbox',
     /*
      * *free play* is deleted from this line, and the reason is not style: **Free Play is a mode**,
      * with a screen, a selection and a week reset that makes its runs postable. A sandbox run has a
      * week, and its growth and its events — so calling it free play named the one thing it is not.
+     *
+     * The branch above is that sentence enforced rather than restated: free play has a label of its
+     * own, so this one cannot quietly become its label again.
      */
     progress: `${String(Math.round(shiftLengthS / 60))} min of demand · nothing to bank`,
   };
@@ -112,6 +135,11 @@ function weekName(week: WeekState): string {
   const contract = contractById(week.contractId);
   if (contract !== undefined) return contract.label;
   if (week.contractId === ENDLESS_CONTRACT_ID) return 'Your endless week';
+  // Issue #125. Reachable as the *arrival* on every Free Play start — `dev/main.ts`'s `start` arm
+  // prints this line for the same reason the building select does, and this is the fourth name it
+  // can produce. As the *departure* it is unreachable and that is a property rather than a gap: a
+  // free-play week is day 1 with nothing in it, so `weekKeptLine` returns `undefined` for it.
+  if (week.contractId === FREE_PLAY_CONTRACT_ID) return 'Your free-play run';
   return 'Your own building’s week';
 }
 
@@ -163,9 +191,24 @@ export function weekKeptLine(left: WeekState, arrived: WeekState): string | unde
   const carried =
     `day ${String(left.day)}` + (also.length === 0 ? '' : ` with ${also.join(' and ')}`);
 
+  /*
+   * The arrival's own clause, and free play gets a third rather than borrowing one — issue #125.
+   *
+   * *"starts a new week"* is the wrong claim about a Free Play run: the mode's whole premise is one
+   * run from one selection, `advancesTheWeek` refuses to close a day into it, and a line promising a
+   * week would be a caption describing something the run cannot become. Which leaves the true and
+   * more useful thing to say — that nothing here is banked, so the week named in the first clause is
+   * the only progress in play.
+   */
+  const arrival =
+    arrived.contractId === FREE_PLAY_CONTRACT_ID
+      ? 'is one run and banks nothing.'
+      : arrived.day > 1
+        ? `picks up on day ${String(arrived.day)}.`
+        : 'starts a new week.';
+
   return (
     `${weekName(left)} is kept on ${carried} — pick that building again and it carries on from ` +
-    `there. ${weekName(arrived)} ` +
-    (arrived.day > 1 ? `picks up on day ${String(arrived.day)}.` : 'starts a new week.')
+    `there. ${weekName(arrived)} ${arrival}`
   );
 }

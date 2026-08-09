@@ -1499,6 +1499,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * The decision is `menu/enterFreePlay.ts` — pure, and tested by comparing the legs against a
          * run built from the selection alone. This arm performs it.
          */
+        /*
+         * The week being put down, read **before** the switch — GitHub issue #125, and it is the
+         * building select's line one arm over.
+         *
+         * `enterFreePlay` now parks the campaign week rather than overwriting it
+         * (`dev/state.ts#withFreePlayWeek`), and from the outside a parked week and a destroyed one
+         * look identical: the ribbon reads day 1 either way. `weekKeptLine` is the sentence that
+         * tells the difference, and it is the sentence that says *how* — *pick that building again
+         * and it carries on from there* is the recovery path, which on the campaign's own building
+         * is a re-pick of the select the player is already looking at.
+         */
+        const leavingWeek = state.week;
         const entered = enterFreePlay(state, resources, menuState.freePlay, menuCatalogue);
         if (entered === undefined) return;
         // `enterFreePlay` selects the simulation tab — issue #23, and it is in the decision rather
@@ -1507,6 +1519,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
         runShift();
+        /*
+         * After `runShift` and drawn on its own, for the building select's reason: `runShift` spends
+         * the notices already on screen, so assigning this one before it would hand it to the line
+         * that clears it.
+         */
+        weekNotice = weekKeptLine(leavingWeek, state.week);
+        if (weekNotice !== undefined) drawCoach(viewAt());
         return;
       }
 

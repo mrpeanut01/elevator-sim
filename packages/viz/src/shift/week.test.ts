@@ -17,6 +17,7 @@ import { CONTRACTS } from './contracts.js';
 import { readGoals } from './goals.js';
 import { goalsForDay } from './goals.js';
 import {
+  FREE_PLAY_CONTRACT_ID,
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
@@ -335,13 +336,22 @@ describe('switching assignment parks the week rather than destroying it', () => 
   });
 
   it('bounds the list, and the bound covers every id it can be asked for', () => {
-    // One per contract plus the two sentinels, so nothing a player can reach evicts anything else.
-    expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + 2);
+    /*
+     * One per contract plus the three sentinels, so nothing a player can reach evicts anything else.
+     * The third is `FREE_PLAY_CONTRACT_ID` — GitHub issue #125 — and it is walked here rather than
+     * asserted about, because the property is *the whole set fits*, not *the constant went up*.
+     */
+    expect(PARKED_WEEKS_MAX).toBe(CONTRACTS.length + 3);
     let state = { week: openWeek(CONTRACTS[0]?.id), parked: [] as readonly WeekState[] };
     for (const contract of CONTRACTS) state = switchWeek(state.week, state.parked, contract.id, 'resume');
     state = switchWeek(state.week, state.parked, SANDBOX_CONTRACT_ID, 'resume');
+    state = switchWeek(state.week, state.parked, FREE_PLAY_CONTRACT_ID, 'restart');
     expect(state.parked.length).toBeLessThan(PARKED_WEEKS_MAX);
-    expect(state.parked.length).toBe(CONTRACTS.length);
+    expect(state.parked.length).toBe(CONTRACTS.length + 1);
+    // Nothing was evicted: every id walked above is still in the list, or is the one on screen.
+    expect(new Set([...state.parked.map((week) => week.contractId), state.week.contractId])).toEqual(
+      new Set([...CONTRACTS.map((contract) => contract.id), SANDBOX_CONTRACT_ID, FREE_PLAY_CONTRACT_ID]),
+    );
   });
 
   it('mutates neither the week nor the list it is handed', () => {

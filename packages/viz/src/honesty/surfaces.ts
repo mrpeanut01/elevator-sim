@@ -264,7 +264,7 @@ import { libraryNoticeFor, restoreNoticeFor, saveNoticeFor } from '../persist/no
 import { LIBRARY_BUDGET_CHARACTERS, type DroppedEntry } from '../persist/types.js';
 import { loadSession } from '../persist/session.js';
 import { SESSION_SCHEMA_VERSION, type SessionRestoreFailure, type SessionStore } from '../persist/types.js';
-import { closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
+import { FREE_PLAY_CONTRACT_ID, closeDay, openEndless, openWeek, outcomeOf } from '../shift/week.js';
 import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
@@ -2446,6 +2446,14 @@ const SHIFT_REPORT: SurfaceAdapter = {
       ['scenario', { ...openWeek('c2'), day: 4, cleanRun: 1 }],
       ['endless', { ...openEndless(), day: 12, cleanRun: 5 }],
       ['sandbox', openWeek('no-such-contract')],
+      /*
+       * The fourth branch, added with GitHub issue #125 and added for this loop's founding reason.
+       * A free-play week used to carry the *building's* contract id, so it reached the **scenario**
+       * branch and a run that banks nothing was labelled *Scenario · day 1 · 0 clean shifts banked*.
+       * It now carries `FREE_PLAY_CONTRACT_ID` and has a branch of its own — and a branch nothing
+       * drives is a claim nobody checks, which is what this loop exists to say.
+       */
+      ['free play', openWeek(FREE_PLAY_CONTRACT_ID)],
     ] as const) {
       const lines = coachWeekLines(week, 1800);
       seeds.push({ field: `coachWeekLines(${name}).label`, text: lines.label, role: 'label' });
@@ -2481,6 +2489,18 @@ const SHIFT_REPORT: SurfaceAdapter = {
         'scenario→sandbox',
         { ...openWeek('c1'), day: 4, cleanRun: 1 },
         { ...openWeek('no-such-contract'), day: 4 },
+      ],
+      /*
+       * The fifth pair, and the one whose line a player now reads on every **Start** — issue #125.
+       * `dev/main.ts`'s `start` arm prints this the way the building select does, because a parked
+       * week and a destroyed one look identical from the ribbon, and this sentence is what tells
+       * them apart. It is also the only pair that reaches the arrival clause *"is one run and banks
+       * nothing"*, which replaces *"starts a new week"* for a mode that has no week to start.
+       */
+      [
+        'scenario→free play',
+        { ...openWeek('c2'), day: 4, streak: 4, cleanRun: 2 },
+        openWeek(FREE_PLAY_CONTRACT_ID),
       ],
     ] as const) {
       const line = weekKeptLine(left, arrived);

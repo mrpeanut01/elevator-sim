@@ -97,6 +97,7 @@ import {
 } from '../shift/types.js';
 import {
   ENDLESS_CONTRACT_ID,
+  FREE_PLAY_CONTRACT_ID,
   HISTORY_DAYS,
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
@@ -541,7 +542,10 @@ export function snapshotIssue(value: unknown): ShapeIssue | undefined {
  * caller eight combinations to write words for. A renamed scenario is a deploy-time event; a
  * partially restored session would be a permanent class of bug.
  *
- * ## The two ids that resolve to nothing **on purpose**, and the session this was refusing
+ * ## The ids that resolve to nothing **on purpose**, and the session this was refusing
+ *
+ * There were two when this was written and there are three since GitHub issue #125 — see
+ * {@link namesSomething}, which is where the set is kept and where the third is argued for.
  *
  * Found while building issue #107's parked weeks, and it is a defect of its own rather than a
  * consequence of that work: this test was `contractById(id) === undefined`, and `week.ts` ships two
@@ -580,15 +584,26 @@ export function unknownContractsIn(week: WeekState): readonly string[] {
 }
 
 /**
- * Whether an id names a state this build has — a contract, or one of the two deliberate sentinels.
+ * Whether an id names a state this build has — a contract, or one of the three deliberate sentinels.
  *
- * Named rather than derived, and the set is closed: `week.ts` exports exactly two ids that resolve
- * to no contract on purpose, and a third would have to be added here to be readable — which is the
+ * Named rather than derived, and the set is closed: `week.ts` exports exactly three ids that resolve
+ * to no contract on purpose, and a fourth would have to be added here to be readable — which is the
  * right amount of friction for a value that decides whether a player keeps their week.
+ *
+ * **The third arrived, and the friction did its job** — GitHub issue #125 gave Free Play a week of
+ * its own, {@link FREE_PLAY_CONTRACT_ID}. It reaches a saved session in one situation and it is not
+ * a rare one: `dev/state.ts#weeksForSession` holds the stored pair back for every mode that does not
+ * advance a week, but on a **first visit** there is no stored pair to hold back, so the free-play
+ * week is what gets written. Without this line that session would come back reported as an
+ * assignment *"this build no longer has"* and be cleared — which is the exact defect the section
+ * above records for `endless` and `sandbox`, arriving a third time.
  */
 function namesSomething(id: string): boolean {
   return (
-    contractById(id) !== undefined || id === ENDLESS_CONTRACT_ID || id === SANDBOX_CONTRACT_ID
+    contractById(id) !== undefined ||
+    id === ENDLESS_CONTRACT_ID ||
+    id === SANDBOX_CONTRACT_ID ||
+    id === FREE_PLAY_CONTRACT_ID
   );
 }
 
