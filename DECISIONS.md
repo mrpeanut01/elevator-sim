@@ -22353,3 +22353,181 @@ precedent: the submission and the subject may not mention `menuState.freePlay` a
 **Checked by re-introducing the defect**: three occurrences instead of one, test red, message naming
 the 422. The one legitimate reader is `enterFreePlay`, where the menu's selection *becomes* the run's
 — the only moment the arrow points that way.
+
+---
+
+## D319 — Casual asks a different question of the same run, and answers it with the same figures
+
+Issues #110 and #100.
+
+### The premise was generous, and the truth decides the fix
+
+#110 says Casual is *"Engineer with four sentences swapped."* The Day report was **byte-identical**,
+and structurally had to be: `DayReportInput` carried no mode field and `reportViewOf` took no mode
+parameter, so **no input to the sheet could carry one**. #110's measured 221-character delta on that
+tab was not reproduced; driven, it is the left rail's *hide the maths* block, which shares the tab and
+is not this sheet. Recorded as unmeasured rather than guessed.
+
+The second finding decides the design: **the sheet's prose is already people-shaped.** On a
+saturating `vertical-city` run the lede reads *"It did not cope. 2 843 people asked for a lift and
+2 830 got one…"*. So this was never a glossary problem, and a glossary is what #100's framing invites.
+
+### The reframing
+
+Engineer asks *what is the average wait, over what n, in what window, may I quote it?* Casual asks
+**did the building have a good day, and what would make tomorrow better?** Same run, same numbers,
+different question.
+
+Concretely: the grid leads with **people** — every count is drawn before the one cell a run may
+refuse; a refused mean is led by `mode/disclosure.ts#suppressionLeadFor`'s per-ground sentence,
+**imported rather than re-written**; the levers become *What would make tomorrow better*; and the
+engineer's small print is **translated in front and behind, never cut**.
+
+### `SATURATED` was not softened, and the reason is better than the intention
+
+The refusal is **ground-free by construction**, because `awtIsValid` has **five** grounds and only
+one of them is saturation — *"the building could not cope"* would be **false on three of them**. So
+the plain-language lead is per-ground rather than one comforting sentence, and the tests assert that
+*busy day* and *could not cope* appear nowhere.
+
+That is the general form of the rule this repository keeps rediscovering: plain language is not
+licence to collapse a distinction the figure depends on.
+
+### Reach is asserted as an equality
+
+There is no `CASUAL_HIDES`. Casual carries every cell, value, colour, class, lever, goal and verdict,
+and that is a test rather than a claim. Engineer's grid order and small print are pinned whole, so a
+change that made Casual better **by making Engineer say less** goes red — § D299 § 1's test, in the
+file it is about.
+
+#110's own recommendation — that the 13 dispatchers *become* 4–5 play styles — stays refused.
+
+### Both registers are now in the corpus
+
+Both adapters render **both** modes on every case, which is what `honesty/types.ts#HONESTY_MODES`
+was for and what § D194's *"measured null"* recorded as producing zero new strings. That null was a
+measurement of a tree, not a property of the axis, and it is corrected in place. The report adapter
+pairs cells **by id**, because Casual reorders them and an index zip would have mis-attributed the
+energy exemption.
+
+---
+
+## D320 — the between-day beat shows what already happened, and three of #91's four claims did not survive
+
+Issue #91.
+
+| #91 says | what ships |
+|---|---|
+| no Tomorrow screen | `ForecastView`, `#report-forecast-*`, and `#report-next-day`, which applies `nextDay` and runs it |
+| add a seven-column week strip | `leftRail.ts#historyBarsOf`, drawn on every render |
+| no between-day configuration window | `scope/surface.ts` classifies `calendar` and `commissioning` `between-games` and `week` `between-days`, each with a legs probe |
+
+**The correction worth carrying:** growth is **linear**, `1 + 0.11 × (day − 1)`, not compounding.
+Day 4 = 1.33× is right either way; day 20 is ×3.09 rather than ×7.26, and `growth.ts` states the
+difference is deliberate. The brief this lane was given said *compounding*, and the lane checked
+rather than inherited it.
+
+So the loop was invisible rather than absent, and the genuine gap was narrow: the card names an event
+and a percentage and says **nothing about what changed overnight**. `shift/tomorrow.ts` answers three
+questions — what just happened, what changed overnight, what tomorrow is under.
+
+### What makes it honest
+
+**Tomorrow's population is predicted exactly, through the shipped chain** —
+`tomorrowFactsOf(...).population === shiftRunConfigOf(..., nextDay(week)).building.totalPopulation`,
+with a **negative control**: multiplying the whole building gives a *different* number, because
+growth rounds per floor. A test that recomputed the percentage would have agreed with itself.
+
+**The four outcomes stay four.** `DayOutcome` carries only `arrived`/`carried`, the row prints
+`74 of 180 carried`, and the test asserts the difference `106` appears **nowhere** — because that
+difference is waiting, abandoned and turned away folded together, which is § D266's whole objection.
+
+**§ D307 was checked rather than assumed.** The beat is built from observations folded at
+`endedAt`, holds no `VizSummary` figure at all, and is `null` on the empty sheet, the watching sheet
+and the single-run sheet.
+
+The beat deliberately **does not restate the event**, because `forecastFor` names the event the
+ordinary schedule would give rather than the one a calendar period books — issue #135, which a second
+lane then found at a second caller.
+
+---
+
+## D321 — a board row is run, not beaten, and the label says so
+
+Issue #93.
+
+### The name is refused on arithmetic
+
+The board fixes the configuration and the row carries the seed; the engine is deterministic from it.
+So pressing a row **reproduces that row**, and *Beat this score* would promise — at the surface a
+player most wants to believe — something its own press cannot do. It ships as **`Run this row's
+configuration`**, with a return leg to *This week's challenge*, which is where beating actually lives.
+
+### The reveal is per board, because the digest already says so
+
+`configHashOf` digests building, dispatcher, template, rate, duration and window — everything but the
+seed. So #93's opt-in *public or hidden dispatcher* asks for a per-row secret that is already a
+per-board fact, and the reveal names it **once, above the table**.
+
+It is server-verified rather than claimed: a score is accepted only when the replay reproduces, and
+the dispatcher is resolved from the server's own `data/`. A row this build cannot resolve is
+**disabled with `freePlayIssues`' own sentence**, and the reveal refuses to put a name on the id.
+**The weight vector is deliberately not printed**, and that absence is asserted so a later editor
+cannot quietly fill it in: the board pins the digest the *server* loaded, and the viewer is
+CDN-served in front of a separately deployed API.
+
+### A trap found on the legs
+
+`enterFreePlay` resets the week, held cars and levers by a stated rule, and **missed `calendar` and
+`commissioning`** — both read when the run is built, and `withBuilding` drops the fabric only when
+the building *moves*, which is exactly not the case when taking on a row for the building already
+loaded. Measured: a quarter-end week plus a fifth shaft **changes the legs**. So the control would
+have run something else and called it the row's configuration. Both cleared, with a negative control.
+
+### E-3's seeding is scoped, not built, and its phrasing does not survive
+
+`entries` has no reference column and `user_id` is a foreign key to `users`, so labelling a row
+*reference* is a schema change rather than a client one. **And the correction that matters:** because
+`configHashOf` includes the dispatcher, seeding the baseline dispatchers produces **one board per
+dispatcher with one row each**, not one board with several rows. Several reference rows on *one*
+board means several **seeds** under **one** dispatcher. #101's and E-3's wording assumed otherwise.
+
+---
+
+## D322 — the delta block enters the corpus, and the basis learns the day's plan
+
+Issues #127 and #126.
+
+### #127 — the sweep found a real violation on its first run
+
+`honesty/surfaces.ts` now builds **paired** report bundles: six pairings per case, each a state a
+player produces, each reaching a different branch of `reportDeltaOf` — a drawn comparison with moving
+figures, a drawn *nothing moved*, and four refusals naming one or two axes each. A drawn comparison
+needs two runs, so `simulations` moves from `1 + batch` to `2 + batch`, and that figure is published.
+
+Its first sweep found **`estimate-without-n`**: `AVERAGE WAIT was 17.8 s → 23.4 s`, a mean with no
+count anywhere in its box, on both surfaces that draw the row (§ D310 reuses the view). **Recorded
+rather than fixed**, on § D307's precedent — *a corpus that grew an axis and stayed green is a
+different claim from one that had to be repaired first* — and because the fix changes what two
+shipped surfaces look like, which the design handoff owns. Issue **#137**.
+
+### The deep tier was already red, and the register was the thing missing
+
+`honesty-9100031`/`suppressed-mean` was published as *outstanding* in `CLAUDE.md` and the roadmap and
+**held by no register at all**, so `ELEVATOR_SIM_HONESTY=deep` failed on the untouched base. A
+finding described in prose and asserted by nothing is the same defect as a refusal pinned by a
+sentence (§ D227), one layer up. Now registered in both tiers with ghost checks.
+
+### #126 — the basis, and the trap the issue names
+
+`DayReportInput` gains a **required** `plan: ShiftPlan`, threaded from `closeShift`'s own `state` and
+**never from the recording** — the trap being that `endedAt` is `max(lastEventAt, demandEndedAt)` and
+therefore moves with the traffic, so a span-keyed basis would refuse exactly the comparison the block
+exists for. Pinned by a run: one plan, two recordings whose spans genuinely differ, basis equal,
+delta not refused. The regression guard — *a dispatcher swap is not refused* — is green untouched.
+
+`windowStartS` is carried as well as length, because two parts of one day can be equally long, so a
+length-only axis would close the case a reader meets first and leave the harder one open.
+
+`BASIS_DIFFERENCES`' exhaustive record made the two new phrases a **compile error** rather than
+something to remember — which is the shape to copy the next time an axis is added.
