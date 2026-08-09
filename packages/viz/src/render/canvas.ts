@@ -1085,11 +1085,138 @@ function windowBand(layout: Layout): { readonly rightX: number; readonly cells: 
 /** The label gutter's face — design `:2039`. Smaller and heavier than the body face. */
 const FLOOR_LABEL_FONT = '600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace';
 
+/**
+ * One run of adjacent columns that belong to the same bank, and what the row above them says.
+ *
+ * The heading spans the whole group rather than repeating over each column, so its budget is the
+ * group's width and not one shaft's. See {@link planShaftLabels}.
+ */
+interface ShaftGroupLabel {
+  readonly text: string;
+  readonly centreX: number;
+  readonly widthPx: number;
+}
+
+interface ShaftLabelPlan {
+  /** What to write under each column, in `layout.columns` order. */
+  readonly columnTexts: readonly string[];
+  readonly groups: readonly ShaftGroupLabel[];
+}
+
+/**
+ * The shaft row and the bank row, planned together — GitHub issue #115 § 4.
+ *
+ * ## The defect: thirty-three labels that all said `Z…`
+ *
+ * `fitLabel` clips a label's **tail**, which is the right half to lose when labels differ at the
+ * front and the wrong half when they differ at the back. Vertical City's cars are `Z1-A` … `Z6-C`
+ * and its plot gives each column 18.5 px — a two-character budget — so **25 of the 33 drawn shaft
+ * labels rendered as the single string `Z…`**, and the bank row under them rendered as `z…`
+ * thirty-three times. Two rows of the header band, both drawn, both saying nothing, on the
+ * building the whole campaign builds to. Measured at the viewer's own 910 × 547 canvas.
+ *
+ * ## The fix keeps the whole label on screen, and that is the point
+ *
+ * The shared part of a group's labels is drawn **once, in the bank row, over the group it belongs
+ * to** — `zone-1 · Z1-*` — and each column keeps the part that distinguishes it: `A`, `B`, `C`.
+ * Nothing is elided that a reader cannot read back off the same picture, so this adds information
+ * rather than trading some away, which is the constraint [§ D299](../../../../DECISIONS.md) puts
+ * on any change to a surface an engineer reads.
+ *
+ * Three rules keep it from moving a picture that was already right:
+ *
+ * 1. **A prefix is elided only when a label does not fit its column.** Every building whose labels
+ *    already fit — Chancery House's `A`…`F`, Mixed-Use's `S1`/`O1`/`R1` — draws exactly what it
+ *    drew before.
+ * 2. **A prefix never consumes a whole label.** It is trimmed to one character short of the
+ *    shortest label in its group, so a group can never be reduced to a row of empty strings.
+ * 3. **The heading is `fitLabel`'d to the group's span**, so `RV-06`'s bank label still cannot
+ *    overhang the columns it names. It is the one string here whose budget is *wider* than a
+ *    column, and it is wider because it is drawn once for several.
+ *
+ * When there is one bank and nothing was elided, no heading is drawn at all — `RV-06`'s rule that
+ * repeating `main` over every column is noise, unchanged.
+ */
+function planShaftLabels(layout: Layout, bankCount: number): ShaftLabelPlan {
+  const columnTexts: string[] = [];
+  const groups: ShaftGroupLabel[] = [];
+  let index = 0;
+  while (index < layout.columns.length) {
+    const first = layout.columns[index];
+    if (first === undefined) break;
+    let end = index + 1;
+    while (layout.columns[end]?.bankId === first.bankId) end += 1;
+    const run = layout.columns.slice(index, end);
+
+    const last = run[run.length - 1] ?? first;
+    const spanPx = last.x + last.width - first.x;
+
+    const overflows = run.some((column) => column.label.length * CHAR_ADVANCE_PX > column.width);
+    const candidate = overflows ? sharedPrefixOf(run.map((column) => column.label)) : '';
+    /*
+     * The elision is taken **only if the heading can carry it back**.
+     *
+     * `${prefix}*` has to survive `fitLabel` at the group's own span, or the shared part would be
+     * gone from the picture altogether and the columns would be a row of initials belonging to
+     * nothing. A one-column group at 18.5 px cannot hold `Z6-*`, so that group keeps the clipped
+     * label it has always drawn — no better, and not worse.
+     */
+    const prefix = (candidate.length + 1) * CHAR_ADVANCE_PX <= spanPx ? candidate : '';
+    for (const column of run) {
+      columnTexts.push(fitLabel(column.label.slice(prefix.length), column.width));
+    }
+
+    // The elided prefix leads, because it is the half a reader cannot guess. Bank ids repeat down
+    // the row and read from their neighbours; `Z1-` reads from nowhere else on the canvas.
+    const heading =
+      prefix === ''
+        ? bankCount > 1
+          ? first.bankId
+          : ''
+        : bankCount > 1
+          ? `${prefix}* · ${first.bankId}`
+          : `${prefix}*`;
+    if (heading !== '') {
+      groups.push({
+        text: fitLabel(heading, spanPx),
+        centreX: first.x + spanPx / 2,
+        widthPx: spanPx,
+      });
+    }
+    index = end;
+  }
+  return { columnTexts, groups };
+}
+
+/**
+ * The longest prefix every label shares, trimmed so it can never swallow the shortest one whole.
+ *
+ * A single-label group is a real case — a bank filter, or a bank whose other cars are past
+ * `hiddenShaftCount` — and its "shared" prefix is the whole label, which would leave the column
+ * blank. One character is held back for the same reason `fitLabel` never returns the empty string.
+ */
+function sharedPrefixOf(labels: readonly string[]): string {
+  const first = labels[0];
+  if (first === undefined) return '';
+  let length = first.length;
+  for (const label of labels) {
+    length = Math.min(length, label.length - 1);
+    for (let i = 0; i < length; i += 1) {
+      if (label[i] !== first[i]) {
+        length = i;
+        break;
+      }
+    }
+  }
+  return length <= 0 ? '' : first.slice(0, length);
+}
+
 function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, layout } = input;
   const servedById = new Map(recording.shafts.map((shaft) => [shaft.carId, new Set(shaft.servedFloorIds)]));
   const bankCount = new Set(recording.shafts.map((shaft) => shaft.bankId)).size;
-  for (const column of layout.columns) {
+  const plan = planShaftLabels(layout, bankCount);
+  for (const [columnIndex, column] of layout.columns.entries()) {
     const served = servedById.get(column.carId);
     // A shaft is drawn only over the floors it physically serves — service zoning made visible,
     // and distinct from access and operational zoning, which are not geometry.
@@ -1112,16 +1239,20 @@ function drawShafts(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
     ctx.font = FONT;
     // Clipped to the column, like the floor labels: a 16-shaft building gives each column about
     // 30 px, and `shuttle`/`office-low` run into their neighbours long before that. Found by
-    // running the viewer on Mixed-Use High-Rise.
-    ctx.fillText(fitLabel(column.label, column.width), column.centreX, layout.header.shaftY);
-    // RV-06: banks are grouped and *labelled*. Only when there is more than one — repeating
-    // "main" over every column of a single-bank building is noise, and the shipped buildings
-    // that have several banks are exactly the ones where the grouping is the point. The *row* is
-    // reserved either way, so a bank filter does not move the picture — see {@link HeaderBand}.
-    if (bankCount > 1) {
-      ctx.fillStyle = theme.badge;
-      ctx.fillText(fitLabel(column.bankId, column.width), column.centreX, layout.header.bankY);
-    }
+    // running the viewer on Mixed-Use High-Rise. What is clipped is the *distinguishing* part of
+    // the label — see {@link planShaftLabels} for where the shared part went.
+    ctx.fillText(plan.columnTexts[columnIndex] ?? '', column.centreX, layout.header.shaftY);
+  }
+  // RV-06: banks are grouped and *labelled*. Once per contiguous group rather than once per
+  // column, so the label is budgeted by the room it actually has. The *row* is reserved whether
+  // or not anything is drawn in it, so a bank filter does not move the picture — see
+  // {@link HeaderBand}.
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle = theme.badge;
+  ctx.font = FONT;
+  for (const group of plan.groups) {
+    ctx.fillText(group.text, group.centreX, layout.header.bankY);
   }
 }
 

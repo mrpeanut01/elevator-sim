@@ -43,6 +43,45 @@ export function loadTrackMax(cars: readonly { readonly loadFactor: number }[]): 
 const FONT = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
 const FONT_SMALL = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
 const LINE = 16;
+
+/**
+ * Measured advance of one character at the two faces above — GitHub issue #115 § 6.
+ *
+ * `Canvas2DLike` has no `measureText`, for `render/canvas.ts#CHAR_ADVANCE_PX`'s stated reason, so
+ * every horizontal budget in this file is arithmetic against these two numbers. The 12 px figure
+ * is the same one `canvas.ts` uses and is stated there; 6.6 px is the same face at 11 px.
+ *
+ * {@link wrap} used **6.0** for the small face, which is not a rounding: it is 9 % narrow, so a
+ * reason wrapped to the panel's width overhung it by three characters on every line. The one
+ * number in this file that was measured rather than assumed is the one that was wrong.
+ */
+const ADVANCE_PX = 7.2;
+const ADVANCE_SMALL_PX = 6.6;
+
+/** Inset from each edge of the panel — the `+ 10` the rows are drawn at, on both sides. */
+const PANEL_INSET_PX = 10;
+
+/**
+ * The longest of `candidates` that fits `widthPx`, or the last one clipped to it.
+ *
+ * The same shape `render/canvas.ts#drawNotices` uses for `RS-05`'s notice, and for the same
+ * reason: a sentence that has to lose words should lose the ones the reader can do least with,
+ * chosen here, rather than whichever ones happen to fall past the panel's edge. The fallback
+ * clips, because a clipped string is still better than one drawn over the panel border — but
+ * every caller below supplies a last candidate that fits {@link MIN_OVERLAY_WIDTH_PX}, so the
+ * fallback is a guard rather than a plan.
+ */
+function longestThatFits(
+  candidates: readonly string[],
+  widthPx: number,
+  advancePx: number,
+): string {
+  const found = candidates.find((candidate) => candidate.length * advancePx <= widthPx);
+  if (found !== undefined) return found;
+  const last = candidates[candidates.length - 1] ?? '';
+  const budget = Math.max(1, Math.floor(widthPx / advancePx));
+  return last.length <= budget ? last : `${last.slice(0, Math.max(1, budget - 1))}…`;
+}
 /** Lines of suppression reason the panel will spend before deferring to the status line. */
 const REASON_LINES = 4;
 /**
@@ -81,7 +120,17 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   ctx.lineWidth = 1;
   ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
 
-  const left = panel.x + 10;
+  const left = panel.x + PANEL_INSET_PX;
+  /**
+   * The room a row actually has — the panel less both insets.
+   *
+   * Nothing in this file had one before, which is issue #115 § 6 in one sentence: the panel
+   * checked its own **height** and drew whatever width it liked. `render/layout.ts` now refuses
+   * to hand over a panel narrower than `MIN_OVERLAY_WIDTH_PX`; this is the other half of the same
+   * agreement, and it is what makes an *authored* bank id — the one string here whose length
+   * nobody chose — unable to overhang the border.
+   */
+  const contentWidth = Math.max(1, panel.width - 2 * PANEL_INSET_PX);
   let y = panel.y + 12;
   const line = (text: string, style: string, font = FONT): void => {
     ctx.font = font;
@@ -156,7 +205,11 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   if (metrics.suppressed) {
     line('rolling mean wait', theme.textDim);
     line('SUPPRESSED', theme.warning);
-    const reason = wrap(metrics.suppressionReason ?? 'no reason given', panel.width - 20, 6);
+    const reason = wrap(
+      metrics.suppressionReason ?? 'no reason given',
+      contentWidth,
+      ADVANCE_SMALL_PX,
+    );
     // Whatever is left once both lists have had their reserved rows. May be zero on a very short
     // panel; the pointer line below still says where the full text is.
     const forLists = 2 * LINE + 2 * GAP + Math.min(cars, CAR_ROWS_RESERVED) * CAR_ROW + Math.min(banks, 2) * LINE;
@@ -167,7 +220,18 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
     for (const chunk of reason.slice(0, budget)) {
       line(chunk, theme.textDim, FONT_SMALL);
     }
-    if (reason.length > budget) line('… (full reason below the canvas)', theme.textDim, FONT_SMALL);
+    if (reason.length > budget) {
+      // The pointer must survive: it is the only thing telling a reader the reason continues.
+      line(
+        longestThatFits(
+          ['… (full reason below the canvas)', '… (full reason below)', '… (more below)'],
+          contentWidth,
+          ADVANCE_SMALL_PX,
+        ),
+        theme.textDim,
+        FONT_SMALL,
+      );
+    }
   } else {
     line(
       `rolling mean wait${metrics.rollingMeanWaitS === undefined ? '  —' : ''}`,
@@ -190,7 +254,16 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
    * banks and thirty-five cars, where both sections wanted more than the panel had.
    */
   if (banks > 0 && bankRows === 0) {
-    line(`BY BANK  ${String(banks)} bank${banks === 1 ? '' : 's'} — no room here`, theme.warning, FONT_SMALL);
+    const count = `${String(banks)} bank${banks === 1 ? '' : 's'}`;
+    line(
+      longestThatFits(
+        [`BY BANK  ${count} — no room here`, `BY BANK  ${count} — no room`, `BY BANK  ${count}`],
+        contentWidth,
+        ADVANCE_SMALL_PX,
+      ),
+      theme.warning,
+      FONT_SMALL,
+    );
   } else {
     line('BY BANK', theme.textDim, FONT_SMALL);
     if (banks === 0) {
@@ -198,7 +271,20 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
     }
     for (const bank of metrics.banks.slice(0, bankRows)) {
       const mean = bank.meanWaitS === undefined ? 'suppressed' : `${bank.meanWaitS.toFixed(1)} s`;
-      line(`${bank.bankId}  ${String(bank.boardedInWindow)} legs  ${mean}`, theme.text, FONT_SMALL);
+      /*
+       * The **id** yields, never the figures beside it.
+       *
+       * `bankId` is authored in `data/buildings/`, so its length is the one thing on this panel
+       * nobody here chose — `zone-1-local` is twelve characters and Mixed-Use's `office-low-rise`
+       * is fifteen. Clipping the row as a whole would have taken the leg count or the word
+       * `suppressed` off the end, which is a suppression notice disappearing because a building
+       * has long names. The id is the part a reader can identify from its neighbours; the figures
+       * are not.
+       */
+      const tail = `  ${String(bank.boardedInWindow)} legs  ${mean}`;
+      const idBudget = Math.max(1, contentWidth - tail.length * ADVANCE_SMALL_PX);
+      const id = longestThatFits([bank.bankId], idBudget, ADVANCE_SMALL_PX);
+      line(`${id}${tail}`, theme.text, FONT_SMALL);
     }
     if (bankRows < banks) {
       line(`showing ${String(bankRows)} of ${String(banks)} banks`, theme.warning, FONT_SMALL);
