@@ -1981,7 +1981,35 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
 
     /*
-     * The fourth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
+     * The fourth refusal — **the predicate this function's own docstring names, finally called
+     * here.** GitHub issue #129.
+     *
+     * The docstring above has said since it was written that *"what it must not do is send a run
+     * the server cannot reproduce. `runIdentityIssues` is that predicate"*, and this handler did
+     * not ask it. The only gate was the affordance: `menuHost.runState` computes the same issues,
+     * `menu/screens.ts` disables the row and draws `rankingRefusal` beside it. That is the right
+     * place for the *affordance* and it is not a gate — which is issue #21's own argument about the
+     * three refusals above it, in as many words: *"this is the backstop for every route that
+     * reaches the handler anyway"*. Three of the four had one and the load-bearing one did not.
+     *
+     * It matters more now than it did. #129 moved a commissioned fabric and a calendar period from
+     * *silently posted and refused as a forgery* to *refused here by name*, so this predicate is
+     * the thing standing between a shipped feature and the one accusation this product makes. A
+     * refusal that exists only in a disabled button is a refusal one keyboard route away from not
+     * existing.
+     */
+    const identity = runIdentityIssues(state, resources, 'ranked');
+    if (identity.length > 0) {
+      accountState = withNotice(
+        accountState,
+        `This run cannot be posted: ${identity.map((issue) => issue.message).join('; ')}.`,
+      );
+      drawMenu();
+      return;
+    }
+
+    /*
+     * The fifth refusal, and the one that used to be a `?? 0`. See `claimedMetricsOf`: an
      * unmeasured long-wait share written as zero is a wrong claim, and the server answers a wrong
      * claim by refusing the submission as a forgery.
      */
