@@ -21946,3 +21946,65 @@ exactly the comparison the block exists for. The cheap fix is worse than the gap
 new refusal sentence is unswept prose on a shipped surface. True before this change and not a
 regression — and now drawn on two surfaces, since § D310's strip reuses the same view. Recorded
 because an unswept refusal is the shape § D227 rates above a stale figure.
+
+---
+
+## D312 — a week is parked per contract, and the prompt the issue asked for is the half that did not survive
+
+Issue #107, the backlog's only P0. Triage marked it **unverified**, so it was reproduced before it
+was touched.
+
+### The stated mechanism survived exactly
+
+Driving the real `withBuilding`:
+
+```
+a: { id: 'c1', day: 4, streak: 4, cleanRun: 4 }   // Garden, four days played
+b: { id: 'c2', day: 1, streak: 0, cleanRun: 0 }   // after switching to Midtown
+c: { id: 'c1', day: 1, streak: 0, cleanRun: 0 }   // after switching straight back
+```
+
+That is the reporter's own A/B/C table, including their `banked 4/1 → 0/2 → 0/1`, which is
+`cleanRun` over each contract's `needClean`. Cause in one expression: `dev/state.ts` called
+`takeContract` on **every** change of contract, and `shift/week.ts`'s `takeContract` is
+`{ ...openWeek(contractId), completed }` — a fresh week by construction. `saveSessionNow` then
+persisted it, so a reload did not recover what a switch had thrown away.
+
+The issue's own recommendation — keyed by scenario rather than one global slot — is correct, and is
+what shipped: `switchWeek(week, parked, contractId, arrival)`, a parked-week map on `ViewerState`, a
+persist envelope at **version 4** reading v1–v3 back with `parkedWeeks: []`, and the two other doors
+that called `takeContract` directly (`scenariosPanel`, `reportPanel`) changed on their *departure*
+only — the cards' own titles promise a restart on arrival and still deliver one.
+
+### The half that did not survive, and why refusing it is the honest answer
+
+The issue also asks for **confirm-before-abandon**. Once the week is parked, *nothing is abandoned* —
+so the prompt would guard an action with no consequence. A dialog that always says *"are you sure?"*
+about something safe is how a reader learns to dismiss dialogs, including the one that matters.
+
+What is genuinely owed is the second half of the issue's own sentence: switching still *shows* day 1,
+which is indistinguishable from the defect. That is answered by a told-once line in the ribbon's
+existing hint slot, not by a modal.
+
+### The acceptance test is on the legs
+
+Not on state. The resumed run must **differ** from a fresh day-1 run and **equal** the run the player
+left — and the two are distinguishable by construction, because day drives `grownBuilding`'s 11 %
+per day, so day 4 is 1.33× population. A test that compared saved fields would have passed against a
+week that was restored into a building that had not grown.
+
+### A pre-existing defect this had to fix first, flagged rather than absorbed
+
+`unknownContractsIn` tested `contractById(id) === undefined`, so **every endless and every sandbox
+week was refused on reload** as *"banked toward an assignment this build no longer has"* — both ids
+are deliberate sentinels — and `restoreSession` then cleared the slot. Verified by run before being
+fixed. It had to be fixed here because a parked sandbox week would have poisoned every session under
+the new schema, and it is named here because absorbing an unrelated defect silently into a P0 is how
+a fix becomes unreviewable.
+
+### What is not closed
+
+Issue **#94**'s residual is untouched: dispatcher portability across buildings, preservation of
+edited traffic parameters, and the persistent building-header anchor. **#125** is filed for
+`enterFreePlay`, which still clobbers the in-memory campaign week when Free play is started on the
+campaign's own building — pre-existing, and now recoverable-but-silent rather than lost outright.
