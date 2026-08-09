@@ -650,8 +650,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
    *
    * It is **not** the same question as *"is the menu hidden right now?"*. Re-opening the menu
    * mid-week must not un-choose the mode the player is in; this latches once and never goes back.
+   *
+   * ## The two questions this used to be, and why they had to come apart — GitHub issue #117
+   *
+   * One flag answered both of the numbered points above, and {@link closeMenu} latched it on
+   * **every** way out of the overlay — including **Resume**, whose own docstring says *"Resume
+   * itself starts nothing"*. For autoplay that is right and is argued there. For filing it is not:
+   * Resume is a change of mind, and it un-gated `closeShift` over a recording nobody had asked for.
+   *
+   * What that cost is issue #117. Boot's own `runShift()` puts a full recording on screen before the
+   * player has touched anything (a saved session's building and dispatcher, on a saved seed). Press
+   * **Escape**, press play, and that run reached the end, filed as a real day, and **rotated into
+   * the `was` column of the Day report's *What moved since the run before this one***. The next
+   * genuine run was then differenced against a day the player never asked for: the reporter's
+   * `CARRIED was 39 → 621`, a real improvement rendered as a catastrophe.
+   *
+   * So the *filing* gate is this flag and it is latched only where a mode is entered; the *autoplay*
+   * gate is {@link menuHasBeenDismissed}, latched on every way out. The two were always two
+   * questions and the second one only looked like the first because both start `false`.
    */
   let playerHasChosen = false;
+  /**
+   * Whether the overlay has ever been dismissed — the **autoplay** half of what was one flag.
+   *
+   * True on every way out, **Resume included**, and that is the argument {@link closeMenu} used
+   * to make for latching everything: a player who pressed *Resume* to get back to the shift they
+   * were watching has left the menu on purpose, and a run they then re-roll should play, exactly as
+   * it would have had they never opened the menu.
+   *
+   * It gates nothing that counts. `adopt` reads it for `autoplay` and nothing else does — see
+   * {@link playerHasChosen} for the half that must not follow it, and for what happened when it did.
+   */
+  let menuHasBeenDismissed = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -1347,7 +1377,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         // than here for the reason that module exists at all.
         state = entered;
         menuState = navigate(menuState, 'main');
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
       }
@@ -1357,8 +1387,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * The way out that is not a mode being entered — issues #40, #33 and #68. `renderAll`
          * rather than `runShift`: leaving the menu is not asking for a different day, and re-running
          * here would throw away the shift the player pressed **Resume** to get back to.
+         *
+         * **And the one arm that must not latch the filing gate** — issue #117. It is the arm
+         * Escape presses, and behind the overlay on a cold load sits boot's own recording, which
+         * nobody asked for; letting this count as a choice let that run be filed and become the
+         * baseline the next real run was measured against. See `closeMenu`.
          */
-        closeMenu();
+        closeMenu('changed-their-mind');
         renderAll();
         return;
 
@@ -1369,7 +1404,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * the simulation, not the scenarios. The screen behind the menu is now selected explicitly.
          */
         state = { ...state, tab: 'scenarios' };
-        closeMenu();
+        closeMenu('entered-a-mode');
         renderAll();
         return;
 
@@ -1385,7 +1420,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         state = enterEndless(state);
         menuState = navigate(menuState, 'main');
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
 
@@ -1501,7 +1536,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
          * disagree the day the review gains a gate.
          */
         state = { ...state, tab: 'run' };
-        closeMenu();
+        closeMenu('entered-a-mode');
         runShift();
         return;
 
@@ -1940,27 +1975,44 @@ function boot(ui: Elements, resources: BrowserResources): void {
   }
 
   /**
-   * Leave the menu — and the one place {@link playerHasChosen} is latched.
+   * Leave the menu — and the one place either latch is set.
    *
-   * Three of the four ways out are a mode being entered: **Start** (free play), **Open the doors**
-   * (the campaign) and **Keep going** (endless). **Resume** is the fourth, and it is a change of
-   * mind rather than a choice — GitHub issue #40, and the intent Escape presses.
+   * Four of the five ways out are a mode being entered: **Start** (free play), **Open the doors**
+   * (the campaign), **Keep going** (endless) and **Open the week on this fabric** (commissioning).
+   * **Resume** is the other, and it is a change of mind rather than a choice — GitHub issue #40, and
+   * the intent Escape presses.
    *
-   * It latches `playerHasChosen` all the same, and that is deliberate rather than an oversight in
-   * the new arm. The flag gates autoplay on the next `adopt`, and a player who pressed **Resume** to
-   * get back to the shift they were watching has left the menu on purpose; a run they then re-roll
-   * should play, exactly as it would have had they never opened the menu. Resume itself starts
-   * nothing — there is no `adopt` on this path — so the shift on screen stays where the playhead
-   * left it.
+   * ## Why the caller has to say which, and may not omit it — GitHub issue #117
+   *
+   * This latched `playerHasChosen` unconditionally, on every arm, and the docstring argued for it:
+   * a player who pressed **Resume** has left the menu on purpose and a run they re-roll should play.
+   * That argument is sound about **autoplay** and false about **filing**, and one flag could not
+   * hold both. Boot's own `runShift()` has a full recording on screen before the player has touched
+   * anything, and un-gating `closeShift` from Resume let that recording be filed as a real day and
+   * become the baseline the *next* run was differenced against — #117's phantom `was`.
+   *
+   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode.
+   * The two are still latched **here** rather than in the five arms, which is the property the
+   * previous docstring was protecting and it survives: a sixth way out of the overlay cannot forget
+   * to answer, because {@link exit} is a required parameter with two values and no default. That is
+   * `shift/report.ts`'s own rule about `ReportSubject` — *a required field cannot be forgotten by
+   * the next mode that arrives; a default would let the same bug ship again in silence.*
+   *
+   * Resume itself starts nothing — there is no `adopt` on that path — so the shift on screen stays
+   * where the playhead left it either way.
    *
    * **It redraws**, because the overlay's `hidden` is what `menuPanel.ts#coverShell` reads to decide
    * whether the shell behind is `inert`. Setting `hidden` without drawing would hide the menu and
    * leave the page underneath it out of the accessibility tree and unclickable — issue #68 with the
    * sign flipped, and the reason the covering is keyed on one value with one writer.
+   *
+   * @param exit whether this way out is a play mode being entered, or the player changing their
+   *   mind about having opened the menu at all.
    */
-  function closeMenu(): void {
+  function closeMenu(exit: 'entered-a-mode' | 'changed-their-mind'): void {
     menuRoot.hidden = true;
-    playerHasChosen = true;
+    menuHasBeenDismissed = true;
+    if (exit === 'entered-a-mode') playerHasChosen = true;
     drawMenu();
   }
 
@@ -2839,15 +2891,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * system's. `shouldAutoplay` reads `prefers-reduced-motion`; a player who set the setting has
        * asked for the same thing by a different route and was being ignored.
        *
-       * **And nothing plays until a mode has been chosen** — § D232, issue #39. Boot's own
+       * **And nothing plays until the overlay has been dismissed** — § D232, issue #39. Boot's own
        * `runShift()` lands under the menu overlay, so a page nobody had touched read
        * `running · 0 arrived, 0 carried` on load and had carried 376 people by the time the reader
        * finished the menu. The recording is still made and still drawn — the stage shows the
        * building at 06:00, which is the start state a cold load should sit at — it simply does not
        * start moving on its own behind a screen the player has not left yet.
+       *
+       * `menuHasBeenDismissed` rather than `playerHasChosen` — issue #117 split the two, and this
+       * is the half that keeps **Resume** behaving exactly as § D232 wrote it: a player who pressed
+       * Resume has left the menu on purpose, and a run they re-roll should play. What Resume no
+       * longer does is let a run **count**; that is `closeShift`'s gate and the reason for the
+       * split.
        */
       autoplay:
-        playerHasChosen &&
+        menuHasBeenDismissed &&
         shouldAutoplayWith(window.matchMedia.bind(window), menuState.settings.reduceMotion),
     });
     disableTransport(ui, false);
@@ -2920,6 +2978,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * cold load with the overlay still up reached `tick`, found `playback.state === 'ended'`, and
      * closed a day: `1 clean days running` and `1/3 banked this scenario` on a page nobody had
      * touched. The run itself is real and stays on screen; what it may not do is count.
+     *
+     * **And `playerHasChosen` is the narrow flag, not `menuHasBeenDismissed`** — GitHub issue #117.
+     * Pressing *Resume* dismisses the overlay without entering a mode, and while the two questions
+     * shared one flag that press un-gated this line over boot's own recording: it filed as a real
+     * day and became the baseline the Day report differenced the player's *next* run against. A
+     * banked day is not the only thing a premature file costs.
      */
     if (!playerHasChosen) return;
     filedRunId = recording.runId;

@@ -167,6 +167,78 @@ export type ReportSubject =
   | { readonly kind: 'single-run'; readonly selection: SingleRunSelection };
 
 /**
+ * What two sheets must agree about before the difference between them is a difference **in**
+ * anything — GitHub issues #117 and #102.
+ *
+ * ## What was reported
+ *
+ * *What moved since the run before this one* differenced whatever sheet happened to be filed before
+ * this one, whatever it was a sheet **of**. A player finished a Free Play run on Midtown Office and
+ * opened a scenario day on Garden Apartments, and read `CARRIED was 726 → 48` as though 678 people
+ * had stopped being carried; another switched building mid-session and read `was 48 → 5961`. Both
+ * are true statements about two counts and neither is a statement about anything the player did.
+ * The count follows the building.
+ *
+ * ## Why this is data on the sheet rather than a string comparison in the panel
+ *
+ * The panel already *labels* a building change — `BUILDING & DISPATCHER was … → …` is one of the
+ * identity rows — and labelling it was not enough, because the figure rows underneath went on being
+ * drawn and a labelled misleading diff is still a misleading diff. What the panel could not do is
+ * **tell a building change from a dispatcher change**, because both live in one printed line
+ * (`metaLinesFor`'s first entry is `${buildingName} · ${dispatcherName}`) and a dispatcher change is
+ * exactly the comparison the block exists for. So the sheet publishes the axes themselves.
+ *
+ * ## The three axes, and why the dispatcher is deliberately not one of them
+ *
+ * A dispatcher swap on one building, one day and one seed is the retry loop the whole block was
+ * built for (issue #38): it is the *only* thing this product lets a player change and re-run against
+ * the same passengers, and refusing it would leave the block with nothing to say. The three that are
+ * here are the ones that change **what was asked**, not **how it was answered**:
+ *
+ * - {@link buildingId} — a different tower has a different population, a different core and a
+ *   different number of cars, so every count on the sheet moves for reasons the reader did not
+ *   cause.
+ * - {@link subject} — a Free Play run and a day of a week are not the same question even on one
+ *   building: the campaign grows the tenants 11 % a day (`growth.ts`) and books an event over the
+ *   demand, and Free Play does neither.
+ * - {@link demand} — what the passengers were generated from. On a single run that is the player's
+ *   own selection line, template, rate and the **length of the demand schedule** together (see
+ *   {@link SingleRunSelection.durationS}, which is minutes *of demand* rather than minutes of run).
+ *   On a day of a week it is the day number and the day's event, which are the two things that move
+ *   a campaign day's demand.
+ *
+ * ## What this cannot see, said here rather than left to be discovered
+ *
+ * A campaign day's **shift length** and its **traffic pattern** are not on this input at all —
+ * `DayReportInput` carries neither, and inventing them from the recording's own span is not
+ * available. That last part is measured rather than assumed: `endedAt` is
+ * `max(lastEventAt, demandEndedAt)` (`sim/simulation.ts`), so it moves with the **dispatcher**.
+ * Driven in the shipped shell on Midtown Office at seed 20 260 804, three dispatchers back to back
+ * on one selection printed spans of `08:30–09:25`, `08:30–09:22` and `08:30–09:20` — so a basis
+ * keyed on the span would have refused every one of the three comparisons the block exists for.
+ *
+ * So two campaign days of the same day number, run at different lengths, compare as though they
+ * were the same question. That is a **named gap**, pinned by a case in `reportPanel.test.ts` rather
+ * than by this paragraph — § D227: a refusal is pinned by a run, never by another sentence. Closing
+ * it means a required field on `DayReportInput`, which is wider than either issue asks for.
+ */
+export interface ReportBasis {
+  /** `VizRecording.buildingId` — the tower, not its display name. */
+  readonly buildingId: string;
+  /** Which shape of run this was. {@link ReportSubject}'s own discriminator. */
+  readonly subject: ReportSubject['kind'];
+  /**
+   * What the passengers were generated from, as one string.
+   *
+   * A string rather than a record because the two shapes of sheet answer it with different fields
+   * and nothing compares the parts — the only question ever asked of it is *are these two the
+   * same?*. Composed from the sheet's own published words on a single run, so a reader who is shown
+   * the refusal can find the difference on the identity rows above it.
+   */
+  readonly demand: string;
+}
+
+/**
  * The half of the sheet that is true of **any** run — derived from {@link DayReport} by removing
  * the week-shaped fields rather than restated, so a field added to `DayReport` cannot silently miss
  * the single-run sheet.
@@ -201,6 +273,14 @@ interface ShapedOnlyFields {
    * looked up under one key, cannot say three different things about it.
    */
   readonly diagnosisHeading: string;
+  /**
+   * What this sheet is comparable **with** — issues #117 and #102. See {@link ReportBasis}.
+   *
+   * Here rather than on `types.ts`'s `DayReport` for {@link diagnosisHeading}'s reason, and carried
+   * on **both** shapes because the mode is one of the three axes: a sheet that did not publish its
+   * own basis could not be told apart from a sheet of a different question, which is the defect.
+   */
+  readonly basis: ReportBasis;
 }
 
 /**
@@ -371,19 +451,52 @@ function bookedLine(event: ShiftEvent, subject: ReportSubject): readonly string[
   return [`${event.name} — ${event.note}`];
 }
 
-/** The rest of what it takes to run this again, and the statement that it stands alone. */
-function selectionLines(selection: SingleRunSelection): readonly string[] {
+/**
+ * What a single run's demand was asked to be, in one line — the meta block's third entry, and
+ * {@link ReportBasis.demand}'s single-run arm.
+ *
+ * One function rather than two, because the line a reader is shown and the string two sheets are
+ * compared on have to be the same string. A basis composed separately would be a second answer to
+ * *what traffic was this?*, and the first thing it could do is disagree with the line printed two
+ * rows above the refusal that quotes it.
+ */
+function demandLineOf(selection: SingleRunSelection): string {
   const rate =
     selection.arrivalRatePctPop5min === null
       ? 'the building’s own rate'
       : `${selection.arrivalRatePctPop5min.toFixed(1)} %pop/5min`;
-  return [
-    // *"min of demand"* rather than *"min selected"* — issue #80. The number is the demand
-    // schedule and never the run: the clock range on the line above is the run, drain included, and
-    // the two used to be read as one because nothing said which was which.
-    `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min of demand`,
-    'one run, not part of a week — nothing is banked',
-  ];
+  // *"min of demand"* rather than *"min selected"* — issue #80. The number is the demand
+  // schedule and never the run: the clock range on the line above is the run, drain included, and
+  // the two used to be read as one because nothing said which was which.
+  return `${selection.demandTemplateId} · ${rate} · ${String(Math.round(selection.durationS / 60))} min of demand`;
+}
+
+/** The rest of what it takes to run this again, and the statement that it stands alone. */
+function selectionLines(selection: SingleRunSelection): readonly string[] {
+  return [demandLineOf(selection), 'one run, not part of a week — nothing is banked'];
+}
+
+/**
+ * What this sheet may be differenced against — issues #117 and #102, and see {@link ReportBasis}.
+ *
+ * Exhaustive over the subject, so a third shape of run is a compile error here rather than a sheet
+ * that silently compares as though it were a week's.
+ *
+ * The week-day arm names the **day** and the **event** because those are the two things that move a
+ * campaign day's demand: `growth.ts` adds 11 % of tenants per day, and `shiftRunPatch` writes the
+ * event over the pattern. It does not name the dispatcher, the seed or the attempt — a retry with a
+ * different dispatcher on one day is the comparison this block exists to draw.
+ */
+function basisOf(input: DayReportInput): ReportBasis {
+  const { recording, subject, week, event } = input;
+  return {
+    buildingId: recording.buildingId,
+    subject: subject.kind,
+    demand:
+      subject.kind === 'single-run'
+        ? demandLineOf(subject.selection)
+        : `day ${String(week.day)} · ${event.id}`,
+  };
 }
 
 /**
@@ -442,6 +555,14 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
         ? `${weekdayOf(week.dayIdx)} — day ${String(week.day)}`
         : `One run — ${recording.buildingName}`,
     metaLines: metaLinesFor(input, dispatcherName, dayStartS),
+    /*
+     * What this sheet may be differenced against — issues #117 and #102.
+     *
+     * On the sheet rather than worked out by the panel, for {@link ReportBasis}' reason: the panel
+     * has the printed lines and cannot tell a building change from a dispatcher change inside one
+     * of them, and a dispatcher change is the one comparison the block is for.
+     */
+    basis: basisOf(input),
     lede: judgement.lede,
     figures: figuresFor(summary, observations, dayStartS, input.showEnergyAxis ?? true),
     verdict: judgement.verdict,

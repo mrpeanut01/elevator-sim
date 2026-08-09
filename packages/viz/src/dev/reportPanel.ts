@@ -106,7 +106,12 @@
 
 import { GOAL_GLYPHS } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
-import { clockOf, type ReportNextStep, type ShapedDayReport } from '../shift/report.js';
+import {
+  clockOf,
+  type ReportBasis,
+  type ReportNextStep,
+  type ShapedDayReport,
+} from '../shift/report.js';
 import type {
   ClearedAward,
   FigureTone,
@@ -267,16 +272,65 @@ export interface DeltaRowView {
  * thing they touched. So {@link ReportDeltaView.selection} pairs the identity lines — the building
  * and dispatcher, the seed and span, and which day the sheet is of — and a reader can see whether
  * the two runs were even asked the same question.
+ *
+ * ## And why *seeing* it was not enough — GitHub issues #117 and #102
+ *
+ * That last paragraph was the answer this block gave for a year, and it is the half-measure the two
+ * issues report from opposite ends. A player who finished a Free Play run on Midtown Office and
+ * opened a scenario day on Garden Apartments read `CARRIED was 726 → 48`; another switched building
+ * mid-session and read `was 48 → 5961`. Both cases *were* labelled — the identity row said the
+ * building had changed — and both still printed six figure rows underneath, because a label is
+ * something a reader may notice and arithmetic is something they will read. #117 puts it exactly:
+ * *"the panel already prints the honest caveat … it should refuse the arithmetic in the cases where
+ * the caveat is load-bearing."*
+ *
+ * So the figures are **withheld** when the two sheets are not sheets of the same question, and
+ * {@link ReportDeltaView.refused} says which axis differs, in words. That is the shape this
+ * repository already uses for a mean it may not publish (`shift/report.ts`'s `WITHHELD` beside the
+ * run's own `awtInvalidReason`): the cell is not quietly dropped and it is not filled with a number
+ * the same run calls invalid — it says what it is not saying, and why.
+ *
+ * The identity rows stay. They are not the comparison; they are the reason there is not one, and a
+ * refusal that hid what it was refusing about would send a reader hunting for it.
  */
 export interface ReportDeltaView {
   /** What the block is. Always present when the block is. */
   readonly caption: string;
   /** What differs about *what was run*. Empty when the two runs were the same selection. */
   readonly selection: readonly DeltaRowView[];
-  /** Figures whose printed value differs, in the sheet's own order. Empty when none did. */
+  /**
+   * Figures whose printed value differs, in the sheet's own order.
+   *
+   * Empty when none did — **and empty whenever {@link refused} is non-null**, which is the whole of
+   * the fix for issues #117 and #102. The two emptinesses are told apart by {@link note}, never by
+   * the reader guessing.
+   */
   readonly figures: readonly DeltaRowView[];
+  /**
+   * Why the figures are not paired, or `null` when they are.
+   *
+   * `null` is *these two sheets answer the same question*, which is the case the block was built
+   * for: one building, one shape of run, one demand, and a dispatcher swapped between them.
+   */
+  readonly refused: DeltaRefusal | null;
   /** The sentence under the rows — the refusal, or the reason nothing moved. Never empty. */
   readonly note: string;
+}
+
+/**
+ * Why two sheets may not be differenced — issues #117 and #102.
+ *
+ * Structured rather than only prose because a test can hold a list and cannot hold a sentence: the
+ * property that matters is *the axes that differ are named*, and asserting that against a paragraph
+ * would be asserting against wording. {@link ReportDeltaView.note} is composed from this, so the
+ * words on screen and the reason cannot drift apart.
+ */
+export interface DeltaRefusal {
+  /**
+   * The axes the two runs disagree on, in the words the note uses, in {@link ReportBasis}' own
+   * field order. Never empty — a refusal with nothing to name would be a refusal with no grounds.
+   */
+  readonly differsOn: readonly string[];
 }
 
 /** The green banner, present only on the day that banked the last clean shift. */
@@ -577,6 +631,88 @@ function sheetIdentityOf(report: ShapedDayReport | undefined, progress: RunProgr
 }
 
 /* -------------------------------------------------------------------------- *
+ * The rotation — what the panel remembers between frames
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two sheets the panel is holding, and whether the reader is still owed the top of one.
+ *
+ * ## Why this is a value rather than three `let`s inside the mount
+ *
+ * It was three `let`s inside {@link mountReport}, and that made the entire mechanism of issue #38
+ * unreachable: closure variables in a function that needs a `document`, in a package whose every
+ * vitest project is `environment: 'node'`. The suite could assert the *source order* of two
+ * assignments and nothing else — so when GitHub issue #117 reported *"three consecutive runs printed
+ * an identical baseline"*, there was no way to answer it except by reading the code and arguing.
+ *
+ * A pure reducer can be **driven**: fed the exact frame sequence the shell produces — a run cleared,
+ * a run watched, a run filed, sixty frames of each — and asked what the `was` column then says. That
+ * is what `reportPanel.test.ts`'s three-run case does, and it is the difference between *we think
+ * this cannot happen* and *we ran it three times and read the answer*.
+ *
+ * ## Why the drawn sheet's continuity and not the shell's history
+ *
+ * `ViewerState` does not carry a previous sheet, and this is not a workaround for that: the run a
+ * delta is against should be **the one the reader actually read**, not one the shell remembers on
+ * their behalf. It is lost on reload, which is honest, because so is the reader's memory of it.
+ */
+export interface SheetContinuity {
+  /**
+   * {@link sheetIdentityOf} of the last **filed** sheet taken on, or `''` for *nothing filed yet*.
+   *
+   * Unfiled sheets never move it. Pressing *Run this shift* clears the report, so an unfiled sheet
+   * stands between every pair of filed ones; rotating on that would hand the next delta an
+   * `undefined` predecessor and lose the run the reader just read.
+   */
+  readonly filedIdentity: string;
+  /** The filed sheet on screen now. */
+  readonly current: ShapedDayReport | undefined;
+  /** The filed sheet before it — issue #38's *was* column, and the only thing read out of here. */
+  readonly previous: ShapedDayReport | undefined;
+  /** Whether the top of a new sheet is still owed to the reader — issue #62. */
+  readonly owesTop: boolean;
+}
+
+/** A panel that has drawn nothing yet. The state {@link mountReport} starts in. */
+export const NOTHING_FILED_YET: SheetContinuity = Object.freeze({
+  filedIdentity: '',
+  current: undefined,
+  previous: undefined,
+  owesTop: false,
+});
+
+/**
+ * Take on a frame — the rotation, as a total function of the frame and what came before it.
+ *
+ * Called **before** the view is built, never after. Rotating afterwards would make every sheet its
+ * own predecessor on the very next frame — `renderAll` runs sixty times a second — and every delta
+ * would read *nothing moved* one frame after appearing.
+ *
+ * A frame that is not a new filed sheet returns the memory **by reference**, which is not an
+ * optimisation: it is the property that makes the sixty frames a second between two runs provably
+ * inert, and `reportPanel.test.ts` asserts identity rather than equality on exactly that case.
+ */
+export function rotatedOn(
+  memory: SheetContinuity,
+  report: ShapedDayReport | undefined,
+  progress: RunProgress,
+): SheetContinuity {
+  const identity = sheetIdentityOf(report, progress);
+  if (identity === '' || identity === memory.filedIdentity) return memory;
+  return { filedIdentity: identity, current: report, previous: memory.current, owesTop: true };
+}
+
+/**
+ * The reader has been given the top of the new sheet — issue #62's debt, discharged.
+ *
+ * Cleared on the **write** rather than on the identity change, so a reader who scrolls *this* sheet
+ * keeps their place: the debt is false from then until a different sheet arrives.
+ */
+export function topWritten(memory: SheetContinuity): SheetContinuity {
+  return { ...memory, owesTop: false };
+}
+
+/* -------------------------------------------------------------------------- *
  * The delta — issue #38
  * -------------------------------------------------------------------------- */
 
@@ -597,6 +733,74 @@ const SELECTION_ROWS: readonly { readonly label: string; readonly of: 'title' | 
   ]);
 
 /**
+ * Each axis of {@link ReportBasis}, in the words the refusal says it in.
+ *
+ * An exhaustive `Record` over the basis's own keys, for the reason {@link VERDICT_COLOUR} is one: a
+ * fourth axis added to the sheet must be a **compile error here** rather than an axis that silently
+ * stops being checked. That failure would be invisible on screen — the block would go on drawing a
+ * confident diff — which is the whole of issues #117 and #102.
+ *
+ * The phrases are clauses of one sentence (*"…was in a different building and against different
+ * traffic"*) rather than nouns, so the note reads as English at one, two or three of them without
+ * this file assembling grammar.
+ */
+const BASIS_DIFFERENCES: Readonly<Record<keyof ReportBasis, string>> = Object.freeze({
+  buildingId: 'in a different building',
+  subject: 'in a different mode',
+  demand: 'against different traffic',
+});
+
+/**
+ * Which axes two sheets disagree on — empty when they are sheets of the same question.
+ *
+ * Keyed off {@link BASIS_DIFFERENCES} rather than off `Object.keys(basis)` so the order is the
+ * frozen table's and a field the table does not name cannot be compared silently. The two are the
+ * same set by construction: the table is typed as a total `Record` over the basis.
+ */
+function basisDifferencesOf(previous: ReportBasis, current: ReportBasis): readonly string[] {
+  const differs: string[] = [];
+  for (const [axis, phrase] of Object.entries(BASIS_DIFFERENCES) as readonly [
+    keyof ReportBasis,
+    string,
+  ][]) {
+    if (previous[axis] !== current[axis]) differs.push(phrase);
+  }
+  return differs;
+}
+
+/** `a`, `a and b`, `a, b and c` — one sentence's worth of clauses, joined the way English does. */
+function andList(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1] ?? ''}`;
+}
+
+/**
+ * The sentence a reader gets **instead of** the figure rows — issues #117 and #102.
+ *
+ * Three things it has to do, and the third is the one that is easy to lose. It names the axis, so
+ * the refusal is checkable against the identity rows directly above it. It says the arithmetic is
+ * not being done rather than doing it quietly wrong — `docs/10` R3's rule that an absence must be
+ * distinguishable from a failure, which here means *"nothing here is a comparison"* in as many
+ * words. And it keeps the pointer at **Compare**, because a reader who has just been told this is
+ * not a comparison is exactly the reader who wants to know where one can be had; the un-refused
+ * note carries that pointer too, and a refusal that dropped it would answer a player's question
+ * with a door closing.
+ *
+ * No word in it orders the two runs. That is the same line {@link ReportDeltaView} draws for the
+ * ordinary case and it does not relax because the block is refusing: *the earlier run was on a
+ * bigger building* is still a comparison, and still one run against one run.
+ */
+function refusalNoteOf(differsOn: readonly string[]): string {
+  return (
+    `The run before this one was ${andList(differsOn)}. Nothing here is a comparison, so the ` +
+    'figures are not paired: the two runs were not asked the same question, and a count that ' +
+    'moved because the building or the traffic moved says nothing about what you changed. What ' +
+    'differs is listed above. Comparing two settings needs them run against the same passengers, ' +
+    '50 or more times each, with an interval that excludes zero — which is what Compare is for.'
+  );
+}
+
+/**
  * What moved between two filed sheets — and nothing else.
  *
  * Pure, total, and **arithmetic-free**: every value is a string one of the two sheets already
@@ -608,6 +812,11 @@ const SELECTION_ROWS: readonly { readonly label: string; readonly of: 'title' | 
  * than reprinting the grid. When nothing differs at all the block is still drawn, and says why: the
  * run id is building, dispatcher and seed, so an unchanged selection reproduces bit-identically
  * (§ D223) and *"the report did not update"* is the reading this replaces.
+ *
+ * **The comparability gate comes first** — issues #117 and #102. Two sheets of different questions
+ * get the identity rows, no figure rows and a note that says which axis differs; see
+ * {@link ReportDeltaView} and {@link ReportBasis}. It is checked ahead of the pairing rather than
+ * used to filter it afterwards, because a partial pairing would be the same defect with fewer rows.
  */
 function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): ReportDeltaView {
   const lineOf = (report: ShapedDayReport, of: 'title' | 0 | 1): string =>
@@ -618,6 +827,22 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     const before = lineOf(previous, row.of);
     const after = lineOf(current, row.of);
     if (before !== after) selection.push({ label: row.label, before, after });
+  }
+
+  const differsOn = basisDifferencesOf(previous.basis, current.basis);
+  if (differsOn.length > 0) {
+    return {
+      /*
+       * A different caption, because the old one is a promise the block is about to break. *What
+       * moved since the run before this one* over a refusal would be a heading answering a question
+       * the paragraph beneath it declines — and the heading is the part a reader keeps.
+       */
+      caption: 'The run before this one',
+      selection,
+      figures: [],
+      refused: { differsOn },
+      note: refusalNoteOf(differsOn),
+    };
   }
 
   const was = new Map(previous.figures.map((cell) => [cell.id, cell.value]));
@@ -634,6 +859,7 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
     caption: 'What moved since the run before this one',
     selection,
     figures,
+    refused: null,
     note: moved
       ? /*
          * The refusal, in the same visual unit as the rows it qualifies. It states what the block
@@ -893,22 +1119,14 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
   const leversHeading = headingOf(ui.levers);
   /** `.sheet` — the element `index.html` gives `overflow: auto`. Issue #62. */
   const scroller = ui.title.closest('.sheet');
-  /** {@link sheetIdentityOf} of the last **filed** sheet drawn. Unfiled sheets never move it. */
-  let filedIdentity: string | undefined;
-  /** Whether the top of a new sheet is still owed to the reader. See the render. */
-  let owesTop = false;
-  /** The filed sheet on screen now, and the one before it — issue #38's *was* column. */
-  let currentSheet: ShapedDayReport | undefined;
   /**
-   * The filed sheet before the one on screen, which is what the current one is differenced against.
+   * The two sheets this panel is holding, and the reader's unpaid scroll — issues #38, #62 and #117.
    *
-   * It lives here rather than in `ViewerState` because the state does not carry one and this lane
-   * does not own `dev/state.ts`. That is not only a constraint: continuity of the *drawn* sheet is
-   * exactly the right relation — the earlier run in the delta is the one the reader actually read,
-   * not one the shell remembers on their behalf. It is lost on reload, which is honest, because so
-   * is the reader's memory of it.
+   * One value through one reducer, rather than the three `let`s this was: see
+   * {@link SheetContinuity} for why the difference is the difference between a mechanism a test can
+   * drive and a mechanism a test can only read.
    */
-  let previousSheet: ShapedDayReport | undefined;
+  let continuity: SheetContinuity = NOTHING_FILED_YET;
 
   /**
    * *Take the next assignment.*
@@ -1141,6 +1359,14 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
     });
   }
 
+  /*
+   * The block, refused or not, drawn the same way — issues #117 and #102.
+   *
+   * There is no branch here and there deliberately is not one: a refused delta is a delta whose
+   * `figures` are empty and whose `caption` and `note` say so, which is the shape `reportDeltaOf`
+   * returns. A renderer that drew the refusal differently would be a second place that decides
+   * whether two runs are comparable, and the two would disagree the day one of them was edited.
+   */
   function drawDelta(view: ReportView): void {
     const delta = view.delta;
     setHidden(deltaBox, delta === null);
@@ -1163,22 +1389,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
        *
        * A new filed account arrives: the sheet that was on screen becomes the one this sheet is
        * differenced against (issue #38), and the reader is owed the top of the new one (issue #62).
-       * Rotating after the view is drawn would make every sheet its own predecessor on the very
-       * next frame — `renderAll` runs sixty times a second — and every delta would read *nothing
-       * moved* one frame after appearing.
-       *
-       * Only a **filed** identity moves it. Pressing *Run this shift* clears the report, so an
-       * unfiled sheet stands between every pair of filed ones; rotating on that would hand the next
-       * delta an `undefined` predecessor and lose the run the reader just read.
+       * Both halves, and the reasons neither may move, are {@link rotatedOn}'s — this line is the
+       * one place it is called, and the whole of the state it keeps is {@link continuity}.
        */
-      const identity = sheetIdentityOf(view.state.report, progress);
-      if (identity !== '' && identity !== filedIdentity) {
-        previousSheet = currentSheet;
-        currentSheet = view.state.report;
-        filedIdentity = identity;
-        owesTop = true;
-      }
-      const drawn = reportViewOf(view.state.report, progress, previousSheet);
+      continuity = rotatedOn(continuity, view.state.report, progress);
+      const drawn = reportViewOf(view.state.report, progress, continuity.previous);
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
        * the same value, so a slot can never be left showing yesterday's sentence on a sheet that
@@ -1247,11 +1462,11 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
        * the identity changed would land on an element with no layout and be dropped.
        *
        * The flag is cleared on the write rather than on the identity change, so a reader who scrolls
-       * *this* sheet keeps their place: `owesTop` is false from then until a different sheet arrives.
+       * *this* sheet keeps their place — see {@link topWritten}.
        */
-      if (owesTop && scroller !== null && view.state.tab === 'report') {
+      if (continuity.owesTop && scroller !== null && view.state.tab === 'report') {
         scroller.scrollTop = 0;
-        owesTop = false;
+        continuity = topWritten(continuity);
       }
     },
   };
