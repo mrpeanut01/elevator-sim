@@ -1026,6 +1026,51 @@ describe('the levers point at what this run showed — issue #55', () => {
     expect(leverBody(outrun, 'add-a-car')).toContain('backlog was still growing');
   });
 
+  it('pluralises both of its own clauses, and the singular is the case that was wrong', () => {
+    /*
+     * Issue #134. Both clauses read `1 legs never boarded at all` and `1 riders gave up and took
+     * the stairs`, driven on `vertical-city` at 16 %pop/5 min, seed 20260727.
+     *
+     * **Exactly one of each, because that is the value the defect got wrong.** A case at zero
+     * omits the clause entirely and a case above one was always right, so either would pass against
+     * the bug — the same shape as § D318's field round-trip. Both counts are asserted on screen so
+     * a future change cannot fix the grammar by dropping the number.
+     *
+     * These two clauses are two of the four outcomes § D266 refuses to fold together, which is why
+     * a sentence that reads as an unfilled template costs more here than elsewhere: it teaches the
+     * reader that this line is boilerplate exactly when it is carrying a real and unusual fact.
+     */
+    const one = dayReportOf({
+      recording: { ...saturated, summary: fixtureSummary({ ...saturated.summary, unservedCount: 1 }) },
+      observations: { ...observationsOfRun(saturated), abandoned: 1 },
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
+    });
+    const body = leverBody(weekDay(one), 'add-a-car');
+    expect(body).toContain('1 leg never boarded at all');
+    expect(body).toContain('1 rider gave up and took the stairs');
+    expect(body).not.toContain('1 legs');
+    expect(body).not.toContain('1 riders');
+  });
+
+  it('keeps the plural where the count is plural, so the fix did not trade one error for another', () => {
+    const many = dayReportOf({
+      recording: { ...saturated, summary: fixtureSummary({ ...saturated.summary, unservedCount: 4 }) },
+      observations: { ...observationsOfRun(saturated), abandoned: 7 },
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      subject: { kind: 'week-day' },
+    });
+    const body = leverBody(weekDay(many), 'add-a-car');
+    expect(body).toContain('4 legs never boarded at all');
+    expect(body).toContain('7 riders gave up and took the stairs');
+  });
+
   it('quotes counts, and never a figure the run refuses', () => {
     /*
      * Every pointer is a count or a ratio of counts. None of the three quantities `awtIsValid`
