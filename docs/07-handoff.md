@@ -38,9 +38,14 @@ the shape of all three, and **Phase 9's ✅ is the one that must not be read alo
   before the measurement existed.
 - **Phase 9** — **ACCEPTED WITH NAMED GAPS (2026-07-30)** against [§ D163](../DECISIONS.md), whose
   own rule is that the status row and the verdict land together or neither does. Both load-bearing
-  clauses are met **by a run rather than by an argument**: the deep honesty tier is green at
-  **60 cases, 271 985 strings, 4 650 simulations, 23 surfaces, 0 violations** — and it **found two
-  violations first**, one real and one a check accepting the wrong branch, which is why
+  clauses are met **by a run rather than by an argument**: the honesty tiers run at **49 cases,
+  261 176 strings, 606 simulations, 30 surfaces** (always-on) and **60 cases, 329 357 strings,
+  4 710 simulations, 31 surfaces** (deep), re-measured 2026-08-09 — neither is at zero violations,
+  and both open findings are recorded in `honesty.test.ts`'s `OUTSTANDING` rather than argued away
+  (the delta block's missing `n`, issue #127; and `honesty-9100031`'s cue collision). The superseded
+  figures were *"60 cases, 271 985 strings, 4 650 simulations, 23 surfaces, 0 violations"*, then
+  § D307's 246 875 / 312 104 — **stale twice, and the surface count was wrong in both**. It
+  **found two violations first**, one real and one a check accepting the wrong branch, which is why
   [§ D186](../DECISIONS.md) exists and why [§ D172](../DECISIONS.md)'s *"the refinement relation,
   not a run"* had to be corrected. Mode parity is derived from the code and proved against a fail
   state the product does not ship. **The gaps are not decoration.** Clause 4 — *every unit names its

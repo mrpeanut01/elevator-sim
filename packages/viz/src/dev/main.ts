@@ -3287,6 +3287,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
               },
             }
           : { kind: 'week-day' as const },
+      /*
+       * What the day was set to run — GitHub issue #126, and **the one caller that knows**.
+       *
+       * All three fields are read off `state`, which is where `shiftRunConfigOf` reads them from
+       * eighty lines up: `shiftLengthS` and `windowStartS` are the two halves § D286 split one
+       * control into, and `pattern` is the arrival pattern the run resolved against. Not one of them
+       * is available from `recording` — `ShiftPlan`'s docstring measures the span that looks like it
+       * would do and does not, and the reason it does not is that a dispatcher swap moves it.
+       *
+       * Read here rather than at `runShift` for `dayStartS`'s reason one field down: this is the
+       * value the run on screen was started from, and the mid-run energy-axis refile above spreads
+       * this same input rather than rebuilding it, so a sheet redrawn for a preference cannot
+       * silently acquire a plan the run never had.
+       */
+      plan: {
+        shiftLengthS: state.shiftLengthS,
+        windowStartS: state.windowStartS,
+        patternId: state.pattern,
+      },
       event,
       dispatcherName: profileById(resources, state.savedDispatchers, state.dispatcherId).name,
       /*
