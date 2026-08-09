@@ -74,8 +74,8 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **287 083** | **606** | 30 | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **362 317** | **4 710** | **31** | **1** | **green** — the one finding is registered |
+  | always-on | 49 | **335 950** | **606** | 30 | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **426 662** | **4 710** | **31** | **1** | **green** — the one finding is registered |
 
   Measured 2026-08-09 on the integrated tree, both tiers, in one sitting — and that is the point of
   the sentence rather than a detail of it. **Three lanes in this wave each measured the corpus on a
@@ -83,6 +83,16 @@ verdict:
   was taken and none of them correct here. A figure re-measured per branch is a figure that is stale
   the moment the branch merges, so the measurement now happens once, after integration, or not at
   all.
+
+  **Wave 18 moved both counts by roughly a sixth — `287 083 → 335 950` and `362 317 → 426 662` — and
+  the rule above earned its keep again.** The lane that produced most of that rise measured **335 803**
+  on its own branch and said so explicitly as a branch-local figure; the integrated number is 147
+  higher, from a *different* lane's free-play fixtures. Neither lane could have published the right
+  number, and both were correct where they stood. Cases, simulations and surfaces are all unmoved,
+  which is what a wave that gave existing surfaces a second register is supposed to look like: the
+  rise is the Casual arm of the canvas header, the dispatcher cards and the plates entering the
+  corpus, plus `buildingPlateOf`'s Casual arm being swept for the first time — it had been shipping
+  unreachable since issue #71 because `keyedPlate` hashed a key that a mode toggle did not change.
 
   **The verdict column says *green* rather than *0 violations*, and the difference is deliberate.**
   Both tiers pass, which means every violation the search finds is in `honesty.test.ts`'s
