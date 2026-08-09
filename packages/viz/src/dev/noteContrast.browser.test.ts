@@ -31,15 +31,31 @@
  * `.rail-prose` **6.35 / 5.92** on `--rail`. No pairing below 4.5:1, and the page's own resolved
  * font sizes are 12 px and 11.5 px.
  *
- * ## One thing this tier can see that the other cannot, and it is not a contrast failure
+ * ## One thing this tier saw that the other could not — and it has since been fixed
  *
- * `#rail-access-note` is authored `class="rail-prose warn"`. `.warn { color: var(--warn) }` is
- * declared at the top of the stylesheet and `.rail-prose { … color: var(--dimmer) }` far below it;
- * they tie on specificity, so **source order gives the paragraph `--dimmer` and the `warn` class
- * changes nothing.** Both inks clear AA on `--rail` — 6.35 / 5.92 against 9.27 / 4.83 — so this is
- * not the issue's defect and is not fixed here. It is recorded because a class named `warn` that
- * does not warn is the stale-refusal shape § D227 names, wearing a stylesheet's hat, and it wants
- * its own issue rather than a silent one-line reorder inside a contrast lane.
+ * **The finding, as recorded here when this file was written:** `#rail-access-note` is authored
+ * `class="rail-prose warn"`; `.warn { color: var(--warn) }` is declared at the top of the
+ * stylesheet and `.rail-prose { … color: var(--dimmer) }` far below it; they tie on specificity, so
+ * source order gave the paragraph `--dimmer` and **the `warn` class changed nothing**. Both inks
+ * clear AA on `--rail` — 6.35 / 5.92 against 9.27 / 4.83 — so it was never this issue's defect. It
+ * was recorded rather than fixed because a class named `warn` that does not warn is § D227's
+ * stale-refusal shape wearing a stylesheet's hat, and it deserved its own issue rather than a
+ * silent one-line reorder inside a contrast lane.
+ *
+ * **It got one — GitHub issue #143 — and the answer was that the warning register is correct.** A
+ * `DECISIONS.md` number is owed; the argument is in `index.html` beside the `.rail-prose.warn` rule
+ * and in `noteContrast.test.ts`'s section 5. In short: `role="status"` is not evidence for the
+ * quieter reading, because the role governs how an assistive technology *interrupts* and the class
+ * governs the register the sentence *reads* in. Four things said the sentence is a caution — docs/10
+ * § 10.3 is titled *"the dispatcher compatibility **warning**"* and calls it *"a warning rather than
+ * a block"*, `checkAccessCompatibility` returns it in a field named `warning`, the editor's
+ * counterpart `#ed-access-note` had been drawing it in `--warn` all along, and the fact itself is
+ * that some riders cannot be carried at all.
+ *
+ * So `.rail-prose.warn` now settles it at (0,2,0), which beats both singles without depending on
+ * where either is declared, and the case below pins `--warn` instead. The measurement that made the
+ * old sentence true is kept above rather than deleted, because it is the record of what this tier
+ * could see that the node tier could not — which is this file's whole reason for existing.
  */
 
 import { existsSync } from 'node:fs';
@@ -259,26 +275,52 @@ describe.skipIf(!HAS_BROWSER)('the change-scope notes are legible on the page a 
           .filter((row) => row.theme === theme && row.className.split(/\s+/)[0] === name)
           .map((row) => row.ratio),
       ),
-    ];
+    ].sort((a, b) => a - b);
     expect(only('advice', 'dark')).toEqual([7.21]);
     expect(only('advice', 'light')).toEqual([8.25]);
-    expect(only('rail-prose', 'dark')).toEqual([6.35]);
-    expect(only('rail-prose', 'light')).toEqual([5.92]);
+    /*
+     * **`.rail-prose` has two inks, and issue #143 is why.** Every user of the class draws in
+     * `--dimmer` — 6.35 / 5.92 — except `#rail-access-note`, which `.rail-prose.warn` now draws in
+     * `--warn`: 9.27 dark, 4.83 light. Both figures are the #124 lane's own measurements for
+     * `--warn` on `--rail`, taken before the class was made to bite, so this case is now the
+     * confirmation that the fix landed on the ink that was already known to be legible rather than
+     * on a new one nobody had checked.
+     *
+     * Listed as a set rather than collapsed, and sorted so the assertion does not depend on the
+     * order the page happens to yield elements in. The light pair is the one to watch: 4.83 clears
+     * AA for normal text with less room than anything else on the page, so a token change that
+     * darkens the rail or lightens the amber is red here first.
+     */
+    expect(only('rail-prose', 'dark')).toEqual([6.35, 9.27]);
+    expect(only('rail-prose', 'light')).toEqual([4.83, 5.92]);
   });
 
-  it('resolves `class="rail-prose warn"` to `--dimmer`, because source order says so', () => {
+  it('resolves `class="rail-prose warn"` to `--warn`, because a compound rule says so', () => {
     /*
      * Not a contrast case — both candidates clear AA — and it is here because it is the one fact
      * this tier can settle and the node tier can only propose. `#rail-access-note` asks for two
-     * colours; the browser gives it `--dimmer`, so the `warn` class on that paragraph is inert.
-     * Asserted rather than fixed: a reorder is a change to what the rail *looks* like and belongs
-     * in an issue of its own, and until then this is the sentence that stops it being a surprise.
+     * colours, and a real cascade in a real browser is what says which it gets.
+     *
+     * **This case read `rgb(139, 152, 169)` — `--dimmer` — until issue #143**, and that measurement
+     * is what turned "the `warn` class looks inert" from a reading of the stylesheet into a fact.
+     * The fix is `.rail-prose.warn` at (0,2,0): it beats `.warn` and `.rail-prose` on specificity,
+     * so the answer no longer depends on which of them is declared first. Written as a compound
+     * rather than by moving `.warn` below `.rail-prose`, because a move fixes this pairing by luck
+     * and re-breaks on the next colour-setting class declared beneath it — and there are eighty of
+     * those.
+     *
+     * The paired node-tier assertion is `noteContrast.test.ts`'s section 5, which also sweeps the
+     * whole markup for the general shape: two rules of equal specificity, naming different
+     * subjects, proposing different inks. Same-selector overrides are exempt and `#copy-cli` is the
+     * control on that exemption.
      */
-    const dimmer = measured.find(
+    const note = measured.find(
       (row) => row.theme === 'dark' && row.className.split(/\s+/).includes('warn'),
     );
-    expect(dimmer, 'no `.rail-prose.warn` on the page').toBeDefined();
-    // `--dimmer` in dark is `#8b98a9`.
-    expect((dimmer as Measured).color).toBe('rgb(139, 152, 169)');
+    expect(note, 'no `.rail-prose.warn` on the page').toBeDefined();
+    // `--warn` is `var(--band-1)` is `tokens.BAND_WAITING` is `#e0b040` in dark — the wait ladder's
+    // amber, which is the point: the register this note reads in is the one the stage already uses
+    // for *people are waiting*. Was `rgb(139, 152, 169)` — `--dimmer` — before #143.
+    expect((note as Measured).color).toBe('rgb(224, 176, 64)');
   });
 });

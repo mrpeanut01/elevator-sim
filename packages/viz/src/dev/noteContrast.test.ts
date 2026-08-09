@@ -965,3 +965,167 @@ describe('what this tier cannot see is bounded rather than merely disclaimed', (
     }
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * 5 — an ink decided by source order rather than by intent — GitHub issue #143
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Two rules of equal specificity proposing different inks for one element is an accident, and
+ * this is where an accident becomes a red test.**
+ *
+ * A `DECISIONS.md` number is **owed** for this section and for the `.rail-prose.warn` rule it
+ * guards; the argument is here and in `index.html` rather than only in a commit message, per this
+ * repository's working agreement.
+ *
+ * ## The finding
+ *
+ * `#rail-access-note` is authored `class="rail-prose warn"`. `.warn { color: var(--warn) }` is
+ * declared at index.html:480 and `.rail-prose { … color: var(--dimmer) }` some four hundred lines
+ * below it. Both are single-class selectors, so they tie at (0,1,0), and the later rule takes it:
+ * the paragraph docs/10 § 10.3 calls *the dispatcher compatibility warning* rendered as ordinary
+ * dim prose. Confirmed in a real browser — `noteContrast.browser.test.ts` read `rgb(139, 152, 169)`
+ * off the element before the fix.
+ *
+ * **It was never a contrast defect**, which is why the lane that found it recorded it instead of
+ * fixing it: both candidate inks clear AA on `--rail` (`--dimmer` 6.35 dark / 5.92 light, `--warn`
+ * 9.27 / 4.83). Nothing was unreadable. What was wrong is that the markup claimed a register the
+ * screen did not deliver — § D227's stale-refusal shape, living in a stylesheet instead of a
+ * docstring — and the editor's counterpart `#ed-access-note`, which carries `warn` **alone** and so
+ * had nothing to tie with, had been rendering the same sentence in `--warn` the whole time. One
+ * fact, the two surfaces § 10.3 requires, two registers.
+ *
+ * ## Why the check is general and not a pin on that one element
+ *
+ * Pinning `#rail-access-note`'s ink would assert the fix and leave the mechanism: `.warn` is early
+ * in a stylesheet with **eighty** single-class rules that set `color`, so it loses to any of them a
+ * future element pairs it with, silently, and looking exactly like a class that is doing something.
+ *
+ * So the property asserted is *no element's ink is decided by source order between rules that
+ * disagree*. A tie at equal specificity where both rules propose the **same** value is harmless and
+ * allowed. A tie where they disagree must be settled by a compound selector that outranks both —
+ * which is a statement of intent a reader can see, rather than a consequence of where somebody
+ * happened to paste a rule.
+ *
+ * Swept over the whole shipped markup rather than a list of ids, so the day a second element pairs
+ * two disagreeing classes it is red on that commit. Today exactly one element carries two
+ * colour-setting classes at all, and after the `.rail-prose.warn` rule its winner is a compound.
+ */
+describe('no element’s ink is decided by source order between rules that disagree', () => {
+  /** Every element in the shipped markup whose `color` has more than one proposal. */
+  const contested = MARKUP.map((node) => ({ node, proposals: proposalsFor(node, 'color') })).filter(
+    (entry) => entry.proposals.length > 1,
+  );
+
+  it('finds the contested elements by sweeping the markup, not by naming them', () => {
+    // The control on the sweep itself. A parse that matched nothing would make every assertion
+    // below vacuously true — the failure mode this repository calls a measured null.
+    expect(contested.length, 'no element has a contested colour, so this whole section is inert')
+      .toBeGreaterThan(0);
+  });
+
+  it('settles every disagreement between different selectors with one that outranks the tie', () => {
+    /*
+     * ## The discriminator, and it was found by the check going red on a rule that is correct
+     *
+     * The first draft asserted that *no* tie may decide an ink, and `#copy-cli` failed it: the
+     * footer declares `#copy-run, #copy-cli { color: var(--dim) }` and then `#copy-cli { color:
+     * var(--dimmer) }` a few lines below, with a comment saying why — *"the CLI line … is a step
+     * quieter rather than a second primary"* (issue #118 § 2). That is the ordinary override, and
+     * source order is exactly the mechanism it is supposed to use.
+     *
+     * So the property is narrower than *no tie*, and the line is **whether the two rules name the
+     * same subject**:
+     *
+     * - **Same selector text** — the later rule can only have been written to override the earlier
+     *   one. You do not write `#copy-cli` twice by accident, and CSS's later-wins rule is the tool
+     *   being used on purpose. Allowed.
+     * - **Different selector texts** — neither rule mentions the other, so which one wins is
+     *   decided by their relative position in a 3 000-line file. `.warn` and `.rail-prose` are the
+     *   case: two independent registers that happen to meet on one element, and the outcome is
+     *   wherever somebody pasted a rule. Must be settled explicitly.
+     *
+     * That distinction is a judgement, and it is written here rather than assumed so the next
+     * reader can disagree with it in one place.
+     */
+    for (const { node, proposals } of contested) {
+      /*
+       * `proposalsFor` returns weakest first and weights specificity above source order, as
+       * `specificity * 1_000_000 + order` — so equal specificity means the two weights agree in
+       * their millions component, and the last two entries are the decision.
+       */
+      const winner = proposals.at(-1);
+      const runnerUp = proposals.at(-2);
+      if (winner === undefined || runnerUp === undefined) continue;
+
+      const tied = Math.floor(winner.weight / 1_000_000) === Math.floor(runnerUp.weight / 1_000_000);
+      if (!tied || winner.from === runnerUp.from) continue;
+      expect(
+        runnerUp.value,
+        `${node.where} takes its colour from “${winner.from}” only because that rule is declared ` +
+          `after “${runnerUp.from}”; the two name different subjects, propose different inks and ` +
+          'tie on specificity, so the winner is where somebody pasted a rule rather than what ' +
+          'anybody decided. Settle it with a compound selector naming both.',
+      ).toBe(winner.value);
+    }
+  });
+
+  it('still allows a same-selector override, and `#copy-cli` is the one that proves it', () => {
+    // The negative control on the discriminator above. Without this, narrowing the rule to
+    // *different selectors* could be quietly widened back to *nothing* and the section would still
+    // be green — a check that exempts everything looks exactly like a check that finds nothing.
+    const cli = proposalsFor(byId('copy-cli'), 'color');
+    expect(cli.length, '#copy-cli no longer has two colour proposals').toBeGreaterThan(1);
+    expect(cli.at(-1)?.from).toBe(cli.at(-2)?.from);
+    expect(cli.at(-1)?.value).not.toBe(cli.at(-2)?.value);
+  });
+
+  it('gives `#rail-access-note` the warning register, by a rule that beats both singles', () => {
+    /*
+     * The specific case, kept beside the general rule because the general rule would also be
+     * satisfied by *deleting* `warn` from the markup — and that was the live alternative. It is
+     * rejected on evidence rather than taste: docs/10 § 10.3 titles this "the dispatcher
+     * compatibility **warning**" and calls it "a warning rather than a block",
+     * `access/dispatcherCredentials.ts#checkAccessCompatibility` returns it in a field named
+     * `warning`, and the editor already draws it in `--warn`.
+     *
+     * `role="status"` is **not** evidence for the quieter reading, which is the trap here. The role
+     * governs how an assistive technology interrupts; the class governs the register the sentence
+     * reads in. Choosing `status` over `alert` says the note must not barge in — Run stays enabled,
+     * ED-15 — and says nothing about what colour it should be.
+     */
+    const note = byId('rail-access-note');
+    expect(note.classes).toContain('warn');
+
+    /*
+     * The **elected** ink, which is `proposalsFor`'s last entry. `inkTokensOf` deliberately reports
+     * every ink any matching rule proposes — `['--warn', '--dimmer']` here, and it still is, because
+     * the losing rules have not gone anywhere — since the contrast assertions hold all of them to
+     * the bar rather than trusting this file's cascade to pick the winner. That is the right answer
+     * for a contrast question and the wrong one for this question, which is precisely *which rule
+     * won*.
+     */
+    const winner = proposalsFor(note, 'color').at(-1);
+    expect(winner?.value).toBe('var(--warn)');
+    expect(winner?.from, 'the warning register is back to depending on source order').toBe(
+      '.rail-prose.warn',
+    );
+
+    // And the register it now reads in is still legible on the rail, in both themes — the thing
+    // that was true before the fix and had to stay true after it.
+    for (const theme of ['dark', 'light'] as const) {
+      expect(ratio('--warn', '--rail', theme), `--warn on --rail, ${theme}`).toBeGreaterThanOrEqual(
+        AA_BODY,
+      );
+    }
+  });
+
+  it('leaves the editor’s counterpart alone, and says why it never needed the fix', () => {
+    // `#ed-access-note` carries `warn` and nothing else that sets a colour, so it had no tie to
+    // lose and has always drawn in the warning register. Asserted so that a future edit adding a
+    // second class to it — the exact way the rail note got into this state — is red here.
+    const editorNote = byId('ed-access-note');
+    expect(editorNote.classes).toEqual(['warn']);
+    expect(inkTokensOf(editorNote).tokens).toEqual(['--warn']);
+  });
+});
