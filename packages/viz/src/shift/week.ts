@@ -102,6 +102,51 @@ export const ENDLESS_CONTRACT_ID = 'endless';
 export const SANDBOX_CONTRACT_ID = 'sandbox';
 
 /**
+ * The contract id a **Free Play** week carries — GitHub issue #125.
+ *
+ * ## Why free play needs an id of its own, which is a fact about {@link switchWeek} rather than a
+ * preference
+ *
+ * `menu/enterFreePlay.ts` opened its week as `openWeek(contractForBuilding(buildingId)?.id)` — the
+ * *campaign's* contract id, borrowed for the label. On a building the campaign is not being played
+ * on that is harmless. On the campaign's own building it is the whole of issue #125: the week on
+ * screen and the week being replaced were the same contract, so {@link switchWeek}'s first line —
+ * `if (contractId === week.contractId) return { week, parked }` — made the departure a no-op, and
+ * the campaign's day 4 was then overwritten in memory by a day-1 week wearing its id.
+ *
+ * **Parking it under the borrowed id does not fix that, and that was driven rather than reasoned
+ * about.** A parked `c2` beside a live `c2` violates the one invariant {@link switchWeek} maintains
+ * — see `dev/state.ts#ViewerState.parkedWeeks` — and the violation is not cosmetic: the next switch
+ * away filters the list by `entry.contractId !== week.contractId`, so the parked campaign week is
+ * dropped and the free-play scaffold is parked in its place. The player would have a week back that
+ * looked right for exactly as long as they did not touch the building select.
+ *
+ * So a free-play week is a week on **no assignment**, and it says so in the one field every consumer
+ * already reads. `contractById` answers `undefined`, the rail's *banked this scenario* reads `—`
+ * rather than `0/3` under a run that banks nothing, and {@link switchWeek} can tell the two weeks
+ * apart — which is what lets the departing campaign week be parked and picked up again.
+ *
+ * ## Why a third sentinel rather than reusing {@link SANDBOX_CONTRACT_ID}
+ *
+ * {@link SANDBOX_CONTRACT_ID}'s own docstring made this argument once and it holds again: the same
+ * *mechanics*, a different *event*. The sandbox is arrived at — a player drew a building and nobody
+ * wrote an assignment for it — and free play is chosen, from a screen, as a selection. `weekLabel.ts`
+ * says the difference out loud already: the words *free play* were deleted from its sandbox line
+ * precisely because *"Free Play is a mode … a sandbox run has a week, and its growth and its
+ * events"*. Routing free play back through that branch would restore the sentence that comment
+ * removed.
+ *
+ * Reuse also fails to close the case it was reused for. A player entering free play **from** a
+ * sandbox week would meet {@link switchWeek}'s same-id line again, and their drawn building's day 6
+ * would be overwritten by exactly the mechanism above.
+ *
+ * It shares its spelling with the `PlayMode` of the same name, and that is deliberate rather than a
+ * collision: two fields in different namespaces naming one state, where a third spelling would be a
+ * value a reader has to translate.
+ */
+export const FREE_PLAY_CONTRACT_ID = 'free-play';
+
+/**
  * A week with no assignment — the *endless mode* `c5` and `c8` name in their rewards.
  *
  * ## What it is, and what it deliberately is not
@@ -377,10 +422,15 @@ export function takeContract(week: WeekState, contractId: string): WeekState {
 /**
  * How many weeks are kept beside the one being played, and why it is this number.
  *
- * One per contract, plus the two sentinel weeks a player can also be on — {@link SANDBOX_CONTRACT_ID}
- * and {@link ENDLESS_CONTRACT_ID}. So the set is *closed*: every id {@link switchWeek} can ever be
- * asked for has a place, and the ceiling is a bound on a slot rather than a policy about how much
- * history a player may keep.
+ * One per contract, plus the three sentinel weeks a player can also be on —
+ * {@link SANDBOX_CONTRACT_ID}, {@link ENDLESS_CONTRACT_ID} and {@link FREE_PLAY_CONTRACT_ID}. So the
+ * set is *closed*: every id {@link switchWeek} can ever be asked for has a place, and the ceiling is
+ * a bound on a slot rather than a policy about how much history a player may keep.
+ *
+ * It was `+ 2` until issue #125 gave free play a week of its own to leave behind. The `+ 3` is
+ * derived from the same closed set rather than nudged: a sentinel that can be parked and has no slot
+ * evicts the oldest week in the list, which is the loss this ceiling exists to bound rather than to
+ * cause.
  *
  * It is derived from `CONTRACTS` rather than written as `10`, for § D213's reason: three buildings
  * landed after the campaign was designed and five hand-written lists had to be widened by hand, two
@@ -392,7 +442,7 @@ export function takeContract(week: WeekState, contractId: string): WeekState {
  * entries that go — oldest parked first. `persist/validate.ts#unknownContractsIn` refuses such a
  * session outright, so in practice the list never fills.
  */
-export const PARKED_WEEKS_MAX = CONTRACTS.length + 2;
+export const PARKED_WEEKS_MAX = CONTRACTS.length + 3;
 
 /** The live week and the ones parked beside it, which are only ever produced together. */
 export interface WeekSwitch {
@@ -428,6 +478,11 @@ function parkedWeekFor(
  * |---|---|---|
  * | the building select (`withBuilding`) | `resume` | nothing — it is a `<select>` labelled *building*, and a control that reads like a setting may not restart a week |
  * | a scenario card, *Take the next assignment* | `restart` | *"taking this assignment restarts the week on Garden Apartments"*, in the card's own `title` |
+ * | **Free play's Start** (`withFreePlayWeek`) | `restart` | the menu describes a single run from a selection, and `docs/16` S6 resets every scope the mode does not permit — a free-play week that resumed anything would be running a day the screen did not name |
+ *
+ * The third arrival is issue #125's, and its destination is {@link FREE_PLAY_CONTRACT_ID} rather
+ * than the building's contract — which is what makes it a *transition* at all rather than the
+ * same-id no-op on the first line of {@link switchWeek}.
  *
  * So `restart` **discards** a parked week for the destination, and that is not this issue arriving
  * through a third door: it is the card's promise kept. A card that said *restarts* and resumed would

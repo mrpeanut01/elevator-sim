@@ -93,7 +93,14 @@ import {
   commissionableClasses,
   type CommissioningChoices,
 } from '../commissioning/types.js';
-import { SANDBOX_CONTRACT_ID, closeDay, nextDay, openWeek, switchWeek } from '../shift/week.js';
+import {
+  FREE_PLAY_CONTRACT_ID,
+  SANDBOX_CONTRACT_ID,
+  closeDay,
+  nextDay,
+  openWeek,
+  switchWeek,
+} from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import type { DayOutcome, ShiftEvent, WeekState } from '../shift/types.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -529,8 +536,9 @@ export interface StoredWeeks {
  * week and the parked list are one campaign, and the invariant that binds them — **no parked week
  * carries the live week's `contractId`** — is a property of the *pair*. Held back separately, a
  * free-play save would write the campaign's stored week beside the in-memory parked list, and
- * `enterFreePlay` reaches this state through `withBuilding`, which has just parked that very week.
- * The player would reload onto a campaign holding Garden Apartments twice, on two different days.
+ * `enterFreePlay` reaches this state through `withBuilding` and — since issue #125 —
+ * {@link withFreePlayWeek}, one or both of which has just parked that very week. The player would
+ * reload onto a campaign holding Garden Apartments twice, on two different days.
  *
  * So the pair is chosen at one instant, from one side, and `persist.test.ts` drives that case
  * rather than trusting this paragraph.
@@ -664,6 +672,98 @@ export function withBuilding(
     buildingSpec: specFromBuilding(wanted, buildingId),
     editingBuildingId: buildingId,
   };
+}
+
+/**
+ * Put down whatever week is on screen and open Free Play's — GitHub issue #125.
+ *
+ * **A decision number is owed for this function.** The argument is here rather than in
+ * `DECISIONS.md` because the lane that wrote it was told not to claim a `## D3xx` heading it could
+ * not reserve; the numbered entry, when it lands, should say no more than this docstring does.
+ *
+ * ## The defect
+ *
+ * `menu/enterFreePlay.ts` composed its state as `{ ...withBuilding(state, …), week: openWeek(…) }`.
+ * `withBuilding` parks the week it is leaving — that is {@link withBuilding}'s half of issue #107 —
+ * and then the spread **overwrote the result**. On a building the campaign is not on, no harm is
+ * done: the campaign week was already parked one line up, and what is discarded is the destination's
+ * week, which {@link switchWeek} had just opened or resumed. On the campaign's **own** building the
+ * two ids are equal, `switchWeek` returns `{ week, parked }` untouched by its first line, and the
+ * week the player has been banking against is replaced in memory by a day-1 week wearing its id.
+ *
+ * `weeksForSession` keeps the disk copy — that is § D231, and it is why the loss is recoverable at
+ * all — so the week comes back on reload and only on reload. Driven on the shipped code before
+ * anything was changed: `midtown-office` day 4 → **Free play on midtown-office** → `week.day` is 1,
+ * `weeksForSession` still answers 4, and moving the building select away and straight back gives
+ * day 1, because the day-4 week is no longer anywhere in memory to resume.
+ *
+ * **Pre-existing, and measured as such rather than assumed.** The same sequence run on the tree
+ * *before* § D312 (`58d4216^`) produces the same four figures: the in-memory loss and the disk
+ * protection both predate the parked weeks. What § D312 changed is only that the *other* door — free
+ * play on a different building — stopped losing anything.
+ *
+ * ## The decision, of the three the issue holds open
+ *
+ * **(a) park the campaign week.** A building switch already parks and resumes. Free play entering
+ * the campaign's building is the same shape of departure — the player leaves a week and expects to
+ * come back to it — and a second, different answer to one shape is the state this repository keeps
+ * paying for.
+ *
+ * *(b) refuse, and say the campaign is on that building*, was rejected: Free Play is documented as
+ * *"Any building, any dispatcher, any traffic"*, and refusing it on one building makes the campaign
+ * a lock rather than a save.
+ *
+ * *(c) keep the behaviour and say so* was rejected because the sentence it needs — *your progress is
+ * safe, reload to see it* — is a promise the screen is actively contradicting.
+ * `shift/weekLabel.ts#weekKeptLine` already refuses that shape one function over: a claim that a week
+ * is kept, on a build that shows day 1, has to be **true**, and telling a player to reload to check
+ * is not the same thing as it being true.
+ *
+ * ## Why it is not the one-line `switchWeek(…, 'resume')` the issue sketches
+ *
+ * Because that call is a no-op, and parking under the borrowed id is worse than a no-op. Both were
+ * driven. `switchWeek(week, parked, week.contractId, …)` returns its arguments — that arm exists so
+ * the coach select can fire `change` on a re-pick without shuffling anything. And a hand-rolled park
+ * that puts `c2` in the list while `c2` is live breaks {@link ViewerState.parkedWeeks}' invariant in
+ * the direction that loses the week anyway: `switchWeek`'s `kept` filter drops every entry sharing
+ * the departing week's id, so the first later building change replaces the parked campaign week with
+ * the free-play scaffold. The week would be back for exactly as long as nobody touched a control.
+ *
+ * So the fix is one field further down: `shift/week.ts#FREE_PLAY_CONTRACT_ID` makes a free-play week
+ * a week on no assignment, `switchWeek` can then tell it from the campaign's, and this function is
+ * an ordinary `restart` arrival like the scenario card's. `restart` and not `resume`: free play is
+ * day 1 by `docs/16` S6, and resuming a previous free-play week would be the mode running a day its
+ * own screen did not name.
+ *
+ * ## Why it runs *after* {@link withBuilding} rather than before
+ *
+ * Before, it would park the campaign week and `withBuilding` would then immediately switch away from
+ * the free-play week and back onto the destination's contract, which is the same overwrite with two
+ * more steps. After, the week being put down is whatever `withBuilding` left live — the campaign's
+ * own when the building did not move, and the destination's freshly resumed one when it did. That
+ * second case is a loss of its own and it is closed by the same line: a player on `midtown-office`
+ * with `garden-apartments` parked on day 7 who started free play on Garden used to have `withBuilding`
+ * resume day 7 into the live slot and the spread discard it.
+ *
+ * ## Its non-test caller
+ *
+ * `menu/enterFreePlay.ts#enterFreePlay`, and only that. It is exported for the same reason
+ * {@link withBuilding} is: `enterFreePlay` is a pure function in another module and the week and the
+ * parked list are `dev/state.ts`'s to decide, not the menu's — *"re-implementing either here would be
+ * the second answer to a question `dev/state.ts` has already answered"* is that module's own rule,
+ * and this is the question it names.
+ */
+export function withFreePlayWeek(state: ViewerState): ViewerState {
+  const switched = switchWeek(
+    state.week,
+    state.parkedWeeks,
+    FREE_PLAY_CONTRACT_ID,
+    // `restart`. Entering free play a second time is the one arrival that reaches `switchWeek`'s
+    // same-id line, and it is harmless there: a free-play week never advances — `advancesTheWeek`
+    // is false for the mode — so the week it declines to touch is already day 1 with nothing in it.
+    'restart',
+  );
+  return { ...state, week: switched.week, parkedWeeks: switched.parked };
 }
 
 /**

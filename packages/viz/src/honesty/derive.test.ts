@@ -254,6 +254,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/state.ts#advancesTheWeek',
         'dev/state.ts#closedWeekOf',
         'dev/state.ts#weeksForSession',
+        /*
+         * The fourth of the same shape — GitHub issue #125. `FREE_PLAY_CONTRACT_ID` is the string
+         * `free-play`, and it is derived for the one reason every id above it is: the hyphen reads
+         * as a word break. Its two siblings in the same file, `ENDLESS_CONTRACT_ID` and
+         * `SANDBOX_CONTRACT_ID`, are not derived at all, because `endless` and `sandbox` carry no
+         * separator — which is the whole of the difference between them.
+         *
+         * What a player *reads* about a week carrying it is `coachWeekLines`' fourth branch —
+         * **Free play** on the eyebrow — and that is driven rather than excused: `surfaces.ts`
+         * renders `coachWeekLines` on a free-play week beside the scenario, endless and sandbox
+         * ones, for the reason that sweep already states about the branches nothing could print.
+         */
+        'shift/week.ts#FREE_PLAY_CONTRACT_ID',
       ],
     },
     {
