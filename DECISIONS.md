@@ -22291,6 +22291,7 @@ supposed to add is present in the **served bundle**, not in the build log. The b
 about a run; the bundle is the run's result. `provision.sh --deploy-now` already does this for the
 API origin (docs/16 § 3), and the same discipline was simply not applied to ordinary merges.
 
+
 ## D318 — a finished run is described from the run, never from what the menu has selected
 
 Two surfaces described a run they did not build by reading **`menuState.freePlay`** — *what the menu
@@ -22353,6 +22354,7 @@ precedent: the submission and the subject may not mention `menuState.freePlay` a
 **Checked by re-introducing the defect**: three occurrences instead of one, test red, message naming
 the 422. The one legitimate reader is `enterFreePlay`, where the menu's selection *becomes* the run's
 — the only moment the arrow points that way.
+
 
 ---
 
@@ -22531,3 +22533,8 @@ length-only axis would close the case a reader meets first and leave the harder 
 
 `BASIS_DIFFERENCES`' exhaustive record made the two new phrases a **compile error** rather than
 something to remember — which is the shape to copy the next time an axis is added.
+
+**So the check that caught it is the one to keep**: after a deploy, assert a string the change was
+supposed to add is present in the **served bundle**, not in the build log. The build log is a claim
+about a run; the bundle is the run's result. `provision.sh --deploy-now` already does this for the
+API origin (docs/16 § 3), and the same discipline was simply not applied to ordinary merges.
