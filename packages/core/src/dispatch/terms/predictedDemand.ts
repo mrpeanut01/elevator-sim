@@ -95,6 +95,14 @@ export const predictedDemandTerm: CostTermDefinition = Object.freeze({
   id: 'predictedDemand',
   unit: 'm',
   measures: 'Misalignment with forecast future calls',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'predicted demand',
+    serves: 'pre-positioning',
+    atZero: 'react only',
+    atFull: 'move before the crowd does',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'distanceM' } as const),
   evaluate: demandMisalignmentM,
 });

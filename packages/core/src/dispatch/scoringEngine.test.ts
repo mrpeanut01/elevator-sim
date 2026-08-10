@@ -217,6 +217,7 @@ describe('the weighted sum', () => {
       id: 'bogus',
       unit: 's',
       measures: 'nothing',
+      player: { name: 'bogus', serves: 'nothing', atZero: 'nothing', atFull: 'nothing' },
       normalization: { mode: 'saturating', scale: 'waitTimeS' },
       evaluate: () => -1,
     };

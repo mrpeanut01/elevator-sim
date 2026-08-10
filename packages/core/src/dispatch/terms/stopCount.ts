@@ -80,6 +80,14 @@ export const stopCountTerm: CostTermDefinition = Object.freeze({
   id: 'stopCount',
   unit: '',
   measures: 'Number of stops added',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'stop count',
+    serves: 'energy, and a stopping trip\'s annoyance',
+    atZero: 'stop wherever it helps',
+    atFull: 'fewer stops, longer walks',
+  } as const),
   normalization: Object.freeze({ mode: 'bounded', fullScale: 2 } as const),
   partiallyActiveWhen: Object.freeze({
     'dispatch.callType': Object.freeze(['destination-entry', 'mobile-credential']),

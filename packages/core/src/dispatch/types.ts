@@ -258,6 +258,31 @@ export const HARD_CONSTRAINT_IDS = ['noDirectionReversal'] as const;
 
 export type HardConstraintId = (typeof HARD_CONSTRAINT_IDS)[number];
 
+/**
+ * The player-facing words for each hard constraint — GitHub issue #147, and the Everyday Mode
+ * handoff's §16 rule 11 (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`).
+ *
+ * A constraint's `description` on its `constraints.<id>` schema row is addressed to an optimizer
+ * and a reading engineer; #147's finding is that a card built from it can say what a constraint
+ * *is* but never what it *does* in words a player can act on. The fix is **two fields with two
+ * readers, declared beside the model** — never a lookup table in a renderer, which is
+ * `if (id === …)` wearing prose and goes stale the day a constraint is added.
+ *
+ * A `Record` keyed by {@link HardConstraintId} rather than a parallel array: adding a constraint
+ * id without its words is a compile error, not a runtime fallback. The honest fallback for a
+ * surface that meets a constraint this record somehow cannot name (*a filter no weight can buy
+ * past*, plus the id) lives with the surface, because reaching it is a content bug the surface
+ * must survive, not a state this module is allowed to ship.
+ */
+export const HARD_CONSTRAINT_WORDS: Readonly<Record<HardConstraintId, PlayerControlWords>> =
+  Object.freeze({
+    noDirectionReversal: Object.freeze({
+      name: 'finish the direction first',
+      effect:
+        'a car never turns around for a new call — it finishes the direction it is travelling, however the weights are set',
+    }),
+  });
+
 /** One car's answer to "could you take this call at all?", with the estimate that decided it. */
 export interface EligibilityVerdict {
   readonly carId: string;
@@ -382,6 +407,51 @@ export interface TermContext {
 }
 
 /**
+ * The words an Everyday surface prints for one cost term — the term's name, the `serves`
+ * clause, and both slider ends, as the Everyday Mode engine contract §6.3 specifies them
+ * (`docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md`).
+ *
+ * Declared **beside the term** rather than in a screen, because that is where the contract and
+ * GitHub issue #147 both put them: *"the name, the serves clause and both end labels are
+ * properties of the model, not of the screen"*. A table in a renderer mapping ids to friendly
+ * prose is forbidden — it goes stale the day a term is added, and the screen is the wrong owner.
+ *
+ * Two readers, two vocabularies, and neither replaces the other. {@link CostTermDefinition.measures}
+ * and the library's `serves` (`AWT`, `WT95`) are addressed to an optimizer and an engineer;
+ * these words are addressed to a player. Collapsing them to save a field produces a sentence
+ * addressed to nobody, which is the defect #147 caught before it shipped.
+ */
+export interface PlayerTermWords {
+  /** The term as a player reads it — `wait time`, never `waitTime`. */
+  readonly name: string;
+  /** What weighting it serves, in plain words — `average wait`, never `AWT`. */
+  readonly serves: string;
+  /** The slider's zero end — what a weight of nothing buys. */
+  readonly atZero: string;
+  /** The slider's full end — what the maximum weight buys. */
+  readonly atFull: string;
+}
+
+/**
+ * The player-facing name and one-clause effect of a control — a schema row, a hard constraint —
+ * as the Everyday Mode handoff's §16 rule 11 requires
+ * (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`, GitHub issue #147).
+ *
+ * Optional end labels carry a slider's two ends where the control is continuous; a toggle or a
+ * choice has none. The optimizer-facing `description` stays untouched beside it — two fields,
+ * two readers, never one string doing both jobs.
+ */
+export interface PlayerControlWords {
+  readonly name: string;
+  /** One clause: what moving the control does, in words a player can act on. */
+  readonly effect: string;
+  /** The low end of a continuous control, where a surface draws slider ends. */
+  readonly atZero?: string | undefined;
+  /** The high end. */
+  readonly atFull?: string | undefined;
+}
+
+/**
  * One cost term: an id, how to normalize it, and a pure function of a {@link TermContext}.
  *
  * Adding the remaining nine terms in Phase 5 is adding nine of these to `terms/` and nine
@@ -438,6 +508,14 @@ export interface CostTermDefinition {
    * declaration that fails the second is a gate wearing the wrong name.
    */
   readonly partiallyActiveWhen?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * The words an Everyday surface prints for this term — see {@link PlayerTermWords}.
+   *
+   * Required, not optional: a term authored without its player words would reach the Everyday
+   * editor as a slider labelled with its engine id, which is the exact defect #147 names. The
+   * compiler is the coverage test here; `playerWords.test.ts` checks the words' register.
+   */
+  readonly player: PlayerTermWords;
   /** Pure. Non-negative. Never `NaN`. */
   readonly evaluate: (context: TermContext) => number;
 }
@@ -987,6 +1065,16 @@ export interface DispatchParameterSpec {
    * is inert while `auction.rounds` is 1 and no list of strings can say so about an integer.
    */
   readonly activeWhen?: Readonly<Record<string, ActiveWhenCondition>> | undefined;
+  /**
+   * The player-facing name and one-clause effect, present on every row an Everyday surface can
+   * reach — see {@link PlayerControlWords} and `playerWords.test.ts`, which pins the reachable
+   * set in both directions.
+   *
+   * Optional on the schema row because most of the schema is the optimizer's territory and a
+   * player never meets it; a row without one that a Casual surface *does* reach renders the
+   * honest fallback and is a content bug (#147).
+   */
+  readonly player?: PlayerControlWords | undefined;
 }
 
 /**

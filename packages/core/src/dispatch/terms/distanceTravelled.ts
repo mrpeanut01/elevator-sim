@@ -87,6 +87,14 @@ export const distanceTravelledTerm: CostTermDefinition = Object.freeze({
   id: 'distanceTravelled',
   unit: 'm',
   measures: 'Metres of travel added',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'distance travelled',
+    serves: 'energy, roughly',
+    atZero: 'run the motors hard',
+    atFull: 'save the motors',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'distanceM' } as const),
   evaluate: marginalDistanceM,
 });
