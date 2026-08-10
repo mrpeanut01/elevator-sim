@@ -58,6 +58,7 @@
  * same argument applies to the elevation's drag bars in `buildingEditor.ts`, for the same reason.
  */
 
+import { COST_TERMS_BY_ID } from '@elevator-sim/core/browser';
 import type { CostTerm, DispatcherProfile } from '@elevator-sim/core/browser';
 
 import {
@@ -75,6 +76,13 @@ import {
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
 
+import {
+  applyPlainLever,
+  plainLeversOf,
+  type PlainLeverId,
+  type PlainLeverView,
+} from '../mode/plainLevers.js';
+import type { ViewMode } from '../mode/types.js';
 import { commitmentOf } from '../scope/commitment.js';
 import type { ShapedDayReport } from '../shift/report.js';
 
@@ -206,7 +214,14 @@ export interface TermRow {
   readonly label: string;
   /** The tooltip: the term's own `measures` sentence from the profile library. */
   readonly help: string;
-  /** The sub-line: `serves AWT`, from the term's own `serves`. */
+  /**
+   * The sub-line, in the mode's own vocabulary.
+   *
+   * Advanced: `serves AWT`, from the library's engineer-facing `serves`. Basic: the term's
+   * `player` words from `core` — the plain serves clause and both slider ends — which is §16
+   * rule 11 of the Everyday Mode handoff (issue #147): the words live beside the term in the
+   * model, and this row *reads* them rather than owning a translation table.
+   */
   readonly serves: string;
   /** The slider position, `0..100`. `weight = position / 100`. */
   readonly value: number;
@@ -230,6 +245,7 @@ export function termRowsOf(
   terms: readonly CostTerm[],
   spec: DispatcherSpec,
   inert: readonly { readonly termId: string; readonly why: string }[],
+  mode: ViewMode = 'advanced',
 ): readonly TermRow[] {
   const why = new Map(inert.map((entry) => [entry.termId, entry.why]));
   return terms.map((term): TermRow => {
@@ -238,12 +254,28 @@ export function termRowsOf(
       termId: term.id,
       label: humanTermName(term.id),
       help: term.measures,
-      serves: `serves ${term.serves}`,
+      serves: mode === 'basic' ? plainServesOf(term) : `serves ${term.serves}`,
       value,
       weighted: value > 0,
       inertWhy: why.get(term.id),
     };
   });
+}
+
+/**
+ * The Basic sub-line: the plain serves clause and both slider ends, from the term's own
+ * `player` words in `core` (Everyday handoff §11.4 — *"labelled with what it serves and both of
+ * its ends"*; §16 rule 11 — the words are the model's, never a table in this file).
+ *
+ * The engineer's `serves AWT` is the fallback for a term the registry has not implemented —
+ * such a term has no `player` block to read, its weight moves nothing, and inventing plain
+ * words here for it would be the id-to-prose table #147 forbids, one register over.
+ */
+function plainServesOf(term: CostTerm): string {
+  const implemented = COST_TERMS_BY_ID.get(term.id);
+  if (implemented === undefined) return `serves ${term.serves}`;
+  const player = implemented.player;
+  return `serves ${player.serves} · ${player.atZero} → ${player.atFull}`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -996,11 +1028,45 @@ export function mountDispatcherEditor(
     children: [resultEyebrow, resultPairing, resultRows, resultNote],
   });
 
+  /*
+   * The four plain levers — the Everyday handoff's tinker drawer (§11.3), built here on the same
+   * precedent as the nodes above because `index.html` has no block for it yet.
+   *
+   * **There is no lever state.** Each row is a named view onto a control this panel already
+   * binds — two weights, two group controls — through `plainLeversOf`/`applyPlainLever`
+   * (`mode/plainLevers.ts`, which owns the mapping and the §20.1 argument). That is why the block
+   * sits *above* the thirteen terms: a reader who moves a lever and then opens the terms sees the
+   * same number, because it is the same number.
+   *
+   * Sliders are built once and updated in place, for the drag-capture reason the term rows give;
+   * the two toggle slots are re-filled per render like the flags block.
+   */
+  const plainSliderRows = new Map<PlainLeverId, SliderHandles>();
+  const plainSlots = new Map<PlainLeverId, HTMLElement>();
+  const plainBlock = el(doc, 'div', {
+    style: { margin: '0 0 14px' },
+    children: [
+      el(doc, 'div', {
+        className: 'eyebrow',
+        text: 'THE FOUR PLAIN LEVERS',
+        style: { 'margin-bottom': '4px' },
+      }),
+      el(doc, 'p', {
+        className: 'helpful',
+        text:
+          'Each lever is a plain name for a control below. Moving it moves the same setting the ' +
+          'engineer’s own controls show, so the two can never disagree.',
+        style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
+      }),
+    ],
+  });
+
   setHidden(savedNote, true);
   setHidden(unauthorable, true);
   elements.save.parentElement?.append(runThis, rename, savedNote);
   elements.save.parentElement?.after(resultStrip);
   elements.summary.parentElement?.append(unauthorable);
+  elements.termsUsed.before(plainBlock);
 
   /*
    * The two scope notes, written once at mount rather than on every render — issue #104. Each sits
@@ -1215,6 +1281,72 @@ export function mountDispatcherEditor(
     setHidden(savedNote, true);
   }
 
+  /* --- the four plain levers ---------------------------------------------- */
+
+  /** Route a lever's new value through the model and into state, both documents at once. */
+  function pullPlainLever(id: PlainLeverId, value: number | boolean): void {
+    const at = view;
+    if (at === undefined) return;
+    const applied = applyPlainLever(at.state.dispatcherSpec, at.state.levers, id, value);
+    context.update({ dispatcherSpec: applied.spec, levers: applied.levers });
+  }
+
+  function drawPlainLevers(rows: readonly PlainLeverView[]): void {
+    for (const row of rows) {
+      let slot = plainSlots.get(row.id);
+      if (slot === undefined) {
+        slot = el(doc, 'div');
+        plainSlots.set(row.id, slot);
+        plainBlock.append(slot);
+      }
+      const sub = `${row.reads} · ${row.atZero} → ${row.atFull}`;
+      const help = row.serves === undefined ? `writes ${row.writes}` : `${row.serves} — writes ${row.writes}`;
+      if (row.kind === 'toggle') {
+        fill(
+          slot,
+          toggle(doc, {
+            label: row.label,
+            hint: sub,
+            help,
+            on: row.value === true,
+            onToggle: () => {
+              pullPlainLever(row.id, !(row.value === true));
+            },
+          }),
+        );
+        continue;
+      }
+      const position = typeof row.value === 'number' ? row.value : 0;
+      let handles = plainSliderRows.get(row.id);
+      if (handles === undefined) {
+        const node = slider(doc, {
+          label: row.label,
+          value: String(position),
+          raw: position,
+          min: 0,
+          max: 100,
+          step: 1,
+          help,
+          sub,
+          onInput: (next) => {
+            pullPlainLever(row.id, next);
+          },
+        });
+        handles = sliderHandlesOf(node);
+        if (handles !== undefined) plainSliderRows.set(row.id, handles);
+        fill(slot, node);
+        continue;
+      }
+      updateSliderRow(handles, {
+        raw: position,
+        value: String(position),
+        sub,
+        subColor: 'var(--faint)',
+        labelColor: position > 0 ? 'var(--text)' : 'var(--dimmer)',
+      });
+    }
+  }
+
   /* --- the term rows ------------------------------------------------------ */
 
   function drawTerms(rows: readonly TermRow[]): void {
@@ -1304,7 +1436,9 @@ export function mountDispatcherEditor(
     setText(elements.yoursCount, `${String(yours)} of your own saved`);
     if (elements.name.value !== current.name) elements.name.value = current.name;
 
-    const rows = termRowsOf(terms, current, inertTerms(current));
+    drawPlainLevers(plainLeversOf(current, state.levers));
+
+    const rows = termRowsOf(terms, current, inertTerms(current), state.mode);
     const weighted = rows.filter((row) => row.weighted).length;
     setText(
       elements.termsUsed,

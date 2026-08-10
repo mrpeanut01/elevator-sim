@@ -14,6 +14,15 @@ runtime at [`docs/design/support.js`](design/support.js), so a reviewer can diff
 against the artefact it was cut from without a network round trip. **Do not edit the vendored
 copy.** It is a record, not a source file; re-import it if the design moves.
 
+> **A second handoff now exists for the Casual product.** *Everyday Mode* — the re-imagined
+> Casual gameplay from the same design project — is vendored at
+> [`docs/design/design_handoff_casual_mode/`](design/design_handoff_casual_mode/): a gameplay and
+> navigation guide, an engine contract (every seed, formula and threshold), an ordered build plan
+> mapped to this tree's real seams, and an adjudication of the repo's open issues. Its precedence
+> rule is this document's own, restated in its README: the prototype wins layout and copy, the
+> guide wins behaviour, the contract wins numbers, and the code wins anything about the existing
+> tree. The same vendoring rule applies — a record, not a source file.
+
 It is worth saying plainly what the handoff *is*, because it changes how it should be read: it is a
 working prototype with its own toy simulator — S-curve-ish motion, `Math.random()` arrivals, a
 twelve-term cost function, and a report sheet whose "average wait" is computed as
