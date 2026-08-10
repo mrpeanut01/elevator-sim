@@ -113,9 +113,11 @@ import type {
   BankConfig,
   BuildingConfig,
   BuildingType,
+  CarConfig,
   DirectionalTraversalTime,
   ElevatorSpecs,
   FloorConfig,
+  ServiceEventConfig,
   StairsUseConfig,
   TransportModeConfig,
   TransportModeKind,
@@ -282,6 +284,104 @@ export interface SpecBelowLobbyFloor {
   readonly isEntrance?: boolean | undefined;
 }
 
+/**
+ * One floor of the document this spec was read from, verbatim.
+ *
+ * Everything a floor carries that the `floors × capacity × occupancy` model has no room for, held
+ * so it can be written back unchanged. See {@link SpecCarry}.
+ */
+export interface SpecCarriedFloor {
+  readonly id: string;
+  readonly heightM: number;
+  readonly population: number;
+  readonly isEntrance?: boolean | undefined;
+  readonly isTransferFloor?: boolean | undefined;
+  readonly label?: string | undefined;
+  readonly trafficProfile?: string | undefined;
+}
+
+/**
+ * **The document this spec was read from, in the parts no control here authors.**
+ *
+ * ## What this is for
+ *
+ * The five sliders describe a building as *N floors of C people, M identical cars in bands*. Every
+ * shipped building is more than that, and until this existed the difference was **deleted in
+ * silence**: `vertical-city` went into the editor with 7 banks, 35 cars and four double-deck floor
+ * pairs and came out with 1 bank of 12 single-deck hydraulics; `secure-tower` lost the only
+ * `isTransferFloor` it has, so its two banks could no longer interchange; `mixed-use-high-rise`'s
+ * 8 m/s shuttle, its office local and its residential local came back as one bank at 8 m/s. Nothing
+ * on any surface said so, and the only reason nothing on disk was corrupted is that
+ * `savedBuildingFrom` allocates a new id.
+ *
+ * So the parts the model cannot express are **carried** rather than re-derived, and written back
+ * exactly as they arrived.
+ *
+ * ## The one rule that makes this safe rather than a lie
+ *
+ * A carried part is written back **only while the controls that would re-deal it have not moved**.
+ * That is what the four keys are: each is a fingerprint, taken at read time, of the spec fields
+ * whose edit makes that part of the document no longer describe the building on screen.
+ *
+ * - {@link geometry} — the floor count, the basement ids, the first floor number. Its edit
+ *   invalidates {@link floors} and, through {@link shafts}, {@link banks}: a bank naming floor `77`
+ *   means nothing in a building that now has forty.
+ * - {@link shafts} — the geometry, plus the car count, the sky floors, the pinned bands and the
+ *   express toggles. Its edit invalidates {@link banks}, because those five controls *are* the
+ *   bank-dealing model and a reader who moves one is asking for the bands to be re-dealt.
+ * - {@link hardware} — the class, speed and rated-load sliders. Its edit does **not** invalidate the
+ *   banks; it overwrites the three fields it names on every carried car and leaves the deck
+ *   geometry, the door type and the transfer time alone. That is exactly what those three controls
+ *   claim to do.
+ * - {@link occupancy} — the design capacity and the building-wide let share. Its edit invalidates
+ *   the carried per-floor populations, because a building-wide occupancy slider that a carried
+ *   population shadowed would be a control that changes nothing. A **per-floor** override still
+ *   wins over the carry without invalidating it, so dragging one floor moves one floor.
+ *
+ * {@link floorHeightM} is the fifth and is a value rather than a key, because it is one number:
+ * while the pitch slider is where it was read, the authored per-floor heights are written back
+ * (which is the only way an unevenly-pitched tower survives at all); move it and every height is
+ * `floor × pitch` again.
+ *
+ * **Every one of those invalidations is a loss, and {@link validateSpec} names it at the control
+ * before the reader saves.** A visible refusal beats an invisible deletion; that is the whole
+ * lesson of the audit this field closes.
+ *
+ * ## What is deliberately *not* here
+ *
+ * The building's own `$comment`. A comment is provenance for the numbers beside it, and this editor
+ * can change those numbers — {@link transportCommentFor} makes the same argument for the machines
+ * and writes a fresh one rather than carrying the document's. Carrying a stale citation is the
+ * defect `CLAUDE.md` opens on.
+ *
+ * **A `$comment` on a bank or a car is a different case and is stated rather than glossed:** those
+ * ride through inside {@link banks}, because a carried bank is the authored object. No shipped
+ * building has one — the eight declare `$comment` at the top level only — so this is a description
+ * of the mechanism rather than of anything that happens today. If one is ever authored beside a car
+ * speed, the hardware sliders will move the speed and leave the sentence, and this paragraph is
+ * where the fix belongs.
+ */
+export interface SpecCarry {
+  /** Fingerprint of the floor vocabulary at read time. See the interface docstring. */
+  readonly geometry: string;
+  /** Fingerprint of the shaft-dealing controls at read time. */
+  readonly shafts: string;
+  /** Fingerprint of the class/speed/load controls at read time. */
+  readonly hardware: string;
+  /** Fingerprint of the capacity and building-wide occupancy controls at read time. */
+  readonly occupancy: string;
+  /** The pitch {@link specFromBuilding} derived, so a fresh read matches and an edit does not. */
+  readonly floorHeightM: number;
+  /** The authored floors, keyed by this spec's own floor number. */
+  readonly floors: Readonly<Record<number, SpecCarriedFloor>>;
+  /** The authored banks, verbatim — ids, names, served floor ids, deck pairs and every car. */
+  readonly banks: readonly BankConfig[];
+  /** The authored mid-run service schedule. No shipped building declares one; a UI-authored one may. */
+  readonly serviceEvents?: readonly ServiceEventConfig[] | undefined;
+  /** The document's own notes. Prose about the building, which no control here writes. */
+  readonly notes?: readonly string[] | undefined;
+}
+
 /** The editor's whole state. Flat, total, slider-shaped. */
 export interface BuildingSpec {
   readonly id: string;
@@ -346,6 +446,14 @@ export interface BuildingSpec {
    * is charged to a lift, which is what four of the five shipped buildings say by declaring none.
    */
   readonly transportModes: readonly SpecTransportMode[];
+  /**
+   * The document this spec was read from, in the parts no control here authors — see
+   * {@link SpecCarry} for what is carried, when each part is written back, and what invalidates it.
+   *
+   * Absent on {@link BLANK_SPEC} and on everything this editor authors from nothing: there is no
+   * document behind those, so there is nothing to carry and the model *is* the building.
+   */
+  readonly carried?: SpecCarry | undefined;
 }
 
 export const BLANK_SPEC: BuildingSpec = Object.freeze({
@@ -428,20 +536,133 @@ export const SPEC_ROWS: readonly SpecRow[] = Object.freeze([
     help: 'How much of that capacity is actually let today. Population = capacity × occupancy, and population is what the lifts have to move. A building sized at 100% and let at 60% feels like a different building.',
   },
   {
+    /*
+     * `40` rather than `12`, and the ceiling moved because the old one was **silently editing the
+     * building**. `specFromBuilding` clamped a shipped building's car count into this range, so
+     * `vertical-city`'s 35 cars were read back as 12 and the elevation drew a 35-car tower as a
+     * 12-car one — a screen that disagreed with the document it had just opened. The largest
+     * shipped fleet is 35; 40 leaves room above it without inviting a fleet nothing here can draw.
+     */
     key: 'cars',
     label: 'Cars in the group',
     group: 'THE LIFTS',
     min: 1,
-    max: 12,
+    max: 40,
     step: 1,
     unit: '',
     help: 'Lifts answering as one group. A shaft is the most expensive thing in the building — this is the lever you are meant to avoid pulling.',
   },
 ]);
 
-/** Percent let on one floor: its override, or the building-wide slider. */
+/* -------------------------------------------------------------------------- *
+ * The carried document — {@link SpecCarry}
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The floor vocabulary, as one comparable string.
+ *
+ * Everything a carried floor or a carried bank is *keyed by*: how many floors there are, what the
+ * ones below the lobby are called, and what number the first one above it prints. A bank naming
+ * floor `77` describes nothing once one of these has moved.
+ */
+function geometryKeyOf(spec: BuildingSpec): string {
+  return JSON.stringify([
+    spec.floors,
+    spec.belowLobby.map((floor) => [floor.id, floor.isEntrance === true]),
+    spec.firstFloorNumber,
+  ]);
+}
+
+/**
+ * The five controls that deal the shafts, as one comparable string — the geometry included, since a
+ * band means nothing without it.
+ */
+function shaftKeyOf(spec: BuildingSpec): string {
+  return JSON.stringify([
+    geometryKeyOf(spec),
+    spec.cars,
+    [...spec.skyFloors].sort((a, b) => a - b),
+    Object.entries(spec.bandByCar).sort(([a], [b]) => a.localeCompare(b)),
+    Object.entries(spec.noLobby)
+      .filter(([, off]) => off)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  ]);
+}
+
+/** The three controls that write hardware onto every car. */
+function hardwareKeyOf(spec: BuildingSpec): string {
+  return JSON.stringify([spec.specClass, spec.ratedSpeedMps, spec.ratedLoadLb]);
+}
+
+/**
+ * The two controls that write a population onto every floor.
+ *
+ * `occupancyByFloor` is deliberately **not** in here: a per-floor override already wins over the
+ * carried population in {@link occupancyAt}, so including it would mean that dragging one floor
+ * flattened the other ninety-nine.
+ */
+function occupancyKeyOf(spec: BuildingSpec): string {
+  return JSON.stringify([spec.capacityPerFloor, spec.occupancyPct]);
+}
+
+/**
+ * The carried document, while the floor vocabulary it is keyed by is still the one on screen.
+ *
+ * Module-private, with {@link carriedBanksOf}: every caller is in this file, and exporting a
+ * predicate nothing outside consults would be a seam with no caller — `CLAUDE.md`'s standing
+ * requirement, at function scale.
+ */
+function carriedFabricOf(spec: BuildingSpec): SpecCarry | undefined {
+  const carry = spec.carried;
+  if (carry === undefined) return undefined;
+  return carry.geometry === geometryKeyOf(spec) ? carry : undefined;
+}
+
+/** The authored banks, while none of the five shaft controls has moved. See {@link carriedFabricOf}. */
+function carriedBanksOf(spec: BuildingSpec): readonly BankConfig[] | undefined {
+  const carry = carriedFabricOf(spec);
+  if (carry === undefined) return undefined;
+  return carry.shafts === shaftKeyOf(spec) ? carry.banks : undefined;
+}
+
+/** Whether the class, speed and load sliders still say what the document said. */
+function carriedHardwareHolds(spec: BuildingSpec): boolean {
+  const carry = carriedFabricOf(spec);
+  return carry !== undefined && carry.hardware === hardwareKeyOf(spec);
+}
+
+/** The authored per-floor population, while the capacity and occupancy sliders have not moved. */
+function carriedPopulationAt(spec: BuildingSpec, floor: number): number | undefined {
+  const carry = carriedFabricOf(spec);
+  if (carry === undefined || carry.occupancy !== occupancyKeyOf(spec)) return undefined;
+  return carry.floors[floor]?.population;
+}
+
+/** The authored per-floor height, while the pitch slider has not moved. */
+function carriedHeightAt(spec: BuildingSpec, floor: number): number | undefined {
+  const carry = carriedFabricOf(spec);
+  if (carry === undefined || carry.floorHeightM !== spec.floorHeightM) return undefined;
+  return carry.floors[floor]?.heightM;
+}
+
+/**
+ * Percent let on one floor: its override, the document's own population, or the building-wide
+ * slider — in that order.
+ *
+ * The middle arm is what makes an unevenly-occupied tower survive being opened. It is expressed as a
+ * *percentage of design capacity* rather than as a population so that the elevation's bar, the
+ * per-floor nudge (`occupancyAt(current, floor) + step`) and {@link populationAt} all read one
+ * number: `populationAt` multiplies it straight back out, so the carried population comes back
+ * exact rather than quantised to the slider's 5 % step.
+ */
 export function occupancyAt(spec: BuildingSpec, floor: number): number {
-  return spec.occupancyByFloor[floor] ?? spec.occupancyPct;
+  const override = spec.occupancyByFloor[floor];
+  if (override !== undefined) return override;
+  const carried = carriedPopulationAt(spec, floor);
+  if (carried !== undefined) {
+    return spec.capacityPerFloor === 0 ? 0 : (carried / spec.capacityPerFloor) * 100;
+  }
+  return spec.occupancyPct;
 }
 
 /** People on one floor today. */
@@ -595,6 +816,34 @@ export function servedFloorsOf(spec: BuildingSpec, car: number): readonly number
 }
 
 /**
+ * **The floors each shaft opens onto in the document this spec will actually write** — one entry per
+ * shaft group, not per car, since cars in a bank share their served floors.
+ *
+ * Derived from the bands while the editor is dealing the shafts, and read off the carried banks
+ * while {@link carriedBanksOf} holds. That distinction is the point: `vertical-city`'s shuttle
+ * serves `G, 2, 26, 27, 51, 52, 76, 77`, which is not a contiguous band and never will be, so a
+ * warning computed from bands would be a warning about a building the save does not produce.
+ *
+ * `servedFloorsOf` is left alone and stays the *editing* model — it is what the elevation draws
+ * while a reader drags a band — which is why this is a separate function rather than a change to it.
+ */
+function servedFloorSetsOf(spec: BuildingSpec): readonly (readonly number[])[] {
+  const carried = carriedBanksOf(spec);
+  if (carried !== undefined) {
+    const numberById = new Map<string, number>();
+    for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+      numberById.set(floorIdOf(spec, floor), floor);
+    }
+    return carried.map((bank) =>
+      bank.servesFloors
+        .map((id) => numberById.get(id))
+        .filter((floor): floor is number => floor !== undefined),
+    );
+  }
+  return Array.from({ length: spec.cars }, (_, car) => servedFloorsOf(spec, car));
+}
+
+/**
  * Floors no car reaches.
  *
  * The elevation's warning, and a genuine defect in a building rather than a display nicety: a call
@@ -602,16 +851,14 @@ export function servedFloorsOf(spec: BuildingSpec, car: number): readonly number
  * never be reported as one. `access/lockedOut.ts` makes the same distinction for the credential
  * case; this is the service-zoning half of it.
  *
- * Counted over {@link servedFloorsOf} rather than over the raw band, because an express car really
- * does open at the lobby and `buildingFromSpec` really does write `G` into its `servesFloors`. The
- * band alone said otherwise, which was harmless while every band above the lobby was express and is
- * not once one of them can be closed.
+ * Counted over {@link servedFloorSetsOf} rather than over the raw band, because an express car
+ * really does open at the lobby and `buildingFromSpec` really does write `G` into its
+ * `servesFloors`. The band alone said otherwise, which was harmless while every band above the
+ * lobby was express and is not once one of them can be closed.
  */
 export function orphanFloors(spec: BuildingSpec): readonly number[] {
   const served = new Set<number>();
-  for (let car = 0; car < spec.cars; car += 1) {
-    for (const floor of servedFloorsOf(spec, car)) served.add(floor);
-  }
+  for (const floors of servedFloorSetsOf(spec)) for (const floor of floors) served.add(floor);
   const orphans: number[] = [];
   for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
     if (!served.has(floor)) orphans.push(floor);
@@ -639,15 +886,53 @@ export function orphanFloors(spec: BuildingSpec): readonly number[] {
  * been a *false refusal*: a two-level lobby whose upper level is reached only by escalator is a
  * building the loader builds and the router routes, and an editor calling those floors stranded
  * would be arguing with the run it is about to produce.
+ *
+ * **The search used to start at the lobby and nowhere else, and that was wrong in two ways.**
+ *
+ * - A building can have **more than one way in**. `midtown-office` flags its car park `P1`
+ *   `isEntrance`, so arrivals really do reach the building there; a floor reachable only from `P1`
+ *   was reported stranded when nobody was stranded. Every entrance is a root now, which is
+ *   {@link isEntranceFloor}'s own list.
+ * - The transfer set was `skyFloors.filter(floor > 0)`, so **a transfer level at or below the lobby
+ *   was invisible to it**. Three of the eight shipped buildings flag `G` — `secure-tower`,
+ *   `mixed-use-high-rise` and `vertical-city` — and on `secure-tower` it is the *only* one, so the
+ *   floor where its low and high banks interchange was not a floor this search would let a journey
+ *   interchange at. It is read off the carried document ({@link SpecCarry}) for those floors,
+ *   because the sky-floor dot's own domain is the floors above the lobby and this is not the place
+ *   to widen it.
+ *
+ * ## This should be `core`'s connectivity model rather than a second copy of it
+ *
+ * `config/buildingConnectivity.ts` now exports `measureConnectivity`, `legCountsFrom` and
+ * `connectivityDiagnostics`, and the loader runs them at resolve time — which is the canonical
+ * answer and the one the run obeys. This function should call it, and does not yet only because
+ * that module is not in this tree.
+ *
+ * **It is not simply deletable, and the difference is worth stating before somebody deletes it.**
+ * `measureConnectivity` answers *is this building routable*, of a `ResolvedBuilding`. This answers
+ * *would the building I am about to write be routable*, of a spec, while the reader is mid-drag and
+ * before any document exists — `dev/buildingEditor.ts` calls `validateSpec` on every keystroke, and
+ * a hundred-floor tower cannot be parsed and resolved between two of them. So the shape to aim for
+ * is: build the floors and the served-floor sets here, hand them to `core`'s traversal, and keep no
+ * second search. Until then the two must be pinned against each other on the shipped buildings —
+ * one asserting the other's answer — rather than left to agree by inspection.
  */
 export function unreachableFloors(spec: BuildingSpec): readonly number[] {
   const transfers = new Set(spec.skyFloors.filter((floor) => floor > 0 && floor <= spec.floors));
-  const served: readonly (readonly number[])[] = Array.from({ length: spec.cars }, (_, car) =>
-    servedFloorsOf(spec, car),
-  );
+  const fabric = carriedFabricOf(spec);
+  if (fabric !== undefined) {
+    for (let floor = lowestFloorOf(spec); floor <= 0; floor += 1) {
+      if (fabric.floors[floor]?.isTransferFloor === true) transfers.add(floor);
+    }
+  }
+  const served = servedFloorSetsOf(spec);
   const edges = writtenTransportModes(spec);
-  const seen = new Set<number>([0]);
-  let frontier: number[] = [0];
+  const roots: number[] = [];
+  for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
+    if (isEntranceFloor(spec, floor)) roots.push(floor);
+  }
+  const seen = new Set<number>(roots);
+  let frontier: number[] = [...roots];
   while (frontier.length > 0) {
     const next: number[] = [];
     const reach = (floor: number): void => {
@@ -1150,18 +1435,32 @@ export interface BuildingFromSpecOptions {
  * the table does carry (1.2 and 1.75), which is the least-wrong reading of a building that is both
  * — and it is written onto the car, visibly, rather than defaulted silently, so a reader who
  * disagrees can see the number and change it in the document editor.
+ *
+ * **It is a stopgap for one named type and not a default for any other**, which is the whole
+ * difference between this table and the `?? 1.2` that used to sit beside it. See
+ * {@link transferSecondsFor}.
  */
 const TRANSFER_S_BY_TYPE: Readonly<Record<string, number>> = Object.freeze({
   'mixed-use': 1.5,
 });
 
-/** Turn the spec into a document the loader will parse and resolve. */
+/**
+ * Turn the spec into a document the loader will parse and resolve.
+ *
+ * **Everything the five sliders do not author is written back from {@link SpecCarry}** while the
+ * control that would re-deal it has not moved — the authored banks with their cars, deck pairs and
+ * per-car hardware; the authored per-floor heights, populations, labels and traffic profiles; the
+ * transfer flag on a floor at or below the lobby; the service schedule; the notes. Read
+ * {@link SpecCarry} for the rule and {@link validateSpec} for what a reader is told when an edit
+ * drops one of them.
+ */
 export function buildingFromSpec(
   spec: BuildingSpec,
   options: BuildingFromSpecOptions = {},
 ): BuildingConfig {
   const floors: FloorConfig[] = [];
   const skies = new Set(spec.skyFloors);
+  const fabric = carriedFabricOf(spec);
   /*
    * Bottom floor first, which for a building with a basement is a negative index — `config/schema.ts`
    * says so in as many words (*"floor index must be an integer (negative for basements)"*), and all
@@ -1170,78 +1469,113 @@ export function buildingFromSpec(
    */
   for (let floor = lowestFloorOf(spec); floor <= spec.floors; floor += 1) {
     const entrance = isEntranceFloor(spec, floor);
+    const carried = fabric?.floors[floor];
+    const heightM = carriedHeightAt(spec, floor);
     const config: {
       -readonly [K in keyof FloorConfig]: FloorConfig[K];
     } = {
       id: floorIdOf(spec, floor),
       index: floor,
-      heightM: Math.round(floor * spec.floorHeightM * 100) / 100,
+      heightM: heightM ?? Math.round(floor * spec.floorHeightM * 100) / 100,
       population: entrance ? 0 : populationAt(spec, floor),
     };
     if (entrance) config.isEntrance = true;
-    if (!entrance && skies.has(floor)) config.isTransferFloor = true;
+    /*
+     * Above the lobby the dot on the elevation is the authority, which is what `skyFloors` is. At or
+     * below it there is no control — the dot is drawn inert on an entrance — so the document's own
+     * flag is carried instead of being dropped. It was dropped, and on `secure-tower` the flag it
+     * dropped was the building's only one: two banks that interchange at `G` came back as two banks
+     * that cannot, and `traffic/route.ts` will not plan a lift change anywhere else.
+     */
+    if (floor > 0 ? !entrance && skies.has(floor) : carried?.isTransferFloor === true) {
+      config.isTransferFloor = true;
+    }
+    /*
+     * A label and a per-floor traffic profile are facts about the floor that no control here writes.
+     * The profile is not decoration: `traffic/generator.ts` reads it, so a residential floor that
+     * came back with the building-wide office profile generates different people.
+     */
+    if (carried?.label !== undefined) config.label = carried.label;
+    if (carried?.trafficProfile !== undefined) config.trafficProfile = carried.trafficProfile;
     floors.push(config);
   }
 
-  const groups = banksOf(spec);
-  const banks: BankConfig[] = groups.map((group, index) => {
-    const servesFloors: string[] = [];
-    for (let floor = group.band[0]; floor <= group.band[1]; floor += 1) {
-      servesFloors.push(floorIdOf(spec, floor));
-    }
-    /*
-     * A band that starts above the lobby still lands in the lobby — that is what a high-rise bank
-     * is, and every shipped building with one says so. Adding the entrance rather than leaving the
-     * band closed is the difference between an express group and a service car nobody can reach
-     * from the ground.
-     *
-     * Which is exactly why it is a *choice* and not a rule: the handoff's express toggle (§ 1.3
-     * M11) turns it off, and a bank with `lobby: false` is that self-contained service car. It is a
-     * building this loader builds without complaint — measured, not assumed — and it is one a
-     * reader can strand, so {@link unreachableFloors} guards it at the control.
-     */
-    // Through {@link floorIdOf} like every other crossing, rather than the literal `'G'` this line
-    // used to hold. The two agree today and the rule is what matters: one function turns a floor
-    // number into an id, so a building that renamed its lobby could not rename it here only.
-    const lobbyId = floorIdOf(spec, 0);
-    if (group.band[0] > 0 && group.lobby && !servesFloors.includes(lobbyId)) {
-      servesFloors.unshift(lobbyId);
-    }
-    return {
+  const carriedBanks = carriedBanksOf(spec);
+  /*
+   * Built only when the carry does not hold. Not an optimisation: the derived path asks
+   * {@link transferSecondsFor} for a transfer time, which **throws** on a building type nothing has
+   * priced, and a refusal raised by a branch whose result is thrown away is a refusal about the
+   * wrong thing.
+   */
+  const derivedBanksOf = (): BankConfig[] => {
+    const groups = banksOf(spec);
+    return groups.map((group, index) => {
+      const servesFloors: string[] = [];
+      for (let floor = group.band[0]; floor <= group.band[1]; floor += 1) {
+        servesFloors.push(floorIdOf(spec, floor));
+      }
       /*
-       * The single-bank case keeps the id every shipped building uses, so a spec that describes
-       * one group produces the document a hand-authored one would — and a reader comparing the
-       * downloaded JSON with `midtown-office.json` is not distracted by a gratuitous rename.
+       * A band that starts above the lobby still lands in the lobby — that is what a high-rise bank
+       * is, and every shipped building with one says so. Adding the entrance rather than leaving the
+       * band closed is the difference between an express group and a service car nobody can reach
+       * from the ground.
+       *
+       * Which is exactly why it is a *choice* and not a rule: the handoff's express toggle (§ 1.3
+       * M11) turns it off, and a bank with `lobby: false` is that self-contained service car. It is a
+       * building this loader builds without complaint — measured, not assumed — and it is one a
+       * reader can strand, so {@link unreachableFloors} guards it at the control.
        */
-      id: groups.length === 1 ? 'main' : `bank-${String(index + 1)}`,
-      name:
-        // `<= 0` rather than `=== 0`: a band that reaches the lobby *or below it* is the main bank.
-        // On a building with a basement the default band starts at `-1`, and `=== 0` named it
-        // `Floors -1–23`.
-        group.band[0] <= 0
-          ? 'Main bank'
-          : group.lobby
-            ? `Floors ${String(group.band[0])}–${String(group.band[1])}`
-            : `Floors ${String(group.band[0])}–${String(group.band[1])}, no lobby`,
-      servesFloors,
-      cars: group.cars.map((car) => {
-        const config: Record<string, unknown> = {
-          id: carLabelOf(car),
-          spec: spec.specClass,
-          ratedSpeedMps: spec.ratedSpeedMps,
-          ratedLoadLb: spec.ratedLoadLb,
-          doorType: 'centerOpening',
-        };
-        const transfer = transferSecondsFor(spec.type, options.specs);
-        if (transfer !== undefined) config['passengerTransferS'] = transfer;
-        if (options.dwell !== undefined) {
-          config['dwellCarCallS'] = options.dwell.dwellCarCallS;
-          config['dwellHallCallS'] = options.dwell.dwellHallCallS;
-        }
-        return config as unknown as BankConfig['cars'][number];
-      }),
-    };
-  });
+      // Through {@link floorIdOf} like every other crossing, rather than the literal `'G'` this line
+      // used to hold. The two agree today and the rule is what matters: one function turns a floor
+      // number into an id, so a building that renamed its lobby could not rename it here only.
+      const lobbyId = floorIdOf(spec, 0);
+      if (group.band[0] > 0 && group.lobby && !servesFloors.includes(lobbyId)) {
+        servesFloors.unshift(lobbyId);
+      }
+      return {
+        /*
+         * The single-bank case keeps the id every shipped building uses, so a spec that describes
+         * one group produces the document a hand-authored one would — and a reader comparing the
+         * downloaded JSON with `midtown-office.json` is not distracted by a gratuitous rename.
+         */
+        id: groups.length === 1 ? 'main' : `bank-${String(index + 1)}`,
+        name:
+          // `<= 0` rather than `=== 0`: a band that reaches the lobby *or below it* is the main bank.
+          // On a building with a basement the default band starts at `-1`, and `=== 0` named it
+          // `Floors -1–23`.
+          group.band[0] <= 0
+            ? 'Main bank'
+            : group.lobby
+              ? `Floors ${String(group.band[0])}–${String(group.band[1])}`
+              : `Floors ${String(group.band[0])}–${String(group.band[1])}, no lobby`,
+        servesFloors,
+        cars: group.cars.map((car) => {
+          const config: Record<string, unknown> = {
+            id: carLabelOf(car),
+            spec: spec.specClass,
+            ratedSpeedMps: spec.ratedSpeedMps,
+            ratedLoadLb: spec.ratedLoadLb,
+            doorType: 'centerOpening',
+          };
+          const transfer = transferSecondsFor(spec.type, options.specs);
+          if (transfer !== undefined) config['passengerTransferS'] = transfer;
+          if (options.dwell !== undefined) {
+            config['dwellCarCallS'] = options.dwell.dwellCarCallS;
+            config['dwellHallCallS'] = options.dwell.dwellHallCallS;
+          }
+          return config as unknown as BankConfig['cars'][number];
+        }),
+      };
+    });
+  };
+
+  const banks: readonly BankConfig[] =
+    carriedBanks === undefined
+      ? derivedBanksOf()
+      : carriedBanks.map((bank) => ({
+          ...bank,
+          cars: bank.cars.map((car) => carriedCarOf(spec, car, floors, bank, options)),
+        }));
 
   /*
    * Written only when there is one, unlike `accessZones` below. `transportModes` is optional on
@@ -1250,6 +1584,8 @@ export function buildingFromSpec(
    * nothing — the same argument that keeps the single-bank id `main` rather than `bank-1`.
    */
   const transportModes = transportModesOf(spec);
+  const serviceEvents = fabric?.serviceEvents;
+  const notes = fabric?.notes;
 
   return {
     id: spec.id,
@@ -1257,7 +1593,13 @@ export function buildingFromSpec(
     type: spec.type,
     trafficProfile: spec.trafficProfile,
     floors,
-    totalPopulation: totalPopulation(spec),
+    /*
+     * The sum of the floors this function just wrote, not `totalPopulation(spec)`. The two agree
+     * whenever the model produced the populations, and they part company the moment a carried
+     * population does — and `config/parse.ts` cross-checks the declared figure against the floor
+     * sum, so the model's answer would be a document the loader refuses.
+     */
+    totalPopulation: floors.reduce((total, floor) => total + floor.population, 0),
     banks,
     ...(transportModes.length === 0 ? {} : { transportModes }),
     /*
@@ -1267,7 +1609,95 @@ export function buildingFromSpec(
      * from the one named at the top of the screen.
      */
     accessZones: accessZonesOf(spec),
+    /*
+     * The mid-run service schedule and the document's own prose. Neither has a control here, and
+     * both were dropped: `serviceEvents` is a *behaviour* — it recalls and returns cars mid-run —
+     * so losing it silently produced a building that stopped doing something it said it did.
+     */
+    ...(serviceEvents === undefined ? {} : { serviceEvents }),
+    ...(notes === undefined ? {} : { notes }),
   };
+}
+
+/**
+ * One carried car, with the three sliders applied to it if the reader has moved them.
+ *
+ * The authored car is the base — its class, speed, rated load, door type, transfer time, initial
+ * service mode and whole deck geometry — because none of those is a thing the five sliders describe
+ * and all of them change the run. What the sliders *do* describe is class, speed and rated load, so
+ * when {@link hardwareKeyOf} has moved those three are overwritten on every car and nothing else is.
+ *
+ * **Two derived fields have to move with them or the document stops loading**, and both are
+ * arithmetic the reader cannot be expected to do:
+ *
+ * - `ratedLoadLbPerDeck` is half the whole-car rating by definition; leaving the authored half
+ *   beside a new whole raises `deck-load-mismatch`.
+ * - `deckSeparationM` is the height between the two floors of a served pair, and `config/parse.ts`
+ *   makes a mismatch a **fatal issue** rather than a warning. So it is re-measured against the
+ *   floors this call just wrote. When the pairs no longer agree on one separation the authored value
+ *   is kept and {@link validateSpec} says the loader will refuse the building — a stated refusal
+ *   beats a document that silently describes different hardware.
+ */
+function carriedCarOf(
+  spec: BuildingSpec,
+  car: CarConfig,
+  floors: readonly FloorConfig[],
+  bank: BankConfig,
+  options: BuildingFromSpecOptions,
+): CarConfig {
+  const config: Record<string, unknown> = { ...car };
+  if (!carriedHardwareHolds(spec)) {
+    config['spec'] = spec.specClass;
+    config['ratedSpeedMps'] = spec.ratedSpeedMps;
+    config['ratedLoadLb'] = spec.ratedLoadLb;
+    if (car.ratedLoadLbPerDeck !== undefined) config['ratedLoadLbPerDeck'] = spec.ratedLoadLb / 2;
+  }
+  if (car.doubleDeck === true) {
+    const separation = deckSeparationOf(bank, floors);
+    if (separation !== undefined) config['deckSeparationM'] = separation;
+  }
+  /*
+   * Only when the authored car left it off. A car that declares its own transfer time keeps it —
+   * that is what `mixed-use-high-rise` says by giving its office local 1.2 s and its residential
+   * local 1.75 s — and a car that does not needs one the moment a reader points the type dropdown at
+   * a type the reference table has no row for, or the loader refuses the building. This is the
+   * derived path's rule applied to a carried car, not a second rule.
+   */
+  if (car.passengerTransferS === undefined) {
+    const transfer = transferSecondsFor(spec.type, options.specs);
+    if (transfer !== undefined) config['passengerTransferS'] = transfer;
+  }
+  if (options.dwell !== undefined) {
+    config['dwellCarCallS'] = options.dwell.dwellCarCallS;
+    config['dwellHallCallS'] = options.dwell.dwellHallCallS;
+  }
+  return config as unknown as CarConfig;
+}
+
+/**
+ * The one deck separation this bank's floor pairs agree on, measured on the floors as written, or
+ * `undefined` when they do not agree on one.
+ *
+ * `undefined` covers two cases and neither may be papered over: a bank with no pairs (nothing to
+ * measure) and a bank whose pairs sit at different heights apart (no separation can serve both).
+ * {@link validateSpec} reports the second.
+ */
+function deckSeparationOf(
+  bank: BankConfig,
+  floors: readonly FloorConfig[],
+): number | undefined {
+  const pairs = bank.servesFloorPairs ?? [];
+  if (pairs.length === 0) return undefined;
+  const heightById = new Map(floors.map((floor) => [floor.id, floor.heightM]));
+  const gaps: number[] = [];
+  for (const [lower, upper] of pairs) {
+    const low = heightById.get(lower);
+    const high = heightById.get(upper);
+    if (low === undefined || high === undefined) return undefined;
+    gaps.push(Math.round((high - low) * 1000) / 1000);
+  }
+  const first = gaps[0] as number;
+  return gaps.every((gap) => Math.abs(gap - first) < 1e-6) ? first : undefined;
 }
 
 /**
@@ -1276,13 +1706,185 @@ export function buildingFromSpec(
  * Asks `elevator-specs.json` first and only fills a gap. Writing the field unconditionally would
  * override the table on every ordinary building — the reference data would still be right and the
  * run would stop using it, which is the drift `SimulationConfig.elevatorSpecs` exists to prevent.
+ *
+ * The table is read **by key**, out of `data/`, rather than through a `switch` over the type union:
+ * that is invariant 7's reading, and it means a type added to the reference data is covered here
+ * without a code change.
+ *
+ * ## The line that used to end this function, and why it is a throw now
+ *
+ * It read `return TRANSFER_S_BY_TYPE[type] ?? 1.2`. That `?? 1.2` is **the office figure applied to
+ * an unknown building type, silently, on every car** — precisely the fall-through
+ * `config/resolveCar.ts#findPassengerTransferS` exists to make impossible, reintroduced one package
+ * over. Its docstring names the bug in as many words: *"the bug this function exists to make
+ * impossible was a silent fall-through to 1.2 s on every residential and hotel building in the
+ * repository"*. `2·P·tp` is the term the round-trip time is most sensitive to, so a wrong `tp` is a
+ * wrong interval, a wrong handling capacity and a wrong AWT — reported with no signal at all.
+ *
+ * So an uncovered type raises instead. It cannot happen for a type in today's union — every one of
+ * the five is either in the reference table or in {@link TRANSFER_S_BY_TYPE} — and it is the
+ * *sixth* this is written for. A throw is loud, names the type, and names the file to fix; a
+ * plausible number is none of those.
+ *
+ * ## What should replace the body of this function, and why it has not yet
+ *
+ * `config/resolveCar.ts#findPassengerTransferS` is the one function that should answer this, and
+ * the core lane has just made its table open (`z.object({…}).catchall(positive)`) and folded
+ * `analytical/upPeak.ts`'s duplicate `switch` into it. Once it is exported from
+ * `@elevator-sim/core/browser` — it is **not** on that barrel today, which is the only reason this
+ * still reads the table itself — the body here becomes:
+ *
+ * ```ts
+ * if (specs !== undefined && findPassengerTransferS(specs, type) !== undefined) return undefined;
+ * ```
+ *
+ * and {@link TRANSFER_S_BY_TYPE} is deleted outright the moment `mixed-use` has a row in
+ * `data/elevator-specs.json`, because a stopgap for a type the reference data prices is a second
+ * opinion about a number. The reading here is already **by key out of data** rather than a `switch`,
+ * so the two agree on every type; what is duplicated is the lookup, not the answer.
  */
 function transferSecondsFor(type: BuildingType, specs: ElevatorSpecs | undefined): number | undefined {
-  if (specs === undefined) return TRANSFER_S_BY_TYPE[type];
+  const stopgap = TRANSFER_S_BY_TYPE[type];
+  if (specs === undefined) {
+    /*
+     * No reference data to ask. The field is left off rather than guessed, and the loader raises its
+     * own refusal on save if the type needs one — which is a message about the reference table
+     * rather than about this editor, and is the right place for it.
+     */
+    return stopgap;
+  }
   const table = specs.timing.passengerTransferS as unknown as Record<string, unknown>;
   const declared = table[type];
   if (typeof declared === 'number') return undefined;
-  return TRANSFER_S_BY_TYPE[type] ?? 1.2;
+  if (stopgap !== undefined) return stopgap;
+  throw new Error(
+    `building type "${String(type)}" has no passengerTransferS: it is not in ` +
+      `elevator-specs.json's timing.passengerTransferS table and has no entry in ` +
+      `TRANSFER_S_BY_TYPE. Add the row to data/elevator-specs.json (preferred, since the value is ` +
+      `reference data) or the stopgap to packages/viz/src/authoring/buildingSpec.ts. It is not ` +
+      `defaulted, because 2*P*tp is the term the round-trip time is most sensitive to and the ` +
+      `office figure on another building type is a wrong interval reported as a right one.`,
+  );
+}
+
+/**
+ * **What this save will no longer contain of the building it was opened from.**
+ *
+ * The other half of {@link SpecCarry}, and the half the UI readiness audit says matters most. The
+ * carry makes an untouched round trip lossless; it cannot make an *edited* one lossless, because
+ * `vertical-city`'s shuttle serves `G, 2, 26, 27, 51, 52, 76, 77` and a reader who moves the car
+ * slider is asking for bands, which cannot express that. What can be done — and what was not being
+ * done — is to **say so before the reader presses save**. A visible refusal beats an invisible
+ * deletion.
+ *
+ * Silent while nothing has been re-dealt, which is what makes it worth reading when it speaks.
+ */
+function carryLosses(spec: BuildingSpec): readonly string[] {
+  const carry = spec.carried;
+  if (carry === undefined) return [];
+  const said: string[] = [];
+  const authoredCars = carry.banks.reduce((total, bank) => total + bank.cars.length, 0);
+  const decks = carry.banks.reduce(
+    (total, bank) => total + bank.cars.filter((car) => car.doubleDeck === true).length,
+    0,
+  );
+  const pairs = carry.banks.reduce(
+    (total, bank) => total + (bank.servesFloorPairs?.length ?? 0),
+    0,
+  );
+  /*
+   * **How many genuinely different lifts the document authored**, counted on every field the three
+   * sliders cannot say — the class, the speed, the load, the doors and the transfer time. `1` means
+   * the derived path would rebuild the same fleet, which is why the warnings below are gated on it:
+   * a sentence that fires on `midtown-office`'s four identical cars is a sentence a reader learns to
+   * skip, and then it is not there when `vertical-city` needs it.
+   */
+  const variants = new Set(
+    carry.banks.flatMap((bank) =>
+      bank.cars.map(
+        (car) =>
+          `${String(car.spec)}/${String(car.ratedSpeedMps ?? '')}/${String(car.ratedLoadLb ?? '')}/` +
+          `${String(car.doorType ?? '')}/${String(car.passengerTransferS ?? '')}`,
+      ),
+    ),
+  );
+  /**
+   * A bank whose floors the band model cannot express: a gap in the run it serves.
+   *
+   * **Two arms, and the second is not an optimisation** — it is the express bank. `buildingFromSpec`
+   * emits either `[low … high]` or `G` followed by `[low … high]`, so a bank is expressible when
+   * *either* its whole floor list is a run *or* its list without the lobby is. Testing only the
+   * second was wrong in the direction that matters: `midtown-office` serves `P1, G, 2 … 20`, a
+   * perfect run from `-1` to `19`, and dropping its lobby left `-1, 1 … 19` with a hole in it, so
+   * the editor warned that a building the sliders reproduce exactly was about to lose something.
+   */
+  const numberById = new Map(
+    Object.entries(carry.floors).map(([number, floor]) => [floor.id, Number(number)]),
+  );
+  const isRun = (sorted: readonly number[]): boolean =>
+    sorted.length < 2 ||
+    (sorted[sorted.length - 1] as number) - (sorted[0] as number) === sorted.length - 1;
+  const nonContiguous = carry.banks.filter((bank) => {
+    const numbers = bank.servesFloors
+      .map((floorId) => numberById.get(floorId))
+      .filter((floor): floor is number => floor !== undefined)
+      .sort((a, b) => a - b);
+    return !isRun(numbers) && !isRun(numbers.filter((floor) => floor !== 0));
+  });
+  const rebuildLoses =
+    carry.banks.length > 1 || decks > 0 || variants.size > 1 || nonContiguous.length > 0;
+  if (carriedBanksOf(spec) === undefined && rebuildLoses) {
+    const banksWord = `${String(carry.banks.length)} bank${carry.banks.length === 1 ? '' : 's'}`;
+    const deckWord =
+      decks === 0
+        ? ''
+        : ` — including ${String(decks)} double-deck car${decks === 1 ? '' : 's'} and ${String(pairs)} paired floor stop${pairs === 1 ? '' : 's'}, which no control here authors`;
+    said.push(
+      `Saving now replaces the ${banksWord} and ${String(authoredCars)} cars this building was authored with${deckWord}. The shafts are re-dealt from the sliders instead: ${String(spec.cars)} car${spec.cars === 1 ? '' : 's'} in contiguous bands. Re-open the building to get the authored lifts back; nothing on disk has changed.`,
+    );
+  } else if (carriedBanksOf(spec) !== undefined && !carriedHardwareHolds(spec) && variants.size > 1) {
+    said.push(
+      `This building was authored with ${String(variants.size)} different lift specifications across its ${String(authoredCars)} cars. The class, speed and load controls here write one specification onto every car, so saving now gives all ${String(authoredCars)} the same machine. The banks, the doors and the deck geometry are kept.`,
+    );
+  }
+  const fabric = carriedFabricOf(spec);
+  if (fabric === undefined) {
+    said.push(
+      'Changing the floor count re-numbers the building, so the authored floor heights, populations, labels and per-floor traffic profiles are replaced by the capacity and occupancy sliders.',
+    );
+  } else {
+    if (fabric.floorHeightM !== spec.floorHeightM) {
+      said.push(
+        `The authored floors are not evenly pitched; moving the floor-to-floor control gives every floor the same ${spec.floorHeightM.toFixed(1)} m rise.`,
+      );
+    }
+    if (fabric.occupancy !== occupancyKeyOf(spec)) {
+      said.push(
+        'The authored per-floor populations are replaced by capacity × occupancy on every floor.',
+      );
+    }
+  }
+  /*
+   * The one carried edit that produces a document the loader **refuses** rather than merely a
+   * different building: a double-deck bank whose floor pairs no longer sit one deck separation
+   * apart. `config/parse.ts` makes that a fatal issue, so it is worth its own sentence.
+   */
+  const banks = carriedBanksOf(spec);
+  const decked = (banks ?? []).filter(
+    (bank) => (bank.servesFloorPairs?.length ?? 0) > 0 && bank.cars.some((car) => car.doubleDeck === true),
+  );
+  if (decked.length > 0) {
+    // Built once, and only for a building that actually has a paired deck bank: this runs on every
+    // keystroke and `vertical-city` is a hundred floors.
+    const built = buildingFromSpec(spec).floors ?? [];
+    for (const bank of decked) {
+      if (deckSeparationOf(bank, built) !== undefined) continue;
+      said.push(
+        `Bank "${bank.id}" pairs floors that are no longer all the same distance apart, so its double-deck cars cannot serve them and the loader refuses this building.`,
+      );
+    }
+  }
+  return said;
 }
 
 /**
@@ -1292,13 +1894,15 @@ function transferSecondsFor(type: BuildingType, specs: ElevatorSpecs | undefined
  * every edit and shows whatever it says. What this adds is the two refusals the parser cannot make
  * because they are about a *drag* rather than about a document — a band that has collapsed, and a
  * floor no car reaches — plus the class limits, which the parser does raise and which a reader
- * needs to see while dragging rather than after.
+ * needs to see while dragging rather than after, plus {@link carryLosses}: what this save drops of
+ * the building it was opened from, which no parser can say because the dropped parts are gone by
+ * the time it sees the document.
  */
 export function validateSpec(
   spec: BuildingSpec,
   machineClass: { readonly maxRiseM: number; readonly maxFloors: number; readonly name: string } | undefined,
 ): readonly string[] {
-  const problems: string[] = [];
+  const problems: string[] = [...carryLosses(spec)];
   const orphans = orphanFloors(spec);
   const orphaned = new Set(orphans);
   /*
@@ -1477,25 +2081,60 @@ export function validateSpec(
   return problems;
 }
 
-/** The handoff's occupancy line, § 1.3 M11. */
+/**
+ * The handoff's occupancy line, § 1.3 M11.
+ *
+ * **The tail has a third arm, and it exists because the first one became a false statement.** *"N
+ * people on every floor today"* is true of a building whose floors the model produced; it is not
+ * true of one opened from a document, whose floors carry the populations their author wrote. On
+ * `vertical-city` those run from 22 to 90 and the line was reporting the first of them as every
+ * one — an untouched control saying something about the building that the building does not say.
+ */
 export function occupancyLine(spec: BuildingSpec): string {
   const capacity = totalCapacity(spec);
   const population = totalPopulation(spec);
   const share = capacity === 0 ? 0 : Math.round((population / capacity) * 100);
   const handSet = Object.keys(spec.occupancyByFloor).length;
+  const occupiable = occupiableFloorsOf(spec);
+  const counts = new Set(occupiable.map((floor) => populationAt(spec, floor)));
   const tail =
-    handSet === 0
-      ? `${String(populationAt(spec, 1))} people on every floor today`
-      : `${String(handSet)} floor${handSet === 1 ? '' : 's'} let by hand`;
+    handSet > 0
+      ? `${String(handSet)} floor${handSet === 1 ? '' : 's'} let by hand`
+      : counts.size <= 1
+        ? `${String(populationAt(spec, 1))} people on every floor today`
+        : `${String(Math.min(...counts))}–${String(Math.max(...counts))} people per floor as authored`;
   return `Capacity ${String(capacity)} · occupied ${String(population)} (${String(share)}%) · ${tail}`;
 }
 
-/** The handoff's summary line, § 1.3 M11. */
+/**
+ * The handoff's summary line, § 1.3 M11.
+ *
+ * **The speed and the capacity are the sliders' values, and on a building whose cars differ they
+ * are only the first car's.** That is said here rather than averaged, because a mean speed over a
+ * bank of 10 m/s shuttles and 2.5 m/s locals describes no lift in the building. `validateSpec`
+ * carries the count of distinct specifications and what moving a slider would do to them; this line
+ * says which arm of that it is quoting.
+ */
 export function buildingSummary(spec: BuildingSpec): string {
+  const carry = spec.carried;
+  const variants =
+    carry === undefined
+      ? 1
+      : new Set(
+          carry.banks.flatMap((bank) =>
+            bank.cars.map(
+              (car) =>
+                `${String(car.spec)}/${String(car.ratedSpeedMps ?? '')}/${String(car.ratedLoadLb ?? '')}`,
+            ),
+          ),
+        ).size;
+  const lifts =
+    carriedBanksOf(spec) !== undefined && variants > 1
+      ? `${String(spec.cars)} cars, ${String(variants)} specifications — the fastest is ${spec.ratedSpeedMps.toFixed(2)} m/s at ${String(personsOf(spec.ratedLoadLb))} persons`
+      : `${String(spec.cars)} cars at ${spec.ratedSpeedMps.toFixed(2)} m/s · ${String(personsOf(spec.ratedLoadLb))} persons each`;
   return (
     `${String(floorCountOf(spec))} floors · ${riseM(spec).toFixed(1)} m of travel · ` +
-    `${String(totalPopulation(spec))} people · ${String(spec.cars)} cars at ` +
-    `${spec.ratedSpeedMps.toFixed(2)} m/s · ${String(personsOf(spec.ratedLoadLb))} persons each`
+    `${String(totalPopulation(spec))} people · ${lifts}`
   );
 }
 
@@ -1521,7 +2160,16 @@ export function specIsDirty(spec: BuildingSpec, source: BuildingSpec): boolean {
   return JSON.stringify(normalize(spec)) !== JSON.stringify(normalize(source));
 }
 
-/** Key order made total, so two equal specs stringify equal. */
+/**
+ * Key order made total, so two equal specs stringify equal.
+ *
+ * **{@link BuildingSpec.carried} is deliberately not here.** It is a snapshot of the document the
+ * spec was read from, not an edit a reader can make, so two specs read from the same building carry
+ * the same one and it can never be the thing that differs. Including it would also make *dirty* mean
+ * something it must not: `dev/state.ts` asks `specIsDirty(spec, specFromBuilding(source))`, and the
+ * question there is whether this saves a different building — which is answered entirely by the
+ * fields below, since every carried part is written back verbatim exactly when none of them moved.
+ */
 function normalize(spec: BuildingSpec): unknown {
   return {
     name: spec.name,
@@ -1618,11 +2266,23 @@ function firstFloorNumberOf(above: readonly FloorConfig[]): number {
 /**
  * Read a shipped building back into the editor's shape.
  *
- * Lossy in one direction and honest about it: a shipped building's floors have labels and per-floor
- * traffic profiles and per-floor populations that a `floors × capacity × occupancy` model cannot
- * express. What comes back is the *shape* — how tall, how many people, how many cars, how fast — so
- * a reader can start from Midtown Office and change one thing. The document editor beneath the
- * elevation is where the parts this drops are edited, which is why it is still there (§ 4.5).
+ * **This docstring used to open by declaring the read lossy and calling that honesty**, and the UI
+ * readiness audit's S5 is what that honesty cost: *"a shipped building's floors have labels and
+ * per-floor traffic profiles and per-floor populations that a `floors × capacity × occupancy` model
+ * cannot express"* was true of the **sliders** and was then treated as true of the round trip.
+ * `vertical-city` went in with 7 banks, 35 cars, 8 double-deck shuttles and four paired floor stops
+ * and came back out with 1 bank of 12 single-deck hydraulics; `secure-tower` lost the only
+ * `isTransferFloor` it has. A model that cannot express something is a reason to *carry* it, not a
+ * licence to delete it.
+ *
+ * So what comes back is the shape **and the document**: the sliders describe how tall, how many
+ * people, how many cars and how fast, and {@link BuildingSpec.carried} holds everything they cannot
+ * — read {@link SpecCarry} for the list, the rule that decides when each part is written back, and
+ * {@link validateSpec} for what a reader is told when an edit drops one. `roundTrip.test.ts` holds
+ * all eight shipped buildings to it on the resolved building **and on the legs of a run**.
+ *
+ * The document editor beneath the elevation is still where the carried parts are *edited*, which is
+ * why it is still there (§ 4.5). The difference is that not editing them no longer deletes them.
  *
  * **Access zoning is no longer one of the parts it drops.** Zone floors are matched by their
  * **position** relative to the lobby — the same convention `skyFloors` below already uses — never
@@ -1676,11 +2336,44 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
   const pitch =
     heights.length > 1 ? (heights[heights.length - 1] as number) - (heights[0] as number) : 3.6;
   const cars = config.banks.flatMap((bank) => bank.cars);
-  const first = cars[0];
+  /*
+   * **The fastest car, not the first one.** The three hardware sliders hold one class, one speed and
+   * one load between them, and a building whose cars differ has to be quoted by *some* car. It was
+   * the first, which is an accident of authoring order — and `buildingSummary` now says out loud
+   * *"the fastest is …"* on such a building, so the convention is a claim a reader can check rather
+   * than a coincidence. `??` guards a car that leaves the field to its class; every shipped car
+   * declares it.
+   */
+  const headline = [...cars].sort(
+    (left, right) => (right.ratedSpeedMps ?? 0) - (left.ratedSpeedMps ?? 0),
+  )[0];
   // Design capacity is not recorded on a shipped building — it only has today's population. Taking
   // the tallest floor as ~90% let is the least-wrong inversion, and it is stated rather than hidden.
   const capacity = Math.max(10, Math.round(peak / 0.9 / 5) * 5);
-  return {
+  const floorHeightM = Math.max(2.8, Math.round((pitch / Math.max(1, floors.length - 1)) * 10) / 10);
+  /*
+   * The carried document, keyed to the spec this call is about to return — see {@link SpecCarry}.
+   * The four fingerprints are taken from that spec, so a freshly-read one matches every one of them
+   * and every carried part is written straight back; the moment a control moves, the key it belongs
+   * to stops matching and {@link validateSpec} says what the save will drop.
+   */
+  const carriedFloors: Record<number, SpecCarriedFloor> = {};
+  const carryFloor = (floor: FloorConfig, number: number): void => {
+    carriedFloors[number] = {
+      id: floor.id,
+      heightM: floor.heightM,
+      population: floor.population,
+      ...(floor.isEntrance === true ? { isEntrance: true } : {}),
+      ...(floor.isTransferFloor === true ? { isTransferFloor: true } : {}),
+      ...(floor.label === undefined ? {} : { label: floor.label }),
+      ...(floor.trafficProfile === undefined ? {} : { trafficProfile: floor.trafficProfile }),
+    };
+  };
+  for (const floor of declared) {
+    const number = floorNumberById.get(floor.id);
+    if (number !== undefined) carryFloor(floor, number);
+  }
+  const shape: BuildingSpec = {
     id,
     name: config.name,
     type: config.type,
@@ -1695,14 +2388,27 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
       ...(floor.isEntrance === true ? { isEntrance: true } : {}),
     })),
     firstFloorNumber: firstFloorNumberOf(floors),
-    floorHeightM: Math.max(2.8, Math.round((pitch / Math.max(1, floors.length - 1)) * 10) / 10),
+    floorHeightM,
     capacityPerFloor: capacity,
     occupancyPct: Math.max(10, Math.min(120, Math.round((mean / capacity) * 100 / 5) * 5)),
     occupancyByFloor: {},
-    cars: Math.max(1, Math.min(12, cars.length)),
-    specClass: first?.spec ?? 'geared-traction',
-    ratedSpeedMps: first?.ratedSpeedMps ?? 2.5,
-    ratedLoadLb: first?.ratedLoadLb ?? 2500,
+    /*
+     * **Uncapped.** This read `Math.min(12, cars.length)`, so `vertical-city`'s 35 cars came back as
+     * 12 and every surface downstream — the elevation, the summary line, the saved document — was
+     * describing a fleet a third of the size of the one the reader had just opened. A clamp on a
+     * *reading* is an edit nobody made; the slider's own ceiling is where a limit belongs, and
+     * `SPEC_ROWS.cars.max` now clears the largest shipped fleet.
+     */
+    cars: Math.max(1, cars.length),
+    specClass: headline?.spec ?? 'geared-traction',
+    ratedSpeedMps: headline?.ratedSpeedMps ?? 2.5,
+    ratedLoadLb: headline?.ratedLoadLb ?? 2500,
+    /*
+     * Above the lobby only, which is the sky-floor dot's own domain: the elevation draws that dot
+     * inert on an entrance, and the lobby always is one. A transfer flag at or below the lobby — all
+     * three shipped instances are `G` — rides in {@link SpecCarry} instead, so it survives the round
+     * trip without this list quietly claiming a control that does not exist.
+     */
     skyFloors: floors
       .map((floor, index) => (floor.isTransferFloor === true ? index + 1 : 0))
       .filter((floor) => floor > 0),
@@ -1781,5 +2487,28 @@ export function specFromBuilding(config: BuildingConfig, id: string): BuildingSp
           use?: StairsUseConfig;
         } => mode.connects.every((floor) => floor !== undefined),
       ),
+  };
+  /*
+   * Everything above is the *shape*; the carry below is the building. See {@link SpecCarry} for what
+   * is held, when each part is written back, and what a reader is told when an edit drops one.
+   *
+   * The four fingerprints are taken **from the spec this function just built**, through the same
+   * four functions that later compare against them — which is what makes a freshly-read spec match
+   * all four by construction, and what stops this call and {@link carriedFabricOf} drifting into two
+   * different opinions about what a floor vocabulary is.
+   */
+  return {
+    ...shape,
+    carried: {
+      geometry: geometryKeyOf(shape),
+      shafts: shaftKeyOf(shape),
+      hardware: hardwareKeyOf(shape),
+      occupancy: occupancyKeyOf(shape),
+      floorHeightM,
+      floors: carriedFloors,
+      banks: config.banks,
+      ...(config.serviceEvents === undefined ? {} : { serviceEvents: config.serviceEvents }),
+      ...(config.notes === undefined ? {} : { notes: config.notes }),
+    },
   };
 }

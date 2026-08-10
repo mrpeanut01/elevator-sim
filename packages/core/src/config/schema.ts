@@ -86,6 +86,16 @@ export const ISSUE_CODES = {
   missingPassengerTransfer: 'missing-passenger-transfer',
   /** A `serviceEvents` entry names a car this building does not have, or names one ambiguously. */
   unknownServiceEventCar: 'unknown-service-event-car',
+  /**
+   * **No** journey the demand generator could draw is servable by this building's lifts.
+   *
+   * The one hard refusal `buildingConnectivity.ts` raises. Every softer shape of the same defect
+   * — one floor cut off, one zone orphaned — is a warning there, because the building still
+   * serves everybody else and is a legitimate intermediate state in an editor. A building that
+   * connects nothing is not: the run creates no legs, and every figure it publishes describes an
+   * empty building.
+   */
+  disconnectedBuilding: 'disconnected-building',
 } as const;
 
 /** Stable codes for non-fatal diagnostics. */
@@ -119,6 +129,25 @@ export const WARNING_CODES = {
   unusedFloorPairs: 'unused-floor-pairs',
   deckLoadMismatch: 'deck-load-mismatch',
   deckPersonsOutsideClassRange: 'deck-persons-outside-class-range',
+  /**
+   * A populated floor no entrance reaches by any chain of banks. Incoming demand for it is
+   * **lost** at run time — it has no surviving share to fall back on — so the building's total
+   * arrival rate runs below what its traffic profiles specify. See `buildingConnectivity.ts`.
+   */
+  unreachableFromEntrance: 'unreachable-from-entrance',
+  /**
+   * Populated → populated pairs with no chain of banks between them. Distinct from
+   * {@link unreachableFromEntrance} because the *consequence* differs: outgoing and interfloor
+   * demand is redistributed rather than dropped, so the building's total rate survives and its
+   * directional split does not.
+   */
+  unroutableInterfloor: 'unroutable-interfloor',
+  /**
+   * A journey from an entrance that is routable but needs more lift legs than a supertall's
+   * position-shuttle-local chain. Advisory: usually a zone anchored to a lobby level the
+   * entrance cannot reach directly.
+   */
+  excessiveTransferChain: 'excessive-transfer-chain',
 } as const;
 
 /** Render a zod path as `banks[0].cars[1].spec`. */
@@ -335,13 +364,33 @@ export const elevatorSpecsSchema = z
       $comment: comment,
       motorStartDelayS: nonNegative,
       levelingSettleS: valueRangeSchema,
-      passengerTransferS: z.strictObject({
-        $comment: comment,
-        office: positive,
-        residential: positive,
-        hospital: positive,
-        hotel: positive,
-      }),
+      /*
+       * **The four cited rows are required; the key set is not closed.**
+       *
+       * This was a `strictObject`, and that made the loader contradict itself. A building of a
+       * type the table has no row for is refused by `resolveCar` with a message that tells the
+       * author to *"add the type to the reference table"* — and adding `"school": 1.4` to
+       * `data/elevator-specs.json` then failed with `Unrecognized key: "school"`. The docstring
+       * claiming the table is data *"so the value stays tunable without a rebuild (CLAUDE.md
+       * invariant 7)"* was true of the values and false of the keys, which is the same defect as
+       * a control that says it writes nothing while writing something: the advice was live and
+       * the mechanism behind it was not.
+       *
+       * `catchall(positive)` is what opens it, and it opens it to *numbers only*: a further row
+       * is a transfer time in seconds per passenger per direction, so a string or a nested object
+       * under a new key is still refused at the field. The four named rows stay required because
+       * they are cited reference values (CIBSE Guide D) that shipped buildings resolve against,
+       * not defaults this file may drop.
+       */
+      passengerTransferS: z
+        .object({
+          $comment: comment,
+          office: positive,
+          residential: positive,
+          hospital: positive,
+          hotel: positive,
+        })
+        .catchall(positive),
     }),
     loadSensor: z.strictObject({
       $comment: comment,

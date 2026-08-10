@@ -292,6 +292,69 @@ describe('resolveCar', () => {
       expect(error.message).toContain('passengerTransferS');
     });
 
+    it('takes the remedy its own error message advises: a new row in the reference table', () => {
+      /*
+       * The sharp edge this closes. `resolveCar`'s refusal tells the author to *"add the type to
+       * the reference table"*, and `timing.passengerTransferS` was a `strictObject` over exactly
+       * four keys — so `"school": 1.4` in `data/elevator-specs.json` failed with
+       * `Unrecognized key: "school"` and the advice could not be taken. The table's docstring
+       * claimed it was data *"so the value stays tunable without a rebuild (CLAUDE.md invariant
+       * 7)"*, which was true of the values and false of the keys.
+       *
+       * Before the fix this test fails twice over: `parseElevatorSpecs` throws on the key, and
+       * had it not, `findPassengerTransferS`' `switch` had no case to return it from.
+       */
+      const raw = JSON.parse(JSON.stringify(specs)) as {
+        timing: { passengerTransferS: Record<string, unknown> };
+      };
+      raw.timing.passengerTransferS['school'] = 1.4;
+      const extended = parseElevatorSpecs(raw, '<extended specs>');
+
+      expect(findPassengerTransferS(extended, 'school' as BuildingType)).toBe(1.4);
+      const resolved = resolveCar({ id: 'A', spec: 'hydraulic' }, extended, {
+        buildingType: 'school' as BuildingType,
+        buildingId: 'lakeside-primary',
+      });
+      expect(resolved.passengerTransferS).toBe(1.4);
+
+      // The four cited rows are still required, and still read the same.
+      expect(findPassengerTransferS(extended, 'office')).toBe(1.2);
+      expect(findPassengerTransferS(extended, 'residential')).toBe(1.75);
+      expect(findPassengerTransferS(extended, 'hotel')).toBe(1.5);
+    });
+
+    it('opens the table to seconds, not to anything', () => {
+      // A row is a transfer time. Opening the key set may not open the value set, or the next
+      // author puts a note under a type name and gets a car that transfers a string.
+      const raw = JSON.parse(JSON.stringify(specs)) as {
+        timing: { passengerTransferS: Record<string, unknown> };
+      };
+      raw.timing.passengerTransferS['school'] = 'about a second and a half';
+      expect(() => parseElevatorSpecs(raw, '<extended specs>')).toThrow(ConfigError);
+
+      const negative = JSON.parse(JSON.stringify(specs)) as {
+        timing: { passengerTransferS: Record<string, unknown> };
+      };
+      negative.timing.passengerTransferS['school'] = -1;
+      expect(() => parseElevatorSpecs(negative, '<extended specs>')).toThrow(ConfigError);
+    });
+
+    it('drops none of the four cited rows just because the key set opened', () => {
+      // `catchall` makes unknown keys legal; it must not make known ones optional.
+      const raw = JSON.parse(JSON.stringify(specs)) as {
+        timing: { passengerTransferS: Record<string, unknown> };
+      };
+      delete raw.timing.passengerTransferS['hospital'];
+      expect(() => parseElevatorSpecs(raw, '<extended specs>')).toThrow(ConfigError);
+    });
+
+    it('never reads $comment as a transfer time', () => {
+      // The table carries a `$comment`, and the lookup is now a key read rather than a `switch`,
+      // so the narrowing to a finite number is what stands between a building type literally
+      // named `$comment` and a car that transfers a paragraph.
+      expect(findPassengerTransferS(specs, '$comment' as BuildingType)).toBeUndefined();
+    });
+
     it('refuses an unrecognised building type the same way', () => {
       // A type that is not in `BUILDING_TYPES` at all — a hand-built config, or a type added
       // to the buildings schema and not to the reference table. Silence here is how the

@@ -400,6 +400,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'the group levers are the same case: moved off their defaults they make a run unreproducible elsewhere, and a reload is not the moment to inherit that silently',
   'viewer.selectorSpec':
     'the weight-set selector is a group lever by another name — applied on top of whoever is driving — and off its seeded value it writes a selection block and an arm map no shipped profile carries, so a restored one would be a run nobody selected wearing the shipped dispatcher’s name',
+  'viewer.patience':
+    'the Parameters tab’s one applied schema, and the field it is written from is a mount that redraws at its declared defaults on every load — so persisting it would restore a run in which riders abandon while the four controls that say so read “none”, which is the screen and the run disagreeing rather than a session being remembered. It is also unreproducible elsewhere (runIdentity.ts refuses it by name) and abandonment moves the mean it would be judged on',
 
   /* --- the four editors’ working copies ---------------------------------- */
   'viewer.dispatcherSpec':

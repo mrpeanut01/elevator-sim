@@ -12,7 +12,8 @@
  * | `shift/contracts.ts`, `week.ts`, `goals.ts`, `events.ts`, `growth.ts` | `dev/state.ts`'s `shiftRunConfigOf`, called by {@link runShift} |
  * | `shift/report.ts` | {@link closeShift}, and `dev/reportPanel.ts` |
  * | `authoring/*` | the four editor mounts, and `shiftRunConfigOf` |
- * | `record/decisionLog.ts` | `recordRun`, called by {@link runShift} |
+ * | `record/decisionLog.ts` | `recordRun` — called by `dev/shiftWorker.ts` for the shift, and directly by {@link runChallenge} for a challenge's seeds |
+ * | `dev/shiftRunner.ts`, `dev/shiftWorker.ts` | {@link runShift} and {@link verifyCurrent}, which no longer simulate on this thread |
  * | `dev/surfaces.ts` | {@link applyNavigation} |
  * | `frame/overlay.ts` | {@link drawStage} and the landing selector |
  * | `record/document.ts` | **Load recording**, **Save recording** and **Verify replay** |
@@ -69,7 +70,13 @@ import {
   fetchTransport,
   type LeaderboardClient,
 } from '../menu/client.js';
-import { initialMenuState, isSeedText, navigate, SEED_MAX_DIGITS } from '../menu/menu.js';
+import {
+  FREE_PLAY_RATES,
+  initialMenuState,
+  isSeedText,
+  navigate,
+  SEED_MAX_DIGITS,
+} from '../menu/menu.js';
 import { partById, partIdOf, partsOfDay } from '../menu/partsOfDay.js';
 import { enterEndless } from '../menu/enterEndless.js';
 import { enterFreePlay } from '../menu/enterFreePlay.js';
@@ -173,7 +180,7 @@ import { mountDispatcherEditor } from './dispatcherEditor.js';
 import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
-import { mountParameterForm } from './parameterForm.js';
+import { APPLIED_SCHEMA, mountParameterForm, patienceFromCandidate } from './parameterForm.js';
 import { mountReport, runProgressOf } from './reportPanel.js';
 import { mountRightRail } from './rightRail.js';
 import { mountScenarios } from './scenariosPanel.js';
@@ -207,8 +214,14 @@ import {
   weeksForSession,
   withBuilding,
   type PatternSelection,
+  type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
+import {
+  createShiftRunner,
+  shiftRunCostOf,
+  type ShiftRunCost,
+} from './shiftRunner.js';
 import {
   DRAWER_BREAKPOINT_PX,
   applyDrawerState,
@@ -2264,6 +2277,50 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let looping = false;
 
   const clock = systemClock();
+
+  /**
+   * The shift, run off the painting thread — the UI readiness audit's B3.
+   *
+   * `dev/shiftRunner.ts` holds the whole argument: why the config crosses whole rather than being
+   * re-derived, why the clone is faithful, why there is no progress bar and why cancellation is
+   * `terminate()`. This is its one non-test caller.
+   *
+   * The **Run this shift** button is the cancel button while a run is in flight. That is one
+   * control rather than two, and it is the control the player is already looking at: the primary
+   * action of the ribbon is *make this run happen*, and while one is happening its opposite is the
+   * only thing that action can honestly mean. It also needs no new element on a page whose markup
+   * is canonical (`docs/12` § D174).
+   */
+  const shiftRunner = createShiftRunner({
+    spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
+    clock,
+    onStatus: (text) => {
+      setText(ui.transport.status, text);
+    },
+    onRunning: (running) => {
+      /*
+       * The transport is deliberately **not** disabled here. The recording on screen is the one
+       * from before, it is complete, and it plays: `dev/batchPanel.ts`'s own line — *"the page is
+       * still yours while this runs"* — is the whole point of moving off the main thread, and
+       * greying the transport out would give back the thing that was bought.
+       */
+      ui.coach.run.textContent = running ? 'Cancel this run' : 'Run this shift';
+    },
+    onFailed: (message) => {
+      failRun(message);
+    },
+  });
+  /*
+   * The elapsed line, ticked from here rather than from inside the runner.
+   *
+   * One interval for the life of the page rather than one started and stopped per run: `tick()` is
+   * a no-op when nothing is running, so the alternative buys nothing and adds two more transitions
+   * to keep in step with the worker's. 500 ms because the line counts whole seconds — a faster tick
+   * would redraw the same string.
+   */
+  window.setInterval(() => {
+    shiftRunner.tick();
+  }, 500);
   /**
    * The legend's fill, keyed on the bands themselves.
    *
@@ -2306,8 +2363,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       if (patchTouchesLibrary(patch)) saveSessionNow();
       renderAll();
     },
-    runShift() {
-      runShift();
+    runShift(onRan) {
+      runShift(onRan);
     },
     openTab(tab) {
       const revealed = new Set(state.revealedTabs);
@@ -2401,11 +2458,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
     currentDispatcherId: () => state.dispatcherId,
   });
 
+  /*
+   * **The Parameters tab, bound to one schema and honest about the other eleven** — the UI
+   * readiness audit's B4.
+   *
+   * The handle this mount used to return was discarded here, and `ParameterFormHandle.candidate()`
+   * — *"the only route from that form to a value"* — was called by nothing in `packages/viz/src` or
+   * `packages/cli/src`. 114 live controls, 12 schemas, and a run that came back byte for byte
+   * whatever a player moved.
+   *
+   * What is wired is `sim.patience.*`, and it is wired **through the state** rather than read out of
+   * the form at Run time: `ViewerState.patience` is what `shiftRunConfigOf` reads, which is what
+   * puts this control inside `scope/scope.test.ts`'s derived key set — the instrument that would
+   * have caught the original defect and could not see a closure local. The other eleven schemas and
+   * the dispatcher space say *NOT APPLIED* on screen, in the form, above their own controls.
+   *
+   * The branch is here rather than in the mount because **this file is what knows what a run
+   * reads**. `dev/parameterForm.ts` publishes what the picker is showing and names its source; the
+   * shell decides what that means.
+   */
   mountParameterForm({
     container: ui.paramForm,
     picker: ui.paramSource,
     status: ui.paramStatus,
     refusal: ui.paramRefusal,
+    onCandidate: (sourceName, candidate) => {
+      if (sourceName !== APPLIED_SCHEMA) return;
+      /*
+       * `context.update` and **not** `runShift()`. An edit here takes effect on the next Run, which
+       * is what `mountDispatcherEditor` and `mountSelectorEditor` already do and for the same
+       * reason: a slider that re-simulated on every change would put a run inside a drag. The
+       * on-screen note says *press Run this shift to see it* for exactly this reason.
+       */
+      context.update({ patience: patienceFromCandidate(candidate) });
+    },
   });
 
   mountBatchPanel({
@@ -3113,7 +3199,66 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The run
    * ---------------------------------------------------------------------- */
 
-  function runShift(): void {
+  /**
+   * How big the run `plan` describes is about to be — `dev/shiftRunner.ts#shiftRunCostOf`.
+   *
+   * The rate is read the way `core` reads it: `config.demand.arrivalRatePctPop5min` when the player
+   * named one, and otherwise the building's own profile at the `typical` band, which is the
+   * precedence `Simulation` itself applies. A second guess at it here would be a number that agreed
+   * with the run on the cells anybody checked and diverged on the rest — `dev/batchPanel.ts`'s
+   * `effectiveRatePctPop5min` makes the same argument one tab over, and this follows it rather than
+   * inventing a third rule.
+   *
+   * A building whose profile this build does not carry yields `0`, which reads as *not heavy* — the
+   * config layer already warns about that case, and a size estimate is not the place to raise it a
+   * second time.
+   */
+  function costOf(plan: ShiftRunConfig): ShiftRunCost {
+    const named = plan.config.demand?.arrivalRatePctPop5min;
+    /*
+     * `plan.config.trafficProfiles` and **not** `resources.trafficProfiles`: a reader who edited the
+     * pattern is running against `trafficProfilesWithPattern`'s widened file, and reading the
+     * shipped one here would estimate the run they did not ask for. The config is what the kernel
+     * is handed, so it is what the estimate is taken from.
+     */
+    const profile = plan.config.trafficProfiles.profiles.find(
+      (entry) => entry.id === plan.building.trafficProfile,
+    );
+    const ratePctPop5min = named ?? profile?.arrivalRatePctPop5min.typical ?? 0;
+    return shiftRunCostOf({
+      population: plan.building.totalPopulation,
+      ratePctPop5min,
+      // `durationS` when the run is the whole period and the window's own length when it is a part
+      // of one — § D286 puts exactly one of the two on the config, so this reads whichever is there.
+      durationS:
+        plan.config.durationS ??
+        (plan.config.windowEndS ?? 0) - (plan.config.windowStartS ?? 0),
+    });
+  }
+
+  /**
+   * Simulate the shift the current state describes — **on a worker**, since `dev/shiftWorker.ts`.
+   *
+   * ## What moved, and what deliberately did not
+   *
+   * This function used to call `recordRun` inline, which put a 31–70 s synchronous simulation on
+   * the thread that paints (the UI readiness audit's B3; 21–31 s measured in Node on the worst cell
+   * the menu offers, under the shipped `collective` — see `dev/shiftRunner.ts` for the table and for
+   * why that row rather than a slower one). Everything up to and including `shiftRunConfigOf` is **still synchronous and
+   * still here**: it is the part that can refuse, and a refusal must land on the same keystroke that
+   * caused it. What crosses the thread is the run.
+   *
+   * Its **signature has not changed**, and that is the point rather than a convenience. Fourteen
+   * call sites in this file are `runShift()` at the end of a handler, and every one of them was
+   * already fire-and-forget — nothing read `state.recording` on the next line. The two that set a
+   * notice *after* the call still work, because the clearing they order themselves against happens
+   * in the synchronous prologue below.
+   *
+   * The one thing that did have to move is `drawMenu()`: boot draws the overlay immediately after
+   * calling this, and on a synchronous run that overlay was painted over a finished recording.
+   * See {@link applyShift}.
+   */
+  function runShift(onRan?: (recording: VizRecording) => void): void {
     setText(ui.transport.error, '');
     /*
      * The restore notice survives boot's own run and nothing after it.
@@ -3139,30 +3284,86 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;
       calendarCaption = plan.calendarLine;
-      const recorded = recordRun(plan.config, {
+      shiftRunner.start({
+        label: 'shift',
+        config: plan.config,
         outOfServiceCarIds: plan.outOfServiceCarIds,
+        /*
+         * **On, and the cost was measured rather than assumed.** `recordRun` defaults it to `true`
+         * and the left rail's decision log is what reads it, so turning it off would take a shipped
+         * surface with it.
+         *
+         * On the worst cell the menu offers — `vertical-city`/`collective`/`constant-iso`/7 200 s —
+         * the log is **818 KB of a 57.3 MB recording, 1.4 %**, because `DecisionCollector` caps at
+         * 4 000 entries. Its **run-time** cost is *not resolvable by this apparatus*, which is the
+         * honest statement rather than *"it is free"*: two consecutive runs disagreed about the sign
+         * across two sessions (48.3 s instrumented against 55.9 s plain in one; 27.5 s against
+         * 21.2 s in the other), so what dominates is warm-up and not the collector. There is nothing
+         * here worth buying back on a 1.4 % share.
+         */
+        recordDecisions: true,
+        cost: costOf(plan),
+        onDone: (recording, startOfDayS) => {
+          applyShift(recording, startOfDayS, plan.withheld);
+          /*
+           * **After the state is written and after the page has been drawn**, so a panel that arms
+           * itself here is arming against the run that is on screen rather than the one before it.
+           * `dev/dispatcherEditor.ts` then re-renders itself from inside the callback, which is the
+           * one extra paint this seam costs and the reason it is a callback rather than a fifth
+           * member on {@link MountContext}.
+           */
+          onRan?.(recording);
+        },
       });
-      // The template's own hour, moved on by the window when the run is a part of a day. Absent for
-      // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
-      runStartOfDayS = recorded.result.trace.startOfDayS;
-      // The run this shell simulated — GitHub issue #136, and the only place it is written. See
-      // {@link simulatedRecording}.
-      simulatedRecording = recorded.recording;
-      // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
-      // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
-      // under today's date, which is the stale-sheet defect § D223 closed one field over.
-      state = {
-        ...state,
-        recording: recorded.recording,
-        report: undefined,
-        tomorrow: undefined,
-        withheld: plan.withheld,
-      };
-      adopt(recorded.recording);
-      renderAll();
     } catch (error) {
       failRun(error);
     }
+  }
+
+  /**
+   * Take delivery of a finished run. The second half of {@link runShift}, on the message.
+   *
+   * Everything here was inline in `runShift` before the worker, in this order, and the order is
+   * unchanged. What is new is the last line.
+   */
+  function applyShift(
+    recording: VizRecording,
+    startOfDayS: number | undefined,
+    withheld: readonly string[],
+  ): void {
+    // The template's own hour, moved on by the window when the run is a part of a day. Absent for
+    // `constant-iso`, which declares none — omission means *this has no hour*, never *midnight*.
+    runStartOfDayS = startOfDayS;
+    // The run this shell simulated — GitHub issue #136, and the only place it is written. See
+    // {@link simulatedRecording}.
+    simulatedRecording = recording;
+    // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
+    // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
+    // under today's date, which is the stale-sheet defect § D223 closed one field over.
+    state = {
+      ...state,
+      recording,
+      report: undefined,
+      tomorrow: undefined,
+      withheld,
+    };
+    adopt(recording);
+    renderAll();
+    /*
+     * **The overlay is redrawn when the run it is standing over finishes** — GitHub issue #97,
+     * kept closed across the move to a worker.
+     *
+     * Boot's sequence is `runShift(); drawMenu();`. On a synchronous run that `drawMenu` painted
+     * against a finished recording; on this one it paints against `hasRun === false`, and *Resume*
+     * would sit disabled under *"There is no shift on screen to go back to yet"* over a shift that
+     * had been simulated and drawn. Issue #97's own sentence, arriving by a new route.
+     *
+     * Guarded on the overlay being **on screen**, which is the narrow case where its world can have
+     * gone stale under it — boot, and the `set-calendar` arm, which already calls `drawMenu()` one
+     * line before running. `renderAll` deliberately does not do this (see boot's own note): a
+     * rebuild on every state change is issue #106, a press swallowed mid-`mousedown`.
+     */
+    if (!menuRoot.hidden) drawMenu();
   }
 
   function adoptEditedBuilding(config: BuildingConfig): void {
@@ -3750,7 +3951,18 @@ function boot(ui: Elements, resources: BrowserResources): void {
       step(event.key === 'ArrowRight' ? 60 : -60);
     });
     // § 4.7 — Run moved into the coach ribbon, beside the three selects that decide what it runs.
+    /*
+     * **And it is the cancel button while a run is in flight** — the audit's B3, second half.
+     *
+     * The branch is on the runner rather than on a flag of this file's own, so the label, the
+     * behaviour and the worker's lifetime cannot disagree about whether something is running: one
+     * fact, read where it lives. `onRunning` above writes the label from the same transition.
+     */
     ui.coach.run.addEventListener('click', () => {
+      if (shiftRunner.isRunning()) {
+        shiftRunner.cancel();
+        return;
+      }
       runShift();
     });
     ui.transport.verify.addEventListener('click', () => {
@@ -3962,16 +4174,40 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Recording in and out
    * ---------------------------------------------------------------------- */
 
+  /**
+   * Re-run the current configuration and compare — `PB-16`.
+   *
+   * **On the worker too, and that is not incidental.** This is a second full simulation of exactly
+   * the run that already froze the tab once, behind a button one click from the transport; leaving
+   * it synchronous would have left B3 half-fixed on the surface where it is most surprising, since
+   * nothing about *Verify replay* says *this will cost you a minute*.
+   *
+   * It goes through the same runner, so the two share one worker slot: pressing Verify while a
+   * shift is running terminates the shift, which is the same *latest ask wins* rule every other
+   * control on this page follows.
+   */
   function verifyCurrent(): void {
     const recording = state.recording;
     if (recording === undefined) return;
     try {
       const plan = shiftRunConfigOf(resources, state);
-      const again = recordRun(plan.config, { outOfServiceCarIds: plan.outOfServiceCarIds });
-      const verdict = verifyReplay(recording, again.recording);
-      // The stored recording stays on screen either way — `PB-16`'s second half. A mismatch is
-      // evidence about the build, not a reason to quietly swap in whatever came out.
-      setText(ui.transport.status, verdict.message);
+      shiftRunner.start({
+        label: 'replay check',
+        config: plan.config,
+        outOfServiceCarIds: plan.outOfServiceCarIds,
+        // The default `recordRun` takes, so the run being compared is the run this shell makes.
+        // A check that verified an uninstrumented recording against an instrumented one would be
+        // comparing two different requests, which `record/decisionLog.ts` says produce equal
+        // records — but *says* is not the claim this button exists to make.
+        recordDecisions: true,
+        cost: costOf(plan),
+        onDone: (again) => {
+          const verdict = verifyReplay(recording, again);
+          // The stored recording stays on screen either way — `PB-16`'s second half. A mismatch is
+          // evidence about the build, not a reason to quietly swap in whatever came out.
+          setText(ui.transport.status, verdict.message);
+        },
+      });
     } catch (error) {
       failRun(error);
     }
@@ -4611,6 +4847,50 @@ function applyDeepLink(state: ViewerState, resources: BrowserResources): ViewerS
  * period and is deliberately *not* called `window`: the CLI's `--window` names the reporting window
  * and `--part` takes a clock range, and a third meaning for either would be worse than a new word.
  */
+/**
+ * The largest arrival rate any control in this product will accept — `menu/menu.ts#FREE_PLAY_RATES`'
+ * top rung, read rather than restated.
+ *
+ * Derived so the ladder stays the single authority: if Free Play ever offers 20 %, a link may carry
+ * 20 % on the same commit and nobody has to remember this line.
+ */
+const MAX_OFFERED_RATE_PCT_POP5MIN = FREE_PLAY_RATES.reduce<number>(
+  (highest, rate) => (rate === null ? highest : Math.max(highest, rate)),
+  0,
+);
+
+/**
+ * The link's `rate`, bounded — the UI readiness audit's B3, second axis.
+ *
+ * ## What was wrong
+ *
+ * `rate` was parsed by `/^\d+(\.\d+)?$/` and honoured **whatever it said**. Free Play's own
+ * validator only requires `rate > 0` (`menu/menu.ts#freePlayIssues`), so nothing anywhere put a
+ * ceiling on the demand a shared address could ask a stranger's browser for. Measured on
+ * `midtown-office`/`nearest-car`/1 800 s: rate 12 → 447 ms, 50 → 950 ms, 100 → 2 794 ms,
+ * **200 → 6 588 ms** — and that is the *small* building at a quarter of the longest run the menu
+ * offers. A link is not a control a player moved; it is a number somebody else typed.
+ *
+ * ## Why this is a clamp and not a refusal
+ *
+ * `duration` two dozen lines up is `Math.max(60, Math.min(7200, …))`, and this is the same
+ * decision about the same kind of stranger's input: a link that overshoots runs the largest thing
+ * the product itself offers rather than nothing at all. The precedent that says a link may not
+ * exceed what a field would accept is `seed`'s, right here — *"an address carrying twenty-one
+ * digits would run something no field in this product would have accepted and no board would have
+ * taken"* (issue #111(c)). This is that rule at the second axis, and it was the axis with no rule.
+ *
+ * A rate that is not a positive number is `null`, which is *the building's own profile* — the same
+ * value the parser already produced for an absent or unparseable `rate`, so this changes nothing
+ * about links that were already honest.
+ */
+function linkRateOf(rate: string | null): number | null {
+  if (rate === null || !/^\d+(\.\d+)?$/.test(rate)) return null;
+  const value = Number(rate);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.min(value, MAX_OFFERED_RATE_PCT_POP5MIN);
+}
+
 export function deepLinkStateOf(
   state: ViewerState,
   resources: BrowserResources,
@@ -4671,8 +4951,7 @@ export function deepLinkStateOf(
     template !== null &&
     resources.trafficProfiles.demandTemplates.some((entry) => entry.id === template);
   if (templateShips) {
-    const parsedRate = rate !== null && /^\d+(\.\d+)?$/.test(rate) ? Number(rate) : null;
-    patch.freePlay = { demandTemplateId: template, arrivalRatePctPop5min: parsedRate };
+    patch.freePlay = { demandTemplateId: template, arrivalRatePctPop5min: linkRateOf(rate) };
   }
   /*
    * The **state's** opening length when the link names none, not the module constant — § D234.

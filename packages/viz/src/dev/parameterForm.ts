@@ -46,6 +46,29 @@
  * A surface that looks complete because the incomplete parts are invisible is this repository's
  * signature defect pointed at a schema. What moved is the granularity — one bad row used to take
  * sixteen good ones off the screen with it.
+ *
+ * ## What this form does to a run — the UI readiness audit's **B4**
+ *
+ * For most of its life: **nothing.** `mountParameterForm` returned a handle whose `candidate()` was
+ * *"the only route from that form to a value"*, `dev/main.ts` discarded it, and
+ * `grep '\.candidate()'` over `packages/viz/src` and `packages/cli/src` returned zero hits. The
+ * audit counted the cost — **12 schemas, 130 declared rows, 114 live controls and 16 named
+ * refusals** — and named the shape: a player sets `sim.patience.meanS` to 120, presses Run, and gets
+ * the same day back byte for byte, under a status line that reads like a configurator. It was
+ * declared honestly in `docs/10` § 11 and **in a document**, which is CLAUDE.md's *a stated refusal
+ * is pinned by a run, never by another sentence* pointed at the wrong medium.
+ *
+ * Both halves are closed here, and they are different repairs:
+ *
+ * - **The screen says so.** {@link appliedNoteFor} draws one sentence per source, as the form's
+ *   first child, naming the button and what pressing it will do.
+ * - **One schema is genuinely wired.** {@link ParameterFormOptions.onCandidate} replaces the
+ *   discarded getter, and `dev/main.ts` routes `PATIENCE_PARAMETERS` into `ViewerState.patience`.
+ *   The getter is **deleted** rather than left beside it: a route nothing takes is what the audit
+ *   found, and keeping it would be two answers to *how does a value leave this form*.
+ *
+ * The rest of the picker still binds nothing, and that is now a sentence a reader meets rather than
+ * one they would have to go looking for.
  */
 
 import {
@@ -53,6 +76,7 @@ import {
   discoverParameterSchemas,
 } from '@elevator-sim/experiments/browser';
 import type { ParameterValue, SearchSpace } from '@elevator-sim/experiments/browser';
+import type { PatienceConfig } from '@elevator-sim/core/browser';
 
 import {
   applyControlEdit,
@@ -69,6 +93,97 @@ import { glossaryFor } from '../mode/glossary.js';
 /** The id the picker uses for the profile-authorable space, which is not one declared schema. */
 const SEARCH_SPACE_SOURCE = '<dispatcher search space>';
 
+/**
+ * The one discovered schema the Run button reads — `core`'s own export name, which is what
+ * `discoverParameterSchemas()` keys by.
+ *
+ * Exported because **`dev/main.ts` decides what to do with it and this file decides nothing**: the
+ * mount publishes a candidate with its source's name, the shell matches on this constant, and
+ * `dev/state.ts#shiftRunConfigOf` puts the result on the config. One name, read in both places, so
+ * the sentence {@link appliedNoteFor} prints and the branch that applies it cannot disagree — which
+ * is the failure mode this whole tab was an instance of.
+ */
+export const APPLIED_SCHEMA = 'PATIENCE_PARAMETERS';
+
+/**
+ * What this schema does to the next run, in the reader's register — the audit's **B4**.
+ *
+ * ## Why a sentence per schema rather than one banner
+ *
+ * Because the true statement differs, and a banner that said *"nothing here is applied"* would be
+ * wrong on the one screen where it matters. Eleven of the twelve discovered schemas and the
+ * dispatcher space are **drawn and not applied**; `PATIENCE_PARAMETERS` is applied. Saying so per
+ * source is the difference between a disclaimer and a fact.
+ *
+ * ## Why the refusal says what the tab *is* rather than only what it is not
+ *
+ * A control that is drawn as live and binds nothing is unacceptable, and the honest repair is not
+ * only *"this does nothing"* — it is *what is this, then*. These controls are the search space a
+ * generic optimizer would be handed (CLAUDE.md invariant 8), rendered from the schemas `core`
+ * declares; reading them tells you what is tunable and what each range is. That is a real thing to
+ * be, and a reader who knows it will stop expecting the Run button to move.
+ */
+export function appliedNoteFor(sourceName: string): string {
+  if (sourceName === APPLIED_SCHEMA) {
+    return (
+      'APPLIED — these four reach the next shift. What you set here is written onto the run as ' +
+      'sim.patience, so riders give up and leave. Abandonment improves the average wait by ' +
+      'construction, because it removes the longest waits from the sample: read the abandoned ' +
+      'count beside the mean, never instead of it, and above 2 % the mean is suppressed outright. ' +
+      'Press Run this shift to see it. Every other schema on this picker is drawn and not applied.'
+    );
+  }
+  return (
+    `NOT APPLIED — nothing the Run button does reads ${sourceName}. Move a control here, press Run ` +
+    'this shift, and the day that comes back is byte for byte the day you would have got without ' +
+    'touching it. What this is instead: the search space a generic optimizer would be handed — ' +
+    'every tunable core declares, with its type, its range and the gates that decide when it is ' +
+    `live. ${APPLIED_SCHEMA} is the one source on this picker that does reach a run.`
+  );
+}
+
+/**
+ * The patience curve a candidate describes, or `null` for *nobody leaves*.
+ *
+ * `null` rather than a default curve, and that is `core`'s own rule rather than a choice made here:
+ * `sim/patience.ts` says an absent block means every run is byte-identical to one produced before
+ * patience existed, and `sim.patience.distribution` declares `'none'` as its default for exactly
+ * that reason. A default patience would put an unstated behaviour into every run in the product.
+ *
+ * The three numbers are read out of the candidate rather than defaulted here, because
+ * `candidateOf` has already applied each row's `activeWhen`: under `exponential` there is no
+ * `spreadS` in the map at all, which is the schema's own statement that the field is inert there.
+ * Substituting a number for it would be this file inventing a value `core` refuses to read.
+ */
+export function patienceFromCandidate(
+  candidate: ReadonlyMap<string, ParameterValue>,
+): PatienceConfig | null {
+  const distribution = candidate.get('sim.patience.distribution');
+  if (distribution !== 'exponential' && distribution !== 'uniform') return null;
+  const meanS = numberIn(candidate, 'sim.patience.meanS');
+  // `requireValidPatience` throws on a non-positive mean — *"a mean patience of zero abandons every
+  // rider at the instant they arrive and reports an AWT over nobody"*. The schema's range starts at
+  // 1 so no control can produce one, and this is the guard that keeps that true of a schema change
+  // rather than of today's schema.
+  if (meanS === undefined || meanS <= 0) return null;
+  const spreadS = numberIn(candidate, 'sim.patience.spreadS');
+  const minS = numberIn(candidate, 'sim.patience.minS');
+  return {
+    distribution,
+    meanS,
+    ...(spreadS === undefined ? {} : { spreadS }),
+    ...(minS === undefined ? {} : { minS }),
+  };
+}
+
+function numberIn(
+  candidate: ReadonlyMap<string, ParameterValue>,
+  id: string,
+): number | undefined {
+  const value = candidate.get(id);
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 export interface ParameterFormOptions {
   /** Where the controls are drawn. Emptied and refilled on every render. */
   readonly container: HTMLElement;
@@ -78,13 +193,33 @@ export interface ParameterFormOptions {
   readonly status: HTMLElement;
   /** Refusals, in the reader's register. `role="alert"` in the markup. */
   readonly refusal: HTMLElement;
-}
-
-export interface ParameterFormHandle {
-  /** Redraw from the current state. Used by the tab switch. */
-  refresh(): void;
-  /** The live point, as a search would see it — inactive dimensions dropped. */
-  candidate(): ReadonlyMap<string, ParameterValue>;
+  /**
+   * The live point, whenever it moves — the seam the UI readiness audit's **B4** found missing.
+   *
+   * ## What was wrong
+   *
+   * This mount used to hand back a `ParameterFormHandle` whose `candidate()` was *"the only route
+   * from that form to a value"*, `dev/main.ts` **discarded the handle**, and `grep '\.candidate()'`
+   * over `packages/viz/src` and `packages/cli/src` returned **zero hits**. So 114 live controls
+   * over 12 schemas drew, accepted edits, cascaded their gates, refused bad values and reported
+   * *"41 dimensions, 41 live — authorable as a dispatcher profile"* — and a player could set
+   * `sim.patience.meanS` to 120, press Run, and get the same day back byte for byte.
+   *
+   * A callback rather than a getter, because a getter is what was there: the difference between a
+   * value that *can* be read and a value that *is* read is the whole of the standing requirement,
+   * and the second one is harder to leave unwired by accident.
+   *
+   * ## It fires on every accepted edit and on every source change
+   *
+   * On the source change too, so what the receiver holds is always the point the picker is
+   * currently showing rather than the last one it was told about — the two would drift the moment
+   * a player moved the picker, and a stale value the screen has stopped displaying is exactly the
+   * disagreement this seam existed to avoid.
+   *
+   * Called with the source's name, because **the receiver decides what is applied**. This file
+   * knows what the controls hold; it does not know what a run reads.
+   */
+  readonly onCandidate?: ((sourceName: string, candidate: ReadonlyMap<string, ParameterValue>) => void) | undefined;
 }
 
 /** A schema that collected, or the reason it did not. Never a silently missing entry. */
@@ -195,8 +330,8 @@ function valueFrom(control: Control, input: HTMLInputElement | HTMLSelectElement
   }
 }
 
-export function mountParameterForm(options: ParameterFormOptions): ParameterFormHandle {
-  const { container, picker, status, refusal } = options;
+export function mountParameterForm(options: ParameterFormOptions): void {
+  const { container, picker, status, refusal, onCandidate } = options;
   const doc = container.ownerDocument;
 
   for (const name of [SEARCH_SPACE_SOURCE, ...discoverParameterSchemas().keys()]) {
@@ -205,10 +340,35 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
 
   let sourceName = picker.value;
   let source = collectFormSource(sourceName);
-  let values: ControlValues = source.ok ? defaultValues(source.space) : new Map();
+  /**
+   * What each source was left holding, so the picker is a **view** and not a reset.
+   *
+   * It was one `values` map re-seeded from `defaultValues` on every picker change, which meant
+   * looking at a second schema silently discarded whatever had been set on the first. That was
+   * harmless while nothing read the form; it stops being harmless the moment a source is applied to
+   * the run, because *the screen and the run must not disagree* — and a value the run still holds
+   * while the control that set it has snapped back to its default is precisely that disagreement.
+   */
+  const valuesBySource = new Map<string, ControlValues>();
+
+  function valuesFor(name: string, from: Source): ControlValues {
+    const held = valuesBySource.get(name);
+    if (held !== undefined) return held;
+    const seeded: ControlValues = from.ok ? defaultValues(from.space) : new Map();
+    valuesBySource.set(name, seeded);
+    return seeded;
+  }
+
+  let values: ControlValues = valuesFor(sourceName, source);
 
   function say(reason: string): void {
     refusal.textContent = reason;
+  }
+
+  /** Tell the receiver what the picker is showing now. See {@link ParameterFormOptions.onCandidate}. */
+  function publish(): void {
+    if (onCandidate === undefined) return;
+    onCandidate(sourceName, source.ok ? candidateOf(source.space, values) : new Map());
   }
 
   function draw(): void {
@@ -224,6 +384,20 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
 
     const space = source.space;
     const controls = controlsFor(space, values);
+    /*
+     * **What this schema does to the next run, said above the controls it draws** — the audit's B4.
+     *
+     * First child of the form rather than a footnote, because it is the thing a reader has to know
+     * before they touch anything, and because the tab's own status line reads like a configurator:
+     * *"41 dimensions, 41 live — authorable as a dispatcher profile"* is a true sentence about a
+     * search space and was being read as a claim about the Run button. `docs/10` § 11 declared the
+     * gap honestly and declared it **in a document**, which is CLAUDE.md's *a stated refusal is
+     * pinned by a run, never by another sentence* pointed at the wrong medium.
+     */
+    const applied = doc.createElement('p');
+    applied.className = 'control-inactive';
+    applied.textContent = appliedNoteFor(sourceName);
+    container.append(applied);
     container.append(instantiateControlNode(doc, renderControls(controls)));
     const unsearchable = renderUnsearchable(space.unsearchable);
     if (unsearchable !== undefined) container.append(instantiateControlNode(doc, unsearchable));
@@ -265,7 +439,11 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
   function apply(edit: ControlEdit): void {
     if (edit.accepted) {
       values = edit.values;
+      valuesBySource.set(sourceName, values);
       say('');
+      // Only on acceptance. A refused edit changed nothing, and telling the receiver about it would
+      // make the run and the screen agree on a value neither of them is showing.
+      publish();
     } else {
       say(edit.reason);
     }
@@ -277,8 +455,9 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
   picker.addEventListener('change', () => {
     sourceName = picker.value;
     source = collectFormSource(sourceName);
-    values = source.ok ? defaultValues(source.space) : new Map();
+    values = valuesFor(sourceName, source);
     say('');
+    publish();
     draw();
   });
 
@@ -303,9 +482,4 @@ export function mountParameterForm(options: ParameterFormOptions): ParameterForm
   });
 
   draw();
-
-  return {
-    refresh: draw,
-    candidate: () => (source.ok ? candidateOf(source.space, values) : new Map()),
-  };
 }

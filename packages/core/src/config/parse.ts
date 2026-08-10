@@ -21,6 +21,7 @@
 
 import type { ZodError } from 'zod';
 
+import { connectivityDiagnostics } from './buildingConnectivity.js';
 import { expandFloors } from './expandFloors.js';
 import { findElevatorSpec, resolveCar } from './resolveCar.js';
 import {
@@ -574,6 +575,30 @@ export function resolveBuilding(
       );
     });
   });
+
+  /*
+   * Does the service actually connect?
+   *
+   * Last, and only when every reference already checked out. Running it earlier would report
+   * "floor 26 is unreachable" about a building whose real problem is that `servesFloors` names a
+   * floor that does not exist — a derived complaint stacked on top of its own cause, which is
+   * the diagnostics failure this module's header rule 1 exists to prevent.
+   *
+   * `banks` is the resolved list rather than the authored one for the same reason: a bank whose
+   * cars all failed to resolve has already reported that, and asking the graph about it would
+   * add noise to a building that is going to be refused anyway.
+   *
+   * See `buildingConnectivity.ts` for why this is a warning in every shape but one, why it is
+   * credential-blind, and why it models lifts alone.
+   */
+  if (issues.length === 0) {
+    const connectivity = connectivityDiagnostics(
+      { floors, entranceFloors, transferFloors, banks },
+      { file, buildingId: building.id },
+    );
+    issues.push(...connectivity.issues);
+    warnings.push(...connectivity.warnings);
+  }
 
   if (issues.length > 0) {
     throw new ConfigError(issues, {

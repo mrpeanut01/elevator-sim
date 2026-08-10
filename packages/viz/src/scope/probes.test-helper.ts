@@ -526,6 +526,36 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
       }),
     ],
   },
+  'viewer.patience': {
+    /*
+     * **Move the control and require the run to change** — § D177, pointed at the Parameters tab's
+     * one applied schema.
+     *
+     * The arms are `null` against a 120 s exponential curve, which is the pair `sim/patience.ts`'s
+     * own contract is written about: *"an absent block means nobody ever leaves, which is every run
+     * this repository produced before this type existed"*. So the left arm is required to be
+     * byte-identical to the run before the field existed, and the right arm is required to differ —
+     * a rider who leaves never boards, and `legsOf` compares exactly that.
+     *
+     * On Midtown Office at 1 800 s for `viewer.outOfServiceCarIds`' measured reason one row down:
+     * Garden Apartments is a residential trickle, and nobody who is served in under a minute ever
+     * runs out of patience — the probe would report a live control dead on a building where
+     * abandonment cannot happen rather than on a control that does not work.
+     *
+     * 120 s is CLAUDE.md's own worked example (*"at `midtown-office` 6 % with a 120 s mean patience,
+     * AWT goes 61.9 s → 23.3 s with fifty-one riders gone"*), which is why it is that number and not
+     * a smaller one chosen to make the arms differ.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', shiftLengthS: 1800, patience: null }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        patience: { distribution: 'exponential', meanS: 120 },
+      }),
+    ],
+  },
   'viewer.outOfServiceCarIds': {
     /*
      * On Midtown Office, not Garden Apartments — and the reason is a measured fact about the probe

@@ -1308,3 +1308,126 @@ describe('failure modes', () => {
     expect(trace.warnings.some((w) => w.includes('no demand at all'))).toBe(true);
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * The demand surface refuses what it does not recognise
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A knob that is silently ignored is a control the player moves for no effect.
+ *
+ * `TrafficConfig` never goes through zod — it carries a `ResolvedBuilding` and a `StreamSet`, so
+ * it cannot — and the compiler only sees it when the caller is TypeScript. A viewer that builds
+ * this object from a form or a URL parameter is neither. Measured on `midtown-office` at seed
+ * 20 260 810 under `rise-and-fall` before these refusals existed: `interfloorWeighting: 'bogus'`
+ * and `credentialAssignment: 'bogus'` each produced **719 legs**, exactly the default run, because
+ * the reads downstream are `=== 'uniform'` and `!== 'none'` and a misspelling lands on the wrong
+ * side of both; `batchSharesDestination: 'yes'` did the same through truthiness; and
+ * `demandLevel: 'high'` failed as `TrafficError: … received NaN` from `poissonBatch.ts`, three
+ * layers from the field that was wrong.
+ */
+describe('demand options are validated at the boundary', () => {
+  const base = (): {
+    building: ResolvedBuilding;
+    profiles: TrafficProfiles;
+    streams: StreamSet;
+  } => ({
+    building: building('midtown-office'),
+    profiles,
+    streams: new StreamSet(20260810),
+  });
+
+  it('refuses a field nothing reads, by name', () => {
+    expect(() => generateTrace({ ...base(), arrivalRateMultiplier: 3 } as never)).toThrow(
+      /arrivalRateMultiplier/,
+    );
+    expect(() => generateTrace({ ...base(), arrivalRateMultiplier: 3 } as never)).toThrow(
+      TrafficError,
+    );
+  });
+
+  it('names the declared fields in the refusal, so the message is the documentation', () => {
+    let message = '';
+    try {
+      generateTrace({ ...base(), arrivalRateMultiplier: 3 } as never);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    for (const field of ['demandLevel', 'arrivalRatePctPop5min', 'entranceWeights', 'maxLegs']) {
+      expect(message).toContain(field);
+    }
+  });
+
+  it('refuses an out-of-range demandLevel at the field rather than as a NaN three layers down', () => {
+    let message = '';
+    try {
+      generateTrace({ ...base(), demandLevel: 'high' } as never);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('traffic.demandLevel');
+    expect(message).toContain('"min", "typical", "max"');
+    expect(message).toContain('"high"');
+    // The old failure. If this ever comes back, the refusal has moved downstream again.
+    expect(message).not.toContain('NaN');
+  });
+
+  it('refuses an unrecognised interfloorWeighting instead of silently meaning "population"', () => {
+    expect(() => generateTrace({ ...base(), interfloorWeighting: 'bogus' } as never)).toThrow(
+      /traffic\.interfloorWeighting/,
+    );
+  });
+
+  it('refuses an unrecognised credentialAssignment instead of silently enforcing', () => {
+    expect(() => generateTrace({ ...base(), credentialAssignment: 'bogus' } as never)).toThrow(
+      /traffic\.credentialAssignment/,
+    );
+  });
+
+  it('refuses a non-boolean batchSharesDestination instead of taking it as true', () => {
+    expect(() => generateTrace({ ...base(), batchSharesDestination: 'yes' } as never)).toThrow(
+      /traffic\.batchSharesDestination/,
+    );
+  });
+
+  it('refuses an unrecognised trafficModel, which is a version rather than a tunable', () => {
+    expect(() => generateTrace({ ...base(), trafficModel: 'v3' } as never)).toThrow(
+      /traffic\.trafficModel/,
+    );
+  });
+
+  it('accepts every declared value of every enumerated knob', () => {
+    // The other half. A refusal that also refuses the legal values is a wall, and the shipped
+    // defaults have to be inside their own allow-lists.
+    for (const demandLevel of ['min', 'typical', 'max'] as const) {
+      expect(() => generateTrace({ ...base(), demandLevel })).not.toThrow();
+    }
+    for (const interfloorWeighting of ['population', 'uniform'] as const) {
+      expect(() => generateTrace({ ...base(), interfloorWeighting })).not.toThrow();
+    }
+    for (const credentialAssignment of ['none', 'permitted-first'] as const) {
+      expect(() => generateTrace({ ...base(), credentialAssignment })).not.toThrow();
+    }
+    for (const trafficModel of ['v1', 'v2'] as const) {
+      expect(() => generateTrace({ ...base(), trafficModel })).not.toThrow();
+    }
+    for (const batchSharesDestination of [true, false]) {
+      expect(() => generateTrace({ ...base(), batchSharesDestination })).not.toThrow();
+    }
+  });
+
+  it('changes nothing about a configuration that was already legal', () => {
+    // The refusals must be a gate, not a filter. A default run is byte-identical to the run
+    // before they existed, which is what makes them safe to add to a published figure's path.
+    const trace = generateTrace(base());
+    expect(trace.passengerCount).toBeGreaterThan(0);
+    expect(JSON.stringify(trace)).toBe(JSON.stringify(generateTrace(base())));
+  });
+
+  it('guards planDemand too, which is the other public entry point', () => {
+    const { streams: _unused, ...demandOnly } = base();
+    expect(() => planDemand({ ...demandOnly, demandLevel: 'high' } as never)).toThrow(
+      /traffic\.demandLevel/,
+    );
+  });
+});

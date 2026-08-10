@@ -53,7 +53,7 @@ import { recordRun } from '../record/recordRun.js';
 import { disclosureItems } from '../mode/disclosure.js';
 import type { DisclosureItem } from '../mode/types.js';
 
-import { isSeedText, SEED_MAX_DIGITS } from '../menu/menu.js';
+import { FREE_PLAY_RATES, isSeedText, SEED_MAX_DIGITS } from '../menu/menu.js';
 
 import {
   deepLinkDefaultsOf,
@@ -1174,6 +1174,45 @@ describe('the four new params round-trip, and they reach the run', () => {
     // template — the same refusal shape the other seven params take.
     expect(arrived.freePlay).toBeUndefined();
     expect(arrived.pattern).toBe('building');
+  });
+
+  /**
+   * **The rate a link may ask for is bounded** — the UI readiness audit's B3, second axis.
+   *
+   * `rate` was parsed by `/^\d+(\.\d+)?$/` and honoured whatever it said, and Free Play's own
+   * validator only requires `rate > 0`. A shared address could therefore ask a stranger's browser
+   * for arbitrarily much demand, on a run that was already synchronous: measured on
+   * `midtown-office`/`nearest-car`/1 800 s, rate 200 is 6 588 ms against rate 12's 447 ms, and the
+   * cell the audit measured the freeze on is four times longer on a building three times bigger.
+   *
+   * The bound is `menu/menu.ts#FREE_PLAY_RATES`' top rung, **read rather than restated**, so the
+   * ladder stays the single authority. The precedent is `seed`'s, four params up: *"an address
+   * carrying twenty-one digits would run something no field in this product would have accepted"*
+   * (issue #111(c)). This is that rule at the axis that had none.
+   */
+  it('clamps a rate no control in this product offers, and leaves the ones it does alone', () => {
+    const rateOf = (search: string): number | null | undefined =>
+      deepLinkStateOf(initialState(resources, 7n), resources, new URLSearchParams(search)).freePlay
+        ?.arrivalRatePctPop5min;
+    const highest = FREE_PLAY_RATES.reduce<number>(
+      (top, rate) => (rate === null ? top : Math.max(top, rate)),
+      0,
+    );
+
+    // The measured case: 200 %/5 min is 6 588 ms of somebody else's browser on the *small*
+    // building, and nothing anywhere refused it.
+    expect(rateOf('?template=rise-and-fall&rate=200')).toBe(highest);
+    expect(rateOf('?template=rise-and-fall&rate=1000000')).toBe(highest);
+    // Every rung the menu offers arrives unchanged, which is what makes this a bound rather than a
+    // second opinion about what a reasonable rate is.
+    for (const rate of FREE_PLAY_RATES) {
+      if (rate === null) continue;
+      expect(rateOf(`?template=rise-and-fall&rate=${String(rate)}`)).toBe(rate);
+    }
+    // Zero is not a rate. It arrives as `null` — *the building's own profile* — which is the value
+    // an absent or unparseable `rate` already produced, so an honest link is unaffected.
+    expect(rateOf('?template=rise-and-fall&rate=0')).toBeNull();
+    expect(rateOf('?template=rise-and-fall')).toBeNull();
   });
 
   it('and the link moves the run — the legs differ when the rate does', () => {

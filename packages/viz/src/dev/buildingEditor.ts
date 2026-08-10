@@ -28,9 +28,17 @@
  * ## Two things an entrance row deliberately cannot do
  *
  * `buildingFromSpec` writes an entrance floor's `population = 0` and sets `isEntrance`, and it
- * never marks an entrance a transfer floor. So on an entrance row the occupancy bar and the sky dot
- * would write fields nothing reads. They are drawn inert, with the reason in the tooltip, rather
- * than drawn live — `docs/05-roadmap.md`'s standing requirement applied to a control.
+ * reads `skyFloors` only **above** the lobby. So on an entrance row the occupancy bar and the sky
+ * dot would write fields nothing reads. They are drawn inert, with the reason in the tooltip,
+ * rather than drawn live — `docs/05-roadmap.md`'s standing requirement applied to a control.
+ *
+ * **That is a claim about the two controls and not about the document, and the distinction had
+ * rotted.** This paragraph used to say `buildingFromSpec` *"never marks an entrance a transfer
+ * floor"*, which stopped being true once a lobby-level `isTransferFloor` survived the round trip —
+ * `secure-tower`'s `G` is a transfer level and is simulated as one. The **mark** on an entrance row
+ * therefore says what is true (`elevationRowsOf`'s `isSky`, and the ⇄ beside it); the **dot** still
+ * says it writes nothing there. Two questions, two answers, which is what the one sentence was
+ * conflating.
  *
  * It is *an entrance* rather than *the lobby* because a building may have more than one and
  * `midtown-office` does: its car park `P1` is flagged `isEntrance`, so it is a way into the
@@ -584,12 +592,58 @@ export interface ElevationRow {
  * which case it is drawn as one and carries no population — `midtown-office`'s car park is a way
  * into the building, and `crown-hotel`'s back of house is a floor with people on it.
  */
+/**
+ * The car count a press of **+ shaft** or **− shaft** lands on.
+ *
+ * ## Two literals, and the ceiling was the destructive one
+ *
+ * The two handlers read `Math.min(12, …)` and `Math.max(1, …)` — the `cars` row's declared bounds,
+ * copied. That was invisible while `specFromBuilding` clamped a shipped building's car count into
+ * the same range on the way *in*: nothing could hold more than twelve, so nothing could lose any.
+ *
+ * The moment a building reads back its true count — `vertical-city` is **35 cars**, and was reading
+ * back as 12 — the copied ceiling becomes a data loss with no warning and no undo: one press of
+ * **+ shaft** and the tower is a twelve-car building. So the bound is read off {@link SPEC_ROWS},
+ * which is where it is declared and where the slider beside these buttons already reads it.
+ *
+ * ## And it never returns fewer cars than the building already has
+ *
+ * Deriving the ceiling is not on its own enough, and the extra clause is the point rather than
+ * belt-and-braces. The bug was *a control and a bound disagreeing about how big a building may be*,
+ * and a reader whose building is already over the declared ceiling — because a document says so, or
+ * because the row moves in a later build — must not discover that by losing shafts. So an ask that
+ * would reduce the count below where it started is refused: **+ shaft** on an over-ceiling building
+ * does nothing, which is what a ceiling means, and it does nothing *visibly* rather than by
+ * deleting twenty-three shafts.
+ *
+ * **− shaft is unaffected by that clause**, because a decrease is what it is for: `delta` is
+ * negative there, so `current + delta` is already below `current` and only the floor applies.
+ */
+export function shaftCountAfter(current: number, delta: number): number {
+  const row = SPEC_ROWS.find((entry) => entry.key === 'cars');
+  const asked = current + delta;
+  // No declared row means no declared bound. One car is still the floor — a bank with no car is a
+  // set of floors nobody can reach — and inventing a ceiling here is the defect this removes.
+  if (row === undefined) return Math.max(1, asked);
+  const bounded = Math.min(row.max, Math.max(row.min, asked));
+  return delta > 0 ? Math.max(bounded, current) : bounded;
+}
+
 export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
   const skies = new Set(spec.skyFloors);
   const rows: ElevationRow[] = [];
   for (let floor = spec.floors; floor >= lowestFloorOf(spec); floor -= 1) {
     const isEntrance = isEntranceFloor(spec, floor);
-    const isSky = !isEntrance && skies.has(floor);
+    /*
+     * **The mark says what is true; the dot says what may be changed.** Those are two questions and
+     * this line used to answer both with one, as `!isEntrance && skies.has(floor)`.
+     *
+     * `secure-tower`'s `G` **is** a transfer level and is simulated as one, and the elevation drew
+     * no ⇄ for it — an entrance was ineligible for the mark because the *control* on an entrance
+     * writes nothing. `skyToggles` below is where that second fact belongs and it already carries
+     * it, so the guard here was the answer to the wrong question sitting in the wrong place.
+     */
+    const isSky = skies.has(floor);
     const badge = isEntrance ? '⌂' : isSky ? '⇄' : '';
     const occupancyPct = isEntrance ? 0 : occupancyAt(spec, floor);
     const clamped = Math.min(OCCUPANCY_MAX_PCT, Math.max(0, occupancyPct));
@@ -611,8 +665,18 @@ export function elevationRowsOf(spec: BuildingSpec): readonly ElevationRow[] {
       isEntrance,
       isSky,
       skyMark: isSky ? '⇄' : '',
+      /*
+       * **The stale half of that same conflation** — CLAUDE.md's *a stated mechanism goes stale*,
+       * and this one had gone stale in the direction that tells a reader something false about the
+       * document they are holding.
+       *
+       * It read *"buildingFromSpec never marks an entrance a transfer level"*. That stopped being
+       * true when a lobby-level `isTransferFloor` began surviving the round trip: the flag is
+       * carried, and what is true of the **dot** is narrower — it writes `skyFloors`, which
+       * `buildingFromSpec` reads only above the lobby.
+       */
       skyTitle: isEntrance
-        ? 'This floor is an entrance; buildingFromSpec never marks an entrance a transfer level, so this dot would write nothing.'
+        ? `This dot writes skyFloors, which buildingFromSpec reads only above the lobby, so on an entrance it writes nothing. A transfer flag already on a floor at or below the lobby is carried through from the document${isSky ? ` — floor ${floorId} has one, which is what the ⇄ beside it means.` : '.'}`
         : `Make floor ${floorId} a transfer level. Transfer levels cut the tower into segments and the cars are dealt round-robin into them, which is what makes a sky lobby worth building.`,
       skyToggles: !isEntrance,
       occupancyPct,
@@ -1539,13 +1603,13 @@ export function mountBuildingEditor(
 
   elements.addShaft.addEventListener('click', () => {
     const current = spec();
-    if (current !== undefined) patch({ cars: Math.min(12, current.cars + 1) });
+    if (current !== undefined) patch({ cars: shaftCountAfter(current.cars, 1) });
   });
 
   elements.removeShaft.addEventListener('click', () => {
     const current = spec();
     if (current === undefined) return;
-    const cars = Math.max(1, current.cars - 1);
+    const cars = shaftCountAfter(current.cars, -1);
     // The band of a shaft that no longer exists would otherwise sit in `bandByCar` and come back
     // the moment the reader added one, which is a pin they did not place.
     const bands: Record<number, readonly [number, number]> = {};

@@ -1609,6 +1609,27 @@ goals and § 8.4's honest deltas are possible.
 > **What W4 does not do**, stated rather than discovered: the authored candidate is validated —
 > through the shipped `SearchSpace.validate`, which is `parseDispatcherProfiles` plus
 > `createPolicyFor` — and is **not yet routed into the Run button**. Wiring it is W5/W6's.
+>
+> **That paragraph was true, was the only place it was said, and that was the defect.** The UI
+> readiness audit's **B4** measured what it cost: 12 schemas, 130 declared rows, **114 live controls**
+> that accepted edits, cascaded their gates and refused bad values while binding nothing — with the
+> tab's own status line reading *"41 dimensions, 41 live — authorable as a dispatcher profile"* over
+> them. A reader on that screen has no route to this sentence, which is CLAUDE.md's *a stated refusal
+> is pinned by a run, never by another sentence* arriving in the wrong medium. Two things changed and
+> neither of them is this paragraph:
+>
+> 1. **The refusal is on the screen.** `dev/parameterForm.ts#appliedNoteFor` draws a line as the
+>    first child of the form, per source, naming the button — *move a control here, press Run this
+>    shift, and the day that comes back is byte for byte the day you would have got*. Pinned by
+>    `dev/boot.browser.test.ts`, which reads it off a booted page.
+> 2. **One schema is genuinely routed**, so the note is a fact rather than a blanket disclaimer.
+>    `PATIENCE_PARAMETERS` reaches `ViewerState.patience` through `ParameterFormOptions.onCandidate`
+>    and `dev/state.ts#shiftRunConfigOf` writes it onto the config. It lives in `ViewerState` rather
+>    than in the mount's closure **because that is what `scope/scope.test.ts` can see**: the field is
+>    now one of its derived keys, and `viewer.patience moves the legs` is what proves the control is
+>    not inert. The `candidate()` getter this paragraph's *"not yet routed"* referred to is deleted —
+>    a route nothing takes is what the audit found, and leaving it beside a route something does take
+>    would be two answers to *how does a value get out of this form*.
 
 Four control renderers keyed on `type`, one `activeWhen` rule, `description` as help, `unit` as
 suffix, `default` as reset. Pointed at `collectSearchSpace()` for U6 and at `TRAFFIC_PARAMETERS` for

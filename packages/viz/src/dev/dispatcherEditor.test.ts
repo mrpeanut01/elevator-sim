@@ -826,8 +826,31 @@ describe('the panel says what one press buys, on the press', () => {
   });
 
   it('arms the pairing only on a press that produced a run', () => {
-    // `runShift` catches its own failures and leaves the state alone. Arming optimistically would
-    // pair the previous sheet against itself and caption it as the run the reader just asked for.
-    expect(code).toContain('if (now !== undefined && now !== wasRunId) caused = { runId: now, before };');
+    /*
+     * Arming optimistically would pair the previous sheet against itself and caption it as the run
+     * the reader just asked for. **The guarantee is unchanged and the mechanism moved**, which is
+     * the UI readiness audit's B3 arriving here.
+     *
+     * It used to read `view.recording.runId` on the line after `context.runShift()`, under a comment
+     * saying *"`runShift` re-renders synchronously"*. That was true when it was written and stopped
+     * being true when the shift moved to a worker (`dev/shiftWorker.ts`) — at which point this panel
+     * armed nothing at all, because `view` still held the previous run. Three cases of
+     * `dispatcherStrip.browser.test.ts` caught it; this source-read did not, because a sentence
+     * about what a *different* file does synchronously is not something a substring can check.
+     *
+     * So what is pinned now is the two halves that carry the property:
+     *
+     * 1. the arming is **inside the callback**, which `dev/main.ts` calls only when a run landed —
+     *    never for a press that refused, threw or was cancelled; and
+     * 2. it still compares against the run id captured **before** the press.
+     */
+    expect(code).toContain('context.runShift((recording) => {');
+    expect(code).toContain('if (recording.runId === wasRunId) return;');
+    expect(code).toContain('caused = { runId: recording.runId, before };');
+    // Read before anything is written, which is the half that makes `before` the sheet that was on
+    // screen at the instant of the press rather than whatever survived the run.
+    expect(code.indexOf('const wasRunId = at.recording?.runId;')).toBeLessThan(
+      code.indexOf('context.runShift((recording) => {'),
+    );
   });
 });

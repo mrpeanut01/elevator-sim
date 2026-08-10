@@ -59,6 +59,7 @@ import {
   skyFloorsEvery,
   specFieldOf,
   specPatchFor,
+  shaftCountAfter,
   specRowsOf,
   specTrackOf,
   speedChipsOf,
@@ -102,6 +103,50 @@ describe('the five spec rows', () => {
     expect(specFieldOf('floorHeightM')).toBe('floors[].heightM');
     expect(specFieldOf('occupancyPct')).toContain('capacity × occupancy');
     expect(specFieldOf('cars')).toBe('banks[].cars[]');
+  });
+
+  /**
+   * **The + shaft button cannot cost a reader shafts.**
+   *
+   * The two handlers held the `cars` row's bounds as literals — `Math.min(12, …)` and
+   * `Math.max(1, …)`. Invisible while `specFromBuilding` clamped a shipped building's car count on
+   * the way *in*, and a silent data loss the moment one reads back its true count:
+   * **`vertical-city` is 35 cars**, and one press of *+ shaft* against a copied ceiling of 12 makes
+   * it a twelve-car building with no warning and no undo.
+   *
+   * Both halves are asserted, and the ceiling is read off `SPEC_ROWS` here too — a test that wrote
+   * `12` would be the third copy of the number and would go green on the day the row moves.
+   */
+  describe('the shaft buttons', () => {
+    const carsRow = SPEC_ROWS.find((row) => row.key === 'cars');
+    if (carsRow === undefined) throw new Error('SPEC_ROWS declares no cars row');
+
+    it('honours the cars row’s own ceiling rather than a literal', () => {
+      expect(shaftCountAfter(carsRow.max - 1, 1)).toBe(carsRow.max);
+      expect(shaftCountAfter(carsRow.max, 1)).toBe(carsRow.max);
+      expect(shaftCountAfter(4, 1)).toBe(5);
+    });
+
+    it('honours the floor, because a bank with no car is a set of floors nobody can reach', () => {
+      expect(shaftCountAfter(carsRow.min + 1, -1)).toBe(carsRow.min);
+      expect(shaftCountAfter(carsRow.min, -1)).toBe(carsRow.min);
+      expect(shaftCountAfter(4, -1)).toBe(3);
+    });
+
+    it('never takes shafts away from a building that already has more than the ceiling', () => {
+      /*
+       * The destructive case, written as the building it was measured on. Adding is refused —
+       * which is what a ceiling means — and refused *visibly*, by nothing happening, rather than by
+       * deleting the difference.
+       *
+       * Watched failing against the shipped `Math.min(12, current.cars + 1)`:
+       *   AssertionError: expected 12 to be 35
+       */
+      const over = carsRow.max + 23;
+      expect(shaftCountAfter(over, 1)).toBe(over);
+      // And − shaft still works on one: a decrease is what that button is for.
+      expect(shaftCountAfter(over, -1)).toBe(carsRow.max);
+    });
   });
 
   it('draws an over-capacity track and note only past 100% let', () => {
@@ -281,6 +326,49 @@ describe('the elevation’s floor rows', () => {
     expect(lobby?.fillPct).toBe(0);
     expect(lobby?.peopleText).toBe('entrance');
     expect(lobby?.occTitle).toContain('population = 0');
+  });
+
+  /**
+   * **The mark says what is true; the dot says what may be changed.**
+   *
+   * `isSky` answered both with `!isEntrance && skies.has(floor)`, so a lobby that genuinely *is* a
+   * transfer level drew no ⇄ — `secure-tower`'s `G` is one, and is simulated as one. The dot being
+   * inert there is a separate fact and `skyToggles` already carried it; the guard was the answer to
+   * the wrong question in the wrong place.
+   *
+   * Watched failing against `!isEntrance && skies.has(floor)`:
+   *   AssertionError: the lobby is a transfer level and the elevation does not say so:
+   *   expected '' to be '⇄'
+   */
+  it('marks a lobby that really is a transfer level, and leaves its dot inert', () => {
+    const lobby = elevationRowsOf({ ...TOWER, skyFloors: [0, 6] }).find((row) => row.floor === 0);
+    expect(
+      lobby?.skyMark,
+      'the lobby is a transfer level and the elevation does not say so',
+    ).toBe('⇄');
+    expect(lobby?.isSky).toBe(true);
+    // Unchanged, and it is the half that keeps the control honest: `toggleSky` returns early on an
+    // entrance, so a dot drawn as writable there would be an inert control.
+    expect(lobby?.skyToggles).toBe(false);
+    // The entrance badge still wins the label — a lobby is a lobby first.
+    expect(lobby?.badge).toBe('⌂');
+  });
+
+  it('says what the dot writes rather than what the loader supposedly never does', () => {
+    /*
+     * CLAUDE.md's *a stated mechanism goes stale*. The tooltip claimed *"buildingFromSpec never
+     * marks an entrance a transfer level"*, which stopped being true when a lobby-level
+     * `isTransferFloor` began surviving the round trip. What is true is narrower and is about the
+     * **dot**: it writes `skyFloors`, which the loader reads only above the lobby.
+     */
+    const plain = elevationRowsOf(TOWER).find((row) => row.floor === 0);
+    expect(plain?.skyTitle).toContain('writes skyFloors');
+    expect(plain?.skyTitle).toContain('reads only above the lobby');
+    expect(plain?.skyTitle).not.toContain('never marks an entrance');
+    // And where a flag is in fact carried, the tooltip says so rather than leaving the ⇄ unexplained.
+    const carried = elevationRowsOf({ ...TOWER, skyFloors: [0] }).find((row) => row.floor === 0);
+    expect(carried?.skyTitle).toContain('carried through from the document');
+    expect(carried?.skyTitle).toContain('⇄');
   });
 
   it('shows people as today’s population over the floor’s design capacity', () => {

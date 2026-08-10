@@ -54,7 +54,7 @@
  *
  * | Export | Non-test caller |
  * |---|---|
- * | {@link recordRun} | `src/dev/main.ts`, the browser viewer's load path |
+ * | {@link recordRun} | `src/dev/shiftWorker.ts`, which is where the browser viewer's shift is now simulated (the UI readiness audit's B3 — it was `src/dev/main.ts` on the thread that paints); and `src/dev/main.ts#runChallenge` directly, for a challenge's seeds |
  * | {@link overlayAt} | `src/dev/main.ts`'s draw loop, every animation frame; and `drawScene` draws its result |
  * | {@link landingAssignmentsAt} | `src/dev/main.ts`'s landing selector and its draw loop |
  * | {@link meansAreSuppressed} | three of them, which is the point: `overlayAt` here, `drawHeader` in `src/render/canvas.ts`, and `statusLine` in `src/dev/main.ts` — `D1` |
