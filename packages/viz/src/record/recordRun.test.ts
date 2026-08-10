@@ -75,6 +75,62 @@ describe('instrumentation is neutral', () => {
   }, 120_000);
 });
 
+/**
+ * **The config survives the thread boundary, byte for byte** — the guard `dev/shiftWorker.ts` rests
+ * on, and CLAUDE.md invariant 5 asked at the one seam that can silently break it.
+ *
+ * The viewer no longer simulates on the thread that paints: `dev/shiftRunner.ts` posts the whole
+ * `SimulationConfig` `dev/state.ts#shiftRunConfigOf` built to a worker, which calls the function
+ * below. A `postMessage` is a **structured clone**, so the run that happens is a run of a *copy* of
+ * the config — and if the copy is not faithful, every leg, every board submission and every replay
+ * is quietly of a different building than the one on screen. Nothing asserted that before this.
+ *
+ * The second case is what gives the first one teeth. `JSON` is the obvious way to move an object
+ * between two threads and it is **lossy here in three ways at once** — the `bigint` seed throws
+ * outright, and `ResolvedBuilding.floorsById`/`floorsByIndex` are `Map`s, which JSON renders as
+ * `{}`. A test that only asserted *structured clone works* would pass just as happily against a
+ * transport that did not, so the lossy one is run beside it and required to fail.
+ */
+describe('a run survives being posted to a worker', () => {
+  const identity = (run: ReturnType<typeof recordRun>): string =>
+    JSON.stringify(
+      run.recording.legs.map((leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1]),
+    );
+
+  it('is byte-identical when the config is structured-cloned first', () => {
+    const simulationConfig = fixtureConfig(config);
+    const direct = recordRun(simulationConfig);
+    const cloned = recordRun(structuredClone(simulationConfig));
+
+    // The legs first, because § D177's rule is that a run is compared on the legs and never on a
+    // window statistic — a mean can be unchanged for a run that is entirely different.
+    expect(identity(cloned)).toBe(identity(direct));
+    expect(JSON.stringify(cloned.recording)).toBe(JSON.stringify(direct.recording));
+    // The two fields the worker actually sends back, named rather than left to the whole-object
+    // comparison above: `dev/shiftWorker.ts` posts the recording and `result.trace.startOfDayS`.
+    expect(cloned.result.trace.startOfDayS).toBe(direct.result.trace.startOfDayS);
+  }, 120_000);
+
+  it('would not survive a JSON transport, which is why the clone is the one asserted', () => {
+    const simulationConfig = fixtureConfig(config);
+    // The seed is a bigint on every run this viewer builds — `ViewerState.seed` is one — and
+    // `JSON.stringify` refuses a bigint rather than rounding it, which is the loud half.
+    expect(() => JSON.stringify(simulationConfig)).toThrow(TypeError);
+    // The quiet half, and the one that would have shipped: the resolved building's indexes are
+    // `Map`s, and JSON writes a `Map` as `{}`. A transport that dropped them would hand the worker
+    // a building with no floors and the failure would arrive as a simulation error, not as a
+    // different run — but nothing in the shape says so, which is the point.
+    const viaJson = JSON.parse(
+      JSON.stringify(simulationConfig.building.floorsById),
+    ) as Record<string, unknown>;
+    expect(simulationConfig.building.floorsById.size).toBeGreaterThan(0);
+    expect(Object.keys(viaJson)).toEqual([]);
+    expect(structuredClone(simulationConfig.building.floorsById).size).toBe(
+      simulationConfig.building.floorsById.size,
+    );
+  });
+});
+
 describe('a recording', () => {
   it('carries its seed, its identity and the run window', () => {
     const { recording, result } = recordRun(fixtureConfig(config));

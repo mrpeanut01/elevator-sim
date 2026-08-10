@@ -3,12 +3,27 @@
  *
  * `roundTripTime.ts` is the arithmetic; this file is the bridge from `data/buildings/*.json`
  * to the seven scalars that arithmetic consumes. It is the only part of `analytical/` that
- * knows what a building is, and it imports **types only** — nothing here executes any code
- * the simulation also executes, which is what makes the result an independent oracle.
+ * knows what a building is.
+ *
+ * ## What "independent oracle" means here, stated precisely because it narrowed
+ *
+ * This header used to say the file imports **types only**, and drew the independence claim from
+ * that. It imports one value now — {@link findPassengerTransferS}, the config layer's reading of
+ * `elevator-specs.json → timing.passengerTransferS` — and the claim is *stronger* for it rather
+ * than weakened, so the sentence is corrected rather than deleted.
+ *
+ * The oracle's independence is about the **derivation**: no round-trip arithmetic, no kinematics,
+ * no dwell model here is code the simulation also runs, so a bug in one cannot hide in the other.
+ * A shared *reading of a reference constant* is the opposite kind of thing. `tp` is an input both
+ * sides must agree on: if the closed form read 1.2 s where the simulator read 1.75 s, the two
+ * would be describing different hardware and the comparison would be meaningless — which is why
+ * `sim/simulation.test.ts` already pinned the two readings together while they were two copies.
+ * One body is what that pin was asking for.
  *
  * Pure throughout: no fs, no RNG, no kernel, no mutation of the building.
  */
 
+import { findPassengerTransferS } from '../config/resolveCar.js';
 import type {
   BuildingType,
   ElevatorSpecs,
@@ -59,29 +74,23 @@ function allSame(values: readonly number[]): boolean {
 /**
  * `tp` for a building type, from `elevator-specs.json → timing.passengerTransferS`.
  *
- * Returns `undefined` for `mixed-use`, which the reference table has no row for — a
- * mixed-use tower's banks serve populations with different transfer behaviour (office
- * 1.2 s, residential 1.75 s), so there is no honest building-wide answer and the caller
- * must state one per bank. Reading the value from data rather than a table in code keeps
- * it tunable without a rebuild (CLAUDE.md invariant 7).
+ * **One line, because the body it used to hold was a second copy of
+ * {@link findPassengerTransferS}** — the same `switch` over the same four cases, in a file that
+ * must agree with the config layer to the last decimal or the oracle is checking the simulator
+ * against different hardware. `sim/simulation.test.ts` pinned the two readings together, which
+ * was the right guard for the wrong shape: it held two bodies in agreement where one body was
+ * available. Adding a building type meant editing both, and forgetting one produced a divergence
+ * that the pin would catch and the *reader* would not.
+ *
+ * Returns `undefined` for `mixed-use`, which the reference table has no row for — a mixed-use
+ * tower's banks serve populations with different transfer behaviour (office 1.2 s, residential
+ * 1.75 s), so there is no honest building-wide answer and the caller must state one per bank.
  */
 export function passengerTransferSecondsFor(
   specs: ElevatorSpecs,
   buildingType: BuildingType,
 ): number | undefined {
-  const table = specs.timing.passengerTransferS;
-  switch (buildingType) {
-    case 'office':
-      return table.office;
-    case 'residential':
-      return table.residential;
-    case 'hotel':
-      return table.hotel;
-    case 'hospital':
-      return table.hospital;
-    case 'mixed-use':
-      return undefined;
-  }
+  return findPassengerTransferS(specs, buildingType);
 }
 
 // ---------------------------------------------------------------------------

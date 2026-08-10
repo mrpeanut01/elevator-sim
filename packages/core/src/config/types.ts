@@ -149,6 +149,25 @@ export interface PassengerTransferTimes extends Commented {
    * carry different traffic overrides it per car, which `st-jude-hospital`'s bed bank does.
    */
   readonly hospital: number;
+  /**
+   * Any further building type, keyed by its {@link BuildingType} id, in seconds.
+   *
+   * **The key set is open, and that is the half of CLAUDE.md invariant 7 this table used to
+   * fail.** `resolveCar` refuses a building whose type has no row here and tells the author to
+   * *"add the type to the reference table"*; until this index signature existed the schema was a
+   * `strictObject` and refused that exact fix with `Unrecognized key`. The values were tunable
+   * without a rebuild and the keys were not, so the loader's own advice could not be taken.
+   *
+   * The four rows above stay named because they are cited (CIBSE Guide D) and shipped buildings
+   * resolve against them. `string` is in the union only because {@link Commented}'s `$comment`
+   * shares this shape — {@link findPassengerTransferS} narrows to a finite number, so a `$comment`
+   * can never be read as a transfer time.
+   *
+   * `mixed-use` deliberately has no row: a mixed tower's banks serve populations that transfer at
+   * different speeds, so there is no honest building-wide answer and the value has to be stated
+   * per car. That is a fact about the reference data, not a rule this type enforces.
+   */
+  readonly [buildingType: string]: number | string | undefined;
 }
 
 /** Fixed time costs that are not part of the motion profile. */

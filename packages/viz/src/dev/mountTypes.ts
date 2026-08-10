@@ -47,8 +47,24 @@ export interface ViewAt {
 export interface MountContext {
   /** Merge a patch into the state and re-render. Never mutates the state it was given. */
   update(patch: Partial<ViewerState>): void;
-  /** Re-run the simulation with the current state, and draw the result. */
-  runShift(): void;
+  /**
+   * Re-run the simulation with the current state, and draw the result.
+   *
+   * **It returns before the run finishes**, and since `dev/shiftWorker.ts` it always did in the
+   * sense that matters: the simulation happens on a worker, so the recording is not on the state
+   * when this call returns. Every panel but one already treated this as the last statement of a
+   * handler, which is why the signature did not have to change for them.
+   *
+   * `onRan` is for the one that did not. `dev/dispatcherEditor.ts` arms its result strip on
+   * *"which run did my press cause"* and read `view.recording.runId` on the next line, under a
+   * comment that said `runShift` re-renders synchronously — true when it was written, and the
+   * shape CLAUDE.md calls a stale stated mechanism. The callback is handed **the recording the run
+   * produced**, so the panel does not have to ask a `ViewAt` that has not been rebuilt yet, and it
+   * is called **only when a run actually landed**: a configuration that refused, a run that threw
+   * and a run the player cancelled all call it never, which is exactly the guarantee that panel's
+   * strip depends on.
+   */
+  runShift(onRan?: (recording: VizRecording) => void): void;
   /** Move to a surface, revealing its tab if it is one of the four contextual editors. */
   openTab(tab: TabName): void;
   /**

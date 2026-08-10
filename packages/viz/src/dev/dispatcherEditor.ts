@@ -1094,14 +1094,31 @@ export function mountDispatcherEditor(
       context.update({ dispatcherId: at.state.editingDispatcherId });
       context.openTab('run');
     }
-    context.runShift();
     /*
-     * `runShift` re-renders synchronously, so `view` is the state the press produced by the time it
-     * returns. Arming here rather than optimistically before the call is what keeps the strip's
-     * claim — *this is the run you started* — true of a press that failed.
+     * **Armed when the run lands, not on the next line** — and the sentence that used to be here
+     * was true when it was written and had stopped being true, which is this repository's own
+     * standing hazard rather than a new one.
+     *
+     * It read *"`runShift` re-renders synchronously, so `view` is the state the press produced by
+     * the time it returns"*. That was a fact about `dev/main.ts#runShift` calling `recordRun`
+     * inline, and it stopped being one when the shift moved to a worker — at which point this
+     * panel armed nothing, because `view.recording` was still the previous run's when the next line
+     * ran. The strip went on drawing *"Nothing to put side by side yet"* after a press that had in
+     * fact started a run, which `dispatcherStrip.browser.test.ts` caught in three cases.
+     *
+     * `MountContext.runShift`'s callback is the fix and it keeps the property the old comment was
+     * about: it is handed the recording the run produced, and it is **not called at all** for a
+     * press that refused, threw or was cancelled. So arming is still conditional on a run having
+     * happened — the condition is simply the shell's answer now rather than an inference from a
+     * field that may not have been written yet.
      */
-    const now = view?.recording?.runId;
-    if (now !== undefined && now !== wasRunId) caused = { runId: now, before };
+    context.runShift((recording) => {
+      if (recording.runId === wasRunId) return;
+      caused = { runId: recording.runId, before };
+      // `renderAll` has already run by the time the callback fires, so the strip needs one more
+      // paint to show the pairing this press just armed. `view` is the fresh one by then.
+      if (view !== undefined) render(view);
+    });
   });
 
   /**

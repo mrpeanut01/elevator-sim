@@ -29,6 +29,7 @@ import {
   type DispatcherProfile,
   type DispatcherProfiles,
   type ElevatorSpecs,
+  type PatienceConfig,
   type ResolvedBuilding,
   type SimulationConfig,
 } from '@elevator-sim/core/browser';
@@ -421,6 +422,41 @@ export interface ViewerState {
    * `selectorEditor.test.ts`.
    */
   readonly selectorSpec: SelectorSpec;
+
+  /**
+   * The patience curve the Parameters tab is showing, or `null` for *nobody leaves*.
+   *
+   * ## Why this field exists — the UI readiness audit's **B4**
+   *
+   * The Parameters tab drew **114 live controls over 12 schemas** and bound none of them:
+   * `mountParameterForm` handed back a `candidate()` that nothing in `packages/viz/src` or
+   * `packages/cli/src` called, and the values lived in a closure local rather than here — so
+   * `scope/scope.test.ts`, which derives its key set from this interface, could not see them and
+   * never probed them. A player could set `sim.patience.meanS` to 120, press Run, and get the same
+   * run byte for byte.
+   *
+   * `sim.patience.*` is the schema that is now wired, and it was chosen rather than being first
+   * alphabetically: it is fully built in `core` (`sim/patience.ts`, wave 13), it is the one whose
+   * effect a player can *see* on the stage — people give up and walk away — and its consequence for
+   * the statistics is already enforced everywhere else in the product, so making it reachable adds
+   * a control and no new claim.
+   *
+   * ## Why `null` and not a default curve
+   *
+   * `core`'s rule, not a choice made here. `sim/patience.ts`: *"there is no default and there
+   * deliberately is not one: a default patience would put an unstated behaviour into every run"*.
+   * At `null` this field writes nothing onto the config and the run is byte-identical to the run
+   * before the field existed, which is what `scope/probes.test-helper.ts`'s probe measures from.
+   *
+   * ## Read this beside the mean, never instead of it
+   *
+   * Abandonment **improves** AWT by construction — it removes the longest waits from the sample. At
+   * `midtown-office` 6 % with a 120 s mean patience the mean goes 61.9 s → 23.3 s with fifty-one
+   * riders gone. `metrics/awtValidity.ts`'s fifth ground suppresses the mean outright above 2 %,
+   * and `RunSummary.abandonment` is published beside it; nothing this field does needs a new rule,
+   * because the rule was written when the mechanism was.
+   */
+  readonly patience: PatienceConfig | null;
 
   /* --- the week ----------------------------------------------------------- */
   readonly week: WeekState;
@@ -926,6 +962,12 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
      * they could see what the mechanism is.
      */
     selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
+    /*
+     * `null`, which is `sim.patience.distribution`'s own declared default (`'none'`) read back as a
+     * config: a page that has just loaded has nobody abandoning, and the opening run is the run it
+     * was before this field existed. See {@link ViewerState.patience}.
+     */
+    patience: null,
     week: openWeek(contractForBuilding(buildingId)?.id),
     // Nothing has been stepped away from yet. `switchWeek` is the only thing that fills this.
     parkedWeeks: [],
@@ -1310,6 +1352,18 @@ export function shiftRunConfigOf(
           }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
       demand: { ...demand, ...patch.demand, ...calendar.demand },
+      /*
+       * The Parameters tab's one applied schema — the audit's B4, and `dev/parameterForm.ts`'s
+       * `APPLIED_SCHEMA`.
+       *
+       * **Spread rather than written as `patience: state.patience ?? undefined`**, so a run with no
+       * curve carries no `patience` key at all. `sim/patience.ts` is explicit that an absent block
+       * and a present-but-off one are different claims — *"a run which did not ask for a feature
+       * must be the run it was before the feature existed"* — and `scope/probes.test-helper.ts`
+       * compares the two arms on the legs, so *byte-identical at null* is asserted rather than
+       * asserted-in-prose.
+       */
+      ...(state.patience === null ? {} : { patience: state.patience }),
       /*
        * `report`, not the kernel's default `throw`. At the shipped traffic rates three of the five
        * buildings routinely end a run with people still in the system, and `Simulation` treats

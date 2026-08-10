@@ -238,6 +238,23 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       : 'a saved machine class widens the specs this building resolves against, and only this browser has it',
 
   /**
+   * The patience curve — the field the UI readiness audit's B4 made reachable.
+   *
+   * `null` is *nobody leaves*, which is every run this repository has ever published and what
+   * `shiftRunConfigOf` writes nothing for, so it carries. Anything else does not: neither a CLI line
+   * nor a `RunSubmission` has a field for a patience curve, and the consequence is worse here than
+   * for most of this table — abandonment **improves** the average wait by construction, so a run
+   * that carried a curve the server could not see would re-verify as a slower run and be rejected
+   * as a forgery, punishing an honest player for a client that stayed quiet.
+   */
+  patience: (state) =>
+    state.patience === null
+      ? undefined
+      : `riders abandon after about ${String(state.patience.meanS)} s in this run, and neither a CLI ` +
+        'line nor a submission carries a patience curve — a run replayed without it is a different ' +
+        'run, and abandonment moves the mean it would be judged on',
+
+  /**
    * The fabric — issue #129's first field.
    *
    * **Asked as *did the building move?*, never as *is the array non-empty?***, and the distinction

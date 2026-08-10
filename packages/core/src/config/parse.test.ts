@@ -117,6 +117,11 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
       // five shape builders keep by construction, and the rules live in one module so that the
       // schema and the resolver cannot drift. It imports a *type* from `types.ts` and nothing
       // else, which is what keeps this list free of `node:`.
+      // The lift-only reachability model `resolveBuilding` now runs as a real validation.
+      // Pure graph work over `servesFloors` and `isTransferFloor`, so it adds nothing to
+      // `external` and nothing to the `node:` set — which is the whole reason it could be
+      // promoted out of `buildingConnectivity.test.ts` and into the loader at all.
+      'buildingConnectivity.ts',
       'demandPhases.ts',
       'expandFloors.ts',
       'parse.ts',
@@ -130,7 +135,13 @@ describe('parse.ts is fs-free so the browser build can use it', () => {
   });
 
   it('keeps every other config module fs-free too', async () => {
-    for (const name of ['expandFloors.ts', 'resolveCar.ts', 'schema.ts', 'types.ts']) {
+    for (const name of [
+      'buildingConnectivity.ts',
+      'expandFloors.ts',
+      'resolveCar.ts',
+      'schema.ts',
+      'types.ts',
+    ]) {
       const specifiers = await staticSpecifiers(join(CONFIG_DIR, name));
       expect(specifiers.filter((spec) => spec.startsWith('node:')), name).toEqual([]);
     }

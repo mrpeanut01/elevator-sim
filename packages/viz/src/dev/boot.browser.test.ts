@@ -104,6 +104,20 @@ interface Loaded {
    * is a fact about `boot()`'s call order and reachable from nowhere else.
    */
   readonly resume: { readonly disabled: boolean; readonly detail: string };
+  /**
+   * The first line the Parameters tab draws — the UI readiness audit's **B4**, read off the page.
+   *
+   * That tab drew **114 live controls over 12 schemas** and bound none of them, and the fact was
+   * declared in `docs/10-experience-layer-contract.md` — *in a document, not on the screen*, which
+   * is precisely what CLAUDE.md's standing requirement is about. So the repair has to be checked
+   * where the reader is, and this tier is the only one that can: `mountParameterForm` needs a
+   * `document` and `parameterForm.test.ts` says so about itself in terms.
+   *
+   * Read by `textContent` off a `hidden` panel, which is honest about what it proves — the node is
+   * on the page, put there by the shipped mount, at boot and with no tab pressed. It proves nothing
+   * about styling, exactly as this file's header says of everything else here.
+   */
+  readonly parameterNote: string;
 }
 
 async function load(): Promise<Loaded> {
@@ -170,6 +184,9 @@ async function load(): Promise<Loaded> {
       detail: row?.querySelector('.menu-row-detail')?.textContent ?? '',
     };
   });
+  const parameterNote = await page.evaluate(
+    () => document.querySelector('#param-form p')?.textContent ?? '',
+  );
   await page.close();
   return {
     errors,
@@ -178,6 +195,7 @@ async function load(): Promise<Loaded> {
     distinctColours: measured.distinct,
     status,
     resume,
+    parameterNote,
   };
 }
 
@@ -259,5 +277,31 @@ describe.skipIf(!HAS_BROWSER)('the viewer boots', () => {
       loaded.resume.detail,
       'the refusal for a cold shell is on screen over a warm one',
     ).not.toContain('no shift on screen');
+  });
+
+  it('says on the Parameters tab itself that its controls do not reach the run — B4', () => {
+    /*
+     * **The screen, not the document.** `docs/10-experience-layer-contract.md` § 11 declared this
+     * honestly — *"not yet routed into the Run button"* — and a player reading a tab full of live
+     * sliders, over a status line reading *"41 dimensions, 41 live — authorable as a dispatcher
+     * profile"*, has no way to reach that sentence. `mountParameterForm` now draws it as the first
+     * child of the form, and this is the only tier that can watch it arrive.
+     *
+     * The form opens on `<dispatcher search space>`, which is one of the sources that is **not**
+     * applied, so this is the note a cold load actually shows. `parameterForm.test.ts` holds the
+     * other eleven sources and the applied one; what is added here is that the mount puts the node
+     * on the page at all.
+     *
+     * Watched failing by deleting the two `applied` lines from `parameterForm.ts#draw`:
+     *
+     *     × says on the Parameters tab itself that its controls do not reach the run — B4
+     *       AssertionError: expected '' to contain 'NOT APPLIED'
+     */
+    expect(
+      loaded.parameterNote,
+      'the Parameters tab draws no note about whether its controls reach a run',
+    ).toContain('NOT APPLIED');
+    expect(loaded.parameterNote).toContain('Run this shift');
+    expect(loaded.parameterNote).toContain('PATIENCE_PARAMETERS');
   });
 });

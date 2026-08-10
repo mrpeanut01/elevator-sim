@@ -292,14 +292,20 @@ describe('every field the module is asked about has an answer, and no answer is 
     );
   });
 
-  it('asks about the three fields issue #129 is about, and about the four it always did', () => {
+  it('asks about the three fields issue #129 is about, the four it always did, and patience', () => {
     // Non-vacuity for the assertion above: a `fieldsAnsweredFor` that returned nothing would agree
     // with a `CARRY_CHECKS` that was empty, and both would be catastrophically wrong.
+    //
+    // `patience` is the eighth and is the UI readiness audit's B4: the Parameters tab's one applied
+    // schema. It arrived here on the day it landed rather than on the day somebody remembered,
+    // which is what the walk over `SCOPE_OF` was built for — the field was red in four cases of
+    // this file before a line of it was written.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
       'commissioning',
       'levers',
       'outOfServiceCarIds',
+      'patience',
       'savedClasses',
       'selectorSpec',
       'week',

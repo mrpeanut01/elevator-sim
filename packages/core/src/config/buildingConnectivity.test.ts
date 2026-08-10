@@ -1,7 +1,8 @@
 /// <reference types="node" />
 
 /**
- * Connectivity acceptance tests for the shipped building configurations.
+ * Connectivity acceptance tests for the shipped building configurations, and for the loader
+ * check that now holds every *other* building to the same properties.
  *
  * `loader.test.ts` proves the shipped data *validates*. This file proves it *routes*: that
  * every passenger the demand generator can create has a declared chain of elevator legs to
@@ -12,6 +13,16 @@
  * loads cleanly and then silently drops or mis-attributes demand at run time, which shows
  * up as a plausible-looking time-to-destination that is quietly wrong — exactly the
  * "confident nonsense" CLAUDE.md names as the most likely way this project fails.
+ *
+ * ## The model used to live here, and that was the defect
+ *
+ * Every function this file used to define — the topology, the deck-aware leg expansion, the
+ * breadth-first search — is now `./buildingConnectivity.ts`, imported below rather than
+ * restated. A check bound to `REAL_DATA_DIR` covers the eight files on disk and **nothing a UI
+ * creates**, and the new viewer authors buildings at run time. Measured on a purpose-built
+ * tower before the move: a populated floor no bank served, an orphaned bank, and
+ * `isTransferFloor` stripped from both lobby levels were each accepted by `loadConfig` in
+ * silence, with no error and no warning, at up to 160 of 324 ordered pairs unroutable.
  *
  * Nothing here is elevator-specific policy: it is graph reachability over
  * `servesFloors`, restricted by `servesFloorPairs` (a double-deck leg cannot change deck
@@ -30,7 +41,8 @@
  * directly, once, at the bottom of this file: whatever this model can reach, the real planner
  * must reach in **no more lift legs**. Without that assertion the "guard whose meaning eroded
  * when something else moved into its filtered region" shape would apply exactly — a mirror that
- * stopped mirroring, still green.
+ * stopped mirroring, still green. That tie is *stronger* now than when it was written, because
+ * the mirror it holds is shipped code rather than a copy in a test file.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -39,94 +51,32 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { RoutePlanner } from '../traffic/route.js';
 
+import {
+  MAX_LEGS_FROM_ENTRANCE,
+  type ConnectivityTopology as Topology,
+  connectivityDiagnostics,
+  connectivityTopologyOf as topologyOf,
+  deckAwareDestinations as legDestinations,
+  legCountsFrom as legsFrom,
+  measureConnectivity,
+  populatedFloorIds as populatedFloorsOf,
+} from './buildingConnectivity.js';
 import { loadConfig } from './loader.js';
-import type { LoadedConfig, ResolvedBuilding } from './types.js';
+import { parseBuilding, resolveBuilding } from './parse.js';
+import { ConfigError, ISSUE_CODES, WARNING_CODES } from './schema.js';
+import type { BuildingConfig, ElevatorSpecs, LoadedConfig, ResolvedBuilding } from './types.js';
 
 const REAL_DATA_DIR = fileURLToPath(new URL('../../../../data', import.meta.url));
 
-/**
- * How many legs a passenger should ever need from a street entrance. Three covers a
- * double-deck supertall (position for the correct deck, shuttle, local); anything more
- * means a zone is anchored to a lobby level the entrance cannot reach directly, which is
- * a layout bug rather than a long trip.
- */
-const MAX_LEGS_FROM_ENTRANCE = 3;
-
-// ---------------------------------------------------------------------------
-// Routing model
-// ---------------------------------------------------------------------------
-
+/** A `ResolvedBank`-shaped view for the hand-built topologies below. */
 interface Bank {
   readonly id: string;
   readonly servesFloors: readonly string[];
   readonly servesFloorPairs?: readonly (readonly [string, string])[] | undefined;
 }
 
-interface Topology {
-  readonly banks: readonly Bank[];
-  /** Floors where a journey may change banks and keep its identity. */
-  readonly transferFloors: ReadonlySet<string>;
-}
-
-function topologyOf(building: ResolvedBuilding): Topology {
-  return {
-    banks: building.banks,
-    transferFloors: new Set(building.transferFloors.map((floor) => floor.id)),
-  };
-}
-
-/**
- * Where one leg on `bank` boarded at `from` can put a passenger down.
- *
- * For a single-deck bank that is every floor it serves. For a double-deck bank the decks
- * travel together, so a passenger who boards the lower deck alights on a lower-deck floor:
- * boarding at `G` of the pair `["G", "2"]` reaches `26`, never `27`.
- */
-function legDestinations(bank: Bank, from: string): readonly string[] {
-  const pairs = bank.servesFloorPairs ?? [];
-  if (pairs.length === 0) return bank.servesFloors;
-
-  const lower = pairs.some((pair) => pair[0] === from);
-  const upper = pairs.some((pair) => pair[1] === from);
-  // A floor outside every pair is served by the car as a whole, so either deck will do.
-  if (!lower && !upper) return bank.servesFloors;
-
-  const paired = new Set(pairs.flatMap((pair) => [pair[0], pair[1]]));
-  const reachable = new Set(bank.servesFloors.filter((floor) => !paired.has(floor)));
-  for (const pair of pairs) {
-    if (lower) reachable.add(pair[0]);
-    if (upper) reachable.add(pair[1]);
-  }
-  return [...reachable];
-}
-
-/** Minimum number of legs from `origin` to every floor it can reach. */
-function legsFrom(topology: Topology, origin: string): ReadonlyMap<string, number> {
-  const legs = new Map<string, number>([[origin, 0]]);
-  // The origin is boardable because the passenger starts there; anywhere else, a second
-  // leg may only begin on a declared transfer floor.
-  let frontier = [origin];
-  let depth = 0;
-  while (frontier.length > 0) {
-    depth += 1;
-    const next: string[] = [];
-    for (const at of frontier) {
-      for (const bank of topology.banks) {
-        if (!bank.servesFloors.includes(at)) continue;
-        for (const dest of legDestinations(bank, at)) {
-          if (legs.has(dest)) continue;
-          legs.set(dest, depth);
-          if (topology.transferFloors.has(dest)) next.push(dest);
-        }
-      }
-    }
-    frontier = next;
-  }
-  return legs;
-}
-
 const populatedFloors = (building: ResolvedBuilding): readonly string[] =>
-  building.floors.filter((floor) => floor.population > 0).map((floor) => floor.id);
+  populatedFloorsOf(building);
 
 /** Floor ids the given origin cannot reach at all. */
 function unreachableFrom(
@@ -382,5 +332,284 @@ describe('the lift-only model is a conservative view of the planner that actuall
     // crosses at sky lobby A. Pinned so the gap cannot quietly close back up.
     expect(legsFrom(topologyOf(b), '40').get('34')).toBe(5);
     expect(planner.legCount('40', '34')).toBe(2);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The loader check — the half of this file that is not about the shipped data
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A two-zone tower with a two-level lobby, authored correct.
+ *
+ * Small enough to state in one screen, structured enough to break in the three ways a building
+ * editor breaks a building: orphan a floor, orphan a bank, unflag a transfer floor.
+ * `totalPopulation` is kept honest in every mutation so the existing `population-mismatch`
+ * warning cannot be what raises the alarm.
+ */
+const PROBE: BuildingConfig = {
+  id: 'connectivity-probe',
+  name: 'Connectivity Probe Tower',
+  type: 'office',
+  trafficProfile: 'office-standard',
+  totalPopulation: 1080,
+  floors: [
+    { id: 'G', index: 0, heightM: 0, population: 0, isEntrance: true, isTransferFloor: true },
+    { id: 'M', index: 1, heightM: 4.5, population: 0, isTransferFloor: true },
+  ],
+  floorRanges: [
+    { fromIndex: 2, toIndex: 11, startHeightM: 9, floorToFloorM: 3.8, populationPerFloor: 60 },
+    { fromIndex: 12, toIndex: 19, startHeightM: 47.2, floorToFloorM: 3.8, populationPerFloor: 60 },
+  ],
+  banks: [
+    {
+      id: 'low',
+      servesFloors: ['G', 'M', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
+      cars: [
+        { id: 'L1', spec: 'gearless-traction' },
+        { id: 'L2', spec: 'gearless-traction' },
+      ],
+    },
+    {
+      id: 'high',
+      servesFloors: ['G', 'M', '12', '13', '14', '15', '16', '17', '18', '19'],
+      cars: [
+        { id: 'H1', spec: 'gearless-traction' },
+        { id: 'H2', spec: 'gearless-traction' },
+      ],
+    },
+  ],
+};
+
+const clone = (building: BuildingConfig): BuildingConfig =>
+  JSON.parse(JSON.stringify(building)) as BuildingConfig;
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+describe('the loader refuses to accept an unroutable building in silence', () => {
+  let specs: ElevatorSpecs;
+
+  beforeAll(async () => {
+    specs = (await loadConfig(REAL_DATA_DIR)).elevatorSpecs;
+  });
+
+  const resolve = (building: BuildingConfig): ResolvedBuilding =>
+    resolveBuilding(parseBuilding(building), specs);
+
+  const codes = (building: BuildingConfig): readonly string[] =>
+    resolve(building).warnings.map((warning) => warning.code);
+
+  it('says nothing about the probe as authored', () => {
+    expect(codes(PROBE)).toEqual([]);
+    const measured = measureConnectivity(resolve(PROBE));
+    expect(measured.pairsConsidered).toBe(324);
+    expect(measured.pairsRoutable).toBe(324);
+  });
+
+  it('warns when a populated floor is served by no bank', () => {
+    // Before this check existed: accepted, zero warnings, 37 of 361 ordered pairs unroutable.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.floors = [
+      ...(edited.floors ?? []),
+      { id: '20', index: 20, heightM: 77.8, population: 60 },
+    ];
+    edited.totalPopulation = 1140;
+
+    const resolved = resolve(edited);
+    expect(resolved.warnings.map((warning) => warning.code)).toEqual([
+      WARNING_CODES.unreachableFromEntrance,
+      WARNING_CODES.unroutableInterfloor,
+    ]);
+    // The population cross-check is silent, so the connectivity warning is doing the work.
+    expect(resolved.warnings.map((warning) => warning.code)).not.toContain(
+      WARNING_CODES.populationMismatch,
+    );
+    const stranded = resolved.warnings.find(
+      (warning) => warning.code === WARNING_CODES.unreachableFromEntrance,
+    );
+    expect(stranded?.message).toContain('"G" -> "20"');
+    expect(measureConnectivity(resolved).pairsConsidered).toBe(361);
+    expect(measureConnectivity(resolved).pairsRoutable).toBe(324);
+  });
+
+  it('warns when a whole bank is disconnected from the rest of the building', () => {
+    // Before: accepted, zero warnings, 74 of 400 ordered pairs unroutable.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.floors = [
+      ...(edited.floors ?? []),
+      { id: 'X1', index: 21, heightM: 81.6, population: 60 },
+      { id: 'X2', index: 22, heightM: 85.4, population: 60 },
+    ];
+    edited.totalPopulation = 1200;
+    edited.banks = [
+      ...edited.banks,
+      { id: 'orphan', servesFloors: ['X1', 'X2'], cars: [{ id: 'O1', spec: 'gearless-traction' }] },
+    ];
+
+    const resolved = resolve(edited);
+    expect(resolved.warnings.map((warning) => warning.code)).toEqual([
+      WARNING_CODES.unreachableFromEntrance,
+      WARNING_CODES.unroutableInterfloor,
+    ]);
+    expect(measureConnectivity(resolved).pairsConsidered).toBe(400);
+    expect(measureConnectivity(resolved).pairsRoutable).toBe(326);
+  });
+
+  it('warns when the lobby levels lose isTransferFloor', () => {
+    // Before: accepted, zero warnings, 160 of 324 ordered pairs unroutable — the mutation that
+    // took 72 % of a bigger tower's pairs out and produced not one diagnostic.
+    //
+    // Only the interfloor code fires, and that is the model being precise rather than lenient:
+    // G is in both banks' `servesFloors`, so every populated floor is still one leg from the
+    // street. What breaks is `4 -> 15`, which needed to change banks at a floor that no longer
+    // says a journey may.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.floors = (edited.floors ?? []).map((floor) => {
+      const { isTransferFloor: _dropped, ...rest } = floor;
+      return rest;
+    });
+
+    const resolved = resolve(edited);
+    expect(resolved.warnings.map((warning) => warning.code)).toEqual([
+      WARNING_CODES.unroutableInterfloor,
+    ]);
+    const measured = measureConnectivity(resolved);
+    expect(measured.pairsConsidered).toBe(324);
+    expect(measured.pairsConsidered - measured.pairsRoutable).toBe(160);
+  });
+
+  it('warns when a bank stops serving the sky lobby its zone hangs off', () => {
+    // `vertical-city`'s `zone-3-local` minus floor 26 — the single most likely edit a player
+    // makes in a bank editor. Measured before this check: `loadConfig` clean, the run clean, and
+    // `generated` down from 1 833 to 1 570 with nothing said until the trace was already built.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.banks = edited.banks.map((bank) =>
+      bank.id === 'high'
+        ? { ...bank, servesFloors: bank.servesFloors.filter((id) => id !== 'G' && id !== 'M') }
+        : bank,
+    );
+
+    const resolved = resolve(edited);
+    const stranded = resolved.warnings.find(
+      (warning) => warning.code === WARNING_CODES.unreachableFromEntrance,
+    );
+    expect(stranded).toBeDefined();
+    expect(stranded?.message).toContain('8 populated floors');
+  });
+
+  it('rejects — does not warn about — a building that can serve nobody', () => {
+    // The one hard refusal. Both banks keep their floors and lose the lobby, so no journey the
+    // generator would draw is servable at all and the run would create no legs.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.floors = [
+      { id: 'G', index: 0, heightM: 0, population: 0, isEntrance: true, isTransferFloor: true },
+      { id: 'M', index: 1, heightM: 4.5, population: 0, isTransferFloor: true },
+    ];
+    edited.floorRanges = [
+      { fromIndex: 2, toIndex: 11, startHeightM: 9, floorToFloorM: 3.8, populationPerFloor: 60 },
+    ];
+    edited.totalPopulation = 600;
+    edited.banks = [
+      {
+        id: 'lobby-only',
+        servesFloors: ['G', 'M'],
+        cars: [{ id: 'C1', spec: 'gearless-traction' }],
+      },
+    ];
+
+    let thrown: unknown;
+    try {
+      resolve(edited);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ConfigError);
+    const issues = (thrown as ConfigError).issues;
+    expect(issues.map((issue) => issue.code)).toEqual([ISSUE_CODES.disconnectedBuilding]);
+    expect(issues[0]?.message).toContain('no journey');
+  });
+
+  it('warns about a transfer chain longer than a supertall needs', () => {
+    // Reachable, so not an error; four legs from the street, so not a building anybody meant.
+    // Four banks in a chain, each meeting the next at one transfer floor.
+    const chained: BuildingConfig = {
+      id: 'chain-probe',
+      name: 'Chain Probe',
+      type: 'office',
+      trafficProfile: 'office-standard',
+      floors: [
+        { id: 'G', index: 0, heightM: 0, population: 0, isEntrance: true, isTransferFloor: true },
+        { id: 'A', index: 1, heightM: 4, population: 10, isTransferFloor: true },
+        { id: 'B', index: 2, heightM: 8, population: 10, isTransferFloor: true },
+        { id: 'C', index: 3, heightM: 12, population: 10, isTransferFloor: true },
+        { id: 'D', index: 4, heightM: 16, population: 10 },
+      ],
+      banks: [
+        { id: 'b1', servesFloors: ['G', 'A'], cars: [{ id: 'c1', spec: 'gearless-traction' }] },
+        { id: 'b2', servesFloors: ['A', 'B'], cars: [{ id: 'c2', spec: 'gearless-traction' }] },
+        { id: 'b3', servesFloors: ['B', 'C'], cars: [{ id: 'c3', spec: 'gearless-traction' }] },
+        { id: 'b4', servesFloors: ['C', 'D'], cars: [{ id: 'c4', spec: 'gearless-traction' }] },
+      ],
+    };
+
+    const resolved = resolve(chained);
+    expect(resolved.warnings.map((warning) => warning.code)).toContain(
+      WARNING_CODES.excessiveTransferChain,
+    );
+    const chain = resolved.warnings.find(
+      (warning) => warning.code === WARNING_CODES.excessiveTransferChain,
+    );
+    expect(chain?.message).toContain('"G" -> "D" (4 legs)');
+    // Nothing is unroutable here, so neither of the other two codes may fire.
+    expect(resolved.warnings.map((warning) => warning.code)).not.toContain(
+      WARNING_CODES.unreachableFromEntrance,
+    );
+  });
+
+  it('is credential-blind, so secure-tower keeps every load-time verdict it had', async () => {
+    // The decision this check would be wrong to reverse. `secure-tower` deliberately makes some
+    // origin-destination pairs impossible *for a person*: its `facilities` group reaches four
+    // tenant zones and not the executive floor. The shafts connect; the badge does not. Turning
+    // that into a load-time diagnostic would fire on a shipped building for doing exactly what
+    // it was authored to do — so the credential question stays in the generator's per-run
+    // rejection census, where the rider exists.
+    const config = await loadConfig(REAL_DATA_DIR);
+    const tower = config.buildingsById.get('secure-tower');
+    if (tower === undefined) throw new Error('no secure-tower');
+    expect(tower.accessZones.length).toBeGreaterThan(0);
+    expect(measureConnectivity(tower).pairsRoutable).toBe(measureConnectivity(tower).pairsConsidered);
+    expect(tower.warnings.map((warning) => warning.code)).toEqual([]);
+  });
+
+  it('leaves all eight shipped buildings loading clean', async () => {
+    const config = await loadConfig(REAL_DATA_DIR);
+    expect(config.buildings).toHaveLength(8);
+    const connectivityCodes: readonly string[] = [
+      WARNING_CODES.unreachableFromEntrance,
+      WARNING_CODES.unroutableInterfloor,
+      WARNING_CODES.excessiveTransferChain,
+    ];
+    const raised = config.buildings.flatMap((b) =>
+      b.warnings.filter((warning) => connectivityCodes.includes(warning.code)).map((warning) => `${b.id}: ${warning.code}`),
+    );
+    expect(raised).toEqual([]);
+  });
+
+  it('reports diagnostics on the same object the demand generator will route over', () => {
+    // The tie that stops this becoming a second opinion. `connectivityDiagnostics` is what
+    // `resolveBuilding` calls; `measureConnectivity` is what it calls; both are exported so a
+    // caller wanting the facts does not parse them back out of a message.
+    const edited = clone(PROBE) as Mutable<BuildingConfig>;
+    edited.floors = [
+      ...(edited.floors ?? []),
+      { id: '20', index: 20, heightM: 77.8, population: 60 },
+    ];
+    edited.totalPopulation = 1140;
+    const resolved = resolve(edited);
+    const direct = connectivityDiagnostics(resolved, { buildingId: resolved.id });
+    expect(direct.issues).toEqual([]);
+    expect(direct.warnings.map((warning) => warning.code)).toEqual(
+      resolved.warnings.map((warning) => warning.code),
+    );
   });
 });

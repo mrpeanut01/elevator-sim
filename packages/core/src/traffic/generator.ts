@@ -137,7 +137,11 @@ import {
 } from './poissonBatch.js';
 import { RoutePlanner } from './route.js';
 import {
+  CREDENTIAL_ASSIGNMENTS,
+  DEMAND_LEVELS,
+  INTERFLOOR_WEIGHTINGS,
   TRAFFIC_DEFAULTS,
+  TRAFFIC_MODEL_VERSIONS,
   TrafficError,
   type ArrivalEvent,
   type BatchSizeCurve,
@@ -342,29 +346,162 @@ interface ResolvedOptions {
   readonly passengerMass: PassengerMassConfig;
 }
 
+/* -------------------------------------------------------------------------- *
+ * The demand surface refuses what it does not recognise
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Every field of {@link TrafficConfig}, **derived from the type rather than listed beside it**.
+ *
+ * `-?` over `Required<TrafficConfig>` makes this exhaustive at compile time: add a field to
+ * `TrafficConfig` and this object stops building until it is named here too. A hand-written array
+ * would go stale the first time somebody added a knob, and a stale allow-list is worse than none —
+ * it refuses the new field by name and looks deliberate doing it.
+ *
+ * The pattern is `experiments/src/runner/experiment.ts`'s `DEMAND_PARSERS`, one layer down.
+ */
+const TRAFFIC_CONFIG_FIELDS: { readonly [K in keyof Required<TrafficConfig>]-?: true } = {
+  building: true,
+  profiles: true,
+  streams: true,
+  trafficModel: true,
+  template: true,
+  templateOverrides: true,
+  windowStartS: true,
+  windowEndS: true,
+  demandLevel: true,
+  arrivalRatePctPop5min: true,
+  directionalSplit: true,
+  batchSize: true,
+  passengerMass: true,
+  batchSharesDestination: true,
+  entranceWeights: true,
+  interfloorWeighting: true,
+  credentialAssignment: true,
+  credentialGap: true,
+  maxLegs: true,
+  idPrefix: true,
+  journeyIdPrefix: true,
+  batchIdPrefix: true,
+  dayVariation: true,
+};
+
+const TRAFFIC_CONFIG_KEYS: readonly string[] = Object.keys(TRAFFIC_CONFIG_FIELDS).sort();
+
+/**
+ * Refuse a key nobody declared, rather than ignoring it.
+ *
+ * **This is the check a demand surface built from a form or a URL parameter needs**, and the
+ * reason it is here rather than only in the schema layer: `TrafficConfig` never goes through zod.
+ * A misspelled knob is not a typo that costs the author one run — it is a control the player moves
+ * that changes nothing, which is the exact shape `docs/05-roadmap.md`'s standing requirement is
+ * about, arriving from the other side.
+ *
+ * Exported because the same allow-list answers the same question one layer up: `SimulationConfig`
+ * spreads `demand.*` field by field into a `TrafficConfig`, so a key `SimulationDemandOptions`
+ * does not declare is dropped **before** it reaches here and is a silent no-op that this cannot
+ * see. Measured on `midtown-office`, seed 20 260 810: `demand: { arrivalRateMultiplier: 3 }`
+ * produces 719 legs, identical to no demand block at all. Closing that needs one call in
+ * `sim/simulation.ts`'s `traceConfigFor` — `requireKnownTrafficKeys(demand, 'demand')` before the
+ * spread — which is why this takes a label rather than assuming its own.
+ */
+export function requireKnownTrafficKeys(value: object, label = 'traffic config'): void {
+  const unknown = Object.keys(value).filter((key) => !TRAFFIC_CONFIG_KEYS.includes(key));
+  if (unknown.length === 0) return;
+  throw new TrafficError(
+    `${label} declares ${unknown.length === 1 ? 'a field' : 'fields'} nothing reads: ${unknown.map((key) => `"${key}"`).join(', ')}. A knob that is silently ignored is a control the player moves for no effect. Declared fields: ${TRAFFIC_CONFIG_KEYS.join(', ')}.`,
+  );
+}
+
+/**
+ * Refuse a value that is not one of a declared set, **by name and at the boundary**.
+ *
+ * The three enumerated demand knobs used to reach `resolveOptions` unchecked, and each failed in
+ * its own way, none of them loudly. Measured on `midtown-office` at seed 20 260 810,
+ * `rise-and-fall`, before this existed:
+ *
+ * | given | what happened |
+ * |---|---|
+ * | `demandLevel: 'high'` | `TrafficError: … received NaN` from `poissonBatch.ts`, three layers down |
+ * | `interfloorWeighting: 'bogus'` | 719 legs — silently `population`, because the read is `=== 'uniform' ? … : …` |
+ * | `credentialAssignment: 'bogus'` | 719 legs — silently enforcing, because the read is `!== 'none'` |
+ *
+ * The first is a bad message about a real refusal; the other two are no refusal at all. Both are
+ * the same defect as a misspelled tunable that is quietly ignored, which CLAUDE.md invariant 8
+ * exists to prevent — and the type system does not catch it, because `TrafficConfig` crosses a
+ * package boundary and arrives from JSON, a URL parameter or a form as often as from TypeScript.
+ */
+function requireOneOf<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  id: string,
+  why: string,
+): T {
+  if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) return value as T;
+  throw new TrafficError(
+    `${id} must be one of ${allowed.map((option) => `"${option}"`).join(', ')}; received ${JSON.stringify(value)}. ${why}`,
+  );
+}
+
 function resolveOptions(config: DemandConfig): ResolvedOptions {
+  // First, before any `??` can hand a misspelling its default. `planDemand` and `generateTrace`
+  // both come through here, so both public entry points get it from one call site.
+  requireKnownTrafficKeys(config);
   const maxLegs = config.maxLegs ?? TRAFFIC_DEFAULTS.maxLegs;
   if (!Number.isInteger(maxLegs) || maxLegs < 1) {
     throw new TrafficError(`maxLegs must be a positive integer; received ${maxLegs}`);
+  }
+  const demandLevel = requireOneOf(
+    config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
+    DEMAND_LEVELS,
+    'traffic.demandLevel',
+    'It selects a point of each profile\'s own arrivalRatePctPop5min range. To sweep to an arbitrary rate instead, set arrivalRatePctPop5min, which overrides every profile.',
+  );
+  const interfloorWeighting = requireOneOf(
+    config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
+    INTERFLOOR_WEIGHTINGS,
+    'traffic.interfloorWeighting',
+    'It decides how an interfloor destination is drawn: "population" weights each candidate floor by its occupancy, "uniform" treats them alike.',
+  );
+  const credentialAssignment = requireOneOf(
+    config.credentialAssignment ?? TRAFFIC_DEFAULTS.credentialAssignment,
+    CREDENTIAL_ASSIGNMENTS,
+    'traffic.credentialAssignment',
+    'It decides whether access zoning is enforced on the generated trace at all. "none" turns the credential off, which is the control arm rather than a default.',
+  );
+  const trafficModel = requireOneOf(
+    config.trafficModel ?? TRAFFIC_DEFAULTS.trafficModel,
+    TRAFFIC_MODEL_VERSIONS,
+    'traffic.trafficModel',
+    'It is a draw-ordering version, not a tunable: every figure this repository publishes was measured under "v1".',
+  );
+  // A boolean that is not a boolean is the same silent no-op one type over: `?? DEFAULT` accepts
+  // `"yes"` and every later read is truthy, so the run is the `true` run whatever was meant.
+  const batchSharesDestination =
+    config.batchSharesDestination ?? TRAFFIC_DEFAULTS.batchSharesDestination;
+  if (typeof batchSharesDestination !== 'boolean') {
+    throw new TrafficError(
+      `traffic.batchSharesDestination must be a boolean; received ${JSON.stringify(batchSharesDestination)}. It decides whether a batch travels together to one floor or splits across destinations.`,
+    );
   }
   // Validated here rather than at the first draw, so a mis-specified curve fails while the plan is
   // being built instead of a thousand batches into a trace. `meanBatchSizeOf` is the whole check:
   // every family has to expose a mean, because the batch rate divides by it.
   if (config.batchSize !== undefined) meanBatchSizeOf(config.batchSize);
   return {
-    demandLevel: config.demandLevel ?? TRAFFIC_DEFAULTS.demandLevel,
-    interfloorWeighting: config.interfloorWeighting ?? TRAFFIC_DEFAULTS.interfloorWeighting,
-    credentialAssignment: config.credentialAssignment ?? TRAFFIC_DEFAULTS.credentialAssignment,
+    demandLevel,
+    interfloorWeighting,
+    credentialAssignment,
     // No `??` of this module's own, for `passengerMass`'s reason: unset means *the data decides*,
     // and the only honest resolution is the block `data/traffic-profiles.json` authored.
     credentialGapShare: resolveCredentialGap(config),
-    batchSharesDestination: config.batchSharesDestination ?? TRAFFIC_DEFAULTS.batchSharesDestination,
+    batchSharesDestination,
     maxLegs,
     directionalSplit: normalizeSplit(config.directionalSplit),
     idPrefix: config.idPrefix ?? 'p',
     journeyIdPrefix: config.journeyIdPrefix ?? 'j',
     batchIdPrefix: config.batchIdPrefix ?? 'b',
-    trafficModel: config.trafficModel ?? TRAFFIC_DEFAULTS.trafficModel,
+    trafficModel,
     batchSize: config.batchSize,
     // No `?? { ... }` of this module's own: unset means *the data decides*, and the only honest
     // resolution is the block `data/traffic-profiles.json` authored. A default invented here would

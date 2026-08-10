@@ -187,6 +187,15 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'configuring an automatic policy in advance rather than intervening — the run still has to be ' +
       'simulated again to see it.',
   ),
+  'viewer.patience': control(
+    'within-day',
+    'How long a rider will stand at a landing before giving up — the one schema on the Parameters ' +
+      'tab that reaches a run. within-day rather than between-games because it is a property of the ' +
+      'crowd rather than of the contest: it does not name the run, it changes what the run costs, ' +
+      'and it re-runs the day like the levers beside it. It is here at all because the audit found ' +
+      '114 controls on that tab binding nothing, and the values living in a closure rather than in ' +
+      'this state is what stopped this file from being able to say so.',
+  ),
   'viewer.outOfServiceCarIds': control(
     'within-day',
     'Cars the reader took out of service by clicking a badge. Re-runs the day; the CLI has no flag ' +

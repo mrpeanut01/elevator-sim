@@ -14,6 +14,19 @@
  * `src/replay/replay.test.ts`, the second because a replay test that cannot fail proves
  * nothing.
  *
+ * **And deterministic across a thread boundary**, which is a third thing and is asserted below in
+ * this file's own suite. The browser viewer no longer calls this on the thread that paints: since
+ * the UI readiness audit's B3, `dev/shiftRunner.ts` posts the config to `dev/shiftWorker.ts` and
+ * that worker calls this function. A `postMessage` is a structured clone, so what runs is a run of
+ * a *copy* — and `recordRun(structuredClone(config))` is required to be byte-identical to
+ * `recordRun(config)`, legs and whole recording. Nothing else in the tree would notice if it
+ * stopped being: the recording would still be internally consistent, still replay against itself,
+ * and simply be of a different building.
+ *
+ * This stays the **only** place in the package that runs a simulation. The worker is a transport,
+ * not a second implementation — the honesty sweep, the CLI, the scope probes and the viewer all
+ * measure the same simulator because they all end up here.
+ *
  * ## What is folded, and what is kept raw
  *
  * Car motion is kept **raw**: the `CarMotion` objects carry the `MotionProfile` the kernel

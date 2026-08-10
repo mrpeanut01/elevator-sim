@@ -454,18 +454,28 @@ describe('issue #136 — a loaded recording banks nothing', () => {
 
   it('holds the run it simulated, and writes it in exactly one place', async () => {
     /*
-     * One writer, in `runShift`. A second — in `adopt`, say, which is the tempting place because
-     * every recording passes through it — would set it for loaded recordings too and make the whole
-     * gate inert: a control that writes nothing while looking exactly like one that does, which is
-     * the defect this repository has shipped eleven times.
+     * One writer. A second — in `adopt`, say, which is the tempting place because every recording
+     * passes through it — would set it for loaded recordings too and make the whole gate inert: a
+     * control that writes nothing while looking exactly like one that does, which is the defect this
+     * repository has shipped eleven times.
      *
      * Over `mainCode()` rather than `mainSource()`, so the prose explaining the binding does not
      * count as a second writer.
+     *
+     * **The writer is `applyShift`, not `runShift`, and that is the UI readiness audit's B3 rather
+     * than a weakening.** `runShift` no longer simulates: it builds the plan, hands it to
+     * `dev/shiftRunner.ts` and returns, and `applyShift` is the half that runs when the worker
+     * answers. The property this case is about is unchanged and is the one that matters — **one**
+     * writer, on the path a simulated run takes and on no other — and the count above is what
+     * enforces it. Naming the function it lives in is the part that had to move.
      */
     const code = await mainCode();
     const writes = [...code.matchAll(/simulatedRecording\s*=[^=]/g)];
-    expect(writes, 'simulatedRecording is written somewhere other than runShift').toHaveLength(1);
-    expect(await bodyOf('runShift')).toContain('simulatedRecording = recorded.recording');
+    expect(writes, 'simulatedRecording is written somewhere other than applyShift').toHaveLength(1);
+    expect(await bodyOf('applyShift')).toContain('simulatedRecording = recording');
+    // And `runShift` still owns getting there: the only route into `applyShift` is the run it
+    // starts, so a second entry point would be a second way for a recording to be called simulated.
+    expect(await bodyOf('runShift')).toContain('applyShift(recording, startOfDayS, plan.withheld)');
   });
 
   it('clears the run’s own hour on load, so the docstring that says it does is true', async () => {

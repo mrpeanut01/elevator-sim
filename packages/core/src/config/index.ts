@@ -49,6 +49,22 @@ export {
   transportModeSchema,
 } from './schema.js';
 
+export {
+  MAX_LEGS_FROM_ENTRANCE,
+  connectivityDiagnostics,
+  deckAwareDestinations,
+  legCountsFrom,
+  measureConnectivity,
+  populatedFloorIds,
+  connectivityTopologyOf,
+  type BuildingConnectivity,
+  type ConnectivityBank,
+  type ConnectivityDiagnosticsOptions,
+  type ConnectivityGap,
+  type ConnectivitySource,
+  type ConnectivityTopology,
+} from './buildingConnectivity.js';
+
 export { demandPhaseIssues } from './demandPhases.js';
 export type {
   DemandPhaseIssue,

@@ -706,7 +706,20 @@ describe('resolveBuilding', () => {
             // `parse.test.ts` § resolveBuilding resolves passengerTransferS. Incidental to what
             // this test is about (floorRanges), and stated rather than worked around.
             cars: [{ id: 'A', spec: 'high-speed-gearless', passengerTransferS: 1.75 }],
-            servesFloors: ['G', '32', '45', '60'],
+            /*
+             * The whole range, not the three floors this used to name.
+             *
+             * It used to be `['G', '32', '45', '60']` against a `floorRange` that populates
+             * twenty-nine floors, so twenty-six populated floors were served by no bank at all
+             * and `resolveBuilding` said nothing — this fixture *was* the defect
+             * `buildingConnectivity.ts` now catches, sitting unnoticed inside a test about
+             * something else. Incidental to what this test is about (floorRanges expanding
+             * correctly), and fixed rather than exempted.
+             */
+            servesFloors: [
+              'G',
+              ...Array.from({ length: 29 }, (_unused, offset) => String(32 + offset)),
+            ],
           },
         ],
       },

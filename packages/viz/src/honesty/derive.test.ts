@@ -51,6 +51,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/parameterForm.ts#mountParameterForm',
         'dev/parameterForm.ts#collectFormSource',
         'dev/parameterForm.ts#formStatusLine',
+        /*
+         * The UI readiness audit's B4 line — *NOT APPLIED — nothing the Run button does reads X* —
+         * and it is **player-facing prose that this search does not check**, said plainly rather
+         * than dressed as a non-surface.
+         *
+         * It is here beside `formStatusLine` because the whole Parameters tab is: nothing on that
+         * surface is in the corpus, and putting one sentence of it in while the status line it sits
+         * above — *"41 dimensions, 41 live — authorable as a dispatcher profile"*, the sentence the
+         * audit found a reader mistaking for a claim about the Run button — stays out would read as
+         * coverage of a tab that is not covered. The tab belongs in the corpus as a unit; that is
+         * follow-up work and is named here rather than half-done.
+         *
+         * What does hold it meanwhile: `dev/parameterForm.test.ts` drives it over every discovered
+         * schema, and `dev/boot.browser.test.ts` reads it off a booted page. Both are weaker than
+         * the search, and both are stated as such.
+         */
+        'dev/parameterForm.ts#appliedNoteFor',
         'dev/data.ts#loadBrowserResources',
         'dev/data.ts#loadCampaign',
         'dev/data.ts#resolveEdited',
@@ -626,6 +643,30 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'through `applyIntent` — driven, and covered there. Putting it in an adapter instead would ' +
         'have been a coverage claim for prose that does not exist.',
       ids: ['menu/screens.ts#withChosenValue'],
+    },
+    {
+      reason:
+        'A decoder with no sentence in it. `patienceFromCandidate` turns the Parameters tab’s live ' +
+        'point into a `PatienceConfig`, and every literal the derivation sees in it is a parameter ' +
+        'id (`sim.patience.meanS`) or a distribution name (`exponential`) — `core`’s vocabulary, ' +
+        'not prose, and nothing it returns is a string at all. It is `dev/dom.ts`’s case at the ' +
+        'other end of the pipe: the strings near it belong to somebody else, and driving it would ' +
+        'put a schema id in the corpus under a decoder’s name.',
+      ids: ['dev/parameterForm.ts#patienceFromCandidate'],
+    },
+    {
+      reason:
+        'Worker-lifecycle prose — the shift runner’s two lines, *simulating the shift: 12 s so ' +
+        'far, about 300 people expected … not progress*, and its cancel sentence. **Player-facing, ' +
+        'and not driven here**, said plainly: producing either one means starting a run, holding a ' +
+        'worker and advancing a clock, which is the same *cannot be reached from this context* the ' +
+        'DOM-bound group above states about a mount — the corpus hands an adapter a finished ' +
+        'recording, and these sentences exist only while there is not one yet. ' +
+        '`dev/shiftRunner.test.ts` drives the shipped runner through a worker it answers for and ' +
+        'asserts both, including the clause that stops the elapsed counter being read as progress; ' +
+        'that is weaker than the search and is stated as a limitation rather than presented as ' +
+        'coverage.',
+      ids: ['dev/shiftRunner.ts#createShiftRunner'],
     },
   ]);
 

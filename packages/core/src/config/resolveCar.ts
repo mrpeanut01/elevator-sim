@@ -53,37 +53,38 @@ export function findElevatorSpec(specs: ElevatorSpecs, id: string): ElevatorSpec
 /**
  * `tp` for a building type, from `elevator-specs.json → timing.passengerTransferS`.
  *
+ * **The one implementation.** `analytical/upPeak.ts` needs the same number for the closed-form
+ * oracle and used to reach it through a second `switch` over the same four cases, written out in
+ * full a second time — so adding a building type meant editing two functions that had no way of
+ * telling each other apart, and `sim/simulation.test.ts` existed to pin the two readings
+ * together. `passengerTransferSecondsFor` now delegates here and the pin holds two names for one
+ * body rather than two bodies.
+ *
+ * **The lookup is a key read, not a `switch`, and that is what makes the table extensible.** A
+ * `switch` over `BuildingType` cannot see a row the union does not name, so `"school": 1.4` in
+ * `data/elevator-specs.json` would have been schema-legal (once the whitelist came off) and
+ * still unreadable. Adding a type is now one code site — the union in `types.ts` — plus one data
+ * row, and the loader's advice to *"add the type to the reference table"* is finally true.
+ *
  * `undefined` for `mixed-use`, which the reference table has no row for on purpose: a mixed
  * tower's banks serve populations that transfer at different speeds (office 1.2 s against
  * residential 1.75 s), so there is no honest building-wide answer and the value has to be
  * stated per car. `undefined` is therefore "nobody has said", never "assume office" — the
  * bug this function exists to make impossible was a silent fall-through to 1.2 s on every
- * residential and hotel building in the repository.
+ * residential and hotel building in the repository. Note that this is now a property of the
+ * **data** rather than of this function: a data directory that authored a `mixed-use` row would
+ * get it, which is the right place for that decision to live.
  *
- * The table is read from data, not hard-coded, so the value stays tunable without a rebuild
- * (CLAUDE.md invariant 7). `analytical/upPeak.ts` reads the same table for the closed-form
- * oracle; `sim/simulation.test.ts` pins the two readings together so they cannot drift.
+ * The narrowing to a finite number is load-bearing rather than defensive. The table's key set is
+ * open (see {@link PassengerTransferTimes}) and it carries `$comment`, so a caller asking for a
+ * type whose "row" is a string must be told nobody has said, not handed prose.
  */
 export function findPassengerTransferS(
   specs: ElevatorSpecs,
   buildingType: BuildingType,
 ): number | undefined {
-  const table = specs.timing.passengerTransferS;
-  switch (buildingType) {
-    case 'office':
-      return table.office;
-    case 'residential':
-      return table.residential;
-    case 'hotel':
-      return table.hotel;
-    case 'hospital':
-      // Longest of the four, and the only one whose population is not all ambulant: a trolley with
-      // an attendant is not a person stepping in. `st-jude-hospital`'s bed bank overrides it again
-      // per car, which is how a building says its two banks carry different traffic.
-      return table.hospital;
-    case 'mixed-use':
-      return undefined;
-  }
+  const value = specs.timing.passengerTransferS[buildingType];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 /**

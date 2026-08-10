@@ -669,7 +669,13 @@ describe('the building spec', () => {
       expect(spec.floors).toBeGreaterThan(0);
       expect(spec.cars).toBeGreaterThan(0);
       const rebuilt = buildingFromSpec(spec, { specs: SPECS });
-      // Lossy by construction (§ 4.5) — what must hold is that it is still a *building*.
+      /*
+       * What must hold here is that it is still a *building*. That it is still **the same** building
+       * is a stronger claim and it is now made, on the resolved banks, the resolved floors and the
+       * legs of a run — `roundTrip.test.ts`. This line said *"lossy by construction (§ 4.5)"* for as
+       * long as the round trip deleted `vertical-city`'s seven banks, and a comment asserting the
+       * loss was acceptable is exactly how it stayed unmeasured.
+       */
       expect(() => resolveBuilding(parseBuilding(rebuilt as unknown), SPECS)).not.toThrow();
     }
   });
@@ -1251,10 +1257,19 @@ describe('the building editor is not decoration', () => {
   it('a lobby the toggle closed off is a building that strands people, and the editor says so first', () => {
     /*
      * The reason the toggle needed a guard rather than only a label. Two cars, both closed inside
-     * `7–11`, no transfer level: measured on this branch the document **parses and resolves with no
-     * error and no warning**, and the run then carries 8 legs where the same building with the
-     * lobby carries 114 — the missing passengers are not slow, they were never generated. So the
-     * refusal has to be said at the control, which is what `validateSpec` is for.
+     * `7–11`, no transfer level: the run carries 8 legs where the same building with the lobby
+     * carries 114 — the missing passengers are not slow, they were never generated.
+     *
+     * **This comment said the document "parses and resolves with no error and no warning", and that
+     * clause is now false and was worth being false.** It was a measurement of the loader at the
+     * time, and it pinned the exact hole the UI readiness audit's S4 named: a building whose floors
+     * nothing can reach loaded in silence. The loader runs a real connectivity check at resolve time
+     * now, so it reports the stranding itself — the two codes below.
+     *
+     * The point of the test is unchanged, and it is the reason it is still here rather than deleted:
+     * **the editor refuses first, and it refuses rather than warns.** A loader warning arrives on
+     * save, about a document; `validateSpec` arrives while the reader is dragging the toggle that
+     * causes it. The two are complementary, and the assertion order below says so.
      */
     const stranded: BuildingSpec = {
       ...spec,
@@ -1266,7 +1281,10 @@ describe('the building editor is not decoration', () => {
       parseBuilding(buildingFromSpec(stranded, { specs: SPECS }) as unknown),
       SPECS,
     );
-    expect(resolved.warnings).toStrictEqual([]);
+    expect(resolved.warnings.map((warning) => warning.code)).toStrictEqual([
+      'unreachable-from-entrance',
+      'unroutable-interfloor',
+    ]);
     expect(RoutePlanner.forBuilding(resolved).plan('G', '8')).toBeUndefined();
     expect(validateSpec(stranded, undefined).join(' ')).toMatch(/nobody can board from the lobby/);
 
