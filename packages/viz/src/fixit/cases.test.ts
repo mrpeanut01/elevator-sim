@@ -198,6 +198,128 @@ const PINNED: readonly Pinned[] = [
   },
 ];
 
+/**
+ * Every numeral in a case's authored copy that is **not** one of its measured figures, with the
+ * source it came from — GAMEPLAY § 20.11's *"a real source … or an explicit `FIXTURE` marker"*.
+ *
+ * ## Why this exists when the figures are already pinned
+ *
+ * {@link PINNED} pins what the *engine computes*; the copy quotes those figures **by hand**, one
+ * sentence away. So a figure that moved turned this suite red on `figureTexts` and left the
+ * sentence quoting the old number — the two are linked by a reviewer's memory, which is the link
+ * § D227 records going stale. The assertion below closes it in the direction that matters: every
+ * number a player reads in this file is either produced by the run or declared here with where it
+ * came from.
+ *
+ * The declared ones are of exactly two kinds and neither is a measurement:
+ *
+ * - **floor ids**, in the complainer's line — *tenant, floor 62* is who wrote the letter;
+ * - **served headcounts**, from the building document's own population split, which the zoning
+ *   case's diagnosis is *about*: they are the fault, not a reading of it.
+ *
+ * A third kind would be a figure with no source, and it has nowhere to go: an unrecognised numeral
+ * fails, and an entry here that stops appearing fails too — a ghost source is a source nobody reads.
+ */
+const AUTHORED_FACTS: Readonly<Record<string, Readonly<Record<string, string>>>> = Object.freeze({
+  'sleeping-sky-lobby': Object.freeze({
+    '62': 'a floor of Vertical City — the letter-writer’s own floor, not a reading',
+  }),
+  'zoning-starves-the-top': Object.freeze({
+    '18': 'a floor of the case’s building — the letter-writer’s own floor',
+    '600': 'the low bank’s served population, from the building document; the split is the fault',
+    '1,170': 'the high bank’s served population, from the same place',
+    '585': 'half of 1,170 — the arithmetic the repair line performs in front of the reader',
+  }),
+  'three-cars-one-cars-work': Object.freeze({
+    '4': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+});
+
+/** Every number a reader could match against a figure. `NUMBER_TOKEN`'s rule, one package over. */
+const COPY_NUMERAL = /\d[\d,]*(?:\.\d+)?/g;
+
+/** Every player-facing string a case authors, named so a failure says which sentence. */
+function authoredCopyOf(entry: FixitCase): readonly (readonly [string, string])[] {
+  return [
+    ['name', entry.name],
+    ['asBuilt.note', entry.asBuilt.note],
+    ['complaint.text', entry.complaint.text],
+    ['complaint.complainer', entry.complaint.complainer],
+    ['complaint.measure.label', entry.complaint.measure.label],
+    ['symptom', entry.symptom],
+    ['diagnosis.text', entry.diagnosis.text],
+    ['diagnosis.reasoning', entry.diagnosis.reasoning],
+    ['result.head', entry.result.head],
+    ['result.body', entry.result.body],
+    ...entry.figures.map((figure, index): readonly [string, string] => [
+      `figures[${String(index)}].label`,
+      figure.label,
+    ]),
+    ...entry.repairs.flatMap((repair): readonly (readonly [string, string])[] => [
+      [`repairs.${repair.id}.name`, repair.name],
+      [`repairs.${repair.id}.effect`, repair.effect],
+    ]),
+  ];
+}
+
+/**
+ * Whether `numeral` is one of these measured values, as a reader would read it.
+ *
+ * Rounding-tolerant in one direction only: the copy may quote *341 s* for a measured `341.1`,
+ * because that is what a sentence does with a figure, and it may not quote a value the run did not
+ * produce. Compared at the copy's own precision, so `341` matches `341.1` and `342` does not.
+ */
+function isMeasured(numeral: string, measured: readonly number[]): boolean {
+  const bare = numeral.replaceAll(',', '');
+  const places = bare.includes('.') ? (bare.split('.')[1]?.length ?? 0) : 0;
+  return measured.some((value) => value.toFixed(places) === bare);
+}
+
+describe.each(PINNED)('case $id — its copy quotes the run and nothing else (§ 20.11)', (pinned) => {
+  it('every authored numeral is a measured figure or a declared fact', () => {
+    const entry = caseOf(pinned.id);
+    const facts = AUTHORED_FACTS[pinned.id] ?? {};
+    /*
+     * The values the run produced, taken from the same pins the panel's figures are checked
+     * against plus the complaint measurement itself — never re-derived here, for `stageRun.ts`'s
+     * reason: a second computation of what the case measured would vouch for itself.
+     */
+    const measured = [
+      pinned.before,
+      pinned.after,
+      ...pinned.figureTexts.flatMap((text) =>
+        [...text.matchAll(COPY_NUMERAL)].map((match) => Number(match[0].replaceAll(',', ''))),
+      ),
+    ].filter((value) => Number.isFinite(value));
+
+    const unsourced: string[] = [];
+    const usedFacts = new Set<string>();
+    for (const [field, text] of authoredCopyOf(entry)) {
+      for (const match of text.matchAll(COPY_NUMERAL)) {
+        const numeral = match[0].replace(/,$/, '');
+        if (isMeasured(numeral, measured)) continue;
+        if (numeral in facts) {
+          usedFacts.add(numeral);
+          continue;
+        }
+        unsourced.push(`${field}: ${numeral} — in ${JSON.stringify(text.slice(0, 90))}`);
+      }
+    }
+    expect(
+      unsourced,
+      'an authored figure with no source. Either it is a reading, in which case pin it in PINNED ' +
+        'and let the run produce it, or it is a fact about the building, in which case declare it ' +
+        'in AUTHORED_FACTS with where it came from. § 20.11: nothing is presented as truth unsourced.',
+    ).toEqual([]);
+
+    // And no ghost: a declared source for a numeral the copy no longer quotes is a source nobody reads.
+    expect(
+      Object.keys(facts).filter((numeral) => !usedFacts.has(numeral)),
+      'delete the AUTHORED_FACTS entry; a list of ghosts is how a list stops being read',
+    ).toEqual([]);
+  });
+});
+
 describe.each(PINNED)('case $id', (pinned) => {
   it(
     'is validated by a real run pair: the diagnosed fix clears both measured bars (§ 10.6 rule 6)',

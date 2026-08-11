@@ -330,6 +330,86 @@ describe('the DOM is confined to the dev entry point', () => {
   });
 });
 
+/**
+ * Where a world figure can enter the product — GAMEPLAY § 16 rule 15, GitHub issue #123.
+ *
+ * > **Every screen renders with the API absent.** World figures … degrade to a labelled *world
+ * > figures unavailable* state. Never a zero, never a spinner, never an empty chart that reads as
+ * > "nobody played".
+ *
+ * ## Why this is a boundary rather than a rendering test
+ *
+ * A rendering test can only ask *does this surface degrade well* of a surface somebody thought to
+ * ask about. The claim § 16 rule 15 makes is about **every** screen, and the cheapest true form of
+ * it is structural: a surface that never reads the server has nothing to lose when it is absent,
+ * so the question is only ever about the modules that do. Confining those to a named list turns
+ * *"which screens need the world?"* from a judgement into a grep — and it is what lets the Everyday
+ * surfaces this delivery built (`watch/`, `fixit/`, `live/raceStrip.ts`, `batch/suite.ts`, the rules
+ * editor) be **complete with no server** by construction rather than by inspection.
+ *
+ * The two that remain are the leaderboard and the challenge, and both are driven with the API absent
+ * by the honesty sweep's `world-absent` axis (`honesty/generate.ts#WITHHELD_REASONS`), which is the
+ * other half of this rule: this one says where a hole can be, that one says the hole is labelled.
+ *
+ * **Type-only imports are not consumers.** `menu/screens.ts` takes a `BoardPage` it is *given*;
+ * `menu/boardRun.ts` reads a `RunSubmission` off a row it is handed. Neither can fetch anything, and
+ * a rule that counted them would be about spelling rather than about reach.
+ *
+ * **Two files, and the second is this instrument.** The list came out shorter than it was written:
+ * `dev/menuPanel.ts` draws every board in the product and imports the client **for its types only**,
+ * so even the panel cannot ask the server anything — it is handed a page, and when it is handed none
+ * it draws the labelled example (issue #28) rather than an empty table. That is § 16 rule 15 already
+ * satisfied structurally on the one screen most likely to break it.
+ */
+const SERVER_READERS: readonly string[] = Object.freeze([
+  // The shell, which owns the transport and hands every answer to a panel as data.
+  'dev/main.ts',
+  // The sweep, which drives the client's own three sentences and both arms of the board screen.
+  'honesty/surfaces.ts',
+]);
+
+describe('§ 16 rule 15 — a missing server can only leave a hole where the world was', () => {
+  it('confines the leaderboard client to the shell, the board panel and the sweep', async () => {
+    const readers = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      // A value import: `import type { … } from './client.js'` cannot reach the network.
+      .filter((file) => /import\s+(?!type\b)[^;]*from\s+['"][^'"]*menu\/client\.js['"]/.test(file.code))
+      .map((file) => file.id)
+      .sort((a, b) => a.localeCompare(b));
+    expect(
+      readers,
+      'a module gained a leaderboard client. Either it is a screen that must degrade with the API ' +
+        'absent — in which case drive it under the sweep’s `world-absent` axis and add it here — or ' +
+        'it should be handed the answer as data, which is how every other surface reads the world.',
+    ).toEqual([...SERVER_READERS]);
+  });
+
+  it('leaves the Everyday surfaces with no world figure to lose', async () => {
+    /*
+     * The claim stated positively, over the directories the Everyday delivery built. It is not
+     * implied by the list above — a future entry in `SERVER_READERS` could name one of these, and
+     * the rule that matters for § 16 rule 15 is that a spectator's replay, a fix-a-building case, a
+     * race strip and a bench suite are **local**: every figure they print comes from a run this
+     * machine made, so the API being absent removes nothing from them.
+     */
+    const everyday = (await vizSources())
+      .filter((file) => !isTest(file.id))
+      .filter(
+        (file) =>
+          file.id.startsWith('watch/') ||
+          file.id.startsWith('fixit/') ||
+          file.id === 'live/raceStrip.ts' ||
+          file.id === 'batch/suite.ts' ||
+          file.id === 'dev/ruleEditor.ts' ||
+          file.id === 'authoring/ruleSpec.ts',
+      );
+    // The set is real — a path typo would make the assertion below vacuous, which is this file's
+    // own positive-control habit.
+    expect(everyday.length).toBeGreaterThan(8);
+    expect(everyday.filter((file) => /menu\/client\.js/.test(file.code)).map((file) => file.id)).toEqual([]);
+  });
+});
+
 describe('the browser-facing modules import no node builtins', () => {
   it('leaves `node:` to the dev entry point and the test helpers', async () => {
     const offenders = (await vizSources())
