@@ -122,6 +122,7 @@ function sheetOf(recording: VizRecording, day = 4): ShapedDayReport {
     opened,
     outcomeOf({
       record: null,
+      recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
@@ -149,7 +150,9 @@ function sheetOf(recording: VizRecording, day = 4): ShapedDayReport {
 const LINK: CardRecipe = { ok: true, line: 'https://example.test/?seed=42' };
 const REFUSED: CardRecipe = {
   ok: false,
-  reasons: ['the building “my-tower” is yours alone and data/buildings/ does not ship it'],
+  reasons: [
+    'the building “my-tower” is saved on this device alone and data/buildings/ does not ship it',
+  ],
 };
 
 const cardOf = (recording: VizRecording, recipe: CardRecipe = LINK) =>

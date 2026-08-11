@@ -263,6 +263,7 @@ describe('withBuilding', () => {
         { ...week, day, dayIdx: (day - 1) % 7 },
         outcomeOf({
           record: null,
+          recordRefusal: null,
           day,
           dayIdx: (day - 1) % 7,
           eventId: 'ordinary',

@@ -46,10 +46,43 @@ import type { WatchableRun } from './types.js';
  * Not an apology and not a fault report. It is the **measured** state of that session — see
  * `shift/types.ts#DayOutcome.record` — and the sentence says what would have to be true instead,
  * because a refusal that only says no sends a reader hunting a defect (`shift/banking.ts`'s rule).
+ *
+ * ## Its second clause was deleted, and the deletion is `docs/20` defect 1
+ *
+ * It read *"— days closed from here on carry one"*, and that was **false for the days it was
+ * actually printed on**. `DayOutcome.record` is `null` for two different days and this sentence was
+ * shown for both: the build-had-no-record day it describes, and a day whose record
+ * `watchRecordIssues` refused. For the second kind, *from here on* promises a fix that the next day
+ * does not bring — the audit wrote one Everyday rule, watched every subsequent day be refused
+ * identically, re-ran the same day on a shipped dispatcher and watched it stay refused, because the
+ * rule row is session state. A refusal that predicts its own end is worse than one that says
+ * nothing, because a reader believes it and stops looking.
+ *
+ * The wording is now narrowed to the claim that is true of this arm and nothing wider. The other
+ * arm has its own sentence — {@link refusalForDay} — and names what fired.
  */
 export const DAY_HAS_NO_RECORD =
-  'this day was filed without the record of what it ran, so there is nothing to re-simulate — ' +
-  'days closed from here on carry one';
+  'this day was filed by a build that kept no record of what it ran, so there is nothing to ' +
+  're-simulate';
+
+/**
+ * What a day says when its record was **refused**, naming the issue that refused it.
+ *
+ * `docs/20` defect 1's first half. `watchRecordIssues` has always known which issue fired;
+ * `DayOutcome.recordRefusal` is that sentence, kept at the moment the day closed because the state
+ * that produced it does not survive the sitting.
+ *
+ * The reason is quoted rather than paraphrased — `live/honesty.ts`'s rule about a refusal having
+ * one author, one directory over. What is added around it is the part the issue cannot know: that
+ * this is about *watching*, and that the day itself is fine. A player whose Tuesday will not replay
+ * has not lost the Tuesday.
+ */
+export function refusalForDay(reason: string): string {
+  return (
+    `this day cannot be re-simulated exactly, so it is not offered as a replay — ${reason}. ` +
+    'The day itself is filed and counted; it is the replay that is refused'
+  );
+}
 
 /**
  * The days this device filed, newest first, as rows a picker can draw.
@@ -128,8 +161,22 @@ function rowForDay(
     subtitle: `day ${String(outcome.day)} of this week`,
     record: outcome.record,
     posted,
+    /*
+     * Two different days carry `null`, and until `docs/20` defect 1 they said one sentence — see
+     * {@link DAY_HAS_NO_RECORD}. `recordRefusal` is what tells them apart: a day that *was* refused
+     * carries the reason it was refused with, and a day from a build that kept no reason carries
+     * `null` and gets the sentence that describes exactly that.
+     */
     blocked:
-      outcome.record === null ? { ground: 'no-record', reason: DAY_HAS_NO_RECORD } : null,
+      outcome.record !== null
+        ? null
+        : {
+            ground: 'no-record',
+            reason:
+              outcome.recordRefusal === null
+                ? DAY_HAS_NO_RECORD
+                : refusalForDay(outcome.recordRefusal),
+          },
   };
 }
 

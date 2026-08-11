@@ -18,7 +18,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DAY_HAS_NO_RECORD } from './library.js';
+import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
+import type { ViewerState } from '../dev/state.js';
+
+import { DAY_HAS_NO_RECORD, refusalForDay } from './library.js';
+import { PERIOD_BOOKS_THE_EVENT } from './record.js';
 import { reproductionRefusalFor } from './reproduce.js';
 import {
   PLAYER_SHELL_COPY,
@@ -42,6 +47,24 @@ import {
 } from './view.js';
 
 const POSTED: PostedResult = { arrived: 300, carried: 290, minutePct: 82, worstWaitS: 94 };
+
+/**
+ * States that between them fire every arm of `runIdentityIssues` a filed day can carry.
+ *
+ * Written as states rather than as a list of sentences so the corpus follows the module: an arm
+ * added to `CARRY_CHECKS` with a first-person message is red here on the day it lands, which is the
+ * only arrangement that survives somebody else maintaining the copy.
+ */
+const SCOPE_STATES: readonly ViewerState[] = [
+  { ...baseState(), buildingId: 'nobody-ships-this' },
+  { ...baseState(), dispatcherId: 'nobody-ships-this' },
+  { ...baseState(), pattern: 'nobody-ships-this' },
+  { ...baseState(), patience: { distribution: 'exponential', meanS: 120 } },
+  { ...baseState(), levers: { ...baseState().levers, parking: !baseState().levers.parking } },
+  { ...baseState(), savedClasses: [{ id: 'mine' }] as never },
+  { ...baseState(), week: { ...baseState().week, day: 4 } },
+  { ...baseState(), ruleRows: [{ when: 'call-waited', whenValue: 30, then: 'hold-at-lobby' }] },
+];
 
 function runOf(overrides: Partial<WatchableRun> = {}): WatchableRun {
   return {
@@ -136,6 +159,34 @@ describe('the watching view', () => {
     expect(drifted).not.toBeNull();
     for (const text of [DAY_HAS_NO_RECORD, drifted ?? '']) {
       expect(firstPersonWordsIn(text)).toEqual([]);
+    }
+  });
+
+  /*
+   * And in the refusal that quotes somebody else's module — `docs/20` defect 1.
+   *
+   * `refusalForDay` prints a `ScopeIssue`'s own sentence on the picker, which puts `scope/`'s copy
+   * on a watching surface. Three of those sentences said *"is yours alone"* until this landed, so
+   * the rule is asserted over **every** message `runIdentityIssues` can produce rather than over the
+   * wrapper: a refusal composed from a corpus somebody else maintains is only first-person-free by
+   * accident unless the whole corpus is checked.
+   */
+  it('keeps every scope refusal it may quote free of first-person copy', () => {
+    const messages = [
+      ...SCOPE_STATES.flatMap((state) =>
+        runIdentityIssues(state, RESOURCES, 'ranked').map((issue) => issue.message),
+      ),
+      PERIOD_BOOKS_THE_EVENT,
+    ];
+    // The corpus must not be empty, and it must contain the three sentences that made this case
+    // necessary — a green run over a corpus that happened to miss them would be green about nothing.
+    expect(messages.length).toBeGreaterThan(3);
+    expect(messages.filter((message) => message.includes('saved on this device alone'))).toHaveLength(3);
+    for (const message of messages) {
+      expect(
+        firstPersonWordsIn(refusalForDay(message)),
+        `“${message}” would print first-person on the watch picker`,
+      ).toEqual([]);
     }
   });
 

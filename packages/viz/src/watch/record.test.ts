@@ -27,6 +27,8 @@ import { checkedRun, filedDayRuns } from './library.js';
 import {
   PERIOD_BOOKS_THE_EVENT,
   WATCH_RECORD_CARRIES,
+  recordRefusalFor,
+  recordUnreadableReason,
   stateFromWatchRecord,
   watchRecordIssues,
   watchRecordOf,
@@ -55,13 +57,15 @@ function legsOf(recording: VizRecording): string {
 }
 
 describe('the watch record', () => {
-  it('carries exactly the three fields a selection cannot, and nothing else', () => {
+  it('carries exactly the four fields a selection cannot, and nothing else', () => {
     // Both directions. A row with no field behind it is issue #129's premise; a field with no row
-    // is a subtraction nobody argued for.
+    // is a subtraction nobody argued for. The fourth is `docs/20` defect 1's — see below for why it
+    // is a carry rather than a refusal.
     const rows = Object.keys(WATCH_RECORD_CARRIES).sort();
     expect(rows).toEqual([
       'viewer.interventions',
       'viewer.outOfServiceCarIds',
+      'viewer.ruleRows',
       'viewer.week',
     ]);
     const record = watchRecordOf(baseState(), RESOURCES);
@@ -89,6 +93,90 @@ describe('the watch record', () => {
     const day4 = { ...baseState(), week: { ...baseState().week, day: 4 } };
     expect(watchRecordIssues(day4, RESOURCES)).toEqual([]);
     expect(watchRecordOf(day4, RESOURCES)?.day).toBe(4);
+  });
+
+  /*
+   * `docs/20` defect 1, both halves, driven rather than argued.
+   *
+   * The defect: writing **one** Everyday rule made every day filed afterwards unwatchable, because
+   * `runIdentityIssues` refuses a rule list for the wire and `watchRecordOf` refuses to write a
+   * record for anything it refuses — and the rule row is session state, so re-running the same day
+   * on a shipped dispatcher did not clear it.
+   */
+  it('carries a written rule rather than refusing the day that ran it', () => {
+    const withRule = {
+      ...baseState(),
+      ruleRows: [{ when: 'lobby-queue-passes' as const, whenValue: 30, then: 'hold-at-lobby' as const }],
+    };
+    expect(watchRecordIssues(withRule, RESOURCES)).toEqual([]);
+    expect(watchRecordOf(withRule, RESOURCES)?.ruleRows).toEqual(withRule.ruleRows);
+  });
+
+  it('replays a rules run *with* its rules — a record that dropped them is a different run', () => {
+    /*
+     * The carry has to be measured on the legs, not on the field: a record that stored the rows and
+     * a `stateFromWatchRecord` that re-seeded them from the profile would satisfy every field
+     * assertion above and replay the day with the rules taken out. `midtown-office` for
+     * `interventions`' reason — a two-car bank has nowhere to hold anything, so the same case at
+     * Garden Apartments would be green about a rule that never bit.
+     */
+    const withRule = {
+      ...baseState(),
+      buildingId: 'midtown-office',
+      /*
+       * `call-waited 30 s → hold a car at the lobby`, and the pair is **measured** rather than
+       * plausible: `lobby-queue-passes 6 → hold-at-lobby` typechecks, runs, and produces
+       * leg-identical output at this cell, so a case written on it would be green about a rule that
+       * never bit — the inert-control failure § D177 exists to catch, arriving inside the test. The
+       * value is one of the condition's own list: `core` refuses an out-of-list value rather than
+       * rounding it, exactly as the editor's dropdown does.
+       */
+      ruleRows: [{ when: 'call-waited' as const, whenValue: 30, then: 'hold-at-lobby' as const }],
+    };
+    const record = watchRecordOf(withRule, RESOURCES);
+    expect(record?.ruleRows).toHaveLength(1);
+    if (record === undefined) return;
+
+    const withRules = recordRun(watchRunConfigOf(withRule, RESOURCES, record)).recording;
+    const without = recordRun(
+      watchRunConfigOf(withRule, RESOURCES, { ...record, ruleRows: [] }),
+    ).recording;
+    expect(legsOf(withRules)).not.toBe(legsOf(without));
+    // And the replay is the run the player's own state produced, which is the whole claim.
+    expect(legsOf(withRules)).toBe(
+      legsOf(recordRun(shiftRunConfigOf(RESOURCES, withRule).config).recording),
+    );
+  }, 60_000);
+
+  it('refuses a record naming a rule vocabulary this build does not ship', () => {
+    const record = watchRecordOf(baseState(), RESOURCES);
+    expect(record).toBeDefined();
+    if (record === undefined) return;
+    const alien = {
+      ...record,
+      ruleRows: [{ when: 'when-the-moon-is-full' as never, then: 'hold-at-lobby' as const }],
+    };
+    expect(recordUnreadableReason(alien, RESOURCES)).toContain('when-the-moon-is-full');
+  });
+
+  it('names the issue that refused a record, rather than blaming the file', () => {
+    /*
+     * The first half of defect 1. `recordRefusalFor` is `null` exactly when a record exists, and
+     * quotes every issue that fired otherwise — so the day can say what to change instead of
+     * *"filed without the record of what it ran — days closed from here on carry one"*, which was
+     * false in its second clause for precisely these days.
+     */
+    expect(recordRefusalFor(baseState(), RESOURCES)).toBeNull();
+    const refused = { ...baseState(), patience: { distribution: 'exponential' as const, meanS: 120 } };
+    const reason = recordRefusalFor(refused, RESOURCES);
+    expect(reason).not.toBeNull();
+    expect(reason).toContain('abandon');
+    // All of them, joined, never the first — `runIdentityIssues`' rule, inherited.
+    const two = {
+      ...refused,
+      levers: { ...baseState().levers, parking: !baseState().levers.parking },
+    };
+    expect(recordRefusalFor(two, RESOURCES)?.split(';')).toHaveLength(2);
   });
 
   it('refuses a calendar period that books the day’s event — the arm the subtraction would lose', () => {
@@ -288,6 +376,9 @@ describe('the reproduction gate', () => {
           minutePct: 90,
           readings: [],
           record: null,
+          // A day from a build that kept no reason — `library.ts`'s `no-record` arm, which is what
+          // this case drives.
+          recordRefusal: null,
           allMet: true,
         },
       ],

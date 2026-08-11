@@ -7,7 +7,7 @@
       "label": "The house baseline",
       "subtitle": "the shipped dispatcher, on the shipped morning",
       "record": {
-        "version": 1,
+        "version": 2,
         "seed": "20260811",
         "buildingId": "garden-apartments",
         "dispatcherId": "collective",
@@ -19,7 +19,8 @@
         "day": 1,
         "dayIdx": 0,
         "outOfServiceCarIds": [],
-        "interventions": []
+        "interventions": [],
+        "ruleRows": []
       },
       "posted": {
         "arrived": 26,
@@ -33,7 +34,7 @@
       "label": "The lobby-parking reference",
       "subtitle": "a busier tower, with the cars sent to the lobby five minutes in",
       "record": {
-        "version": 1,
+        "version": 2,
         "seed": "20260811",
         "buildingId": "midtown-office",
         "dispatcherId": "collective",
@@ -52,7 +53,8 @@
               "kind": "park-cars-lobby"
             }
           }
-        ]
+        ],
+        "ruleRows": []
       },
       "posted": {
         "arrived": 363,

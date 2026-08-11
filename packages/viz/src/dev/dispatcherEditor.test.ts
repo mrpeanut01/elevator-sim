@@ -577,6 +577,7 @@ describe('the press really moves the run, and the strip really reports it — §
       opened,
       outcomeOf({
         record: null,
+        recordRefusal: null,
         day,
         dayIdx: opened.dayIdx,
         eventId: 'ordinary',

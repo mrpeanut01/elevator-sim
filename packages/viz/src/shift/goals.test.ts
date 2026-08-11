@@ -48,6 +48,7 @@ function observations(overrides: Partial<GoalObservations> = {}): GoalObservatio
 function closedDay(day: number, forDay: GoalObservations): DayOutcome {
   return outcomeOf({
     record: null,
+    recordRefusal: null,
     day,
     dayIdx: (day - 1) % 7,
     eventId: 'ordinary',

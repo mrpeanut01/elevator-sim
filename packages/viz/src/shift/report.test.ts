@@ -149,6 +149,7 @@ function reportOf(
     opened,
     outcomeOf({
       record: null,
+      recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',

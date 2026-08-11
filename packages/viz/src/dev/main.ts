@@ -239,7 +239,7 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf } from './ghostRun.js';
-import { watchRecordOf } from '../watch/record.js';
+import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
 import {
@@ -4824,6 +4824,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * left on after the run.
        */
       record: watchRecordOf(state, resources) ?? null,
+      /*
+       * And **why**, when there is no record — `docs/20` defect 1. Written from the same `state` on
+       * the same line for the same reason: the two are one fact with two spellings, and a day that
+       * carried a `null` record with no cause is what made every day filed after a rule was written
+       * unwatchable under a sentence blaming the file format.
+       */
+      recordRefusal: recordRefusalFor(state, resources),
     });
     /*
      * **The week is written only by a mode that owns one** — § D231, issue #64.

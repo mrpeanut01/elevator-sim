@@ -217,6 +217,16 @@ export interface DayOutcomeInput {
    * exactly the shape of failure this repository keeps paying for.
    */
   readonly record: WatchRecord | null;
+  /**
+   * Why there is no record, or `null` — {@link DayOutcome.recordRefusal}, on `record`'s exact
+   * footing and required for `record`'s exact reason.
+   *
+   * The caller passes both because only the caller can produce either: the sentence comes from
+   * `watch/record.ts#recordRefusalFor`, which needs `BrowserResources` and the scope table.
+   * Required rather than optional so a caller that forgets it cannot silently file a day whose
+   * refusal has no cause — which is the state `docs/20` defect 1 is about.
+   */
+  readonly recordRefusal: string | null;
 }
 
 /**
@@ -238,6 +248,9 @@ export function outcomeOf(input: DayOutcomeInput): DayOutcome {
     minutePct: input.minutePct,
     readings: input.readings,
     record: input.record,
+    // `null` for a day that has a record, and the sentence that refused it otherwise — the two are
+    // written together by one caller so a day can never carry both or neither.
+    recordRefusal: input.recordRefusal,
     allMet:
       input.readings.length > 0 && input.readings.every((reading) => reading.state === 'met'),
   };

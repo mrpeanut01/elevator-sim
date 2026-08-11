@@ -99,7 +99,7 @@ import {
   raceStripViewOf,
   raceVerdictOf,
 } from '../live/raceStrip.js';
-import { DAY_HAS_NO_RECORD } from '../watch/library.js';
+import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
 import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
 import type { WatchableRun } from '../watch/types.js';
@@ -2409,6 +2409,9 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
     const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
       record: null,
+      // No record and no cause: these bundle days are built from a recording rather than from a
+      // `ViewerState`, so there is no state for `recordRefusalFor` to have refused.
+      recordRefusal: null,
       day,
       dayIdx,
       eventId: event.id,
@@ -5885,7 +5888,7 @@ const REPORT_CARD: SurfaceAdapter = {
           /*
            * Ids `data/` does **not** ship, deliberately: a value taken from the loaded configuration
            * would be reproducible by construction and the refusal arm would render nothing. These
-           * are the two *"yours alone"* refusals a reader is most likely to meet.
+           * are the two *"saved on this device alone"* refusals a reader is most likely to meet.
            */
           reasons: runIdentityIssues(
             { ...initialState(resources, 1n), buildingId: 'my-tower', dispatcherId: 'my-dispatcher' },
@@ -6370,6 +6373,14 @@ const WATCH: SurfaceAdapter = {
     'watch/view.ts#PLAY_THIS_CROWD_LABEL',
     'watch/view.ts#POSTED_FIGURES_NOTE',
     'watch/library.ts#DAY_HAS_NO_RECORD',
+    'watch/library.ts#refusalForDay',
+    /*
+     * `recordRefusalFor` composes no prose of its own — it joins `runIdentityIssues`' sentences,
+     * which `SCOPE_REFUSALS` already sweeps — but it *is* the producer that puts them on a watching
+     * surface, and the seed above renders one through `refusalForDay` in the wording a picker row
+     * prints. Covered here rather than excluded, because the composition is the player-facing act.
+     */
+    'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
     'watch/record.ts#recordUnreadableReason',
     /*
@@ -6434,6 +6445,19 @@ const WATCH: SurfaceAdapter = {
 
     // The three grounds a row can lose its affordance on, each in the words the picker prints.
     seeds.push({ field: 'watch.blocked(no-record)', text: DAY_HAS_NO_RECORD, role: 'reason' });
+    /*
+     * And the fourth sentence a `no-record` row can carry — `docs/20` defect 1. A day whose record
+     * was *refused* quotes the issue that refused it, so this seed carries a real scope message
+     * rather than a literal: the wording a reader meets is the wrapper plus whatever
+     * `runIdentityIssues` said, and seeding the wrapper alone would sweep half a sentence.
+     */
+    seeds.push({
+      field: 'watch.blocked(refused)',
+      text: refusalForDay(
+        'the group levers are moved off their defaults, and a selection carries no levers',
+      ),
+      role: 'reason',
+    });
     const unreadable = recordUnreadableReason(
       {
         version: 1,
@@ -6449,6 +6473,7 @@ const WATCH: SurfaceAdapter = {
         dayIdx: 0,
         outOfServiceCarIds: [],
         interventions: [],
+        ruleRows: [],
       },
       browserResourcesOf(context),
     );

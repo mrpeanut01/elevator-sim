@@ -525,6 +525,35 @@ export interface DayOutcome {
    * would be a second answer to `dev/state.ts`'s question about what a run is.
    */
   readonly record: WatchRecord | null;
+  /**
+   * Why this day carries no record, in the words of the issue that refused it — `null` when it has
+   * one, and `null` for a day filed before the reason was kept.
+   *
+   * ## Why a day had to grow this field too
+   *
+   * `docs/20` defect 1. The paragraph above says the picker's refusal *"names its ground rather
+   * than saying no record"*, and it did not: both kinds of `null` produced one sentence blaming the
+   * file format — *"this day was filed without the record of what it ran … days closed from here on
+   * carry one"* — and the second clause was false, because whatever refused this day refuses the
+   * next one identically. The audit re-ran and re-filed the same day on a shipped dispatcher and
+   * watched it stay unwatchable, with no surface anywhere naming the rule row that was doing it.
+   *
+   * `watch/record.ts#recordRefusalFor` knows the answer at the moment the day closes and nothing
+   * can recover it afterwards — the state that produced the day is gone, and a day outlives every
+   * sitting. So the sentence is stored beside the `null` it explains.
+   *
+   * ## Why a string and not the issues
+   *
+   * A `ScopeIssue[]` here would put a shape `scope/` owns inside an envelope this package versions,
+   * and it would go stale the day a key is renamed. The sentence is the half a reader needs and the
+   * only half that survives storage. `watch/record.ts#recordRefusalFor` composes it — **all** the
+   * issues, joined, never the first.
+   *
+   * `null` on a day from a version 1–6 envelope is a measurement rather than a stand-in, on
+   * `record`'s own precedent: those builds recorded no reason, so there is no reason to recover,
+   * and `watch/library.ts` says exactly that instead of inventing a cause.
+   */
+  readonly recordRefusal: string | null;
 }
 
 /** The green banner's payload, produced by the day that banked the last clean shift. */

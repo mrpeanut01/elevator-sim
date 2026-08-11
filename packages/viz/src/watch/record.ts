@@ -52,7 +52,7 @@
  * bearing rather than decorative.
  */
 
-import type { SimulationConfig } from '@elevator-sim/core/browser';
+import { RULE_ACTIONS, RULE_CONDITIONS, type SimulationConfig } from '@elevator-sim/core/browser';
 
 // `dispatcherSpec.ts` and `selectorSpec.ts` both export a `specFromProfile`, over different
 // shapes. They are aliased at every site that needs both — `selectorSpec.ts`'s own naming hazard.
@@ -60,7 +60,6 @@ import {
   specFromProfile as selectorSpecFromProfile,
   selectorContextFrom,
 } from '../authoring/selectorSpec.js';
-import { rulesFromProfile } from '../authoring/ruleSpec.js';
 import { DEFAULT_LEVERS, specFromProfile } from '../authoring/dispatcherSpec.js';
 import { specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { specFromBuilding } from '../authoring/buildingSpec.js';
@@ -94,6 +93,18 @@ export const WATCH_RECORD_CARRIES: Readonly<Record<string, string>> = Object.fre
   'viewer.week': 'WatchRecord.day and .dayIdx — growth.ts re-derives the growth, events.ts#eventFor the event',
   'viewer.interventions': 'WatchRecord.interventions, in press order — contract § 1.4',
   'viewer.outOfServiceCarIds': 'WatchRecord.outOfServiceCarIds',
+  /*
+   * The fourth, added by `docs/20` defect 1 — and it is the row that shows why this table is a
+   * table rather than three `filter` clauses.
+   *
+   * `runIdentityIssues` refuses a rule list **naming the wire as the reason**: *"no selection or
+   * submission carries a rule list"*. That is true of the wire and says nothing about the rules,
+   * which are four scalars per row that `localStorage` already round-trips. Meanwhile the refusal's
+   * effect here was total: one rule made every day filed afterwards unwatchable, under a message
+   * blaming the file format, because the rule row is session state and survives the run that wrote
+   * it. Carrying them is cheap, exact and reversible; declining to was neither honest nor free.
+   */
+  'viewer.ruleRows': 'WatchRecord.ruleRows, in first-match order — authoring/ruleSpec.ts#RuleRow',
 });
 
 /** Why a period that books today's event is refused — one sentence, so a test can match it. */
@@ -152,7 +163,51 @@ export function watchRecordOf(
     dayIdx: state.week.dayIdx,
     outOfServiceCarIds: [...state.outOfServiceCarIds],
     interventions: state.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
+    /*
+     * The rows as the player wrote them, never the profile they make — see
+     * `types.ts#WatchRecord.ruleRows`. Copied field by field rather than spread, so a `RuleRow`
+     * that grows a key does not silently enter a persisted record without a version to say so.
+     */
+    ruleRows: state.ruleRows.map((row) => ({
+      when: row.when,
+      ...(row.whenValue === undefined ? {} : { whenValue: row.whenValue }),
+      then: row.then,
+      ...(row.thenValue === undefined ? {} : { thenValue: row.thenValue }),
+    })),
   };
+}
+
+/**
+ * **Why this day cannot be re-asked, in the words of the issue that fired** — or `null` when it can.
+ *
+ * `docs/20` defect 1's first half, and the defect was as much in the *sentence* as in the gate. A
+ * day whose record was refused produced a picker row reading *"this day was filed without the
+ * record of what it ran, so there is nothing to re-simulate — days closed from here on carry one"*.
+ * Both clauses misled: the file format was not the reason, and *from here on* was false, because
+ * whatever refused this day refuses the next one identically — the audit re-ran and re-filed the
+ * same day on a shipped dispatcher and watched it stay unwatchable.
+ *
+ * `watchRecordIssues` has always known which issue fired. This is that knowledge, kept, so the row
+ * can say *what to change* instead of describing a gap in a file.
+ *
+ * ## Why it is a string rather than the issues
+ *
+ * Because it is **persisted**, on the day outcome, beside the `null` record it explains — a day
+ * outlives the state that produced it, and nothing can re-derive an old day's refusal from a state
+ * nobody kept. A `ScopeIssue[]` in `localStorage` would be a second copy of a shape `scope/` owns,
+ * versioned by this package, going stale on the day a key is renamed. The sentence is the part a
+ * reader needs and the only part that survives being stored.
+ *
+ * All of them, joined, never the first — `runIdentityIssues`' own rule, inherited with its reason:
+ * a reader told about one and then about the next has been made to guess how many there are.
+ */
+export function recordRefusalFor(
+  state: ViewerState,
+  resources: BrowserResources,
+): string | null {
+  const issues = watchRecordIssues(state, resources);
+  if (issues.length === 0) return null;
+  return issues.map((issue) => issue.message).join('; ');
 }
 
 /** Why a record cannot be turned back into a run here, or `null`. */
@@ -177,6 +232,22 @@ export function recordUnreadableReason(
     !resources.trafficProfiles.profiles.some((p) => p.id === record.pattern)
   ) {
     return `this build does not ship the arrival pattern “${record.pattern}”`;
+  }
+  /*
+   * The rule vocabulary, on exactly the footing the three ids above sit on — `docs/20` defect 1. A
+   * record naming a condition or an action this build no longer declares cannot be re-asked, and
+   * the honest answer is the same sentence shape rather than a row that replays the run with the
+   * unknown rule quietly dropped. `profileWithRules` would accept the row and
+   * `selection.policy: 'rules'` would then decide by a rule nothing implements, which is a replay
+   * that is *approximate* — § 1.5's own forbidden outcome.
+   */
+  for (const row of record.ruleRows) {
+    if (!(RULE_CONDITIONS as readonly string[]).includes(row.when)) {
+      return `this build does not ship the rule condition “${row.when}”`;
+    }
+    if (!(RULE_ACTIONS as readonly string[]).includes(row.then)) {
+      return `this build does not ship the rule action “${row.then}”`;
+    }
   }
   return null;
 }
@@ -241,7 +312,14 @@ export function stateFromWatchRecord(
     interventions: record.interventions.map((entry) => ({ atS: entry.atS, change: entry.change })),
     levers: DEFAULT_LEVERS,
     selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
-    ruleRows: rulesFromProfile(profile),
+    /*
+     * **The record's rows, not the profile's** — `docs/20` defect 1. It was `rulesFromProfile`,
+     * which was the only honest answer while the record carried none: the rows a shipped profile
+     * declares are the rows its id already implies. Now that the record carries what the *player*
+     * wrote, reading the profile instead would replay a rules run with the rules taken out — the
+     * exact *"replay without them is a different run"* `runIdentityIssues` refuses by name.
+     */
+    ruleRows: record.ruleRows.map((row) => ({ ...row })),
     patience: null,
     week: { ...base.week, day: record.day, dayIdx: record.dayIdx },
     savedDispatchers: [],
