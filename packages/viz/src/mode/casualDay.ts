@@ -188,9 +188,21 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
     'Averaged over the busiest five minutes of the day rather than over all of it: this is what ' +
     'a wait came to when the building was under the most pressure, which is the stretch worth ' +
     'judging it on.',
+  /*
+   * Rewritten for `docs/19` defect 3, and the old sentence is quoted because it was false twice
+   * over: *"People who stopped waiting and walked. They are counted here and nowhere else."* The
+   * cell counts **waits that crossed the give-up horizon**, whether or not a car eventually came
+   * — on a saturated no-patience run every one of those riders was still carried, so they were
+   * counted *here and in CARRIED*, and the claim of a disjoint cohort is what made the sheet's
+   * people impossible to total. The lead now says what the count is and defers the overlap to
+   * the cell's own note (`shift/report.ts#stairsNote`), which carries the run's actual split —
+   * a static lead may not restate a figure, so it may not guess the overlap either.
+   */
   stairs:
-    'People who stopped waiting and walked. They are counted here and nowhere else — leaving ' +
-    'them out of the average is what makes an average of the ones who stayed flatter the day.',
+    'People this building made stand past its give-up line. The note beside the count says how ' +
+    'many of them a car still came for — those are inside CARRIED as well, so the two cells can ' +
+    'overlap rather than add. The count is published beside the average and never folded into ' +
+    'it: dropping the longest waits is what would flatter the day.',
   'energy-work':
     'How hard the motors worked. It is read beside the waits and never added to them: a day ' +
     'that spends less by carrying fewer people has not saved anything.',

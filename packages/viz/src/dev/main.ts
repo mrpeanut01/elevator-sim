@@ -436,16 +436,54 @@ export function stageLayoutFor(options: {
  * `undefined` — never an empty string — when there is no run or the items carry neither figure.
  * The strip's transient messages live in the same element, and writing `''` over one of them would
  * blank the screen at the moment a reader is being told something.
+ *
+ * ## The line is playhead-aware, and the whole-run sentence waits for the end — `docs/19` defect 4
+ *
+ * The figures this line carries are folds of the **finished** day: `disclosureItems` reads
+ * `recording.summary`, which exists before the first paint because `recordRun` simulates the whole
+ * day up front. Drawn unconditionally, the line published *"average wait suppressed … the queues
+ * never settled during this run"* — past tense — from the first second of playback, beside a
+ * stage header that correctly speaks in the *so far* register. That is the violation class the
+ * honesty sweep's temporal axis polices (a whole-run figure at a playhead short of `endedAt`), on
+ * the one line a reader glances at without opening a panel.
+ *
+ * `progress` is the playhead against the run's own end. Short of the end the line **withholds and
+ * says so**, in the register `dev/reportPanel.ts`'s watching sheet established: it names the
+ * figures that are coming and when they file, and prints no number and no verdict — the running
+ * figure a reader can have mid-run is already on the stage header (`render/canvas.ts#meanClause`),
+ * and a second copy here would be a second answer. At `endedAt` (or for a caller with no playhead,
+ * which is how the parity check and the pre-playhead call sites read a whole run) the line is the
+ * whole-run one, unchanged. `honesty/surfaces.ts` drives both registers at five playheads and
+ * declares a whole-run line drawn early as `basis: 'whole-run'`, so the temporal property holds
+ * this seam closed rather than this docstring. A decision number is owed for the register split.
  */
+export interface TransportStatusProgress {
+  /** The playhead, simulated seconds. */
+  readonly atS: number;
+  /** The run's own end — `recording.endedAt`, never a constant. */
+  readonly endedAt: number;
+}
+
 export function transportStatusOf(
   items: readonly DisclosureItem[],
   mode: ViewMode,
+  progress?: TransportStatusProgress | undefined,
 ): string | undefined {
   const drawn = itemsIn(items, mode);
   const shown = [AWT_ID, WT95_ID]
     .map((id) => drawn.find((item) => item.id === id))
     .filter((item) => item !== undefined);
   if (shown.length === 0) return undefined;
+
+  if (progress !== undefined && progress.atS < progress.endedAt) {
+    /*
+     * The so-far register. Labels only — the labels are the reader's names for the two figures,
+     * and naming what is withheld is what makes this a refusal rather than a blank. No numeral:
+     * a count here would be a figure, and the figures are exactly what has not been earned yet.
+     */
+    const labels = shown.map((item) => item.label).join(' and ');
+    return `still playing — ${labels} are read over the finished day, and file when the playhead reaches the end`;
+  }
 
   const figures = shown.map((item) => {
     const { value, count } = item.rendering;
@@ -639,6 +677,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * sheet `ViewerState.report` currently holds, and those two are written together and only here.
    */
   let filedReportInput: DayReportInput | undefined;
+  /**
+   * The `(run, mode, register)` key the transport status line was last derived for — see
+   * {@link drawTransportStatus} for why a transient message survives exactly until it changes,
+   * and why the key is these three facts rather than the derived text.
+   */
+  let lastTransportStatusKey: string | undefined;
   /**
    * Where the service badges were last drawn, for the click handler.
    *
@@ -2806,6 +2850,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       resources,
       recording,
       simTimeS,
+      // The header clock's own hour, on the view so every panel prints the same one — `docs/19`
+      // defect 2. See {@link runStartOfDayS} for when it is `undefined`.
+      startOfDayS: runStartOfDayS,
       /*
        * The **last run's** building while a run is on screen, and the building the state is
        * pointing at when there is not — § D234, issue #36.
@@ -2928,6 +2975,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawHeader(view);
     drawFooter(view);
     drawPlayhead(view);
+    // The status strip's register follows the playhead (`docs/19` defect 4): the whole-run line
+    // may not stand while the day is still playing. Writes only when the derived text changed,
+    // so the strip's transient messages survive — see drawTransportStatus.
+    drawTransportStatus();
     // The legend's counts are a reading at `t`, so they belong here and not only in `renderAll`.
     // Left out, the row would state the counts of whichever frame last changed the state — a
     // figure that is stale in exactly the way a scrubbing reader cannot see.
@@ -3076,7 +3127,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * that left the strip on the previous mode's words would be the disclosure selector doing
        * three-quarters of something, which is worse to read than doing none of it.
        */
-      drawTransportStatus();
+      drawTransportStatus(true);
     });
     /*
      * The remembered mode, **unless the link named one**. A deep link is somebody sending a
@@ -3136,7 +3187,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
         ? clockAt(0, runStartOfDayS)
         : clockAt(view.simTimeS, runStartOfDayS),
     );
-    const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
+    // The run's own hour, exactly as the clock two lines up — the pill's segment carries clocked
+    // titles, and a second call site on the default axis is how two clocks come back (defect 2).
+    const phase =
+      view.recording === undefined
+        ? undefined
+        : phaseAt(view.recording, view.simTimeS, { dayStartS: runStartOfDayS ?? DAY_START_S });
     setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
     /*
      * Slice 4b — the pattern the selector holds at the playhead, beside the phase pill and
@@ -3262,20 +3318,39 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * requirement's own shape one level in: **a call whose return value is dropped looks exactly like
    * a caller and is not one.**
    *
-   * ## Why this is written on adopt and on a mode change, and not in `renderAll`
+   * ## Why this is written on adopt, on a mode change, and on a register change — not per frame
    *
    * `#status` is also where four transient messages land — the copied provenance line, *copied*,
    * *the shift did not run*, a batch's progress — each of which restores itself after its own
-   * moment. A writer inside `renderAll` would clobber whichever of those was on screen the next
-   * time any state moved, which is a regression wearing a fix. So the derived text is written at
-   * the two moments it can actually change: a new recording, and the reader moving the mode
-   * selector. One derivation ({@link transportStatusOf}), two call sites, and the transient
-   * messages keep the screen until one of those two happens — which is exactly what they did
-   * before.
+   * moment. A writer that re-wrote the derived text every frame would clobber whichever of those
+   * was on screen, which is a regression wearing a fix. So the derived text is written only when
+   * it **changed**: {@link lastTransportStatusKey} remembers what the line was derived for, `renderLive`
+   * calls this at 60 Hz, and the write happens exactly when the line's register flips — the
+   * playhead reaching `endedAt`, or scrubbing back off it — plus the two original moments (a new
+   * recording, the mode selector), which pass `force` because they are also the moments a stale
+   * transient must yield. Between those instants the derived text is constant, so the transients
+   * keep the screen exactly as they did when this ran on two call sites.
    */
-  function drawTransportStatus(): void {
-    const text = transportStatusOf(disclosureNow(), state.mode);
-    if (text !== undefined) setText(ui.transport.status, text);
+  function drawTransportStatus(force = false): void {
+    const recording = state.recording;
+    /*
+     * The register is a function of three facts — which run, which mode, and whether the playhead
+     * has reached the run's end — and of nothing that moves between those flips. Keyed on them so
+     * the 60 Hz caller pays one string compare per frame, not a `disclosureItems` rebuild: the
+     * items fold the whole recording and are exactly the work this line must not redo per frame.
+     */
+    const progress =
+      recording === undefined
+        ? undefined
+        : { atS: playback?.simTimeS ?? recording.startedAt, endedAt: recording.endedAt };
+    const key = `${recording?.runId ?? 'none'}|${state.mode}|${
+      progress !== undefined && progress.atS < progress.endedAt ? 'playing' : 'ended'
+    }`;
+    if (!force && key === lastTransportStatusKey) return;
+    const text = transportStatusOf(disclosureNow(), state.mode, progress);
+    if (text === undefined) return;
+    lastTransportStatusKey = key;
+    setText(ui.transport.status, text);
   }
 
   /* ---------------------------------------------------------------------- *
@@ -3703,7 +3778,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * reads are the ones `drawParity` checks — so the line on screen and the parity claim about it
      * can no longer be about two different lists.
      */
-    drawTransportStatus();
+    drawTransportStatus(true);
   }
 
   /**
@@ -4357,7 +4432,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     );
     fill(
       ui.transport.ticks,
-      ...tickLabelsOf(recording, 5).map((label) =>
+      // The same hour as the segments one call up and the header clock — the tick row was the one
+      // transport surface still on the 06:00 default, so a `lunch-two-way` run was ruled
+      // `06:00 06:07 …` under a header reading `12:00` (`docs/19` defect 2).
+      ...tickLabelsOf(recording, 5, { dayStartS: runStartOfDayS ?? DAY_START_S }).map((label) =>
         el(document, 'span', { text: label.label }),
       ),
     );
@@ -4387,7 +4465,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * so a slider announces its own units instead of a percentage. The header clock stays `hh:mm` —
      * it is a caption on a day, not a readout on a control.
      */
-    ui.transport.timeline.setAttribute('aria-valuetext', clockWithSecondsAt(view.simTimeS));
+    ui.transport.timeline.setAttribute(
+      'aria-valuetext',
+      clockWithSecondsAt(view.simTimeS, runStartOfDayS),
+    );
   }
 
   function fillLandingSelect(recording: VizRecording): void {
@@ -4774,10 +4855,13 @@ export function spaceBelongsToFocus(focus: ActivationRole): boolean {
  * resolve its own control's smallest move is what made the shortcut look dead.
  *
  * Built from `timeOfDayAt` rather than from a second copy of the day-start offset, so the two
- * clocks cannot come to disagree about what 06:00 means.
+ * clocks cannot come to disagree about what 06:00 means. `dayStartS` follows `timeOfDayAt`'s
+ * contract — the run's own hour, `undefined` falling back to the shared default — because a
+ * readout that announced `06:12:07` over a header reading `08:42` is `docs/19` defect 2 on the
+ * one surface a sighted reader cannot cross-check.
  */
-export function clockWithSecondsAt(simTimeS: number): string {
-  const wrapped = ((timeOfDayAt(simTimeS) % 86_400) + 86_400) % 86_400;
+export function clockWithSecondsAt(simTimeS: number, dayStartS?: number | undefined): string {
+  const wrapped = ((timeOfDayAt(simTimeS, dayStartS) % 86_400) + 86_400) % 86_400;
   const hours = Math.floor(wrapped / 3600);
   const minutes = Math.floor((wrapped % 3600) / 60);
   const seconds = Math.floor(wrapped % 60);

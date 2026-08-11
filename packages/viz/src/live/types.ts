@@ -226,6 +226,19 @@ export interface LiveObservations {
    */
   readonly abandoned: number;
   /**
+   * Of {@link abandoned}, the legs that had nonetheless **alighted** by `t` — the overlap between
+   * *took the stairs* and *carried*, counted so a sheet can say it (`docs/19` defect 3).
+   *
+   * The overlap is real and it is the common case on a saturated no-patience run: `abandoned`
+   * counts a wait that crossed the horizon whether or not a car eventually came, and on a building
+   * that declares no patience nobody actually leaves, so every one of those legs can still board,
+   * alight, and be inside `carried`. A sheet that printed `CARRIED 768 of 768` beside
+   * `TOOK THE STAIRS 348` with no stated overlap was asking the reader to total 1 116 people out
+   * of 768 — the two cells overlap rather than add, and this field is the size of the overlap,
+   * folded from the same legs in the same pass so the three counts cannot disagree.
+   */
+  readonly abandonedCarried: number;
+  /**
    * The longest wait any leg arrived by `t` had realised **or accrued** by `t`, seconds.
    * `undefined` when nobody has arrived.
    *

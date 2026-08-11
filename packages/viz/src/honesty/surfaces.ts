@@ -1930,7 +1930,38 @@ const MODE: SurfaceAdapter = {
          */
         declaredCount: awt?.rendering.count === undefined ? undefined : countOf(awt.rendering.count),
         countShown: awt?.rendering.count !== undefined,
+        // The register a caller with no playhead gets is the whole-run one — said explicitly, at
+        // the one playhead it is earned, so the temporal axis sees this line's terminal form too.
+        playhead: atPlayhead(recording, recording.endedAt),
       });
+      /*
+       * The same line at every sampled playhead — `docs/19` defect 4, on § D307's precedent.
+       *
+       * `dev/main.ts#drawTransportStatus` now derives this line per frame with the playhead
+       * against the run's own end, so the corpus drives the call the shell makes rather than the
+       * one it used to make. The mechanisation is the declaration: a line drawn short of
+       * `endedAt` that is **byte-identical to the whole-run line** is the whole-run register
+       * published early, and it is seeded with `basis: 'whole-run'` so the temporal property's
+       * structural half refuses it without any cue-matching — which matters here, because the
+       * whole-run sentence's own numerals (`29.3 s`, `n = 236 rides`) name quantities the
+       * WHOLE_RUN_COUNTS table has no live counterpart for. The honest mid-run register differs
+       * from the terminal line by construction (it withholds and says so), carries no figure, and
+       * is seeded as the refusal-shaped prose it is.
+       */
+      for (const at of sampleTimes(recording)) {
+        if (at >= recording.endedAt) continue;
+        const early = transportStatusOf(items, mode, { atS: at, endedAt: recording.endedAt });
+        if (early === undefined) continue;
+        seeds.push({
+          field: `${mode}.transportStatus@${at.toFixed(0)}s`,
+          text: early,
+          role: 'prose',
+          playhead:
+            early === status
+              ? { atS: at, endedAt: recording.endedAt, basis: 'whole-run' }
+              : atPlayhead(recording, at),
+        });
+      }
     }
 
     const refusal = parityRefusal(items);

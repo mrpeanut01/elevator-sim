@@ -78,6 +78,7 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
   let carried = 0;
   let servedUnderThresholdCount = 0;
   let abandoned = 0;
+  let abandonedCarried = 0;
   let worstWaitSoFarS: number | undefined;
   let worstWaitIsCensored = false;
 
@@ -86,14 +87,20 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     arrived += 1;
 
     const { boardedAt } = leg;
+    const alighted = leg.alightedAt !== undefined && leg.alightedAt <= t;
     if (boardedAt !== undefined && boardedAt <= t) {
       boarded += 1;
       if (boardedAt - leg.arrivedAt < longWaitThresholdS) servedUnderThresholdCount += 1;
     }
-    if (leg.alightedAt !== undefined && leg.alightedAt <= t) carried += 1;
+    if (alighted) carried += 1;
     // Strictly past, not at: waiting *exactly* the horizon is inside it, matching `core`'s own
     // `overHorizonCount`, which counts arrivals whose wait is **known to exceed** the horizon.
-    if (crossesHorizonAt(leg, horizonS) < t) abandoned += 1;
+    if (crossesHorizonAt(leg, horizonS) < t) {
+      abandoned += 1;
+      // The overlap with `carried`, from the same two facts the two counts above read — see
+      // `LiveObservations.abandonedCarried` for why a sheet needs it.
+      if (alighted) abandonedCarried += 1;
+    }
 
     /*
      * The worst wait known at `t` — `diagnoseServiceLevel`'s ending rules with `censoredAtS`
@@ -134,6 +141,7 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     deepestQueueNow: queues.deepestNow,
     deepestQueueFloorId: queues.deepestNowFloorId,
     abandoned,
+    abandonedCarried,
     horizonS,
     worstWaitSoFarS,
     worstWaitIsCensored,

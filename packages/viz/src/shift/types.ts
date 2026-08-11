@@ -354,6 +354,23 @@ export interface Observations extends GoalObservations {
   readonly carried: number;
   /** Legs that boarded. {@link minutePct}'s denominator, and R13's `n` for it. */
   readonly servedLegs: number;
+  /**
+   * Of {@link GoalObservations.abandoned}, the legs that were nonetheless carried — the overlap
+   * between the sheet's TOOK THE STAIRS and CARRIED cells (`docs/19` defect 3).
+   *
+   * Carried so the sheet can make the people-accounting total: `abandoned` is an **attribute** (a
+   * wait that crossed the horizon), not a disjoint outcome, and on a no-patience saturated run
+   * every abandoned leg can still board and land inside `carried`. A caption that treats the two
+   * cells as adding — `768 of 768 who turned up` beside `TOOK THE STAIRS 348` — cannot be
+   * totalled by a reader; the note that names this overlap can.
+   */
+  readonly abandonedCarried: number;
+  /**
+   * The abandonment horizon the {@link GoalObservations.abandoned} count is drawn at, seconds —
+   * `summary.serviceLevel.horizonS`, copied and never assumed, so the TOOK THE STAIRS caption
+   * names this run's own line rather than a hard-coded fifteen minutes.
+   */
+  readonly horizonS: number;
   /** Where the deepest queue stood. `null` when no landing ever held anybody. */
   readonly peakQueueFloorId: string | null;
   /**

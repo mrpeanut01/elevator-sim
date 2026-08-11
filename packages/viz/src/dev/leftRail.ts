@@ -920,8 +920,8 @@ export function mountLeftRail(elements: LeftRailElements, context: MountContext)
       drawMood(doc, elements.mood, surfaces, recording, t, state.mode);
       drawStats(doc, surfaces, recording, t);
       drawShift(doc, elements.shift, surfaces, view);
-      drawHonesty(elements.honesty, recording, t, mode, state.showMaths);
-      drawDecisions(doc, surfaces, recording, t);
+      drawHonesty(elements.honesty, recording, t, mode, state.showMaths, view.startOfDayS);
+      drawDecisions(doc, surfaces, recording, t, view.startOfDayS);
     },
   };
 }
@@ -1246,16 +1246,19 @@ function drawHonesty(
   t: SimTime,
   mode: DisclosureMode,
   showMaths: boolean,
+  startOfDayS: number | undefined,
 ): void {
   /*
    * The same basis the mood card above it is drawn on, and it has to be the same one: a rail whose
    * face is retrospective and whose honesty card is instantaneous is two panels answering two
-   * questions with no way for a reader to tell which is which.
+   * questions with no way for a reader to tell which is which. `startOfDayS` is the header's own
+   * hour, from `ViewAt` — the maths paragraph quotes the reporting window as a clock range, and a
+   * range on the 06:00 template axis under a header reading 09:26 is `docs/19` defect 2.
    */
   const card =
     recording === undefined
       ? idleHonestyCard()
-      : honestyAt(recording, t, mode, basisAt(recording, t));
+      : honestyAt(recording, t, mode, basisAt(recording, t), startOfDayS);
   setStyle(ui.card, 'background', card.bg);
   setStyle(ui.card, 'border-color', card.edge);
   setText(ui.glyph, card.glyph);
@@ -1277,11 +1280,14 @@ function drawDecisions(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  startOfDayS: number | undefined,
 ): void {
+  // The run's own hour, so a stamp and the header clock agree about one instant — `docs/19`
+  // defect 2. `undefined` falls back to the shared offset together with the header.
   const rows =
     recording === undefined
       ? [idleDecisionRow()]
-      : decisionRowsAt(recording, t, DECISION_ROWS).map(decisionRowViewOf);
+      : decisionRowsAt(recording, t, DECISION_ROWS, startOfDayS).map(decisionRowViewOf);
   // Keyed on the row keys alone: `DecisionRow.key` is `${at}-${callId}`, so the log is rebuilt
   // exactly when a decision enters or leaves the window — which is when `riseIn` should play.
   surfaces.decisions(rows.map((entry) => entry.key).join('|'), () =>

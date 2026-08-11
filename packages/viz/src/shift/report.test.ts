@@ -305,6 +305,79 @@ describe('the observations, which are never suppressed', () => {
   });
 });
 
+describe('TOOK THE STAIRS names its true cohort, and the people can be totalled — docs/19 defect 3', () => {
+  /*
+   * The audit's Midtown day 1: `CARRIED 768 of 768 who turned up` beside `TOOK THE STAIRS 348`
+   * with a caption claiming a disjoint cohort — 1 116 people out of 768. The count is an
+   * *attribute* (a wait that crossed the horizon), the overlap with CARRIED is real, and the note
+   * now states it from `Observations.abandonedCarried`, the run's own split.
+   */
+  const withStairs = (overrides: Partial<Observations>): string => {
+    const report = dayReportOf({
+      recording: saturated,
+      observations: { ...observationsOfRun(saturated), ...overrides },
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+    });
+    return figure(report, 'stairs').note;
+  };
+
+  it('says the overlap outright when every horizon-crosser was still carried — the audit’s shape', () => {
+    const note = withStairs({ abandoned: 348, abandonedCarried: 348 });
+    expect(note).toContain('every one of them is inside CARRIED too');
+    expect(note).toContain('overlap rather than add');
+  });
+
+  it('says the disjoint case as the gap in CARRIED’s own denominator', () => {
+    const note = withStairs({ abandoned: 51, abandonedCarried: 0 });
+    expect(note).toContain('never carried');
+    expect(note).toContain('CARRIED’s');
+  });
+
+  it('splits a mixed day with the run’s own count on the carried side', () => {
+    const note = withStairs({ abandoned: 10, abandonedCarried: 4 });
+    expect(note).toContain('4 of them were still carried');
+  });
+
+  it('names the run’s own horizon, never a hard-coded fifteen minutes', () => {
+    expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 900 })).toContain('15-minute');
+    expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 600 })).toContain('10-minute');
+    expect(withStairs({ abandoned: 0, abandonedCarried: 0 })).toContain('give-up horizon');
+  });
+
+  it('no surface on the sheet claims these riders left — the old wording is gone', () => {
+    const report = reportOf(saturated);
+    const everything = JSON.stringify(report);
+    expect(everything).not.toContain('gave up and took the stairs');
+    expect(everything).not.toContain('counted here and nowhere else');
+  });
+
+  it('grounds the carry goal in arrivals including the horizon-crossers, so abandonment cannot flatter it', () => {
+    /*
+     * § D106's footing, asked of the carry bar: a rider who walks keeps their arrival (`VizLeg`
+     * carries no `abandonedAt`) and can never enter `carried`, so the percentage moves down or
+     * not at all when riders give up — unlike AWT, which abandonment improves by construction.
+     * Driven on the real run rather than argued: the identity below is the accounting the sheet
+     * now states in words.
+     */
+    const live = observationsAt(saturated, saturated.endedAt);
+    const observations = shiftObservationsOf(live);
+    expect(observations.carryPct).toBe(Math.round((live.carried / live.arrived) * 100));
+    // The walkers-or-still-standing share of the stairs count fits inside CARRIED's shortfall…
+    expect(observations.abandoned - observations.abandonedCarried).toBeLessThanOrEqual(
+      observations.arrived - observations.carried,
+    );
+    // …and the overlap fits inside both cells it belongs to.
+    expect(observations.abandonedCarried).toBeLessThanOrEqual(observations.abandoned);
+    expect(observations.abandonedCarried).toBeLessThanOrEqual(observations.carried);
+  });
+});
+
 describe('WORST WAIT states its censoring', () => {
   it('reports the run’s own longest wait', () => {
     const longest = clean.summary.serviceLevel.longestWaitS;
@@ -339,6 +412,19 @@ describe('WORST WAIT states its censoring', () => {
     const worst = figure(report, 'worst-wait');
     expect(worst.value).toBe('at least 640 s');
     expect(worst.note).toContain('lower bound');
+    // The window rides inline on the censored branch too — docs/19 defect 3's second half.
+    expect(worst.note).toContain(`the ${censored.reportWindow.id} window`);
+  });
+
+  it('labels its window inline, and points at the whole-shift reading beside it — docs/19 defect 3', () => {
+    /*
+     * Two figures called “worst wait” share the sheet: this cell (the reporting window's) and the
+     * goal row (the whole shift's), 1 488 s against 1 725 s on the audit's Midtown day. Each now
+     * says which it is where it stands, not only in the small print.
+     */
+    const worst = figure(reportOf(clean), 'worst-wait');
+    expect(worst.note).toContain(`the ${clean.summary.reportWindow.id} window`);
+    expect(worst.note).toContain('the goal row reads the whole shift');
   });
 
   it('reads "not recorded" — never 0 s — when the window held no arrivals', () => {
@@ -1238,7 +1324,10 @@ describe('the levers point at what this run showed — issue #55', () => {
     });
     const body = leverBody(weekDay(one), 'add-a-car');
     expect(body).toContain('1 leg never boarded at all');
-    expect(body).toContain('1 rider gave up and took the stairs');
+    // *Waited past the give-up horizon*, not *gave up and took the stairs* — `docs/19` defect 3:
+    // the count is an attribute of a wait, and these riders may all be inside CARRIED.
+    expect(body).toContain('1 rider waited past the give-up horizon');
+    expect(body).not.toContain('gave up and took the stairs');
     expect(body).not.toContain('1 legs');
     expect(body).not.toContain('1 riders');
   });
@@ -1257,7 +1346,7 @@ describe('the levers point at what this run showed — issue #55', () => {
     });
     const body = leverBody(weekDay(many), 'add-a-car');
     expect(body).toContain('4 legs never boarded at all');
-    expect(body).toContain('7 riders gave up and took the stairs');
+    expect(body).toContain('7 riders waited past the give-up horizon');
   });
 
   it('quotes counts, and never a figure the run refuses', () => {

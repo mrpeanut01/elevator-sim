@@ -1145,7 +1145,7 @@ function figuresFor(
       id: 'stairs',
       label: 'TOOK THE STAIRS',
       value: String(observations.abandoned),
-      note: 'waited past the 15-minute horizon',
+      note: stairsNote(observations),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
@@ -1216,11 +1216,71 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
 }
 
 /**
+ * The count the sheet calls *took the stairs*, with its true cohort in the caption —
+ * `docs/19` defect 3.
+ *
+ * ## The cohort, and the overlap the old caption hid
+ *
+ * `Observations.abandoned` counts **waits that crossed the abandonment horizon**, whether or not
+ * a car eventually came — the handoff's *took the stairs* is a name for the attribute, not a
+ * fourth disjoint outcome. On a saturated no-patience run nobody actually leaves, so every one of
+ * those legs can still board and land inside CARRIED, and the sheet printed
+ * `CARRIED 768 of 768 who turned up` beside `TOOK THE STAIRS 348` with nothing connecting them:
+ * a reader trying to total the people gets 1 116 out of 768. The counts were both right and the
+ * captions treated overlapping cells as adding ones.
+ *
+ * So the note states the overlap, from {@link Observations.abandonedCarried} — folded in the same
+ * pass as both counts, so the three cannot disagree — and names the run's **own** horizon
+ * ({@link Observations.horizonS}) rather than a hard-coded fifteen minutes. The three branches are
+ * the three shapes the overlap takes; none of them re-states the cell's value, and the sentence
+ * *overlap, not an addition* is the whole point of the cell carrying a note at all.
+ *
+ * A decision number is owed for the cohort captions (this note, the lever clause, the Casual lead
+ * in `mode/casualDay.ts`, and the goal label's window); this docstring is the argument.
+ */
+function stairsNote(observations: Observations): string {
+  const horizon = horizonLabelOf(observations.horizonS);
+  const { abandoned, abandonedCarried } = observations;
+  if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
+  if (abandonedCarried === abandoned) {
+    return (
+      `waited past the ${horizon} horizon before a car came — every one of them is inside ` +
+      'CARRIED too, so these two cells overlap rather than add'
+    );
+  }
+  if (abandonedCarried === 0) {
+    return (
+      `waited past the ${horizon} horizon and were never carried — they sit inside CARRIED’s ` +
+      'denominator and not its count'
+    );
+  }
+  return (
+    `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
+    'and are inside CARRIED too; the rest were not'
+  );
+}
+
+/** `15-minute` for a whole-minute horizon, `900 s` for anything else. The run's own number. */
+function horizonLabelOf(horizonS: number): string {
+  const minutes = horizonS / 60;
+  return Number.isInteger(minutes) ? `${String(minutes)}-minute` : `${horizonS.toFixed(0)} s`;
+}
+
+/**
  * The longest wait in the window, and the word that keeps it honest.
  *
  * `longestWaitIsCensored` means the leg never boarded, so the number is a **lower bound** and the
  * sentence has to say *at least*. Drawing the censored and uncensored cases identically would put
  * the understatement precisely where the service is worst — `VizServiceLevel`'s own argument.
+ *
+ * ## The window is named in the cell, not only in the small print — `docs/19` defect 3
+ *
+ * This figure is `summary.serviceLevel.longestWaitS`, taken over the **reporting window**; the
+ * goal row three blocks up grades `Observations.worstWaitS`, the **whole shift's** maximum. Every
+ * shipped template narrows its window, so the two legitimately differ on the same sheet — 1 488 s
+ * against 1 725 s on the audit's Midtown day — and the only reconciliation was the small print. A
+ * reader who meets two “worst waits” four inches apart needs each labelled where it stands, so
+ * the note carries the cell's own window inline and says which surface reads the whole shift.
  */
 function worstWaitFigure(summary: VizSummary): ReportFigure {
   const { longestWaitS, longestWaitIsCensored } = summary.serviceLevel;
@@ -1234,13 +1294,14 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
       axisOnly: false,
     };
   }
+  const windowClause = `the ${summary.reportWindow.id} window’s worst — the goal row reads the whole shift`;
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
     value: `${longestWaitIsCensored ? 'at least ' : ''}${longestWaitS.toFixed(0)} s`,
     note: longestWaitIsCensored
-      ? 'a rider who never boarded — this is a lower bound, not their wait'
-      : 'one rider, and they remember it',
+      ? `a rider who never boarded — a lower bound, not their wait; ${windowClause}`
+      : `one rider, and they remember it; ${windowClause}`,
     tone: longestWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
   };
@@ -1530,8 +1591,17 @@ function leverPointersFor(
     outrun.push(`${String(legs)} leg${legs === 1 ? '' : 's'} never boarded at all`);
   }
   if (observations.abandoned > 0) {
+    /*
+     * *Waited past the horizon*, not *gave up and took the stairs* — `docs/19` defect 3. The count
+     * is an attribute of a wait, and on a no-patience run every one of these riders was still
+     * carried; a clause that said they left, beside a CARRIED cell that counts them, was the sheet
+     * contradicting itself. The stairs figure's own note states the overlap; this clause only has
+     * to stop claiming the opposite.
+     */
     const gaveUp = observations.abandoned;
-    outrun.push(`${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} gave up and took the stairs`);
+    outrun.push(
+      `${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} waited past the give-up horizon`,
+    );
   }
   if (outrun.length > 0) pointers.set('add-a-car', listOf(outrun));
 

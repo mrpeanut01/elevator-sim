@@ -185,9 +185,15 @@ export function goalsForDay(day: number): readonly ShiftGoal[] {
   // *Inside*, not *under*: `at-most` meets the bar at the bar, and a label that said "under
   // 230 s" about a day whose worst wait was exactly 230 s would claim a strictness the
   // comparison does not have — § D227's rule at the scale of one preposition.
+  //
+  // *Across the whole shift* is on the label because the sheet carries a second worst wait —
+  // the WORST WAIT cell, `summary.serviceLevel.longestWaitS`, which is the reporting window's
+  // and legitimately larger or smaller on the same day. Two figures called "worst wait" four
+  // inches apart, reconciled only in the small print, is `docs/19` defect 3's second half; each
+  // now names its window where it stands (the cell's note carries the other label).
   const worst: ShiftGoal = {
     id: 'worst-wait',
-    label: `Keep the worst wait inside ${String(worstBar)} s`,
+    label: `Keep the worst wait inside ${String(worstBar)} s across the whole shift`,
     unit: ' s',
     bar: worstBar,
     compare: 'at-most',

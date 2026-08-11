@@ -129,12 +129,19 @@ export function fallingBehindAt(recording: VizRecording, simTimeS: SimTime): boo
  * is inside the run, `'whole-run'` once it has reached the end. The engineer card reads a verdict
  * about the whole run either way and does not move. The parameter defaults to the live reading so
  * every caller written before it existed keeps the card it had.
+ *
+ * `dayStartS` is the run's own hour — the value `dev/main.ts` feeds the header clock — and it
+ * reaches exactly one string: the maths paragraph's reporting-window range. That range used to
+ * take the 06:00 default unconditionally, so on a run whose template declares 08:30 the engineer's
+ * card quoted a window on a clock no other surface was showing (`docs/19` defect 2 — one clock
+ * per run). `undefined` falls back to the shared `DAY_START_S`, together with every other reader.
  */
 export function honestyAt(
   recording: VizRecording,
   simTimeS: SimTime,
   mode: DisclosureMode,
   basis: WaitBandBasis = 'now',
+  dayStartS?: number | undefined,
 ): HonestyCard {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
   const suppressed = meansAreSuppressed(recording);
@@ -162,7 +169,7 @@ export function honestyAt(
         ? closedPlain(recording, suppressed)
         : casualPlain(fallingBehind),
     hasMaths: engineer,
-    maths: engineer ? mathsOf(recording, suppressed) : undefined,
+    maths: engineer ? mathsOf(recording, suppressed, dayStartS) : undefined,
     bg: warning ? WARNING_BG : CALM_BG,
     edge: warning ? WARNING_EDGE : CALM_EDGE,
     warning,
@@ -282,7 +289,11 @@ function engineerPlain(recording: VizRecording, suppressed: boolean): string {
  * branch quotes counts, thresholds and a longest wait. `noMeans.test.ts` asserts that no module in
  * this directory so much as names the three suppressible fields.
  */
-function mathsOf(recording: VizRecording, suppressed: boolean): string {
+function mathsOf(
+  recording: VizRecording,
+  suppressed: boolean,
+  dayStartS?: number | undefined,
+): string {
   const s = recording.summary;
   // Not `window`: `boundaries.test.ts` rule 3 forbids a bare identifier of that name anywhere
   // outside `src/dev/`, because the finding that rule actually produced was a local shadowing the
@@ -290,7 +301,7 @@ function mathsOf(recording: VizRecording, suppressed: boolean): string {
   const reportWindow = s.reportWindow;
   const windowClause =
     `Reporting window ${reportWindow.id}, ` +
-    `${hhmm(timeOfDayAt(reportWindow.startS))}–${hhmm(timeOfDayAt(reportWindow.endS))} ` +
+    `${hhmm(timeOfDayAt(reportWindow.startS, dayStartS))}–${hhmm(timeOfDayAt(reportWindow.endS, dayStartS))} ` +
     `(${s.windowSeconds.toFixed(0)} s), n = ${String(s.waitCount)} legs.`;
 
   if (suppressed) {
