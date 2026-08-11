@@ -58,6 +58,7 @@ import {
   averageWaitFigure,
   clockOf,
   dayReportOf,
+  type DayReportInput,
   type ReportSubject,
   type ShapedDayReport,
   type ShiftPlan,
@@ -650,6 +651,58 @@ describe('the rest of the sheet', () => {
     expect(meta).not.toContain(SHIFT_EVENTS['move-in'].name);
   });
 
+  it('carries the intervention log, one line per press in time order — docs/19 defect 10', () => {
+    /*
+     * The audit's finding: the stamp lived only on the stage, so the filed sheet of an intervened
+     * day was indistinguishable from an untouched one. The lines are `interventionLogOf`'s — the
+     * stage stamp's own verbs and clock — so this asserts the exact sentence the stage showed,
+     * with the log handed over out of order to prove the sheet holds *in time order* itself.
+     */
+    const sheet = (interventions: DayReportInput['interventions']): readonly string[] =>
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        interventions,
+      }).metaLines;
+    const meta = sheet([
+      { atS: 2 * 3600, change: { kind: 'park-cars-lobby' } },
+      { atS: 30 * 60, change: { kind: 'park-cars-lobby' } },
+    ]);
+    // 06:00 + 0:30 and 06:00 + 2:00, restored to time order.
+    const stamps = meta.filter((line) => line.includes('parked the cars in the lobby'));
+    expect(stamps).toEqual([
+      '06:30 · parked the cars in the lobby',
+      '08:00 · parked the cars in the lobby',
+    ]);
+    // An untouched day prints nothing — no placeholder line, and an absent key is the empty log
+    // (core's own contract, `sim/interventions.test.ts`).
+    expect(sheet(undefined).some((line) => line.includes('parked'))).toBe(false);
+    expect(sheet(undefined)).toEqual(sheet([]));
+  });
+
+  it('carries the log on a single run too — a free-play day can be intervened in', () => {
+    const meta = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'single-run', selection: SELECTION },
+      interventions: [{ atS: 30 * 60, change: { kind: 'park-cars-lobby' } }],
+    }).metaLines;
+    expect(meta).toContain('06:30 · parked the cars in the lobby');
+  });
+
   it('clears the shift when every goal was met', () => {
     const report = reportOf(clean);
     expect(report.goals.every((line) => line.reading.state === 'met')).toBe(true);
@@ -786,6 +839,54 @@ describe('the rest of the sheet', () => {
     );
     expect(report.contractLine).toContain('2 of 2 clean shifts banked');
     expect(report.contractLine).not.toContain('5 of');
+  });
+
+  it('stops asking for zero more clean shifts once the scenario stands cleared — docs/19 defect 9', () => {
+    /*
+     * The audit's repro: `week.cleared` is the banner of the day that earned it and `nextDay`
+     * clears it on purpose, so every later day on a cleared scenario fell through to *"Bank 0 more
+     * clean shifts on this building and the next assignment opens"*. The branch's condition is
+     * `contractStatus` — `week.completed`, the same expression the scenario card reads and the one
+     * `closeDay`'s clearing guard negates — so this case drives the exact state the audit saw: the
+     * contract in `completed`, the banner gone.
+     */
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), cleanRun: 2, completed: ['c2'], cleared: null },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(report.taught).not.toContain('Bank 0 more');
+    expect(report.taught).toContain('already cleared');
+    // The reward is restated as standing open rather than promised again as next.
+    expect(report.taught).toContain(contractById('c2')?.reward ?? '');
+    // And the day that earns the clear still gets the banner's own sentence, not this one.
+    const clearedDay = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: {
+          ...openWeek('c2'),
+          cleanRun: 2,
+          completed: ['c2'],
+          cleared: { contractId: 'c2', reward: contractById('c2')?.reward ?? '', nextContractId: 'c3', nextTitle: 'x' },
+        },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(clearedDay.taught).toContain('Cleared:');
   });
 
   it('grades a reader’s own building without pretending it banks anything', () => {
@@ -1370,6 +1471,11 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
      * The other half of the fix, and the half a reviewer should distrust first: § D106's two
      * `unranked` energy cells, the `WITHHELD` gate and `docs/10` R3/R11 govern the figure grid and
      * they are correct. The sheet's *shape* changed; nothing it publishes did.
+     *
+     * `verdictLine` left this list with `docs/19` defect 13 — it is no longer an observation the
+     * two shapes share but the one claim a single run may not make; the case below owns it. The
+     * `verdict` itself still matches, because the lede and the diagnosis heading were chosen
+     * through it (§ D237's one-key rule) and both remain observations about the day.
      */
     const week = weekDay(sheetOf({ kind: 'week-day' }));
     const single = singleRun(sheetOf(SINGLE));
@@ -1379,8 +1485,21 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     expect(single.goals).toEqual(week.goals);
     expect(single.lede).toBe(week.lede);
     expect(single.verdict).toBe(week.verdict);
-    expect(single.verdictLine).toBe(week.verdictLine);
     expect(single.smallPrint).toBe(week.smallPrint);
+  });
+
+  it('announces no verdict on a run no contract graded — docs/19 defect 13', () => {
+    /*
+     * The audit's own question was *"Cleared what?"* — the free-play sheet said **Shift cleared**
+     * over goals no contract issued. The banner slot now carries a refusal to grade, worded in the
+     * report layer because two renderers draw it (`dev/reportPanel.ts` and `render/reportCard.ts`),
+     * and a fix in one would be the two-renderers defect issue #137 closed, reopened with words.
+     */
+    const single = singleRun(sheetOf(SINGLE));
+    expect(single.verdictLine).toBe('read, not graded — no scenario asked for this run');
+    expect(single.verdictLine).not.toContain('cleared');
+    // The week's sheet keeps its verdict — the refusal is about the shape, not the day.
+    expect(weekDay(sheetOf({ kind: 'week-day' })).verdictLine).toBe('Shift cleared');
   });
 });
 

@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from './interventions.js';
+import { interventionLogOf, interventionStampOf, PARK_CARS_LOBBY_LABEL } from './interventions.js';
 
 // 09:14 under the shared 06:00 day start: 3 h 14 min into the run.
 const AT_0914 = 3 * 3600 + 14 * 60;
@@ -54,5 +54,37 @@ describe('interventionStampOf', () => {
   it('labels the control with a verb, and the stamp with its past tense', () => {
     // One arm today; a second change kind must extend both sentences together.
     expect(PARK_CARS_LOBBY_LABEL).toBe('Park the cars in the lobby');
+  });
+});
+
+describe('interventionLogOf', () => {
+  /*
+   * The filed sheet's half — `docs/19` defect 10. No playhead in the signature, on purpose: the
+   * Day report is a whole-day account (§ D223), so its log is the whole log, and the temporal
+   * discipline the stamp keeps by shape does not apply to a surface that only exists at the end.
+   */
+  it('prints every entry, in time order, in the stamp’s own words', () => {
+    const lines = interventionLogOf([
+      { atS: AT_0914, change: PARK },
+      { atS: 600, change: PARK },
+    ]);
+    // Handed over out of order; the claim *in time order* is the function's own, not the caller's.
+    expect(lines).toEqual([
+      '06:10 · parked the cars in the lobby',
+      '09:14 · parked the cars in the lobby',
+    ]);
+    // Line one is byte-identical to the stage's stamp at that instant — shared verbs, shared
+    // clock, so the sheet and the stage cannot disagree about what a press was called.
+    expect(lines[1]).toBe(interventionStampOf([{ atS: AT_0914, change: PARK }], AT_0914));
+  });
+
+  it('prints nothing for an empty log — no placeholder line', () => {
+    expect(interventionLogOf([])).toEqual([]);
+  });
+
+  it('reads the run’s own hour, exactly as the stamp does', () => {
+    expect(interventionLogOf([{ atS: 0, change: PARK }], 8 * 3600)).toEqual([
+      '08:00 · parked the cars in the lobby',
+    ]);
   });
 });

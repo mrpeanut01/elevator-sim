@@ -95,11 +95,13 @@
  * navigate on rather than prose a reader has to act on themselves.
  */
 
-import type { SimTime } from '@elevator-sim/core/browser';
+import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
+import { interventionLogOf } from '../live/interventions.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
+import { contractStatus } from './contracts.js';
 import { readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
@@ -506,6 +508,31 @@ export interface DayReportInput {
    * pair is emitted.
    */
   readonly showEnergyAxis?: boolean | undefined;
+  /**
+   * The player's mid-run interventions, in press order — the run record's third member
+   * (`run = { seed, config, interventions[] }`), reaching the sheet at last (`docs/19` defect 10).
+   *
+   * ## The defect this closes
+   *
+   * The stamp (`09:14 · parked the cars in the lobby`) lived only on the stage, so the filed sheet
+   * of an intervened day was indistinguishable from an untouched one and the player's question —
+   * *did my park matter?* — had no answer on the surface built to answer questions about the day.
+   * {@link metaLinesFor} now prints one line per intervention, in time order, through
+   * `live/interventions.ts#interventionLogOf` — the same verbs and the same clock the stage stamp
+   * uses, so the sheet and the stage cannot disagree about what a press was called.
+   *
+   * ## Why it is optional where `subject`, `plan` and `calendar` are required
+   *
+   * Those three are required because a caller that forgot to say would produce a sheet of the wrong
+   * *shape* in silence. An absent log has one meaning, and `core` pins it: a run built with no
+   * `interventions` key is byte-identical to one built before the field existed
+   * (`sim/interventions.test.ts`, cited by `dev/state.ts#ViewerState.interventions`). So `undefined`
+   * here *is* the empty log rather than a guess at one, and the callers that pass nothing — the
+   * acceptance suites, the honesty fixtures that drive an untouched day — are describing runs whose
+   * record genuinely holds no entry. The one caller with a player (`dev/main.ts#closeShift`) passes
+   * `state.interventions`, which is the log the run on screen was re-simulated under.
+   */
+  readonly interventions?: readonly RunInterventionConfig[] | undefined;
 }
 
 /**
@@ -551,6 +578,17 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(input.event, subject),
     ...attemptLine(subject, week.attempt),
+    /*
+     * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
+     * the run record is `{ seed, config, interventions[] }`, and a sheet that reproduces without
+     * the log describes a different day. One line per press, in time order, in the stage stamp's
+     * own words (`interventionLogOf` shares `STAMP_VERBS` and the clock with `interventionStampOf`),
+     * on both shapes of sheet — a Free Play day can be intervened in exactly as a campaign day can.
+     * Last rather than beside the seed, because the lines above are what was *asked for* and these
+     * are what the player *did to it* mid-run; an untouched day prints nothing here, which is how
+     * every one of its sheets has always read.
+     */
+    ...interventionLogOf(input.interventions ?? [], dayStartS),
   ];
 }
 
@@ -747,7 +785,25 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
   };
 
   if (subject.kind === 'single-run') {
-    return { ...core, of: 'single-run' };
+    /*
+     * **The banner is the contract's answer, and no contract asked** — `docs/19` defect 13.
+     *
+     * The judgement above still runs whole: the lede, the diagnosis heading and the goal readings
+     * are observations about the day and stay (`contractLineFor`'s own precedent — on a week with
+     * no contract *"the goals are still read from what happened"*). What may not survive the
+     * reshaping is the **claim**: `Shift cleared` answers *did this run clear the shift it was
+     * asked for?*, and a Free Play run was asked for nothing — the audit's own question, *"Cleared
+     * what?"*. So the line is replaced here, in the layer that decides every claim, rather than in
+     * a renderer: `dev/reportPanel.ts` and `render/reportCard.ts` both draw `verdictLine`, and a
+     * fix in one would be the two-renderers defect issue #137 just closed, reopened with words.
+     *
+     * {@link SingleRunReport.verdict} keeps the judgement's own value — the lede and heading were
+     * chosen through it (§ D237's one-key rule), and rewriting it would make them strings that
+     * reached the sheet through a key the sheet no longer carries. What the verdict may not do on
+     * this shape is colour or word a banner, and both renderers now key their neutral treatment on
+     * `of === 'single-run'` rather than on the verdict.
+     */
+    return { ...core, of: 'single-run', verdictLine: SINGLE_RUN_VERDICT_LINE };
   }
 
   const nextIdx = (week.dayIdx + 1) % 7;
@@ -762,6 +818,25 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     nextDayName: weekdayOf(nextIdx),
   };
 }
+
+/**
+ * What a single run's sheet says where a week's says **Shift cleared** — a refusal to grade,
+ * spoken rather than blanked (`docs/19` defect 13).
+ *
+ * Lowercase and claim-free on purpose: it sits in the banner slot, and a sentence styled like a
+ * verdict would be the thing it replaces with softer wording. It names *why* there is no grade —
+ * no scenario asked — because the empty string was the other candidate and an empty banner beside
+ * a heading reading *The shift asked for* is `docs/10` R3's blank where an answer should be. The
+ * four goal rows under it are neutralised by the renderer on the same discriminator
+ * (`dev/reportPanel.ts#reportViewOf`), so the block reads as *what a scenario would ask*, read and
+ * not graded, top to bottom.
+ *
+ * Module-private on purpose: the sheet is the product, so the suites and the honesty sweep read
+ * the sentence off {@link dayReportOf}'s own output rather than importing a constant beside it —
+ * an export whose only shipped reader is its own module is the shape `deadCode.test.ts` exists to
+ * refuse.
+ */
+const SINGLE_RUN_VERDICT_LINE = 'read, not graded — no scenario asked for this run';
 
 /* -------------------------------------------------------------------------- *
  * The judgement — one verdict, and every sentence that states it
@@ -1618,11 +1693,31 @@ function forecastFor(
   };
 }
 
-/** *What this taught* — the design's two branches (`design.html` :3506). */
+/**
+ * *What this taught* — the design's two branches (`design.html` :3506), plus the one the design
+ * could not reach.
+ *
+ * ## The already-cleared branch — `docs/19` defect 9
+ *
+ * The *Bank N more…* arm kept printing after the scenario was done: `week.cleared` is the banner
+ * of the **day that earned it** and `nextDay` clears it on purpose, so every later day on a
+ * cleared scenario fell through to `Bank 0 more clean shifts on this building and the next
+ * assignment opens` — a count of nothing, promising a door already open. The branch's condition is
+ * `contractStatus`, which is the **same expression** the scenario card reads
+ * (`week.completed.includes(id)`) and the negation of the guard `closeDay` clears on
+ * (`!base.completed.includes(contract.id)`) — derived, not restated, so this line and the card
+ * cannot disagree about whether the assignment stands cleared.
+ */
 function taughtFor(contract: ScenarioContract | undefined, week: WeekState): string {
   if (week.cleared !== null) return `Cleared: ${week.cleared.reward}.`;
   if (contract === undefined) {
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
+  }
+  if (contractStatus(week, contract.id) === 'cleared') {
+    return (
+      `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
+      'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'
+    );
   }
   const left = Math.max(0, contract.needClean - week.cleanRun);
   return (

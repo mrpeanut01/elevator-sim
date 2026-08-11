@@ -41,6 +41,42 @@ export interface ViewAt {
   readonly building: ResolvedBuilding | undefined;
   /** Whether playback is running, for the transport's glyph and the status line. */
   readonly playing: boolean;
+  /**
+   * Why the Day report has nothing on it while the rest of the screen suggests otherwise, or
+   * `undefined` when the empty sheet is empty for the plain reason (nothing has been run).
+   *
+   * Here rather than derivable by the panel, because both facts live in `boot()`'s closure where
+   * no panel can reach them: whether the run on screen is one the player asked for (§ D232's
+   * `playerHasChosen`), and whether any sheet has been filed **in this sitting** (a restored
+   * week's `history` cannot tell a reload from a day advanced five minutes ago). The panel's
+   * `emptyReportView` holds the wording; this carries the facts — the split every panel keeps.
+   */
+  readonly unfiledSheet?: UnfiledSheetFacts | undefined;
+}
+
+/**
+ * The two facts behind an empty sheet that is not plainly empty — `docs/19` defects 1 and 14.
+ *
+ * Both optional and independently so, because they answer different questions and can hold at
+ * once (a reload mid-campaign followed by watching boot's run to its end raises both): the
+ * refusal is about the **run on screen**, the prior-sitting flag is about the **week the rail is
+ * describing**. `dev/reportPanel.ts#emptyReportView` gives the refusal precedence — a completed
+ * run standing unfiled is the thing the reader is looking at.
+ */
+export interface UnfiledSheetFacts {
+  /**
+   * Why the completed run on screen has not filed, in one sentence, or `undefined` when no
+   * completed run is standing unfiled. The sentences are `shift/banking.ts`'s two — a run this
+   * shell did not simulate (issue #136), and a run nobody started (§ D232, `docs/19` defect 1) —
+   * quoted, never composed here.
+   */
+  readonly refusal: string | undefined;
+  /**
+   * Whether the week on the rail was banked in a previous sitting with no sheet filed in this
+   * one — the restore state `docs/19` defect 14 found incoherent: the rail read *on a roll ·
+   * 1/1 banked* while the sheet read *Nothing filed yet* with nothing connecting the two.
+   */
+  readonly fromPreviousSitting: boolean;
 }
 
 /** What a mount may do to the world. Everything else it must ask for. */
