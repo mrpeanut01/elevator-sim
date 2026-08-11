@@ -582,6 +582,48 @@ Nothing else about the block moved: no colour, no arithmetic, no ordering, and a
 draws the bare word `withheld` with **no** count beside it — a refusal has no sample, and a
 denominator printed next to it would read as a figure with a caveat.
 
+### 4.11 The mood bar's fourth band is *eyeing the stairs*, because the handoff gave one phrase to two cohorts
+
+`docs/20` defect 4. This is the first deviation taken on the grounds of the **second** half of
+CLAUDE.md's rule rather than the first: *the handoff wins every disagreement about what the screen
+looks like, and the simulator wins every disagreement about what a number means.*
+
+**What the handoff says.** The mood card's fourth band is *taking the stairs* (`design.html`
+:72–76, :230–233) and its legend rung is *gave up* (`:233`). The Day report's abandonment cell is
+also *TOOK THE STAIRS*. Both are the handoff's words, and the handoff never puts them on screen
+together.
+
+**What the product does, and what that cost.** It puts them on screen together, on the same
+sheet-plus-rail view a player reads after every shift. The audit's Midtown day 1 read **taking the
+stairs 534** on the left rail and **TOOK THE STAIRS 288** in the figure grid six centimetres away —
+and the sheet's own note said all 288 of them *were carried*. Neither number is wrong. They are
+different cohorts:
+
+| | left rail, fourth band | Day report, TOOK THE STAIRS |
+|---|---|---|
+| population | people **still standing** at the playhead | legs whose wait **crossed the horizon** |
+| threshold | 120 s, the design's fixed rung | `summary.serviceLevel.horizonS`, the run's own |
+| window | this instant | the whole shift |
+| relation | either can be nonzero while the other is zero | — |
+
+`live/bands.ts` has said *"bands are ages; abandonment is an outcome"* in its own docstring since it
+was written, and `live/types.ts` warned in as many words that conflating them *"would let a rail
+report four people taking the stairs while nobody had abandoned anything"*. The code knew. The
+labels did not, and the labels are what a player reads.
+
+**What changed, and which one moved.** The band's label becomes **`eyeing the stairs`** and its
+legend rung becomes **`past two minutes`**. The report cell is untouched. The direction is forced
+rather than chosen: the sheet's cohort has actually taken the stairs, the rail's is still in the
+lobby, so the phrase stays with the cohort it describes. *past two minutes* also rejoins the rung to
+the duration ladder the other three are on — *under 30 s* / *a minute* / *two minutes* — which is
+what it was measuring all along; *gave up* was the one rung stating an outcome.
+
+**What did not change.** `WaitBandId` is still `taking-the-stairs`. It is an engine string that
+reaches no player surface, it is what `MoodSegment.bandId` and every stored view key on, and
+renaming it would migrate data to fix a caption. The boundaries, the palette, the faces and the
+apportionment are all untouched, and `waitLegendEntries`' range tooltip stays: a range is the thing
+a reader checks a count against, and the fourth entry is still the one that most needs checking.
+
 ---
 
 ## 5 — Definition of done

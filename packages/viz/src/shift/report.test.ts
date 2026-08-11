@@ -40,6 +40,9 @@ import { contractById } from './contracts.js';
 import { SHIFT_EVENTS, eventFor } from './events.js';
 import { goalsForDay } from './goals.js';
 import { observationsAt } from '../live/observations.js';
+// `docs/20` defect 4 — the rail's fourth band label, derived rather than retyped. See the test
+// that asserts the two *stairs* cohorts share no phrase.
+import { WAIT_BANDS } from '../live/bands.js';
 import { shiftObservationsOf } from './observations.js';
 
 /**
@@ -176,7 +179,7 @@ function reportOf(
 function figure(
   report: ShapedDayReport,
   id: string,
-): { value: string; note: string; tone: string; axisOnly: boolean } {
+): { label: string; value: string; note: string; tone: string; axisOnly: boolean } {
   const found = report.figures.find((candidate) => candidate.id === id);
   if (found === undefined) throw new Error(`no figure "${id}" on the sheet`);
   return found;
@@ -363,6 +366,31 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     const everything = JSON.stringify(report);
     expect(everything).not.toContain('gave up and took the stairs');
     expect(everything).not.toContain('counted here and nowhere else');
+  });
+
+  /**
+   * The two *stairs* cohorts may not share a phrase — `docs/20` defect 4, `docs/12` § 4.11.
+   *
+   * The left rail's fourth mood band and this cell were both called *taking the stairs*, on one
+   * screen, with two different numbers under them (534 against 288) and the cell's own note saying
+   * all 288 of the second cohort **were carried**. Both labels are derived here rather than
+   * retyped — the cell's off a real report, the band's off `WAIT_BANDS` — so this fails if either
+   * surface drifts back onto the other's words, which no assertion inside a single module could
+   * catch.
+   *
+   * Compared on the distinctive phrase rather than on equality: *TOOK THE STAIRS* and *taking the
+   * stairs* are not equal strings and were exactly the collision.
+   */
+  it('does not share its words with the rail’s fourth mood band', () => {
+    const cellLabel = figure(reportOf(saturated), 'stairs').label.toLowerCase();
+    const bandLabel = WAIT_BANDS[WAIT_BANDS.length - 1]?.label.toLowerCase() ?? '';
+
+    expect(cellLabel).toContain('stairs');
+    expect(bandLabel).toContain('stairs');
+    // The verb is what separates them: one cohort has gone, the other is still standing there.
+    expect(cellLabel).toContain('took the stairs');
+    expect(bandLabel).not.toContain('took the stairs');
+    expect(bandLabel).not.toContain('taking the stairs');
   });
 
   it('grounds the carry goal in arrivals including the horizon-crossers, so abandonment cannot flatter it', () => {

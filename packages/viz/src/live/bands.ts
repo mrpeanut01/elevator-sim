@@ -11,7 +11,7 @@
  *
  * The mood card is a different instrument and the design fixes its boundaries at 30 s, 60 s and
  * 120 s (`design.html:1365–1370`). It has to: the four legend labels are **fixed prose** —
- * *breezy*, *tapping foot*, *checking watch*, *taking the stairs* — and *checking watch* is a
+ * *breezy*, *tapping foot*, *checking watch*, *eyeing the stairs* — and *checking watch* is a
  * claim about a minute, not about whatever this run's long-wait threshold happens to be. Sliding
  * the boundary under a fixed sentence is how a caption stops describing the picture, which is the
  * defect the honesty card exists to prevent.
@@ -23,12 +23,13 @@
  *
  * ## Bands are ages; abandonment is an outcome
  *
- * The fourth band is called *taking the stairs* and it counts **people still standing** who have
+ * The fourth band is called *eyeing the stairs* and it counts **people still standing** who have
  * been standing at least two minutes. It is not the count of people who gave up — that is
- * `observationsAt(…).abandoned`, over a different population (legs whose wait passed the run's
- * own 900 s horizon) on a different clock. The design carries both, in two places, and the two
- * move independently: a building can hold four riders past two minutes with nobody having
- * abandoned anything, and can have abandoned a dozen with an empty lobby.
+ * `observationsAt(…).abandoned`, the sheet's *TOOK THE STAIRS*, over a different population (legs
+ * whose wait passed the run's own 900 s horizon) on a different clock. The design carries both, in
+ * two places, and the two move independently: a building can hold four riders past two minutes with
+ * nobody having abandoned anything, and can have abandoned a dozen with an empty lobby. The design
+ * gave the two one word; `WAIT_BANDS`' fourth entry below says why this one no longer has it.
  *
  * Nothing here is an estimate and nothing here is suppressible. Every figure is a head count.
  *
@@ -120,12 +121,47 @@ export const WAIT_BANDS: readonly WaitBandDefinition[] = Object.freeze([
     color: 'var(--band-2)',
     face: '⌄',
   }),
+  /**
+   * **The fourth band's words are the simulator's, not the handoff's** — `docs/20` defect 4.
+   *
+   * The handoff spells this band *taking the stairs* (`:72–76`) and its legend rung *gave up*
+   * (`:233`), and it also gives the Day report's **abandonment** cell the same name, *TOOK THE
+   * STAIRS*. Two cohorts, one phrase, and the audit found both on screen at once: the rail reading
+   * *taking the stairs 534* six centimetres from the sheet reading *TOOK THE STAIRS 288*, whose own
+   * note says all 288 **were carried**. A player cannot total the people, and the accounting
+   * complaint `docs/19` defect 3 raised is back in a new hat.
+   *
+   * They are genuinely different populations, on different clocks, and this module's own docstring
+   * has said so since it was written (*"Bands are ages; abandonment is an outcome"*):
+   *
+   * | | the rail's fourth band | the sheet's TOOK THE STAIRS |
+   * |---|---|---|
+   * | who | people **still standing** at the playhead | legs whose wait **crossed the horizon** |
+   * | when | at least 120 s, the design's fixed rung | at least `serviceLevel.horizonS`, the run's own |
+   * | over | this instant | the whole shift |
+   * | can be nonzero while the other is zero | yes | yes |
+   *
+   * CLAUDE.md decides which one moves: *the handoff wins every disagreement about what the screen
+   * looks like, and the simulator wins every disagreement about what a number means.* Which cohort
+   * a count is over is what a number means, so the phrase stays with the cohort that has literally
+   * taken the stairs — the sheet's — and the band, whose people are all still in the lobby, is
+   * renamed. `docs/12-design-handoff.md` carries the deviation and the constraint that forced it.
+   *
+   * *eyeing the stairs* keeps the design's escalation and its metaphor while stating the one thing
+   * the old word got wrong: nobody in this band has gone anywhere yet. The legend rung stops saying
+   * *gave up* for the same reason and rejoins the duration ladder the other three rungs are on
+   * (*under 30 s* / *a minute* / *two minutes*), which is what it was measuring all along.
+   *
+   * The **id** does not move. It is an engine string that reaches no player surface, it is what
+   * `MoodSegment.bandId` and every stored view key on, and renaming it would migrate data to fix a
+   * caption.
+   */
   Object.freeze({
     id: 'taking-the-stairs' as const,
     fromS: 120,
     toS: undefined,
-    label: 'taking the stairs',
-    legendLabel: 'gave up',
+    label: 'eyeing the stairs',
+    legendLabel: 'past two minutes',
     color: 'var(--band-3)',
     face: '×',
   }),

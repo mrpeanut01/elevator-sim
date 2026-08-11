@@ -192,7 +192,7 @@ export interface MoodView {
  * apportionment is what keeps it one.
  *
  * Ties in the remainder go to the calmer band, which is the direction that cannot flatter: a
- * rounding unit awarded upward would widen *taking the stairs*, and the one error this card must
+ * rounding unit awarded upward would widen *eyeing the stairs*, and the one error this card must
  * not make is the reassuring one — so the tie-break is the conservative direction for the *bar*,
  * while the worst band's *presence* is never rounded away because {@link MoodLegendEntry.count} is
  * the raw head count and sits beside it.

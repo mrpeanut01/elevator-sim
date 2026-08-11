@@ -296,13 +296,15 @@ describe('moodViewOf — the face, the bar and the legend', () => {
     expect(view.anybodyWaiting).toBe(false);
   });
 
-  it('legends the four bands by the design’s names, with the raw head count beside each', () => {
+  it('legends the four bands by their own names, with the raw head count beside each', () => {
     const view = moodViewOf(bandsOf([5, 4, 3, 2]), moodOf(bandsOf([5, 4, 3, 2])));
+    // Three of the design's, and the fourth the simulator's — `docs/20` defect 4, `docs/12`
+    // § 4.11. `live/bands.test.ts` is where that split is argued and pinned.
     expect(view.legend.map((entry) => entry.label)).toEqual([
       'breezy',
       'tapping foot',
       'checking watch',
-      'taking the stairs',
+      'eyeing the stairs',
     ]);
     expect(view.legend.map((entry) => entry.count)).toEqual([5, 4, 3, 2]);
     expect(view.legend.map((entry) => entry.color)).toEqual(WAIT_BANDS.map((band) => band.color));

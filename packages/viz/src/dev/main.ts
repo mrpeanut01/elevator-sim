@@ -346,11 +346,18 @@ export interface WaitLegendEntry {
   /**
    * The band's own boundary, for the entry's tooltip — `0–30 s`, `30–60 s`, `60–120 s`, `120 s+`.
    *
-   * It earns its place on the fourth entry. `WAIT_BANDS[3].legendLabel` is the handoff's word
-   * *gave up* (`:233`), and `bands.ts` is explicit that the band counts **people still standing**
-   * past two minutes rather than people who abandoned — that is `observationsAt(…).abandoned`, a
-   * different population on a different clock. A bare label could carry that ambiguity harmlessly;
-   * a label with a *count* on it is a figure, so the boundary goes beside it.
+   * It earns its place on the fourth entry, and it used to be the **only** thing holding that
+   * entry honest. `WAIT_BANDS[3].legendLabel` was the handoff's word *gave up* (`:233`), and
+   * `bands.ts` is explicit that the band counts **people still standing** past two minutes rather
+   * than people who abandoned — that is `observationsAt(…).abandoned`, a different population on a
+   * different clock. A bare label could carry that ambiguity harmlessly; a label with a *count* on
+   * it is a figure, so the boundary went beside it.
+   *
+   * `docs/20` defect 4 then measured what the tooltip could not reach: the *bar's* own labels sat
+   * beside the Day report's, six centimetres apart, under one phrase and with two different
+   * numbers. The rung now reads *past two minutes* and the band *eyeing the stairs*, so the words
+   * carry it too — and this stays, because a range is the thing a reader checks a count against and
+   * the fourth entry is still the one that most needs checking.
    *
    * **Two numbers and a unit, deliberately, rather than a sentence.** It restates a bound the band
    * already publishes, so it cannot be false unless `WAIT_BANDS` moves, in which case it moves
@@ -364,7 +371,8 @@ export interface WaitLegendEntry {
  * The legend's four entries, in ascending severity — the handoff `:230–233`.
  *
  * **Derived, never written.** Both halves of every entry already exist on `live/bands.ts`'s
- * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *gave up*, and `color`
+ * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *past two minutes*
+ * (`docs/20` defect 4 rejoined the fourth rung to that ladder), and `color`
  * is the same band palette the mood bar, the canvas and the report all read. Until this function
  * existed, `legendLabel` reached **no DOM anywhere** — four authored strings with no non-test
  * caller, which is the dead-seam shape this repository has closed eleven times — and the page drew
@@ -1142,14 +1150,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     {
       /*
-       * 120 s: checking watch → taking the stairs, and the rung that stops blaming the cold start.
+       * 120 s: checking watch → eyeing the stairs, and the rung that stops blaming the cold start.
        * A sleeping container was measured at 32.2 s; four times that is not a cold start any more,
        * and going on saying *it is just waking up* would be a reassurance that had stopped being
        * true — which this repository has a standing rule about.
        */
       afterMs: 120_000,
       text:
-        'Two minutes — your mood bar’s last band, taking the stairs, where a tenant gives up. You ' +
+        'Two minutes — your mood bar’s last band, eyeing the stairs, where a tenant starts ' +
+        'looking for another way up. You ' +
         'do not have that option, and a cold start was measured at about half a minute, so this is ' +
         'no longer a sleeping server. Nothing you typed is lost.',
     },
