@@ -897,6 +897,19 @@ export function repositionDecisionFor(
   config: ResolvedDispatchConfig,
   context: RepositionContext = {},
 ): RepositionDecision {
+  /*
+   * The intervention seam (`RepositionContext.idleOverride`): a caller may hand in the stage 7
+   * settings in force *now*, and every read below — the strategy in `parkingCandidates` and
+   * `responseWeights`, the deadband, the energy exchange rate — goes through the same effective
+   * config, so the three cannot disagree about which idle stage decided this car.
+   *
+   * **`config`, by identity, when no override is supplied.** Not a copy that happens to be equal:
+   * the ordinary run must hand these helpers exactly the object it handed before the field
+   * existed, which is what makes byte-identity at `interventions: []` a structural property
+   * rather than a tolerance — `policy.ts#`#weights`` makes the same move for stage 3.
+   */
+  const effective: ResolvedDispatchConfig =
+    context.idleOverride === undefined ? config : { ...config, idle: context.idleOverride };
   const decide = (
     move: boolean,
     targetFloorId: string | undefined,
@@ -919,21 +932,21 @@ export function repositionDecisionFor(
     return decide(false, undefined, 'busy');
   }
 
-  const { floors, reason } = parkingCandidates(car, config, context);
+  const { floors, reason } = parkingCandidates(car, effective, context);
   const target = floors[0];
   if (target === undefined) return decide(false, undefined, reason ?? 'no-target');
   if (target.id === car.floorId) return decide(false, target.id, 'already-there');
 
-  const forecast = responseWeights(config, context);
+  const forecast = responseWeights(effective, context);
   const savingS =
     expectedResponseSeconds(car, car.heightM, forecast) -
     expectedResponseSeconds(car, target.heightM, forecast);
   const travelSeconds = moveSeconds(car, car.heightM, target.heightM);
   const energySecondsPerCall =
-    (config.idle.repositionEnergyWeight * travelSeconds) / PARK_CALL_HORIZON;
+    (effective.idle.repositionEnergyWeight * travelSeconds) / PARK_CALL_HORIZON;
   const netGainS = savingS - energySecondsPerCall;
 
-  if (netGainS <= 0 || netGainS < config.idle.repositionThresholdS) {
+  if (netGainS <= 0 || netGainS < effective.idle.repositionThresholdS) {
     return decide(false, target.id, 'below-threshold', savingS, travelSeconds, netGainS);
   }
   return decide(true, target.id, 'reposition', savingS, travelSeconds, netGainS);
