@@ -34,10 +34,8 @@ Everyday Mode is not a greenfield build. The repo already carries most of its se
 | Crowds, sim, seeds, metrics | `packages/core/src/traffic/`, `sim/`, `random/`, `metrics/`, `physics/`, `analytical/` |
 | Buildings and profiles | `data/buildings/*.json`, `data/traffic-profiles.json`, `data/dispatcher-profiles.json`, `data/campaign.json`, `data/elevator-specs.json` |
 
-**Two things were the bulk of the work when this plan was written:** the intervention record
-(§7.6) and spectator mode (§14.1). The intervention record's **first pass is now landed** — see
-slice 3's status note below — and spectator mode is not. Everything else is wiring, correcting or
-presenting what is already there.
+**Two things do not exist yet and are the bulk of the work:** the intervention record (§7.6) and
+spectator mode (§14.1). Everything else is wiring, correcting or presenting what is already there.
 
 ---
 
@@ -97,19 +95,6 @@ run = { seed, config, interventions: [ { atS, change } ] }
 
 **Check:** intervene at 09:14 — every figure before 09:14 is identical, every figure after it
 changes. Re-running the same record twice produces identical metrics.
-
-**Status — first pass landed.** `SimulationConfig.interventions` carries the log as data
-(`packages/core/src/sim/types.ts`), the override travels through `RepositionContext.idleOverride`
-into stage 7, and a tenth kernel event walks the idle fleet at each `atS`. The stage control
-(*Park the cars in the lobby*), the stamp under the header, and the playhead resume are in
-`dev/main.ts`; the words in `live/interventions.ts`. The prefix identity, the zero-log byte
-identity, replay determinism and the past-deadline refusal are held by
-`packages/core/src/sim/interventions.test.ts`; the moved-control requirement by
-`scope/probes.test-helper.ts`'s `viewer.interventions` probe. **Not yet built:** dispatcher
-switching as a second `InterventionChange` arm, the campaign incident answer unified onto this
-mechanism (§7.5), the report listing the log in its account of the day, and a wire field for the
-log — until that last one exists, `scope/runIdentity.ts` refuses to post a run carrying one, so
-replay verification cannot be tripped into a false accusation.
 
 ### Slice 4 — Wire the controls that lie (§20.2, §20.3, §20.4)
 

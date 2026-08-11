@@ -229,6 +229,27 @@ so the seam is open) or whether the cells move to `data/`.
 
 ---
 
+## Implementation status register
+
+Slice status lives here rather than in the vendored BUILD_PLAN, because the vendored handoff is
+a record and records do not move (docs/12's rule; the plan's own "keep the documents updated"
+clause is satisfied by this file). One entry per landed slice beyond 0–2:
+
+- **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
+  (`packages/core/src/sim/types.ts`); the override travels through
+  `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at
+  each `atS`. The stage control (*Park the cars in the lobby*), the stamp under the header and
+  the playhead resume are in `dev/main.ts`; the words in `live/interventions.ts`. Prefix
+  identity, zero-log byte identity, replay determinism and the past-deadline refusal are held by
+  `sim/interventions.test.ts`; the moved-control requirement by `scope/probes.test-helper.ts`'s
+  `viewer.interventions` probe (a measured cell — midtown-office, `atS` 120). **Not yet built:**
+  dispatcher switching as the union's second arm; the campaign incident answer unified onto this
+  mechanism (§7.5); the report listing the log in its account of the day; and a wire field for
+  the log — until that exists, `scope/runIdentity.ts` refuses to post a run carrying one, so
+  replay verification cannot be tripped into a false accusation. Known honest gap: on
+  garden-apartments the control is measured inert at the 900 s refit cell — a §7.6
+  "cannot take effect now" refinement is the fix, not a different mechanism.
+
 ## Where the plan and the code disagree — the register
 
 1. §20's *"renders today and reaches nothing"* is false here; the prototype is external.
