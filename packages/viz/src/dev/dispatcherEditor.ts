@@ -1068,7 +1068,9 @@ export function mountDispatcherEditor(
   elements.save.parentElement?.append(runThis, rename, savedNote);
   elements.save.parentElement?.after(resultStrip);
   elements.summary.parentElement?.append(unauthorable);
-  elements.termsUsed.before(plainBlock);
+  // `parentElement?.insertBefore`, not `ChildNode.before` — the sibling-insert idiom every other
+  // mount uses, and the one the DOM test recorders answer.
+  elements.termsUsed.parentElement?.insertBefore(plainBlock, elements.termsUsed);
 
   /*
    * The two scope notes, written once at mount rather than on every render — issue #104. Each sits
