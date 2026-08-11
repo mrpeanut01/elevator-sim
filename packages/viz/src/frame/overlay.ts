@@ -46,6 +46,8 @@
 import type { Direction, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizLeg, VizRecording, VizSummary } from '../contract/types.js';
+// Type-only, so no module edge is added — see `OverlayMetrics.suppressionBasis`.
+import type { WaitBandBasis } from '../live/types.js';
 
 /**
  * The trailing window, in simulated seconds.
@@ -83,6 +85,33 @@ export interface OverlayMetrics {
   /** Copied from `recording.summary`, never recomputed. */
   readonly suppressed: boolean;
   readonly suppressionReason: string | undefined;
+  /**
+   * **Which window a refusal drawn from these metrics may speak about** — `docs/20` defect 3.
+   *
+   * `'whole-run'` once `simTimeS` has reached `recording.endedAt`, `'now'` before it.
+   *
+   * ## Why the producer declares it rather than the renderer deriving it
+   *
+   * {@link suppressed} and {@link suppressionReason} are folds of the **finished** run — `recordRun`
+   * simulates the day up front, so `summary.awtIsValid` exists before the first paint — and
+   * `render/overlay.ts` drew the finished day's verdict from them at every playhead: at 14 % of a
+   * Midtown run the RIGHT NOW box read `NO AVERAGE — A RESULT` over a building whose queues had not
+   * formed yet. The figures were right to withhold; the **words** were dated wrong.
+   *
+   * This is `render/mood.ts`'s `MoodDriver.basis` pattern, which is what § D293 landed and what
+   * `honesty/properties.ts`'s R6 reads: the shipped type carries the window its string folds, the
+   * renderer gates on the declaration, and the search asserts the gate rather than re-deriving
+   * `t >= endedAt` somewhere a third time. `render/overlay.ts` may not import
+   * `render/canvas.ts#playheadHasReachedEnd` — canvas already imports `drawOverlay`, so the arrow
+   * points this way or it points into a cycle — and a private copy of the comparison inside the
+   * renderer is the second source of truth this field exists to avoid.
+   *
+   * Spelled with `live/types.ts`' {@link WaitBandBasis} rather than a private union, for
+   * `render/mood.ts#MoodDriver.basis`'s stated reason: the rail, the mood card and this panel are
+   * answering one question about one clock, and three unions spelling *now* would be three things
+   * to keep in step. The import is type-only, so no module edge is added.
+   */
+  readonly suppressionBasis: WaitBandBasis;
   /** One row per bank that answered anything in the window, sorted by bank id. */
   readonly banks: readonly BankMetrics[];
 }
@@ -204,6 +233,13 @@ export function overlayAt(
     rollingMeanWaitS: suppressed || boardedInWindow === 0 ? undefined : waitSum / boardedInWindow,
     suppressed,
     suppressionReason,
+    /*
+     * `t` is already clamped into `[startedAt, endedAt]` above, so this is `>=` against the run's
+     * own end and not against a caller's arithmetic — the same comparison
+     * `render/canvas.ts#playheadHasReachedEnd` makes, and `>=` rather than `===` for the reason it
+     * gives: a `timed-out` run is finished too, and its terminal frame is the one that matters most.
+     */
+    suppressionBasis: t >= recording.endedAt ? 'whole-run' : 'now',
     banks: bankRows,
   };
 }

@@ -722,6 +722,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Chooses a window, and authors nothing. `shiftReportWindowFor` returns `\'full-run\'` or ' +
+        '`undefined` — `core`\'s own `WindowSelection` — and is derived only because that literal ' +
+        'reads as a phrase to the two-adjacent-words scanner. Nothing a player sees comes from ' +
+        'here: what a reader is told about the window is `shift/report.ts`\'s figure notes and ' +
+        'small print, which quote `summary.reportWindow.id` and are driven through `dayReportOf`. ' +
+        'That the choice actually reaches the run is not a string question either, and is asserted ' +
+        'end to end in `shift/reportWindow.test.ts` against a recording\'s own summary.',
+      ids: ['shift/reportWindow.ts#shiftReportWindowFor'],
+    },
+    {
+      reason:
         'Returns the *facts* about why a goal cannot be judged and deliberately authors none of ' +
         'the words. Derived only because its literals are goal-kind ids and `GoalJudgement` keys, ' +
         'which the two-adjacent-words scanner reads as phrases. Carrying a sentence here would ' +

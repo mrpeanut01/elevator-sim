@@ -113,18 +113,3 @@ export function shiftReportWindowFor(buildingId: string): ShiftReportWindow {
   // length is checked first rather than relied upon.
   return cells.every((cell) => cell.traffic.reportWindow === 'full-run') ? 'full-run' : undefined;
 }
-
-/**
- * The buildings this rule moves, derived rather than listed.
- *
- * Exported for `reportWindow.test.ts`, which asserts the *shape* of the answer — that it is not
- * empty (a rule that moves nothing is a rule nobody is running) and not everything (a rule that
- * moves every building is a re-measurement, not a fix). Naming the members here rather than in the
- * test is what keeps that assertion honest: the list comes off `MATRIX_CELLS` on both sides, so a
- * cell added to the matrix moves the rule and the test together.
- */
-export function fullRunShiftBuildingIds(): readonly string[] {
-  return [...new Set(MATRIX_CELLS.map((cell) => cell.building))]
-    .filter((id) => shiftReportWindowFor(id) === 'full-run')
-    .sort((a, b) => a.localeCompare(b));
-}

@@ -14,9 +14,21 @@ import { describe, expect, it } from 'vitest';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
-import { fullRunShiftBuildingIds, shiftReportWindowFor } from './reportWindow.js';
+import { shiftReportWindowFor } from './reportWindow.js';
 
 const MATRIX_BUILDINGS = [...new Set(MATRIX_CELLS.map((cell) => cell.building))];
+
+/**
+ * The buildings the rule moves, derived here rather than exported from the module.
+ *
+ * It lived on `reportWindow.ts` for one draft and `deadCode.test.ts` was right to refuse it: its
+ * only caller was this file, which is the *"name the non-test caller"* rule the roadmap's standing
+ * requirement states. The derivation is not lost by moving — both sides still read `MATRIX_CELLS`
+ * and `shiftReportWindowFor`, so a cell added to the matrix moves the rule and this list together,
+ * and neither is a hand-written membership list.
+ */
+const movedBuildings = (): readonly string[] =>
+  MATRIX_BUILDINGS.filter((id) => shiftReportWindowFor(id) === 'full-run');
 
 describe('which window a shift reports over', () => {
   it('is the matrix’s own answer, unanimously or not at all', () => {
@@ -45,7 +57,7 @@ describe('which window a shift reports over', () => {
      * running; a rule that moved every building would silently re-window every sheet in the
      * viewer to repair one, which is a change nobody asked for wearing a bug fix's clothes.
      */
-    const moved = fullRunShiftBuildingIds();
+    const moved = movedBuildings();
     expect(moved.length).toBeGreaterThan(0);
     expect(moved.length).toBeLessThan(MATRIX_BUILDINGS.length);
   });
@@ -80,7 +92,7 @@ describe('the run the shift path actually asks for', () => {
    * of field that can be authored, carried and consulted by nothing.
    */
   it('reaches the recording’s own summary, on the building the rule moves', () => {
-    const moved = fullRunShiftBuildingIds()[0];
+    const moved = movedBuildings()[0];
     expect(moved).toBeDefined();
     const summary = summaryOf({ ...baseState(), buildingId: moved ?? '', shiftLengthS: 3600 });
     expect(summary.reportWindow.id).toBe('full-run');

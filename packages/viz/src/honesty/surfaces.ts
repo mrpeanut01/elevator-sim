@@ -60,7 +60,7 @@ import { applyControlEdit, controlsFor, defaultValues, resetControl } from '../c
 import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
-import { disclosureItems } from '../mode/disclosure.js';
+import { casualRefusalFor, disclosureItems } from '../mode/disclosure.js';
 import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
@@ -107,7 +107,7 @@ import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
-import { describeFrame } from '../render/describeFrame.js';
+import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { drawOverlay } from '../render/overlay.js';
@@ -756,7 +756,15 @@ function countOf(count: string): number | null {
 
 const DESCRIBE_FRAME: SurfaceAdapter = {
   id: 'render/describeFrame.ts#describeFrame',
-  covers: ['render/describeFrame.ts#describeFrame'],
+  covers: [
+    'render/describeFrame.ts#describeFrame',
+    /*
+     * The paragraph's refusal clause — `docs/20` defect 3. `describeFrame` is its only non-test
+     * caller and it is seeded again below under its own field, because a clause folded into a
+     * paragraph carries no basis and R6's structural half reads nothing else.
+     */
+    'render/describeFrame.ts#suppressionSentenceOf',
+  ],
   render(context) {
     const seeds: TextSeed[] = [];
     for (const at of sampleTimes(context.recording)) {
@@ -783,6 +791,28 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
          */
         playhead: atPlayhead(context.recording, at),
       });
+      /*
+       * **The refusal clause, on the temporal axis with its own basis** — `docs/20` defect 3.
+       *
+       * Seeded separately from the paragraph above, and that is what makes it reachable: R6's
+       * structural half reads a declaration, R6's textual half reads a numeral, and this clause has
+       * a declaration and no numeral. Folded into the paragraph it was a `role: 'prose'` string with
+       * no basis, which is exactly how *"Queue length rose by 128.7 persons … the system is
+       * saturated"* travelled the corpus unremarked at 14 % of every case.
+       *
+       * `suppressionSentenceOf` is the **product's** function and returns both halves together, so
+       * the adapter declares what the product declares rather than deciding a window here — the
+       * `railBasisAt` rule, applied to a sentence instead of a card.
+       */
+      const suppression = suppressionSentenceOf(context.recording, bundle.frame);
+      if (suppression !== undefined) {
+        seeds.push({
+          field: `describeFrame(@${at.toFixed(0)}s).suppression`,
+          text: suppression.text,
+          role: 'reason',
+          playhead: atPlayhead(context.recording, at, suppression.basis),
+        });
+      }
     }
     return singleRun(this.id, seeds);
   },
@@ -800,7 +830,15 @@ const OVERLAY: SurfaceAdapter = {
           field: `overlayAt(@${at.toFixed(0)}s).suppressionReason`,
           text: metrics.suppressionReason,
           role: 'reason',
-          playhead: atPlayhead(context.recording, at),
+          /*
+           * The **producer's** field, declared with the producer's own basis. It is `core`'s
+           * whole-run sentence and it is carried on every `OverlayMetrics`, so it is `'whole-run'`
+           * only where `overlayAt` says the playhead has earned it — which is never early, which is
+           * correct: `frame/overlay.ts` is not a surface, and whether this string reaches a reader
+           * early is `render/overlay.ts`'s decision. That decision is swept below, where the panel
+           * is driven.
+           */
+          playhead: atPlayhead(context.recording, at, metrics.suppressionBasis),
         });
       }
       /*
@@ -856,6 +894,16 @@ const CANVAS: SurfaceAdapter = {
      */
     'mode/disclosure.ts#suppressionBannerFor',
     'mode/disclosure.ts#NO_AVERAGE_LEAD',
+    /*
+     * The panel's refusal, in both registers — `docs/20` defect 3. `drawOverlay` is their only
+     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
+     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
+     * PENDING` is the engineer's arm of the same gate, drawn by the same function.
+     */
+    'mode/disclosure.ts#casualRefusalFor',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
+    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
     /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
@@ -970,6 +1018,38 @@ const CANVAS: SurfaceAdapter = {
             playhead: atPlayhead(recording, at),
           });
         }
+      }
+      /*
+       * **The RIGHT NOW panel's refusal, with the window it folds** — `docs/20` defect 3.
+       *
+       * The loop above captures every string the panel draws and can declare a basis for **none** of
+       * them: a text-capturing context returns an array, and per-string provenance is precisely what
+       * it throws away. So the refusal is seeded again, from the shipped function that words it, with
+       * the basis that function returns.
+       *
+       * That is not a duplicate reading of the same thing. The loop asks *what did the panel draw*;
+       * this asks *what did the panel claim about which window*, which is the question R6's
+       * structural half is. Until it was asked, `NO AVERAGE — A RESULT` and *"That is a result, not
+       * a gap"* were `role: 'prose'` strings with no numeral and no declaration — invisible to both
+       * halves of the property that exists to catch exactly them.
+       *
+       * Seeded only where the panel actually draws it (`metrics.suppressed`), because a refusal the
+       * surface does not show is a string the corpus should not contain.
+       */
+      if (bundle.metrics.suppressed) {
+        const refusal = casualRefusalFor(bundle.metrics.suppressionBasis === 'whole-run');
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.head`,
+          text: refusal.heads[0] ?? '',
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.reason`,
+          text: refusal.reason,
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
       }
       if (selection !== undefined) {
         seeds.push({

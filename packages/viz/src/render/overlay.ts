@@ -21,7 +21,7 @@
 
 import type { OverlayMetrics } from '../frame/overlay.js';
 import type { Frame, VizRecording } from '../contract/types.js';
-import { NO_AVERAGE_LEAD } from '../mode/disclosure.js';
+import { casualRefusalFor, SUPPRESSION_REASON_PENDING } from '../mode/disclosure.js';
 import type { ViewMode } from '../mode/types.js';
 import type { Canvas2DLike, Theme } from './canvas.js';
 import type { Layout } from './layout.js';
@@ -113,8 +113,8 @@ export interface OverlayInput {
    * simplified would have the search measuring a panel the product does not draw.
    *
    * **It moves words and it does not move a refusal.** See {@link CASUAL_WORDS} and
-   * {@link CASUAL_REFUSAL}: a suppressed statistic is still replaced by a refusal, still in
-   * `theme.warning`, still with no number beside it.
+   * `mode/disclosure.ts#casualRefusalFor`: a suppressed statistic is still replaced by a refusal,
+   * still in `theme.warning`, still with no number beside it, in either mode and at either playhead.
    */
   readonly mode?: ViewMode | undefined;
 }
@@ -172,53 +172,6 @@ const ENGINEER_WORDS = Object.freeze({
   nothingYet: 'nothing served yet',
 });
 
-/**
- * What Casual says where the engineer's panel says `SUPPRESSED` — and the two things it may not be.
- *
- * It may not be **softer**. `SATURATED` is not jargon to be smoothed away; it is the run telling a
- * reader the building could not cope, and *a busy day* is a different and weaker claim. Every
- * candidate here says there is **no average**, in those words, before it says anything else.
- *
- * It may not be **narrower than the ground**. `awtIsValid` has five grounds and only one of them is
- * saturation — an empty window and an abandonment rate above 2 % refuse a mean on a run that coped
- * perfectly well — so a line reading *the building could not cope* would be false on three of the
- * five. This one is ground-free by construction, and the ground-specific sentence is the one the
- * status line under the canvas carries (`dev/main.ts#transportStatusOf`, which is already
- * mode-aware and already reads `mode/disclosure.ts`'s per-ground wording).
- *
- * Ordered longest-first for {@link longestThatFits}, which is this file's own idiom: a sentence
- * that has to lose words loses the ones chosen here rather than the ones that fall past the edge.
- *
- * ## The head is imported, not spelled — GitHub issue #100's second panel is why
- *
- * Both entries used to spell `NO AVERAGE` out. `render/canvas.ts`'s header banner now refuses in the
- * same words one row up, so the phrase had two homes on one bitmap and nothing requiring them to
- * agree — § D227's shape, in eleven characters. It comes from
- * `mode/disclosure.ts#NO_AVERAGE_LEAD` now, which is where the refusal's per-ground wording already
- * lives, and the two lines cannot drift apart without the constant moving under both of them.
- */
-const CASUAL_REFUSAL: readonly string[] = Object.freeze([
-  `${NO_AVERAGE_LEAD} — A RESULT`,
-  NO_AVERAGE_LEAD,
-]);
-
-/**
- * The reason Casual prints in the panel, in place of `core`'s statistics prose.
- *
- * `docs/10` R3 lets a mode **shorten** a reason and forbids it to remove one, and this is the
- * shortening: the full sentence — *"Queue length rose by 268.0 persons (53.59/min, 12.0× the
- * queue's own scatter) … AWT is not approximately normal and its confidence interval must be
- * suppressed"* — is on the status line under the canvas, verbatim, in both modes, and this
- * sentence says so rather than leaving a reader to find it.
- *
- * It is **ground-free**, for {@link CASUAL_REFUSAL}'s reason. It states no number, so R3's textual
- * half cannot be tripped by it. And it says *refuse* rather than *cannot*: the mean exists as an
- * arithmetic mean of something — `1 334 s` on the run `shift/report.test.ts` pins — and what the
- * run declines is to stand behind it, which is a result rather than a gap.
- */
-const CASUAL_REASON =
-  'This run’s own statistics refuse an average here. That is a result, not a gap — the reason ' +
-  'in full is on the line below the canvas.';
 
 /**
  * Draw the panel into {@link Layout.overlay}. A no-op when no room was reserved.
@@ -342,16 +295,51 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
   if (metrics.suppressed) {
     line(words.rollingMean, theme.textDim);
     /*
-     * The refusal, in each register — and it is a refusal in both. Casual's line is chosen by
-     * width from {@link CASUAL_REFUSAL} rather than fixed, because this panel can be 210 px wide
-     * and a clipped refusal is the one string on the screen that may not be clipped.
+     * **What Casual says where the engineer's panel says `SUPPRESSED`** — and the three things it
+     * may not be.
+     *
+     * It may not be **softer**. `SATURATED` is not jargon to be smoothed away; it is the run telling
+     * a reader the building could not cope, and *a busy day* is a different and weaker claim. Every
+     * candidate `casualRefusalFor` offers says there is **no average**, in those words, before it
+     * says anything else.
+     *
+     * It may not be **narrower than the ground**. `awtIsValid` has five grounds and only one of them
+     * is saturation — an empty window and an abandonment rate above 2 % refuse a mean on a run that
+     * coped perfectly well — so a line reading *the building could not cope* would be false on three
+     * of the five. Both arms are ground-free by construction, and the ground-specific sentence is
+     * the one the status line under the canvas carries (`dev/main.ts#transportStatusOf`, which is
+     * already mode-aware and already reads `mode/disclosure.ts`'s per-ground wording).
+     *
+     * And — `docs/20` defect 3 — it may not be **dated wrong**. `NO AVERAGE — A RESULT` is a verdict
+     * about the finished day, and it was drawn at every playhead: at 14 % of a Midtown run it sat
+     * under a label reading *average wait so far*, over a building whose queues had not formed yet.
+     * The register comes from `metrics.suppressionBasis` — the producer's own reading of its clock,
+     * never a comparison made here — and the panel withholds exactly as hard in both.
+     *
+     * The words are **imported, not spelled**, which is GitHub issue #100's argument extended by one
+     * wave. The head used to be written out here and moved to `NO_AVERAGE_LEAD` because
+     * `render/canvas.ts`'s banner says it one row up on the same bitmap; the reason paragraph
+     * follows it now, because with two registers to keep in step a local copy is two copies of two
+     * sentences. Chosen by width rather than fixed, because this panel can be 210 px wide and a
+     * clipped refusal is the one string on the screen that may not be clipped.
      */
+    const refusal = casualRefusalFor(metrics.suppressionBasis === 'whole-run');
     line(
-      casual ? longestThatFits(CASUAL_REFUSAL, contentWidth, ADVANCE_PX) : 'SUPPRESSED',
+      casual ? longestThatFits(refusal.heads, contentWidth, ADVANCE_PX) : 'SUPPRESSED',
       theme.warning,
     );
+    /*
+     * The engineer's arm of the same gate. `core`'s `awtInvalidReason` is a whole-run verdict in
+     * past tense, and it was printed here at every playhead exactly as Casual's was — see
+     * `mode/disclosure.ts#SUPPRESSION_REASON_PENDING` for why fixing one register and not the other
+     * would leave the search green on half a screen.
+     */
     const reason = wrap(
-      casual ? CASUAL_REASON : (metrics.suppressionReason ?? 'no reason given'),
+      casual
+        ? refusal.reason
+        : refusal.basis === 'whole-run'
+          ? (metrics.suppressionReason ?? 'no reason given')
+          : SUPPRESSION_REASON_PENDING,
       contentWidth,
       ADVANCE_SMALL_PX,
     );

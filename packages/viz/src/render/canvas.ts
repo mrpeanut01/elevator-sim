@@ -1060,10 +1060,26 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
  * What does not move is the **gate**. Both registers ask `meansAreSuppressed`, so a mode cannot
  * become the surface that shows a mean the summary refuses — the defect this function exists to
  * have closed, one register later.
+ *
+ * ## And the refusal is dated — `docs/20` defect 3
+ *
+ * This row sits directly above the RIGHT NOW panel, and it is where a reader's eye lands first: the
+ * audit read `no average` here and `NO AVERAGE — A RESULT` eighty pixels below, at **14 %** of
+ * playback. The panel's verdict is now gated on the playhead
+ * (`mode/disclosure.ts#casualRefusalFor`), and this line takes the same treatment for the same
+ * reason — a refusal a reader meets under the words *so far* may not be the finished day's answer.
+ *
+ * The **withholding is unchanged at every playhead**, which is the half that may not move: § D294
+ * refused, on this canvas, to un-gate a figure to fix a sentence, because a PNG exported mid-run has
+ * no later. What changes is one word. The engineer's string is byte-identical in both registers and
+ * `canvas.test.ts` pins it — § D299 § 1 permits Casual to be made legible and forbids paying for it
+ * out of Engineer, and *suppressed* is a statement about the statistic rather than about the day.
  */
 function meanClause(recording: VizRecording, frame: Frame, casual = false): string {
   if (meansAreSuppressed(recording)) {
-    return casual ? NO_AVERAGE_LEAD.toLowerCase() : 'mean wait suppressed';
+    if (!casual) return 'mean wait suppressed';
+    const head = NO_AVERAGE_LEAD.toLowerCase();
+    return playheadHasReachedEnd(recording, frame) ? head : `${head} yet`;
   }
   const mean = frame.runningMeanWaitS;
   const label = casual ? 'average wait so far' : 'mean wait so far';

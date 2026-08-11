@@ -303,7 +303,15 @@ describe('the live metrics panel draws the metrics it was given', () => {
         awtInvalidReason: 'queue length rose by 41 persons over the reporting window',
       },
     };
-    const ctx = draw(frame({ simTimeS: at }), saturated, { overlay: overlayAt(saturated, at) });
+    /*
+     * Driven at `endedAt`, where `core`'s own sentence is what the panel prints — `docs/20`
+     * defect 3. `awtInvalidReason` is a whole-run verdict in past tense, and the panel used to draw
+     * it at every playhead; the test below drives the other register at the same instant this one
+     * used to. Nothing about the engineer's *withholding* moved: `SUPPRESSED` and the absent mean
+     * are asserted here at the end and there mid-run.
+     */
+    const end = saturated.endedAt;
+    const ctx = draw(frame({ simTimeS: end }), saturated, { overlay: overlayAt(saturated, end) });
     const text = ctx.texts.join('\n');
 
     expect(text).toContain('SUPPRESSED');
@@ -317,6 +325,39 @@ describe('the live metrics panel draws the metrics it was given', () => {
     expect(clean.texts.join('\n')).toContain(`${cleanMean} s`);
     expect(text).not.toContain(`${cleanMean} s`);
     expect(text).toContain('suppressed');
+  });
+
+  /**
+   * The engineer's arm of `docs/20` defect 3: the same panel, mid-run.
+   *
+   * `SUPPRESSED` is a statement about the statistic and is drawn at every playhead — § D299 § 1
+   * forbids paying for Casual's legibility out of Engineer, and this asserts nothing was. What is
+   * gated is `core`'s reason, which is a fold over the finished day; in its place goes a sentence
+   * true at any instant that says where the other one has gone.
+   */
+  it('does not date the engineer’s reason to a day that has not finished', () => {
+    const saturated: VizRecording = {
+      ...RECORDING,
+      summary: {
+        ...RECORDING.summary,
+        saturated: true,
+        awtIsValid: false,
+        awtInvalidReason: 'queue length rose by 41 persons over the reporting window',
+      },
+    };
+    const text = draw(frame({ simTimeS: at }), saturated, { overlay: overlayAt(saturated, at) })
+      .texts.join('\n');
+
+    // Withheld exactly as hard, and still in the engineer's word.
+    expect(text).toContain('SUPPRESSED');
+    // The whole-run verdict is not published under a clock that has not reached it.
+    expect(text).not.toContain('queue length rose by 41 persons');
+    // Wrapped across lines by the panel, so the assertion reads the unwrapped sentence.
+    const unwrapped = text.replace(/\s+/g, ' ');
+    expect(unwrapped).toContain('a fold over the whole day');
+    expect(unwrapped).toContain('when the playhead reaches the end');
+    // The observations are live and stay, exactly as they do at the end.
+    expect(text).toContain('waiting now');
   });
 
   it('never draws below the panel it was given, and says what it left out', () => {
@@ -1136,14 +1177,21 @@ describe('the live metrics panel is never narrower than its own content — issu
     // `drawOverlay` rather than `drawScene`: the header's own right-aligned counters are drawn
     // past `panel.x` by design and are not this panel's rows, so going through the scene would
     // measure the wrong strings against the wrong edge.
+    /*
+     * Driven at `endedAt`, where the panel prints `core`'s own reason — `docs/20` defect 3 gates
+     * that sentence behind the playhead, and this test needs the **long** one: its subject is the
+     * clipping rule, and the pointer it asserts on only exists when a reason overruns the budget.
+     * The mid-run reason is one sentence by design and would make the assertion vacuous.
+     */
     drawOverlay(ctx, {
       recording: saturated,
       frame: frame({
+        simTimeS: saturated.endedAt,
         cars: Array.from({ length: 4 }, (_ignored, index) =>
           car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.25 * index }),
         ),
       }),
-      metrics: overlayAt(saturated, 100),
+      metrics: overlayAt(saturated, saturated.endedAt),
       layout,
       theme: DEFAULT_THEME,
     });
@@ -1250,9 +1298,24 @@ describe('the live metrics panel speaks a player’s words in Casual — issue #
     expect(casual).toContain(`the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`);
   });
 
+  /** The same panel at `endedAt`, where the refusal is a fact about a day that has one. */
+  const panelTextAtEnd = (recording: VizRecording, mode: 'basic' | 'advanced'): string => {
+    const ctx = new RecordingContext();
+    const end = recording.endedAt;
+    drawOverlay(ctx, {
+      recording,
+      frame: frame({ simTimeS: end }),
+      metrics: overlayAt(recording, end),
+      layout: layoutFor(recording),
+      theme: DEFAULT_THEME,
+      mode,
+    });
+    return ctx.texts.join('\n');
+  };
+
   it('refuses a mean just as hard, and says so in words a player has', () => {
-    const casual = panelText(SATURATED, 'basic');
-    const engineer = panelText(SATURATED, 'advanced');
+    const casual = panelTextAtEnd(SATURATED, 'basic');
+    const engineer = panelTextAtEnd(SATURATED, 'advanced');
     expect(engineer).toContain('SUPPRESSED');
     expect(casual).not.toContain('SUPPRESSED');
     // Still a refusal, and it says the thing that matters first: there is no average.
@@ -1266,6 +1329,36 @@ describe('the live metrics panel speaks a player’s words in Casual — issue #
     for (const row of ['people waiting', 'longest wait', 'got a car (5min)']) {
       expect(casual, row).toContain(row);
     }
+  });
+
+  /**
+   * `docs/20` defect 3 — the RIGHT NOW box read **`NO AVERAGE — A RESULT`** at 14 % of playback,
+   * under a label reading *average wait so far*, over a building whose queues had not formed.
+   *
+   * The three assertions are the three halves of the fix, and the first is the one that may never
+   * be traded away: the panel **withholds exactly as hard**, because § D294 refused on this canvas
+   * to un-gate a figure to fix a sentence and a bitmap has no later. What moves is the date on the
+   * verdict.
+   */
+  it('does not call the refusal a result before the day has one', () => {
+    const early = panelText(SATURATED, 'basic');
+
+    // Withheld, and leading with the same head — a refusal that stops saying there is no average
+    // has stopped being one. (That no mean is drawn at all is the suite's next test, in both
+    // registers; this one is about the words around the absence.)
+    expect(early).toContain('NO AVERAGE');
+
+    // And not the finished day's verdict.
+    expect(early).not.toContain('A RESULT');
+    expect(early).not.toContain('That is a result, not a gap');
+    expect(early).toContain('NO AVERAGE YET');
+    // Wrapped by the panel — the assertion reads the sentence rather than the lines.
+    expect(early.replace(/\s+/g, ' ')).toContain(
+      'A mean over part of a day is not this day\u2019s average',
+    );
+
+    // The end still earns the verdict, so this is a gate rather than a deletion.
+    expect(panelTextAtEnd(SATURATED, 'basic')).toContain('A RESULT');
   });
 
   it('prints no mean anywhere on a refused run, in either register', () => {

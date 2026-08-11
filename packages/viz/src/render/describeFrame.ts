@@ -27,6 +27,10 @@ import { LOAD_ALARM, LOAD_FULL } from './overlay.js';
 import { formatClock, playheadHasReachedEnd, undeliveredAt } from './canvas.js';
 import { describeQueue } from './riderQueue.js';
 import type { BuildingMood } from './mood.js';
+// One home for a run's refusal, in every register — see {@link suppressionSentenceOf}.
+import { CASUAL_REFUSAL_REASON_SO_FAR } from '../mode/disclosure.js';
+// The window a clause folds, spelled with the union the rail and the mood card already use.
+import type { WaitBandBasis } from '../live/types.js';
 
 export interface DescribeFrameInput {
   readonly recording: VizRecording;
@@ -93,6 +97,59 @@ function directionWords(direction: number): string {
 }
 
 /**
+ * The paragraph's refusal clause, **dated**, and the window it folds — `docs/20` defect 3.
+ *
+ * ## What was wrong
+ *
+ * `summary.awtInvalidReason` is `core`'s sentence about the **finished** run — *"Queue length rose
+ * by 128.7 persons (26.4/min, 8.2× the queue's own scatter) … the system is saturated"*, past tense,
+ * from a trend test over the whole day — and this paragraph published it **byte-identically at
+ * 14 %, 64 % and 97 %** of the same run. A reader on the text alternative was told at 00:00 what the
+ * queues did by 16:29, on the one surface with no picture to contradict it.
+ *
+ * ## What is gated, and what may not be
+ *
+ * The **withholding is unconditional**, exactly as it was. `frame/overlay.ts` withholds the rolling
+ * mean at every playhead on a suppressed run and `render/canvas.ts#meanClause` refuses on the
+ * bitmap at every playhead; a text alternative that stopped saying *there is no mean here* while the
+ * picture went on refusing one would put the sighted and non-sighted halves back out of step, which
+ * is the defect this whole module exists to have closed. What is gated is the **reason**, because
+ * the reason is the verdict.
+ *
+ * The mid-run form is the shape the undelivered clause above already uses and, deliberately, its
+ * words: *not known until the run finishes*. Both registers come from `mode/disclosure.ts`, so the
+ * panel, the banner and this paragraph cannot word one run's refusal three ways.
+ *
+ * ## Why it is exported, and returns its basis
+ *
+ * `honesty/surfaces.ts` seeds this clause as its own string so R6's structural half can read the
+ * declaration — a refusal has no figure, so the textual half can never reach it, and until this
+ * existed the whole class of early whole-run *verdicts* was outside the property that exists to
+ * catch early whole-run claims. The adapter must drive shipped code rather than compose a sentence
+ * of its own (*"the one thing an adapter must never do"*), so the clause and the window it folds
+ * come out of the product together — `render/mood.ts#MoodDriver.basis`'s pattern, on a string with
+ * no number in it.
+ *
+ * `undefined` when the run publishes its mean, which is the case with no clause at all.
+ */
+export function suppressionSentenceOf(
+  recording: VizRecording,
+  frame: Frame,
+): { readonly text: string; readonly basis: WaitBandBasis } | undefined {
+  if (!recording.summary.saturated && recording.summary.awtIsValid) return undefined;
+  if (playheadHasReachedEnd(recording, frame)) {
+    return {
+      text: `Mean waiting time is suppressed: ${recording.summary.awtInvalidReason ?? 'the run saturated.'}`,
+      basis: 'whole-run',
+    };
+  }
+  return {
+    text: `Mean waiting time is not reported. ${CASUAL_REFUSAL_REASON_SO_FAR}`,
+    basis: 'now',
+  };
+}
+
+/**
  * One paragraph describing the frame on screen.
  *
  * Deterministic and ordered exactly as the recording is, so two identical frames produce
@@ -125,11 +182,8 @@ export function describeFrame(input: DescribeFrameInput): string {
           'until the run finishes.',
     );
   }
-  if (recording.summary.saturated || !recording.summary.awtIsValid) {
-    parts.push(
-      `Mean waiting time is suppressed: ${recording.summary.awtInvalidReason ?? 'the run saturated.'}`,
-    );
-  }
+  const suppression = suppressionSentenceOf(recording, frame);
+  if (suppression !== undefined) parts.push(suppression.text);
 
   /*
    * The passenger model, said out loud, and only when it is the one that changes what a landing
