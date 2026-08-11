@@ -1413,6 +1413,13 @@ function diagnosisFor(
   const missed = verdict === 'missed';
   const queueTone: FigureTone = missed ? 'bad' : 'plain';
   const phaseTone: FigureTone = missed ? 'caution' : 'plain';
+  /*
+   * Built once and appended to both populated rows, because both are readings of the **same
+   * instant** — see {@link windowRelationClause}. `''` when there is no such instant, which is
+   * exactly the branch on which neither row is drawn with one.
+   */
+  const windowRelation =
+    at === null ? '' : ` ${windowRelationClause(at, recording.summary.reportWindow)}`;
 
   const queueRow: ReportDiagnosis =
     at === null || floorId === null
@@ -1429,7 +1436,8 @@ function diagnosisFor(
           what: `Floor ${floorId} stacked ${String(observations.peakQueue)} deep`,
           why:
             'Every car was committed elsewhere when the calls landed together. Batch arrivals are ' +
-            'the normal case, not the unlucky one — people travel in groups.',
+            'the normal case, not the unlucky one — people travel in groups.' +
+            windowRelation,
           tone: queueTone,
         };
 
@@ -1456,11 +1464,56 @@ function diagnosisFor(
           why:
             'Round-trip time is what limits you inside a peak, not car speed. A stop costs about ' +
             '10 s of door and transfer time however fast the motor is, so the way out of a peak is ' +
-            'fewer stops per trip rather than a quicker one.',
+            'fewer stops per trip rather than a quicker one.' +
+            /*
+             * The **same instant** the row above names, deliberately: this row's phase is the phase
+             * that instant fell in, not a span of its own, so relating the phase's own bounds to the
+             * window would answer a question the row does not ask (a phase and a window can overlap
+             * three different ways, and none of the three is what *the worst of it* refers to).
+             */
+            windowRelation,
           tone: phaseTone,
         };
 
   return [queueRow, phaseRow];
+}
+
+/**
+ * Where the worst moment sits relative to the window the means are read over — `docs/20` defect 6.
+ *
+ * ## The two windows this reconciles
+ *
+ * The sheet publishes both and, until this clause, said so only in the small print. *The tightest
+ * moment* / *Where it went wrong* is the **whole shift's** deepest queue and the demand phase that
+ * instant fell in; the figure grid four inches up quotes means over `summary.reportWindow`. On the
+ * audit's Chancery day those were **08:50** and **08:42–08:47** — a reader is shown a heading
+ * calling one span *the worst of it* and a mean taken from another, with nothing on either saying
+ * they are different spans.
+ *
+ * `worstWaitFigure` is the precedent and it is exact: two *worst wait* numbers four inches apart
+ * were reconciled by putting each cell's own window in its own note, inline, rather than by a
+ * footnote a reader has to go and find. This is that treatment applied to the rows.
+ *
+ * ## Why it is measured rather than boilerplate
+ *
+ * The clause states which of the two cases this run is in, from the run's own numbers. A fixed
+ * sentence — *"this row reads the whole shift"* — would be true and would still leave a reader
+ * doing the arithmetic on every sheet, including the many sheets where the two agree and there is
+ * nothing to reconcile. Saying *inside* when it is inside is what makes *outside* worth reading.
+ *
+ * The window is named by its **id**, not by its clock span, for {@link windowQualifierOf}'s reason:
+ * these rows sit under a heading a reader arrives at from the figure grid, and a clock time dropped
+ * into an explanatory sentence beside the words *mean* and *average* is the numeral-in-a-caption
+ * shape the honesty search has already caught on this sheet once. The span is printed in the small
+ * print, in full, where nothing else on the line is an estimate cue.
+ */
+function windowRelationClause(atS: SimTime, reportWindow: VizSummary['reportWindow']): string {
+  const inside = atS >= reportWindow.startS && atS < reportWindow.endS;
+  return inside
+    ? `That instant is inside the ${reportWindow.id} window the means above are read over.`
+    : `That instant is outside the ${reportWindow.id} window the means above are read over — the ` +
+      'worst moment of the day and the waits quoted up there are two different parts of it, and ' +
+      'both are true.';
 }
 
 /** ` at 12.4 %pop/5min`, or nothing when the record carried no population to divide by. */
@@ -1829,6 +1882,25 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
  * **The levers.** {@link leversFor} now orders the cards by which observation this run fired, which
  * is a statement about the day and would be read as a statement about the levers if nothing said
  * otherwise. This is what says otherwise, in the same breath as the refusal it belongs to.
+ *
+ * ## The window clause stopped calling itself the busiest five minutes — `docs/20` defect 5
+ *
+ * The illustration was fixed prose: *"“Riders waited twenty-five seconds on average” is false
+ * without **“during the busiest five minutes”**"*. On Garden Apartments day 1 the sheet printed
+ * that under two withheld figures, about a window that held **none of the day's forty arrivals** —
+ * so the one thing it claimed about the window was the one thing that could not be true of it.
+ *
+ * It is not rescued by the window's id, and that is the part worth reading. `summary.reportWindow`
+ * is labelled `peak-5min` whenever it is 300 s long, and there are two entirely different windows
+ * that get that label: the one `core` finds by **searching the arrivals** for their busiest five
+ * minutes (`resolveWindow`'s `'peak-5min'` selection), and the one the **demand template declares**
+ * at a fixed position in its schedule (`simulation.ts#traceReportWindow`). The shift path has only
+ * ever produced the second, and the second is *busiest* only by coincidence. A caption cannot ask
+ * the id which it is looking at.
+ *
+ * So the sentence says what the window **is** — its clock span, which it already prints — instead
+ * of how it was chosen. {@link windowQualifierOf} words it, and the whole-shift arm gets its own
+ * phrase because *between 06:00 and 07:00* is a silly way to say *all day*.
  */
 function smallPrintFor(
   dispatcherName: string,
@@ -1843,13 +1915,60 @@ function smallPrintFor(
     'you is what happened today, and today is where the queue was. ' +
     `Every cohort figure above is the ${reportWindow.id} window, ` +
     `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
-    'seconds on average” is false without “during the busiest five minutes”. The counts — carried, ' +
+    `seconds on average” is false without “${windowQualifierOf(reportWindow)}”. ` +
+    'The counts — carried, ' +
     'took the stairs, the deepest queue, and every goal reading above, the worst-wait bar ' +
     'included — are over the whole shift; the means and the WORST WAIT figure are over that ' +
     'window and nothing else. ' +
+    /*
+     * `docs/20` defect 6, and the sentence the two windows needed. *The tightest moment* and *the
+     * worst of it* are the whole shift's deepest queue and the demand phase it fell in — 08:50 and
+     * 08:47–09:00 on the audit's Chancery day — while the means directly above them were taken over
+     * 08:42–08:47. A reader who meets a heading calling one span *the worst of it* and a figure
+     * grid quoting waits from another has been handed two windows and told about neither.
+     *
+     * Said here **as well as** on the rows themselves ({@link diagnosisFor} labels each inline,
+     * `worstWaitFigure`'s precedent) because this is the paragraph a reader goes to when the two
+     * disagree, and a reconciliation that lives only on the thing being reconciled is not one.
+     */
+    'The two rows under the heading above read the whole shift too: the deepest queue is the ' +
+    'deepest of the day and the phase named beside it is the phase that instant fell in, so the ' +
+    'worst moment on this sheet need not be inside the window the means came from. Where it is ' +
+    'not, both are true and neither is a correction of the other. ' +
     'The levers above are ordered by what today showed, never by what any of them is worth: which ' +
     'one helps this building is the question that needs the paired runs, not the one day.'
   );
+}
+
+/**
+ * How a reader must qualify a wait quoted from this window — the clause inside the small print's
+ * illustration, and the one `docs/20` defect 5 found asserting a peak nobody had measured.
+ *
+ * A **reference**, never a superlative. See {@link smallPrintFor}'s closing section for why the
+ * window's id cannot license *the busiest five minutes*: two entirely different windows carry the
+ * label `peak-5min` and only one of them was chosen by counting arrivals.
+ *
+ * ## Why *that window* and not the clock span
+ *
+ * The span is the obvious replacement and it is the wrong one **here**, for the reason this
+ * function's caller documents at length: the illustration is a sentence with the word *average* in
+ * it, and this clause sits four words away inside quotation marks. The honesty search has already
+ * found this exact paragraph printing `25` under a cell reading `AVERAGE WAIT: withheld` on a run
+ * whose refused mean rounded to 25, and the fix was that the numeral became a **word**. Putting a
+ * clock time back inside the same quotation marks would be re-opening the hiding place a carve-out
+ * for *numerals inside quotes* was refused for.
+ *
+ * It costs nothing, because the span is stated **immediately before the colon** by the caller, in
+ * the same breath — *"Every cohort figure above is the peak-5min window, 08:42–08:47:"*. *That
+ * window* has an antecedent eight words back.
+ *
+ * The whole-shift arm is worded rather than referred, because a sheet whose window is the whole day
+ * has no narrowing for a reader to remember, and *over the whole shift* is also the phrase
+ * `honesty/properties.ts#NAMES_ITS_OWN_WINDOW` recognises — which is not a coincidence: a figure
+ * that names its own window in those words is the shape that rule exists to permit.
+ */
+function windowQualifierOf(reportWindow: VizSummary['reportWindow']): string {
+  return reportWindow.id === 'full-run' ? 'over the whole shift' : 'during that window';
 }
 
 /* -------------------------------------------------------------------------- *

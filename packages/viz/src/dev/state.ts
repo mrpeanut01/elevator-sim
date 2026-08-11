@@ -83,6 +83,7 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
+import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import {
   calendarDayFor,
   calendarLine,
@@ -1383,6 +1384,14 @@ export function shiftRunConfigOf(
   const finalBuilding =
     withEvents === grown ? building : resolveBuilding(parseBuilding(withEvents as unknown), specs);
 
+  /*
+   * 6 — the window the figures are read over. Asked of the **authored** building id rather than of
+   * `finalBuilding.id`, and the two are the same string: growth, commissioning and incidents all
+   * edit a building without renaming it, and asking the resolved one would make the answer look
+   * like it could depend on the day. It cannot; the matrix measures buildings, not days.
+   */
+  const reportWindow = shiftReportWindowFor(authored.id);
+
   return {
     building: finalBuilding,
     event,
@@ -1421,6 +1430,25 @@ export function shiftRunConfigOf(
             windowStartS: state.windowStartS,
             windowEndS: state.windowStartS + state.shiftLengthS,
           }),
+      /*
+       * **Which window the figures are read over** — `docs/20` defect 5, and the *third* kind of
+       * window on this object rather than a variant of the two above it.
+       *
+       * `durationS` decides how much day is generated and `windowStartS`/`windowEndS` decide how
+       * much of it is run; this decides how much of what ran is **measured**. `core`'s own
+       * `SimulationConfig.reportWindow` says the distinction in as many words, and it matters here
+       * because the shift path set none — so the sheet inherited the demand template's fixed
+       * five-minute band and Garden Apartments day 1, the first sheet a new player ever sees,
+       * withheld both of its headline numbers under *"the reporting window held no arrivals"* on a
+       * day of forty riders who all turned up outside it.
+       *
+       * `shiftReportWindowFor` reads the conclusion `benchmark/arms.ts` § 2 already measured rather
+       * than deciding one here, and returns `undefined` — *leave the template's band alone* — for
+       * every building the matrix does not unanimously report full-run. Spread-or-omit, because an
+       * absent key and a present `undefined` are different claims to `core` and only the first
+       * means *the template's own*.
+       */
+      ...(reportWindow === undefined ? {} : { reportWindow }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
       demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
