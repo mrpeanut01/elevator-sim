@@ -231,6 +231,50 @@ so the seam is open) or whether the cells move to `data/`.
 
 ## Implementation status register
 
+### Delivery closed — every slice built, and what the corpus measured afterwards
+
+**Measured once, on the integrated tree, after the last merge** (2026-08-11) — the rule this
+repository learned the hard way and re-learned twice during this delivery, when three lanes each
+published a different correct-where-it-stood figure:
+
+| tier | cases | strings | simulations | surfaces | verdict |
+|---|---|---|---|---|---|
+| always-on | 49 | **374 420** | 606 | **36** | **green** |
+
+The surface count moved 30 → 36 and the always-on strings 335 950 → 374 420 across this delivery:
+the plain levers, the sizing block, the detector readout, the suite bench, the rules editor, the
+race strip, Fix-a-building, the watch view and the withheld matrix each entered the corpus, and
+§12.2's matrix alone seeds ~30 strings across 32 enumerated states per case.
+
+**Slices, all landed:** 0 (vendoring) · 1 (plain levers) · 2 (player words in `core`) · 3
+(interventions) · 4a–d (flags already live · detector readout · rules editor · ghost and race
+strip) · 5 (four-goal day) · 6a–b (the oracle in the designer · Fix-a-building) · 7 (the suite) ·
+8 (watching, client half) · 10a (the withheld matrix). **Two play audits** ([`docs/19`](19-everyday-playtest-audit.md),
+[`docs/20`](20-everyday-playtest-audit-2.md)) and **five fix batches** against them.
+
+**What is deliberately not built, with its reason** — the register of honest absences, so nobody
+mistakes them for oversights:
+
+- **The server half of slices 8, 9 and 12** — no board, no ladder, no percentile line, no
+  posting endpoint. `scope/runIdentity.ts` *refuses* to post a run carrying an intervention log
+  or a rule list rather than posting something a verifier would reject, and slice 4d's ghost
+  omits its *world* and *your best* arms for the same reason. §12.2's ladder and percentile line
+  are recorded as absent in the withheld matrix's own docstring rather than stubbed.
+- **The gauntlet and its forty cases** — a rating needs a board to stand on.
+- **Two rule actions** (*skip everything above floor v*, *treat up-calls as urgent*) — omitted
+  with reasons: service range is building fabric, and no cost term prices direction-conditional
+  urgency, so either would be a label that lies.
+- **Fifteen of the eighteen Fix-a-building cases** — three are authored and validated by real
+  paired runs; the rest are content work against a shipped engine.
+
+**Decision numbers are owed** for: the lever ownership mapping, the alternation retirement,
+session schema 5→6→7, the posting gate, `watch/`, the rules compilation target and
+`RULE_EMPHASIS`, the cells module split, `BatchRequest.demand`/`reportWindow`, the reportWindow
+unanimity rule, the stairs rename, the fixit outcome split, and R6's narrowed exemption. Every
+argument is in the docstring the change landed in; none was minted inside a lane, per the
+standing rule.
+
+
 Slice status lives here rather than in the vendored BUILD_PLAN, because the vendored handoff is
 a record and records do not move (docs/12's rule; the plan's own "keep the documents updated"
 clause is satisfied by this file). One entry per landed slice beyond 0–2:
