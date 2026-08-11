@@ -1009,6 +1009,11 @@
       .selector-arm-signature { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 4px; }
       .selector-arm-signature[hidden] { display: none; }
       .selector-arm .field { margin-top: 7px; }
+      .rule-row { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel); padding: 9px 11px; }
+      .rule-row-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .rule-row-word { font: 600 11px var(--mono); letter-spacing: 0.06em; color: var(--dim); }
+      .rule-row-readback { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 5px; }
+      .rule-row-lever { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 3px; }
 
       .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
       .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
@@ -2015,6 +2020,20 @@
                           <span class="dirty" id="selector-changed" hidden></span>
                         </div>
                       </div>
+                    </div>
+                    <!-- The Everyday rules editor — GAMEPLAY §11.5. Beneath the selector because
+                         it is the same kind of lever: applied over whoever is driving, and when
+                         rules are written they take the run (the selector panel says so). Every
+                         node below is written by dev/ruleEditor.ts; the only static text is the
+                         heading and the add button. -->
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline)">
+                      <div class="eyebrow" style="margin-bottom: 9px">Write your own rules — first match wins</div>
+                      <div style="display: grid; gap: 8px" id="rule-rows"></div>
+                      <div class="editor-actions">
+                        <button type="button" class="chip" id="rule-add">Add a rule</button>
+                      </div>
+                      <div class="selector-line" id="rule-fallback"></div>
+                      <p class="selector-note" id="rule-note" hidden></p>
                     </div>
                     <div class="summary-line" id="dispatcher-summary"></div>
                     <p class="advice" id="dispatcher-advice"></p>

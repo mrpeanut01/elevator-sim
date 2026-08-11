@@ -155,6 +155,14 @@ const SECTIONS_THIS_SWEEP_CANNOT_RUN: Readonly<Record<string, string>> = Object.
   // Supplying the file here is what would make the section runnable, and is the real gate.
   selection:
     'this sweep passes no `dispatcherProfiles`, so no weight-set library reaches the policy and a non-`off` policy cannot be run',
+  // The Everyday rules section (GAMEPLAY §11.5). Not a gap in the sweep but a fact about the
+  // section: it declares no `DISPATCH_PARAMETERS` row — its rows are player sentences over a
+  // declared vocabulary, not dimensions an optimizer samples (the same kind of thing as the
+  // file-level `patternSwitching` arm map, which is also not probed here). The moved-control
+  // obligation those rows carry is discharged per action, on the legs, in
+  // `dispatch/rules.test.ts`'s measured cells rather than by this sweep.
+  rules:
+    'declares no tunable row — rules are player sentences over a declared vocabulary, probed per action on the legs in dispatch/rules.test.ts',
 });
 
 function isParameterSpec(value: unknown): value is DispatchParameterSpec {

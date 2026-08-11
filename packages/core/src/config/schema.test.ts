@@ -41,7 +41,7 @@ import {
  * -------------------------------------------------------------------------- */
 
 /**
- * The seven, in the order `dispatcherProfileSchema` declares them.
+ * The eight, in the order `dispatcherProfileSchema` declares them.
  *
  * Pinned rather than recomputed, because the pin is the guard: a section that stops being found —
  * by being re-authored in a shape the rule does not admit, or by being deleted — must fail here
@@ -57,10 +57,14 @@ const SHIPPED_SECTIONS = [
   'idle',
   'auction',
   'selection',
+  // The Everyday rules (GAMEPLAY §11.5) — the eighth section, and the derivation working as
+  // designed: it entered the tuning search-space enumeration with no edit anywhere else, and it
+  // carries no declared tunables, so `encode.ts` writes nothing under it. The pin moves with it.
+  'rules',
 ] as const;
 
 describe('objectSectionsOf, against the shipped dispatcher profile', () => {
-  it('derives the seven declared sections, in declaration order', () => {
+  it('derives the eight declared sections, in declaration order', () => {
     expect(DISPATCHER_PROFILE_OBJECT_SECTIONS).toStrictEqual([...SHIPPED_SECTIONS]);
     expect(objectSectionsOf(dispatcherProfileSchema)).toStrictEqual([...SHIPPED_SECTIONS]);
   });

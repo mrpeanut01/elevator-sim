@@ -66,6 +66,7 @@ import {
   trafficProfilesWithPattern,
   type PatternSpec,
 } from '../authoring/patternSpec.js';
+import { profileWithRules, rulesFromProfile, type RuleRow } from '../authoring/ruleSpec.js';
 import {
   patternSwitchingWithSelector,
   profileWithSelector,
@@ -452,6 +453,23 @@ export interface ViewerState {
    * `selectorEditor.test.ts`.
    */
   readonly selectorSpec: SelectorSpec;
+
+  /**
+   * The Everyday rules rows — GAMEPLAY §11.5's when/then list, in priority order.
+   *
+   * Beside {@link ViewerState.selectorSpec} and {@link ViewerState.levers} because it is the same
+   * kind of thing: applied on top of whichever dispatcher is driving, never a fork of one.
+   * {@link shiftRunConfigOf} writes it **last** of the three — `profileWithRules` after
+   * `profileWithSelector` — because a written rule list is the reader's most explicit statement
+   * about how the dispatcher behaves during the run, and it sets `selection.policy: 'rules'`
+   * over whatever the switching panel chose (`selectorEditor.ts#rulesOverrideNoteOf` is where
+   * that override is said to the player).
+   *
+   * At its seeded value — the empty list — `profileWithRules` returns the profile **by object
+   * identity**, so the run is byte-identical to one built before this field existed; the
+   * `scope/probes` measured cell holds that as a measurement, not a promise.
+   */
+  readonly ruleRows: readonly RuleRow[];
 
   /**
    * The patience curve the Parameters tab is showing, or `null` for *nobody leaves*.
@@ -999,6 +1017,14 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
      */
     selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
     /*
+     * Seeded from the opening dispatcher, the selectorSpec's own argument one field up: a profile
+     * that authored rules opens with its rows in the editor rather than with a blank list lying
+     * about the run. Every shipped profile authors none, so this is `[]` on every boot the
+     * product ships and the opening run is the run it was before the rules editor existed
+     * (`profileWithRules` at `[]` is the identity — see {@link ViewerState.ruleRows}).
+     */
+    ruleRows: rulesFromProfile(profile),
+    /*
      * `null`, which is `sim.patience.distribution`'s own declared default (`'none'`) read back as a
      * config: a page that has just loaded has nobody abandoning, and the opening run is the run it
      * was before this field existed. See {@link ViewerState.patience}.
@@ -1234,13 +1260,22 @@ export function shiftRunConfigOf(
    * without the other is either a dispatcher declaring a rule with no arms (refused by name in
    * `resolveWeightSets`) or an arm map nothing consults.
    */
-  const dispatcherProfile = profileWithSelector(
-    profileFromSpec(specFromProfile(base, base.name), {
-      id: base.id,
-      base,
-      levers: state.levers,
-    }),
-    state.selectorSpec,
+  /*
+   * The rules write **after** the selector — the reader's most explicit statement writes last,
+   * the same ordering argument the selector makes against the levers one step up. With no rows
+   * `profileWithRules` is the identity (the same object), so a reader who has written nothing
+   * runs exactly the profile the two writes above produced.
+   */
+  const dispatcherProfile = profileWithRules(
+    profileWithSelector(
+      profileFromSpec(specFromProfile(base, base.name), {
+        id: base.id,
+        base,
+        levers: state.levers,
+      }),
+      state.selectorSpec,
+    ),
+    state.ruleRows,
   );
   const dispatcherProfiles = dispatcherProfilesWithSelector(
     resources.dispatcherProfiles,

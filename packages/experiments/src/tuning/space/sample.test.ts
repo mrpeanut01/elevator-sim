@@ -554,7 +554,7 @@ describe('the space satisfies the ports a search declares', () => {
     // A categorical is relaxed to `[0, n)`; a boolean to `[0, 2)`.
     expect(
       port.dimensions.find((dimension) => dimension.id === 'idle.parkingStrategy')?.range,
-    ).toStrictEqual([0, 4]);
+    ).toStrictEqual([0, 5]);
     expect(
       port.dimensions.find((dimension) => dimension.id === 'constraints.noDirectionReversal')?.range,
     ).toStrictEqual([0, 2]);

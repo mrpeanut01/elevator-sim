@@ -180,6 +180,7 @@ import {
 import { mountEditor } from './editor.js';
 import { mountBuildingEditor } from './buildingEditor.js';
 import { mountDispatcherEditor } from './dispatcherEditor.js';
+import { mountRuleEditor } from './ruleEditor.js';
 import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
@@ -2502,6 +2503,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * an edit takes effect on the next Run rather than re-running under the reader.
    */
   const selectorEditor = mountSelectorEditor(ui.selectorEditor, context);
+  /*
+   * The Everyday rules editor, beneath the selector — GAMEPLAY §11.5. The same footing as the
+   * selector in every respect: applied over whoever is driving, next-run rather than mid-run,
+   * and when rules are written they take the run (`rulesOverrideNoteOf` on the selector panel is
+   * the other half of that sentence).
+   */
+  const ruleEditor = mountRuleEditor(ui.ruleEditor, context);
   const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
   const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
   const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
@@ -2511,6 +2519,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     scenariosPanel,
     dispatcherEditor,
     selectorEditor,
+    ruleEditor,
     trafficEditor,
     machinesEditor,
     buildingEditor,

@@ -109,6 +109,7 @@ const PROBE_PROFILE: DispatcherProfileSource = {
   answer: { allowBypassIfSoleEligibleCar: true },
   idle: {
     parkingStrategy: 'zone-center',
+    parkingFloorIndex: 3,
     repositionThresholdS: 17,
     repositionEnergyWeight: 1.4,
   },
@@ -189,6 +190,7 @@ const PROBE_VALUES: ReadonlyMap<string, number | string | boolean> = new Map<
   ['eligibility.maxLoadFactorForAssignment', 0.65],
   ['answer.allowBypassIfSoleEligibleCar', true],
   ['idle.parkingStrategy', 'zone-center'],
+  ['idle.parkingFloorIndex', 3],
   ['idle.repositionThresholdS', 17],
   ['idle.repositionEnergyWeight', 1.4],
   ['selection.policy', 'contextual'],

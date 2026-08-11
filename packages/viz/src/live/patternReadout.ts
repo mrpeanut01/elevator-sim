@@ -33,6 +33,7 @@
 
 import type { SimTime } from '@elevator-sim/core/browser';
 
+import { ruleProvenanceName } from '../authoring/ruleSpec.js';
 import { patternLine, patternName } from '../authoring/selectorSpec.js';
 import type { VizRecording } from '../contract/types.js';
 
@@ -59,9 +60,21 @@ export interface PatternReadout {
 /** The abstention phrase. A state, not a placeholder: the detector is live and undecided. */
 const NO_PATTERN_LABEL = 'no clear pattern';
 
-/** Rule 11's honest fallback: a plain phrase plus the id, never the id alone. */
+/**
+ * Rule 11's honest fallback: a plain phrase plus the id, never the id alone.
+ *
+ * Two naming paths, one precedence: the detector's patterns through `PATTERN_NAMES`, and the
+ * Everyday rules' provenance ids (`rule-2:lobby-queue-passes:12`) through `ruleProvenanceName`,
+ * which composes the header's words from the same core table the rules editor renders — so the
+ * pill says *rule 2 — the lobby queue passes 12 people*, never the raw id. An id neither path
+ * can name gets the fallback, which rule 11 classifies as a content bug rather than a screen bug.
+ */
 function nameOf(patternId: string): string {
-  return patternName(patternId) ?? `a pattern this build cannot name (${patternId})`;
+  return (
+    patternName(patternId) ??
+    ruleProvenanceName(patternId) ??
+    `a pattern this build cannot name (${patternId})`
+  );
 }
 
 /**

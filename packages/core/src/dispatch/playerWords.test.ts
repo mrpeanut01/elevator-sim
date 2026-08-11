@@ -37,6 +37,9 @@ const CASUAL_REACHABLE: readonly string[] = Object.freeze([
   'dispatch.callType',
   'eligibility.maxLoadFactorForAssignment',
   'idle.parkingStrategy',
+  // Reachable through the Everyday rules editor's "park the idle cars at {v}" (the compiler
+  // writes it), so the row carries player words for the same reason parkingStrategy does.
+  'idle.parkingFloorIndex',
   'selection.policy',
   'selection.hysteresisS',
   'selection.observationWindowS',

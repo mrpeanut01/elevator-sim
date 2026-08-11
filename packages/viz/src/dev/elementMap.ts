@@ -330,6 +330,23 @@ export interface SelectorEditorElements {
   readonly changed: HTMLElement;
 }
 
+/**
+ * The Everyday rules editor — GAMEPLAY §11.5's when/then rows, beneath the selector because it
+ * is the same kind of thing: a lever over whoever is driving, never a fork of a profile. The
+ * rows and both notes are written entirely by `dev/ruleEditor.ts`; the only static text is the
+ * heading and the add button.
+ */
+export interface RuleEditorElements {
+  /** The row list. One `.rule-row` per authored rule, in priority order. */
+  readonly rows: HTMLElement;
+  /** The add-a-rule button. */
+  readonly add: HTMLButtonElement;
+  /** *If no rule fits, Steady hand decides.* — always drawn; names the driving style. */
+  readonly fallback: HTMLElement;
+  /** The first-match exclusivity note. Hidden with no rows. */
+  readonly note: HTMLElement;
+}
+
 /** § 1.3 M9 — the traffic editor. */
 export interface TrafficEditorElements {
   readonly editing: HTMLElement;
@@ -495,6 +512,8 @@ export interface Elements {
   readonly dispatcherEditor: DispatcherEditorElements;
   /** The weight-set selector, drawn inside the dispatcher surface. */
   readonly selectorEditor: SelectorEditorElements;
+  /** The Everyday rules editor, drawn beneath the selector — GAMEPLAY §11.5. */
+  readonly ruleEditor: RuleEditorElements;
   readonly trafficEditor: TrafficEditorElements;
   readonly machinesEditor: MachinesEditorElements;
   readonly buildingEditor: BuildingEditorElements;
@@ -674,6 +693,12 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     mapIssue: 'selector-map-issue',
     reset: 'selector-reset',
     changed: 'selector-changed',
+  }),
+  ruleEditor: Object.freeze({
+    rows: 'rule-rows',
+    add: 'rule-add',
+    fallback: 'rule-fallback',
+    note: 'rule-note',
   }),
   trafficEditor: Object.freeze({
     editing: 'traffic-editing',

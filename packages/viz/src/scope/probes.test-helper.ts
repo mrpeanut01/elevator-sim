@@ -526,6 +526,39 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
       }),
     ],
   },
+  'viewer.ruleRows': {
+    /*
+     * **Move the control and require the run to change** — § D177, pointed at the Everyday rules
+     * editor. The empty arm doubles as the identity half: `profileWithRules` with no rows returns
+     * the driving profile by object identity, so the left leg is the run before the field existed.
+     *
+     * On Midtown Office at 1 800 s **on week day 10**, and the day is the measured half of the
+     * cell: at day 1's population this seed answers every call inside 30 s, so the rule never
+     * fired and the probe reported a live control dead — `viewer.outOfServiceCarIds`' lesson,
+     * arrived at through a threshold instead of a building. Nine days of 11 %/day growth put the
+     * morning queue past the threshold for real stretches of the run. Both arms sit on the same
+     * day, so the comparison stays § D177's. The rule is *when a call has waited 30 s, let it
+     * jump the queue* (`weights.starvation` raised to `RULE_EMPHASIS`), a weight arm rather than
+     * an idle one so the probe bites through stage 3 on every decision the rule holds, not only
+     * when a car happens to be idle.
+     */
+    states: [
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        week: { ...s.week, day: 10 },
+        ruleRows: [],
+      }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        shiftLengthS: 1800,
+        week: { ...s.week, day: 10 },
+        ruleRows: [{ when: 'call-waited', whenValue: 30, then: 'jump-queue' }],
+      }),
+    ],
+  },
   'viewer.patience': {
     /*
      * **Move the control and require the run to change** — § D177, pointed at the Parameters tab's

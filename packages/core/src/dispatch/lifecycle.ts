@@ -38,6 +38,7 @@ import type { CarSnapshot, CostEstimate, CostRequest, ServedFloor } from '../mod
 import { phaseByName, travelTime } from '../physics/motion/index.js';
 
 import { assessDirectionReversal } from './terms/directionReversal.js';
+import { PARK_AT_TOP_FLOOR_INDEX } from './types.js';
 import type {
   AnswerDecision,
   CallLifecycle,
@@ -751,6 +752,22 @@ function parkingCandidates(
       : { floors: [middle], reason: undefined };
   }
 
+  if (strategy === 'fixed-floor') {
+    // The Everyday rules' "park a spare car at v", mirroring 'lobby' exactly: resolve the served
+    // floor at the configured index, or say `no-target` — total and stated, like
+    // lobby-with-no-served-entrance. `PARK_AT_TOP_FLOOR_INDEX` names this shaft's own top
+    // served floor, because parking is a per-car decision and the shaft is the honest scope of
+    // "the top floor" (`dispatch/types.ts` carries the argument).
+    const index = config.idle.parkingFloorIndex;
+    const target =
+      index === PARK_AT_TOP_FLOOR_INDEX
+        ? served[served.length - 1]
+        : served.find((floor) => floor.index === index);
+    return target === undefined
+      ? { floors: [], reason: 'no-target' }
+      : { floors: [target], reason: undefined };
+  }
+
   if (strategy === 'predicted-demand') {
     const forecast = context.demandForecast;
     // The forecast is the learned per-floor arrival model, one per bank, which `Simulation`
@@ -823,10 +840,18 @@ function parkingCandidates(
 function responseWeights(
   config: ResolvedDispatchConfig,
   context: RepositionContext,
+  target?: ServedFloor | undefined,
 ): ReadonlyMap<string, number> | undefined {
   const strategy = config.idle.parkingStrategy;
   if (strategy === 'lobby') {
     return new Map((context.entranceFloorIds ?? []).map((id) => [id, 1]));
+  }
+  if (strategy === 'fixed-floor') {
+    // The point mass the strategy implies: choosing a fixed park *is* the assertion that the
+    // demand worth anticipating originates there — the same *strategy's own belief* rule as
+    // `lobby`, one row up in the table above. With no resolved target there is no belief to
+    // score against and the caller has already answered `no-target`.
+    return target === undefined ? undefined : new Map([[target.id, 1]]);
   }
   if (strategy === 'zone-center' && context.zoneFloorIds !== undefined) {
     return new Map(context.zoneFloorIds.map((id) => [id, 1]));
@@ -937,7 +962,7 @@ export function repositionDecisionFor(
   if (target === undefined) return decide(false, undefined, reason ?? 'no-target');
   if (target.id === car.floorId) return decide(false, target.id, 'already-there');
 
-  const forecast = responseWeights(effective, context);
+  const forecast = responseWeights(effective, context, target);
   const savingS =
     expectedResponseSeconds(car, car.heightM, forecast) -
     expectedResponseSeconds(car, target.heightM, forecast);

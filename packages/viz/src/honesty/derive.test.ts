@@ -99,6 +99,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
+        /*
+         * The Everyday rules editor's mount, excluded on the editor mounts' shared ground: it
+         * mounts DOM, and its authored copy is the `when`/`then` joining words, the row buttons'
+         * titles and the next-run advice — swept statically below. Every *claim* it draws — the
+         * readbacks, the lever lines, every refusal, the fallback line and the exclusivity note
+         * — is authored in `authoring/ruleSpec.ts`, whose producers the RULES_EDITOR adapter
+         * drives over the whole declared vocabulary.
+         */
+        'dev/ruleEditor.ts#mountRuleEditor',
         'dev/trafficEditor.ts#mountTrafficEditor',
         /*
          * Reads a mounted row back out of the document to update it in place. There is no string
@@ -456,6 +465,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'authoring/dispatcherSpec.ts#specIsDirty',
         'authoring/machineSpec.ts#machineIsDirty',
         'authoring/patternSpec.ts#demandFromSpec',
+        // Returns a boolean — *is this a time condition* — and is derived only because the
+        // scanner reads its hyphenated condition ids (`time-before`, `day-period`) as prose.
+        // The sentences a player reads about time rules are `ruleIssues`' clock refusal and the
+        // row readbacks, both driven by the RULES_EDITOR adapter.
+        'authoring/ruleSpec.ts#isTimeCondition',
       ],
     },
     {

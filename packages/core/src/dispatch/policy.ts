@@ -62,8 +62,12 @@ import { rankScores, scoreCar } from './scoringEngine.js';
 import {
   ArrivalWindow,
   INITIAL_SELECTOR_STATE,
+  resolveRuleArms,
   resolveWeightSets,
+  rulesObservationOf,
+  selectRuleArm,
   selectWeightSet,
+  type CompiledRules,
   type PatternSwitchingSource,
   type ResolvedSelection,
   type SelectorState,
@@ -92,6 +96,7 @@ import {
   type RepositionContext,
   type RepositionDecision,
   type ResolvedDispatchConfig,
+  type ResolvedIdleStage,
   type SelectionStageConfig,
 } from './types.js';
 
@@ -183,7 +188,7 @@ export function resolveDispatchConfig(
 
   const eligibility = source.eligibility;
   const answer = source.answer;
-  const idle = source.idle;
+  const idleSource = source.idle;
   const selectionSource: SelectionStageConfig = {
     ...(source.selection ?? {}),
     ...(options.selection ?? {}),
@@ -221,11 +226,60 @@ export function resolveDispatchConfig(
       source.id,
     ),
   });
+  // Stage 7 resolved before the rules compile, because a rule's idle arm is the profile's own
+  // idle stage with only the strategy (and, for a fixed park, the floor) replaced — the
+  // `RepositionContext.idleOverride` argument, applied per arm.
+  const idle: ResolvedIdleStage = Object.freeze({
+    parkingStrategy: idleSource?.parkingStrategy ?? DISPATCH_DEFAULTS.parkingStrategy,
+    parkingFloorIndex: integer(
+      idleSource?.parkingFloorIndex ?? DISPATCH_DEFAULTS.parkingFloorIndex,
+      'idle.parkingFloorIndex',
+      source.id,
+    ),
+    repositionThresholdS: nonNegative(
+      idleSource?.repositionThresholdS ?? DISPATCH_DEFAULTS.repositionThresholdS,
+      'idle.repositionThresholdS',
+      source.id,
+    ),
+    repositionEnergyWeight: nonNegative(
+      idleSource?.repositionEnergyWeight ?? DISPATCH_DEFAULTS.repositionEnergyWeight,
+      'idle.repositionEnergyWeight',
+      source.id,
+    ),
+  });
+
+  /*
+   * The Everyday rules compile — GAMEPLAY §11.5 through `dispatch/selector.ts#resolveRuleArms`.
+   *
+   * Both directions are refused rather than tolerated, on the misspelled-`waitTiem` argument:
+   * `policy: 'rules'` with no rows is a dispatcher that declares it follows rules and has none,
+   * and rows authored under any *other* policy are read by nothing — the configured, validated,
+   * dead shape this repository has now shipped eleven times, refused here before it ships a
+   * twelfth.
+   */
+  const ruleRows = source.rules?.rows ?? [];
+  let compiledRules: CompiledRules | undefined;
+  if (selection.policy === 'rules') {
+    // `resolveRuleArms` refuses the empty list with the "declares it follows rules and has none
+    // to follow" message, so a `rules` policy with no section and one with an empty section are
+    // the same refusal — which they are the same claim.
+    compiledRules = resolveRuleArms(ruleRows, weights, idle, source.id);
+  } else if (ruleRows.length > 0) {
+    throw new DispatchError(
+      `Dispatcher "${source.id}" authors ${String(ruleRows.length)} rules row(s) under selection.policy "${selection.policy}", which never reads them. Rules run only under selection.policy "rules"; rows nothing reads are a configuration that silently does not configure.`,
+    );
+  }
+
   // Resolved here rather than at the first decision, and thrown from here rather than returned:
   // a dangling weight-set name is a configuration whose dispatcher cannot express one of its own
   // declared regimes, and finding that out 600 s into a replication is finding it out after the
   // run it invalidated. Same argument, same place, as the unknown hard constraint above.
-  const weightSets = resolveWeightSets(options.weightSets, selection, source.id);
+  // Under `rules` the pattern library is not consulted at all — the arms are the profile's own
+  // rows — so the resolve is gated rather than taught a fourth policy.
+  const weightSets =
+    selection.policy === 'rules'
+      ? undefined
+      : resolveWeightSets(options.weightSets, selection, source.id);
   const waitTimeReference = options.normalization?.waitTimeS ?? source.normalization?.waitTimeS;
   const distanceReference = options.normalization?.distanceM ?? source.normalization?.distanceM;
 
@@ -289,8 +343,12 @@ export function resolveDispatchConfig(
         options.eligibility?.enRouteDiversion ??
         eligibility?.enRouteDiversion ??
         DISPATCH_DEFAULTS.enRouteDiversion,
+      // A `no-new-pickups` rule row outranks everything: it is the reader's most recent, most
+      // explicit statement about this exact field, and the engine's stage-2 mechanism *is* the
+      // rule's condition — the `dev/state.ts` write-order argument, applied to a resolve.
       maxLoadFactorForAssignment: nonNegative(
-        options.eligibility?.maxLoadFactorForAssignment ??
+        compiledRules?.maxLoadFactorForAssignment ??
+          options.eligibility?.maxLoadFactorForAssignment ??
           eligibility?.maxLoadFactorForAssignment ??
           DISPATCH_DEFAULTS.maxLoadFactorForAssignment,
         'eligibility.maxLoadFactorForAssignment',
@@ -301,21 +359,10 @@ export function resolveDispatchConfig(
       allowBypassIfSoleEligibleCar:
         answer?.allowBypassIfSoleEligibleCar ?? DISPATCH_DEFAULTS.allowBypassIfSoleEligibleCar,
     }),
-    idle: Object.freeze({
-      parkingStrategy: idle?.parkingStrategy ?? DISPATCH_DEFAULTS.parkingStrategy,
-      repositionThresholdS: nonNegative(
-        idle?.repositionThresholdS ?? DISPATCH_DEFAULTS.repositionThresholdS,
-        'idle.repositionThresholdS',
-        source.id,
-      ),
-      repositionEnergyWeight: nonNegative(
-        idle?.repositionEnergyWeight ?? DISPATCH_DEFAULTS.repositionEnergyWeight,
-        'idle.repositionEnergyWeight',
-        source.id,
-      ),
-    }),
+    idle,
     selection,
     ...(weightSets === undefined ? {} : { weightSets }),
+    ...(compiledRules === undefined ? {} : { ruleSets: compiledRules.ruleSets }),
   };
 
   return Object.freeze(config);
@@ -455,6 +502,16 @@ function nonNegative(value: number, id: string, profileId: string): number {
   return value;
 }
 
+/** An integer of either sign — a floor index may be negative (P1 is −1 on `midtown-office`). */
+function integer(value: number, id: string, profileId: string): number {
+  if (!Number.isInteger(value)) {
+    throw new DispatchError(
+      `Dispatcher "${profileId}": ${id} must be an integer; received ${value}.`,
+    );
+  }
+  return value;
+}
+
 function nonNegativeInteger(value: number, id: string, profileId: string): number {
   if (!Number.isInteger(value) || value < 0) {
     throw new DispatchError(
@@ -530,6 +587,13 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
   #activePatternId: string | undefined;
   /** What the detector last saw. For a report, for calibration, and for the liveness study. */
   #lastTraffic: TrafficObservation | undefined;
+  /**
+   * The stage-7 settings of the rule arm in force, or `undefined` — which is every instant of
+   * every run on a profile without rules, and every instant a rules run stands on its own style.
+   * The arm at stage 7 is the one from the last dispatch decision: stated, deterministic, and
+   * the same reading `#weights` has for stage 3.
+   */
+  #activeRuleIdle: ResolvedIdleStage | undefined;
 
   constructor(config: ResolvedDispatchConfig) {
     this.config = config;
@@ -833,6 +897,28 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context: DispatchContext | undefined,
   ): void {
+    const rules = this.config.ruleSets;
+    if (rules !== undefined) {
+      // The rules branch — no ArrivalWindow, no rates: every input is state this policy already
+      // holds plus the two facts the context carries (entrances, start-of-day). An arm with an
+      // idle-only payload leaves `#weights` as `config.weights` **by object identity**, the same
+      // structural byte-identity argument the field's declaration makes.
+      const observation = rulesObservationOf(this.#lifecycles.values(), cars, at, context);
+      const result = selectRuleArm(
+        rules.arms,
+        this.config.selection,
+        observation,
+        this.#selectorState,
+        at,
+      );
+      this.#selectorState = result.state;
+      if (result.switched) this.#switchCount += 1;
+      this.#weights = result.arm?.weights ?? this.config.weights;
+      this.#activePatternId = result.arm?.patternId;
+      this.#activeRuleIdle = result.arm?.idle;
+      return;
+    }
+
     const sets = this.config.weightSets;
     if (sets === undefined || this.#arrivals === undefined) return;
 
@@ -1134,7 +1220,19 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context?: RepositionContext | undefined,
   ): RepositionDecision {
-    return repositionDecisionFor(car, this.config, context ?? {});
+    /*
+     * Idle precedence: `context.idleOverride` > the rule arm's idle > the profile's own — most
+     * recent explicit statement first. A player's mid-run *park the cars* intervention outranks
+     * a standing rule; the rule arm outranks the style it borrowed everything else from. With
+     * neither in play (`#activeRuleIdle` undefined — every profile without rules), this is the
+     * exact call it always was, on the exact objects, which is what keeps byte-identity a
+     * structural property.
+     */
+    const armIdle = this.#activeRuleIdle;
+    if (armIdle === undefined || context?.idleOverride !== undefined) {
+      return repositionDecisionFor(car, this.config, context ?? {});
+    }
+    return repositionDecisionFor(car, this.config, { ...(context ?? {}), idleOverride: armIdle });
   }
 
   /* ---------------------------------------------------------------- *
@@ -1177,6 +1275,7 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     this.#selectorState = INITIAL_SELECTOR_STATE;
     this.#weights = this.config.weights;
     this.#activePatternId = undefined;
+    this.#activeRuleIdle = undefined;
     this.#lastTraffic = undefined;
     this.#switchCount = 0;
   }

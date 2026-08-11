@@ -25,6 +25,8 @@ import {
   DWELL_POLICIES,
   PARKING_STRATEGIES,
   REASSIGNMENT_POLICIES,
+  RULE_ACTIONS,
+  RULE_CONDITIONS,
   SERVICE_MODES,
   WEIGHT_SET_POLICIES,
   type AccessZone,
@@ -777,6 +779,10 @@ const answerStageSchema = z.strictObject({
 const idleStageSchema = z.strictObject({
   $comment: comment,
   parkingStrategy: z.enum(PARKING_STRATEGIES).optional(),
+  // The shaft floor index `fixed-floor` parks at. An integer because a floor index is one;
+  // an index the shaft does not serve is refused at stage 7 (`no-target`), not here, because
+  // the schema does not know the building.
+  parkingFloorIndex: z.number().int().optional(),
   repositionThresholdS: nonNegative.optional(),
   repositionEnergyWeight: nonNegative.optional(),
   predictorHorizonS: positive.optional(),
@@ -824,6 +830,32 @@ const selectionStageSchema = z.strictObject({
   switchMargin: fraction.optional(),
 });
 
+/**
+ * The Everyday rules section (GAMEPLAY §11.5): ordered when/then rows, first match wins.
+ *
+ * The `when`/`then` vocabularies are enums over `RULE_CONDITIONS`/`RULE_ACTIONS`, so a misspelled
+ * id fails at load. The **values** are deliberately looser here — any number or string — because
+ * the admissible list per id lives beside the id in `RULE_CONDITION_WORDS`/`RULE_ACTION_WORDS`
+ * and `resolveRuleArms` refuses an out-of-list value by name; encoding nine per-id unions in zod
+ * would be a second copy of that table, one schema bump behind it.
+ */
+const ruleRowSchema = z.strictObject({
+  $comment: comment,
+  when: z.enum(RULE_CONDITIONS),
+  whenValue: z.union([z.number(), z.string()]).optional(),
+  then: z.enum(RULE_ACTIONS),
+  thenValue: z.union([z.number(), z.string()]).optional(),
+});
+
+// `rows` is optional — a section is exactly a key whose every field is optional (the parser
+// cross-check in `schema.test.ts` is the oracle) — and non-empty when present: an authored empty
+// list is a claim ("I follow no rules") the absent key already makes better. A rules section
+// with no rows under `selection.policy: 'rules'` is refused by `resolveDispatchConfig` by name.
+const rulesSchema = z.strictObject({
+  $comment: comment,
+  rows: z.array(ruleRowSchema).min(1, 'a rules section with no rows switches nothing').optional(),
+});
+
 export const dispatcherProfileSchema = z.strictObject({
   $comment: comment,
   id: identifier,
@@ -839,6 +871,7 @@ export const dispatcherProfileSchema = z.strictObject({
   idle: idleStageSchema.optional(),
   auction: auctionStageSchema.optional(),
   selection: selectionStageSchema.optional(),
+  rules: rulesSchema.optional(),
 });
 
 /**

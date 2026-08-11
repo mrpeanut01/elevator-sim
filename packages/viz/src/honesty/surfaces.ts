@@ -29,11 +29,15 @@
  * looked at.
  */
 
-import type {
-  DispatcherProfiles,
-  ElevatorSpecs,
-  ResolvedBuilding,
-  TrafficProfiles,
+import {
+  RULE_ACTIONS,
+  RULE_ACTION_WORDS,
+  RULE_CONDITIONS,
+  RULE_CONDITION_WORDS,
+  type DispatcherProfiles,
+  type ElevatorSpecs,
+  type ResolvedBuilding,
+  type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -239,12 +243,22 @@ import {
   specFromProfile as selectorSpecFromProfile,
   type SelectorSpec,
 } from '../authoring/selectorSpec.js';
+import {
+  RULES_EXCLUSIVITY_NOTE,
+  fallbackLineOf,
+  leverLineOf,
+  readbackOf,
+  ruleIssues,
+  ruleProvenanceName,
+  type RuleRow,
+} from '../authoring/ruleSpec.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   armOptionsOf,
   armRowsOf,
   changedNoteOf,
   policyChipsOf,
+  rulesOverrideNoteOf,
   scalarRowsOf,
   selectorAvailability,
 } from '../dev/selectorEditor.js';
@@ -5804,6 +5818,103 @@ const REPORT_CARD: SurfaceAdapter = {
   },
 };
 
+/**
+ * The Everyday rules editor — GAMEPLAY §11.5's when/then rows, their readbacks, lever lines,
+ * refusals, and the stage header's rule-provenance words.
+ *
+ * Driven over the **whole declared vocabulary** rather than a sample: one row per condition and
+ * one per action, so a template, a lever badge or a caveat added in `core` enters the corpus the
+ * day it lands — the same posture the SELECTOR adapter takes over the detector's patterns. The
+ * refusal arms manufacture each `ruleIssues` message the model can raise, because a refusal is
+ * player copy in exactly the sense a caption is (§ D227: the refusal is the honest half of the
+ * control).
+ */
+const RULES_EDITOR: SurfaceAdapter = {
+  id: 'authoring/ruleSpec.ts#ruleIssues',
+  covers: [
+    'authoring/ruleSpec.ts#ruleIssues',
+    'authoring/ruleSpec.ts#leverLineOf',
+    'authoring/ruleSpec.ts#fallbackLineOf',
+    'authoring/ruleSpec.ts#RULES_EXCLUSIVITY_NOTE',
+    'authoring/ruleSpec.ts#ruleProvenanceName',
+    'dev/selectorEditor.ts#rulesOverrideNoteOf',
+  ],
+  render(this: SurfaceAdapter) {
+    const seeds: TextSeed[] = [];
+
+    // One row per condition, cycling the actions; then one row per action, on a fixed condition
+    // — so every template is substituted at least once and every lever line and caveat renders.
+    const conditionRows: RuleRow[] = RULE_CONDITIONS.map((when, index) => {
+      const then = RULE_ACTIONS[index % RULE_ACTIONS.length]!;
+      return ruleRowOf(when, then);
+    });
+    const actionRows: RuleRow[] = RULE_ACTIONS.map((then) => ruleRowOf('call-waited', then));
+
+    for (const row of [...conditionRows, ...actionRows]) {
+      seeds.push({
+        field: `readback.${row.when}.${row.then}`,
+        text: `Reads as: ${readbackOf(row)}`,
+        role: 'label',
+      });
+      seeds.push({ field: `lever.${row.when}.${row.then}`, text: leverLineOf(row), role: 'prose' });
+    }
+
+    // The provenance naming path — the pill's words for a rule arm, per condition.
+    RULE_CONDITIONS.forEach((when, index) => {
+      const words = RULE_CONDITION_WORDS[when];
+      const value = words.values?.[0]?.value;
+      const suffix = value === undefined ? '' : `:${String(value)}`;
+      seeds.push({
+        field: `provenance.${when}`,
+        text: ruleProvenanceName(`rule-${String(index + 1)}:${when}${suffix}`) ?? '',
+        role: 'label',
+      });
+    });
+
+    // Every refusal the model can raise: the clockless time rule, the invalid pairing, the
+    // duplicated static row, and the out-of-list value.
+    const refusalArms: readonly (readonly [string, readonly RuleRow[], boolean])[] = [
+      ['clockless', [ruleRowOf('time-before', 'hold-at-lobby')], false],
+      ['pairing', [ruleRowOf('call-waited', 'no-new-pickups')], true],
+      [
+        'duplicate',
+        [ruleRowOf('car-fuller-than', 'no-new-pickups'), ruleRowOf('car-fuller-than', 'no-new-pickups')],
+        true,
+      ],
+      ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+    ];
+    for (const [name, rows, hasClock] of refusalArms) {
+      for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
+        seeds.push({
+          field: `${name}.issue[${String(index)}]`,
+          text: issue.message,
+          role: 'reason',
+        });
+      }
+    }
+
+    seeds.push({ field: 'fallback', text: fallbackLineOf('Steady hand'), role: 'label' });
+    seeds.push({ field: 'exclusivity', text: RULES_EXCLUSIVITY_NOTE, role: 'prose' });
+    // The switching panel's override note — both arms, because silence is the other claim.
+    seeds.push({ field: 'override.some', text: rulesOverrideNoteOf(2), role: 'reason' });
+    seeds.push({ field: 'override.none', text: rulesOverrideNoteOf(0), role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/** One rule row with each id's first declared value, for the adapter above. */
+function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
+  const whenValue = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+  const thenValue = RULE_ACTION_WORDS[then].values?.[0]?.value;
+  return {
+    when,
+    ...(whenValue === undefined ? {} : { whenValue }),
+    then,
+    ...(thenValue === undefined ? {} : { thenValue }),
+  };
+}
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -5849,6 +5960,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
   // originals and move every batch-shaped fault onto this surface.
   SUITE_BENCH,
+  // Appended, same reason a third time: the rules editor's readbacks share phrases with the
+  // selector's copy, and inserting it earlier would move selector-shaped faults onto this
+  // surface.
+  RULES_EDITOR,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

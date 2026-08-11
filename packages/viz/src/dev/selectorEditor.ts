@@ -172,6 +172,13 @@ export const POLICY_HINTS: Readonly<Record<WeightSetPolicy, { readonly label: st
         'The same detector, with three gains on what it reads and a margin a challenging pattern ' +
         'must beat the incumbent by. At their defaults it is arithmetically the rule above.',
     }),
+    rules: Object.freeze({
+      label: 'Follow your own rules',
+      hint:
+        'Your when/then rows drive the weights, read top to bottom, first match wins. Entered by ' +
+        'writing rules in the rules editor, not here — a rules policy with no rows is refused by ' +
+        'name at Run.',
+    }),
   });
 
 export interface PolicyChipRow {
@@ -181,12 +188,40 @@ export interface PolicyChipRow {
   readonly pressed: boolean;
 }
 
-/** The three chips, in `core`'s declaration order, with the current one pressed. */
+/**
+ * The chips, in `core`'s declaration order, with the current one pressed.
+ *
+ * **`rules` is deliberately not a chip.** The rules policy is entered by *writing rules* in the
+ * rules editor — its own §11.5 surface, where the rows that make the policy runnable live — and
+ * a chip here would offer a configuration `resolveDispatchConfig` refuses by name (a rules
+ * policy with no rows). `POLICY_HINTS` still carries its entry, because the both-ways key-set
+ * guard covers `core`'s whole vocabulary and the hint is where this exclusion is explained to a
+ * reader of the table.
+ */
 export function policyChipsOf(spec: SelectorSpec): readonly PolicyChipRow[] {
-  return POLICY_VALUES.map((policy): PolicyChipRow => {
+  return POLICY_VALUES.filter((policy) => policy !== 'rules').map((policy): PolicyChipRow => {
     const copy = POLICY_HINTS[policy];
     return { policy, label: copy.label, hint: copy.hint, pressed: spec.policy === policy };
   });
+}
+
+/**
+ * The line drawn in the policy-issue slot while the reader has Everyday rules written: the run
+ * is driven by the rules, and this panel's policy is not consulted. `''` with no rules.
+ *
+ * Here rather than in `selectorIssues` because the fact is the viewer's — `dev/state.ts`'s
+ * `shiftRunConfigOf` writes the rules **after** the selector, as the reader's most explicit
+ * statement — and `authoring/selectorSpec.ts` has no access to the rule rows. A panel that kept
+ * claiming *fuzzy* while the run followed rules would be a stale refusal's mirror image
+ * (§ D227): a control that writes nothing must say so.
+ */
+export function rulesOverrideNoteOf(ruleRowCount: number): string {
+  if (ruleRowCount <= 0) return '';
+  return (
+    `You have ${String(ruleRowCount)} Everyday rule${ruleRowCount === 1 ? '' : 's'} written, so ` +
+    'the next run follows them — first match wins — and the switching configured here is not ' +
+    'consulted. Delete the rules to hand the run back to this panel.'
+  );
 }
 
 /* -------------------------------------------------------------------------- *
@@ -655,7 +690,9 @@ export function mountSelectorEditor(
       ),
     );
     setText(elements.line, policyLine(current, selectorContext));
-    const policyRefusal = refusalFor('policy', issues);
+    const policyRefusal = [rulesOverrideNoteOf(state.ruleRows.length), refusalFor('policy', issues)]
+      .filter((message) => message !== '')
+      .join(' ');
     setText(elements.policyIssue, policyRefusal);
     setHidden(elements.policyIssue, policyRefusal === '');
 
