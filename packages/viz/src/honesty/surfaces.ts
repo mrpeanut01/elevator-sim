@@ -45,7 +45,7 @@ import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONA
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
-import { batchReport, type BatchReport } from '../batch/report.js';
+import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
@@ -1641,12 +1641,39 @@ function batchText(surfaceId: string, seeds: readonly (TextSeed & { readonly com
 
 const BATCH_REPORT: SurfaceAdapter = {
   id: 'batch/report.ts#batchReport',
-  covers: ['batch/report.ts#batchReport', 'batch/types.ts#BATCH_METRIC_PRESENTATION'],
+  covers: [
+    'batch/report.ts#batchReport',
+    /*
+     * The population line, in words — `docs/20` defect 9. Covered here rather than in an adapter of
+     * its own because it is a *projection of this report*: its whole input is
+     * {@link BatchReport.traceKey}, three panels draw it directly under `crnSentence`, and seeding
+     * it beside that sentence is what puts the two on one surface the way a reader meets them.
+     *
+     * `TRACE_KEY_WORDS`, `spacedKey` and `traceValueWords` — the table, the fallback spelling and
+     * the value renderer — are **not** listed: they are module-private, so the derivation does not
+     * find them and a `covers` entry for them would be a coverage claim for nothing. They are swept
+     * all the same, because every string they hold reaches the corpus through the call below.
+     */
+    'batch/report.ts#populationLineOf',
+    'batch/types.ts#BATCH_METRIC_PRESENTATION',
+  ],
   render(context) {
     const report = context.report;
     const seeds: (TextSeed & { comparison?: RenderedText['comparison'] })[] = [
       { field: 'demandClause', text: report.demandClause, role: 'label' },
       { field: 'crnSentence', text: report.crnSentence, role: 'prose' },
+      /*
+       * Seeded as the panels draw it — the lead-in included, because that is the sentence a reader
+       * meets and the numerals in the rendered key sit inside it. Drawn with the building name, the
+       * arm the product takes wherever it has one.
+       */
+      {
+        field: 'populationLine',
+        text: `Every arm ran this population: ${populationLineOf(report.traceKey, {
+          buildingName: report.buildingName,
+        })}.`,
+        role: 'observation',
+      },
     ];
     if (report.budgetNote !== null) {
       seeds.push({ field: 'budgetNote', text: report.budgetNote, role: 'reason' });

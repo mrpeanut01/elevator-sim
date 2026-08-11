@@ -26,6 +26,7 @@ import {
   toggleExtra,
   toggleRepair,
   type FixitMeasurement,
+  type FixitSpend,
 } from './engine.js';
 import type { FixitCase, FixitState } from './types.js';
 
@@ -217,12 +218,93 @@ describe('the four outcomes — § 10.4, copy verbatim', () => {
     expect(REST_DROP_LIMIT_POINTS).toBe(2);
   });
 
-  it('the three budget notes are decided by the spend, not by the panel', () => {
+  /**
+   * `docs/20` defect 8. The fourth branch is the one this test exists for: the panel drew
+   * *"11 of 12 u committed, 0 u of it machinery — Everything you changed is a setting, and settings
+   * are free"*, keying *free* on machinery spend rather than on spend.
+   */
+  it('the four budget notes are decided by the spend, not by the panel', () => {
     expect(budgetNoteOf(CASE, spendOf(CASE, emptyFixitState()))).toContain('settings are free');
     const machinery = spendOf(CASE, { ...emptyFixitState(), speedSteps: 1 });
     expect(budgetNoteOf(CASE, machinery)).toContain('buying machinery');
     expect(
       budgetNoteOf(CASE, { repairUnits: 34, extraUnits: 0, editorUnits: 0, totalUnits: 34, machineryUnits: 34 }),
     ).toContain('Over the budget');
+
+    // Committed, inside the budget, and not one unit of it machinery — the audit's own state.
+    const settingsThatCost: FixitSpend = {
+      repairUnits: 11,
+      extraUnits: 0,
+      editorUnits: 0,
+      totalUnits: 11,
+      machineryUnits: 0,
+    };
+    const note = budgetNoteOf(CASE, settingsThatCost);
+    expect(note).not.toContain('settings are free');
+    expect(note).toContain('committed budget is committed');
+  });
+});
+
+/**
+ * The three copy faults `docs/20` defect 8 found on one screen.
+ *
+ * Each is a sentence that stopped describing the numbers beside it, which is why they are asserted
+ * against the *measurement* and the *spend* rather than against a snapshot of the words.
+ */
+describe('a verdict may not claim more than the run measured — docs/20 defect 8', () => {
+  it('says Better only when some of the complaint measurably went away', () => {
+    const better = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintGonePct: 40 },
+      spendOf(CASE, emptyFixitState()),
+    );
+    expect(better.head).toBe('Better, and the complaint still stands.');
+  });
+
+  it('says No change at 0 %, which is the state the audit bought two repairs to reach', () => {
+    const nothing = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintGonePct: 0 },
+      spendOf(CASE, emptyFixitState()),
+    );
+    expect(nothing.kind).toBe('not-enough');
+    expect(nothing.head).toBe('No change, and the complaint still stands.');
+    expect(nothing.head).not.toContain('Better');
+    expect(nothing.rows[0]?.verdict).toContain('0 % of it went away');
+  });
+
+  it('says No change when the run showed none of the complaint to remove', () => {
+    /*
+     * `null` is *this run shows none of it*. A complaint that was never there cannot have been
+     * improved, and the row already says so — the head now agrees with the row rather than
+     * contradicting it.
+     */
+    const none = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintGonePct: null },
+      spendOf(CASE, emptyFixitState()),
+    );
+    expect(none.head).toBe('No change, and the complaint still stands.');
+  });
+
+  it('leaves the authored “nothing was bought” punchline alone when nothing was bought', () => {
+    const outcome = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState()));
+    expect(outcome.body).toBe('Fixed body.');
+  });
+
+  it('corrects it when the player did buy, naming the committed total', () => {
+    const outcome = classifyOutcome(CASE, MEASURED, {
+      repairUnits: 11,
+      extraUnits: 0,
+      editorUnits: 0,
+      totalUnits: 11,
+      machineryUnits: 0,
+    });
+    expect(outcome.kind).toBe('fixed');
+    // The authored sentence survives; what follows it is the fact it is silent about.
+    expect(outcome.body.startsWith('Fixed body.')).toBe(true);
+    expect(outcome.body).toContain('about the repair, not about your order');
+    expect(outcome.body).toContain('11 of 12 u');
+    expect(outcome.body).toContain('none of it machinery');
   });
 });
