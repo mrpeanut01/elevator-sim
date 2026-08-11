@@ -30,7 +30,7 @@
  *
  * Every tone maps to a colour *and* is already carried by the words `shift/report.ts` put in the
  * note, which is why the note is not optional in {@link FigureView}. The goal rows go further and
- * carry a glyph (`✓ ○ ·`, from `shift/goals.ts`) plus a `title` naming the state in words, because
+ * carry a glyph (`✓ × ·`, from `shift/goals.ts`) plus a `title` naming the state in words, because
  * the met/missed pair differs by a green that reads as grey under `prefers-contrast`.
  *
  * ## The pure part and the dumb part
@@ -104,7 +104,7 @@
  * has no *finished* instant to agree with.
  */
 
-import { GOAL_GLYPHS } from '../shift/goals.js';
+import { GOAL_GLYPHS, PENDING_DISPLAY } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
 import {
   CASUAL_LEVERS_HEADING,
@@ -123,7 +123,7 @@ import {
 import type {
   ClearedAward,
   FigureTone,
-  GoalReading,
+  GoalLine,
   ReportDiagnosis,
   ReportFigure,
   ReportLever,
@@ -131,9 +131,10 @@ import type {
 import { nextDay, switchWeek } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
+import { buildingEditorSeedOf } from './buildingEditor.js';
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
 import type { ReportElements, TabName } from './elementMap.js';
-import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 
 /* -------------------------------------------------------------------------- *
  * The view — every string and every colour this surface will show
@@ -176,6 +177,12 @@ export interface GoalRowView {
   readonly label: string;
   /** The observed value, or the em dash while the building has not woken up. */
   readonly display: string;
+  /**
+   * `was 78%`, or the bare em dash when the building has no previous day — `GoalLine.was`,
+   * dressed exactly as the rail's `goalRowsOf` dresses it, because two spellings of yesterday
+   * would be two screens disagreeing.
+   */
+  readonly was: string;
   readonly colour: string;
   readonly background: string;
   /** The state in words, as a `title`. The glyph is the shorthand; this is the message. KB-15. */
@@ -468,6 +475,17 @@ export interface ReportView {
    * `''` on both unfiled sheets, where the list is empty and the heading is hidden with it.
    */
   readonly diagnosisHeading: string;
+  /**
+   * What the goal block is headed, or `undefined` for *keep what `index.html` authored*.
+   *
+   * `index.html` authors the heading as a fixed `<h3>The shift asked for</h3>`, and on a single
+   * run that is a claim about a contract that does not exist — `docs/19` defect 13's first half.
+   * The single-run sheet reframes it to {@link SINGLE_RUN_GOALS_HEADING}; every other sheet keeps
+   * the markup's own words, on {@link leversHeading}'s exact arrangement and for its exact reason:
+   * this package holds no second copy of a string the markup owns, and the write happens on every
+   * frame because the sheet's shape moves both ways.
+   */
+  readonly goalsHeading: string | undefined;
   readonly levers: readonly LeverRowView[];
   /**
    * What the lever section is headed, or `undefined` for *keep what `index.html` authored*.
@@ -616,7 +634,8 @@ export function figureViewOf(cell: ReportFigure, mode: ViewMode = 'advanced'): F
  * -------------------------------------------------------------------------- */
 
 /** The design's two goal-row treatments, widened to the third state the implementation has. */
-export function goalRowViewOf(reading: GoalReading): GoalRowView {
+export function goalRowViewOf(line: GoalLine): GoalRowView {
+  const { reading } = line;
   const dressing =
     reading.state === 'met'
       ? { colour: 'var(--ok)', background: 'rgb(63 178 127 / 0.07)', help: 'met' }
@@ -637,7 +656,53 @@ export function goalRowViewOf(reading: GoalReading): GoalRowView {
     glyph: GOAL_GLYPHS[reading.state],
     label: reading.goal.label,
     display: reading.display,
+    // The word only when there is a figure to attribute — `was —` would dress an absence as a
+    // measurement. The same rule `dev/leftRail.ts#goalRowsOf` applies, spelled the same way.
+    was: line.was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${line.was}`,
     ...dressing,
+  };
+}
+
+/**
+ * What the single-run sheet heads its goal block — `docs/19` defect 13, the reframing decided.
+ *
+ * ## The decision: reframe, not drop
+ *
+ * The audit allowed either. Dropping the block would have put the sheet in silent disagreement
+ * with the left rail, which reads the same goals against the same observations while the shift
+ * runs — one surface measuring what the other declines to mention. Reframed, the block keeps every
+ * observation and loses every **claim**: the heading stops asserting that the shift asked for
+ * anything, and {@link unaskedGoalRowViewOf} strips the ✓/× that graded bars no contract issued.
+ * The dash in the heading carries the disclaimer in the same visual unit as the words it
+ * qualifies, which is R13's own placement rule applied to a sentence.
+ */
+const SINGLE_RUN_GOALS_HEADING = 'What a scenario would ask — read, not graded';
+
+/**
+ * A goal row on a single run's sheet: the reading kept, the grade withheld.
+ *
+ * Built **on** {@link goalRowViewOf} rather than beside it so the label, the observed value and
+ * the `was` dressing cannot drift between the two shapes. What changes is the grade's three
+ * channels — glyph, colour, background — and the `title` that says why in words (KB-15: the glyph
+ * is the shorthand, never the message). A `pending` row passes through untouched: it was never
+ * graded, its em dash and its own help sentence are already the honest rendering, and rewording it
+ * would claim it was *read* when the building had not woken up.
+ *
+ * Module-private, like the heading above it: the suites and the honesty sweep read these rows off
+ * {@link reportViewOf}'s own output, and an export whose only shipped reader is its own module is
+ * the shape `deadCode.test.ts` refuses.
+ */
+function unaskedGoalRowViewOf(line: GoalLine): GoalRowView {
+  const graded = goalRowViewOf(line);
+  if (line.reading.state === 'pending') return graded;
+  return {
+    ...graded,
+    // `pending`'s own glyph — the vocabulary already means *no verdict here*, and a fourth mark
+    // would be a new symbol for a distinction the help text and the heading both carry in words.
+    glyph: GOAL_GLYPHS.pending,
+    colour: 'var(--dimmer)',
+    background: 'transparent',
+    help: 'read, not graded — no scenario asked for this run',
   };
 }
 
@@ -1055,13 +1120,45 @@ function clearedBannerOf(award: ClearedAward | null): ClearedBannerView | null {
  * *Close the day* button, and this implementation has no such control — the day is filed by running
  * a shift. Printing the design's own wording would be a caption naming a button that is not on the
  * screen, which is the class of defect § 4.1 exists to refuse. The rest of the sentence is verbatim.
+ *
+ * ## The lede answers for the screen it is on — `docs/19` defects 1 and 14
+ *
+ * The design's sentence is advice, and twice it was false advice. A completed run standing
+ * unfileable (boot's own, watched to its end after **Resume**; a recording loaded from a file)
+ * got *"press 'Run this shift'"* from a sheet refusing, in silence, the very thing that copy
+ * promises — so when {@link UnfiledSheetFacts.refusal} carries a sentence, the lede **is** that
+ * sentence, `shift/banking.ts`'s own words unedited. And after a reload the rail said *on a roll ·
+ * 1/1 banked* over this sheet's *Nothing filed yet* with nothing connecting the two; the
+ * prior-sitting arm is the connection.
+ *
+ * ### The defect-14 decision, and why the sheet is not restored instead
+ *
+ * The alternative was to persist the filed sheet. Refused: a `ShapedDayReport` is derived, whole,
+ * from a recording this shell holds in memory and deliberately does not persist (`persist/` — a
+ * session snapshot is the week's facts, not a 57 MB recording), so a restored sheet would be a
+ * document with no run behind it — unreplayable, undiffable, and one build away from a shape the
+ * renderer no longer draws. The week's **facts** survive because they are facts; the sheet is an
+ * *account*, and an account that cannot be reproduced is exactly what issue #136 refused to bank.
+ * So the sheet says what happened to it, in words, and the title keeps the empty state's name —
+ * the rail's claim is true, the sheet's is true, and the lede is what makes them one story.
+ *
+ * The refusal outranks the prior-sitting sentence when both hold: the completed run standing on
+ * the stage is the thing the reader is looking at, and the older story can wait a run.
  */
-export function emptyReportView(): ReportView {
+export function emptyReportView(unfiled?: UnfiledSheetFacts): ReportView {
+  const lede =
+    unfiled?.refusal !== undefined
+      ? unfiled.refusal
+      : unfiled?.fromPreviousSitting === true
+        ? 'The rail’s banked days are real — they were filed in a previous sitting. Their sheet ' +
+          'was not kept: a sheet is an account of a run, and the run itself is not restored. Play ' +
+          'a day through — press “Run this shift” — and today’s sheet fills itself in.'
+        : 'Play a day through — press “Run this shift” — and the sheet fills itself in.';
   return {
     filed: false,
     title: 'Nothing filed yet',
     metaLines: [],
-    lede: 'Play a day through — press “Run this shift” — and the sheet fills itself in.',
+    lede,
     figures: [],
     verdictLine: '',
     verdictColour: 'var(--dim)',
@@ -1069,6 +1166,9 @@ export function emptyReportView(): ReportView {
     diagnosis: [],
     // Nothing to head. The heading is hidden with its empty list rather than left standing over one.
     diagnosisHeading: '',
+    // No rows, so the markup's own words stand — and the mount hides the heading with its empty
+    // list, exactly as it does for the two headings below.
+    goalsHeading: undefined,
     levers: [],
     // No cards, so nothing to head — and `undefined` here means *leave the markup alone*, which is
     // the right answer for a heading that is about to be hidden with its own empty list.
@@ -1219,11 +1319,18 @@ export function reportViewOf(
   previous?: ShapedDayReport | undefined,
   overnight?: TomorrowBriefing | undefined,
   mode: ViewMode = 'advanced',
+  /*
+   * Why the empty sheet is empty, when the shell knows more than *nothing has run* — `docs/19`
+   * defects 1 and 14. Optional so every caller that holds only a report (the honesty sweep, the
+   * dispatcher editor's strip, the suites) keeps its meaning: no facts is the plain empty sheet.
+   */
+  unfiled?: UnfiledSheetFacts | undefined,
 ): ReportView {
-  if (report === undefined) return emptyReportView();
+  if (report === undefined) return emptyReportView(unfiled);
   if (progress.kind === 'watching') return watchingReportView(progress);
   const shaped: ShapedDayReport = report;
   const casual = mode === 'basic';
+  const singleRun = shaped.of === 'single-run';
   return {
     filed: true,
     // Both shapes carry it — see {@link SingleRunFramingView}.
@@ -1260,9 +1367,22 @@ export function reportViewOf(
      *
      * Written as an exhaustive record for the reason § D237 gives about `VERDICT_VOICE`: a fourth
      * verdict must fail to compile here rather than silently inherit whatever the `else` says.
+     *
+     * **A single run's banner is not a verdict, so it does not take a verdict's colour** —
+     * `docs/19` defect 13. `shift/report.ts` replaced its words with a refusal to grade; a green
+     * refusal would be the grade back as a colour (KB-15's converse — colour may not carry a
+     * signal the words withdrew), so the arm keys on the sheet's shape, exactly as
+     * `render/reportCard.ts` inks the same line on the shared card.
      */
-    verdictColour: VERDICT_COLOUR[shaped.verdict],
-    goals: shaped.goals.map(goalRowViewOf),
+    verdictColour: singleRun ? 'var(--dim)' : VERDICT_COLOUR[shaped.verdict],
+    /*
+     * The readings survive; the grade does not — `docs/19` defect 13's other half, decided at
+     * {@link SINGLE_RUN_GOALS_HEADING}. The mapping is chosen per sheet-shape here for Casual's
+     * reason two fields down: this function is the panel's one decision surface, and a branch
+     * inside the mount would be a branch no node suite can drive.
+     */
+    goals: shaped.goals.map(singleRun ? unaskedGoalRowViewOf : goalRowViewOf),
+    goalsHeading: singleRun ? SINGLE_RUN_GOALS_HEADING : undefined,
     diagnosis: diagnosisRowsOf(shaped.diagnosis),
     diagnosisHeading: shaped.diagnosisHeading,
     levers: leverRowsOf(shaped.levers),
@@ -1321,6 +1441,18 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
    */
   const diagnosisHeading = headingOf(ui.diagnosis);
   const leversHeading = headingOf(ui.levers);
+  /*
+   * The goal block's heading — `<h3>The shift asked for</h3>` — resolved through the **verdict
+   * span** rather than through `#report-goals`, because that is where the markup put it:
+   * `index.html` seats the h3 and `#report-verdict` in one flex row, with the cleared banner and
+   * the goal list as later siblings, so the one-level reach from the list would land on the
+   * banner. The reach from `ui.verdict` is the same single `previousElementSibling` step
+   * {@link headingOf} makes everywhere else, and it degrades the same way: no h3, and the heading
+   * keeps whatever the markup says.
+   */
+  const goalsHeading = headingOf(ui.verdict);
+  /** The markup's own words for it, captured at mount — {@link authoredLeversHeading}'s reason. */
+  const authoredGoalsHeading = goalsHeading?.textContent ?? '';
   /**
    * *Levers you actually have* — `index.html`'s own words, captured once, at mount.
    *
@@ -1387,6 +1519,9 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         parkedWeeks: moved.parked,
         ...(contract === undefined ? {} : { buildingId: contract.buildingId }),
         outOfServiceCarIds: [],
+        // The intervention log belongs to the day being left, on outOfServiceCarIds' ground —
+        // see ViewerState.interventions for the clearing ledger.
+        interventions: [],
         recording: undefined,
         report: undefined,
         tomorrow: undefined,
@@ -1419,6 +1554,10 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       report: undefined,
       tomorrow: undefined,
       withheld: [],
+      // Yesterday's change of mind is part of yesterday's record, and tomorrow opens with none —
+      // an intervention stamped 09:14 replayed onto a different day would be a stamp about a run
+      // that never carried it. See ViewerState.interventions for the clearing ledger.
+      interventions: [],
     });
     context.openTab('run');
     context.runShift();
@@ -1514,6 +1653,9 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
               style: { color: row.colour },
             }),
             el(doc, 'span', { className: 'goal-label', text: row.label }),
+            // Last night's figure before today's — the handoff's "was" column (§ 8.6), in the
+            // same reading order the rail draws: claim, precedent, verdict.
+            el(doc, 'span', { className: 'goal-was', text: row.was }),
             el(doc, 'span', {
               className: 'goal-got',
               text: row.display,
@@ -1586,6 +1728,19 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
           children: words,
         });
         card.addEventListener('click', () => {
+          /*
+           * **The crisis points at the fix, on the right building** — `docs/19` defect 11 and its
+           * *point the crisis at the fix* note. This card's advice (*Add a car*, *Zone the tower*)
+           * is about the day the sheet describes, so arriving at the Building tab with some other
+           * building's draft open converts the report's advice into an edit of the wrong tower.
+           * `buildingEditorSeedOf` is the whole rule — it declines for a dirty draft, so an
+           * unsaved edit still wins over this navigation — and the rail's own link goes through
+           * the same function, which is what keeps the two doors from drifting.
+           */
+          if (surface === 'building' && latest !== undefined) {
+            const seed = buildingEditorSeedOf(latest);
+            if (seed !== undefined) context.update(seed);
+          }
           context.openTab(surface);
         });
         return card;
@@ -1708,6 +1863,10 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         continuity.previous,
         view.state.tomorrow,
         view.state.mode,
+        // Why an empty sheet is empty, when the shell knows — `docs/19` defects 1 and 14. Read
+        // off the same `ViewAt` as everything else, so the sheet's excuse and the rail's claim
+        // are facts about one frame.
+        view.unfiledSheet,
       );
       /*
        * One `null` per shape, read once. Every week-shaped slot below is written *and* hidden from
@@ -1734,6 +1893,17 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       setText(ui.clearedNote, week?.cleared?.note ?? '');
 
       drawGoals(drawn);
+      /*
+       * The goal block's heading, written from the sheet on the one shape where the authored words
+       * are a false claim (`docs/19` defect 13) and restored to the markup's own on every other —
+       * {@link authoredLeversHeading}'s two-way rule, because the mode selector and the play mode
+       * both move both ways. Hidden with its empty list on the two unfiled sheets, where *The
+       * shift asked for* stood over nothing.
+       */
+      if (goalsHeading !== undefined) {
+        setText(goalsHeading, drawn.goalsHeading ?? authoredGoalsHeading);
+        setHidden(goalsHeading, drawn.goals.length === 0);
+      }
       drawDiagnosis(drawn);
       drawLevers(drawn);
       /*

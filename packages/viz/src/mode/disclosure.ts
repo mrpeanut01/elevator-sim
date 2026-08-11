@@ -458,6 +458,140 @@ export function suppressionBannerFor(ground: string | undefined): string {
   return `${NO_AVERAGE_LEAD} — ${clause?.cause ?? 'this run’s own statistics refuse one'}`;
 }
 
+/* -------------------------------------------------------------------------- *
+ * The refusal at a playhead short of the end — `docs/20` defect 3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **A refusal is a verdict, and a verdict has a window** — `docs/20` defect 3, § D300's E-4.
+ *
+ * ## What was wrong
+ *
+ * At **14 %** of playback — 08:38, sixty people carried, ninety-three per cent away inside a minute,
+ * the longest wait 102 s — the stage's RIGHT NOW box read:
+ *
+ * > `average wait so far` / **`NO AVERAGE — A RESULT`**
+ *
+ * and its reason read *"This run's own statistics refuse an average **here**. That is a **result**,
+ * not a gap."* Every word after the head is a claim about the **finished** day, published under a
+ * label saying *so far*, over a building whose queues had not formed yet. `render/canvas.ts`'s
+ * header banner had exactly this defect and it was closed by exactly this method — the whole-run
+ * sentence appears when `playheadHasReachedEnd`, and not before — but the closure stopped at the
+ * banner, and the panel eighty pixels below it went on publishing the verdict from the first frame.
+ *
+ * ## What may **not** change, and why this is a wording fix rather than a gate
+ *
+ * The **withholding stays at every playhead**. `frame/overlay.ts` sets `rollingMeanWaitS` to
+ * `undefined` on a suppressed run, and § D294 refused, on this same canvas, to trade one honesty
+ * rule for another: a bitmap has no later, so a PNG exported mid-run must not carry a mean this
+ * run's own summary declines to stand behind. Un-gating the number to fix the sentence would be the
+ * larger defect, in the direction that cannot be corrected by looking again.
+ *
+ * So the panel keeps refusing and stops **dating the refusal wrong**. Before the end it speaks the
+ * register the row above it already speaks — *so far*, and *the day is not over* — which is the
+ * form `render/describeFrame.ts` has used for the undelivered count since R6 found it: *"How many
+ * end up undelivered is not known until the run finishes."* That sentence is true at the playhead
+ * and claims nothing about the end, and this is the same sentence about a different quantity.
+ *
+ * ## Why `basis` travels with it
+ *
+ * `MoodDriver.basis` is the precedent § D293 set and `honesty/properties.ts`'s R6 reads: a **shipped
+ * type declares which window its string folds**, the renderer gates on the declaration, and the
+ * search asserts the gate rather than re-deriving the arithmetic. A refusal that returns its own
+ * basis is that pattern applied to the one kind of string R6's textual half can never catch — a
+ * verdict with no figure in it. See `honesty/properties.ts#checkWholeRunFigureEarly`, whose
+ * `role === 'reason'` exemption had to be narrowed to the textual half for this to be reachable.
+ */
+export interface CasualRefusal {
+  /** The head, longest first, for a panel that chooses by width. Never clipped to nothing. */
+  readonly heads: readonly string[];
+  /** The paragraph under it. Ground-free, for {@link CASUAL_REFUSAL_REASON}'s reason. */
+  readonly reason: string;
+  /**
+   * Which window this wording folds — `'whole-run'` once the playhead has earned the verdict,
+   * `'now'` before it. Read by `honesty/surfaces.ts`, never recomputed there.
+   */
+  readonly basis: 'now' | 'whole-run';
+}
+
+/**
+ * The reason Casual prints in place of `core`'s statistics prose, once the day is over.
+ *
+ * Moved here from `render/overlay.ts` so that both registers of one refusal sit in the module that
+ * owns the refusal's vocabulary, which is the argument {@link NO_AVERAGE_LEAD} already makes about
+ * the head: a second home is a second thing to keep in step.
+ *
+ * `docs/10` R3 lets a mode **shorten** a reason and forbids it to remove one, and this is the
+ * shortening: the full sentence — *"Queue length rose by 268.0 persons (53.59/min, 12.0× the queue's
+ * own scatter) … AWT is not approximately normal and its confidence interval must be suppressed"* —
+ * is on the status line under the canvas, verbatim, in both modes, and this sentence says so rather
+ * than leaving a reader to find it.
+ *
+ * It is **ground-free**, for the reason the heads are. It states no number, so R3's textual half
+ * cannot be tripped by it. And it says *refuse* rather than *cannot*: the mean exists as an
+ * arithmetic mean of something — `1 334 s` on the run `shift/report.test.ts` pins — and what the run
+ * declines is to stand behind it, which is a result rather than a gap.
+ */
+export const CASUAL_REFUSAL_REASON =
+  'This run’s own statistics refuse an average here. That is a result, not a gap — the reason ' +
+  'in full is on the line below the canvas.';
+
+/**
+ * The same refusal **before** the day has finished. See {@link CasualRefusal}.
+ *
+ * It withholds exactly as hard and dates itself correctly. *No average yet* is what is true at this
+ * playhead; whether the finished day has one is a question this frame has not reached, and the
+ * closing clause says so in `describeFrame`'s own words rather than in a second phrasing of them.
+ */
+export const CASUAL_REFUSAL_REASON_SO_FAR =
+  'A mean over part of a day is not this day’s average, so there is none to show yet.';
+
+/**
+ * The **engineer's** reason before the day has finished — the same gate, in the other register.
+ *
+ * `core`'s `awtInvalidReason` is a whole-run verdict in past tense — *"Queue length rose by 128.7
+ * persons (26.4/min, 8.2× the queue's own scatter) … the system is saturated"* — computed from a
+ * trend test over the finished day, and the panel printed it at 14 % of playback. Casual's arm of
+ * that defect is the one `docs/20` defect 3 names; this is the same string on the same panel one
+ * mode over, and fixing one and not the other would leave the search green on a screen half of
+ * which still dates its verdict wrong.
+ *
+ * § D299 § 1 is satisfied rather than bent: Engineer keeps a reason at **every** playhead, keeps
+ * `SUPPRESSED` unconditionally, and gets `core`'s own sentence verbatim the moment the playhead
+ * earns it. Nothing is removed; one sentence is re-dated, and this one says where the other has
+ * gone. It states no number and reaches no verdict, so it can be true at any instant of any run.
+ */
+export const SUPPRESSION_REASON_PENDING =
+  'The reason is a fold over the whole day; it prints when the playhead reaches the end.';
+
+/**
+ * The panel's refusal, in the register the playhead has earned.
+ *
+ * `wholeRun` is the caller's reading of its own clock — `OverlayMetrics.suppressionBasis` on the
+ * panel, `playheadHasReachedEnd` on the canvas — rather than a comparison made here, for
+ * `honesty/surfaces.ts#railBasisAt`'s stated reason: a probe that recomputed `t >= endedAt` would
+ * assert its own arithmetic and say nothing about the surface.
+ *
+ * The heads are ordered longest-first for `render/overlay.ts#longestThatFits`, which is that file's
+ * own idiom: a refusal that has to lose words loses the ones chosen here rather than the ones that
+ * fall past the edge. Both arms lead with {@link NO_AVERAGE_LEAD}, because a refusal that stops
+ * saying there is no average has stopped being one — what the arms differ on is only whether they
+ * go on to call it the day's result.
+ */
+export function casualRefusalFor(wholeRun: boolean): CasualRefusal {
+  return wholeRun
+    ? {
+        heads: [`${NO_AVERAGE_LEAD} — A RESULT`, NO_AVERAGE_LEAD],
+        reason: CASUAL_REFUSAL_REASON,
+        basis: 'whole-run',
+      }
+    : {
+        heads: [`${NO_AVERAGE_LEAD} YET`, NO_AVERAGE_LEAD],
+        reason: CASUAL_REFUSAL_REASON_SO_FAR,
+        basis: 'now',
+      };
+}
+
 /**
  * Every item a run puts in front of a player, with both modes' renderings.
  *

@@ -38,6 +38,7 @@ import type { CarSnapshot, CostEstimate, CostRequest, ServedFloor } from '../mod
 import { phaseByName, travelTime } from '../physics/motion/index.js';
 
 import { assessDirectionReversal } from './terms/directionReversal.js';
+import { PARK_AT_TOP_FLOOR_INDEX } from './types.js';
 import type {
   AnswerDecision,
   CallLifecycle,
@@ -751,6 +752,22 @@ function parkingCandidates(
       : { floors: [middle], reason: undefined };
   }
 
+  if (strategy === 'fixed-floor') {
+    // The Everyday rules' "park a spare car at v", mirroring 'lobby' exactly: resolve the served
+    // floor at the configured index, or say `no-target` — total and stated, like
+    // lobby-with-no-served-entrance. `PARK_AT_TOP_FLOOR_INDEX` names this shaft's own top
+    // served floor, because parking is a per-car decision and the shaft is the honest scope of
+    // "the top floor" (`dispatch/types.ts` carries the argument).
+    const index = config.idle.parkingFloorIndex;
+    const target =
+      index === PARK_AT_TOP_FLOOR_INDEX
+        ? served[served.length - 1]
+        : served.find((floor) => floor.index === index);
+    return target === undefined
+      ? { floors: [], reason: 'no-target' }
+      : { floors: [target], reason: undefined };
+  }
+
   if (strategy === 'predicted-demand') {
     const forecast = context.demandForecast;
     // The forecast is the learned per-floor arrival model, one per bank, which `Simulation`
@@ -823,10 +840,18 @@ function parkingCandidates(
 function responseWeights(
   config: ResolvedDispatchConfig,
   context: RepositionContext,
+  target?: ServedFloor | undefined,
 ): ReadonlyMap<string, number> | undefined {
   const strategy = config.idle.parkingStrategy;
   if (strategy === 'lobby') {
     return new Map((context.entranceFloorIds ?? []).map((id) => [id, 1]));
+  }
+  if (strategy === 'fixed-floor') {
+    // The point mass the strategy implies: choosing a fixed park *is* the assertion that the
+    // demand worth anticipating originates there — the same *strategy's own belief* rule as
+    // `lobby`, one row up in the table above. With no resolved target there is no belief to
+    // score against and the caller has already answered `no-target`.
+    return target === undefined ? undefined : new Map([[target.id, 1]]);
   }
   if (strategy === 'zone-center' && context.zoneFloorIds !== undefined) {
     return new Map(context.zoneFloorIds.map((id) => [id, 1]));
@@ -897,6 +922,19 @@ export function repositionDecisionFor(
   config: ResolvedDispatchConfig,
   context: RepositionContext = {},
 ): RepositionDecision {
+  /*
+   * The intervention seam (`RepositionContext.idleOverride`): a caller may hand in the stage 7
+   * settings in force *now*, and every read below — the strategy in `parkingCandidates` and
+   * `responseWeights`, the deadband, the energy exchange rate — goes through the same effective
+   * config, so the three cannot disagree about which idle stage decided this car.
+   *
+   * **`config`, by identity, when no override is supplied.** Not a copy that happens to be equal:
+   * the ordinary run must hand these helpers exactly the object it handed before the field
+   * existed, which is what makes byte-identity at `interventions: []` a structural property
+   * rather than a tolerance — `policy.ts#`#weights`` makes the same move for stage 3.
+   */
+  const effective: ResolvedDispatchConfig =
+    context.idleOverride === undefined ? config : { ...config, idle: context.idleOverride };
   const decide = (
     move: boolean,
     targetFloorId: string | undefined,
@@ -919,21 +957,21 @@ export function repositionDecisionFor(
     return decide(false, undefined, 'busy');
   }
 
-  const { floors, reason } = parkingCandidates(car, config, context);
+  const { floors, reason } = parkingCandidates(car, effective, context);
   const target = floors[0];
   if (target === undefined) return decide(false, undefined, reason ?? 'no-target');
   if (target.id === car.floorId) return decide(false, target.id, 'already-there');
 
-  const forecast = responseWeights(config, context);
+  const forecast = responseWeights(effective, context, target);
   const savingS =
     expectedResponseSeconds(car, car.heightM, forecast) -
     expectedResponseSeconds(car, target.heightM, forecast);
   const travelSeconds = moveSeconds(car, car.heightM, target.heightM);
   const energySecondsPerCall =
-    (config.idle.repositionEnergyWeight * travelSeconds) / PARK_CALL_HORIZON;
+    (effective.idle.repositionEnergyWeight * travelSeconds) / PARK_CALL_HORIZON;
   const netGainS = savingS - energySecondsPerCall;
 
-  if (netGainS <= 0 || netGainS < config.idle.repositionThresholdS) {
+  if (netGainS <= 0 || netGainS < effective.idle.repositionThresholdS) {
     return decide(false, target.id, 'below-threshold', savingS, travelSeconds, netGainS);
   }
   return decide(true, target.id, 'reposition', savingS, travelSeconds, netGainS);

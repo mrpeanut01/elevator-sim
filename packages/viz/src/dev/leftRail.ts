@@ -41,7 +41,7 @@
  * | mood card's **basis** | nothing — it is never a colour | the headline's tense and the sub-line's *across the whole shift*, both in the `aria-label` too |
  * | *longest wait* | band amber / band red | the figure itself — `142 s` is the state |
  * | *served under N s* | band green / amber / red | the percentage, and `—` when there is no denominator |
- * | goal rows | met green / missed amber / pending grey | `GOAL_GLYPHS`' `✓ ○ ·`, plus the value or `—` |
+ * | goal rows | met green / missed amber / pending grey | `GOAL_GLYPHS`' `✓ × ·`, plus the value or `—` |
  * | honesty card | amber or green edge | the `⚠`/`✓` glyph and the title sentence |
  * | decision rows | the outcome palette | the head reads `A → Level 12`, `A ⇄ Level 12` or `no car for Level 12` — three different sentences, not three colours |
  * | mood drivers | the three level colours | `MOOD_GLYPH`'s `○ ◑ ●`, and each row states its own number |
@@ -78,7 +78,13 @@ import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { scheduledEventFor } from '../shift/calendar.js';
-import { PENDING_DISPLAY, bestLineFor, goalsForDay, readGoals } from '../shift/goals.js';
+import {
+  PENDING_DISPLAY,
+  bestLineFor,
+  goalsForDay,
+  readGoals,
+  wasDisplayOf,
+} from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
   weekdayOf,
@@ -186,7 +192,7 @@ export interface MoodView {
  * apportionment is what keeps it one.
  *
  * Ties in the remainder go to the calmer band, which is the direction that cannot flatter: a
- * rounding unit awarded upward would widen *taking the stairs*, and the one error this card must
+ * rounding unit awarded upward would widen *eyeing the stairs*, and the one error this card must
  * not make is the reassuring one — so the tie-break is the conservative direction for the *bar*,
  * while the worst band's *presence* is never rounded away because {@link MoodLegendEntry.count} is
  * the raw head count and sits beside it.
@@ -435,7 +441,8 @@ export function servedTitleFor(thresholdS: number, servedCount: number): string 
       ? SERVED_TITLE
       : `Share of served calls whose hall wait was under ${thresholdS.toFixed(0)} s — this run's ` +
         'own long-wait threshold, rather than the conventional sixty.';
-  return `${base} Over ${String(servedCount)} served legs.`;
+  // `1 served leg` singular — docs/19 defect 8's `over 1 legs`, on this rail's copy of the idiom.
+  return `${base} Over ${String(servedCount)} served leg${servedCount === 1 ? '' : 's'}.`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -467,16 +474,43 @@ export function streakLineOf(week: WeekState): StreakLine {
  * there is no contract behind it to bank against and a fraction with no denominator is not a
  * progress figure. `contractById` returns `undefined` there rather than throwing, which is the
  * behaviour `week.ts` relies on for restored state naming a scenario since renamed.
+ *
+ * ## *best day so far* reads `—` until a day has closed, and it used to read `0%`
+ *
+ * Found by the withheld-matrix sweep (ENGINE_CONTRACT § 12.2, `honesty/generate.ts#withheldStates`)
+ * on the state a **new player is in for their whole first shift**: `openWeek` seeds
+ * `bestMinutePct: 0`, so the middle figure published *0%* under the label *best day so far* from
+ * boot until the first day filed. § 12.2's rule for a withheld cell is *never a zero*, and § 16
+ * rule 1 says why in the reader's terms: an unfinished thing shows `—`. A best over an empty sample
+ * is not a bad best, and the two are indistinguishable at a glance — the same distinction
+ * `awtIsValid` draws when it refuses a mean over an empty window rather than reporting one.
+ *
+ * The gate is `history.length === 0` rather than `bestMinutePct === 0`, because the question is
+ * *has any day closed* and `closeDay` is the only writer of either: it appends the day and raises
+ * the high-water mark in the same expression, so an empty history is exactly *nothing has been
+ * banked in this week*. Reading the mark instead would also withhold a genuine 0 % day, which is a
+ * measured figure and belongs on screen.
+ *
+ * `historyBarsOf` has always drawn its own version of this state — *"nothing banked yet — no shift
+ * has closed"* — one figure to the right of this one, which is what makes the old `0%` a
+ * disagreement between two cells of one card rather than only a wrong number.
  */
 export function runFiguresOf(week: WeekState): readonly RunFigure[] {
   const contract = contractById(week.contractId);
+  const banked = week.history.length > 0;
   return [
     {
       value: String(week.streak),
-      label: 'clean days running',
+      // `1 clean day running` singular — docs/19's copy nit. The label is read beside the value,
+      // so the value decides its number the same way `shift/tomorrow.ts#streakValue` does.
+      label: week.streak === 1 ? 'clean day running' : 'clean days running',
       color: week.streak > 0 ? GOOD : DIM,
     },
-    { value: `${String(week.bestMinutePct)}%`, label: 'best day so far', color: undefined },
+    {
+      value: banked ? `${String(week.bestMinutePct)}%` : PENDING_DISPLAY,
+      label: 'best day so far',
+      color: banked ? undefined : DIM,
+    },
     {
       value:
         contract === undefined
@@ -486,6 +520,42 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
       color: BANKED,
     },
   ];
+}
+
+/**
+ * The *today, so far* figure the week strip may read — or `undefined`, which is every state where
+ * the run on the stage is not the player's own day.
+ *
+ * ## The defect this closes, which is § 12.2's *stale figure* in its sharpest form
+ *
+ * {@link historyBarsOf}'s second argument is the share of riders away inside a minute **so far**,
+ * and `drawShift` took it from `observationsAt(view.recording, …)` — the recording on the stage.
+ * While watching somebody else's posted day (`watch/session.ts#watchingStateOf`) that recording is
+ * a stranger's, and `WeekState` is deliberately untouched, so on a week with no closed day the
+ * player's own strip drew one bar reading **“Tuesday, so far: 66 % away inside a minute”** — the
+ * watched player's figure, in the player's own week, labelled as theirs by nothing.
+ *
+ * It is reachable on a first sitting and nowhere else: the empty-history arm is the only one that
+ * reads this argument, so the state is *a player who has filed no day yet opens somebody else's
+ * run*, which is the shipped reference runs' whole purpose. Found by the withheld-matrix sweep
+ * (`honesty/generate.ts#withheldStates`, the `watching` axis) rather than by review.
+ *
+ * ## Why a function rather than a ternary at the call site
+ *
+ * `dev/state.ts`'s standing rule: a decision made inside a render body cannot be tested, because the
+ * body needs a document and a canvas. This is the decision — *whose figure is this* — and it is the
+ * one the sweep drives. The call site is `drawShift`, its non-test caller, and `ViewAt.watching` is
+ * the fact it reads.
+ *
+ * A **withheld** figure rather than a substituted one: there is no honest number to put here while
+ * watching. The strip's empty-history arm already says *"nothing banked yet — no shift has closed"*,
+ * which is true of the spectator's own week and is what the reader then sees.
+ */
+export function todayShareFor(
+  watching: boolean | undefined,
+  minutePct: number | undefined,
+): number | undefined {
+  return watching === true ? undefined : minutePct;
 }
 
 /** One bar of the seven-day sparkline. */
@@ -562,11 +632,17 @@ function shareColor(pct: number): string {
  * -------------------------------------------------------------------------- */
 
 export interface GoalRow {
-  /** `✓`, `○` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
+  /** `✓`, `×` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
   readonly glyph: string;
   readonly label: string;
   /** The observed value with its unit, or `PENDING_DISPLAY`. Never a number while pending. */
   readonly value: string;
+  /**
+   * `was 78%`, or the bare em dash when the building has no previous day — the handoff's "was"
+   * figure (§ 8.6), derived by `shift/goals.ts#wasDisplayOf` so this screen and the report sheet
+   * cannot show two different yesterdays.
+   */
+  readonly was: string;
   readonly state: GoalReading['state'];
   readonly barPct: number;
   /** Glyph and value colour. */
@@ -576,22 +652,31 @@ export interface GoalRow {
 }
 
 /**
- * One row per reading — design `:130–140`.
+ * One row per reading — design `:130–140`, plus the "was" slot the casual handoff adds (§ 8.6).
  *
  * The three states are the design's three, and `pending` is not a `missed` in a grey coat: a
  * morning under twenty arrivals has not been judged, so its row shows the em dash and a flat
  * track. `readGoal` decides that; this only paints it, which is why the assertion *a pending goal
  * never renders a number* is a property of {@link GoalReading.display} that this function may not
  * be able to break.
+ *
+ * The `was` slot prints the word only when there is a figure to attribute: `was —` would dress an
+ * absence as a measurement, so a day with no yesterday shows the bare dash.
  */
-export function goalRowsOf(readings: readonly GoalReading[]): readonly GoalRow[] {
+export function goalRowsOf(
+  readings: readonly GoalReading[],
+  history: readonly DayOutcome[],
+  day: number,
+): readonly GoalRow[] {
   return readings.map((reading) => {
     const met = reading.state === 'met';
     const pending = reading.state === 'pending';
+    const was = wasDisplayOf(history, day, reading.goal);
     return {
       glyph: reading.glyph,
       label: reading.goal.label,
       value: reading.display,
+      was: was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${was}`,
       state: reading.state,
       barPct: reading.progressPct,
       color: pending ? FAINT : met ? GOOD : CAUTION,
@@ -899,8 +984,8 @@ export function mountLeftRail(elements: LeftRailElements, context: MountContext)
       drawMood(doc, elements.mood, surfaces, recording, t, state.mode);
       drawStats(doc, surfaces, recording, t);
       drawShift(doc, elements.shift, surfaces, view);
-      drawHonesty(elements.honesty, recording, t, mode, state.showMaths);
-      drawDecisions(doc, surfaces, recording, t);
+      drawHonesty(elements.honesty, recording, t, mode, state.showMaths, view.startOfDayS);
+      drawDecisions(doc, surfaces, recording, t, view.startOfDayS);
     },
   };
 }
@@ -1116,7 +1201,8 @@ function drawShift(
   const observations = goalObservationsOf(recording, view.simTimeS);
   const bars = historyBarsOf(
     week.history,
-    recording === undefined ? undefined : observations.minutePct,
+    // Not the run on the stage when the run on the stage is somebody else's — {@link todayShareFor}.
+    todayShareFor(view.watching, recording === undefined ? undefined : observations.minutePct),
     week.dayIdx,
   );
   surfaces.history(bars.map((bar) => `${bar.short}:${String(bar.heightPct)}`).join('|'), () =>
@@ -1146,9 +1232,11 @@ function drawShift(
   setText(ui.event, event.name);
   setText(ui.note, event.note);
 
-  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations));
+  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations), week.history, week.day);
   surfaces.goals(
-    goals.map((goal) => `${goal.label}=${goal.value}=${String(goal.barPct)}`).join('|'),
+    goals
+      .map((goal) => `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}`)
+      .join('|'),
     () =>
       goals.map((goal) =>
         el(doc, 'div', {
@@ -1163,6 +1251,9 @@ function drawShift(
                   style: { color: goal.color },
                 }),
                 el(doc, 'span', { className: 'goal-label', text: goal.label }),
+                // Last night's figure, dim, before today's — reading order is claim, precedent,
+                // verdict. The dash carries no "was": see `goalRowsOf`.
+                el(doc, 'span', { className: 'goal-was', text: goal.was }),
                 el(doc, 'span', {
                   className: 'goal-got',
                   text: goal.value,
@@ -1199,7 +1290,15 @@ function goalObservationsOf(
   t: SimTime,
 ): GoalObservations {
   if (recording === undefined) {
-    return { arrived: 0, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 };
+    return {
+      arrived: 0,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      worstWaitS: 0,
+      worstWaitIsCensored: false,
+    };
   }
   return shiftObservationsOf(observationsAt(recording, t));
 }
@@ -1212,16 +1311,19 @@ function drawHonesty(
   t: SimTime,
   mode: DisclosureMode,
   showMaths: boolean,
+  startOfDayS: number | undefined,
 ): void {
   /*
    * The same basis the mood card above it is drawn on, and it has to be the same one: a rail whose
    * face is retrospective and whose honesty card is instantaneous is two panels answering two
-   * questions with no way for a reader to tell which is which.
+   * questions with no way for a reader to tell which is which. `startOfDayS` is the header's own
+   * hour, from `ViewAt` — the maths paragraph quotes the reporting window as a clock range, and a
+   * range on the 06:00 template axis under a header reading 09:26 is `docs/19` defect 2.
    */
   const card =
     recording === undefined
       ? idleHonestyCard()
-      : honestyAt(recording, t, mode, basisAt(recording, t));
+      : honestyAt(recording, t, mode, basisAt(recording, t), startOfDayS);
   setStyle(ui.card, 'background', card.bg);
   setStyle(ui.card, 'border-color', card.edge);
   setText(ui.glyph, card.glyph);
@@ -1243,11 +1345,14 @@ function drawDecisions(
   surfaces: RailSurfaces,
   recording: VizRecording | undefined,
   t: SimTime,
+  startOfDayS: number | undefined,
 ): void {
+  // The run's own hour, so a stamp and the header clock agree about one instant — `docs/19`
+  // defect 2. `undefined` falls back to the shared offset together with the header.
   const rows =
     recording === undefined
       ? [idleDecisionRow()]
-      : decisionRowsAt(recording, t, DECISION_ROWS).map(decisionRowViewOf);
+      : decisionRowsAt(recording, t, DECISION_ROWS, startOfDayS).map(decisionRowViewOf);
   // Keyed on the row keys alone: `DecisionRow.key` is `${at}-${callId}`, so the log is rebuilt
   // exactly when a decision enters or leaves the window — which is when `riseIn` should play.
   surfaces.decisions(rows.map((entry) => entry.key).join('|'), () =>

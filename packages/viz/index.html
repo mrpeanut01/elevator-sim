@@ -604,6 +604,13 @@
            pressed. The handoff's toggle IS the close control (`design.html` :2447 — no close
            control exists inside the drawer), so it stacks above the overlay's z-index: 20. */
         #drawer-toggle { display: inline-flex !important; position: relative; z-index: 21; }
+        /* docs/19 defect 6's second half: the toggle stacked above the drawer then sat ON the
+           drawer's own segment strip — measured at 1280×800, 'Close controls' (x 979–1057, y
+           64–88) covered the 'Dispatcher' and 'Traffic' segment labels (y 69–93). The drawer's
+           content starts below the strip the toggle lives in, so the two controls that both must
+           stay pressable stop sharing pixels. Padding, not margin: the overlay's edge and shadow
+           still reach the top of the body, so it reads as one sheet. */
+        .rail-r { padding-top: 52px; }
       }
       @media (max-width: 899px) { .body { grid-template-columns: 236px minmax(0, 1fr); } }
 
@@ -671,12 +678,29 @@
          than at the report sheet's. The same scoping `.transport-tail .chip` already does. */
       .coach-controls .primary { padding: 6px 12px; font-size: 12px; }
 
-      /* The stage, § 1.3 M3. */
+      /* The stage, § 1.3 M3.
+
+         docs/19 defect 7: `min-height: 0` let the canvas absorb every pixel the chrome around it
+         grew — measured at 1280×800 on a campaign Midtown day, the 21-floor tower had collapsed
+         to a 103 px sliver under the coach ribbon, two legend rows and the transport, and the
+         wait-age ramp the stage exists to show was sub-pixel. The floor is sized to the drawing,
+         not to taste: `render/layout.ts` spends MIN_HEADER_PX (90) + MIN_FOOTER_PX (51) on the
+         canvas's own bands, and `render/canvas.ts` degrades rider glyphs below a 12 px floor
+         pitch — 21 floors × 12 px + 141 px of bands ≈ 393, so 400 keeps the shipped tallest
+         tower legible. When the viewport genuinely cannot hold stage + chrome, #panel-run
+         scrolls (below) rather than the picture vanishing; the 767 px block's 60vh override
+         later in this sheet still wins on phones. `stageHeight.browser.test.ts` measures this in
+         a real browser at 1280×800 and 1440×1000. */
       .stage-wrap {
-        flex: 1; min-height: 0; position: relative; margin: 0 14px 8px;
+        flex: 1; min-height: 400px; position: relative; margin: 0 14px 8px;
         border: 1px solid var(--edge); border-radius: var(--r-card);
         overflow: hidden; background: var(--bg);
       }
+      /* The half that makes the floor above honest: with a real min-height the run panel's
+         content can exceed the column, and a `.stagecol` that is `overflow: hidden` would clip
+         the transport silently. Scrolling is the honest overflow — the stage keeps its size and
+         the provenance rows go below the fold instead of the building. */
+      #panel-run { overflow-y: auto; }
       #stage { width: 100%; height: 100%; display: block; }
       .alarm {
         position: absolute; left: 14px; top: 14px;
@@ -725,6 +749,42 @@
       /* The glyph half of every KB-15 pair, at the canvas's own characters. `--text` unless the
          entry tints it, so `▮ ▯ ◂▸ OOS ⏻` read as marks rather than as decoration. */
       .legend-glyph { color: var(--text); font-weight: 600; }
+
+      /* The race strip — GAMEPLAY §7.4, Everyday slice 4d. Two lanes under the stage, drawn as
+         SVG polylines with fixed viewBoxes so the strip scales with the column and the geometry
+         module (`live/raceStrip.ts#raceLaneOf`) never needs a pixel measurement. `vector-effect:
+         non-scaling-stroke` keeps the line weights honest under the non-uniform scale.
+
+         Colour, a stated deviation: the casual handoff draws *you* in its terracotta and the
+         ghost in grey. This shell's design language carries *yours* in `--accent` everywhere a
+         thing is the player's (the primary Run control, the selected chip), so the strip follows
+         the shell rather than importing one terracotta for one component — docs/12's pattern of
+         a deviation with the constraint that forced it, recorded in docs/18's register. The line
+         is never the only signal: it is heavier than the ghost's and the key below names both. */
+      .race {
+        display: flex; flex-direction: column; gap: 5px;
+        margin: 0 14px 10px; padding: 8px 10px;
+        border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel);
+        font: 500 11.5px var(--mono); color: var(--dim);
+      }
+      .race[hidden] { display: none; }
+      .race-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .race-pick { display: inline-flex; align-items: baseline; gap: 6px; color: var(--dim); }
+      .race-verdict { margin-left: auto; font-weight: 600; color: var(--text); }
+      .race-note { margin: 0; color: var(--faint); }
+      .race-lane { display: grid; grid-template-columns: 168px 1fr; gap: 8px; align-items: center; }
+      .race-lane-label { color: var(--faint); }
+      .race-lane svg {
+        width: 100%; height: 44px; display: block;
+        background: var(--card); border: 1px solid var(--edge); border-radius: 4px;
+      }
+      .race-line-you { fill: none; stroke: var(--accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+      .race-line-ghost { fill: none; stroke: var(--dimmer); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+      .race-sixty { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+      .race-key { display: flex; gap: 14px; align-items: baseline; }
+      .race-swatch-you { background: var(--accent); }
+      .race-swatch-ghost { background: var(--dimmer); }
+      .race-footer { margin: 0; color: var(--faint); }
 
       /* The transport, § 1.3 M5. */
       .transport {
@@ -832,6 +892,7 @@
       .goal-line { display: flex; gap: 7px; align-items: baseline; }
       .goal-glyph { font-size: 11px; flex: none; }
       .goal-label { font-size: 12px; line-height: 1.35; flex: 1; }
+      .goal-was { font: 500 10px var(--mono); color: var(--dimmer); flex: none; }
       .goal-got { font: 600 11px var(--mono); flex: none; }
       .goal-track { display: block; height: 4px; border-radius: 2px; background: var(--bg); margin-top: 5px; overflow: hidden; }
       .goal-fill { display: block; height: 100%; }
@@ -896,6 +957,12 @@
       }
       .report-meta { text-align: right; font: 500 11px/1.6 var(--mono); color: var(--dim); }
       .report-lede { font-size: 15px; line-height: 1.6; color: var(--dim); margin: 18px 0 0; }
+      /* The spectator's note above the sheet — § 14.1. Ink on the sheet's own paper, bordered on
+         the leading edge so it reads as a statement *about* the sheet rather than a line of it. */
+      .report-spectator-note {
+        margin: 0 0 16px; padding: 9px 12px; font: 500 12px/1.5 var(--sans);
+        color: var(--dim); border-left: 3px solid var(--accent); background: var(--panel);
+      }
       .report-figures {
         display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 1px; background: var(--edge); border: 1px solid var(--edge);
@@ -1008,6 +1075,11 @@
       .selector-arm-signature { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 4px; }
       .selector-arm-signature[hidden] { display: none; }
       .selector-arm .field { margin-top: 7px; }
+      .rule-row { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel); padding: 9px 11px; }
+      .rule-row-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .rule-row-word { font: 600 11px var(--mono); letter-spacing: 0.06em; color: var(--dim); }
+      .rule-row-readback { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 5px; }
+      .rule-row-lever { font: 500 10px var(--mono); color: var(--faint); line-height: 1.5; margin-top: 3px; }
 
       .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
       .dirty { font: 500 10.5px var(--mono); color: var(--warn); }
@@ -1489,6 +1561,11 @@
                  § S5's sentence steps *secondary text* aside; the traffic phase is not secondary,
                  it is what the run is read against, and it is six characters wide. -->
             <span class="phase-pill" id="phase-label"></span>
+            <!-- Slice 4b — the detected traffic pattern in force at the playhead, from the
+                 recording's own selector trace (schema 9). `hidden` until a run that built the
+                 detector provides one: an absent detector draws no placeholder that reads as a
+                 pattern, which is the same honesty rule the timeline keeps about unknown bands. -->
+            <span class="phase-pill" id="pattern-label" hidden></span>
           </div>
           <div class="topbar-day">
             <div class="topbar-day-name" id="day-label">Day 1</div>
@@ -1572,18 +1649,21 @@
                observations either way, and a deeper read belongs under the headline it explains. -->
           <div id="mood-drivers" style="margin-top: 12px"></div>
 
-          <!-- L4 — YOUR RUN. -->
+          <!-- L4 — YOUR RUN.
+
+               The eyebrow and the note are written from `watch/shell.ts` rather than authored here
+               — `docs/20` defect 7. Both said *your* over a stranger's day and neither could
+               branch, because static markup has no arms. The figures under them are the player's
+               week either way; what the spectator arm changes is the label, not the subject. -->
           <div class="eyebrow-row">
-            <span class="eyebrow">Your run</span>
+            <span class="eyebrow" id="run-eyebrow"></span>
             <span class="eyebrow-note eyebrow-note-strong" id="streak-line"></span>
           </div>
           <div class="card" style="margin-bottom: 14px">
             <div class="run-figures" id="run-figures"></div>
             <div style="padding: 12px 13px; border-top: 1px solid var(--edge)">
               <div class="history" id="history"></div>
-              <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.45">
-                Share of riders away within a minute. No losing — just a line you are trying to bend upward.
-              </p>
+              <p id="run-note" style="margin: 10px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.45"></p>
             </div>
           </div>
 
@@ -1756,6 +1836,62 @@
               <span class="legend-entry"><span class="legend-glyph">⏻</span>in service</span>
             </div>
 
+            <!-- ============================================================
+                 The race strip — GAMEPLAY §7.4, Everyday slice 4d.
+
+                 Two lanes against the clock, sampled every four simulated
+                 minutes: how long the people standing right now have stood
+                 (with a dashed sixty-second line), and how many are standing.
+                 Your line against a ghost's — a SECOND RECORDING of the same
+                 crowd, same seed, only the dispatcher differing — both
+                 replayed at the one playhead, so pause and speed drive both
+                 by construction.
+
+                 Every word here is written by `dev/main.ts#drawRaceStrip`
+                 from `live/raceStrip.ts`'s producers; the only static copy is
+                 the two lane labels and the key's "you". The picker's options
+                 come from `GHOST_OPTIONS`, never from markup. The footer is
+                 `RACE_FOOTER`, §7.4's permanent sentence, written from code
+                 so the string has one author and the honesty sweep drives it.
+                 ============================================================ -->
+            <div class="race" id="race-strip" hidden>
+              <div class="race-head">
+                <span class="legend-title">The race</span>
+                <!-- Hidden while watching — § 14.1's *"no verdict — you are not in this
+                     comparison"*. It was merely disabled, which left the option list's own
+                     *your latest saved* on screen beside somebody else's day. -->
+                <label class="race-pick" id="race-pick">race against
+                  <select id="race-ghost"></select>
+                </label>
+                <span class="race-verdict" id="race-verdict"></span>
+              </div>
+              <p class="race-note" id="race-note"></p>
+              <div class="race-lane">
+                <span class="race-lane-label">how long people are waiting · dashes mark 60 s</span>
+                <svg viewBox="0 0 640 64" preserveAspectRatio="none" aria-hidden="true">
+                  <line id="race-sixty" class="race-sixty" x1="0" x2="640" y1="0" y2="0"></line>
+                  <polyline id="race-top-ghost" class="race-line-ghost" points=""></polyline>
+                  <polyline id="race-top-you" class="race-line-you" points=""></polyline>
+                </svg>
+              </div>
+              <div class="race-lane">
+                <span class="race-lane-label">still standing</span>
+                <svg viewBox="0 0 640 40" preserveAspectRatio="none" aria-hidden="true">
+                  <polyline id="race-bottom-ghost" class="race-line-ghost" points=""></polyline>
+                  <polyline id="race-bottom-you" class="race-line-you" points=""></polyline>
+                </svg>
+              </div>
+              <div class="race-key">
+                <!-- The key's own word is written from `watch/shell.ts` — `docs/20` defect 7. It
+                     read a literal "you" here, which is § 14.1's stated defect condition on a
+                     watched run and could not branch, because nothing wrote it. Both arms now have
+                     one author and the honesty sweep drives them; empty here, like `#race-note`. -->
+                <span class="legend-entry"><span class="legend-swatch race-swatch-you" aria-hidden="true"></span><span id="race-you-name"></span></span>
+                <span class="legend-entry" id="race-ghost-key" hidden><span class="legend-swatch race-swatch-ghost" aria-hidden="true"></span><span id="race-ghost-name"></span></span>
+              </div>
+              <p class="race-footer" id="race-footer"></p>
+            </div>
+
             <!-- M5 — the transport. -->
             <div class="transport">
               <div class="transport-row">
@@ -1852,6 +1988,13 @@
           <section role="tabpanel" id="panel-report" aria-labelledby="tab-report" hidden>
             <div class="sheet">
               <div class="report">
+                <!-- What this sheet is *of*, while a replay is on the stage — `docs/20` defect 7.
+                     Pressing Day report while watching showed the spectator's own last filed sheet
+                     with nothing saying it was not the run on screen. Written by
+                     `dev/main.ts#drawWatching` from `watch/shell.ts`, on both arms, and hidden the
+                     rest of the time: the sheet itself is untouched, which is § 14.1's own promise
+                     that the sheet the player left open is still theirs. -->
+                <p id="report-spectator-note" class="report-spectator-note" role="note" hidden></p>
                 <div class="report-head">
                   <div>
                     <div class="eyebrow">Vertical transportation — daily observation sheet</div>
@@ -2009,6 +2152,20 @@
                           <span class="dirty" id="selector-changed" hidden></span>
                         </div>
                       </div>
+                    </div>
+                    <!-- The Everyday rules editor — GAMEPLAY §11.5. Beneath the selector because
+                         it is the same kind of lever: applied over whoever is driving, and when
+                         rules are written they take the run (the selector panel says so). Every
+                         node below is written by dev/ruleEditor.ts; the only static text is the
+                         heading and the add button. -->
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline)">
+                      <div class="eyebrow" style="margin-bottom: 9px">Write your own rules — first match wins</div>
+                      <div style="display: grid; gap: 8px" id="rule-rows"></div>
+                      <div class="editor-actions">
+                        <button type="button" class="chip" id="rule-add">Add a rule</button>
+                      </div>
+                      <div class="selector-line" id="rule-fallback"></div>
+                      <p class="selector-note" id="rule-note" hidden></p>
                     </div>
                     <div class="summary-line" id="dispatcher-summary"></div>
                     <p class="advice" id="dispatcher-advice"></p>
@@ -2439,6 +2596,34 @@
             </div>
             <div class="instrument-body">
               <div class="instrument-form batch-report" id="batch-output" aria-label="Batch report"></div>
+            </div>
+            <!-- ============ Everyday Mode slice 7: the suite (docs/18 § Slice 7) ============ -->
+            <!--
+              One comparison over multiple fixed cells, beside the pairwise bench rather than in
+              place of it — §20.8 is inverted for this tree (the bench above IS the pairwise one;
+              the suite is what was missing). Sibling sections rather than children of the bench's
+              `.instrument-body`, because that container is a flex ROW: children inserted into it
+              lay out beside the report and intercept its clicks — found by the compare-lab
+              browser test, not by inspection. The cell ticks are NOT in this file: they render
+              from packages/experiments' MATRIX_CELLS at mount time, so the fixture list is
+              imported, never retyped, and a ninth cell appears with no edit here.
+            -->
+            <div class="instrument-bar">
+              <label>baseline <select id="suite-baseline"></select></label>
+              <label>candidate <select id="suite-candidate"></select></label>
+              <label title="50–200 replications per configuration is this project’s budget; below 50 every separating row refuses to name a winner">
+                replications <input id="suite-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
+              </label>
+              <label>seed <input id="suite-seed" size="18" inputmode="numeric" value="20260729" /></label>
+              <button id="suite-run">Run suite</button>
+              <button id="suite-cancel">Cancel</button>
+              <progress id="suite-progress" value="0" max="1" aria-label="suite progress"></progress>
+              <span id="suite-status" role="status"></span>
+              <span id="suite-error" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-bar" id="suite-cells" aria-label="Matrix cells to run"></div>
+            <div class="instrument-body">
+              <div class="instrument-form batch-report" id="suite-output" aria-label="Suite report"></div>
             </div>
           </section>
 

@@ -458,6 +458,27 @@ export interface SceneInput {
    */
   readonly mood?: BuildingMood | undefined;
   /**
+   * The dispatcher's **display name**, for the subtitle — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11.
+   *
+   * ## Why the recording's own field is not it
+   *
+   * `VizRecording.dispatcherProfileId` is an id, and on a profile the reader authored it is a
+   * *generated* one: the second dispatcher a player saves is `yours-1`. The header drew that
+   * string, under a building drawn by its display name, while every other surface in the product —
+   * the sheet's identity line, the drawer, the footer, the compare rows — said **Lobby holder**.
+   * A player who reads `yours-1` on the stage and `Lobby holder` on the sheet has two runs as far
+   * as they can tell.
+   *
+   * Passed in rather than looked up, for {@link SceneInput.overlay}'s reason and for one more:
+   * the id-to-name map is `data/dispatcher-profiles.json` plus whatever the reader has saved, which
+   * is `dev/state.ts`'s to know and not a renderer's. This is `shift/report.ts#dayReportOf`'s own
+   * idiom (`input.dispatcherName ?? recording.dispatcherProfileId`), spelled the same way here so
+   * the stage and the sheet fall back to the same string when a caller has no name to give — a
+   * headless probe, a fixture, a recording loaded from a file whose profile this build does not
+   * ship.
+   */
+  readonly dispatcherName?: string | undefined;
+  /**
    * The reader's disclosure level, for the strings on this canvas that have two registers.
    *
    * ## It reached `render/overlay.ts` and nothing else, and that claim has been retired
@@ -831,7 +852,9 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
 
   ctx.font = FONT;
   ctx.fillStyle = theme.textDim;
-  const meta = `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
+  // The name a reader knows this dispatcher by, never the generated id. See
+  // {@link SceneInput.dispatcherName} for why the renderer is handed it rather than resolving one.
+  const meta = `${input.dispatcherName ?? recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
   ctx.fillText(meta, 12, layout.header.metaY);
 
   ctx.textAlign = 'right';
@@ -917,13 +940,30 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
    * factored into one condition because the engineer arm's *first* branch is not a suppression
    * test — it reports saturation, which is a fact about the queues — and collapsing them would
    * make the two lines look like one decision when they are two.
+   *
+   * ## And it waits for the playhead — `docs/19` defect 4, {@link undeliveredAt}'s rule again
+   *
+   * Every clause on this arm is a verdict about the **finished** run — `SATURATED`, and *the
+   * queues never settled during this run*, past tense — and it was drawn from the first frame of
+   * playback, over a building whose queues had not formed yet. That is the same class § D307's
+   * temporal axis caught in the undelivered count two clauses up, closed the same way: the
+   * whole-run sentence appears when {@link playheadHasReachedEnd}, and not before.
+   *
+   * What a mid-run frame keeps is the *so far* register the counters line already speaks:
+   * {@link meanClause} prints `no average` / `mean wait suppressed` at every playhead, gated on
+   * the same `meansAreSuppressed`, so a PNG exported mid-run still refuses the mean on the bitmap
+   * — § D294's concern — while claiming nothing about how the day ends. The engineer strings
+   * themselves are unchanged, byte for byte; what moved is *when* the banner earns them, which is
+   * the distinction § D299 § 1 permits. A decision number is owed for the gate.
    */
-  if (casual) {
-    if (meansAreSuppressed(recording)) {
-      banner.push(suppressionBannerFor(recording.summary.awtInvalidGround));
-    }
-  } else if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
-  else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
+  if (playheadHasReachedEnd(recording, frame)) {
+    if (casual) {
+      if (meansAreSuppressed(recording)) {
+        banner.push(suppressionBannerFor(recording.summary.awtInvalidGround));
+      }
+    } else if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
+    else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
+  }
   // `D10` — a call no car answered is never left to the landing selector alone. See
   // {@link SceneInput.unansweredCallFloorIds}.
   const unanswered = input.unansweredCallFloorIds ?? [];
@@ -1020,10 +1060,26 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
  * What does not move is the **gate**. Both registers ask `meansAreSuppressed`, so a mode cannot
  * become the surface that shows a mean the summary refuses — the defect this function exists to
  * have closed, one register later.
+ *
+ * ## And the refusal is dated — `docs/20` defect 3
+ *
+ * This row sits directly above the RIGHT NOW panel, and it is where a reader's eye lands first: the
+ * audit read `no average` here and `NO AVERAGE — A RESULT` eighty pixels below, at **14 %** of
+ * playback. The panel's verdict is now gated on the playhead
+ * (`mode/disclosure.ts#casualRefusalFor`), and this line takes the same treatment for the same
+ * reason — a refusal a reader meets under the words *so far* may not be the finished day's answer.
+ *
+ * The **withholding is unchanged at every playhead**, which is the half that may not move: § D294
+ * refused, on this canvas, to un-gate a figure to fix a sentence, because a PNG exported mid-run has
+ * no later. What changes is one word. The engineer's string is byte-identical in both registers and
+ * `canvas.test.ts` pins it — § D299 § 1 permits Casual to be made legible and forbids paying for it
+ * out of Engineer, and *suppressed* is a statement about the statistic rather than about the day.
  */
 function meanClause(recording: VizRecording, frame: Frame, casual = false): string {
   if (meansAreSuppressed(recording)) {
-    return casual ? NO_AVERAGE_LEAD.toLowerCase() : 'mean wait suppressed';
+    if (!casual) return 'mean wait suppressed';
+    const head = NO_AVERAGE_LEAD.toLowerCase();
+    return playheadHasReachedEnd(recording, frame) ? head : `${head} yet`;
   }
   const mean = frame.runningMeanWaitS;
   const label = casual ? 'average wait so far' : 'mean wait so far';

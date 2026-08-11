@@ -33,7 +33,7 @@ import { observationsAt } from '../live/observations.js';
 import { contractById } from '../shift/contracts.js';
 import { SHIFT_EVENTS } from '../shift/events.js';
 import type { ShiftEvent } from '../shift/types.js';
-import { GOAL_GLYPHS, goalsForDay, readGoals } from '../shift/goals.js';
+import { GOAL_GLYPHS, goalsForDay, PENDING_DISPLAY, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
   WITHHELD,
@@ -140,6 +140,8 @@ function reportOf(
   const week = closeDay(
     opened,
     outcomeOf({
+      record: null,
+      recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
@@ -217,6 +219,8 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
     week = closeDay(
       week,
       outcomeOf({
+        record: null,
+        recordRefusal: null,
         day,
         dayIdx: week.dayIdx,
         eventId: 'ordinary',
@@ -523,6 +527,41 @@ describe('the empty state, which is drawn rather than hidden', () => {
     expect(reportViewOf(undefined, runProgressOf({ recording: again, simTimeS: again.startedAt })))
       .toEqual(emptyReportView());
   });
+
+  it('speaks the refusal when a completed run stands unfileable — docs/19 defect 1', () => {
+    /*
+     * The audit's blocks-play trap, sheet half: a completed run `closeShift` refused got the same
+     * lede that tells the reader to press the button they (from their view) already pressed. The
+     * lede is now the refusal itself — `shift/banking.ts`'s sentence, unedited — while the title
+     * keeps the empty state's pinned name, which is what the menuExit browser suite reads.
+     */
+    const refusal = 'this run was set going by the page when it loaded, not by you';
+    const view = reportViewOf(undefined, { kind: 'played-out' }, undefined, undefined, 'advanced', {
+      refusal: `${refusal} — press “Run this shift”`,
+      fromPreviousSitting: false,
+    });
+    expect(view.title).toBe('Nothing filed yet');
+    expect(view.lede).toContain(refusal);
+    expect(view.lede).not.toContain('the sheet fills itself in');
+  });
+
+  it('connects the rail’s restored streak to the missing sheet — docs/19 defect 14', () => {
+    // After a reload the rail says *on a roll · 1/1 banked* from the restored week; the sheet says
+    // why it cannot show that day: the sheet is an account of a run, and the run is not restored.
+    const view = emptyReportView({ refusal: undefined, fromPreviousSitting: true });
+    expect(view.title).toBe('Nothing filed yet');
+    expect(view.lede).toContain('previous sitting');
+    expect(view.lede).toContain('not kept');
+    // The advice survives, because it is now true advice: the next day the player runs will file.
+    expect(view.lede).toContain('Run this shift');
+  });
+
+  it('gives the refusal precedence when both facts hold', () => {
+    // A reload mid-campaign followed by watching boot's run to its end raises both; the completed
+    // run standing on the stage is the thing the reader is looking at.
+    const view = emptyReportView({ refusal: 'the refusal sentence', fromPreviousSitting: true });
+    expect(view.lede).toBe('the refusal sentence');
+  });
 });
 
 describe('a filed sheet may not describe a day the screen has not reached — issue #16, § D223', () => {
@@ -823,15 +862,71 @@ describe('a week’s slots are absent, not blank, on a run that has no week', ()
     expect(reportViewOf(report).nextStep).toBe(report.nextStep);
   });
 
-  it('draws the same figures, goals, diagnosis and levers on either shape', () => {
+  it('draws the same figures, diagnosis and levers on either shape', () => {
+    /*
+     * `goals` and `verdictColour` left this list with `docs/19` defect 13: the readings survive on
+     * both shapes but the single run's rows are ungraded and its banner uncoloured — the suite one
+     * screen down owns that. What may never differ is what the sheet *publishes*: the figure grid,
+     * the diagnosis, the levers and the small print are the same values on both.
+     */
     const week = reportViewOf(reportOf(clean));
     const single = reportViewOf(reportOf(clean, 4, SINGLE));
     expect(single.figures).toEqual(week.figures);
-    expect(single.goals).toEqual(week.goals);
     expect(single.diagnosis).toEqual(week.diagnosis);
     expect(single.levers).toEqual(week.levers);
     expect(single.smallPrint).toBe(week.smallPrint);
-    expect(single.verdictColour).toBe(week.verdictColour);
+  });
+
+  it('reads the goals without grading them, and says so — docs/19 defect 13', () => {
+    /*
+     * The audit's question was *"Cleared what?"*: the sheet showed ✓s and **Shift cleared**
+     * against bars no contract issued. The readings stay (label, observed value, `was`), because
+     * the rail reads the same goals against the same observations and a sheet that dropped them
+     * would put the two surfaces in silent disagreement. What goes is the grade's every channel:
+     * glyph, colour, background — and the `title` says why in words (KB-15).
+     */
+    const week = reportViewOf(reportOf(clean));
+    const single = reportViewOf(reportOf(clean, 4, SINGLE));
+    expect(single.goals.map((row) => row.label)).toEqual(week.goals.map((row) => row.label));
+    expect(single.goals.map((row) => row.display)).toEqual(week.goals.map((row) => row.display));
+    for (const row of single.goals) {
+      expect(row.glyph, row.label).toBe('·');
+      expect(row.glyph).not.toBe('✓');
+      expect(row.help).toContain('not graded');
+      expect(row.colour).toBe('var(--dimmer)');
+    }
+    // The heading is reframed on this shape only: the markup's *The shift asked for* is a claim
+    // about a contract, and no contract asked.
+    expect(single.goalsHeading).toBe('What a scenario would ask — read, not graded');
+    expect(week.goalsHeading).toBeUndefined();
+    // And the banner is neutral rather than green — a colour may not carry the grade the words
+    // withdrew.
+    expect(single.verdictColour).toBe('var(--dim)');
+    expect(single.verdictLine).toContain('not graded');
+    expect(week.verdictColour).toBe('var(--ok)');
+  });
+
+  it('leaves a pending row’s own honesty alone on a single run', () => {
+    // A quiet free-play morning is ungraded for the building's reason, not the contract's; its
+    // em dash and its own help sentence are already the honest rendering.
+    const goal = goalsForDay(4)[0];
+    if (goal === undefined) throw new Error('goalsForDay(4) produced no goals');
+    const pendingLine = {
+      reading: {
+        goal,
+        state: 'pending' as const,
+        display: PENDING_DISPLAY,
+        glyph: '·',
+        observed: null,
+        progressPct: 0,
+      },
+      was: PENDING_DISPLAY,
+    };
+    const report = reportOf(clean, 4, SINGLE);
+    if (report.of !== 'single-run') throw new Error('expected a single-run sheet');
+    const view = reportViewOf({ ...report, goals: [pendingLine] });
+    const row = view.goals[0];
+    expect(row?.help).toContain('had not woken up');
   });
 
   it('holds every rule of this suite on a single run’s sheet too', () => {
@@ -873,7 +968,7 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   it('gives every state a glyph and a word, not only a colour', () => {
     const seen = new Set<string>();
     for (const state of ['met', 'missed', 'pending'] as const) {
-      const row = goalRowViewOf(reading(state));
+      const row = goalRowViewOf({ reading: reading(state), was: '—' });
       expect(row.glyph).toBe(GOAL_GLYPHS[state]);
       expect(row.help.length).toBeGreaterThan(0);
       seen.add(row.colour);
@@ -884,10 +979,17 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   });
 
   it('draws a pending goal as neither met nor missed', () => {
-    const row = goalRowViewOf(reading('pending'));
+    const row = goalRowViewOf({ reading: reading('pending'), was: '—' });
     expect(row.background).toBe('transparent');
     expect(row.help).toContain('not graded');
     expect(row.display).toBe('—');
+  });
+
+  it('dresses the "was" slot as the rail does — the word only when there is a figure', () => {
+    // One spelling of yesterday on both surfaces: `dev/leftRail.ts#goalRowsOf` makes the same
+    // two-way choice, and a sheet that said `was —` would dress an absence as a measurement.
+    expect(goalRowViewOf({ reading: reading('met'), was: '—' }).was).toBe('—');
+    expect(goalRowViewOf({ reading: reading('met'), was: '91%' }).was).toBe('was 91%');
   });
 });
 

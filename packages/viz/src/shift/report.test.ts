@@ -28,6 +28,7 @@
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { DATA_DIR, fixtureConfig, fixtureSummary } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import type { VizRecording, VizSummary } from '../contract/types.js';
@@ -40,6 +41,9 @@ import { contractById } from './contracts.js';
 import { SHIFT_EVENTS, eventFor } from './events.js';
 import { goalsForDay } from './goals.js';
 import { observationsAt } from '../live/observations.js';
+// `docs/20` defect 4 — the rail's fourth band label, derived rather than retyped. See the test
+// that asserts the two *stairs* cohorts share no phrase.
+import { WAIT_BANDS } from '../live/bands.js';
 import { shiftObservationsOf } from './observations.js';
 
 /**
@@ -58,6 +62,7 @@ import {
   averageWaitFigure,
   clockOf,
   dayReportOf,
+  type DayReportInput,
   type ReportSubject,
   type ShapedDayReport,
   type ShiftPlan,
@@ -147,6 +152,8 @@ function reportOf(
   const week = closeDay(
     opened,
     outcomeOf({
+      record: null,
+      recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
@@ -174,7 +181,7 @@ function reportOf(
 function figure(
   report: ShapedDayReport,
   id: string,
-): { value: string; note: string; tone: string; axisOnly: boolean } {
+): { label: string; value: string; note: string; tone: string; axisOnly: boolean } {
   const found = report.figures.find((candidate) => candidate.id === id);
   if (found === undefined) throw new Error(`no figure "${id}" on the sheet`);
   return found;
@@ -250,6 +257,13 @@ describe('AVERAGE WAIT', () => {
     const noReason = averageWaitFigure(fixtureSummary({ saturated: true, awtIsValid: true }));
     expect(noReason.note.length).toBeGreaterThan(20);
   });
+
+  it('numbers a one-leg denominator in the singular — docs/19 defect 8’s “over 1 legs”', () => {
+    // A window can legitimately carry one served leg, and R13 makes the count part of what the
+    // mean means — so its grammar is asserted, not left to luck.
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 1 })).note).toContain('over 1 leg in');
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 2 })).note).toContain('over 2 legs in');
+  });
 });
 
 describe('the observations, which are never suppressed', () => {
@@ -304,6 +318,104 @@ describe('the observations, which are never suppressed', () => {
   });
 });
 
+describe('TOOK THE STAIRS names its true cohort, and the people can be totalled — docs/19 defect 3', () => {
+  /*
+   * The audit's Midtown day 1: `CARRIED 768 of 768 who turned up` beside `TOOK THE STAIRS 348`
+   * with a caption claiming a disjoint cohort — 1 116 people out of 768. The count is an
+   * *attribute* (a wait that crossed the horizon), the overlap with CARRIED is real, and the note
+   * now states it from `Observations.abandonedCarried`, the run's own split.
+   */
+  const withStairs = (overrides: Partial<Observations>): string => {
+    const report = dayReportOf({
+      recording: saturated,
+      observations: { ...observationsOfRun(saturated), ...overrides },
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'week-day' },
+    });
+    return figure(report, 'stairs').note;
+  };
+
+  it('says the overlap outright when every horizon-crosser was still carried — the audit’s shape', () => {
+    const note = withStairs({ abandoned: 348, abandonedCarried: 348 });
+    expect(note).toContain('every one of them is inside CARRIED too');
+    expect(note).toContain('overlap rather than add');
+  });
+
+  it('says the disjoint case as the gap in CARRIED’s own denominator', () => {
+    const note = withStairs({ abandoned: 51, abandonedCarried: 0 });
+    expect(note).toContain('never carried');
+    expect(note).toContain('CARRIED’s');
+  });
+
+  it('splits a mixed day with the run’s own count on the carried side', () => {
+    const note = withStairs({ abandoned: 10, abandonedCarried: 4 });
+    expect(note).toContain('4 of them were still carried');
+  });
+
+  it('names the run’s own horizon, never a hard-coded fifteen minutes', () => {
+    expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 900 })).toContain('15-minute');
+    expect(withStairs({ abandoned: 3, abandonedCarried: 3, horizonS: 600 })).toContain('10-minute');
+    expect(withStairs({ abandoned: 0, abandonedCarried: 0 })).toContain('give-up horizon');
+  });
+
+  it('no surface on the sheet claims these riders left — the old wording is gone', () => {
+    const report = reportOf(saturated);
+    const everything = JSON.stringify(report);
+    expect(everything).not.toContain('gave up and took the stairs');
+    expect(everything).not.toContain('counted here and nowhere else');
+  });
+
+  /**
+   * The two *stairs* cohorts may not share a phrase — `docs/20` defect 4, `docs/12` § 4.11.
+   *
+   * The left rail's fourth mood band and this cell were both called *taking the stairs*, on one
+   * screen, with two different numbers under them (534 against 288) and the cell's own note saying
+   * all 288 of the second cohort **were carried**. Both labels are derived here rather than
+   * retyped — the cell's off a real report, the band's off `WAIT_BANDS` — so this fails if either
+   * surface drifts back onto the other's words, which no assertion inside a single module could
+   * catch.
+   *
+   * Compared on the distinctive phrase rather than on equality: *TOOK THE STAIRS* and *taking the
+   * stairs* are not equal strings and were exactly the collision.
+   */
+  it('does not share its words with the rail’s fourth mood band', () => {
+    const cellLabel = figure(reportOf(saturated), 'stairs').label.toLowerCase();
+    const bandLabel = WAIT_BANDS[WAIT_BANDS.length - 1]?.label.toLowerCase() ?? '';
+
+    expect(cellLabel).toContain('stairs');
+    expect(bandLabel).toContain('stairs');
+    // The verb is what separates them: one cohort has gone, the other is still standing there.
+    expect(cellLabel).toContain('took the stairs');
+    expect(bandLabel).not.toContain('took the stairs');
+    expect(bandLabel).not.toContain('taking the stairs');
+  });
+
+  it('grounds the carry goal in arrivals including the horizon-crossers, so abandonment cannot flatter it', () => {
+    /*
+     * § D106's footing, asked of the carry bar: a rider who walks keeps their arrival (`VizLeg`
+     * carries no `abandonedAt`) and can never enter `carried`, so the percentage moves down or
+     * not at all when riders give up — unlike AWT, which abandonment improves by construction.
+     * Driven on the real run rather than argued: the identity below is the accounting the sheet
+     * now states in words.
+     */
+    const live = observationsAt(saturated, saturated.endedAt);
+    const observations = shiftObservationsOf(live);
+    expect(observations.carryPct).toBe(Math.round((live.carried / live.arrived) * 100));
+    // The walkers-or-still-standing share of the stairs count fits inside CARRIED's shortfall…
+    expect(observations.abandoned - observations.abandonedCarried).toBeLessThanOrEqual(
+      observations.arrived - observations.carried,
+    );
+    // …and the overlap fits inside both cells it belongs to.
+    expect(observations.abandonedCarried).toBeLessThanOrEqual(observations.abandoned);
+    expect(observations.abandonedCarried).toBeLessThanOrEqual(observations.carried);
+  });
+});
+
 describe('WORST WAIT states its censoring', () => {
   it('reports the run’s own longest wait', () => {
     const longest = clean.summary.serviceLevel.longestWaitS;
@@ -338,6 +450,19 @@ describe('WORST WAIT states its censoring', () => {
     const worst = figure(report, 'worst-wait');
     expect(worst.value).toBe('at least 640 s');
     expect(worst.note).toContain('lower bound');
+    // The window rides inline on the censored branch too — docs/19 defect 3's second half.
+    expect(worst.note).toContain(`the ${censored.reportWindow.id} window`);
+  });
+
+  it('labels its window inline, and points at the whole-shift reading beside it — docs/19 defect 3', () => {
+    /*
+     * Two figures called “worst wait” share the sheet: this cell (the reporting window's) and the
+     * goal row (the whole shift's), 1 488 s against 1 725 s on the audit's Midtown day. Each now
+     * says which it is where it stands, not only in the small print.
+     */
+    const worst = figure(reportOf(clean), 'worst-wait');
+    expect(worst.note).toContain(`the ${clean.summary.reportWindow.id} window`);
+    expect(worst.note).toContain('the goal row reads the whole shift');
   });
 
   it('reads "not recorded" — never 0 s — when the window held no arrivals', () => {
@@ -558,8 +683,60 @@ describe('where it went wrong is derived from the run', () => {
       expect(report.diagnosis.map((row) => row.id)).not.toContain('report-window');
       expect(report.smallPrint).toContain(recording.summary.reportWindow.id);
       expect(report.smallPrint).toContain(clockOf(recording.summary.reportWindow.startS));
-      expect(report.smallPrint).toContain('during the busiest five minutes');
+      /*
+       * `docs/20` defect 5. This used to pin *during the busiest five minutes*, and the phrase was
+       * a claim the sheet could not support: `summary.reportWindow` is labelled `peak-5min`
+       * whenever it is 300 s long, and the shift path only ever produced the **demand template's
+       * declared band**, not the busiest five minutes by arrivals. On Garden Apartments the band
+       * held **zero** of the day's arrivals on 14 of 500 seeds, and the sheet went on calling it
+       * the busiest.
+       *
+       * What replaces it refers to the span the sentence has already printed rather than
+       * characterising it — and the *absence* is pinned as hard as the presence, because a
+       * superlative reappearing here is the whole defect.
+       */
+      expect(report.smallPrint).toContain('during that window');
+      expect(report.smallPrint).not.toContain('busiest');
     }
+  });
+
+  /**
+   * The whole-shift rows say they are whole-shift rows — `docs/20` defect 6.
+   *
+   * The sheet publishes two windows and named neither on the rows: *the tightest moment* and *the
+   * worst of it* are the whole shift's deepest queue and the phase it fell in, while the figure
+   * grid four inches up quotes means over `summary.reportWindow`. On the audit's Chancery day those
+   * were 08:50 and 08:42–08:47.
+   *
+   * Both arms are asserted from the run's own numbers rather than from a snapshot of the words,
+   * because the clause states *which case this run is in* — see `windowRelationClause`. The
+   * predicate here is the same comparison the product makes, written out, so a run that stops being
+   * one case fails rather than quietly reading the other's sentence.
+   */
+  it('says on both diagnosis rows whether the worst moment is inside the window the means used', () => {
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      const observations = observationsOfRun(recording);
+      const at = observations.peakQueueAtS;
+      if (at === null) continue;
+      const window = recording.summary.reportWindow;
+      const inside = at >= window.startS && at < window.endS;
+
+      for (const id of ['peak-queue', 'peak-phase']) {
+        const row = report.diagnosis.find((entry) => entry.id === id);
+        expect(row?.why).toContain(`${window.id} window the means above are read over`);
+        expect(row?.why?.includes('That instant is inside')).toBe(inside);
+        expect(row?.why?.includes('two different parts of it')).toBe(!inside);
+      }
+    }
+  });
+
+  it('reconciles the two windows in the small print as well as on the rows', () => {
+    // A reconciliation that lives only on the thing being reconciled is not one: this is the
+    // paragraph a reader goes to when the heading and the figure grid disagree.
+    const smallPrint = reportOf(saturated).smallPrint;
+    expect(smallPrint).toContain('read the whole shift too');
+    expect(smallPrint).toContain('need not be inside the window the means came from');
   });
 
   it('files only rows that are events, on every run', () => {
@@ -650,9 +827,109 @@ describe('the rest of the sheet', () => {
     expect(meta).not.toContain(SHIFT_EVENTS['move-in'].name);
   });
 
+  it('carries the intervention log, one line per press in time order — docs/19 defect 10', () => {
+    /*
+     * The audit's finding: the stamp lived only on the stage, so the filed sheet of an intervened
+     * day was indistinguishable from an untouched one. The lines are `interventionLogOf`'s — the
+     * stage stamp's own verbs and clock — so this asserts the exact sentence the stage showed,
+     * with the log handed over out of order to prove the sheet holds *in time order* itself.
+     */
+    const sheet = (interventions: DayReportInput['interventions']): readonly string[] =>
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        interventions,
+      }).metaLines;
+    const meta = sheet([
+      { atS: 2 * 3600, change: { kind: 'park-cars-lobby' } },
+      { atS: 30 * 60, change: { kind: 'park-cars-lobby' } },
+    ]);
+    // 06:00 + 0:30 and 06:00 + 2:00, restored to time order.
+    const stamps = meta.filter((line) => line.includes('parked the cars in the lobby'));
+    expect(stamps).toEqual([
+      '06:30 · parked the cars in the lobby',
+      '08:00 · parked the cars in the lobby',
+    ]);
+    // An untouched day prints nothing — no placeholder line, and an absent key is the empty log
+    // (core's own contract, `sim/interventions.test.ts`).
+    expect(sheet(undefined).some((line) => line.includes('parked'))).toBe(false);
+    expect(sheet(undefined)).toEqual(sheet([]));
+  });
+
+  it('names the rules the run was driven by, in the editor’s own readback — docs/20 defect 2', () => {
+    /*
+     * The audit's finding: a rule governed the run, the stage header named it live for forty
+     * minutes, and the filed sheet said *"Midtown Office · Conventional collective"* with the word
+     * **rule** on it zero times. `docs/19` defect 10 exactly, on the mechanism that landed after it
+     * was fixed.
+     *
+     * Asserted through `readbackOf` rather than against a typed literal, because the claim is that
+     * the sheet, the editor's readback and the stage pill are three renderings of **one** producer.
+     * A literal here would pass on the day somebody rewrote the readback and left the sheet behind,
+     * which is the disagreement the shared producer exists to prevent.
+     */
+    const sheet = (ruleRows: DayReportInput['ruleRows']): readonly string[] =>
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        dispatcherName: 'Conventional collective',
+        ruleRows,
+      }).metaLines;
+
+    const rows: readonly RuleRow[] = [
+      { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
+      { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
+    ];
+    const meta = sheet(rows);
+    expect(meta).toContain(`rule 1 · ${readbackOf(rows[0] as RuleRow)}`);
+    expect(meta).toContain(`rule 2 · ${readbackOf(rows[1] as RuleRow)}`);
+    // The ordinals are the first-match order the engine reads them in, not a set.
+    expect(meta.findIndex((line) => line.startsWith('rule 1'))).toBeLessThan(
+      meta.findIndex((line) => line.startsWith('rule 2')),
+    );
+    // And the relationship to the dispatcher on the identity line above, stated once, under the
+    // list — the question a sheet naming both otherwise leaves a reader holding.
+    expect(meta).toContain(fallbackLineOf('Conventional collective'));
+
+    // A day with no rules prints nothing: no ordinal, no fallback line, no caption over nothing.
+    expect(sheet(undefined).some((line) => line.startsWith('rule '))).toBe(false);
+    expect(sheet(undefined).some((line) => line.includes('If no rule fits'))).toBe(false);
+    expect(sheet(undefined)).toEqual(sheet([]));
+  });
+
+  it('carries the log on a single run too — a free-play day can be intervened in', () => {
+    const meta = dayReportOf({
+      recording: clean,
+      observations: observationsOfRun(clean),
+      goals: goalsForDay(4),
+      week: openWeek('c2'),
+      contract: contractById('c2'),
+      event: SHIFT_EVENTS.ordinary,
+      plan: PLAN,
+      calendar: null,
+      subject: { kind: 'single-run', selection: SELECTION },
+      interventions: [{ atS: 30 * 60, change: { kind: 'park-cars-lobby' } }],
+    }).metaLines;
+    expect(meta).toContain('06:30 · parked the cars in the lobby');
+  });
+
   it('clears the shift when every goal was met', () => {
     const report = reportOf(clean);
-    expect(report.goals.every((reading) => reading.state === 'met')).toBe(true);
+    expect(report.goals.every((line) => line.reading.state === 'met')).toBe(true);
     expect(report.verdict).toBe('cleared');
     expect(report.verdictLine).toBe('Shift cleared');
   });
@@ -788,6 +1065,54 @@ describe('the rest of the sheet', () => {
     expect(report.contractLine).not.toContain('5 of');
   });
 
+  it('stops asking for zero more clean shifts once the scenario stands cleared — docs/19 defect 9', () => {
+    /*
+     * The audit's repro: `week.cleared` is the banner of the day that earned it and `nextDay`
+     * clears it on purpose, so every later day on a cleared scenario fell through to *"Bank 0 more
+     * clean shifts on this building and the next assignment opens"*. The branch's condition is
+     * `contractStatus` — `week.completed`, the same expression the scenario card reads and the one
+     * `closeDay`'s clearing guard negates — so this case drives the exact state the audit saw: the
+     * contract in `completed`, the banner gone.
+     */
+    const report = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: { ...openWeek('c2'), cleanRun: 2, completed: ['c2'], cleared: null },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(report.taught).not.toContain('Bank 0 more');
+    expect(report.taught).toContain('already cleared');
+    // The reward is restated as standing open rather than promised again as next.
+    expect(report.taught).toContain(contractById('c2')?.reward ?? '');
+    // And the day that earns the clear still gets the banner's own sentence, not this one.
+    const clearedDay = weekDay(
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: {
+          ...openWeek('c2'),
+          cleanRun: 2,
+          completed: ['c2'],
+          cleared: { contractId: 'c2', reward: contractById('c2')?.reward ?? '', nextContractId: 'c3', nextTitle: 'x' },
+        },
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+      }),
+    );
+    expect(clearedDay.taught).toContain('Cleared:');
+  });
+
   it('grades a reader’s own building without pretending it banks anything', () => {
     const report = weekDay(
       dayReportOf({
@@ -918,7 +1243,7 @@ describe('one judgement, four sentences — issue #53', () => {
     expect(summary.awtIsValid).toBe(true);
     const report = reportOf(missedWithoutSaturating);
     expect(report.verdict).toBe('missed');
-    expect(report.goals.some((reading) => reading.state === 'missed')).toBe(true);
+    expect(report.goals.some((line) => line.reading.state === 'missed')).toBe(true);
   });
 
   it('cannot congratulate a day the banner says was missed — the reported defect', () => {
@@ -1025,10 +1350,10 @@ describe('one judgement, four sentences — issue #53', () => {
 
   it('names the bars that went unmet rather than only that some did', () => {
     const report = reportOf(missedWithoutSaturating);
-    const unmet = report.goals.filter((reading) => reading.state === 'missed');
+    const unmet = report.goals.filter((line) => line.reading.state === 'missed');
     expect(unmet.length).toBeGreaterThan(0);
-    for (const reading of unmet) expect(report.lede).toContain(reading.goal.label);
-    for (const reading of report.goals.filter((r) => r.state === 'met')) {
+    for (const { reading } of unmet) expect(report.lede).toContain(reading.goal.label);
+    for (const { reading } of report.goals.filter((line) => line.reading.state === 'met')) {
       expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
     }
   });
@@ -1048,7 +1373,7 @@ describe('one judgement, four sentences — issue #53', () => {
      * unmet would be false, and saying nothing would be `docs/10` R3's blank. It still says why.
      */
     const report = sheetWith(clean, goalsForDay(4), tooQuiet(clean));
-    expect(report.goals.every((reading) => reading.state === 'pending')).toBe(true);
+    expect(report.goals.every((line) => line.reading.state === 'pending')).toBe(true);
     expect(report.verdict).toBe('ungraded');
     expect(report.verdictLine).toBe('Too quiet to grade');
     expect(report.lede).toContain('Too quiet to grade');
@@ -1056,7 +1381,7 @@ describe('one judgement, four sentences — issue #53', () => {
     expect(report.lede).toContain(`${String(WAKE_UP_ARRIVALS)}`);
     expect(report.lede).toContain('4 people called');
     // And no goal named, on a day none was read.
-    for (const reading of report.goals) {
+    for (const { reading } of report.goals) {
       expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
     }
     expect(report.lede).not.toContain('A day it could handle');
@@ -1137,7 +1462,10 @@ describe('the levers point at what this run showed — issue #55', () => {
     });
     const body = leverBody(weekDay(one), 'add-a-car');
     expect(body).toContain('1 leg never boarded at all');
-    expect(body).toContain('1 rider gave up and took the stairs');
+    // *Waited past the give-up horizon*, not *gave up and took the stairs* — `docs/19` defect 3:
+    // the count is an attribute of a wait, and these riders may all be inside CARRIED.
+    expect(body).toContain('1 rider waited past the give-up horizon');
+    expect(body).not.toContain('gave up and took the stairs');
     expect(body).not.toContain('1 legs');
     expect(body).not.toContain('1 riders');
   });
@@ -1156,7 +1484,7 @@ describe('the levers point at what this run showed — issue #55', () => {
     });
     const body = leverBody(weekDay(many), 'add-a-car');
     expect(body).toContain('4 legs never boarded at all');
-    expect(body).toContain('7 riders gave up and took the stairs');
+    expect(body).toContain('7 riders waited past the give-up horizon');
   });
 
   it('quotes counts, and never a figure the run refuses', () => {
@@ -1249,7 +1577,7 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
       report.nextStep.label,
       report.nextStep.why,
       ...report.figures.flatMap((cell) => [cell.label, cell.value, cell.note]),
-      ...report.goals.map((reading) => reading.goal.label),
+      ...report.goals.map((line) => line.reading.goal.label),
       ...report.diagnosis.flatMap((row) => [row.when, row.what, row.why]),
       ...report.levers.flatMap((lever) => [lever.title, lever.body]),
     ];
@@ -1370,6 +1698,11 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
      * The other half of the fix, and the half a reviewer should distrust first: § D106's two
      * `unranked` energy cells, the `WITHHELD` gate and `docs/10` R3/R11 govern the figure grid and
      * they are correct. The sheet's *shape* changed; nothing it publishes did.
+     *
+     * `verdictLine` left this list with `docs/19` defect 13 — it is no longer an observation the
+     * two shapes share but the one claim a single run may not make; the case below owns it. The
+     * `verdict` itself still matches, because the lede and the diagnosis heading were chosen
+     * through it (§ D237's one-key rule) and both remain observations about the day.
      */
     const week = weekDay(sheetOf({ kind: 'week-day' }));
     const single = singleRun(sheetOf(SINGLE));
@@ -1379,8 +1712,21 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
     expect(single.goals).toEqual(week.goals);
     expect(single.lede).toBe(week.lede);
     expect(single.verdict).toBe(week.verdict);
-    expect(single.verdictLine).toBe(week.verdictLine);
     expect(single.smallPrint).toBe(week.smallPrint);
+  });
+
+  it('announces no verdict on a run no contract graded — docs/19 defect 13', () => {
+    /*
+     * The audit's own question was *"Cleared what?"* — the free-play sheet said **Shift cleared**
+     * over goals no contract issued. The banner slot now carries a refusal to grade, worded in the
+     * report layer because two renderers draw it (`dev/reportPanel.ts` and `render/reportCard.ts`),
+     * and a fix in one would be the two-renderers defect issue #137 closed, reopened with words.
+     */
+    const single = singleRun(sheetOf(SINGLE));
+    expect(single.verdictLine).toBe('read, not graded — no scenario asked for this run');
+    expect(single.verdictLine).not.toContain('cleared');
+    // The week's sheet keeps its verdict — the refusal is about the shape, not the day.
+    expect(weekDay(sheetOf({ kind: 'week-day' })).verdictLine).toBe('Shift cleared');
   });
 });
 

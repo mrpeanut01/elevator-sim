@@ -34,10 +34,34 @@ import type { DayOutcome, GoalReading, WeekState } from './types.js';
 function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly GoalReading[] {
   const observations =
     kind === 'pending'
-      ? { arrived: 3, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 }
+      ? {
+          arrived: 3,
+          carryPct: 100,
+          minutePct: 100,
+          peakQueue: 0,
+          abandoned: 0,
+          worstWaitS: 20,
+          worstWaitIsCensored: false,
+        }
       : kind === 'met'
-        ? { arrived: 400, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 }
-        : { arrived: 400, carryPct: 10, minutePct: 10, peakQueue: 99, abandoned: 9 };
+        ? {
+            arrived: 400,
+            carryPct: 100,
+            minutePct: 100,
+            peakQueue: 0,
+            abandoned: 0,
+            worstWaitS: 40,
+            worstWaitIsCensored: false,
+          }
+        : {
+            arrived: 400,
+            carryPct: 10,
+            minutePct: 10,
+            peakQueue: 99,
+            abandoned: 9,
+            worstWaitS: 940,
+            worstWaitIsCensored: false,
+          };
   return readGoals(goalsForDay(day), observations);
 }
 
@@ -47,6 +71,8 @@ function day(
   minutePct = kind === 'met' ? 90 : 40,
 ): DayOutcome {
   return outcomeOf({
+    record: null,
+    recordRefusal: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',
@@ -97,6 +123,8 @@ describe('unjudged is not passed', () => {
     // `every` over an empty array is `true`, which would make a shift with nothing to prove
     // indistinguishable from one that proved everything.
     const outcome = outcomeOf({
+      record: null,
+      recordRefusal: null,
       day: 1,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -430,6 +458,8 @@ describe('purity', () => {
 describe('re-closing the same day replays it rather than adding to it', () => {
   const cleanDay = (day: number): DayOutcome =>
     outcomeOf({
+      record: null,
+      recordRefusal: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -440,6 +470,8 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     });
   const missedDay = (day: number): DayOutcome =>
     outcomeOf({
+      record: null,
+      recordRefusal: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',

@@ -359,8 +359,13 @@ describe('every parameter core declares is accounted for', () => {
     // `data/traffic-profiles.json` with its reasoning attached, and a second copy here would be a
     // second source of truth — so it lands in `space.unsearchable` and `SPACE.parameters.length`
     // does not move.
-    expect(rows).toBe(130);
-    expect(SPACE.parameters.length).toBe(58);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
+    //
+    // **And one more from Everyday Mode slice 4c**: `idle.parkingFloorIndex`, the floor the new
+    // `fixed-floor` parking strategy heads for. Authorable (`idle.parkingFloorIndex` on the
+    // profile schema), gated on `idle.parkingStrategy: fixed-floor`, so it moves the space as
+    // well as the row count.
+    expect(rows).toBe(131);
+    expect(SPACE.parameters.length).toBe(59);    // Both verdicts occur, and neither is the whole set: an oracle that always said `true` or
     // always said `false` would satisfy the biconditional above only by accident.
     expect(authorable).toBeGreaterThan(0);
     expect(authorable).toBeLessThan(rows);
@@ -665,7 +670,7 @@ describe('the space can be read at its defaults and narrowed', () => {
     // because nothing can read `idle.parkingStrategy` — a search that quietly became narrower
     // than it was asked to be.
     const idle = subspace(SPACE, (parameter) => parameter.section === 'idle');
-    expect(idle.ids.length).toBe(9);
+    expect(idle.ids.length).toBe(10);
     expect(idle.defaults.size).toBe(SPACE.defaults.size);
 
     const parked: Candidate = new Map([['idle.parkingStrategy', 'lobby']]);

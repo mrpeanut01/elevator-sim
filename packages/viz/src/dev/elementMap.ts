@@ -50,6 +50,7 @@
  */
 
 import type { BatchPanelElements } from './batchPanel.js';
+import type { SuitePanelElements } from './suitePanel.js';
 import type { CampaignPanelElements } from './campaignPanel.js';
 
 /**
@@ -119,6 +120,12 @@ export interface HeaderElements {
   readonly buildingSub: HTMLElement;
   readonly clock: HTMLElement;
   readonly phaseLabel: HTMLElement;
+  /**
+   * Slice 4b — the selector's pattern-in-force beside the phase pill. Hidden, not emptied, when
+   * the run built no detector: `drawHeader` toggles `hidden` from the readout's own absence so
+   * nothing on the header reads as a pattern that was never detected.
+   */
+  readonly patternLabel: HTMLElement;
   readonly dayLabel: HTMLElement;
   readonly tenantsLine: HTMLElement;
   /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
@@ -151,6 +158,16 @@ export interface MoodElements {
 
 /** § 1.2 L4, L5 — YOUR RUN and TODAY'S SHIFT. */
 export interface ShiftElements {
+  /**
+   * L4's eyebrow and the note under its history bars — `docs/20` defect 7.
+   *
+   * Both were static markup reading *Your run* and *a line you are trying to bend upward*, six
+   * centimetres from a stranger's day with nothing saying which was which. They are written from
+   * `watch/shell.ts` on both arms now, which is the only way a string can have a spectator arm at
+   * all: nothing wrote them, so nothing could stop.
+   */
+  readonly eyebrow: HTMLElement;
+  readonly runNote: HTMLElement;
   readonly streakLine: HTMLElement;
   readonly runFigures: HTMLElement;
   readonly history: HTMLElement;
@@ -212,6 +229,44 @@ export interface StageElements {
 }
 
 /**
+ * GAMEPLAY §7.4 — the race strip and its ghost picker, under the stage (Everyday slice 4d).
+ *
+ * The strip's words come from `live/raceStrip.ts` and its geometry from `raceLaneOf`; `main.ts`'s
+ * `drawRaceStrip` only copies values onto these elements. The four polylines and the sixty-second
+ * line are SVG children with fixed `viewBox`es, so the strip scales without a resize observer and
+ * the geometry module needs no pixel measurements.
+ */
+export interface RaceElements {
+  /** The whole strip. Hidden when there is no run on screen. */
+  readonly root: HTMLElement;
+  /** The ghost picker. Options are built from `GHOST_OPTIONS`, never written in markup. */
+  readonly ghost: HTMLSelectElement;
+  /** The live verdict — or the plain figure with nobody picked, or a refusal, or the pending line. */
+  readonly verdict: HTMLElement;
+  /** `SAME_CROWD_NOTE` while a rival is drawn; empty with nobody. */
+  readonly note: HTMLElement;
+  /** §7.4's permanent footer, written from `RACE_FOOTER` so the string has one author. */
+  readonly footer: HTMLElement;
+  /**
+   * The picker's label, hidden while watching — § 14.1's *"no verdict — you are not in this
+   * comparison"*. Disabling the `<select>` left its own option list, *your latest saved* included,
+   * legible beside somebody else's day.
+   */
+  readonly pick: HTMLElement;
+  /** The key entry naming the player's line — `you`, or the watched run's name (`watch/shell.ts`). */
+  readonly youName: HTMLElement;
+  /** The key entry naming the grey line. Hidden with nobody — the strip never invents a rival. */
+  readonly ghostKey: HTMLElement;
+  readonly ghostName: HTMLElement;
+  readonly topYou: SVGPolylineElement;
+  readonly topGhost: SVGPolylineElement;
+  /** The dashed sixty-second line in the top lane. */
+  readonly sixty: SVGLineElement;
+  readonly bottomYou: SVGPolylineElement;
+  readonly bottomGhost: SVGPolylineElement;
+}
+
+/**
  * § 1.3 M5 — the transport, plus the provenance block under it (`docs/12` § 4.7).
  *
  * The six the handoff specifies are {@link playPause}, {@link timeline}, {@link playhead},
@@ -244,6 +299,14 @@ export interface TransportElements {
 
 /** § 1.3 M6 — the daily observation sheet. */
 export interface ReportElements {
+  /**
+   * What the sheet is *of* while a replay is on the stage — `docs/20` defect 7, § 14.1.
+   *
+   * Written by `dev/main.ts#drawWatching` and by nothing in `dev/reportPanel.ts`: the sheet is the
+   * player's own and stays untouched (§ 14.1, `watch/session.ts`), so the statement about it is a
+   * separate element with a separate writer rather than a clause the sheet's own view has to carry.
+   */
+  readonly spectatorNote: HTMLElement;
   readonly title: HTMLElement;
   readonly meta: HTMLElement;
   readonly lede: HTMLElement;
@@ -321,6 +384,23 @@ export interface SelectorEditorElements {
   readonly mapIssue: HTMLElement;
   readonly reset: HTMLButtonElement;
   readonly changed: HTMLElement;
+}
+
+/**
+ * The Everyday rules editor — GAMEPLAY §11.5's when/then rows, beneath the selector because it
+ * is the same kind of thing: a lever over whoever is driving, never a fork of a profile. The
+ * rows and both notes are written entirely by `dev/ruleEditor.ts`; the only static text is the
+ * heading and the add button.
+ */
+export interface RuleEditorElements {
+  /** The row list. One `.rule-row` per authored rule, in priority order. */
+  readonly rows: HTMLElement;
+  /** The add-a-rule button. */
+  readonly add: HTMLButtonElement;
+  /** *If no rule fits, Steady hand decides.* — always drawn; names the driving style. */
+  readonly fallback: HTMLElement;
+  /** The first-match exclusivity note. Hidden with no rows. */
+  readonly note: HTMLElement;
 }
 
 /** § 1.3 M9 — the traffic editor. */
@@ -481,6 +561,8 @@ export interface Elements {
   readonly decisionLog: HTMLElement;
   readonly coach: CoachElements;
   readonly stage: StageElements;
+  /** The race strip under the stage — GAMEPLAY §7.4, slice 4d. */
+  readonly race: RaceElements;
   readonly transport: TransportElements;
   readonly report: ReportElements;
   /** § 1.3 M7 — where the five scenario cards go. */
@@ -488,6 +570,8 @@ export interface Elements {
   readonly dispatcherEditor: DispatcherEditorElements;
   /** The weight-set selector, drawn inside the dispatcher surface. */
   readonly selectorEditor: SelectorEditorElements;
+  /** The Everyday rules editor, drawn beneath the selector — GAMEPLAY §11.5. */
+  readonly ruleEditor: RuleEditorElements;
   readonly trafficEditor: TrafficEditorElements;
   readonly machinesEditor: MachinesEditorElements;
   readonly buildingEditor: BuildingEditorElements;
@@ -502,6 +586,8 @@ export interface Elements {
   readonly paramRefusal: HTMLElement;
   /** The Compare surface's controls — `docs/10` § 11 **W3**. */
   readonly batch: BatchPanelElements;
+  /** The suite beside the bench — Everyday Mode slice 7, docs/18 § Slice 7. */
+  readonly suite: SuitePanelElements;
   /** The Campaign surface's controls — `docs/10` § 5, W5. */
   readonly campaign: CampaignPanelElements;
   readonly confirm: HTMLDialogElement;
@@ -532,6 +618,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     buildingSub: 'building-sub',
     clock: 'clock',
     phaseLabel: 'phase-label',
+    patternLabel: 'pattern-label',
     dayLabel: 'day-label',
     tenantsLine: 'tenants-line',
     viewMode: 'view-mode',
@@ -550,6 +637,8 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     stats: 'live-stats',
   }),
   shift: Object.freeze({
+    eyebrow: 'run-eyebrow',
+    runNote: 'run-note',
     streakLine: 'streak-line',
     runFigures: 'run-figures',
     history: 'history',
@@ -587,6 +676,22 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     legend: 'legend',
     legendTitle: 'legend-title',
   }),
+  race: Object.freeze({
+    root: 'race-strip',
+    ghost: 'race-ghost',
+    verdict: 'race-verdict',
+    note: 'race-note',
+    footer: 'race-footer',
+    pick: 'race-pick',
+    youName: 'race-you-name',
+    ghostKey: 'race-ghost-key',
+    ghostName: 'race-ghost-name',
+    topYou: 'race-top-you',
+    topGhost: 'race-top-ghost',
+    sixty: 'race-sixty',
+    bottomYou: 'race-bottom-you',
+    bottomGhost: 'race-bottom-ghost',
+  }),
   transport: Object.freeze({
     playPause: 'play-pause',
     timeline: 'timeline',
@@ -607,6 +712,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     landingSelect: 'landing-select',
   }),
   report: Object.freeze({
+    spectatorNote: 'report-spectator-note',
     title: 'report-title',
     meta: 'report-meta',
     lede: 'report-lede',
@@ -664,6 +770,12 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     mapIssue: 'selector-map-issue',
     reset: 'selector-reset',
     changed: 'selector-changed',
+  }),
+  ruleEditor: Object.freeze({
+    rows: 'rule-rows',
+    add: 'rule-add',
+    fallback: 'rule-fallback',
+    note: 'rule-note',
   }),
   trafficEditor: Object.freeze({
     editing: 'traffic-editing',
@@ -826,6 +938,22 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     status: 'batch-status',
     error: 'batch-error',
     output: 'batch-output',
+  }),
+  // Everyday Mode slice 7: the suite, beside the bench in the same Compare panel. The cell
+  // ticks have no ids of their own — they render from MATRIX_CELLS into `cells` at mount time,
+  // which is what keeps the fixture list imported rather than retyped into markup.
+  suite: Object.freeze({
+    baseline: 'suite-baseline',
+    candidate: 'suite-candidate',
+    replications: 'suite-replications',
+    seed: 'suite-seed',
+    cells: 'suite-cells',
+    run: 'suite-run',
+    cancel: 'suite-cancel',
+    progress: 'suite-progress',
+    status: 'suite-status',
+    error: 'suite-error',
+    output: 'suite-output',
   }),
   campaign: Object.freeze({
     stage: 'campaign-stage',

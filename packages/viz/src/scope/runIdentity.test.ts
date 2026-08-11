@@ -292,7 +292,7 @@ describe('every field the module is asked about has an answer, and no answer is 
     );
   });
 
-  it('asks about the three fields issue #129 is about, the four it always did, and patience', () => {
+  it('asks about the three fields issue #129 is about, the four it always did, patience, and the intervention log', () => {
     // Non-vacuity for the assertion above: a `fieldsAnsweredFor` that returned nothing would agree
     // with a `CARRY_CHECKS` that was empty, and both would be catastrophically wrong.
     //
@@ -300,12 +300,20 @@ describe('every field the module is asked about has an answer, and no answer is 
     // schema. It arrived here on the day it landed rather than on the day somebody remembered,
     // which is what the walk over `SCOPE_OF` was built for — the field was red in four cases of
     // this file before a line of it was written.
+    // `interventions` is the ninth and is Everyday Mode's slice 3: the stage's mid-run change of
+    // mind, the field the contract's own replay-verification would otherwise turn into an
+    // accusation. It arrived here the day the field landed, by the same walk that forced
+    // `patience` in — the probe was compulsory before this list knew the name.
+    // `ruleRows` is the tenth and is slice 4c: the Everyday rules, on `interventions`' exact
+    // footing — the empty list carries by object identity, and a written list has no wire field.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
       'commissioning',
+      'interventions',
       'levers',
       'outOfServiceCarIds',
       'patience',
+      'ruleRows',
       'savedClasses',
       'selectorSpec',
       'week',

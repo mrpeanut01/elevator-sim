@@ -62,6 +62,14 @@ export const loadFactorTerm: CostTermDefinition = Object.freeze({
   id: 'loadFactor',
   unit: '',
   measures: 'Penalty rising as the car approaches capacity',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'load factor',
+    serves: 'leaving room in a car',
+    atZero: 'cram them in',
+    atFull: 'leave room to board',
+  } as const),
   normalization: Object.freeze({ mode: 'bounded', fullScale: 1 } as const),
   evaluate: resultingLoadFactor,
 });

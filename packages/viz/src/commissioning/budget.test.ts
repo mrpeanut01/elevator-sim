@@ -108,6 +108,8 @@ describe('the budget does not reach a results page', () => {
     const week = closeDay(
       opened,
       outcomeOf({
+        record: null,
+        recordRefusal: null,
         day: opened.day,
         dayIdx: opened.dayIdx,
         eventId: 'ordinary',

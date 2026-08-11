@@ -224,6 +224,14 @@ export const rideTimeTerm: CostTermDefinition = Object.freeze({
   id: 'rideTime',
   unit: 's',
   measures: 'Estimated in-car time for the new passenger',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'ride time',
+    serves: 'time to destination',
+    atZero: 'short waits, long rides',
+    atFull: 'straight to the floor',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   activeWhen: Object.freeze({
     'dispatch.callType': Object.freeze(['destination-entry', 'mobile-credential']),

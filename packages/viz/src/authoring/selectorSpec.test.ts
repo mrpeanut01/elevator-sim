@@ -49,6 +49,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INPUT_PHRASES,
   PATTERN_LINES,
+  PATTERN_NAMES,
   POLICY_VALUES,
   SELECTOR_SCALAR_FIELDS,
   defaultSelectorSpec,
@@ -56,6 +57,7 @@ import {
   parameterIdFor,
   patternCards,
   patternLine,
+  patternName,
   patternSwitchingWithSelector,
   policyLine,
   profileWithSelector,
@@ -275,6 +277,23 @@ describe('derivations', () => {
     expect(patternLine('rush-hour')).toBeUndefined();
   });
 
+  it('has a player-facing name for exactly the patterns the shipped detector declares', () => {
+    // The header pill's vocabulary (slice 4b), under the same both-ways guard as the lines: a
+    // sixth pattern in `data/` fails here instead of reaching the header as rule 11's fallback,
+    // and a name for a dropped pattern fails too.
+    expect(Object.keys(PATTERN_NAMES).sort()).toEqual([...PATTERNS].sort());
+    for (const patternId of PATTERNS) {
+      const name = patternName(patternId);
+      expect(name, `no name for ${patternId}`).toBeDefined();
+      // A phrase for a pill, not a sentence and not an id: short, no full stop, and it is not
+      // the engine id wearing a name's clothes.
+      expect(name ?? '').not.toMatch(/\.$/u);
+      expect((name ?? '').length).toBeLessThanOrEqual(24);
+      expect(name).not.toBe(patternId);
+    }
+    expect(patternName('rush-hour')).toBeUndefined();
+  });
+
   it('says nothing about performance in any player-facing line', () => {
     /*
      * The one copy rule this module has, enforced rather than reviewed. Describing what a regime IS
@@ -286,6 +305,7 @@ describe('derivations', () => {
     const spec = { ...defaultSelectorSpec(CONTEXT), policy: 'fuzzy' as WeightSetPolicy };
     const copy = [
       ...Object.values(PATTERN_LINES),
+      ...Object.values(PATTERN_NAMES),
       ...Object.values(INPUT_PHRASES).flatMap((phrases) => [phrases.high, phrases.low]),
       ...PATTERNS.map((patternId) => signatureLine(patternId, CONTEXT) ?? ''),
       policyLine(spec, CONTEXT),

@@ -58,6 +58,14 @@ export const detourPenaltyTerm: CostTermDefinition = Object.freeze({
   id: 'detourPenalty',
   unit: 'passenger·s',
   measures: 'Added delay imposed on already-onboard passengers',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'detour penalty',
+    serves: 'fairness to whoever is aboard',
+    atZero: 'pick up on the way',
+    atFull: 'never divert a loaded car',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   evaluate: detourPassengerSeconds,
 });

@@ -1,5 +1,30 @@
 # Multi-agent execution plan
 
+> ## ↩️ REOPENED 2026-08-11 as the **Everyday Mode delivery** — the casual-mode design handoff.
+>
+> The board works `docs/design/design_handoff_casual_mode/BUILD_PLAN.md`: ten slices in
+> dependency order, one PR-sized lane per slice, all on branch
+> `claude/casual-gameplay-implementation-ycybr1` (PR **#153**). The handoff's own precedence rule
+> governs: the prototype wins layout and copy, the gameplay guide wins behaviour, the engine
+> contract wins numbers, and **the code wins anything about the existing tree** — which is why
+> every slice is verified against the tree before a builder is assigned (five of six issue claims
+> died on verification in wave 18; the plan's claims get no exemption).
+>
+> **Slices 0–2 are landed and pushed** (handoff vendored · player words beside the model in
+> `core`, issue #147 · the four plain levers as stateless views onto the vector, guide §20.1),
+> with the honesty corpus extended over the new surface. **Slice 3 is in build** — the
+> intervention run record (`run = { seed, config, interventions[] }`, guide §7.6, contract §1.4)
+> — on the scouted mechanism recorded in PR #153's body: interventions as data on
+> `SimulationConfig`, a stage-7 `idleOverride` through `RepositionContext`, a kernel wake event
+> at `atS` mirroring `serviceEvents`, prefix identity proven on the legs, and the stage control
+> landing in the same change so the field has a writer. **Slices 4–7 are in verification**
+> against the tree before any builder is scoped; 8–10 wait on their dependencies.
+>
+> Standing rules carried unchanged: move the control and require the run to change, compared on
+> the legs · no `## D3xx` headings from lanes — decision numbers are allocated at integration ·
+> corpus figures are measured once, on the integrated tree, or not at all · the suite re-runs
+> after every merge, not only after each branch.
+
 > ## ↩️ REOPENED 2026-07-31 as **wave 13** — the building-behaviour program.
 >
 > Wave 13 works `docs/14-building-behaviour-contract.md` steps 0–6: richer traffic variance,

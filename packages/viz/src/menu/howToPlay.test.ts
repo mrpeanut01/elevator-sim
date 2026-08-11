@@ -324,16 +324,28 @@ describe('the figures the guide quotes are the figures the code computes', () =>
     );
     expect(text, 'the carried ceiling moved').toContain(`${String(GOAL_BARS.carryMax)} %`);
     expect(text, 'the queue floor moved').toContain(`${String(GOAL_BARS.queueMin)} people`);
+    expect(text, 'the worst-wait floor moved').toContain(`${String(GOAL_BARS.worstMinS)} seconds`);
   });
 
-  it('quotes the wake-up threshold, and the horizon the goal itself names', async () => {
+  it('describes the four goals the shift layer actually asks, every day', async () => {
+    /*
+     * This test pinned the odd-day abandonment goal's label. That goal is retired — the
+     * worst-wait ceiling subsumes it (`shift/goals.ts#goalsForDay`) — so what is pinned now is
+     * the shape that replaced it: four goals, no alternation, and a guide that says so.
+     */
     const text = proseOf(await guide());
     expect(text).toContain(`under ${String(WAKE_UP_ARRIVALS)} arrivals`);
-    // The odd-day goal's own label, so the guide and the bar cannot drift apart.
-    const horizon = goalsForDay(1).find((goal) => goal.id === 'stairs');
-    expect(horizon, 'the abandonment goal is no longer offered on odd days').toBeDefined();
-    expect(horizon?.label).toContain('15-minute');
-    expect(text).toContain('15-minute');
+    expect(goalsForDay(1).map((goal) => goal.id)).toEqual([
+      'carry',
+      'minute',
+      'queue',
+      'worst-wait',
+    ]);
+    expect(text).toContain('four goals');
+    expect(text).toContain('worst wait');
+    expect(text, 'the guide must not resurrect the retired alternation').not.toContain(
+      'alternating by day',
+    );
   });
 
   it('describes the part-of-day control the menu actually offers, and does not predict the end', async () => {

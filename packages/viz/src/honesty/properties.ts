@@ -970,14 +970,40 @@ const WHOLE_RUN_COUNTS: readonly {
  *    detector, and it is why the live value comes from `observationsAt` rather than from arithmetic
  *    written here.
  *
- * ## The one role that is exempt, and why it is the opposite of a loophole
+ * ## The one role that is exempt, and why the exemption is now **half** what it was
  *
- * `role === 'reason'`. A refusal published early **withholds** a figure; R6 is a rule about
- * publishing an outcome, and a retraction is the absence of one. The rail's own retraction row —
- * *"the readings that fold the whole shift … are withheld until the playhead reaches the end"* — is
- * drawn **only** while the shift is unfinished, so a property that refused it would forbid the fix
- * § D293 landed. `role === 'label'` is exempt on the textual half alone, for R3's reason: a caption
- * carries a threshold, not a result.
+ * `role === 'reason'` is exempt from the **textual** half. A refusal published early withholds a
+ * figure; the textual half is a rule about *printing a count*, and a retraction prints none. The
+ * rail's own retraction row — *"the readings that fold the whole shift … are withheld until the
+ * playhead reaches the end"* — is drawn **only** while the shift is unfinished, so a property that
+ * refused it would forbid the fix § D293 landed. `role === 'label'` is exempt from the same half,
+ * for R3's reason: a caption carries a threshold, not a result.
+ *
+ * ## Why a refusal is **not** exempt from the structural half — `docs/20` defect 3
+ *
+ * The exemption used to be total, on the argument *"a refusal is the absence of a claim"*, and that
+ * sentence is true of a refusal and false of a **verdict**. `render/overlay.ts`'s RIGHT NOW panel
+ * drew, at 14 % of playback, under a label reading *average wait so far*:
+ *
+ * > **`NO AVERAGE — A RESULT`** … *"This run's own statistics refuse an average here. That is a
+ * > result, not a gap."*
+ *
+ * Nothing there is a figure, and every word of it is a claim about the **finished** day, published
+ * over a building whose queues had not formed yet. The search could not see it: the textual half
+ * looks for a number and there is none, and the structural half returned before it read the basis.
+ * So a whole class of early whole-run claims — the ones with no numeral in them — was outside the
+ * property that exists to catch early whole-run claims.
+ *
+ * The fix is to move the `continue`, not to widen a cue list. A refusal that **declares** it folds
+ * the whole run is asserting something about the whole run, whatever its role; a refusal that
+ * declares nothing, or declares `'now'`, is the retraction § D293 landed and is untouched. The
+ * rail's retraction seeds no basis (`honesty/surfaces.ts`'s MOOD adapter passes `driver?.basis`,
+ * `undefined` on that row) and so stays exempt in practice as well as in principle — which is the
+ * property the narrowing is safe by, and `honesty.test.ts` drives it rather than assuming it.
+ *
+ * The declaration this now reaches is `mode/disclosure.ts#CasualRefusal.basis`, produced beside the
+ * words themselves, in the module that owns the refusal's vocabulary — `MoodDriver.basis`'s pattern
+ * applied to the one kind of string that has no figure to declare a window for.
  */
 function checkWholeRunFigureEarly(
   context: HonestyContext,
@@ -993,9 +1019,13 @@ function checkWholeRunFigureEarly(
     if (at === undefined) continue;
     // The rule is *short of `endedAt`*, and it is the run's own comparison — see TextPlayhead.
     if (at.atS >= at.endedAt) continue;
-    // A refusal is the absence of a claim. See the docstring: this is § D293's own fix.
-    if (text.role === 'reason') continue;
 
+    /*
+     * The structural half runs on **every** role, refusals included — `docs/20` defect 3. A
+     * refusal that declares `'whole-run'` is a verdict about the finished day and is exactly what
+     * this half is for; a refusal that declares nothing, as § D293's retraction does, never
+     * reaches the branch below. See the docstring for what the total exemption cost.
+     */
     if (at.basis === 'whole-run') {
       found.push(
         violation(
@@ -1009,7 +1039,9 @@ function checkWholeRunFigureEarly(
       continue;
     }
 
-    if (text.role === 'label') continue;
+    // The textual half only. A refusal prints no count and a caption carries a threshold rather
+    // than a result — see the docstring's two paragraphs on the exemptions.
+    if (text.role === 'label' || text.role === 'reason') continue;
     let live = liveAt.get(at.atS);
     if (live === undefined) {
       live = observationsAt(context.recording, at.atS);
@@ -1049,6 +1081,147 @@ function checkWholeRunFigureEarly(
 }
 
 /* -------------------------------------------------------------------------- *
+ * § 12.2 — the withheld matrix
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A cell whose whole content is a zero-valued figure.
+ *
+ * Anchored at both ends on purpose: the forbidden thing is the **figure** being zero, not a zero
+ * inside a sentence. *"nothing banked yet — no shift has closed"* is the honest form of this cell and
+ * would carry a `0` the day somebody wrote *"0 days banked"*; that sentence is a count of what has
+ * happened, which is a real observation, and this rule is about an aggregate over an empty sample.
+ * `0/0` is here because a fraction with no denominator is the same defect wearing a ratio —
+ * `dev/leftRail.ts#runFiguresOf` already refuses to draw one and says why.
+ */
+const ZERO_FIGURE = /^[-+]?0(?:[.,]0+)?\s*(?:%|s|m|kJ|kj|pts?|points?)?$|^0\s*\/\s*0$/;
+
+/**
+ * A cell that is *working on it* — the second thing § 12.2 forbids, and the one nothing else here
+ * would catch.
+ *
+ * A spinner is honest in a build that is fetching something and dishonest in one that is not: this
+ * shell has no server, so a cell that says *loading* is promising an answer that is never coming
+ * (§ 16 rule 15's *"never a spinner"*, issue #123). Matched as the whole cell or as a lone ellipsis,
+ * because a sentence containing the word *loading* in some other sense is not a spinner.
+ */
+const SPINNER = /^[.…·\s]+$|^\s*(?:loading|fetching|updating|refreshing|please wait)\b/i;
+
+/** The em dash `docs/10` and the design both spell an unavailable figure with — `shift/goals.ts#PENDING_DISPLAY`. */
+const EM_DASH = '—';
+
+/**
+ * § 12.2 — **every combination of the withheld reasons renders `—` or a labelled unavailable state;
+ * none renders a zero, a spinner or a stale figure.**
+ *
+ * ## What is judged, and what puts a string in front of it
+ *
+ * Two populations, and they arrive by different routes:
+ *
+ * 1. Every string an adapter marked {@link RenderedText.withheld} — a cell drawn under one of
+ *    `generate.ts#withheldStates`' thirty-two combinations, in a state where the figure that
+ *    belongs in it may not be published. The adapter declares it because the state is not
+ *    recoverable from the words; see {@link WithheldFigure}.
+ * 2. Every string whose **role** is `suppressed`, wherever it came from. That role's own docstring
+ *    has always carried this rule — *"the word that replaces a refused estimate. R3: never a blank,
+ *    never a zero"* — and until now **no property enforced it**: `checkSuppressedMean` asks whether
+ *    a refused figure was published, and never what stands in its place. A rule stated on a type
+ *    and checked by nothing is the shape this repository keeps finding, so the two populations are
+ *    judged together.
+ *
+ * ## The four clauses, and why the fourth needs the adapter
+ *
+ * Blank, zero and spinner are decidable from the string. **Stale** is not: `66` in a cell is a
+ * defect only if `66` is a figure that cell may not carry, and the only thing that knows is what
+ * put the surface in the state — hence {@link WithheldFigure.ifPublished}, compared against whole
+ * number tokens for {@link NUMBER_TOKEN}'s reason.
+ *
+ * The remainder clause is the weakest of the five and it is stated rather than dressed up: a cell
+ * that is neither an em dash nor two letters of a label is refused, which catches a blank, a lone
+ * `?`, a bare colon and the empty parenthesis. It cannot catch a cell that says *"unavailable"*
+ * while carrying no reason a reader can act on — that is a copy judgement, and `docs/16` S1 is
+ * where it is made.
+ */
+function checkWithheldFigure(
+  _context: HonestyContext,
+  texts: readonly RenderedText[],
+): readonly HonestyViolation[] {
+  const found: HonestyViolation[] = [];
+  for (const text of texts) {
+    const { withheld } = text;
+    if (withheld === undefined && text.role !== 'suppressed') continue;
+    const where =
+      withheld === undefined
+        ? 'a figure the run’s own summary refuses'
+        : `${withheld.because.join(' + ')} (state ${withheld.state})`;
+    const value = text.text.trim();
+
+    if (value === '') {
+      found.push(
+        violation(
+          'withheld-figure-published',
+          text,
+          `withheld under ${where}, and drawn as a blank. § 12.2: a withheld figure reads “${EM_DASH}” ` +
+            'or a labelled unavailable state — an empty cell is indistinguishable from a broken one.',
+        ),
+      );
+      continue;
+    }
+    if (ZERO_FIGURE.test(value)) {
+      found.push(
+        violation(
+          'withheld-figure-published',
+          text,
+          `withheld under ${where}, and drawn as a zero. § 12.2 / § 16 rule 1: a figure nobody has ` +
+            'measured yet is not a figure that measured zero, and a reader cannot tell the two apart.',
+        ),
+      );
+      continue;
+    }
+    if (SPINNER.test(value)) {
+      found.push(
+        violation(
+          'withheld-figure-published',
+          text,
+          `withheld under ${where}, and drawn as a spinner. § 16 rule 15: nothing is on its way — ` +
+            'this build has no server, so the wait it promises never ends.',
+        ),
+      );
+      continue;
+    }
+    if (withheld !== undefined && withheld.ifPublished.length > 0) {
+      const tokens = numberTokens(text.text);
+      const leak = withheld.ifPublished.find((form) =>
+        tokens.some((token) => token.value === form),
+      );
+      if (leak !== undefined) {
+        found.push(
+          violation(
+            'withheld-figure-published',
+            text,
+            `withheld under ${where}, and carrying ${leak} — the figure this cell may not publish ` +
+              'here. § 12.2: never a stale figure. A number a reader reads as theirs, taken from a ' +
+              'run this cell is not about, is the worst of the three because it looks right.',
+          ),
+        );
+        continue;
+      }
+    }
+    if (!value.includes(EM_DASH) && (value.match(/\p{L}/gu) ?? []).length < 2) {
+      found.push(
+        violation(
+          'withheld-figure-published',
+          text,
+          `withheld under ${where}, and drawn as “${value}” — neither an em dash nor a label. ` +
+            '§ 12.2: a reader has to be able to tell an unavailable figure from a rendering fault.',
+        ),
+      );
+    }
+  }
+  return found;
+}
+
+/* -------------------------------------------------------------------------- *
  * The whole check
  * -------------------------------------------------------------------------- */
 
@@ -1063,9 +1236,10 @@ export const PROPERTY_CHECKS: Readonly<
   'energy-wait-blend': checkEnergyWaitBlend,
   'goal-without-rate': checkGoalWithoutRate,
   'whole-run-figure-early': checkWholeRunFigureEarly,
+  'withheld-figure-published': checkWithheldFigure,
 });
 
-/** Check all seven against one case's rendered strings. */
+/** Check all eight against one case's rendered strings. */
 export function checkAll(
   context: HonestyContext,
   texts: readonly RenderedText[],

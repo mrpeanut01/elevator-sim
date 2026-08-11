@@ -89,6 +89,29 @@ export const LOADED_RUN_CANNOT_BANK =
   'watch it, scrub it and compare it, and run the shift here to bank one';
 
 /**
+ * Why a run nobody started may not close a day — § D232's ground, given the sentence issue #136's
+ * already had.
+ *
+ * The gate itself lives in `dev/main.ts` (`closeShift`'s `if (!playerHasChosen) return;`) and is a
+ * closure flag this module cannot read, so unlike {@link bankingRefusalFor} the *decision* is not
+ * here — only the words are, beside the other answer to the same question: *what does a run have to
+ * be before it may close a day?* Issue #136's answer is *simulated by this shell*; § D232's is
+ * *asked for by the player*. The play-experience audit (`docs/19` defect 1) found the second ground
+ * refusing in silence: boot's own recording, watched to its end after **Resume**, produced a sheet
+ * reading *"Nothing filed yet — press 'Run this shift'"* with no sentence anywhere saying why the
+ * day had not filed. A refusal that does not speak is `docs/16` S1's
+ * absence-indistinguishable-from-oversight, and this is the sentence.
+ *
+ * It says what the run *is* — the page's own, made so the stage is not blank on load — for
+ * {@link LOADED_RUN_CANNOT_BANK}'s reason: a refusal that only says no sends the reader hunting a
+ * defect. And it names the control that does count, because the empty sheet this sentence replaces
+ * was naming the same control as advice the player had (from their view) already followed.
+ */
+export const UNCHOSEN_RUN_CANNOT_BANK =
+  'this run was set going by the page when it loaded, not by you, so it banks nothing — ' +
+  'press “Run this shift”, or pick a scenario, and the day you start files itself here';
+
+/**
  * The refusal, or `null` when the run on screen **is** the run this shell simulated.
  *
  * ## Reference identity, and the finding that forced it

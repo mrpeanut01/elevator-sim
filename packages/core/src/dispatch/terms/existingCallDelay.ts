@@ -47,6 +47,14 @@ export const existingCallDelayTerm: CostTermDefinition = Object.freeze({
   id: 'existingCallDelay',
   unit: 's',
   measures: 'Added delay to other already-assigned calls',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'existing call delay',
+    serves: 'the good of the whole group',
+    atZero: 'answer this call',
+    atFull: 'protect the calls already made',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   evaluate: existingCallDelaySeconds,
 });

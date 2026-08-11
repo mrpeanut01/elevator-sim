@@ -57,6 +57,8 @@ import type {
   ParkingStrategy,
   PassengerAssignmentMode,
   ReassignmentPolicy,
+  RuleActionId,
+  RuleConditionId,
   SelectionStageConfig,
 } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
@@ -64,6 +66,7 @@ import type { CarSnapshot, CostEstimate, CostRequest } from '../model/car/types.
 import type { CredentialGroup, Direction } from '../model/types.js';
 
 import type {
+  ResolvedRuleSets,
   ResolvedSelection,
   ResolvedWeightSets,
   WeightSetPolicy,
@@ -258,6 +261,31 @@ export const HARD_CONSTRAINT_IDS = ['noDirectionReversal'] as const;
 
 export type HardConstraintId = (typeof HARD_CONSTRAINT_IDS)[number];
 
+/**
+ * The player-facing words for each hard constraint — GitHub issue #147, and the Everyday Mode
+ * handoff's §16 rule 11 (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`).
+ *
+ * A constraint's `description` on its `constraints.<id>` schema row is addressed to an optimizer
+ * and a reading engineer; #147's finding is that a card built from it can say what a constraint
+ * *is* but never what it *does* in words a player can act on. The fix is **two fields with two
+ * readers, declared beside the model** — never a lookup table in a renderer, which is
+ * `if (id === …)` wearing prose and goes stale the day a constraint is added.
+ *
+ * A `Record` keyed by {@link HardConstraintId} rather than a parallel array: adding a constraint
+ * id without its words is a compile error, not a runtime fallback. The honest fallback for a
+ * surface that meets a constraint this record somehow cannot name (*a filter no weight can buy
+ * past*, plus the id) lives with the surface, because reaching it is a content bug the surface
+ * must survive, not a state this module is allowed to ship.
+ */
+export const HARD_CONSTRAINT_WORDS: Readonly<Record<HardConstraintId, PlayerControlWords>> =
+  Object.freeze({
+    noDirectionReversal: Object.freeze({
+      name: 'finish the direction first',
+      effect:
+        'a car never turns around for a new call — it finishes the direction it is travelling, however the weights are set',
+    }),
+  });
+
 /** One car's answer to "could you take this call at all?", with the estimate that decided it. */
 export interface EligibilityVerdict {
   readonly carId: string;
@@ -382,6 +410,51 @@ export interface TermContext {
 }
 
 /**
+ * The words an Everyday surface prints for one cost term — the term's name, the `serves`
+ * clause, and both slider ends, as the Everyday Mode engine contract §6.3 specifies them
+ * (`docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md`).
+ *
+ * Declared **beside the term** rather than in a screen, because that is where the contract and
+ * GitHub issue #147 both put them: *"the name, the serves clause and both end labels are
+ * properties of the model, not of the screen"*. A table in a renderer mapping ids to friendly
+ * prose is forbidden — it goes stale the day a term is added, and the screen is the wrong owner.
+ *
+ * Two readers, two vocabularies, and neither replaces the other. {@link CostTermDefinition.measures}
+ * and the library's `serves` (`AWT`, `WT95`) are addressed to an optimizer and an engineer;
+ * these words are addressed to a player. Collapsing them to save a field produces a sentence
+ * addressed to nobody, which is the defect #147 caught before it shipped.
+ */
+export interface PlayerTermWords {
+  /** The term as a player reads it — `wait time`, never `waitTime`. */
+  readonly name: string;
+  /** What weighting it serves, in plain words — `average wait`, never `AWT`. */
+  readonly serves: string;
+  /** The slider's zero end — what a weight of nothing buys. */
+  readonly atZero: string;
+  /** The slider's full end — what the maximum weight buys. */
+  readonly atFull: string;
+}
+
+/**
+ * The player-facing name and one-clause effect of a control — a schema row, a hard constraint —
+ * as the Everyday Mode handoff's §16 rule 11 requires
+ * (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`, GitHub issue #147).
+ *
+ * Optional end labels carry a slider's two ends where the control is continuous; a toggle or a
+ * choice has none. The optimizer-facing `description` stays untouched beside it — two fields,
+ * two readers, never one string doing both jobs.
+ */
+export interface PlayerControlWords {
+  readonly name: string;
+  /** One clause: what moving the control does, in words a player can act on. */
+  readonly effect: string;
+  /** The low end of a continuous control, where a surface draws slider ends. */
+  readonly atZero?: string | undefined;
+  /** The high end. */
+  readonly atFull?: string | undefined;
+}
+
+/**
  * One cost term: an id, how to normalize it, and a pure function of a {@link TermContext}.
  *
  * Adding the remaining nine terms in Phase 5 is adding nine of these to `terms/` and nine
@@ -438,6 +511,14 @@ export interface CostTermDefinition {
    * declaration that fails the second is a gate wearing the wrong name.
    */
   readonly partiallyActiveWhen?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * The words an Everyday surface prints for this term — see {@link PlayerTermWords}.
+   *
+   * Required, not optional: a term authored without its player words would reach the Everyday
+   * editor as a slider labelled with its engine id, which is the exact defect #147 names. The
+   * compiler is the coverage test here; `playerWords.test.ts` checks the words' register.
+   */
+  readonly player: PlayerTermWords;
   /** Pure. Non-negative. Never `NaN`. */
   readonly evaluate: (context: TermContext) => number;
 }
@@ -560,6 +641,18 @@ export interface DispatchContext {
    * with nothing below the lobby, and stated rather than silent.
    */
   readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
+  /**
+   * Seconds after local midnight at which the run's `t = 0` falls, from the resolved demand
+   * template's `startOfDayS` — authored data, never a wall clock (invariant 3 intact).
+   *
+   * The input `dispatch/selector.ts`'s header said this file would gain *"if a scenario ever
+   * carries a start-of-day"*. Six shipped templates author `startOfDayMin`, and the Everyday
+   * rules' time conditions read `(startOfDayS + at) mod 86400` through this field. Read **only**
+   * under `selection.policy: 'rules'`; absent — a template with no clock, or a hand-built caller
+   * — every time clause evaluates false, which the rules editor states as a refusal rather than
+   * leaving silent (§ D227).
+   */
+  readonly startOfDayS?: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -652,6 +745,23 @@ export interface RepositionContext {
    * strategy reports `no-forecast` rather than guessing.
    */
   readonly demandForecast?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Stage 7 settings in force **instead of** the profile's own `idle` section, for this decision.
+   *
+   * The seam Everyday Mode's interventions travel through (`sim/types.ts#RunInterventionConfig`).
+   * A *park the cars in the lobby* intervention is the profile's own idle stage with
+   * `parkingStrategy` replaced by `'lobby'` — the deadband and the energy exchange rate stay the
+   * operator's, because the player's instruction is about *where* cars wait, not about what a
+   * repositioning trip is worth. `Simulation.#park` computes it as a pure function of
+   * `(interventions, at)` and passes it here; the policy stays one stateless pass-through to
+   * `repositionDecisionFor`, which is what makes before/after delegation unnecessary — the
+   * lifecycle and batch maps in `policy.ts` never fork.
+   *
+   * **Absent means the profile's `idle` is read untouched, by identity** — `repositionDecisionFor`
+   * takes the branch it always took and hands the scorer the same frozen config object, so a run
+   * with no interventions is byte-identical to one built before this field existed.
+   */
+  readonly idleOverride?: ResolvedIdleStage | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -722,11 +832,30 @@ export interface ResolvedAnswerStage {
   readonly allowBypassIfSoleEligibleCar: boolean;
 }
 
+/**
+ * The `idle.parkingFloorIndex` value that means *this shaft's own highest served floor*.
+ *
+ * Written only by the rules compiler, for `park the idle cars at the top floor`: parking is a
+ * per-car decision, `parkingCandidates` resolves it against the shaft it is deciding for, and a
+ * profile that wants a *specific* top floor authors that floor's real index. An integer so the
+ * resolved shape stays one numeric field, and `MAX_SAFE_INTEGER` rather than `Infinity` so the
+ * sentinel survives JSON. No shaft serves a floor at this index, which is what makes the branch
+ * in `parkingCandidates` total rather than a collision.
+ */
+export const PARK_AT_TOP_FLOOR_INDEX: number = Number.MAX_SAFE_INTEGER;
+
 /** Stage 7 settings, resolved. */
 export interface ResolvedIdleStage {
   readonly parkingStrategy: ParkingStrategy;
   readonly repositionThresholdS: number;
   readonly repositionEnergyWeight: number;
+  /**
+   * The shaft floor index `fixed-floor` parks at; {@link PARK_AT_TOP_FLOOR_INDEX} for the
+   * shaft's top served floor. Read by no other strategy, and resolved to its declared default
+   * of 0 so the field is always present — an optimizer sampling `fixed-floor` starts at the
+   * datum floor rather than at an undefined it cannot write back.
+   */
+  readonly parkingFloorIndex: number;
 }
 
 /** Which hard constraints are on. The boolean form a generic optimizer can sample. */
@@ -796,6 +925,16 @@ export interface ResolvedDispatchConfig {
    * `data/dispatcher-profiles.json`, and not a dimension an optimizer samples.
    */
   readonly weightSets?: ResolvedWeightSets | undefined;
+  /**
+   * The Everyday rules' compiled arms, present exactly when `selection.policy` is `'rules'`.
+   *
+   * Beside {@link weightSets} rather than inside `selection`, for `weightSets`' own reason:
+   * `parameters.ts` enumerates `selection`'s keys against declared tunables and a compiled arm
+   * list is not a tunable — it is the resolved form of the profile's `rules.rows`, the same kind
+   * of thing as the arm library. The two are mutually exclusive by construction: the resolver
+   * builds `weightSets` only under `fuzzy`/`contextual` and `ruleSets` only under `rules`.
+   */
+  readonly ruleSets?: ResolvedRuleSets | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -987,6 +1126,16 @@ export interface DispatchParameterSpec {
    * is inert while `auction.rounds` is 1 and no list of strings can say so about an integer.
    */
   readonly activeWhen?: Readonly<Record<string, ActiveWhenCondition>> | undefined;
+  /**
+   * The player-facing name and one-clause effect, present on every row an Everyday surface can
+   * reach — see {@link PlayerControlWords} and `playerWords.test.ts`, which pins the reachable
+   * set in both directions.
+   *
+   * Optional on the schema row because most of the schema is the optimizer's territory and a
+   * player never meets it; a row without one that a Casual surface *does* reach renders the
+   * honest fallback and is a content bug (#147).
+   */
+  readonly player?: PlayerControlWords | undefined;
 }
 
 /**
@@ -1064,10 +1213,28 @@ export interface DispatcherProfileSource {
   readonly idle?:
     | {
         readonly parkingStrategy?: ParkingStrategy | undefined;
+        readonly parkingFloorIndex?: number | undefined;
         readonly repositionThresholdS?: number | undefined;
         readonly repositionEnergyWeight?: number | undefined;
       }
     | undefined;
   /** Stage 3's weight-set selection. Absent is `policy: 'off'`, which every shipped profile is. */
   readonly selection?: SelectionStageConfig | undefined;
+  /**
+   * The Everyday rules rows (§11.5). The id unions rather than bare strings, so a
+   * `DispatcherProfile` — whose `rules` uses them — stays assignable here; `resolveRuleArms`
+   * still validates at runtime, because a hand-built fixture can cast past any type.
+   */
+  readonly rules?:
+    | {
+        readonly rows?:
+          | readonly {
+              readonly when: RuleConditionId;
+              readonly whenValue?: number | string | undefined;
+              readonly then: RuleActionId;
+              readonly thenValue?: number | string | undefined;
+            }[]
+          | undefined;
+      }
+    | undefined;
 }

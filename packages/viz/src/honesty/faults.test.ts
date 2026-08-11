@@ -75,6 +75,12 @@ const FIXTURE_FOR: Readonly<Record<HonestyProperty, 'quotable' | 'suppressed'>> 
    * refuse.
    */
   'whole-run-figure-early': 'quotable',
+  /*
+   * § 12.2 needs neither: the withheld matrix is enumerated from the state model rather than drawn
+   * from the run, so all thirty-two states are rendered on every case whatever the summary decided.
+   * `quotable` for the same reason as the two above — it is the fixture with more surfaces speaking.
+   */
+  'withheld-figure-published': 'quotable',
 });
 
 describe('every property fires when the thing it protects is broken', () => {

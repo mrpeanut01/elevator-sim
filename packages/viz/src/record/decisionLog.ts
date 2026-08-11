@@ -61,14 +61,28 @@ import type {
   DispatcherProfile,
   SimTime,
 } from '@elevator-sim/core/browser';
-import { createPolicyFor } from '@elevator-sim/core/browser';
+import { WeightedCostDispatchPolicy, createPolicyFor } from '@elevator-sim/core/browser';
 
-import type { VizDecision, VizDecisionTerm } from '../contract/types.js';
+import type { VizDecision, VizDecisionTerm, VizPatternSwitch } from '../contract/types.js';
 
 import { shortCarLabel } from './instrument.js';
 
 /** How many of the winner's terms to keep. Three carries the sentence; twelve carries a table. */
 const TERMS_KEPT = 3;
+
+/**
+ * One wrapped policy's selector trace — the policy, the last value seen, the switches so far.
+ *
+ * `previous` starts at `null` because that is what a policy holds before its first decision: the
+ * profile's own weights stand and `activePattern` is `undefined`. So the first sample only
+ * records an entry if the very first decision selected an arm, and a detector that abstains for
+ * the whole run leaves the list empty — which is the contract's *watched and found nothing*.
+ */
+interface PolicyTrace {
+  readonly policy: WeightedCostDispatchPolicy;
+  previous: string | null;
+  readonly switches: { atS: SimTime; patternId: string | null }[];
+}
 
 /**
  * The growing log, shared by every bank's wrapped policy.
@@ -79,6 +93,15 @@ const TERMS_KEPT = 3;
  */
 export class DecisionCollector {
   readonly #entries: VizDecision[] = [];
+  /**
+   * Every policy {@link wrapPolicy} enrolled, in creation order — which is bank declaration
+   * order, because `Simulation`'s constructor builds one policy per bank in a single loop over
+   * `building.banks`. That ordering is what lets {@link buildPatternSwitches} attach a bank id
+   * to each trace after the fact: the factory hook receives `(profile, options)` and no bank.
+   */
+  readonly #policies: DispatchPolicy[] = [];
+  /** The selector traces, keyed by policy identity. Only selecting policies get one. */
+  readonly #traces = new Map<DispatchPolicy, PolicyTrace>();
   /**
    * Call id to the landing it was registered at.
    *
@@ -94,6 +117,77 @@ export class DecisionCollector {
 
   constructor(limit = 4000) {
     this.#limit = Math.max(1, limit);
+  }
+
+  /**
+   * Register a policy the factory just built, and decide whether it can select.
+   *
+   * A selector trace is opened only for a {@link WeightedCostDispatchPolicy} whose resolved
+   * config carries something to select between — the fuzzy/contextual weight-set library, or
+   * the Everyday rules' compiled arms (`ruleSets`), whose provenance ids flow through the same
+   * `activePattern` getter and onto the same recording field, so the stage header can say
+   * either *everyone arriving* or *rule 2 — the lobby queue passes 12 people* from one field.
+   * An auction policy, or a weighted-cost policy with `selection.policy: 'off'`, is enrolled
+   * for the ordinal count and traced by nothing: it will never switch, and a trace for it would
+   * let the recording claim a watch that never happened.
+   */
+  enrollPolicy(policy: DispatchPolicy): void {
+    this.#policies.push(policy);
+    if (
+      policy instanceof WeightedCostDispatchPolicy &&
+      (policy.config.weightSets !== undefined || policy.config.ruleSets !== undefined)
+    ) {
+      this.#traces.set(policy, { policy, previous: null, switches: [] });
+    }
+  }
+
+  /**
+   * Sample one policy's pattern-in-force, after a decision.
+   *
+   * Called from the wrapper's `dispatch` and `reconsider` forwards — the only two methods from
+   * which `#refreshWeightSet` runs — so every instant at which `activePattern` can move is
+   * observed and the trace is exact, not sampled. Reading a getter mutates nothing, draws no
+   * random number and reads no clock, which keeps the wrapper's four safety properties intact.
+   */
+  notePattern(policy: DispatchPolicy, at: SimTime): void {
+    const trace = this.#traces.get(policy);
+    if (trace === undefined) return;
+    const pattern = trace.policy.activePattern ?? null;
+    if (pattern === trace.previous) return;
+    trace.previous = pattern;
+    trace.switches.push({ atS: at, patternId: pattern });
+  }
+
+  /**
+   * The selector trace, with bank identities attached — or `undefined` when no policy selected.
+   *
+   * `bankIds` must be the run's banks in declaration order, because enrollment order is the
+   * constructor's bank loop; a length mismatch throws rather than guessing, since a trace
+   * attributed to the wrong bank is deterministic, replayable and wrong — this package's worst
+   * failure mode. Entries are sorted by `(atS, bankId)`, invariant 4's rule applied to a display
+   * artefact, exactly as {@link build} sorts the decisions.
+   */
+  buildPatternSwitches(bankIds: readonly string[]): readonly VizPatternSwitch[] | undefined {
+    if (this.#traces.size === 0) return undefined;
+    if (this.#policies.length !== bankIds.length) {
+      throw new Error(
+        `recordRun: ${String(this.#policies.length)} policies were built for ` +
+          `${String(bankIds.length)} banks. The pattern trace maps policies to banks by creation ` +
+          'order, so a mismatch would attribute a switch to the wrong bank — refusing is the ' +
+          'loud failure this prefers to a quiet misattribution.',
+      );
+    }
+    const merged: VizPatternSwitch[] = [];
+    this.#policies.forEach((policy, index) => {
+      const trace = this.#traces.get(policy);
+      const bankId = bankIds[index];
+      if (trace === undefined || bankId === undefined) return;
+      for (const entry of trace.switches) {
+        merged.push({ atS: entry.atS, bankId, patternId: entry.patternId });
+      }
+    });
+    merged.sort((a, b) => a.atS - b.atS || a.bankId.localeCompare(b.bankId));
+    return merged;
   }
 
   noteCall(call: DispatchCall): void {
@@ -166,6 +260,7 @@ export function recordingPolicyFactory(
 
 /** Explicit forwarding, one method at a time. See the module docstring for why not a `Proxy`. */
 export function wrapPolicy(inner: DispatchPolicy, collector: DecisionCollector): DispatchPolicy {
+  collector.enrollPolicy(inner);
   const wrapped: DispatchPolicy = {
     get id() {
       return inner.id;
@@ -192,11 +287,13 @@ export function wrapPolicy(inner: DispatchPolicy, collector: DecisionCollector):
     dispatch(callId, cars, at, context) {
       const decision = inner.dispatch(callId, cars, at, context);
       collector.noteDecision(decision, context);
+      collector.notePattern(inner, at);
       return decision;
     },
     reconsider(callId, cars, at, context) {
       const decision = inner.reconsider(callId, cars, at, context);
       collector.noteDecision(decision, context);
+      collector.notePattern(inner, at);
       return decision;
     },
     answer(car, call, at, cars) {

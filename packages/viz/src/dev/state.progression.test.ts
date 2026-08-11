@@ -76,6 +76,8 @@ const CLEAN: GoalObservations = Object.freeze({
   minutePct: 100,
   peakQueue: 4,
   abandoned: 0,
+  worstWaitS: 40,
+  worstWaitIsCensored: false,
 });
 
 /** A day nobody would want banked: everything asked for, nothing delivered. */
@@ -85,10 +87,16 @@ const AWFUL: GoalObservations = Object.freeze({
   minutePct: 38,
   peakQueue: 51,
   abandoned: 7,
+  // Past every shipped ceiling, and *uncensored* — the worst sufferer boarded eventually, so the
+  // maximum is exact and the goal grades `missed` rather than refusing.
+  worstWaitS: 940,
+  worstWaitIsCensored: false,
 });
 
 function outcome(week: WeekState, observed: GoalObservations) {
   return outcomeOf({
+    record: null,
+    recordRefusal: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',

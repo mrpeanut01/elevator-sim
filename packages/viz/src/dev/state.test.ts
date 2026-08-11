@@ -120,6 +120,23 @@ describe('the run builder', () => {
     // `withheld` is a list, never a thrown error and never silence.
     expect(Array.isArray(plan.withheld)).toBe(true);
   });
+
+  it('carries the intervention log into the config, and an empty log as no key at all', () => {
+    /*
+     * The run record's two halves, both load-bearing — contract § 1.4. A non-empty log must reach
+     * `SimulationConfig.interventions` verbatim, because `recordRun` is the only simulator the
+     * viewer has and a log the config dropped would be a stage control that changes a stamp and
+     * no leg (§ D219's `patternSwitching`, one field over). An empty log must write **no key**,
+     * because `core` pins "no `interventions` key" byte-identical to the run before the field
+     * existed (`sim/interventions.test.ts`), and `{}` versus absent is exactly the distinction
+     * `patience` above holds for the same reason.
+     */
+    const log = [{ atS: 450, change: { kind: 'park-cars-lobby' as const } }];
+    const carried = shiftRunConfigOf(resources, { ...base(), interventions: log });
+    expect(carried.config.interventions).toStrictEqual(log);
+    const empty = shiftRunConfigOf(resources, { ...base(), interventions: [] });
+    expect('interventions' in empty.config).toBe(false);
+  });
 });
 
 describe('the dwell lever reaches the cars of the building being run', () => {
@@ -245,6 +262,8 @@ describe('withBuilding', () => {
       closeDay(
         { ...week, day, dayIdx: (day - 1) % 7 },
         outcomeOf({
+          record: null,
+          recordRefusal: null,
           day,
           dayIdx: (day - 1) % 7,
           eventId: 'ordinary',
@@ -509,6 +528,24 @@ describe('withBuilding', () => {
     const before = withGardenFabric(base());
     expect(withBuilding(before, resources, before.buildingId).commissioning).toEqual(
       before.commissioning,
+    );
+  });
+
+  it('clears the intervention log when the building changes, and only then', () => {
+    /*
+     * The log rides the fabric's guard and the fabric's argument: an intervention is stamped
+     * against one day in one tower — `09:14 · parked the cars in the lobby` replayed under a
+     * different building's name would be a stamp about a run that never carried it — and a
+     * re-pick of the running building may not discard a change of mind the player just made.
+     * See ViewerState.interventions for the full clearing ledger.
+     */
+    const before: ViewerState = {
+      ...base(),
+      interventions: [{ atS: 450, change: { kind: 'park-cars-lobby' } }],
+    };
+    expect(withBuilding(before, resources, 'midtown-office').interventions).toEqual([]);
+    expect(withBuilding(before, resources, before.buildingId).interventions).toEqual(
+      before.interventions,
     );
   });
 

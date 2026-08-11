@@ -95,12 +95,15 @@
  * navigate on rather than prose a reader has to act on themselves.
  */
 
-import type { SimTime } from '@elevator-sim/core/browser';
+import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
+import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
+import { interventionLogOf } from '../live/interventions.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
-import { readGoals } from './goals.js';
+import { contractStatus } from './contracts.js';
+import { readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
@@ -506,6 +509,65 @@ export interface DayReportInput {
    * pair is emitted.
    */
   readonly showEnergyAxis?: boolean | undefined;
+  /**
+   * The player's mid-run interventions, in press order — the run record's third member
+   * (`run = { seed, config, interventions[] }`), reaching the sheet at last (`docs/19` defect 10).
+   *
+   * ## The defect this closes
+   *
+   * The stamp (`09:14 · parked the cars in the lobby`) lived only on the stage, so the filed sheet
+   * of an intervened day was indistinguishable from an untouched one and the player's question —
+   * *did my park matter?* — had no answer on the surface built to answer questions about the day.
+   * {@link metaLinesFor} now prints one line per intervention, in time order, through
+   * `live/interventions.ts#interventionLogOf` — the same verbs and the same clock the stage stamp
+   * uses, so the sheet and the stage cannot disagree about what a press was called.
+   *
+   * ## Why it is optional where `subject`, `plan` and `calendar` are required
+   *
+   * Those three are required because a caller that forgot to say would produce a sheet of the wrong
+   * *shape* in silence. An absent log has one meaning, and `core` pins it: a run built with no
+   * `interventions` key is byte-identical to one built before the field existed
+   * (`sim/interventions.test.ts`, cited by `dev/state.ts#ViewerState.interventions`). So `undefined`
+   * here *is* the empty log rather than a guess at one, and the callers that pass nothing — the
+   * acceptance suites, the honesty fixtures that drive an untouched day — are describing runs whose
+   * record genuinely holds no entry. The one caller with a player (`dev/main.ts#closeShift`) passes
+   * `state.interventions`, which is the log the run on screen was re-simulated under.
+   */
+  readonly interventions?: readonly RunInterventionConfig[] | undefined;
+  /**
+   * The Everyday rules the run's dispatcher was driven by, in first-match order — `docs/20`
+   * defect 2, and {@link DayReportInput.interventions}' exact shape one mechanism over.
+   *
+   * ## The defect this closes
+   *
+   * A player wrote `when the lobby queue passes 30 people, hold a car at the lobby`, watched the
+   * stage header name it live for forty minutes of simulated time, filed the day — and the sheet
+   * said *"Midtown Office · Conventional collective"*. The word **rule** appeared on it zero times.
+   * That is `docs/19` defect 10 exactly, on the mechanism that landed after it was fixed: the
+   * surface built to answer *what happened today* did not name the thing that decided it.
+   *
+   * ## Why they sit with identity rather than with the interventions
+   *
+   * Because they are config and the interventions are not. `authoring/ruleSpec.ts` says it
+   * outright — *"a run is `{ seed, config, interventions[] }` and rules are config"*, which is also
+   * why a rule edit is next-run and never mid-run. So the lines go with the things that were
+   * **asked for** — the dispatcher, the seed, the selection, the booking — and above the log of
+   * what the player did to the day once it was running.
+   *
+   * ## Why the readback rather than a count
+   *
+   * `readbackOf` is the rules editor's own sentence — *"Reads as: when the lobby queue passes 30
+   * people, hold a car at the lobby"* — and a sheet quoting a different wording for the same row
+   * would be the second account of one decision this file spends most of its docstrings avoiding.
+   * *"2 rules"* would say a rule was in force without saying which, which is the shape of caption
+   * `docs/10` R3 refuses.
+   *
+   * Optional, and `undefined` **is** the empty list rather than a guess at one, for
+   * {@link DayReportInput.interventions}' stated reason: `profileWithRules` returns the driving
+   * profile by object identity for an empty list, so a run built with no rows is the run the
+   * dispatcher id already implies. Every caller that passes nothing is describing exactly that.
+   */
+  readonly ruleRows?: readonly RuleRow[] | undefined;
 }
 
 /**
@@ -550,7 +612,48 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(input.event, subject),
+    /*
+     * The rules in force, before the attempt count and well before the intervention log —
+     * `docs/20` defect 2. Config, so it belongs with what was asked for; see
+     * {@link DayReportInput.ruleRows} for why that placement is a decision rather than a habit.
+     * An empty list prints nothing, exactly as an untouched day prints no intervention lines.
+     */
+    ...ruleLines(input.ruleRows ?? [], dispatcherName),
     ...attemptLine(subject, week.attempt),
+    /*
+     * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
+     * the run record is `{ seed, config, interventions[] }`, and a sheet that reproduces without
+     * the log describes a different day. One line per press, in time order, in the stage stamp's
+     * own words (`interventionLogOf` shares `STAMP_VERBS` and the clock with `interventionStampOf`),
+     * on both shapes of sheet — a Free Play day can be intervened in exactly as a campaign day can.
+     * Last rather than beside the seed, because the lines above are what was *asked for* and these
+     * are what the player *did to it* mid-run; an untouched day prints nothing here, which is how
+     * every one of its sheets has always read.
+     */
+    ...interventionLogOf(input.interventions ?? [], dayStartS),
+  ];
+}
+
+/**
+ * The rules the run was driven by, one line each, in the words the editor read them back in.
+ *
+ * `docs/20` defect 2. Each line is `readbackOf`'s sentence with its ordinal, so the sheet, the
+ * editor's readback and the stage header's live pill are three renderings of one string producer
+ * rather than three authors — `interventionLogOf`'s arrangement, and its reason: two accounts of
+ * what a control was called is how they come to disagree.
+ *
+ * The fallback is stated **once, under the list**, and only when there is a list. It is
+ * `fallbackLineOf`'s own sentence, and it is the answer to the question this sheet's identity line
+ * otherwise raises by itself: a reader who sees *Conventional collective* on the first line and a
+ * rule on the third is owed the relationship between them, which is that the dispatcher decides
+ * every call no rule matched. Without a rule there is nothing to qualify and the line would be a
+ * caption over nothing — `docs/10` R3, and `interventionLogOf`'s empty arm.
+ */
+function ruleLines(rows: readonly RuleRow[], dispatcherName: string): readonly string[] {
+  if (rows.length === 0) return [];
+  return [
+    ...rows.map((row, index) => `rule ${String(index + 1)} · ${readbackOf(row)}`),
+    fallbackLineOf(dispatcherName),
   ];
 }
 
@@ -730,14 +833,42 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     verdict: judgement.verdict,
     verdictLine: judgement.verdictLine,
     diagnosisHeading: judgement.diagnosisHeading,
-    goals: readings,
+    /*
+     * Each reading with last night's figure beside it — the handoff's "was" column (§ 8.6),
+     * derived from the week's history by the same function the rail's rows call, so the two
+     * surfaces cannot show two different yesterdays. On a single-run sheet the week is a
+     * scaffold with no history, so every `was` is the em dash — which is the honest answer:
+     * one run has no previous day.
+     */
+    goals: readings.map((reading) => ({
+      reading,
+      was: wasDisplayOf(week.history, week.day, reading.goal),
+    })),
     diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
   };
 
   if (subject.kind === 'single-run') {
-    return { ...core, of: 'single-run' };
+    /*
+     * **The banner is the contract's answer, and no contract asked** — `docs/19` defect 13.
+     *
+     * The judgement above still runs whole: the lede, the diagnosis heading and the goal readings
+     * are observations about the day and stay (`contractLineFor`'s own precedent — on a week with
+     * no contract *"the goals are still read from what happened"*). What may not survive the
+     * reshaping is the **claim**: `Shift cleared` answers *did this run clear the shift it was
+     * asked for?*, and a Free Play run was asked for nothing — the audit's own question, *"Cleared
+     * what?"*. So the line is replaced here, in the layer that decides every claim, rather than in
+     * a renderer: `dev/reportPanel.ts` and `render/reportCard.ts` both draw `verdictLine`, and a
+     * fix in one would be the two-renderers defect issue #137 just closed, reopened with words.
+     *
+     * {@link SingleRunReport.verdict} keeps the judgement's own value — the lede and heading were
+     * chosen through it (§ D237's one-key rule), and rewriting it would make them strings that
+     * reached the sheet through a key the sheet no longer carries. What the verdict may not do on
+     * this shape is colour or word a banner, and both renderers now key their neutral treatment on
+     * `of === 'single-run'` rather than on the verdict.
+     */
+    return { ...core, of: 'single-run', verdictLine: SINGLE_RUN_VERDICT_LINE };
   }
 
   const nextIdx = (week.dayIdx + 1) % 7;
@@ -752,6 +883,25 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     nextDayName: weekdayOf(nextIdx),
   };
 }
+
+/**
+ * What a single run's sheet says where a week's says **Shift cleared** — a refusal to grade,
+ * spoken rather than blanked (`docs/19` defect 13).
+ *
+ * Lowercase and claim-free on purpose: it sits in the banner slot, and a sentence styled like a
+ * verdict would be the thing it replaces with softer wording. It names *why* there is no grade —
+ * no scenario asked — because the empty string was the other candidate and an empty banner beside
+ * a heading reading *The shift asked for* is `docs/10` R3's blank where an answer should be. The
+ * four goal rows under it are neutralised by the renderer on the same discriminator
+ * (`dev/reportPanel.ts#reportViewOf`), so the block reads as *what a scenario would ask*, read and
+ * not graded, top to bottom.
+ *
+ * Module-private on purpose: the sheet is the product, so the suites and the honesty sweep read
+ * the sentence off {@link dayReportOf}'s own output rather than importing a constant beside it —
+ * an export whose only shipped reader is its own module is the shape `deadCode.test.ts` exists to
+ * refuse.
+ */
+const SINGLE_RUN_VERDICT_LINE = 'read, not graded — no scenario asked for this run';
 
 /* -------------------------------------------------------------------------- *
  * The judgement — one verdict, and every sentence that states it
@@ -1018,6 +1168,19 @@ function listOf(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
 }
 
+/**
+ * `1 leg`, `5 legs` — one denominator, correctly numbered — `docs/19` defect 8's *"over 1 legs"*.
+ *
+ * A count of one is a state a real run reaches (Garden Apartments quotes a valid AWT over five
+ * legs at one seed; a thinner window reaches one), and R13 makes the count part of what the mean
+ * means, so its grammar is not cosmetic: *"over 1 legs"* reads as a typo in the one clause a
+ * reader is being asked to trust. `noun` is the singular form; module-private because every
+ * caller is a note in this file.
+ */
+function legCount(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 /* -------------------------------------------------------------------------- *
  * The figure grid
  * -------------------------------------------------------------------------- */
@@ -1042,7 +1205,7 @@ function figuresFor(
       label: 'AWAY INSIDE A MINUTE',
       value: `${String(observations.minutePct)}%`,
       // R13: the share never travels without the count it was taken over.
-      note: `an observation, never suppressed — over ${String(observations.servedLegs)} served legs`,
+      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served leg')}`,
       tone: observations.minutePct >= 75 ? 'good' : observations.minutePct >= 50 ? 'caution' : 'bad',
       axisOnly: false,
     },
@@ -1060,7 +1223,7 @@ function figuresFor(
       id: 'stairs',
       label: 'TOOK THE STAIRS',
       value: String(observations.abandoned),
-      note: 'waited past the 15-minute horizon',
+      note: stairsNote(observations),
       tone: observations.abandoned > 0 ? 'bad' : 'good',
       axisOnly: false,
     },
@@ -1122,7 +1285,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${String(summary.waitCount)} legs in the ${summary.reportWindow.id} window`,
+    note: `over ${legCount(summary.waitCount, 'leg')} in the ${summary.reportWindow.id} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1131,11 +1294,71 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
 }
 
 /**
+ * The count the sheet calls *took the stairs*, with its true cohort in the caption —
+ * `docs/19` defect 3.
+ *
+ * ## The cohort, and the overlap the old caption hid
+ *
+ * `Observations.abandoned` counts **waits that crossed the abandonment horizon**, whether or not
+ * a car eventually came — the handoff's *took the stairs* is a name for the attribute, not a
+ * fourth disjoint outcome. On a saturated no-patience run nobody actually leaves, so every one of
+ * those legs can still board and land inside CARRIED, and the sheet printed
+ * `CARRIED 768 of 768 who turned up` beside `TOOK THE STAIRS 348` with nothing connecting them:
+ * a reader trying to total the people gets 1 116 out of 768. The counts were both right and the
+ * captions treated overlapping cells as adding ones.
+ *
+ * So the note states the overlap, from {@link Observations.abandonedCarried} — folded in the same
+ * pass as both counts, so the three cannot disagree — and names the run's **own** horizon
+ * ({@link Observations.horizonS}) rather than a hard-coded fifteen minutes. The three branches are
+ * the three shapes the overlap takes; none of them re-states the cell's value, and the sentence
+ * *overlap, not an addition* is the whole point of the cell carrying a note at all.
+ *
+ * A decision number is owed for the cohort captions (this note, the lever clause, the Casual lead
+ * in `mode/casualDay.ts`, and the goal label's window); this docstring is the argument.
+ */
+function stairsNote(observations: Observations): string {
+  const horizon = horizonLabelOf(observations.horizonS);
+  const { abandoned, abandonedCarried } = observations;
+  if (abandoned === 0) return `no wait crossed the ${horizon} give-up horizon`;
+  if (abandonedCarried === abandoned) {
+    return (
+      `waited past the ${horizon} horizon before a car came — every one of them is inside ` +
+      'CARRIED too, so these two cells overlap rather than add'
+    );
+  }
+  if (abandonedCarried === 0) {
+    return (
+      `waited past the ${horizon} horizon and were never carried — they sit inside CARRIED’s ` +
+      'denominator and not its count'
+    );
+  }
+  return (
+    `waited past the ${horizon} horizon — ${String(abandonedCarried)} of them were still carried ` +
+    'and are inside CARRIED too; the rest were not'
+  );
+}
+
+/** `15-minute` for a whole-minute horizon, `900 s` for anything else. The run's own number. */
+function horizonLabelOf(horizonS: number): string {
+  const minutes = horizonS / 60;
+  return Number.isInteger(minutes) ? `${String(minutes)}-minute` : `${horizonS.toFixed(0)} s`;
+}
+
+/**
  * The longest wait in the window, and the word that keeps it honest.
  *
  * `longestWaitIsCensored` means the leg never boarded, so the number is a **lower bound** and the
  * sentence has to say *at least*. Drawing the censored and uncensored cases identically would put
  * the understatement precisely where the service is worst — `VizServiceLevel`'s own argument.
+ *
+ * ## The window is named in the cell, not only in the small print — `docs/19` defect 3
+ *
+ * This figure is `summary.serviceLevel.longestWaitS`, taken over the **reporting window**; the
+ * goal row three blocks up grades `Observations.worstWaitS`, the **whole shift's** maximum. Every
+ * shipped template narrows its window, so the two legitimately differ on the same sheet — 1 488 s
+ * against 1 725 s on the audit's Midtown day — and the only reconciliation was the small print. A
+ * reader who meets two “worst waits” four inches apart needs each labelled where it stands, so
+ * the note carries the cell's own window inline and says which surface reads the whole shift.
  */
 function worstWaitFigure(summary: VizSummary): ReportFigure {
   const { longestWaitS, longestWaitIsCensored } = summary.serviceLevel;
@@ -1149,13 +1372,14 @@ function worstWaitFigure(summary: VizSummary): ReportFigure {
       axisOnly: false,
     };
   }
+  const windowClause = `the ${summary.reportWindow.id} window’s worst — the goal row reads the whole shift`;
   return {
     id: 'worst-wait',
     label: 'WORST WAIT',
     value: `${longestWaitIsCensored ? 'at least ' : ''}${longestWaitS.toFixed(0)} s`,
     note: longestWaitIsCensored
-      ? 'a rider who never boarded — this is a lower bound, not their wait'
-      : 'one rider, and they remember it',
+      ? `a rider who never boarded — a lower bound, not their wait; ${windowClause}`
+      : `one rider, and they remember it; ${windowClause}`,
     tone: longestWaitS > LONG_WORST_WAIT_S ? 'bad' : 'plain',
     axisOnly: false,
   };
@@ -1205,7 +1429,7 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
-      note: `over ${String(energy.deliveredLegCount)} delivered legs — a day that spends less by carrying fewer people has saved nothing`,
+      note: `over ${legCount(energy.deliveredLegCount, 'delivered leg')} — a day that spends less by carrying fewer people has saved nothing`,
       tone: 'unranked',
       axisOnly: true,
     },
@@ -1254,6 +1478,13 @@ function diagnosisFor(
   const missed = verdict === 'missed';
   const queueTone: FigureTone = missed ? 'bad' : 'plain';
   const phaseTone: FigureTone = missed ? 'caution' : 'plain';
+  /*
+   * Built once and appended to both populated rows, because both are readings of the **same
+   * instant** — see {@link windowRelationClause}. `''` when there is no such instant, which is
+   * exactly the branch on which neither row is drawn with one.
+   */
+  const windowRelation =
+    at === null ? '' : ` ${windowRelationClause(at, recording.summary.reportWindow)}`;
 
   const queueRow: ReportDiagnosis =
     at === null || floorId === null
@@ -1270,7 +1501,8 @@ function diagnosisFor(
           what: `Floor ${floorId} stacked ${String(observations.peakQueue)} deep`,
           why:
             'Every car was committed elsewhere when the calls landed together. Batch arrivals are ' +
-            'the normal case, not the unlucky one — people travel in groups.',
+            'the normal case, not the unlucky one — people travel in groups.' +
+            windowRelation,
           tone: queueTone,
         };
 
@@ -1297,11 +1529,56 @@ function diagnosisFor(
           why:
             'Round-trip time is what limits you inside a peak, not car speed. A stop costs about ' +
             '10 s of door and transfer time however fast the motor is, so the way out of a peak is ' +
-            'fewer stops per trip rather than a quicker one.',
+            'fewer stops per trip rather than a quicker one.' +
+            /*
+             * The **same instant** the row above names, deliberately: this row's phase is the phase
+             * that instant fell in, not a span of its own, so relating the phase's own bounds to the
+             * window would answer a question the row does not ask (a phase and a window can overlap
+             * three different ways, and none of the three is what *the worst of it* refers to).
+             */
+            windowRelation,
           tone: phaseTone,
         };
 
   return [queueRow, phaseRow];
+}
+
+/**
+ * Where the worst moment sits relative to the window the means are read over — `docs/20` defect 6.
+ *
+ * ## The two windows this reconciles
+ *
+ * The sheet publishes both and, until this clause, said so only in the small print. *The tightest
+ * moment* / *Where it went wrong* is the **whole shift's** deepest queue and the demand phase that
+ * instant fell in; the figure grid four inches up quotes means over `summary.reportWindow`. On the
+ * audit's Chancery day those were **08:50** and **08:42–08:47** — a reader is shown a heading
+ * calling one span *the worst of it* and a mean taken from another, with nothing on either saying
+ * they are different spans.
+ *
+ * `worstWaitFigure` is the precedent and it is exact: two *worst wait* numbers four inches apart
+ * were reconciled by putting each cell's own window in its own note, inline, rather than by a
+ * footnote a reader has to go and find. This is that treatment applied to the rows.
+ *
+ * ## Why it is measured rather than boilerplate
+ *
+ * The clause states which of the two cases this run is in, from the run's own numbers. A fixed
+ * sentence — *"this row reads the whole shift"* — would be true and would still leave a reader
+ * doing the arithmetic on every sheet, including the many sheets where the two agree and there is
+ * nothing to reconcile. Saying *inside* when it is inside is what makes *outside* worth reading.
+ *
+ * The window is named by its **id**, not by its clock span, for {@link windowQualifierOf}'s reason:
+ * these rows sit under a heading a reader arrives at from the figure grid, and a clock time dropped
+ * into an explanatory sentence beside the words *mean* and *average* is the numeral-in-a-caption
+ * shape the honesty search has already caught on this sheet once. The span is printed in the small
+ * print, in full, where nothing else on the line is an estimate cue.
+ */
+function windowRelationClause(atS: SimTime, reportWindow: VizSummary['reportWindow']): string {
+  const inside = atS >= reportWindow.startS && atS < reportWindow.endS;
+  return inside
+    ? `That instant is inside the ${reportWindow.id} window the means above are read over.`
+    : `That instant is outside the ${reportWindow.id} window the means above are read over — the ` +
+      'worst moment of the day and the waits quoted up there are two different parts of it, and ' +
+      'both are true.';
 }
 
 /** ` at 12.4 %pop/5min`, or nothing when the record carried no population to divide by. */
@@ -1445,17 +1722,27 @@ function leverPointersFor(
     outrun.push(`${String(legs)} leg${legs === 1 ? '' : 's'} never boarded at all`);
   }
   if (observations.abandoned > 0) {
+    /*
+     * *Waited past the horizon*, not *gave up and took the stairs* — `docs/19` defect 3. The count
+     * is an attribute of a wait, and on a no-patience run every one of these riders was still
+     * carried; a clause that said they left, beside a CARRIED cell that counts them, was the sheet
+     * contradicting itself. The stairs figure's own note states the overlap; this clause only has
+     * to stop claiming the opposite.
+     */
     const gaveUp = observations.abandoned;
-    outrun.push(`${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} gave up and took the stairs`);
+    outrun.push(
+      `${String(gaveUp)} rider${gaveUp === 1 ? '' : 's'} waited past the give-up horizon`,
+    );
   }
   if (outrun.length > 0) pointers.set('add-a-car', listOf(outrun));
 
   /*
    * Zone the tower — the pile-up sat on one landing rather than spreading over the tower. The bar is
-   * **today's own** queue goal where the day set one (even days do; odd days grade abandonment
-   * instead), so this is the run measured against what the run was asked for rather than against a
-   * number invented here. Where there is no queue goal, the sheet's own DEEPEST QUEUE tone bar
-   * stands in — the same threshold the cell above is already coloured by.
+   * **today's own** queue goal where the day set one (every shipped day does, since `goalsForDay`
+   * retired the odd-day alternation), so this is the run measured against what the run was asked
+   * for rather than against a number invented here. Where there is no queue goal — a sheet built
+   * over a custom goal list — the sheet's own DEEPEST QUEUE tone bar stands in, the same
+   * threshold the cell above is already coloured by.
    */
   const floorId = observations.peakQueueFloorId;
   const deep = missedGoal('peakQueue') || observations.peakQueue > DEEP_QUEUE;
@@ -1607,11 +1894,31 @@ function forecastFor(
   };
 }
 
-/** *What this taught* — the design's two branches (`design.html` :3506). */
+/**
+ * *What this taught* — the design's two branches (`design.html` :3506), plus the one the design
+ * could not reach.
+ *
+ * ## The already-cleared branch — `docs/19` defect 9
+ *
+ * The *Bank N more…* arm kept printing after the scenario was done: `week.cleared` is the banner
+ * of the **day that earned it** and `nextDay` clears it on purpose, so every later day on a
+ * cleared scenario fell through to `Bank 0 more clean shifts on this building and the next
+ * assignment opens` — a count of nothing, promising a door already open. The branch's condition is
+ * `contractStatus`, which is the **same expression** the scenario card reads
+ * (`week.completed.includes(id)`) and the negation of the guard `closeDay` clears on
+ * (`!base.completed.includes(contract.id)`) — derived, not restated, so this line and the card
+ * cannot disagree about whether the assignment stands cleared.
+ */
 function taughtFor(contract: ScenarioContract | undefined, week: WeekState): string {
   if (week.cleared !== null) return `Cleared: ${week.cleared.reward}.`;
   if (contract === undefined) {
     return 'A building you drew yourself. Nothing banks here — the sheet is the whole reward.';
+  }
+  if (contractStatus(week, contract.id) === 'cleared') {
+    return (
+      `${contract.label} is already cleared, and its reward is open: ${contract.reward}. ` +
+      'Nothing more banks against it — days here keep the streak, and the sheet is the reward now.'
+    );
   }
   const left = Math.max(0, contract.needClean - week.cleanRun);
   return (
@@ -1640,6 +1947,25 @@ function taughtFor(contract: ScenarioContract | undefined, week: WeekState): str
  * **The levers.** {@link leversFor} now orders the cards by which observation this run fired, which
  * is a statement about the day and would be read as a statement about the levers if nothing said
  * otherwise. This is what says otherwise, in the same breath as the refusal it belongs to.
+ *
+ * ## The window clause stopped calling itself the busiest five minutes — `docs/20` defect 5
+ *
+ * The illustration was fixed prose: *"“Riders waited twenty-five seconds on average” is false
+ * without **“during the busiest five minutes”**"*. On Garden Apartments day 1 the sheet printed
+ * that under two withheld figures, about a window that held **none of the day's forty arrivals** —
+ * so the one thing it claimed about the window was the one thing that could not be true of it.
+ *
+ * It is not rescued by the window's id, and that is the part worth reading. `summary.reportWindow`
+ * is labelled `peak-5min` whenever it is 300 s long, and there are two entirely different windows
+ * that get that label: the one `core` finds by **searching the arrivals** for their busiest five
+ * minutes (`resolveWindow`'s `'peak-5min'` selection), and the one the **demand template declares**
+ * at a fixed position in its schedule (`simulation.ts#traceReportWindow`). The shift path has only
+ * ever produced the second, and the second is *busiest* only by coincidence. A caption cannot ask
+ * the id which it is looking at.
+ *
+ * So the sentence says what the window **is** — its clock span, which it already prints — instead
+ * of how it was chosen. {@link windowQualifierOf} words it, and the whole-shift arm gets its own
+ * phrase because *between 06:00 and 07:00* is a silly way to say *all day*.
  */
 function smallPrintFor(
   dispatcherName: string,
@@ -1654,12 +1980,60 @@ function smallPrintFor(
     'you is what happened today, and today is where the queue was. ' +
     `Every cohort figure above is the ${reportWindow.id} window, ` +
     `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
-    'seconds on average” is false without “during the busiest five minutes”. The counts — carried, ' +
-    'took the stairs, the deepest queue — are over the whole shift; the means and the longest wait ' +
-    'are over that window and nothing else. ' +
+    `seconds on average” is false without “${windowQualifierOf(reportWindow)}”. ` +
+    'The counts — carried, ' +
+    'took the stairs, the deepest queue, and every goal reading above, the worst-wait bar ' +
+    'included — are over the whole shift; the means and the WORST WAIT figure are over that ' +
+    'window and nothing else. ' +
+    /*
+     * `docs/20` defect 6, and the sentence the two windows needed. *The tightest moment* and *the
+     * worst of it* are the whole shift's deepest queue and the demand phase it fell in — 08:50 and
+     * 08:47–09:00 on the audit's Chancery day — while the means directly above them were taken over
+     * 08:42–08:47. A reader who meets a heading calling one span *the worst of it* and a figure
+     * grid quoting waits from another has been handed two windows and told about neither.
+     *
+     * Said here **as well as** on the rows themselves ({@link diagnosisFor} labels each inline,
+     * `worstWaitFigure`'s precedent) because this is the paragraph a reader goes to when the two
+     * disagree, and a reconciliation that lives only on the thing being reconciled is not one.
+     */
+    'The two rows under the heading above read the whole shift too: the deepest queue is the ' +
+    'deepest of the day and the phase named beside it is the phase that instant fell in, so the ' +
+    'worst moment on this sheet need not be inside the window the means came from. Where it is ' +
+    'not, both are true and neither is a correction of the other. ' +
     'The levers above are ordered by what today showed, never by what any of them is worth: which ' +
     'one helps this building is the question that needs the paired runs, not the one day.'
   );
+}
+
+/**
+ * How a reader must qualify a wait quoted from this window — the clause inside the small print's
+ * illustration, and the one `docs/20` defect 5 found asserting a peak nobody had measured.
+ *
+ * A **reference**, never a superlative. See {@link smallPrintFor}'s closing section for why the
+ * window's id cannot license *the busiest five minutes*: two entirely different windows carry the
+ * label `peak-5min` and only one of them was chosen by counting arrivals.
+ *
+ * ## Why *that window* and not the clock span
+ *
+ * The span is the obvious replacement and it is the wrong one **here**, for the reason this
+ * function's caller documents at length: the illustration is a sentence with the word *average* in
+ * it, and this clause sits four words away inside quotation marks. The honesty search has already
+ * found this exact paragraph printing `25` under a cell reading `AVERAGE WAIT: withheld` on a run
+ * whose refused mean rounded to 25, and the fix was that the numeral became a **word**. Putting a
+ * clock time back inside the same quotation marks would be re-opening the hiding place a carve-out
+ * for *numerals inside quotes* was refused for.
+ *
+ * It costs nothing, because the span is stated **immediately before the colon** by the caller, in
+ * the same breath — *"Every cohort figure above is the peak-5min window, 08:42–08:47:"*. *That
+ * window* has an antecedent eight words back.
+ *
+ * The whole-shift arm is worded rather than referred, because a sheet whose window is the whole day
+ * has no narrowing for a reader to remember, and *over the whole shift* is also the phrase
+ * `honesty/properties.ts#NAMES_ITS_OWN_WINDOW` recognises — which is not a coincidence: a figure
+ * that names its own window in those words is the shape that rule exists to permit.
+ */
+function windowQualifierOf(reportWindow: VizSummary['reportWindow']): string {
+  return reportWindow.id === 'full-run' ? 'over the whole shift' : 'during that window';
 }
 
 /* -------------------------------------------------------------------------- *

@@ -37,6 +37,8 @@
  * reader clear a scenario by closing five empty days.
  */
 
+import type { WatchRecord } from '../watch/types.js';
+
 import { CONTRACTS, contractById, FIRST_CONTRACT_ID, nextContract } from './contracts.js';
 import {
   weekdayOf,
@@ -203,6 +205,28 @@ export interface DayOutcomeInput {
   /** The observation the sparkline and the *best day so far* figure both read. */
   readonly minutePct: number;
   readonly readings: readonly GoalReading[];
+  /**
+   * The run this day was, or `null` — {@link DayOutcome.record}, taken as an input rather than
+   * derived.
+   *
+   * Deciding whether a run is re-askable needs `BrowserResources` and the scope table, and neither
+   * belongs in `shift/`. So the caller decides — `dev/main.ts#closeShift`, through
+   * `watch/record.ts#watchRecordOf` — and this function stores what it is handed. The parameter is
+   * **required** rather than optional so a caller that has forgotten it is a compile error: an
+   * optional record would default to `null` and file every day unwatchable, silently, which is
+   * exactly the shape of failure this repository keeps paying for.
+   */
+  readonly record: WatchRecord | null;
+  /**
+   * Why there is no record, or `null` — {@link DayOutcome.recordRefusal}, on `record`'s exact
+   * footing and required for `record`'s exact reason.
+   *
+   * The caller passes both because only the caller can produce either: the sentence comes from
+   * `watch/record.ts#recordRefusalFor`, which needs `BrowserResources` and the scope table.
+   * Required rather than optional so a caller that forgets it cannot silently file a day whose
+   * refusal has no cause — which is the state `docs/20` defect 1 is about.
+   */
+  readonly recordRefusal: string | null;
 }
 
 /**
@@ -223,6 +247,10 @@ export function outcomeOf(input: DayOutcomeInput): DayOutcome {
     carried: input.carried,
     minutePct: input.minutePct,
     readings: input.readings,
+    record: input.record,
+    // `null` for a day that has a record, and the sentence that refused it otherwise — the two are
+    // written together by one caller so a day can never carry both or neither.
+    recordRefusal: input.recordRefusal,
     allMet:
       input.readings.length > 0 && input.readings.every((reading) => reading.state === 'met'),
   };

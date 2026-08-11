@@ -57,6 +57,7 @@ import {
 import { NORMALIZATION_DEFAULTS } from './normalize.js';
 import { WEIGHT_SET_POLICIES } from './selector.js';
 import { COST_TERMS } from './terms/index.js';
+import { HARD_CONSTRAINT_WORDS } from './types.js';
 import type {
   ActiveWhenCondition,
   ActiveWhenRange,
@@ -137,6 +138,12 @@ export const DISPATCH_DEFAULTS = Object.freeze({
    * travel, the travel being amortised over `PARK_CALL_HORIZON` calls.
    */
   repositionEnergyWeight: 0.2,
+  /**
+   * The shaft floor index `fixed-floor` parks at. Zero — the datum floor, which every shipped
+   * building serves — so a profile that opts into the strategy without naming a floor parks
+   * somewhere real rather than reporting `no-target` from a default. Read by no other strategy.
+   */
+  parkingFloorIndex: 0,
 
   /* ---- stage 3: weight-set selection ---- */
   /**
@@ -222,6 +229,15 @@ const WEIGHT_PARAMETERS: readonly DispatchParameterSpec[] = COST_TERMS.map((term
   scale: 'linear' as const,
   default: 0,
   description: `Weight on the normalized ${term.id} term — ${term.measures.toLowerCase()}${term.unit === '' ? '' : `, raw unit ${term.unit}`}. Zero removes the term from the sum entirely.${partialActivitySentence(term)}`,
+  // The player words are the term's own, carried through like activeWhen and never authored
+  // here: only the term knows what it is called on an Everyday surface, and a second authoring
+  // site would be the id-to-prose table issue #147 forbids, one file over.
+  player: {
+    name: term.player.name,
+    effect: `serves ${term.player.serves}`,
+    atZero: term.player.atZero,
+    atFull: term.player.atFull,
+  },
   ...(term.activeWhen === undefined ? {} : { activeWhen: term.activeWhen }),
 }));
 
@@ -267,6 +283,9 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: false,
     description:
       'Refuse any car that would have to change direction on account of the call — either to reach the floor or to face the passenger the right way on arrival. The one line that turns the ETA dispatcher into conventional collective control. A hard filter: no weight vector can buy past it. Authored in a profile as hardConstraints: ["noDirectionReversal"].',
+    // The words are the constraint's own (HARD_CONSTRAINT_WORDS), not authored twice: the
+    // schema row and the eligibility card must say the same thing or issue #147 recurs.
+    player: HARD_CONSTRAINT_WORDS.noDirectionReversal,
   },
 
   /* ---- stage 1: registration ---- */
@@ -277,6 +296,11 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.callType,
     description:
       'What is known when the call is registered. up-down-buttons knows neither destination nor credential; destination-entry knows the destination; mobile-credential knows both. Moving information earlier is the entire source of destination dispatch’s advantage, and this is the knob that moves it.',
+    player: {
+      name: 'ask where they are going',
+      effect:
+        'the panel asks each rider for a destination before a car is chosen, so a car can be grouped by floor',
+    },
   },
   {
     id: 'dispatch.passengerAssignment',
@@ -399,6 +423,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.maxLoadFactorForAssignment,
     description:
       'Refuse assignment when the projected load on arrival would exceed this fraction of rated load. Distinct from the load cell’s bypass threshold: bypass is about the car refusing new hall calls, this is about the dispatcher declining to promise one.',
+    player: {
+      name: 'room to leave in a car',
+      effect: 'a car already fuller than this is promised no new calls',
+      atZero: 'offer no car a new call',
+      atFull: 'send pickups to a car already full',
+    },
   },
 
   /* ---- stage 6: answering ---- */
@@ -417,7 +447,28 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     values: [...PARKING_STRATEGIES],
     default: DISPATCH_DEFAULTS.parkingStrategy,
     description:
-      'Where an idle car waits. stay: where it last stopped. lobby: the nearest served entrance. zone-center: the median floor of its zone. predicted-demand: the floor with the highest forecast arrivals, which needs a forecast — Phase 5 learns one; without it the strategy reports no-forecast rather than guessing. Each choice also declares the demand model the move is scored against, so lobby parking is judged on lobby calls. On sparse-traffic buildings this stage dominates everything else.',
+      'Where an idle car waits. stay: where it last stopped. lobby: the nearest served entrance. zone-center: the median floor of its zone. predicted-demand: the floor with the highest forecast arrivals, which needs a forecast — Phase 5 learns one; without it the strategy reports no-forecast rather than guessing. fixed-floor: the served floor at idle.parkingFloorIndex, or no-target when the shaft does not serve it. Each choice also declares the demand model the move is scored against, so lobby parking is judged on lobby calls and a fixed park on calls at its own floor. On sparse-traffic buildings this stage dominates everything else.',
+    player: {
+      name: 'where cars wait when idle',
+      effect:
+        'where an idle car parks between calls — where it stopped, the lobby, its zone, a named floor, or where the crowd is forecast',
+    },
+  },
+  {
+    id: 'idle.parkingFloorIndex',
+    type: 'integer',
+    // Wide enough for every shipped building (P2 at −2 up to vertical-city's top) with room for
+    // an authored tower; an index the shaft does not serve is answered by stage 7 (`no-target`),
+    // not by this range, because the schema does not know the building.
+    range: [-5, 160],
+    default: DISPATCH_DEFAULTS.parkingFloorIndex,
+    description:
+      'The shaft floor index fixed-floor parking heads for. A floor the shaft does not serve parks nothing and the decision says no-target — total and stated, like lobby parking with no served entrance. The Everyday rules compiler also writes this field for "park the idle cars at {v}", where "the top floor" resolves per shaft to its own highest served floor.',
+    activeWhen: { 'idle.parkingStrategy': ['fixed-floor'] },
+    player: {
+      name: 'which floor to park at',
+      effect: 'the floor an idle car heads for when cars park at a named floor',
+    },
   },
   {
     id: 'idle.repositionThresholdS',
@@ -428,7 +479,9 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     unit: 's',
     description:
       'Deadband: do not move an idle car unless every call it answers from the new park is expected to be served this many seconds sooner. Per call, like the gain it is compared against — the repositioning trip is amortised over the calls the park will answer, so a park is not asked to repay a whole trip out of one call. Stops cars shuffling for fractions of a second.',
-    activeWhen: { 'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand'] },
+    activeWhen: {
+      'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand', 'fixed-floor'],
+    },
   },
   {
     id: 'idle.repositionEnergyWeight',
@@ -438,7 +491,9 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.repositionEnergyWeight,
     description:
       'Exchange rate between anticipated waiting time and energy spent moving an empty car: the per-call net gain is the expected saving minus this times the seconds of travel, amortised over the calls the park is expected to answer. Both sides in seconds per call, so the subtraction is dimensionally honest. 0 ignores energy entirely; 2 makes a park whose saving equals its travel time exactly break even, which is the whole meaningful range.',
-    activeWhen: { 'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand'] },
+    activeWhen: {
+      'idle.parkingStrategy': ['lobby', 'zone-center', 'predicted-demand', 'fixed-floor'],
+    },
   },
 
   /* ---- stage 3: weight-set selection ---- */
@@ -448,7 +503,11 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     values: [...WEIGHT_SET_POLICIES],
     default: DISPATCH_DEFAULTS.selectionPolicy,
     description:
-      'Whether the weight vector may change during the run, and by what rule. off: one vector for the run, which is what every shipped profile does and what every published number in this repository was measured under. fuzzy: a trapezoidal membership per pattern over the observed traffic rates, fuzzy AND across an arm’s clauses, max-membership defuzzification, and a dwell hysteresis. contextual: the same arms and signatures with three learned input gains and a learned switch margin in front of them, which at their defaults is arithmetically the fuzzy rule. Both read their arms from the file-level patternSwitching block; a profile that names a rule with no library supplied is rejected rather than run.',
+      'Whether the weight vector may change during the run, and by what rule. off: one vector for the run, which is what every shipped profile does and what every published number in this repository was measured under. fuzzy: a trapezoidal membership per pattern over the observed traffic rates, fuzzy AND across an arm’s clauses, max-membership defuzzification, and a dwell hysteresis. contextual: the same arms and signatures with three learned input gains and a learned switch margin in front of them, which at their defaults is arithmetically the fuzzy rule. Both read their arms from the file-level patternSwitching block; a profile that names a rule with no library supplied is rejected rather than run. rules: the profile’s own rules.rows compiled to ordered crisp arms — first match wins, no match runs the profile’s own weights — reading no rates, no window and no pattern library.',
+    player: {
+      name: 'traffic-pattern switching',
+      effect: 'whether the weights may change mid-shift as the detector reads the traffic',
+    },
   },
   {
     id: 'selection.hysteresisS',
@@ -458,8 +517,14 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     default: DISPATCH_DEFAULTS.selectionHysteresisS,
     unit: 's',
     description:
-      'Seconds a chosen weight set must be held before another may take it. The detector oscillating between two near-equal patterns would re-rank every car twice a minute for no change in the traffic, and a dispatcher that changes its mind faster than the building changes its behaviour is measuring its own noise. Distinct from dispatch.reassignmentHysteresisS, which is about one call moving between cars.',
-    activeWhen: { 'selection.policy': ['fuzzy', 'contextual'] },
+      'Seconds a chosen weight set must be held before another may take it. The detector oscillating between two near-equal patterns would re-rank every car twice a minute for no change in the traffic, and a dispatcher that changes its mind faster than the building changes its behaviour is measuring its own noise. Under rules it is the same dwell over first-match arms, and it also gates the release to the profile’s own weights — which is what stops a rule at "the lobby queue passes 12" flapping at 11.9/12.1. Distinct from dispatch.reassignmentHysteresisS, which is about one call moving between cars.',
+    activeWhen: { 'selection.policy': ['fuzzy', 'contextual', 'rules'] },
+    player: {
+      name: 'stick with a decision for at least',
+      effect: 'a chosen pattern holds this long before another may take the run',
+      atZero: 'switches on a whim',
+      atFull: 'rides out a false alarm',
+    },
   },
   {
     id: 'selection.observationWindowS',
@@ -471,6 +536,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Trailing window the three traffic rates are counted over. Short enough and the detector tracks batches rather than patterns — passengers arrive in batches, so a 30 s window sees a five-person batch as a burst; long enough and it cannot see a peak begin. The divisor is the whole window and not the elapsed time, so a run starts with every rate at zero and climbs into its regime.',
     activeWhen: { 'selection.policy': ['fuzzy', 'contextual'] },
+    player: {
+      name: 'judge the traffic on the last',
+      effect: 'the trailing window the traffic is read over before the detector decides',
+      atZero: 'reacts to a single minute',
+      atFull: 'slow to notice a real change',
+    },
   },
   {
     id: 'selection.lobbyArrivalRateGain',
@@ -481,6 +552,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Learned gain on the lobby arrival rate before its memberships are evaluated: a gain above 1 makes the detector treat a given rate as busier than it is, which shifts every ramp on that input toward zero. One of the four learned parameters of the contextual policy, and inert at 1 — where the contextual rule is arithmetically the fuzzy one, so what the learning bought is a difference against the fuzzy arm rather than against an unrelated configuration.',
     activeWhen: { 'selection.policy': ['contextual'] },
+    player: {
+      name: 'weight given to lobby arrivals',
+      effect: 'how loudly the lobby queue speaks when the traffic is judged',
+      atZero: 'blind to the morning intake',
+      atFull: 'calls up-peak at the first queue',
+    },
   },
   {
     id: 'selection.interfloorRateGain',
@@ -491,6 +568,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Learned gain on the interfloor arrival rate, applied before its memberships are evaluated. Inert at 1.',
     activeWhen: { 'selection.policy': ['contextual'] },
+    player: {
+      name: 'weight given to floor-to-floor trips',
+      effect: 'how loudly traffic between upper floors speaks when the traffic is judged',
+      atZero: 'ignores meeting traffic',
+      atFull: 'reads a quiet lobby as interfloor',
+    },
   },
   {
     id: 'selection.downPeakRateGain',
@@ -501,6 +584,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Learned gain on the down-travelling arrival rate, applied before its memberships are evaluated. Inert at 1.',
     activeWhen: { 'selection.policy': ['contextual'] },
+    player: {
+      name: 'weight given to people heading down',
+      effect: 'how loudly down-travelling traffic speaks when the traffic is judged',
+      atZero: 'misses the evening',
+      atFull: 'calls down-peak at the first leaver',
+    },
   },
   {
     id: 'selection.switchMargin',
@@ -511,6 +600,12 @@ export const DISPATCH_PARAMETERS: readonly DispatchParameterSpec[] = [
     description:
       'Membership a challenging pattern must exceed the incumbent’s by before it may take the run, on top of the dwell hysteresis. A dwell asks a challenger to be later; this asks it to be better, which is the gate that bites when two memberships are both near 1 and the dwell has already expired. Inert at 0. Memberships are in [0, 1], so 1 admits only a switch from a completely unrecognized regime to a fully recognized one.',
     activeWhen: { 'selection.policy': ['contextual'] },
+    player: {
+      name: 'how much better a new pattern must look',
+      effect: 'a challenger must beat the incumbent pattern by this much before the run switches',
+      atZero: 'changes its mind readily',
+      atFull: 'holds what it has, right or wrong',
+    },
   },
 ];
 

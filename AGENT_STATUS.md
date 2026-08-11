@@ -1,5 +1,39 @@
 # Agent status board
 
+> ## ↩️ REOPENED 2026-08-11 for the **Everyday Mode delivery** (PR #153, branch
+> `claude/casual-gameplay-implementation-ycybr1`). Plan banner: `MULTI_AGENT_PLAN.md` § Everyday
+> Mode. Live lanes:
+>
+> | lane | task | branch/worktree | status | next action |
+> |---|---|---|---|---|
+> | S0 | Vendor handoff docs + docs/12 pointer | main branch (direct) | **MERGED** (pushed, `ea40a64`) | — |
+> | S2 | Player words beside the model (`core`, #147) | main branch (direct) | **MERGED** (pushed, `0f7f57f`) | corpus figures re-measure at integration |
+> | S1 | Four plain levers as views (`viz`, §20.1) | main branch (direct) | **MERGED** (pushed, `5ff2e60`–`1910d57`) | a decision number is owed for the lever ownership mapping |
+> | S3 | Intervention run record (§7.6, contract §1.4) | worktree lane, merged `838305d` | **MERGED** | second `InterventionChange` arm (dispatcher switch), report listing, wire field — registered in docs/18 |
+> | V47 | Verify slices 4–7 against the tree | read-only lane | **DONE** | findings are `docs/18-everyday-mode-tree-audit.md`; slices 4–7 scoped from it |
+> | S5 | The four-goal day (docs/18 § Slice 5) | worktree lane, merged `8be2c8b` | **MERGED** | three decision numbers owed (alternation retirement, schema v5, glyph) — arguments in docstrings |
+> | S6a | Designer runs the oracle (docs/18 § Slice 6) | worktree lane, merged `d6b811c` | **MERGED** | §10 thresholds honestly skipped (office-calibrated); shuttle-destination refusal noted |
+>
+> Integrated-tree verification 2026-08-11: typecheck clean · full viz suite **3 347 passed,
+> 1 skipped** · core sim+dispatch 764 · zero merge-only defects. Corpus string counts moved and
+> are measured at integration only, not per lane. Worktrees and lane branches pruned after merge.
+>
+> **Wave complete through slice 8's build.** Merged in order, each verified after its own merge:
+> S3 `838305d` · S6a `d6b811c` · S5 `8be2c8b` · S6b `1990174` · PT-F1 (blocks-play) · PT-F2
+> (clocks/accounting) · S4b `0cfb79e` · S7 `3bd44fe` · S4c (rules editor) · S4d (ghost + race
+> strip) · PT-F3 (layout/copy polish). Slice 8 in build; slice 10 (close-out) last by design.
+>
+> **Four integration defects no single branch could see**, all caught and fixed here rather than
+> in CI: three lanes appending to one honesty-adapter registry (resolved by reconstruction, both
+> adapters whole); core's public barrel missing eight of the rules editor's new dispatch exports;
+> the prepositioning study auto-adopting `fixed-floor` and producing four unpinned figures (pinned
+> from its own measured run, n = 500); and the booted page's note count, where **two lanes each
+> counted their own addition and each wrote 18** — the integrated page holds both, measured 19.
+>
+> Known-red carried honestly: three `server` store tests time out at the 5 s default under
+> full-suite load only (pass alone, 29/29 in 73 s) — pre-existing, evidenced on issue #149,
+> not this delivery's to fix silently.
+
 > ## ↩️ REOPENED 2026-07-28 for **wave 5**, which has now **CLOSED**. The board is
 > [§ Wave 5](#wave-5--live) at the foot of this file; everything between here and it is the
 > **unaltered** waves 1–4 record.

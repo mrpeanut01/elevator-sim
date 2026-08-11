@@ -46,6 +46,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'than presented as coverage.',
       ids: [
         'dev/batchPanel.ts#mountBatchPanel',
+        /*
+         * Everyday Mode slice 7's suite mount, beside the bench and excluded on the bench's own
+         * ground: it mounts DOM, and its authored copy is the empty state, the derived cost line
+         * and the worker-lifecycle status text. Every *claim about a run* it draws is authored in
+         * `batch/suite.ts` — whose producers the SUITE_BENCH adapter drives — or is `batchReport`'s
+         * own sentence re-rendered. The inline copy reaches the static sweep below, which is
+         * weaker than driving it and is stated as a limitation, exactly as for the mount above.
+         */
+        'dev/suitePanel.ts#mountSuitePanel',
         'dev/campaignPanel.ts#mountCampaignPanel',
         'dev/editor.ts#mountEditor',
         'dev/parameterForm.ts#mountParameterForm',
@@ -70,6 +79,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/parameterForm.ts#appliedNoteFor',
         'dev/data.ts#loadBrowserResources',
         'dev/data.ts#loadCampaign',
+        'dev/data.ts#loadFixitCases',
         'dev/data.ts#resolveEdited',
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
@@ -90,6 +100,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
+        /*
+         * The Everyday rules editor's mount, excluded on the editor mounts' shared ground: it
+         * mounts DOM, and its authored copy is the `when`/`then` joining words, the row buttons'
+         * titles and the next-run advice — swept statically below. Every *claim* it draws — the
+         * readbacks, the lever lines, every refusal, the fallback line and the exclusivity note
+         * — is authored in `authoring/ruleSpec.ts`, whose producers the RULES_EDITOR adapter
+         * drives over the whole declared vocabulary.
+         */
+        'dev/ruleEditor.ts#mountRuleEditor',
         'dev/trafficEditor.ts#mountTrafficEditor',
         /*
          * Reads a mounted row back out of the document to update it in place. There is no string
@@ -106,6 +125,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * static sweep below. That is weaker than driving them and is stated as a limitation.
          */
         'dev/menuPanel.ts#renderMenu',
+        /*
+         * The Fix-a-building overlay, `menuRoot`'s mount pattern: TypeScript-built, appended to
+         * `document.body`, and undrivable under Node for the same reason as every mount above.
+         * Every decision it draws is `fixit/engine.ts`'s or `fixit/run.ts`'s, which the FIXIT
+         * adapter drives; its own literals (headings, the running-total line) reach only the
+         * static sweep below, which is a stated limitation exactly as it is for the menu.
+         */
+        'dev/fixitPanel.ts#mountFixitPanel',
       ],
     },
     {
@@ -302,6 +329,44 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Everyday slice 8’s watch seam, whose player-facing words are driven by the `WATCH` ' +
+        'adapter and whose remaining derived “prose” is not prose. Four shapes, none of them a ' +
+        'sentence anybody reads. (1) The scanner reads hyphenated **identifiers** as words, ' +
+        'exactly as it does for `PlayMode`’s members above: `viewer.calendar`, `free-play`, ' +
+        '`no-such-tower`, `filed-day`, `does-not-reproduce`, `park-cars-lobby`. (2) Two are id ' +
+        '**templates** — `filedDayRuns`’ `day:${contractId}:${day}` selection key and the record ' +
+        'shape number — which no surface prints. (3) `WATCH_RECORD_CARRIES` and ' +
+        '`PERIOD_BOOKS_THE_EVENT` are refusals a **developer** reads: the first is a coverage ' +
+        'table asserted against `WatchRecord`’s own fields, the second is a `ScopeIssue` message ' +
+        'that stops a record being written and therefore never reaches a picker row — a day it ' +
+        'fires on is filed with `record: null` and the row says `DAY_HAS_NO_RECORD`, which the ' +
+        'adapter does drive. (4) The two mounts and the loader are DOM- or fetch-bound and are ' +
+        'excluded on `dev/fixitPanel.ts`’s own established ground: every string they print comes ' +
+        'from `watch/view.ts`, `watch/library.ts` or `watch/reproduce.ts`, all driven. ' +
+        '`firstPersonWordsIn` authors the word list § 14.1 forbids, which is the opposite of ' +
+        'player-facing text — it is the checker for it, and `watch/reference.ts` calls it at load ' +
+        'time so an authored fixture cannot ship first-person copy.',
+      ids: [
+        'dev/data.ts#loadReferenceRuns',
+        'dev/watchPanel.ts#mountWatchPanel',
+        'dev/watchPanel.ts#WATCHING_HEADER_CLASS',
+        'watch/library.ts#checkedRun',
+        'watch/library.ts#filedDayRuns',
+        'watch/record.ts#PERIOD_BOOKS_THE_EVENT',
+        'watch/record.ts#stateFromWatchRecord',
+        'watch/record.ts#WATCH_RECORD_CARRIES',
+        'watch/record.ts#watchRecordIssues',
+        'watch/record.ts#watchRecordOf',
+        'watch/record.ts#watchRunConfigOf',
+        'watch/reference.ts#FIXTURE_MARKER',
+        'watch/reference.ts#parseReferenceRuns',
+        'watch/reproduce.ts#reproductionDrift',
+        'watch/types.ts#WATCH_RECORD_VERSION',
+        'watch/view.ts#firstPersonWordsIn',
+      ],
+    },
+    {
+      reason:
         'TP-13’s provenance emitter. Its `ok` line is CLI flags — machine text the CLI parses, ' +
         'pinned flag-for-flag and leg-for-leg by `main.test.ts` — but its refusal reasons are ' +
         'authored sentences that reach `#status` through `copyProvenance`, so this exclusion is ' +
@@ -387,7 +452,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'id tuples the two shift unions are derived from — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +
         '`ShiftEvent.name` and `note`, both of which `SHIFT_REPORT` drives. ' +
-        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 8; it is derived only because the ' +
+        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 9; it is derived only because the ' +
         'declaration scanner gives a `const` the span up to the next `const`, which in a file of ' +
         'interfaces swallows the string-literal unions of the types below it. A version number ' +
         'reaches a reader only through `record/document.ts#verifyReplay`, which is driven.',
@@ -447,6 +512,11 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'authoring/dispatcherSpec.ts#specIsDirty',
         'authoring/machineSpec.ts#machineIsDirty',
         'authoring/patternSpec.ts#demandFromSpec',
+        // Returns a boolean — *is this a time condition* — and is derived only because the
+        // scanner reads its hyphenated condition ids (`time-before`, `day-period`) as prose.
+        // The sentences a player reads about time rules are `ruleIssues`' clock refusal and the
+        // row readbacks, both driven by the RULES_EDITOR adapter.
+        'authoring/ruleSpec.ts#isTimeCondition',
       ],
     },
     {
@@ -501,6 +571,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/parse.ts#editableIdsOf',
         'campaign/parse.ts#parseCampaign',
         'campaign/parse.ts#validateCampaign',
+        /*
+         * `fixit/parse.ts` is `campaign/parse.ts` one surface over, and the same argument holds:
+         * its sentences refuse a malformed `data/fixit-cases.json` to the person authoring it,
+         * `fixit/parse.test.ts` drives every refusal, and what a *player* reads is the parsed
+         * copy, which travels through the panel and the FIXIT adapter's drivers.
+         * `playerFacingStringsOf` returns that authored copy labelled for the copy sweep — the
+         * validation instrument, not a surface.
+         */
+        'fixit/parse.ts#FixitCasesError',
+        'fixit/parse.ts#parseFixitCases',
+        'fixit/parse.ts#playerFacingStringsOf',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',
@@ -539,12 +620,40 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'The decision log’s collector and its two wrappers, producers since slice 4b’s selector ' +
+        'trace. Their strings are `VizDecision`/`VizPatternSwitch` fields copied from core plus ' +
+        'one thrown invariant — the policy-to-bank ordinal check in `buildPatternSwitches` — ' +
+        'which is a developer diagnostic in exactly `recordRun`’s own class (excluded below): it ' +
+        'reports a bug in this package’s construction, fires before any recording exists, and is ' +
+        'pinned by `recordRun.test.ts` rather than swept as player copy. The sentences a player ' +
+        'actually reads from a decision or a switch are `live/decisions.ts#decisionRowsAt`’s and ' +
+        '`live/patternReadout.ts#patternReadoutAt`’s, both driven by the LIVE_RAIL adapter.',
+      ids: [
+        'record/decisionLog.ts#DecisionCollector',
+        'record/decisionLog.ts#recordingPolicyFactory',
+        'record/decisionLog.ts#wrapPolicy',
+      ],
+    },
+    {
+      reason:
         'Produces data, not prose. Derived only through the transitive clause — it names a helper ' +
         'that has a sentence in it — and its own return value carries ids, counts or geometry. ' +
         'Every string it does carry reaches a player through a surface that is driven.',
       ids: [
         'batch/runBatch.ts#runBatch',
         'batch/runBatch.ts#firstTraceDisagreement',
+        /*
+         * The Fix-a-building run pairing and its measurement: configs in, numbers out. Both are
+         * derived only transitively — `fixitRunPlanOf` through `configOf`'s thrown diagnostics
+         * and a template file name, `measuredOf` through the scope-mode ids — and every sentence
+         * built *from* their numbers is `fixit/engine.ts`'s, which the FIXIT adapter drives. The
+         * two steppers return a `FixitState` and reach prose only through `affordabilityOf`,
+         * which that adapter drives directly.
+         */
+        'fixit/run.ts#fixitRunPlanOf',
+        'fixit/run.ts#measuredOf',
+        'fixit/engine.ts#stepSpeed',
+        'fixit/engine.ts#stepCapacity',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',
@@ -610,6 +719,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'and what it publishes is checked where it is read — `scenario/goalReport.ts` and ' +
         '`campaign/brief.ts`, both driven.',
       ids: ['scenario/measure.ts#measureScenario', 'scenario/measure.ts#publishedScenarioFor'],
+    },
+    {
+      reason:
+        'Chooses a window, and authors nothing. `shiftReportWindowFor` returns `\'full-run\'` or ' +
+        '`undefined` — `core`\'s own `WindowSelection` — and is derived only because that literal ' +
+        'reads as a phrase to the two-adjacent-words scanner. Nothing a player sees comes from ' +
+        'here: what a reader is told about the window is `shift/report.ts`\'s figure notes and ' +
+        'small print, which quote `summary.reportWindow.id` and are driven through `dayReportOf`. ' +
+        'That the choice actually reaches the run is not a string question either, and is asserted ' +
+        'end to end in `shift/reportWindow.test.ts` against a recording\'s own summary.',
+      ids: ['shift/reportWindow.ts#shiftReportWindowFor'],
     },
     {
       reason:
@@ -804,6 +924,11 @@ describe('R10 statically — no authored prose literal contains a probability wo
         module: 'campaign/parse.ts',
         contains: 'a probability word; say a frequency over runs',
         why: 'the refusal `validateCampaign` gives an author who wrote one. Naming the rule is not breaking it.',
+      },
+      {
+        module: 'fixit/parse.ts',
+        contains: 'probability word.',
+        why: 'the same refusal, one data file over — `parseFixitCases` quoting the rule to a case author.',
       },
     ]);
 

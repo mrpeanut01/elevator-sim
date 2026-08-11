@@ -1,0 +1,67 @@
+{
+  "fixture": "FIXTURE — these are reference runs this repository simulated, not people. They are labelled as reference runs everywhere they appear and are never presented as players.",
+  "note": "GAMEPLAY § 20.11. Each entry is a run record — the question the simulator was asked — plus the four figures that run answered with. The figures are pinned twice: packages/viz/src/watch/reference.test.ts re-simulates each record and requires them to reproduce exactly, and the product itself performs the same check before offering the row (ENGINE_CONTRACT § 1.5). Regenerate rather than hand-edit: if core or data/ moves under this file the test says so, and the fix is a new run, not a new number.",
+  "runs": [
+    {
+      "id": "reference-house-baseline",
+      "label": "The house baseline",
+      "subtitle": "the shipped dispatcher, on the shipped morning",
+      "record": {
+        "version": 2,
+        "seed": "20260811",
+        "buildingId": "garden-apartments",
+        "dispatcherId": "collective",
+        "pattern": "building",
+        "demandTemplateId": null,
+        "arrivalRatePctPop5min": null,
+        "shiftLengthS": 1800,
+        "windowStartS": null,
+        "day": 1,
+        "dayIdx": 0,
+        "outOfServiceCarIds": [],
+        "interventions": [],
+        "ruleRows": []
+      },
+      "posted": {
+        "arrived": 26,
+        "carried": 26,
+        "minutePct": 100,
+        "worstWaitS": 29
+      }
+    },
+    {
+      "id": "reference-parked-at-five",
+      "label": "The lobby-parking reference",
+      "subtitle": "a busier tower, with the cars sent to the lobby five minutes in",
+      "record": {
+        "version": 2,
+        "seed": "20260811",
+        "buildingId": "midtown-office",
+        "dispatcherId": "collective",
+        "pattern": "building",
+        "demandTemplateId": null,
+        "arrivalRatePctPop5min": null,
+        "shiftLengthS": 900,
+        "windowStartS": null,
+        "day": 1,
+        "dayIdx": 0,
+        "outOfServiceCarIds": [],
+        "interventions": [
+          {
+            "atS": 300,
+            "change": {
+              "kind": "park-cars-lobby"
+            }
+          }
+        ],
+        "ruleRows": []
+      },
+      "posted": {
+        "arrived": 363,
+        "carried": 363,
+        "minutePct": 22,
+        "worstWaitS": 819
+      }
+    }
+  ]
+}

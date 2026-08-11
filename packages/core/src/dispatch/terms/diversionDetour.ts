@@ -98,6 +98,14 @@ export const diversionDetourTerm: CostTermDefinition = Object.freeze({
   id: 'diversionDetour',
   unit: 'passenger·s',
   measures: 'Added delay imposed on already-onboard passengers, when the call diverts the car',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'diversion detour',
+    serves: 'fairness to the boarded without taxing untouched traffic',
+    atZero: 'divert freely',
+    atFull: 'protect the people aboard',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   activeWhen: Object.freeze({ 'eligibility.enRouteDiversion': Object.freeze(['true']) }),
   evaluate: diversionDetourPassengerSeconds,

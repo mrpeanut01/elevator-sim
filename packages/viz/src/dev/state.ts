@@ -31,6 +31,7 @@ import {
   type ElevatorSpecs,
   type PatienceConfig,
   type ResolvedBuilding,
+  type RunInterventionConfig,
   type SimulationConfig,
 } from '@elevator-sim/core/browser';
 
@@ -65,6 +66,7 @@ import {
   trafficProfilesWithPattern,
   type PatternSpec,
 } from '../authoring/patternSpec.js';
+import { profileWithRules, rulesFromProfile, type RuleRow } from '../authoring/ruleSpec.js';
 import {
   patternSwitchingWithSelector,
   profileWithSelector,
@@ -81,6 +83,7 @@ import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts
 import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
+import { shiftReportWindowFor } from '../shift/reportWindow.js';
 import {
   calendarDayFor,
   calendarLine,
@@ -396,6 +399,35 @@ export interface ViewerState {
   readonly seed: bigint;
   /** Cars the reader took out of service by clicking a badge under a shaft. § 1.5 B7. */
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * The player's mid-run interventions, in press order — Everyday Mode's run record (contract
+   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until the stage control is pressed.
+   *
+   * ## What survives, and what clears it — the decision, stated
+   *
+   * The log is a fact about **this day's run**, so it lives and dies with the day rather than
+   * with the session:
+   *
+   * - **It survives a plain re-run of the same day** — levers moved, patience set, the Run
+   *   button pressed again. The contract's whole point is that the record replays: a re-run that
+   *   silently dropped the log would put a different day on screen under the same stamp.
+   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`),
+   *   taking the next assignment, starting a scenario, and `enterFreePlay`, each of which
+   *   already clears `outOfServiceCarIds` on the same argument: a run inheriting Thursday's
+   *   intervention would not be the run the screen just described.
+   * - **It clears when the building changes** ({@link withBuilding}) — an intervention is
+   *   stamped against one day in one tower, and the contract's own line is that changing the
+   *   tower is a different kind of act than changing your mind.
+   *
+   * It deliberately survives a **seed** change: the log is part of the record being re-rolled,
+   * and re-rolling the crowd under the same change of mind is a legitimate question to ask. What
+   * makes that honest rather than sneaky is `scope/runIdentity.ts`, which refuses to post any
+   * run carrying a non-empty log — no selection, CLI line or submission can express one yet.
+   *
+   * Not persisted (`persist.test.ts`'s ledger): a within-day attempt, on
+   * `outOfServiceCarIds`' exact ground.
+   */
+  readonly interventions: readonly RunInterventionConfig[];
   readonly levers: GroupLevers;
   /**
    * The weight-set selector's configuration — `docs/17` § 5 finding 6, given a surface.
@@ -422,6 +454,23 @@ export interface ViewerState {
    * `selectorEditor.test.ts`.
    */
   readonly selectorSpec: SelectorSpec;
+
+  /**
+   * The Everyday rules rows — GAMEPLAY §11.5's when/then list, in priority order.
+   *
+   * Beside {@link ViewerState.selectorSpec} and {@link ViewerState.levers} because it is the same
+   * kind of thing: applied on top of whichever dispatcher is driving, never a fork of one.
+   * {@link shiftRunConfigOf} writes it **last** of the three — `profileWithRules` after
+   * `profileWithSelector` — because a written rule list is the reader's most explicit statement
+   * about how the dispatcher behaves during the run, and it sets `selection.policy: 'rules'`
+   * over whatever the switching panel chose (`selectorEditor.ts#rulesOverrideNoteOf` is where
+   * that override is said to the player).
+   *
+   * At its seeded value — the empty list — `profileWithRules` returns the profile **by object
+   * identity**, so the run is byte-identical to one built before this field existed; the
+   * `scope/probes` measured cell holds that as a measurement, not a promise.
+   */
+  readonly ruleRows: readonly RuleRow[];
 
   /**
    * The patience curve the Parameters tab is showing, or `null` for *nobody leaves*.
@@ -732,7 +781,10 @@ export function withBuilding(
     buildingId,
     week: switched.week,
     parkedWeeks: switched.parked,
-    ...(moved ? { commissioning: [] } : {}),
+    // The intervention log goes with the fabric and under the same guard: it is stamped against
+    // one day in one tower, and a re-pick of the running building may not discard it — see
+    // ViewerState.interventions for the full clearing ledger.
+    ...(moved ? { commissioning: [], interventions: [] } : {}),
   };
   const withPattern = moved ? withReseededPattern(next, resources, state) : next;
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
@@ -953,6 +1005,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     freePlay: undefined,
     seed,
     outOfServiceCarIds: [],
+    // Nothing has been intervened on. The stage control is the only writer; see the field's
+    // docstring for what clears it.
+    interventions: [],
     levers: DEFAULT_LEVERS,
     /*
      * Seeded from the opening dispatcher and the loaded file, not from a blank: every shipped
@@ -962,6 +1017,14 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
      * they could see what the mechanism is.
      */
     selectorSpec: selectorSpecFromProfile(profile, selectorContextFrom(resources.dispatcherProfiles)),
+    /*
+     * Seeded from the opening dispatcher, the selectorSpec's own argument one field up: a profile
+     * that authored rules opens with its rows in the editor rather than with a blank list lying
+     * about the run. Every shipped profile authors none, so this is `[]` on every boot the
+     * product ships and the opening run is the run it was before the rules editor existed
+     * (`profileWithRules` at `[]` is the identity — see {@link ViewerState.ruleRows}).
+     */
+    ruleRows: rulesFromProfile(profile),
     /*
      * `null`, which is `sim.patience.distribution`'s own declared default (`'none'`) read back as a
      * config: a page that has just loaded has nobody abandoning, and the opening run is the run it
@@ -1198,13 +1261,22 @@ export function shiftRunConfigOf(
    * without the other is either a dispatcher declaring a rule with no arms (refused by name in
    * `resolveWeightSets`) or an arm map nothing consults.
    */
-  const dispatcherProfile = profileWithSelector(
-    profileFromSpec(specFromProfile(base, base.name), {
-      id: base.id,
-      base,
-      levers: state.levers,
-    }),
-    state.selectorSpec,
+  /*
+   * The rules write **after** the selector — the reader's most explicit statement writes last,
+   * the same ordering argument the selector makes against the levers one step up. With no rows
+   * `profileWithRules` is the identity (the same object), so a reader who has written nothing
+   * runs exactly the profile the two writes above produced.
+   */
+  const dispatcherProfile = profileWithRules(
+    profileWithSelector(
+      profileFromSpec(specFromProfile(base, base.name), {
+        id: base.id,
+        base,
+        levers: state.levers,
+      }),
+      state.selectorSpec,
+    ),
+    state.ruleRows,
   );
   const dispatcherProfiles = dispatcherProfilesWithSelector(
     resources.dispatcherProfiles,
@@ -1312,6 +1384,14 @@ export function shiftRunConfigOf(
   const finalBuilding =
     withEvents === grown ? building : resolveBuilding(parseBuilding(withEvents as unknown), specs);
 
+  /*
+   * 6 — the window the figures are read over. Asked of the **authored** building id rather than of
+   * `finalBuilding.id`, and the two are the same string: growth, commissioning and incidents all
+   * edit a building without renaming it, and asking the resolved one would make the answer look
+   * like it could depend on the day. It cannot; the matrix measures buildings, not days.
+   */
+  const reportWindow = shiftReportWindowFor(authored.id);
+
   return {
     building: finalBuilding,
     event,
@@ -1350,6 +1430,25 @@ export function shiftRunConfigOf(
             windowStartS: state.windowStartS,
             windowEndS: state.windowStartS + state.shiftLengthS,
           }),
+      /*
+       * **Which window the figures are read over** — `docs/20` defect 5, and the *third* kind of
+       * window on this object rather than a variant of the two above it.
+       *
+       * `durationS` decides how much day is generated and `windowStartS`/`windowEndS` decide how
+       * much of it is run; this decides how much of what ran is **measured**. `core`'s own
+       * `SimulationConfig.reportWindow` says the distinction in as many words, and it matters here
+       * because the shift path set none — so the sheet inherited the demand template's fixed
+       * five-minute band and Garden Apartments day 1, the first sheet a new player ever sees,
+       * withheld both of its headline numbers under *"the reporting window held no arrivals"* on a
+       * day of forty riders who all turned up outside it.
+       *
+       * `shiftReportWindowFor` reads the conclusion `benchmark/arms.ts` § 2 already measured rather
+       * than deciding one here, and returns `undefined` — *leave the template's band alone* — for
+       * every building the matrix does not unanimously report full-run. Spread-or-omit, because an
+       * absent key and a present `undefined` are different claims to `core` and only the first
+       * means *the template's own*.
+       */
+      ...(reportWindow === undefined ? {} : { reportWindow }),
       demandTemplate: (calendar.demandTemplateId ?? demandTemplate) as typeof demandTemplate,
       demand: { ...demand, ...patch.demand, ...calendar.demand },
       /*
@@ -1364,6 +1463,15 @@ export function shiftRunConfigOf(
        * asserted-in-prose.
        */
       ...(state.patience === null ? {} : { patience: state.patience }),
+      /*
+       * The run record's intervention log — contract § 1.4, and plain data, so it crosses the
+       * shift worker's structured clone like every other field here. **Spread rather than written
+       * as `interventions: state.interventions`**, for `patience`'s stated reason one line up: an
+       * empty log carries no key at all, and `core` promises a run with no `interventions` key is
+       * byte-identical to one built before the field existed — `sim/interventions.test.ts` pins
+       * that with a fingerprint, and this spread is what lets the viewer inherit the pin.
+       */
+      ...(state.interventions.length === 0 ? {} : { interventions: state.interventions }),
       /*
        * `report`, not the kernel's default `throw`. At the shipped traffic rates three of the five
        * buildings routinely end a run with people still in the system, and `Simulation` treats

@@ -81,6 +81,14 @@ export const zoneAffinityTerm: CostTermDefinition = Object.freeze({
   id: 'zoneAffinity',
   unit: 'm',
   measures: "Deviation from the car's assigned zone",
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'zone affinity',
+    serves: 'zoning strategies',
+    atZero: 'ignore the zones',
+    atFull: 'hold each car to its zone',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'distanceM' } as const),
   evaluate: zoneDeviationM,
 });

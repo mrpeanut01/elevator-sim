@@ -187,6 +187,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'configuring an automatic policy in advance rather than intervening — the run still has to be ' +
       'simulated again to see it.',
   ),
+  'viewer.ruleRows': control(
+    'within-day',
+    'The Everyday rules — when/then rows compiled onto the weight-set selector, first match ' +
+      'wins. within-day for selectorSpec’s reason: a rule is the product’s one genuine mid-day ' +
+      'mechanism configured in advance, and editing the list still re-runs the day. Written ' +
+      'after the selector in shiftRunConfigOf, so a non-empty list drives the run under ' +
+      'selection.policy rules and the switching panel says so.',
+  ),
   'viewer.patience': control(
     'within-day',
     'How long a rider will stand at a landing before giving up — the one schema on the Parameters ' +
@@ -200,6 +208,13 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'within-day',
     'Cars the reader took out of service by clicking a badge. Re-runs the day; the CLI has no flag ' +
       'that holds a car, so a run carrying one is not reproducible from its selection.',
+  ),
+  'viewer.interventions': control(
+    'within-day',
+    'The run record’s intervention log — Everyday Mode’s contract § 1.4, run = { seed, config, ' +
+      'interventions[] }. Pressing the stage control appends { atS, park-cars-lobby } and re-runs ' +
+      'the day from t = 0 with the prefix bit-identical; within-day because it is the product’s ' +
+      'purest change-of-mind, and no selection, CLI line or submission carries a log yet.',
   ),
 
   /* ------------------------------------------------------- viewer: the day boundary */

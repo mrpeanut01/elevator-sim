@@ -95,6 +95,8 @@ export const SESSION_KEY = 'elevator-sim.session';
  * | 2 | The same `session` object, **byte for byte**, plus a sibling {@link SavedLibrary}. |
  * | 3 | `session.freePlay` gains `windowStartS` — the first version to change the week's own shape. |
  * | 4 | `session` gains `parkedWeeks` — the weeks the player is not currently playing (issue #107). |
+ * | 5 | No new key: three **value** domains widen inside the week's readings (the worst-wait goal). |
+ * | 6 | `DayOutcome` gains `record` — the run a filed day was, so it can be watched (slice 8). |
  *
  * **A newer payload is still refused**, because this build cannot know what a field it has never
  * seen means — and silently dropping it would hand back a *partially* applied week, which is the
@@ -173,8 +175,82 @@ export const SESSION_KEY = 'elevator-sim.session';
  * in the tree: `ViewerState.seed` is a `bigint` and `JSON.stringify` throws on one. Nothing in a
  * {@link SessionSnapshot} is a `bigint` today; the guard is what makes that a checked property of
  * the value rather than a claim about the types, which are erased by the time this code runs.
+ *
+ * ## Version 5 moves for new *values*, not a new key, and it is read backwards on the evidence
+ *
+ * The worst-wait goal (Everyday Mode slice 5) widened three value domains inside the week's
+ * persisted readings without adding or removing a single key: `ShiftGoal.reads` gained
+ * `worstWaitS`, `ShiftGoal.unit` gained ` s`, and the missed glyph became `×`. A version-4 build's
+ * `validate.ts` checks `reads` and `unit` against **its** closed lists, so a session written here
+ * and met by that build would be refused as *damaged* — the exact false accusation the version-3
+ * paragraph records — where a version it does not read is refused as *newer*, which is true. Both
+ * directions are the same rule the extra-key branch states: the envelope version changes when the
+ * payload can say something an older reader has never seen, whether the novelty is a key or a
+ * value.
+ *
+ * Reading versions 1–4 here invents nothing: a history whose days carry three readings is the
+ * measured state of a week played before the fourth goal existed, and `wasDisplayOf` answers the
+ * em dash for a quantity yesterday never measured — which is the honest answer, not a default.
+ * A decision number is owed for the bump-on-new-values rule; this paragraph is the argument.
+ *
+ * ## Version 6 adds a key to a **nested** shape, and it is read backwards on the same evidence
+ *
+ * Everyday Mode slice 8 (GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5) needed a filed day to be
+ * *watchable*, and the persisted day could not reconstruct its own run: `DayOutcome` carried the
+ * outcome — arrived, carried, `minutePct`, the readings — and nothing about the **question**. Not
+ * the seed, not the building, not the dispatcher, not the intervention log. `shift/banking.ts`
+ * counts the same gap against a `VizRecording` and gets *one of eight*; this counts zero of eight,
+ * because a day's history entry was never meant to describe a run.
+ *
+ * So `DayOutcome` gains `record` — `watch/types.ts#WatchRecord`, or `null`. The key is inside
+ * `week.history[]` and `parkedWeeks[].history[]`, one level deeper than any previous bump has
+ * reached, and the same two questions decide it:
+ *
+ * - **Does the absence determine the value?** Yes, and by the strongest form of the argument this
+ *   docstring has used. `null` means *this day cannot be re-asked*, and a build with no record
+ *   concept could not re-ask any day it filed — no seed was stored, so there is nothing to re-ask
+ *   *with*. Every day in a version 1–5 envelope really is unwatchable, so `null` is the measured
+ *   state and not a stand-in. `session.ts#withDayRecords` performs the completion.
+ * - **Can an older build read what this one writes?** No, which is why the number moves. A
+ *   version-5 reader meets `record` in a history entry and `isObjectOf`'s extra-key branch refuses
+ *   the envelope as *damaged* — the false accusation the version-3 paragraph records. Refusing it
+ *   as *newer* is true; refusing it as damaged is not.
+ *
+ * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
+ *
+ * ## Version 7 adds a key at **two** depths at once, and both absences determine their value
+ *
+ * `docs/20` defect 1. Two things were wrong with a filed day that could not be watched, and fixing
+ * either without the other leaves a half-answer:
+ *
+ * - **The refusal had no cause.** Every unwatchable day said one sentence — *"filed without the
+ *   record of what it ran … days closed from here on carry one"* — which blamed the file format and
+ *   was false in its second clause: whatever refused this day refuses the next one identically.
+ *   `DayOutcome` gains `recordRefusal`, the sentence `watch/record.ts#recordRefusalFor` composes at
+ *   the moment the day closes, because nothing can recover it afterwards.
+ * - **The commonest cause did not have to be a cause at all.** Writing one Everyday rule made every
+ *   later day unwatchable, and rules are four scalars per row that this envelope already carries
+ *   elsewhere. `WatchRecord` gains `ruleRows` and moves to shape 2, so a rules run is watchable
+ *   instead of refused.
+ *
+ * The two questions, as every paragraph above asks them:
+ *
+ * - **Does the absence determine the value?** For both, and by the strongest form of the argument.
+ *   `recordRefusal: null` on a version 1–6 day is a *measurement*: those builds composed no
+ *   sentence, so there is none to recover, and `watch/library.ts` says exactly that rather than
+ *   inventing a cause. `ruleRows: []` on a stored record is stronger still — shape 1's **own write
+ *   gate refused every state with a rule in it**, so an empty list is the only list such a record
+ *   could ever have described. That is why `session.ts#withRecordRefusals` may also set the stored
+ *   record's `version` to 2: after the completion the value *is* a shape-2 record, and the claim is
+ *   justified by the gate that wrote it rather than by a hope about what it contained.
+ * - **Can an older build read what this one writes?** No, twice. A version-6 reader meets
+ *   `recordRefusal` in a history entry and `ruleRows` inside its record, and `isObjectOf`'s
+ *   extra-key branch refuses the envelope as *damaged* — the false accusation the version-3
+ *   paragraph records. Refusing it as *newer* is true; refusing it as damaged is not.
+ *
+ * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
  */
-export const SESSION_SCHEMA_VERSION = 4;
+export const SESSION_SCHEMA_VERSION = 7;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -184,7 +260,7 @@ export const SESSION_SCHEMA_VERSION = 4;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5, 6, 7]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

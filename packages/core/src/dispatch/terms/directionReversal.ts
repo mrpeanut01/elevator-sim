@@ -134,6 +134,14 @@ export const directionReversalTerm: CostTermDefinition = Object.freeze({
   id: 'directionReversal',
   unit: '',
   measures: 'Penalty for reversing travel direction',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'direction reversal',
+    serves: 'how the cars behave together',
+    atZero: 'change direction freely',
+    atFull: 'finish the sweep first',
+  } as const),
   normalization: Object.freeze({ mode: 'bounded', fullScale: 2 } as const),
   evaluate: directionReversals,
 });

@@ -89,6 +89,19 @@ async function openPausedRun(): Promise<Page> {
   await pressMenuRow(page, 'main.campaign');
   await pressMenuRow(page, 'campaign.open');
   await page.locator('#tab-run').first().click();
+  // Boot's own run must have been adopted before #run is pressed: mid-flight, #run is the cancel
+  // button, and a press that lands there cancels boot's run instead of starting this one — after
+  // which nothing adopts and every transport press below waits on a disabled control. The enabled
+  // transport is the adoption signal (`adopt` → `disableTransport(ui, false)`); same latch and
+  // same reason as menuExit.browser.test.ts's playToEnd.
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector('#play-pause');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.locator('#run').first().click();
   await page.waitForTimeout(1_200);
   // Paused, so the playhead only moves when something asks it to.

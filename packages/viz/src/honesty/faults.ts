@@ -230,6 +230,36 @@ export const wholeRunDriverDrawnEarly: TextFault = (texts) =>
   );
 
 /**
+ * R6 a third time — **a refusal that dates itself to a day that has not finished.**
+ *
+ * `docs/20` defect 3, and the fault the narrowing owes. R6's `role === 'reason'` exemption used to
+ * be total, on the argument *"a refusal is the absence of a claim"*, and the RIGHT NOW panel spent
+ * a wave publishing **`NO AVERAGE — A RESULT`** and *"That is a result, not a gap"* at 14 % of
+ * playback under a label reading *average wait so far*. Nothing there is a figure, so the textual
+ * half could never see it; the structural half returned before it read the basis; and the whole
+ * class of numberless early verdicts sat outside the property built to catch early verdicts.
+ *
+ * The exemption is now half what it was — refusals are exempt from the **textual** check only — and
+ * this is what that narrowing must catch. It stamps `'whole-run'` onto the first early refusal,
+ * which is exactly what a regression in `mode/disclosure.ts#casualRefusalFor` would produce: the
+ * words come back and the declaration comes back with them.
+ *
+ * Deliberately **not** a wording fault. It changes no string, so a check that read the refusal's
+ * text — grepping for *A RESULT*, say — would not see it, which is the property that makes this
+ * the structural half's fault rather than a second copy of the one above with a different role.
+ */
+export const wholeRunRefusalDrawnEarly: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.playhead !== undefined && text.playhead.atS < text.playhead.endedAt && text.role === 'reason',
+    /* c8 ignore next -- the predicate above already established `playhead` is defined. */
+    (text) =>
+      text.playhead === undefined
+        ? text
+        : { ...text, playhead: { ...text.playhead, basis: 'whole-run' as const } },
+  );
+
+/**
  * R6 again, textually only — **the sentence § D293 was written about, verbatim.**
  *
  * > `All 34 people got where they were going`
@@ -273,6 +303,50 @@ export const wholeRunCountInProse: TextFault = (texts, context) => {
 };
 
 /**
+ * § 12.2 — a withheld cell drawn as a zero.
+ *
+ * **The defect the withheld-matrix sweep found, restored to the exact string it produced.**
+ * `dev/leftRail.ts#runFiguresOf` published `0%` under *best day so far* on every week whose history
+ * was empty, which is every new player's whole first shift. `0%` rather than a number chosen here,
+ * because the shape of this defect is precisely that the cell keeps rendering a figure's *format*
+ * while nothing has been measured — a reader cannot tell it from a genuinely bad day.
+ *
+ * Structural in the sense that matters: the string is judged because the **adapter** declared the
+ * cell withheld, not because of anything in the words. A search that decided *"this looks like a
+ * placeholder"* from the text could not have caught the real one.
+ */
+export const withheldFigureAsZero: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.withheld !== undefined,
+    (text) => ({ ...text, text: '0%' }),
+  );
+
+/**
+ * § 12.2 again, and the other half — a withheld cell carrying the figure it may not publish.
+ *
+ * **The second defect the sweep found, in its own words**: while watching somebody else's run, the
+ * week strip's *today, so far* bar read the watched player's share in the spectator's own week —
+ * *"Tuesday, so far: 66 % away inside a minute"*. The number is taken from the cell's own
+ * `ifPublished`, so the fault carries whatever that state's forbidden figure actually is rather than
+ * a literal that could drift away from it.
+ *
+ * It lands only on a cell that declares one, which is the guard `wholeRunCountInProse` needs for the
+ * same reason: a fault injected where the property is right to stay quiet would read as the property
+ * failing to fire. It is also the half no wording rule could catch — the sentence is well formed,
+ * labelled, and about the wrong run.
+ */
+export const withheldFigureStale: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.withheld !== undefined && text.withheld.ifPublished.length > 0,
+    (text) => ({
+      ...text,
+      text: `${text.withheld?.ifPublished[0] ?? '66'}% away inside a minute, so far`,
+    }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -297,8 +371,24 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
     ],
     'energy-wait-blend': [{ name: 'energyScore', fault: energyScore }],
     'goal-without-rate': [{ name: 'goalWithoutRate', fault: goalWithoutRate }],
+    /*
+     * Three, and the third is the one `docs/20` defect 3 owes: R6's `role === 'reason'` exemption
+     * was narrowed from both halves to the textual half alone, and a narrowing with nothing it must
+     * still catch is a narrowing nobody is running. `wholeRunRefusalDrawnEarly` is that something.
+     */
     'whole-run-figure-early': [
       { name: 'wholeRunDriverDrawnEarly', fault: wholeRunDriverDrawnEarly },
+      { name: 'wholeRunRefusalDrawnEarly', fault: wholeRunRefusalDrawnEarly },
       { name: 'wholeRunCountInProse', fault: wholeRunCountInProse },
+    ],
+    /*
+     * The fourth pair, and the same reason again: § 12.2 forbids three things in one clause and two
+     * of them are unrelated failures. A zero is a cell that kept a figure's format with nothing
+     * behind it; a stale figure is a cell that carries a real number about the wrong run. Both were
+     * shipping when the axis landed, and each is the fault for the half the other cannot show.
+     */
+    'withheld-figure-published': [
+      { name: 'withheldFigureAsZero', fault: withheldFigureAsZero },
+      { name: 'withheldFigureStale', fault: withheldFigureStale },
     ],
   });

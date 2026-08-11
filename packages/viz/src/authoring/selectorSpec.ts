@@ -705,6 +705,38 @@ export function patternLine(patternId: string): string | undefined {
 }
 
 /**
+ * What each pattern is **called** on a player surface, at header-pill length.
+ *
+ * The short companion to {@link PATTERN_LINES}, added for the stage header's pattern readout
+ * (Everyday Mode slice 4b): the pill has room for a phrase and not for a sentence, and a bare
+ * engine id is what the Everyday handoff's rule 11 forbids on a Casual surface. The pattern ids
+ * are **data** — `data/dispatcher-profiles.json`'s `patternSwitching` block declares them and
+ * carries no player-facing names of its own (checked, not assumed) — so the words live here, in
+ * the one authored table this module already keeps for the same ids, under the same both-ways
+ * key-set guard in `selectorSpec.test.ts`: a sixth pattern in `data/` fails the suite instead of
+ * falling back, and a name for a dropped pattern fails it too.
+ *
+ * **Every name describes traffic and none describes an outcome**, the same copy rule
+ * {@link PATTERN_LINES} states: naming the regime is a fact about the building's day; praising
+ * the switch would be the claim this project has refused three times (§ D145, § D156, § D169).
+ * `idle` is deliberately not named *Quiet*, because the demand timeline's `QUIET` chip already
+ * means something else — a scheduled zero-intensity phase — and one word carrying two claims on
+ * one header is how a reader concludes the two surfaces agree when they merely rhyme.
+ */
+export const PATTERN_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  'up-peak': 'everyone arriving',
+  'down-peak': 'everyone leaving',
+  'two-way': 'busy both ways',
+  'interfloor': 'floor-to-floor',
+  'idle': 'hardly anyone calling',
+});
+
+/** The player-facing name for a pattern, or `undefined` when this build has no name for it. */
+export function patternName(patternId: string): string | undefined {
+  return PATTERN_NAMES[patternId];
+}
+
+/**
  * What each detector input reads like at the top and the bottom of its ramp.
  *
  * Two phrases rather than one label, because a ramp has a direction and *"lobby arrivals: low"* is

@@ -37,10 +37,74 @@ export interface ViewAt {
   readonly recording: VizRecording | undefined;
   /** The playhead, in simulated seconds. Clamped into the recording when there is one. */
   readonly simTimeS: number;
+  /**
+   * The run's own start-of-day, seconds since midnight, or `undefined` when the run declares no
+   * hour (`constant-iso`, and a recording loaded from a file — `VizRecording` does not carry it).
+   *
+   * **One clock per run** (`docs/19` defect 2). This is the value the shell feeds the header
+   * clock, and it is on `ViewAt` so every panel that prints a time of day reads the same hour —
+   * the decision feed's stamps and the honesty card's window range used to take `clockAt`'s
+   * 06:00 default while the header read the run's own 08:30, which is two clocks about one
+   * instant. `undefined` makes every reader fall back to the shared `DAY_START_S` **together**.
+   */
+  readonly startOfDayS?: number | undefined;
   /** The building the current run resolved to, for the plates. `undefined` before the first run. */
   readonly building: ResolvedBuilding | undefined;
   /** Whether playback is running, for the transport's glyph and the status line. */
   readonly playing: boolean;
+  /**
+   * Whether the run on the stage is **somebody else's**, replayed from its record — slice 8.
+   *
+   * Here rather than derivable by a panel for `unfiledSheet`'s reason: the fact lives in `boot()`'s
+   * closure (`dev/main.ts#isWatching`) and no panel can reach it. `watch/session.ts#watchingStateOf`
+   * deliberately leaves `ViewerState` otherwise untouched — the spectator's week, report and
+   * interventions are still their own — so `state` carries no trace of the watch and a panel asking
+   * *"is this recording mine?"* of the state alone would always answer yes.
+   *
+   * One panel needs it and the reason is ENGINE_CONTRACT § 12.2: the left rail's week strip draws a
+   * *today, so far* figure off `recording`, and while watching that recording is a stranger's run.
+   * See `dev/leftRail.ts#todayShareFor`.
+   *
+   * `undefined` means *nobody has said*, treated as **not watching** — the state every caller that
+   * has no shell is in.
+   */
+  readonly watching?: boolean | undefined;
+  /**
+   * Why the Day report has nothing on it while the rest of the screen suggests otherwise, or
+   * `undefined` when the empty sheet is empty for the plain reason (nothing has been run).
+   *
+   * Here rather than derivable by the panel, because both facts live in `boot()`'s closure where
+   * no panel can reach them: whether the run on screen is one the player asked for (§ D232's
+   * `playerHasChosen`), and whether any sheet has been filed **in this sitting** (a restored
+   * week's `history` cannot tell a reload from a day advanced five minutes ago). The panel's
+   * `emptyReportView` holds the wording; this carries the facts — the split every panel keeps.
+   */
+  readonly unfiledSheet?: UnfiledSheetFacts | undefined;
+}
+
+/**
+ * The two facts behind an empty sheet that is not plainly empty — `docs/19` defects 1 and 14.
+ *
+ * Both optional and independently so, because they answer different questions and can hold at
+ * once (a reload mid-campaign followed by watching boot's run to its end raises both): the
+ * refusal is about the **run on screen**, the prior-sitting flag is about the **week the rail is
+ * describing**. `dev/reportPanel.ts#emptyReportView` gives the refusal precedence — a completed
+ * run standing unfiled is the thing the reader is looking at.
+ */
+export interface UnfiledSheetFacts {
+  /**
+   * Why the completed run on screen has not filed, in one sentence, or `undefined` when no
+   * completed run is standing unfiled. The sentences are `shift/banking.ts`'s two — a run this
+   * shell did not simulate (issue #136), and a run nobody started (§ D232, `docs/19` defect 1) —
+   * quoted, never composed here.
+   */
+  readonly refusal: string | undefined;
+  /**
+   * Whether the week on the rail was banked in a previous sitting with no sheet filed in this
+   * one — the restore state `docs/19` defect 14 found incoherent: the rail read *on a roll ·
+   * 1/1 banked* while the sheet read *Nothing filed yet* with nothing connecting the two.
+   */
+  readonly fromPreviousSitting: boolean;
 }
 
 /** What a mount may do to the world. Everything else it must ask for. */
@@ -65,6 +129,23 @@ export interface MountContext {
    * strip depends on.
    */
   runShift(onRan?: (recording: VizRecording) => void): void;
+  /**
+   * Announce that this press **enters a mode** — a scenario card taken, a week restarted — as
+   * opposed to re-running the day already on screen.
+   *
+   * The distinction exists for shell-owned transport state: the speed chips reset on mode entry
+   * and survive mid-week re-runs (`docs/19` defect 12; `dev/main.ts#resetTransportSpeed` owns the
+   * boundary and its argument). The menu's own mode doors reset directly in their `dispatchMenu`
+   * arms; this member is for the one mode door that lives on a panel — the scenario cards. It is
+   * **not** implied by {@link runShift}: every re-run comes through that seam, and resetting there
+   * would fight the player on exactly the surface they iterate on.
+   *
+   * Optional, because ten of the eleven panels never enter a mode and a recorder-backed test
+   * context should not have to stub a member its mount cannot call. A panel that gains a mode
+   * door calls it with `?.` — an absent implementation means the context's owner keeps no
+   * transport state, which is true of every context but the shell's.
+   */
+  enterMode?(): void;
   /** Move to a surface, revealing its tab if it is one of the four contextual editors. */
   openTab(tab: TabName): void;
   /**

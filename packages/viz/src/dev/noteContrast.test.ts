@@ -69,11 +69,11 @@
  *
  * ## Confirmed once against a browser, which is what makes the gate worth having
  *
- * `noteContrast.browser.test.ts` reads the same fifteen paragraphs off the booted page through
+ * `noteContrast.browser.test.ts` reads the booted page's seventeen paragraphs (the fifteen this file gates plus slice 6a's two render-time sizing notes) through
  * `getComputedStyle`, with the real cascade and the real tree, in both modes — driven by
  * `colorScheme` emulation so that `themeFor`'s `system` branch and `applyTheme` are the path, not a
  * `data-theme` stamp. It agrees with this file to two decimals on all four figures and finds the
- * same fifteen sites. It skips wherever `ELEVATOR_SIM_CHROMIUM` names no Chromium (§ D220), which
+ * same sites. It skips wherever `ELEVATOR_SIM_CHROMIUM` names no Chromium (§ D220), which
  * is why the gate is here and the confirmation is there.
  *
  * ## Which bar, and why there is no carve-out available

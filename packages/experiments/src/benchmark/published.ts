@@ -1238,6 +1238,13 @@ export const PINNED_ESTIMATES: Readonly<
     "3/zoned-uppeak/wt99S": { n: 250, mean: 35.82815899479287, standardError: 2.4939013169312543, lower: 30.916328406839895, upper: 40.73998958274585 },
   }),
   "prepositioning": Object.freeze({
+    // fixed-floor at its default parkingFloorIndex 0 parks at this fixture's lobby, so these four
+    // agree with park-lobby to the summation-order ulp — measured on the study's own run after the
+    // strategy joined PARKING_STRATEGIES (slice 4c), not copied from the lobby rows.
+    "park-fixed-floor/awtS": { n: 500, mean: 1.9751251824009144, standardError: 0.11607201169328751, lower: 1.7470750895560472, upper: 2.2031752752457816 },
+    "park-fixed-floor/pctOverLongWait": { n: 500, mean: 0.014285714285714285, standardError: 0.01428571428571428, lower: -0.013781848442681084, upper: 0.04235327701410965 },
+    "park-fixed-floor/ttdMeanS": { n: 500, mean: 1.846547458855998, standardError: 0.1355042775644605, lower: 1.5803182221205505, upper: 2.1127766955914455 },
+    "park-fixed-floor/wt95S": { n: 500, mean: 1.6145853726173776, standardError: 0.1607328220695793, lower: 1.2987888730008823, upper: 1.9303818722338728 },
     "park-lobby/awtS": { n: 500, mean: 1.9751251824009144, standardError: 0.11607201169328751, lower: 1.7470750895560472, upper: 2.2031752752457816 },
     "park-lobby/pctOverLongWait": { n: 500, mean: 0.014285714285714285, standardError: 0.01428571428571428, lower: -0.013781848442681084, upper: 0.04235327701410965 },
     "park-lobby/ttdMeanS": { n: 500, mean: 1.8465474588559985, standardError: 0.1355042775644605, lower: 1.580318222120551, upper: 2.112776695591446 },

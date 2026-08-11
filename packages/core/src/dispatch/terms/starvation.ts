@@ -126,6 +126,14 @@ export const starvationTerm: CostTermDefinition = Object.freeze({
   id: 'starvation',
   unit: 's',
   measures: 'Escalating penalty on the longest-waiting call',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'starvation',
+    serves: 'the worst wait rather than the average',
+    atZero: 'optimise the average',
+    atFull: 'protect the worst wait',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   evaluate: starvationSeconds,
 });

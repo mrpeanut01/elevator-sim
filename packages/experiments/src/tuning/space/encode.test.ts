@@ -145,10 +145,21 @@ describe('a candidate survives the trip to a profile and back, exactly', () => {
     // the **section count** did not: the new tunable joins a section that already existed. That is
     // the relationship this pair exists to distinguish — a space that grows without a section
     // growing is a new knob, and a section count that moves on its own is a schema change.
-    expect(PROFILE_OBJECT_SECTIONS.length).toBe(7);
-    expect(SPACE.parameters.length).toBe(58);
+    //
+    // Both moved with Everyday Mode slice 4c, for its two different halves: `rules` is the
+    // eighth section (7 → 8), and `idle.parkingFloorIndex` is the new knob (58 → 59). The
+    // `rules` section deliberately declares **no** tunable — its rows are player sentences over
+    // a declared vocabulary, not dimensions an optimizer samples (the same standing as the
+    // file-level `patternSwitching` arm map) — so it is the one section absent from the space's
+    // own section set below.
+    expect(PROFILE_OBJECT_SECTIONS.length).toBe(8);
+    expect(SPACE.parameters.length).toBe(59);
     expect(new Set(SPACE.parameters.map((parameter) => parameter.section))).toStrictEqual(
-      new Set(['weights', 'constraints', ...PROFILE_OBJECT_SECTIONS]),
+      new Set([
+        'weights',
+        'constraints',
+        ...PROFILE_OBJECT_SECTIONS.filter((section) => section !== 'rules'),
+      ]),
     );
   });
 

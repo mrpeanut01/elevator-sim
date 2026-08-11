@@ -102,6 +102,7 @@ import {
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
 } from '../shift/week.js';
+import type { WatchRecord } from '../watch/types.js';
 
 import {
   EMPTY_LIBRARY,
@@ -302,7 +303,14 @@ const GOAL_COMPARISONS: Readonly<Record<GoalComparison, true>> = Object.freeze({
   'at-most': true,
 });
 
-const GOAL_UNITS: Readonly<Record<ShiftGoal['unit'], true>> = Object.freeze({ '%': true, '': true });
+// ` s` joined with the worst-wait goal (slice 5): a restored reading may carry `187 s`. The other
+// two are unchanged, and a version-4 build meeting ` s` refuses by version rather than by shape —
+// see `SESSION_SCHEMA_VERSION`'s version-5 paragraph.
+const GOAL_UNITS: Readonly<Record<ShiftGoal['unit'], true>> = Object.freeze({
+  '%': true,
+  ' s': true,
+  '': true,
+});
 
 const THEMES: Readonly<Record<Settings['theme'], true>> = Object.freeze({
   system: true,
@@ -337,6 +345,59 @@ const READING_CHECKS: Readonly<Record<keyof GoalReading, FieldCheck>> = Object.f
   glyph: isString,
 });
 
+/**
+ * The run record a filed day carries — Everyday Mode slice 8, `watch/types.ts#WatchRecord`.
+ *
+ * ## Why the checks are this shallow, and where the real gate is
+ *
+ * Every field here is checked for *shape* and nothing more. `buildingId` is a non-empty string, not
+ * a building this build ships; `seed` is a decimal string, not a seed anybody has run. That is
+ * deliberate and it is not laxity: a record naming a building `data/buildings/` no longer ships is
+ * a **readable record of a run this build cannot re-ask**, which is
+ * `watch/record.ts#recordUnreadableReason`'s answer and a row that says so — and refusing the whole
+ * envelope for it would take a player's entire week away because one Tuesday named a building that
+ * was renamed. The three-way split is the same one `validate.ts` already keeps for the library:
+ * frame here, contents where the contents can be judged.
+ *
+ * `interventions` is checked as a list of objects and no further, for the same reason
+ * {@link isDocument} exists: `core`'s `InterventionChange` is a union `core` owns, and a second
+ * copy of its cases here is a second answer that goes stale the day a third intervention lands.
+ * `shiftRunConfigOf` hands the log to `core`, which refuses what it does not recognise.
+ */
+const WATCH_RECORD_CHECKS: Readonly<Record<keyof WatchRecord, FieldCheck>> = Object.freeze({
+  version: isIntegerAtLeast(1),
+  // A decimal string, because `JSON.stringify` throws on the `bigint` this is read back into —
+  // `jsonSafety.ts` is in the tree because that trap is.
+  seed: isNonEmptyString,
+  buildingId: isNonEmptyString,
+  dispatcherId: isNonEmptyString,
+  pattern: isNonEmptyString,
+  // `null` is *no Free Play override*, which is every campaign run — a state, not a missing value.
+  demandTemplateId: nullOr(isNonEmptyString),
+  arrivalRatePctPop5min: nullOr(isFiniteNumber),
+  shiftLengthS: isIntegerAtLeast(1),
+  windowStartS: nullOr(isNumberWithin(0, 86_400)),
+  day: isIntegerAtLeast(1),
+  dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
+  outOfServiceCarIds: isArrayOf(isNonEmptyString, 64, 'car ids'),
+  interventions: isArrayOf(isDocument('an intervention'), 64, 'interventions'),
+  /*
+   * The Everyday rules — shape 2, `docs/20` defect 1, and checked exactly as shallowly as
+   * `interventions` for the identical reason. `RULE_CONDITIONS` and `RULE_ACTIONS` are `core`'s
+   * unions; a second copy of them here goes stale the day a condition lands, and
+   * `watch/record.ts#recordUnreadableReason` already refuses a row naming one this build does not
+   * ship — with a sentence a reader can act on, where a validator failure takes the whole week away.
+   *
+   * The bound is **this file's**, and it is stated as such: nothing in `dev/ruleEditor.ts` or in
+   * `core`'s schema caps a rule list, so a sentence attributing this number to an editor limit
+   * would be a stated mechanism with nothing behind it. It sits where `interventions` and `car ids`
+   * sit — a length past which an envelope is better described as damaged than as large — and a
+   * player who genuinely writes a thirty-third rule is the reason to raise it rather than a reason
+   * it was wrong.
+   */
+  ruleRows: isArrayOf(isDocument('a rule row'), 32, 'rule rows'),
+});
+
 const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.freeze({
   day: isIntegerAtLeast(1),
   dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
@@ -347,6 +408,17 @@ const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.fr
   minutePct: isNumberWithin(0, 100),
   readings: isArrayOf(isObjectOf(READING_CHECKS, 'a goal reading'), 32, 'goal readings'),
   allMet: isBoolean,
+  // `null` is a day that cannot be re-asked — see `shift/types.ts#DayOutcome.record` for the two
+  // different days that carry one, and `session.ts#withDayRecords` for why a version 1–5 envelope
+  // arrives here with the key already present and `null`.
+  record: nullOr(isObjectOf(WATCH_RECORD_CHECKS, 'a run record')),
+  /*
+   * Why there is no record, or `null` — `docs/20` defect 1. A sentence rather than a code, and
+   * `shift/types.ts#DayOutcome.recordRefusal` argues why; here it only has to be a string or the
+   * absence of one, and `session.ts#withRecordRefusals` is why a version 1–6 envelope arrives with
+   * the key already present.
+   */
+  recordRefusal: nullOr(isString),
 });
 
 const AWARD_CHECKS: Readonly<Record<keyof ClearedAward, FieldCheck>> = Object.freeze({

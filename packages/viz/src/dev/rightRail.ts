@@ -99,6 +99,7 @@ import { statLineOf } from '../shift/contracts.js';
 
 import type { BrowserResources } from './data.js';
 import { resolveEdited } from './data.js';
+import { buildingEditorSeedOf } from './buildingEditor.js';
 import { el, fill, fillPlate, pick, plateRow, setHidden, setText, type PlateEntry } from './dom.js';
 import type { RailElements } from './elementMap.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
@@ -1425,10 +1426,20 @@ const PICKS_RE_RUN =
 export function mountRightRail(ui: RightRailElements, context: MountContext): Panel {
   const doc = ui.root.ownerDocument;
 
+  /** The last rendered view, for the one link whose press needs to read the stage. */
+  let latest: ViewAt | undefined;
+
   /*
-   * The four `Open … editor →` buttons. They move to a surface and do nothing else — in
-   * particular they do not seed the editors' working copies from the rail's selection, because
-   * doing so would silently discard an unsaved edit the reader left on that tab.
+   * The four `Open … editor →` buttons. They move to a surface and (with one decided exception)
+   * do nothing else — in particular they do not blindly seed the editors' working copies from the
+   * rail's selection, because doing so would silently discard an unsaved edit the reader left on
+   * that tab. The drawer they sit in closes as part of the navigation itself —
+   * `dev/main.ts#openTab` owns that write (`docs/19` defect 6), so it is not repeated here.
+   *
+   * The exception is the building link — `docs/19` defect 11. With **no dirty draft** the editor
+   * opened on whatever it last held (*EDITING — GARDEN APARTMENTS* over a Midtown stage), so the
+   * link now seeds the staged building first, through `buildingEditorSeedOf`, whose docstring
+   * carries the no-clobber rule this comment used to state and the three cases where it declines.
    */
   ui.openDispatcher.addEventListener('click', () => {
     context.openTab('dispatcher');
@@ -1437,6 +1448,8 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
     context.openTab('traffic');
   });
   ui.openBuilding.addEventListener('click', () => {
+    const seed = latest === undefined ? undefined : buildingEditorSeedOf(latest);
+    if (seed !== undefined) context.update(seed);
     context.openTab('building');
   });
   ui.openMachines.addEventListener('click', () => {
@@ -1478,6 +1491,7 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
 
   return {
     render(view: ViewAt): void {
+      latest = view;
       const { resources, state, recording, building } = view;
 
       /* ---- Dispatcher ---- */

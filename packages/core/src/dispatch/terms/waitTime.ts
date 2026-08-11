@@ -34,6 +34,14 @@ export const waitTimeTerm: CostTermDefinition = Object.freeze({
   id: 'waitTime',
   unit: 's',
   measures: 'Estimated wait for the new passenger',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'wait time',
+    serves: 'average wait',
+    atZero: 'let a few wait long',
+    atFull: 'nobody waits long',
+  } as const),
   normalization: Object.freeze({ mode: 'saturating', scale: 'waitTimeS' } as const),
   evaluate: waitTimeSeconds,
 });

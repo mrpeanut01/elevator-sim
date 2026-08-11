@@ -59,6 +59,28 @@ describe.each(BUILDING_IDS)('%s — the frame description', (buildingId) => {
     const frame = frameAt(recording, recording.endedAt / 3);
     expect(describeFrame({ recording, frame })).toBe(describeFrame({ recording, frame }));
   }, 300_000);
+
+  /**
+   * `docs/20` defect 9 — the subtitle named the dispatcher `yours-1` where every other surface
+   * said *Lobby holder*.
+   *
+   * Asserted both ways, because both are the contract: a caller that has the display name gets it
+   * and the id is **gone** (not merely joined by a name, which would leave the engine string on
+   * the surface), and a caller that has none gets exactly the sentence it had before the field
+   * existed. The id used here is deliberately one that could not be a display name.
+   */
+  it('names the dispatcher a reader knows, and falls back to the id when given no name', () => {
+    const { recording } = recordRun(breadthConfig(config, buildingId));
+    const frame = frameAt(recording, recording.endedAt / 3);
+
+    const named = describeFrame({ recording, frame, dispatcherName: 'Lobby holder' });
+    expect(named).toContain('dispatcher Lobby holder');
+    expect(named).not.toContain(recording.dispatcherProfileId);
+
+    expect(describeFrame({ recording, frame })).toContain(
+      `dispatcher ${recording.dispatcherProfileId}`,
+    );
+  }, 300_000);
 });
 
 describe('the description carries the two facts a picture must not hide', () => {
@@ -70,15 +92,46 @@ describe('the description carries the two facts a picture must not hide', () => 
      */
     const { recording } = recordRun(suppressedConfig(config));
     expect(recording.summary.awtIsValid).toBe(false);
-    const t = recording.endedAt / 2;
-    const text = describeFrame({
-      recording,
-      frame: frameAt(recording, t),
-      metrics: overlayAt(recording, t),
-    });
-    expect(text).toContain('Mean waiting time is suppressed');
-    expect(text).toContain('is not reported');
-    expect(text).not.toMatch(/Rolling mean wait over the last \d+ seconds is \d/);
+    const describeAt = (t: number): string =>
+      describeFrame({ recording, frame: frameAt(recording, t), metrics: overlayAt(recording, t) });
+
+    /*
+     * At the end, where `core`'s own sentence is what the paragraph carries. Mid-run it is gated —
+     * `docs/20` defect 3, and the test below — because `awtInvalidReason` is a whole-run verdict in
+     * past tense and this paragraph published it byte-identically at 14 %, 64 % and 97 % of one run.
+     * What is unconditional, and is asserted at **both** playheads, is that no mean is quoted.
+     */
+    const end = describeAt(recording.endedAt);
+    expect(end).toContain('Mean waiting time is suppressed');
+    expect(end).toContain('is not reported');
+    expect(end).not.toMatch(/Rolling mean wait over the last \d+ seconds is \d/);
+
+    const half = describeAt(recording.endedAt / 2);
+    expect(half).not.toMatch(/Rolling mean wait over the last \d+ seconds is \d/);
+  }, 300_000);
+
+  /**
+   * The refusal is dated — `docs/20` defect 3, on the surface with no picture to contradict it.
+   *
+   * A reader on the text alternative was told at 00:00 what the queues did by 16:29. The
+   * **withholding** does not move: the paragraph still says there is no mean here at every playhead,
+   * because a text alternative that fell silent while the canvas went on refusing would put the
+   * sighted and non-sighted halves back out of step. What is gated is `core`'s verdict.
+   */
+  it('does not publish the finished day’s reason at a playhead short of the end', () => {
+    const { recording } = recordRun(suppressedConfig(config));
+    const reason = recording.summary.awtInvalidReason;
+    expect(reason).toBeDefined();
+
+    const t = recording.endedAt * 0.14;
+    const early = describeFrame({ recording, frame: frameAt(recording, t) });
+    expect(early).toContain('Mean waiting time is not reported');
+    expect(early).toContain('A mean over part of a day is not this day’s average');
+    expect(early).not.toContain(reason ?? '<no reason>');
+
+    // The end earns it, so this is a gate and not a deletion.
+    const end = describeFrame({ recording, frame: frameAt(recording, recording.endedAt) });
+    expect(end).toContain(reason ?? '<no reason>');
   }, 300_000);
 
   it('quotes the rolling mean it was handed, and the window it was computed over', () => {

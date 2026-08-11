@@ -53,6 +53,7 @@ import {
 } from '../dev/state.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { initialMenuState, updateFreePlay, updateSettings } from '../menu/menu.js';
+import { VIZ_SCHEMA_VERSION } from '../contract/types.js';
 import { DEFAULT_SETTINGS, PLAYBACK_SPEEDS, type MenuState } from '../menu/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -137,6 +138,8 @@ const PERFECT = Object.freeze({
   minutePct: 100,
   peakQueue: 0,
   abandoned: 0,
+  worstWaitS: 30,
+  worstWaitIsCensored: false,
 });
 
 /**
@@ -148,6 +151,8 @@ const PERFECT = Object.freeze({
  */
 function playedWeek(): WeekState {
   const day1 = outcomeOf({
+    record: null,
+    recordRefusal: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',
@@ -157,6 +162,8 @@ function playedWeek(): WeekState {
     readings: readGoals(goalsForDay(1), PERFECT),
   });
   const day2 = outcomeOf({
+    record: null,
+    recordRefusal: null,
     day: 2,
     dayIdx: 1,
     eventId: 'move-in',
@@ -215,6 +222,8 @@ const library = (): SavedLibrary => ({
  */
 function parkedWeek(): WeekState {
   const day1 = outcomeOf({
+    record: null,
+    recordRefusal: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',
@@ -396,10 +405,14 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'a bigint, and the trap this module is built around: JSON.stringify throws on one. The seed a session means is menu.freePlay.seed, which is decimal digits because a seed is an identity rather than a quantity',
   'viewer.outOfServiceCarIds':
     'a car held out of service is a within-day attempt, not a saved game, and nothing in a selection holds one — enterFreePlay clears it for exactly that reason',
+  'viewer.interventions':
+    'the run record’s mid-run intervention log, a within-day attempt on outOfServiceCarIds’ exact ground: it is stamped against one day’s run, the day boundary clears it (reportPanel’s next-day patch), and a restored log would replay yesterday’s change of mind onto a day that never carried it',
   'viewer.levers':
     'the group levers are the same case: moved off their defaults they make a run unreproducible elsewhere, and a reload is not the moment to inherit that silently',
   'viewer.selectorSpec':
     'the weight-set selector is a group lever by another name — applied on top of whoever is driving — and off its seeded value it writes a selection block and an arm map no shipped profile carries, so a restored one would be a run nobody selected wearing the shipped dispatcher’s name',
+  'viewer.ruleRows':
+    'the Everyday rules are the selector spec’s case one surface over: written rows put the driving profile under selection.policy rules, which no shipped profile carries and nothing in a selection or submission expresses (runIdentity.ts refuses a written list by name) — a restored list would silently run yesterday’s rules under the shipped dispatcher’s name, and the empty list is the identity by object',
   'viewer.patience':
     'the Parameters tab’s one applied schema, and the field it is written from is a mount that redraws at its declared defaults on every load — so persisting it would restore a run in which riders abandon while the four controls that say so read “none”, which is the screen and the run disagreeing rather than a session being remembered. It is also unreproducible elsewhere (runIdentity.ts refuses it by name) and abandonment moves the mean it would be judged on',
 
@@ -924,6 +937,55 @@ describe('a payload this build cannot read is refused, with the reason', () => {
     expect(result.failure.message).toContain('library');
   });
 
+  /*
+   * The version 6 → 7 completion — `docs/20` defect 1, and the one arm of this module that
+   * **rewrites** a stored value rather than filling a gap beside it.
+   *
+   * A version-6 day carries no `recordRefusal` and its record carries no `ruleRows` and says
+   * `version: 1`. Read as-is, `recordUnreadableReason` refuses every such record with a true and
+   * useless sentence about shapes, which would take the `Watch it` button off every day a player
+   * has ever filed. `session.ts#withRecordRefusals` completes both keys and moves the record's own
+   * shape number, on the evidence shape 1's write gate provides: it refused every state with a rule
+   * in it, so `[]` is the only list such a record could have described.
+   */
+  it('reads a version-6 envelope, completing the day’s refusal and the record’s rules', () => {
+    const slots = saved();
+    tamper(slots, (envelope) => {
+      envelope['schemaVersion'] = 6;
+      const history = weekOf(envelope)['history'] as Record<string, unknown>[];
+      expect(history.length, 'the fixture week must have days, or this asserts nothing').toBeGreaterThan(0);
+      for (const day of history) {
+        delete day['recordRefusal'];
+        day['record'] = {
+          version: 1,
+          seed: '42',
+          buildingId: 'garden-apartments',
+          dispatcherId: 'collective',
+          pattern: 'building',
+          demandTemplateId: null,
+          arrivalRatePctPop5min: null,
+          shiftLengthS: 1800,
+          windowStartS: null,
+          day: 1,
+          dayIdx: 0,
+          outOfServiceCarIds: [],
+          interventions: [],
+        };
+      }
+    });
+    const result = loadSession(slots.store);
+    expect(
+      result.ok ? '' : `${result.failure.kind}: ${result.failure.message}`,
+      'a version-6 envelope is refused rather than completed',
+    ).toBe('');
+    if (!result.ok) return;
+    for (const day of result.snapshot.week.history) {
+      expect(day.recordRefusal, 'a build that kept no reason must not acquire one').toBeNull();
+      expect(day.record?.ruleRows, 'shape 1 refused every rules run, so the list is []').toEqual([]);
+      expect(day.record?.version, 'the completed record is a shape-2 record and must say so').toBe(2);
+    }
+  });
+
   it('refuses an envelope carrying a key this build does not know', () => {
     // The version number is supposed to have caught this. An unknown sibling means either it was
     // not bumped when a field landed, or these bytes are not ours — and silently dropping whatever
@@ -1322,7 +1384,10 @@ describe('what the bytes must not contain', () => {
 
   it('carries neither the recording nor the report', () => {
     const text = saved().written.get(SESSION_KEY) ?? '';
-    expect(text).not.toContain('schemaVersion":8');
+    // The literal is the *current* recording schema, derived rather than pinned: a pinned `8`
+    // went stale the day slice 4b bumped the contract to 9, and a stale pin here checks that the
+    // session does not embed a recording shape no build writes any more.
+    expect(text).not.toContain(`schemaVersion":${String(VIZ_SCHEMA_VERSION)}`);
     expect(text).not.toContain('smallPrint');
     expect(text).not.toContain('diagnosis');
   });

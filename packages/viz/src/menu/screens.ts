@@ -145,6 +145,23 @@ export type MenuIntent =
    * shell's switch fail to compile until something performs it.
    */
   | { readonly kind: 'start-endless' }
+  /**
+   * Open the Fix-a-building surface — GAMEPLAY § 10's mode 4, mounted as an overlay.
+   *
+   * A member rather than a call, for this union's founding reason: the shell does not compile
+   * until something performs it, and `dev/main.ts`'s arm is what opening the surface *means* —
+   * this module decides nothing about it, exactly as `open-campaign` decides nothing about tabs.
+   */
+  | { readonly kind: 'open-fixit' }
+  /**
+   * Open the watch picker — Everyday Mode slice 8, GAMEPLAY § 14.1.
+   *
+   * {@link 'open-fixit'}'s exact footing, and for its reason: this module decides nothing about
+   * what watching *is*, and `dev/main.ts`'s arm is what opening the surface means. The scope is
+   * `presentation` because opening a picker changes no run — **entering** the spectator state does,
+   * and that is a press on the picker rather than on the menu.
+   */
+  | { readonly kind: 'open-watch' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   /**
    * Take a board row's own configuration and run it — GitHub issue #93 § 1.
@@ -321,6 +338,8 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'start':
     case 'open-campaign':
     case 'start-endless':
+    case 'open-fixit':
+    case 'open-watch':
     case 'open-board':
     case 'beat-score':
     case 'account-form':
@@ -456,6 +475,18 @@ export interface MenuViewInput {
   readonly postingRefusal?: string | undefined;
   /** Whether a finished run is on screen at all. */
   readonly hasRun: boolean;
+  /**
+   * Whether the player has any relationship with the shift behind the overlay — they have left
+   * this menu in this sitting, or the session restored a previous sitting's play. `undefined`
+   * means **nobody has said** ({@link firstVisit}'s convention), and is treated as `true` so a
+   * caller that carries no shell keeps the ordinary Resume wording.
+   *
+   * Exists for one row: on a genuinely first load the run behind the menu is boot's own (issue
+   * #97 requires Resume *enabled* over it), and *"Back to the shift on screen"* claimed a shift
+   * the player had never seen — `docs/19`'s Resume copy nit. The shell computes the fact
+   * (`dev/main.ts#runState`); {@link resumeRow} words it.
+   */
+  readonly everLeftTheMenu?: boolean | undefined;
   /**
    * Why the run on screen may not be ranked — `scope/runIdentity.ts`'s reasons, joined.
    *
@@ -675,7 +706,14 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
     case 'main':
       return {
         ...empty,
-        rows: mainRows(input.hasServer, input.hasRun, input.viewMode ?? 'advanced'),
+        rows: mainRows(
+          input.hasServer,
+          input.hasRun,
+          input.viewMode ?? 'advanced',
+          // `=== false` — *nobody has said* keeps the ordinary wording, exactly as `firstVisit`'s
+          // `=== true` keeps the ordinary silence. See {@link MenuViewInput.everLeftTheMenu}.
+          input.everLeftTheMenu === false,
+        ),
         // `=== true`, so *nobody has said* is silence rather than a welcome. See
         // {@link MenuViewInput.firstVisit}.
         notices: input.firstVisit === true ? [FIRST_VISIT_NOTE] : empty.notices,
@@ -749,11 +787,25 @@ const NEEDS_A_SERVER = ' · needs a server, and this one has none';
  * would open the product on a greyed control; last is where a reader looks for the way out, which
  * is the half of the old sentence that was always right.
  */
-function resumeRow(hasRun: boolean): MenuAffordance {
+function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
+  /*
+   * Two details for the enabled row, and the split is `docs/19`'s Resume copy nit. On a genuinely
+   * first load — nothing restored, this menu never dismissed — the shift behind the overlay is
+   * boot's own demo run, which issue #97 requires the row to stay **enabled** over (pressing it is
+   * fine; the stage shows a building at rest and the filing gate refuses to bank that run). What
+   * was wrong is only the claim: *"Back to the shift on screen"* names a shift the player has
+   * never seen, as though something of theirs were waiting. So the first-sitting wording says what
+   * is actually behind the menu and points at the row that starts a real one; the ordinary wording
+   * returns the moment they have been out there or a session restored (`everLeftTheMenu`).
+   */
+  const detail = neverLeft
+    ? 'Close this menu and look around — the page ran a demo day so the stage is not empty; ' +
+      'nothing is filed from it. Start here, above, opens your first real shift.'
+    : 'Back to the shift on screen — nothing here is changed by leaving';
   return {
     id: 'main.resume',
     label: 'Resume',
-    detail: 'Back to the shift on screen — nothing here is changed by leaving',
+    detail,
     kind: 'commit',
     // Closing an overlay moves no leg. `presentation` is the honest scope and it is what lets this
     // row appear under every play mode, which a way out has to.
@@ -877,6 +929,7 @@ function mainRows(
   hasServer: boolean | undefined,
   hasRun: boolean,
   viewMode: 'basic' | 'advanced',
+  neverLeft: boolean,
 ): readonly MenuAffordance[] {
   // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
   // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
@@ -930,7 +983,7 @@ function mainRows(
     // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
     social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
-    resumeRow(hasRun),
+    resumeRow(hasRun, neverLeft),
   ]);
 }
 
@@ -1022,12 +1075,16 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
       heading: 'What a shift is',
       body: Object.freeze([
         'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
-          'against three goals: carry a share of the people who turned up, get a share of riders ' +
-          'away inside a minute, and — alternating by day — either hold the deepest landing ' +
-          'queue under a number, or let nobody wait past the 15-minute horizon.',
+          'against four goals, all four every day: carry a share of the people who turned up, ' +
+          'get a share of riders away inside a minute, hold the deepest landing queue under a ' +
+          'number, and keep the worst wait inside a ceiling. The four are in tension — a group ' +
+          'that chases the shares cannot also park a car for the landing that stacks, and the ' +
+          'worst wait is the bar that slips when you serve the average rider first. That ' +
+          'tension is the day’s actual puzzle.',
         'The bars harden as the week goes on, and then they stop. Away-inside-a-minute tops out ' +
-          'at 84 %, carried tops out at 96 %, and the queue bar bottoms out at 12 people. There ' +
-          'is no losing here. There is a line you are trying to bend upward.',
+          'at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and the ' +
+          'worst-wait ceiling bottoms out at 150 seconds. There is no losing here. There is a ' +
+          'line you are trying to bend upward.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
           'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
           'rather than competence. Every goal is read from counts — never from an average — so a ' +
@@ -1366,6 +1423,16 @@ function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): reado
     {
       id: 'settings.playback-speed',
       label: 'Playback speed',
+      /*
+       * The relationship to the stage's own ×-chips, in the row's own copy — `docs/19`'s copy nit
+       * (*two speed controls with no stated relationship*). The wording is `dev/main.ts`'s
+       * `applyPlaybackSpeed` docstring made player-sized: the chip is a property of the run being
+       * watched, this is the player's preference, and the effective rate is their product — which
+       * is also why changing a chip does not move this select and vice versa.
+       */
+      detail:
+        'Your own multiplier on top of the ×1–×900 chips under the stage: the chips pick a run’s ' +
+        'pace, this scales all of them and survives changing chips',
       kind: 'select',
       scope: 'presentation',
       enabled: true,
@@ -1479,6 +1546,44 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
       scope: 'presentation',
       enabled: true,
       intent: { kind: 'navigate', to: 'commissioning' },
+    },
+    {
+      /*
+       * GAMEPLAY § 10 — mode 4. It sits on this screen rather than the root for
+       * `campaign.endless`'s own reason one row down: the root's six rows are pinned by § D299's
+       * add-a-door-take-nothing-away test, and this surface is a mode a player chooses from the
+       * scenario board's neighbourhood rather than a seventh peer of Free play. The arm is
+       * `dev/main.ts`'s: close the menu, open the Fix-a-building overlay. No week is touched —
+       * a case runs its own building, and leaving the overlay lands back on the shift exactly as
+       * it was, which is why the scope is `presentation`.
+       */
+      id: 'campaign.fixit',
+      label: 'Fix a building',
+      detail: 'A tower with one thing wrong and a tenant who has written in — the diagnosis is printed, the decision is what to spend',
+      kind: 'commit',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'open-fixit' },
+    },
+    {
+      /*
+       * GAMEPLAY § 14.1. Beside Fix a building for the same reason it sits here rather than on the
+       * root: it is a surface a player reaches from the scenario board's neighbourhood, not a
+       * seventh peer of Free play, and § D299's add-a-door-take-nothing-away test pins the root's
+       * six rows. The arm is `dev/main.ts`'s: close the menu, open the picker. No week is touched
+       * by opening it, which is why the scope is `presentation`.
+       *
+       * The detail line states the substitution rather than hiding it — there is no server here, so
+       * what the product can promise is a local re-simulation, and a row promising more would be a
+       * claim about a check that does not happen.
+       */
+      id: 'campaign.watch',
+      label: 'Watch a run',
+      detail: 'A day filed on this device, or a shipped reference run, re-simulated here from its own record and replayed',
+      kind: 'commit',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'open-watch' },
     },
     {
       id: 'campaign.endless',
@@ -2271,6 +2376,8 @@ export function applyIntent(
     case 'start':
     case 'open-campaign':
     case 'start-endless':
+    case 'open-fixit':
+    case 'open-watch':
     case 'open-board':
     case 'account-form':
     case 'account-submit':

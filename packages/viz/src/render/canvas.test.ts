@@ -27,6 +27,7 @@ import {
   playheadHasReachedEnd,
   undeliveredAt,
   type Canvas2DLike,
+  type SceneInput,
   type Theme,
 } from './canvas.js';
 import { themeFor } from './theme.js';
@@ -593,13 +594,45 @@ describe('drawScene', () => {
       awtIsValid: false,
       awtInvalidReason: 'queue diverged',
     });
-    const transcript = draw(frame({ runningMeanWaitS: 87.7 }), run).transcript;
+    // At `endedAt`: the banner's clause is a whole-run verdict and waits for the playhead —
+    // `docs/19` defect 4, the same rule `undeliveredAt` already keeps two clauses up.
+    const transcript = draw(
+      frame({ runningMeanWaitS: 87.7, simTimeS: RECORDING.endedAt }),
+      run,
+    ).transcript;
     expect(transcript).toContain('SATURATED — AWT suppressed');
     // The assertion the original row stopped one short of.
     expect(transcript).not.toContain('mean wait so far');
     expect(transcript).not.toContain('87.7');
     expect(transcript).toContain('mean wait suppressed');
-    expect(draw(frame()).transcript).not.toContain('SATURATED');
+    expect(draw(frame({ simTimeS: RECORDING.endedAt })).transcript).not.toContain('SATURATED');
+  });
+
+  it('holds the whole-run verdict off the banner while the day is still playing — docs/19 defect 4', () => {
+    /*
+     * The audit watched `NO AVERAGE — the queues never settled during this run`, past tense, at
+     * 27 % playback — a verdict about the finished day drawn over its own middle, the class
+     * § D307's temporal axis caught in the undelivered count. Mid-run the banner claims nothing
+     * about how the day ends; the refusal itself never leaves the bitmap, because the counters
+     * row speaks it at every playhead in both registers — so a PNG exported mid-run still
+     * refuses the mean (§ D294) while the whole-run sentence waits for the end.
+     */
+    const run = suppressed({
+      saturated: true,
+      awtIsValid: false,
+      awtInvalidReason: 'queue diverged',
+    });
+    const early = frame({ runningMeanWaitS: 87.7, simTimeS: 60 });
+    const engineer = draw(early, run).transcript;
+    expect(engineer).not.toContain('SATURATED — AWT suppressed');
+    expect(engineer).toContain('mean wait suppressed'); // the so-far register still refuses
+    expect(engineer).not.toContain('87.7');
+    const casualCtx = new RecordingContext();
+    drawScene(casualCtx, { recording: run, frame: early, layout, theme: DEFAULT_THEME, mode: 'basic' });
+    const casual = casualCtx.transcript;
+    expect(casual).not.toContain('the queues never settled during this run');
+    expect(casual.toLowerCase()).toContain('no average'); // the counters row's refusal stands
+    expect(casual).not.toContain('87.7');
   });
 
   it('prints no mean on the other suppression ground either: awtIsValid false without saturation', () => {
@@ -1510,24 +1543,31 @@ describe('the header band speaks a player’s words in Casual — issue #100', (
      * not make it say less. Both engineer strings are pinned as literals here — not derived from
      * anything this lane can also edit — so a future register that "simplified" them goes red.
      */
-    const saturated = textsOf(refused('saturated'), frame({ runningMeanWaitS: 87.7 }), 'advanced');
+    // At `endedAt`: the refusal clause is a whole-run verdict, and the banner earns it when the
+    // playhead does (`docs/19` defect 4). The strings themselves are unchanged, byte for byte.
+    const atEnd = (): Frame => frame({ runningMeanWaitS: 87.7, simTimeS: RECORDING.endedAt });
+    const saturated = textsOf(refused('saturated'), atEnd(), 'advanced');
     expect(saturated).toContain('SATURATED — AWT suppressed');
     expect(saturated.some((text) => text.includes('mean wait suppressed'))).toBe(true);
 
-    const censored = textsOf(refused('censored'), frame({ runningMeanWaitS: 87.7 }), 'advanced');
+    const censored = textsOf(refused('censored'), atEnd(), 'advanced');
     expect(censored).toContain('AWT suppressed');
     expect(censored).not.toContain('SATURATED — AWT suppressed');
 
     // The default is the engineer's header, byte for byte — `OverlayInput.mode`'s rule, applied to
     // the band above it, so an export or a describing caller gets the engineer's words.
     for (const recording of [RECORDING, refused('saturated'), refused('abandoned')]) {
-      expect(textsOf(recording, frame())).toEqual(textsOf(recording, frame(), 'advanced'));
+      expect(textsOf(recording, atEnd())).toEqual(textsOf(recording, atEnd(), 'advanced'));
     }
   });
 
   it('replaces both of them in Casual, and says which ground refused the mean', () => {
     for (const ground of AWT_INVALID_GROUNDS) {
-      const casual = textsOf(refused(ground), frame({ runningMeanWaitS: 87.7 }), 'basic').join('\n');
+      const casual = textsOf(
+        refused(ground),
+        frame({ runningMeanWaitS: 87.7, simTimeS: RECORDING.endedAt }),
+        'basic',
+      ).join('\n');
       // The jargon the issue names is gone…
       expect(casual, ground).not.toContain('AWT suppressed');
       expect(casual, ground).not.toContain('SATURATED');
@@ -1545,7 +1585,9 @@ describe('the header band speaks a player’s words in Casual — issue #100', (
      * taken off the engineer's line to pay for it — the test above pins both of its strings.
      */
     const banners = AWT_INVALID_GROUNDS.map((ground) =>
-      textsOf(refused(ground), frame(), 'basic').find((text) => text.startsWith(NO_AVERAGE_LEAD)),
+      textsOf(refused(ground), frame({ simTimeS: RECORDING.endedAt }), 'basic').find((text) =>
+        text.startsWith(NO_AVERAGE_LEAD),
+      ),
     );
     for (const banner of banners) expect(banner).toBeDefined();
     expect(new Set(banners).size).toBe(AWT_INVALID_GROUNDS.length);
@@ -1599,11 +1641,57 @@ describe('the header band speaks a player’s words in Casual — issue #100', (
      * transcripts must differ by exactly the lines this lane wrote and by no floor label, no car
      * badge and no footer.
      */
-    const f = frame({ totalWaiting: 41, boardedLegs: 137 });
+    // At `endedAt`, where the banner clause is drawn: two moved lines are the counters row and
+    // the banner. Mid-run the banner waits for the playhead (`docs/19` defect 4), so only the
+    // counters row moves — asserted beside the end case rather than left implicit.
+    const f = frame({ totalWaiting: 41, boardedLegs: 137, simTimeS: RECORDING.endedAt });
     const casual = textsOf(refused('saturated'), f, 'basic');
     const engineer = textsOf(refused('saturated'), f, 'advanced');
     expect(casual.length).toBe(engineer.length);
     const moved = casual.filter((text, index) => text !== engineer[index]);
     expect(moved.length).toBe(2);
+
+    const early = frame({ totalWaiting: 41, boardedLegs: 137 });
+    const casualEarly = textsOf(refused('saturated'), early, 'basic');
+    const engineerEarly = textsOf(refused('saturated'), early, 'advanced');
+    expect(casualEarly.length).toBe(engineerEarly.length);
+    expect(casualEarly.filter((text, index) => text !== engineerEarly[index]).length).toBe(1);
+  });
+});
+
+/**
+ * The subtitle names the dispatcher a reader knows — `docs/20` defect 9, `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11.
+ *
+ * The audit read `yours-1` on the stage under a building drawn by its display name, while the
+ * sheet four inches away said *Lobby holder*. The two assertions are the two halves of the
+ * contract: a caller with a name gets it **instead of** the id, and a caller with none gets the
+ * string this line has always drawn.
+ */
+describe('the header subtitle', () => {
+  const textsOf = (input: Partial<SceneInput>): readonly string[] => {
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      ...input,
+    });
+    return ctx.calls
+      .filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0] ?? ''));
+  };
+
+  it('draws the display name when it is given one, and never the id beside it', () => {
+    const texts = textsOf({ dispatcherName: 'Lobby holder' });
+    expect(texts.some((text) => text.startsWith('Lobby holder · seed 7'))).toBe(true);
+    expect(texts.some((text) => text.includes(RECORDING.dispatcherProfileId))).toBe(false);
+  });
+
+  it('falls back to the recording’s own id, so a caller with no name loses nothing', () => {
+    const texts = textsOf({});
+    expect(
+      texts.some((text) => text.startsWith(`${RECORDING.dispatcherProfileId} · seed 7`)),
+    ).toBe(true);
   });
 });

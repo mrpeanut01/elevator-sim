@@ -129,12 +129,19 @@ export function fallingBehindAt(recording: VizRecording, simTimeS: SimTime): boo
  * is inside the run, `'whole-run'` once it has reached the end. The engineer card reads a verdict
  * about the whole run either way and does not move. The parameter defaults to the live reading so
  * every caller written before it existed keeps the card it had.
+ *
+ * `dayStartS` is the run's own hour — the value `dev/main.ts` feeds the header clock — and it
+ * reaches exactly one string: the maths paragraph's reporting-window range. That range used to
+ * take the 06:00 default unconditionally, so on a run whose template declares 08:30 the engineer's
+ * card quoted a window on a clock no other surface was showing (`docs/19` defect 2 — one clock
+ * per run). `undefined` falls back to the shared `DAY_START_S`, together with every other reader.
  */
 export function honestyAt(
   recording: VizRecording,
   simTimeS: SimTime,
   mode: DisclosureMode,
   basis: WaitBandBasis = 'now',
+  dayStartS?: number | undefined,
 ): HonestyCard {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
   const suppressed = meansAreSuppressed(recording);
@@ -162,7 +169,7 @@ export function honestyAt(
         ? closedPlain(recording, suppressed)
         : casualPlain(fallingBehind),
     hasMaths: engineer,
-    maths: engineer ? mathsOf(recording, suppressed) : undefined,
+    maths: engineer ? mathsOf(recording, suppressed, dayStartS) : undefined,
     bg: warning ? WARNING_BG : CALM_BG,
     edge: warning ? WARNING_EDGE : CALM_EDGE,
     warning,
@@ -175,14 +182,34 @@ export function honestyAt(
  * Copy
  * -------------------------------------------------------------------------- */
 
-/** The design's casual strings, `:2347–2361`, verbatim. */
+/**
+ * The design's casual strings, `:2347–2361` — verbatim but for the second person.
+ *
+ * ## The one deviation, and why it is a deviation from the handoff *to* the handoff
+ *
+ * `docs/20` defect 7 found this card telling a spectator *"That one got away from you"* over
+ * somebody else's day, and § 14.1 of the same handoff calls that a defect in as many words: *"No
+ * first-person copy anywhere in the mode. Not `you`, not `your run`, not `your best`."* Two
+ * sections of one canonical document disagree on a watched run, and something has to give.
+ *
+ * What gives is the pronoun, in **one** register rather than two. The alternative — a spectator arm
+ * for every sentence here — doubles the copy of a module whose whole subject is that two accounts of
+ * one refusal is the failure mode, and it would leave the player's arm free to acquire a *your* that
+ * the watched arm quietly drops. `render/mood.ts` already settled the same question one card over:
+ * *"The building"*, never *"you"*. So the card addresses the building and the run, the sentences
+ * mean exactly what they meant, and § 14.1 holds here without a branch to keep in step.
+ *
+ * What is **not** changed is the editorial *we*: the simulator saying *we are withholding* is the
+ * product speaking about its own refusal, which is the voice `docs/10` R9 asks for and is not a
+ * claim about whose day is on the stage.
+ */
 function casualTitle(fallingBehind: boolean): string {
   return fallingBehind ? 'The building is falling behind' : 'Comfortably keeping up';
 }
 
 function casualPlain(fallingBehind: boolean): string {
   return fallingBehind
-    ? 'People are arriving faster than your cars can clear them. Add a shaft, zone the tower, ' +
+    ? 'People are arriving faster than the cars can clear them. Add a shaft, zone the tower, ' +
         'or ride out a rough morning and read the post-mortem.'
     : 'Cars are clearing calls faster than people turn up. Push the traffic pattern harder, or ' +
         'bank the shift and take tomorrow.';
@@ -197,7 +224,7 @@ function casualPlain(fallingBehind: boolean): string {
  * though the rule behind it stays behind *show me the maths*.
  */
 function closedTitle(suppressed: boolean): string {
-  return suppressed ? 'That one got away from you' : 'The lifts kept up today';
+  return suppressed ? 'That one got away from the building' : 'The lifts kept up today';
 }
 
 /**
@@ -222,13 +249,13 @@ function closedPlain(recording: VizRecording, suppressed: boolean): string {
   if (recording.summary.saturated) {
     return (
       'The queues never settled, so there is no single number for what the wait was — asking for ' +
-      'one would only tell you when we stopped watching. Every count on this rail is real; the ' +
+      'one would only say when we stopped watching. Every count on this rail is real; the ' +
       'average is the thing we are withholding.'
     );
   }
   return (
     'This shift does not pass every check an average has to pass, so the simulator withholds the ' +
-    'average rather than printing one you could not lean on. Every count on this rail is real; ' +
+    'average rather than printing one nothing could lean on. Every count on this rail is real; ' +
     'switch to Engineer for the rule that refused it.'
   );
 }
@@ -236,7 +263,7 @@ function closedPlain(recording: VizRecording, suppressed: boolean): string {
 /** The design's engineer strings, re-keyed onto the flag that actually decides. */
 function engineerTitle(suppressed: boolean): string {
   return suppressed
-    ? 'We won’t show you an average today'
+    ? 'We won’t show an average today'
     : 'The numbers here are safe to quote';
 }
 
@@ -261,7 +288,7 @@ function engineerPlain(recording: VizRecording, suppressed: boolean): string {
   }
   if (recording.summary.saturated) {
     return (
-      'The queues are still growing, so an “average wait” would just tell you when we stopped ' +
+      'The queues are still growing, so an “average wait” would just say when we stopped ' +
       'looking. The counts above are real; the average is not.'
     );
   }
@@ -282,7 +309,11 @@ function engineerPlain(recording: VizRecording, suppressed: boolean): string {
  * branch quotes counts, thresholds and a longest wait. `noMeans.test.ts` asserts that no module in
  * this directory so much as names the three suppressible fields.
  */
-function mathsOf(recording: VizRecording, suppressed: boolean): string {
+function mathsOf(
+  recording: VizRecording,
+  suppressed: boolean,
+  dayStartS?: number | undefined,
+): string {
   const s = recording.summary;
   // Not `window`: `boundaries.test.ts` rule 3 forbids a bare identifier of that name anywhere
   // outside `src/dev/`, because the finding that rule actually produced was a local shadowing the
@@ -290,7 +321,7 @@ function mathsOf(recording: VizRecording, suppressed: boolean): string {
   const reportWindow = s.reportWindow;
   const windowClause =
     `Reporting window ${reportWindow.id}, ` +
-    `${hhmm(timeOfDayAt(reportWindow.startS))}–${hhmm(timeOfDayAt(reportWindow.endS))} ` +
+    `${hhmm(timeOfDayAt(reportWindow.startS, dayStartS))}–${hhmm(timeOfDayAt(reportWindow.endS, dayStartS))} ` +
     `(${s.windowSeconds.toFixed(0)} s), n = ${String(s.waitCount)} legs.`;
 
   if (suppressed) {

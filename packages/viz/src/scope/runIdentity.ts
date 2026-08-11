@@ -29,10 +29,17 @@
  * tomorrow with a `within-day` scope is refused here on the day it lands rather than on the day
  * somebody remembers.
  *
- * The three *"yours alone"* refusals are the exception and are kept explicit, because they are not
- * about a scope at all: `buildingId` is `between-games` and perfectly legal to move, and it is still
+ * The three *"saved on this device alone"* refusals are the exception and are kept explicit, because
+ * they are not about a scope at all: `buildingId` is `between-games` and perfectly legal to move, and it is still
  * unreproducible when it names a building `data/buildings/` does not ship. That is a question about
  * the **value**, not the field, and only `resources` can answer it.
+ *
+ * They said *"is yours alone"* until `docs/20` defect 1, and the wording moved because the audience
+ * did. These messages are quoted verbatim by `watch/library.ts#refusalForDay` onto the watch
+ * picker, and GAMEPLAY § 14.1 forbids first-person copy on a watching surface in as many words —
+ * *"the word `you` on a watched run is a defect"*. The replacement is not a euphemism: **saved on
+ * this device** is the fact the refusal turns on (only this browser has the artefact), where
+ * *yours* was a claim about ownership that the leaderboard's own copy never needed either.
  *
  * ## The unstated premise that sentence had, and the two questions it conflated — issue #129
  *
@@ -224,6 +231,37 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
     state.outOfServiceCarIds.length === 0
       ? undefined
       : `${String(state.outOfServiceCarIds.length)} car(s) are held out of service, and nothing in a selection holds one`,
+
+  /**
+   * The intervention log — Everyday Mode's run record, on `outOfServiceCarIds`' exact footing.
+   *
+   * The empty log carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
+   * pins that run byte-identical to one built before the field existed. A non-empty log does
+   * not — no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses one —
+   * and the consequence is the contract's own replay-verification clause pointed the other way:
+   * the server would re-simulate the seed *without* the log, get different legs, and refuse an
+   * honest run as `metrics-do-not-reproduce`. When the wire grows a field for the record
+   * (contract § 1.4 says it must, for spectating), this arm is the one that comes back out.
+   */
+  interventions: (state) =>
+    state.interventions.length === 0
+      ? undefined
+      : `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and no selection or submission carries an intervention log — a replay without it is a different run`,
+
+  /**
+   * The Everyday rules — `interventions`' exact footing, one mechanism over.
+   *
+   * The empty list carries: `profileWithRules` returns the driving profile by object identity,
+   * so the run is the run the submitted dispatcher id already implies. A written list does not —
+   * no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a rule list —
+   * and the failure direction is `patience`'s: the server would re-simulate the seed on the
+   * profile's own weights, get different legs, and refuse an honest run as
+   * `metrics-do-not-reproduce`.
+   */
+  ruleRows: (state) =>
+    state.ruleRows.length === 0
+      ? undefined
+      : `${String(state.ruleRows.length)} Everyday rule(s) drive this run's dispatcher, and no selection or submission carries a rule list — a replay without them is a different run`,
 
   levers: (state) =>
     state.levers.parking === DEFAULT_LEVERS.parking &&
@@ -530,14 +568,14 @@ export function runIdentityIssues(
     issues.push({
       key: 'viewer.buildingId',
       scope: 'between-games',
-      message: `the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`,
+      message: `the building “${state.buildingId}” is saved on this device alone and data/buildings/ does not ship it`,
     });
   }
   if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
     issues.push({
       key: 'viewer.dispatcherId',
       scope: 'between-games',
-      message: `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
+      message: `the dispatcher “${state.dispatcherId}” is saved on this device alone and data/dispatcher-profiles.json does not ship it`,
     });
   }
   if (
@@ -547,7 +585,7 @@ export function runIdentityIssues(
     issues.push({
       key: 'viewer.pattern',
       scope: 'between-games',
-      message: `the arrival pattern “${state.pattern}” is yours alone and no selection names a saved pattern`,
+      message: `the arrival pattern “${state.pattern}” is saved on this device alone and no selection names a saved pattern`,
     });
   }
 

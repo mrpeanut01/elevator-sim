@@ -164,6 +164,152 @@ export const DEEP_SPACE: HonestySpace = Object.freeze({
   ] as HonestyStageRef[]),
 });
 
+/* -------------------------------------------------------------------------- *
+ * The withheld matrix — ENGINE_CONTRACT § 12.2, enumerated from the state model
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Why a figure is withheld. Four reasons in the contract, five here — and the fifth is the tree's.
+ *
+ * ## What § 12.2 asks for, and why it cannot be a list of cases
+ *
+ * > Four independent reasons a figure is withheld — day not closed, replay, sandbox, `noPost` —
+ * > and they combine. The honesty sweep must **enumerate these from the state model** (guide § 18)
+ * > rather than from hand-written fixtures … Every combination renders `—` or a labelled
+ * > unavailable state; none renders a zero, a spinner or a stale figure.
+ *
+ * A hand-written fixture per state is exactly what the clause forbids, and for a reason this
+ * repository has met before: a fixture list is a list somebody has to remember to extend, and
+ * *"a state a player can reach cannot be a state the sweep has never seen"* (guide § 20.13) is a
+ * claim about **all** of them. So the reasons are declared and {@link withheldStates} takes the
+ * power set; adding a sixth reason here adds thirty-two states to the corpus without anybody
+ * enumerating one.
+ *
+ * ## The tree's equivalents, named rather than assumed
+ *
+ * The prototype the handoff describes is not in this tree (`docs/18`'s framing correction), so
+ * three of the four names are the prototype's and not this shell's. {@link WithheldReason.seam} is
+ * the module that makes each real here, and it is a required field for that reason: a reason with
+ * no seam would be a state the sweep invents rather than one a player reaches.
+ *
+ * `noPost` is the one name that survives least intact. There is **no `settings.noPost` flag in
+ * this tree** — the setting the prototype's state model carries does not exist — and what is real
+ * is the pair of gates that refuse a post: `menu/account.ts#postingRefusal` (nobody is signed in)
+ * and `shift/banking.ts#bankingRefusalFor`, which slice 8 put in front of `submitScore` as well as
+ * in front of filing. The axis is therefore *the post is refused*, which is what the prototype's
+ * flag was for.
+ *
+ * ## Why there is a fifth, and why it is not a smuggled-in axis
+ *
+ * § 12.2's own second paragraph — *"with the API unreachable, every world figure renders a labelled
+ * world figures unavailable state"* (§ 16 rule 15, issue #123) — is a separate sentence about the
+ * same cells. In this tree it is not a hypothetical: **there is no server**, so every world figure
+ * is permanently in that state and the other four axes are only ever swept in it. Making it an axis
+ * is what puts the *other* arm in the corpus: a build that acquires a server must still withhold
+ * under the four, and a build without one must still label rather than zero.
+ */
+export interface WithheldReason {
+  readonly id: WithheldReasonId;
+  /** What is true of the shell while this reason holds, in the reader's terms. */
+  readonly holds: string;
+  /** The module in **this** tree that makes it real. Never a prototype identifier. */
+  readonly seam: string;
+}
+
+/** The five axes, in the order § 12.2 names them, with this tree's own last. */
+export const WITHHELD_REASON_IDS = [
+  'day-not-closed',
+  'watching',
+  'sandbox',
+  'no-post',
+  'world-absent',
+] as const;
+
+export type WithheldReasonId = (typeof WITHHELD_REASON_IDS)[number];
+
+export const WITHHELD_REASONS: readonly WithheldReason[] = Object.freeze([
+  Object.freeze({
+    id: 'day-not-closed' as const,
+    holds: 'no day of this week has been filed, so there is no closed day to read a figure off',
+    seam: 'shift/week.ts#openWeek — a week with an empty `history`; `closeDay` is the only writer',
+  }),
+  Object.freeze({
+    id: 'watching' as const,
+    holds: 'the run on the stage is somebody else’s, replayed from its record',
+    seam: 'watch/session.ts#watchingStateOf — the spectator state, whose `week` is untouched',
+  }),
+  Object.freeze({
+    id: 'sandbox' as const,
+    holds: 'the week banks against no contract, so a progress figure has no denominator',
+    seam: 'shift/week.ts#FREE_PLAY_CONTRACT_ID / #openEndless — a week with no scenario behind it',
+  }),
+  Object.freeze({
+    id: 'no-post' as const,
+    holds: 'this run may not be posted, so no board position exists for it',
+    seam: 'menu/account.ts#postingRefusal and shift/banking.ts#bankingRefusalFor (slice 8’s gate)',
+  }),
+  Object.freeze({
+    id: 'world-absent' as const,
+    holds: 'no leaderboard server answered, so every world figure is unavailable',
+    seam: 'menu/client.ts#CLIENT_FAILURES.unreachable, and `menu/screens.ts`’s absent `boardPage`',
+  }),
+]);
+
+/** One reachable combination of {@link WITHHELD_REASONS}. Derived, never authored. */
+export interface WithheldState {
+  /**
+   * The reasons that hold, joined by `+`, or `nothing-withheld`.
+   *
+   * It is what a violation's `field` carries, so a counterexample names the combination rather than
+   * an index a reader would have to decode.
+   */
+  readonly id: string;
+  /** The bit pattern this state is, so the enumeration is checkable against `2 ** reasons`. */
+  readonly index: number;
+  readonly reasons: readonly WithheldReasonId[];
+  readonly dayNotClosed: boolean;
+  readonly watching: boolean;
+  readonly sandbox: boolean;
+  readonly noPost: boolean;
+  readonly worldAbsent: boolean;
+}
+
+/**
+ * Every combination of the five reasons — the power set, computed.
+ *
+ * Enumerated rather than drawn, which is the one place this file departs from *everything here is a
+ * function of one seed*: § 12.2 is a claim about **every** combination, and a sampled axis would
+ * make the claim true of whichever combinations the corpus happened to draw. Thirty-two states cost
+ * a few hundred strings a case and nothing else — no state runs a simulation of its own, because
+ * every one of them is a projection of the case's own run.
+ *
+ * **Some combinations are degenerate and none is excluded.** A sandbox week can never have filed a
+ * scenario day, so `sandbox + day-not-closed` renders what `sandbox` alone does; a spectator's week
+ * is untouched, so `watching` composes with either. Dropping the degenerate ones would mean deciding
+ * *which* states are degenerate, which is the judgement § 12.2 exists to remove — and a state that
+ * is degenerate today is a state that stops being degenerate the day a seam moves, silently.
+ */
+export function withheldStates(): readonly WithheldState[] {
+  const states: WithheldState[] = [];
+  for (let mask = 0; mask < 2 ** WITHHELD_REASONS.length; mask += 1) {
+    const reasons = WITHHELD_REASON_IDS.filter((_, bit) => ((mask >> bit) & 1) === 1);
+    const on = (id: WithheldReasonId): boolean => reasons.includes(id);
+    states.push(
+      Object.freeze({
+        id: reasons.length === 0 ? 'nothing-withheld' : reasons.join('+'),
+        index: mask,
+        reasons: Object.freeze(reasons),
+        dayNotClosed: on('day-not-closed'),
+        watching: on('watching'),
+        sandbox: on('sandbox'),
+        noPost: on('no-post'),
+        worldAbsent: on('world-absent'),
+      }),
+    );
+  }
+  return Object.freeze(states);
+}
+
 function pick<T>(rng: Rng, items: readonly T[]): T {
   const chosen = items[rng.nextInt(0, items.length)];
   /* c8 ignore next -- nextInt is in range by construction; this narrows the type. */

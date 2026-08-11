@@ -170,7 +170,15 @@ export function reportCardOf(input: ReportCardInput): ReportCard {
     eyebrow: `${input.buildingName.toUpperCase()} · DAILY OBSERVATION SHEET`,
     title: report.title,
     verdictLine: report.verdictLine,
-    verdict: report.verdict,
+    /*
+     * A single run's banner is a refusal to grade, never a verdict — `docs/19` defect 13.
+     * `shift/report.ts` already replaced its words; what this card adds is the ink, and inking
+     * *read, not graded* in the cleared green or the missed amber would be the grade back as a
+     * colour. `ungraded` is the existing neutral key, chosen for the same reason
+     * `dev/reportPanel.ts#reportViewOf` draws the same line in `var(--dim)` — the two renderers of
+     * this string key their neutrality on the same discriminator, `of === 'single-run'`.
+     */
+    verdict: report.of === 'single-run' ? 'ungraded' : report.verdict,
     lede: wrap(report.lede, CARD_WIDTH - PAD * 2, 11.6),
     tiles,
     sectionHeading: report.diagnosisHeading.toUpperCase(),

@@ -40,13 +40,15 @@ import type { VizDecision, VizPhase } from '../contract/types.js';
 /**
  * The four wait-age bands, by the names the design gives the mood card's legend.
  *
- * **These are ages, not outcomes.** `taking-the-stairs` is the fourth *band* — somebody who is
- * standing at a landing right now and has been for at least two minutes. It is **not** the count
- * of people who gave up: that is {@link LiveObservations.abandoned}, which is a different
- * quantity over a different population (legs whose wait passed the run's own abandonment
- * horizon, whether or not anybody is still standing). The design keeps both, in two places, and
- * conflating them would let a rail report four people "taking the stairs" while nobody had
- * abandoned anything.
+ * **These are ages, not outcomes.** `taking-the-stairs` — drawn as *eyeing the stairs* since
+ * `docs/20` defect 4, and see `live/bands.ts` for why the id kept the older spelling — is the
+ * fourth *band*: somebody who is standing at a landing right now and has been for at least two
+ * minutes. It is **not** the count of people who gave up: that is
+ * {@link LiveObservations.abandoned}, the Day report's *TOOK THE STAIRS*, a different quantity
+ * over a different population (legs whose wait passed the run's own abandonment horizon, whether
+ * or not anybody is still standing). The design keeps both, in two places, and **gave them the
+ * same words**, which let the rail report 534 people "taking the stairs" beside a sheet reporting
+ * 288 — the collision the rename closes.
  */
 export type WaitBandId = 'breezy' | 'tapping-foot' | 'checking-watch' | 'taking-the-stairs';
 
@@ -225,6 +227,60 @@ export interface LiveObservations {
    * non-decreasing in `t` and independent of what happens after the playhead.
    */
   readonly abandoned: number;
+  /**
+   * Of {@link abandoned}, the legs that had nonetheless **alighted** by `t` — the overlap between
+   * *took the stairs* and *carried*, counted so a sheet can say it (`docs/19` defect 3).
+   *
+   * The overlap is real and it is the common case on a saturated no-patience run: `abandoned`
+   * counts a wait that crossed the horizon whether or not a car eventually came, and on a building
+   * that declares no patience nobody actually leaves, so every one of those legs can still board,
+   * alight, and be inside `carried`. A sheet that printed `CARRIED 768 of 768` beside
+   * `TOOK THE STAIRS 348` with no stated overlap was asking the reader to total 1 116 people out
+   * of 768 — the two cells overlap rather than add, and this field is the size of the overlap,
+   * folded from the same legs in the same pass so the three counts cannot disagree.
+   */
+  readonly abandonedCarried: number;
+  /**
+   * The longest wait any leg arrived by `t` had realised **or accrued** by `t`, seconds.
+   * `undefined` when nobody has arrived.
+   *
+   * **This is the playhead's own maximum, never `summary.serviceLevel.longestWaitS`.** The
+   * summary's figure is a statement about the whole run's reporting window, and a surface drawn
+   * at a part-way playhead that printed it would be publishing a figure that can only be true of
+   * the whole run — the exact violation class the honesty sweep's temporal axis exists to find
+   * (§ D307: a stage banner reading *127 undelivered at 00:00*). So this is folded from the legs
+   * like every other field here: a resolved leg (boarded or refused by `t`) contributes its
+   * exact wait, an unresolved one contributes `t - arrivedAt`, marked censored. The ending rules
+   * are `core`'s own — `metrics/summarize.ts#diagnoseServiceLevel` ends a wait at
+   * `boardedAt ?? abandonedAt ?? refusedAt ?? censoredAtS`, and this fold is that computation
+   * with `censoredAtS` set to the playhead, over **every** leg arrived by `t`.
+   *
+   * That last clause is a measured difference from the summary, not an approximation of it:
+   * `serviceLevel.longestWaitS` is taken over the reporting window's arrivals, and **every
+   * shipped template narrows its window** — measured by `observations.test.ts`, whose
+   * non-vacuity guard found zero spanning windows across all eight buildings — so this maximum
+   * at `endedAt` is an upper bound on the summary's figure (asserted per building, no patience
+   * declared) and equals it only on the unshipped spanning-window case. The two are two stated
+   * cohorts; `shift/report.ts`'s small print says which figure is which.
+   *
+   * Non-decreasing in `t`: a resolved wait never shrinks, and an unresolved one only grows.
+   */
+  readonly worstWaitSoFarS: number | undefined;
+  /**
+   * Whether {@link worstWaitSoFarS} belongs to a leg still unresolved at `t`, and is therefore a
+   * **lower bound** rather than a wait anybody realised. `false` when nobody has arrived.
+   *
+   * The same distinction `VizServiceLevel.longestWaitIsCensored` carries for the whole run,
+   * applied at the playhead. `shift/goals.ts` reads it as a gate: a censored maximum is never
+   * graded at all, in either direction, and the reason it may not even be graded `missed` is a
+   * fact about the recording rather than generosity. `VizLeg` carries no `abandonedAt` — a rider
+   * who ran out of patience and left is indistinguishable here from one still standing — so a
+   * "lower bound" over an unresolved leg can overstate a walked-out rider's wait by every second
+   * since they departed, which is exactly the mis-crediting `diagnoseServiceLevel`'s own
+   * docstring refuses in `core`. A bound that might overstate can prove nothing, so the goal
+   * refuses (`pending`) rather than guesses.
+   */
+  readonly worstWaitIsCensored: boolean;
   /** The abandonment horizon applied — `summary.serviceLevel.horizonS`. Copied, never assumed. */
   readonly horizonS: number;
 }

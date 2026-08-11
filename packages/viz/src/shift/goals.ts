@@ -34,12 +34,16 @@
  *
  * ## The rule that is structural rather than stated
  *
- * {@link readGoal} takes a {@link GoalObservations}, which carries five numbers and **not one
- * suppressible field** — no `meanWaitS`, no `wait95S`, no `meanTimeToDestinationS`. A goal that
- * wanted to grade a mean could not be written against this type. CLAUDE.md: *"If a configuration
- * saturates, flag it and suppress the AWT interval"*; grading against the suppressed figure would
- * be the inverse of that rule, and the handoff's own footer — *"nothing on this screen is averaged
- * over a queue that never settled"* — is what this enforces.
+ * {@link readGoal} takes a {@link GoalObservations}, which carries six numbers, one censoring
+ * flag and **not one suppressible field** — no `meanWaitS`, no `wait95S`, no
+ * `meanTimeToDestinationS`. A goal that wanted to grade a mean could not be written against this
+ * type. CLAUDE.md: *"If a configuration saturates, flag it and suppress the AWT interval"*;
+ * grading against the suppressed figure would be the inverse of that rule, and the handoff's own
+ * footer — *"nothing on this screen is averaged over a queue that never settled"* — is what this
+ * enforces. The worst wait clears that bar deliberately: it is a **maximum**, not an estimate —
+ * the same classification `report.ts#worstWaitFigure` relies on to print it on a saturated run —
+ * and where a maximum genuinely is unknowable (its leg unresolved) the censoring flag makes the
+ * reading refuse rather than guess; see {@link readGoal}.
  *
  * {@link ShiftGoal.reads} is a **key** of that type rather than a closure for the same reason: a
  * predicate carrying its own reader can read anything it closes over.
@@ -56,6 +60,7 @@
 
 import {
   WAKE_UP_ARRIVALS,
+  type DayOutcome,
   type GoalObservations,
   type GoalReading,
   type GoalState,
@@ -67,13 +72,21 @@ import {
  * -------------------------------------------------------------------------- */
 
 /**
- * The design's own hardening arithmetic (`design.html` :1428–1439), unchanged.
+ * The design's own hardening arithmetic (`design.html` :1428–1439), plus the worst-wait ceiling
+ * the casual handoff's fourth test needs (`GAMEPLAY_AND_NAVIGATION.md` § 8.6, § 20.6).
  *
- * Three ceilings and a floor, and each of the three caps is what stops the week becoming
- * unwinnable: the away-inside-a-minute bar tops out at 84 %, the carried bar at 96 %, and the
- * queue depth bottoms out at 12. A bar that kept hardening would eventually ask for a building
- * that cannot exist, and the design's framing — *"No losing — just a line you are trying to bend
- * upward"* — would stop being true.
+ * Four ceilings and a floor, and each cap is what stops the week becoming unwinnable: the
+ * away-inside-a-minute bar tops out at 84 %, the carried bar at 96 %, the queue depth bottoms out
+ * at 12, and the worst-wait ceiling bottoms out at 150 s. A bar that kept hardening would
+ * eventually ask for a building that cannot exist, and the design's framing — *"No losing — just
+ * a line you are trying to bend upward"* — would stop being true.
+ *
+ * The worst-wait numbers are bracketed by the handoff's own difficulty table rather than
+ * invented: § 8.6 asks 240 s of Easy, 180 s of Standard, 150 s of Hard and 120 s of the tier it
+ * names *Impossible*. So the week opens just under Easy (240 − 10 = 230 s on day 1), hardens by
+ * 10 s a day in the pattern the other three bars established, and stops at Hard's 150 s —
+ * deliberately short of the Impossible tier, because a floor is the promise that the line stays
+ * bendable and a tier named Impossible is the wrong promise to converge on.
  */
 export const GOAL_BARS = Object.freeze({
   minuteMax: 84,
@@ -85,15 +98,37 @@ export const GOAL_BARS = Object.freeze({
   queueMin: 12,
   queueBase: 34,
   queuePerDay: 2,
+  worstMinS: 150,
+  worstBaseS: 240,
+  worstPerDayS: 10,
 });
 
 /**
- * Today's goals: two every day, plus one that alternates.
+ * Today's goals — the handoff's four tests, every day, in tension (§ 8.6).
  *
- * The alternation is the design's (`day % 2`): even days ask you to hold a landing's depth, odd
- * days ask that nobody crosses the abandonment horizon. Both are inverted goals — a number you are
- * trying to keep **down** — and they are alternated rather than both shown because three inverted
- * bars on a bad day is a wall rather than a brief.
+ * ## The `day % 2` alternation is retired, and here is the argument
+ *
+ * This function used to return three goals: carry, minute, and a third that alternated — even
+ * days a queue-depth ceiling, odd days *nobody waits past the 15-minute horizon* (`abandoned`,
+ * bar 0). The alternation's stated reason was that *"three inverted bars on a bad day is a wall
+ * rather than a brief"*, and that reason still binds: this set has exactly two inverted bars, not
+ * three, so retiring the alternation does not rebuild the wall.
+ *
+ * What retired it is the worst-wait ceiling subsuming the horizon goal outright. Every shipped
+ * worst-wait bar is 150–230 s and the abandonment horizon is 900 s, so on any graded day the
+ * ceiling is the stricter test of the same tail: a day that keeps its worst wait under 230 s
+ * abandoned nobody by construction, and a day that abandoned anybody has a worst wait past 900 s
+ * and misses the ceiling. Alternating the two would therefore alternate a strong test with a
+ * test it implies — the week's difficulty would see-saw by parity while claiming to harden — and
+ * § 20.6's own check (*a day that peaks the lobby at 26 against a cap of 25 is missed*) fails on
+ * every day the queue goal sat out. Four tests, each load-bearing, every day, is what § 8.6
+ * specifies; the odd-day goal survives where it belongs, as the report's *took the stairs*
+ * figure and the add-a-car lever, both of which still read `Observations.abandoned`.
+ *
+ * (`GOAL_OBSERVATION_IDS` keeps `'abandoned'` so restored histories that carry the retired
+ * goal's readings stay restorable — see its docstring.)
+ *
+ * A decision number is owed for the retirement; this docstring is the argument.
  *
  * Pure in `day`, so the same day of the same week always asks the same thing.
  */
@@ -104,6 +139,10 @@ export function goalsForDay(day: number): readonly ShiftGoal[] {
   );
   const carryBar = Math.min(GOAL_BARS.carryMax, GOAL_BARS.carryBase + day * GOAL_BARS.carryPerDay);
   const queueBar = Math.max(GOAL_BARS.queueMin, GOAL_BARS.queueBase - day * GOAL_BARS.queuePerDay);
+  const worstBar = Math.max(
+    GOAL_BARS.worstMinS,
+    GOAL_BARS.worstBaseS - day * GOAL_BARS.worstPerDayS,
+  );
 
   const carry: ShiftGoal = {
     id: 'carry',
@@ -121,26 +160,47 @@ export function goalsForDay(day: number): readonly ShiftGoal[] {
     compare: 'at-least',
     reads: 'minutePct',
   };
-  const third: ShiftGoal =
-    day % 2 === 0
-      ? {
-          id: 'queue',
-          label: `Never let a landing stack past ${String(queueBar)} people`,
-          unit: '',
-          bar: queueBar,
-          compare: 'at-most',
-          reads: 'peakQueue',
-        }
-      : {
-          id: 'stairs',
-          label: 'Nobody waits past the 15-minute horizon',
-          unit: '',
-          bar: 0,
-          compare: 'at-most',
-          reads: 'abandoned',
-        };
+  /*
+   * *A landing*, deliberately, where the handoff's test 3 says *the lobby* — and the sentence
+   * says what the code does (§ D227), so the word "lobby" may not appear here while `peakQueue`
+   * is a maximum over **every** landing. Any-landing is kept rather than narrowed, for three
+   * reasons stated so they can be attacked. It is strictly the harder test: the lobby's peak is
+   * one term of the maximum, so § 20.6's check — a lobby that peaks at 26 against a cap of 25 —
+   * misses under this goal a fortiori. It matches what the reader is shown: the alarm chip and
+   * the report's DEEPEST QUEUE name whichever floor stacked worst (`peakQueueFloorId` is carried
+   * for exactly that), and a goal that graded only the ground floor while the chip pointed at
+   * Level 12 would be two screens disagreeing about what the day was asked. And a lobby-only
+   * goal would let every upper landing stack unbounded without a miss — on the shipped mixed-use
+   * and residential buildings the pressure floor routinely is not the lobby, so the narrowing
+   * would un-grade the very failure the test exists to catch.
+   */
+  const queue: ShiftGoal = {
+    id: 'queue',
+    label: `Never let a landing stack past ${String(queueBar)} people`,
+    unit: '',
+    bar: queueBar,
+    compare: 'at-most',
+    reads: 'peakQueue',
+  };
+  // *Inside*, not *under*: `at-most` meets the bar at the bar, and a label that said "under
+  // 230 s" about a day whose worst wait was exactly 230 s would claim a strictness the
+  // comparison does not have — § D227's rule at the scale of one preposition.
+  //
+  // *Across the whole shift* is on the label because the sheet carries a second worst wait —
+  // the WORST WAIT cell, `summary.serviceLevel.longestWaitS`, which is the reporting window's
+  // and legitimately larger or smaller on the same day. Two figures called "worst wait" four
+  // inches apart, reconciled only in the small print, is `docs/19` defect 3's second half; each
+  // now names its window where it stands (the cell's note carries the other label).
+  const worst: ShiftGoal = {
+    id: 'worst-wait',
+    label: `Keep the worst wait inside ${String(worstBar)} s across the whole shift`,
+    unit: ' s',
+    bar: worstBar,
+    compare: 'at-most',
+    reads: 'worstWaitS',
+  };
 
-  return Object.freeze([carry, minute, third]);
+  return Object.freeze([carry, minute, queue, worst]);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -151,7 +211,13 @@ export function goalsForDay(day: number): readonly ShiftGoal[] {
 export const PENDING_DISPLAY = '—';
 
 /**
- * The glyphs, matching `design.html` :2383–2391.
+ * The glyphs. `✓` and `·` match `design.html` :2383–2391; the missed mark is the casual
+ * handoff's `×` (§ 8.3, § 8.6, § 20.6 — *"the calendar draws an ×"*) rather than the older
+ * prototype's `○`, because the handoff wins every disagreement about what the screen looks like
+ * and it draws missed as a cross everywhere it draws it at all. `○` also collided with three
+ * other vocabularies on the same screens — the scenarios panel's *not started*, the building
+ * editor's *unzoned* and the mood rows' calm — all of which mean something neutral, which is the
+ * one thing a missed day is not.
  *
  * A glyph is never the **only** signal — {@link GoalReading} also carries {@link GoalState}, and
  * the definition of done's clause 8 (KB-15) forbids a colour-only signal. The rail draws the state
@@ -159,7 +225,7 @@ export const PENDING_DISPLAY = '—';
  */
 export const GOAL_GLYPHS: Readonly<Record<GoalState, string>> = Object.freeze({
   met: '✓',
-  missed: '○',
+  missed: '×',
   pending: '·',
 });
 
@@ -168,9 +234,31 @@ export const GOAL_GLYPHS: Readonly<Record<GoalState, string>> = Object.freeze({
  *
  * Total: every goal gets an answer and nothing throws. The `pending` branch is checked **first**,
  * before the observation is even read, so a quiet morning cannot produce a `met` by arithmetic.
+ *
+ * ## The second gate: a censored worst wait is not graded, in either direction
+ *
+ * A goal reading `worstWaitS` while {@link GoalObservations.worstWaitIsCensored} is `pending`,
+ * whatever the number says. Half of that is the ordinary censoring argument — the wait belongs to
+ * somebody still standing, so it is a lower bound, and a lower bound under the bar cannot prove
+ * `met`. The other half is why the *provable-looking* direction is refused too: a bound past the
+ * bar looks like a certain `missed`, but the recording carries no `abandonedAt`, so an
+ * "unresolved" leg may belong to a rider who walked out long ago and whose true wait was short
+ * (`live/types.ts#LiveObservations.worstWaitIsCensored` owns that argument). A bound that might
+ * overstate proves nothing, so both directions read `pending` — which `week.ts` already treats
+ * correctly: unjudged is not passed, and not failed either.
  */
 export function readGoal(goal: ShiftGoal, observations: GoalObservations): GoalReading {
   if (observations.arrived < WAKE_UP_ARRIVALS) {
+    return {
+      goal,
+      state: 'pending',
+      observed: null,
+      display: PENDING_DISPLAY,
+      progressPct: 0,
+      glyph: GOAL_GLYPHS.pending,
+    };
+  }
+  if (goal.reads === 'worstWaitS' && observations.worstWaitIsCensored) {
     return {
       goal,
       state: 'pending',
@@ -233,4 +321,44 @@ export function bestLineFor(observations: GoalObservations, bestMinutePct: numbe
     return 'not enough riders yet — nothing graded before the building wakes up';
   }
   return `best day ${String(bestMinutePct)}%`;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Last night's figure
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What this goal's quantity measured on the building's **previous day**, or the em dash.
+ *
+ * The handoff's "was" figures (§ 8.6): *"last night's actual result for this building, not a
+ * constant. If there is no previous day, they read `—`."* This is the one derivation both
+ * renderers call — the rail's goal rows and the report sheet's — so the two screens cannot show
+ * two different yesterdays. See {@link GoalLine} for why the string is derived at draw time
+ * rather than stored beside the reading.
+ *
+ * Three deliberate choices:
+ *
+ * - **The previous day is found by day number**, `entry.day === day - 1`, never as
+ *   `history[history.length - 1]`. While a day is being played, yesterday *is* the last entry —
+ *   but the moment today is closed and re-closed (the retry loop `WeekState.attempt` models),
+ *   the last entry is today, and a "was" that read it would show this attempt's own figures as
+ *   last night's.
+ * - **Matched on {@link ShiftGoal.reads}**, not on the goal's id or bar: the bar hardens
+ *   nightly, so yesterday's goal is a different object asking about the same quantity — and the
+ *   quantity is what *"what it was last time"* means. A history written before a goal existed
+ *   (a restored session from the three-goal build) simply has no reading for it, and answers
+ *   the em dash rather than a stand-in.
+ * - **The previous reading's own {@link GoalReading.display} is returned**, not a re-format of
+ *   its `observed`: one formatting decision, made where the reading was made. A pending
+ *   yesterday therefore reads `—` here too, which is honest — an ungraded morning measured
+ *   nothing worth quoting tonight.
+ */
+export function wasDisplayOf(
+  history: readonly DayOutcome[],
+  day: number,
+  goal: ShiftGoal,
+): string {
+  const previous = history.find((entry) => entry.day === day - 1);
+  const reading = previous?.readings.find((entry) => entry.goal.reads === goal.reads);
+  return reading?.display ?? PENDING_DISPLAY;
 }

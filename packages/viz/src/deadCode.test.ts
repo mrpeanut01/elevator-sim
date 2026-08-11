@@ -100,6 +100,7 @@ const AUDITED_MODULES = [
   'viz/src/controls',
   'viz/src/dev',
   'viz/src/editor',
+  'viz/src/fixit',
   'viz/src/frame',
   'viz/src/honesty',
   'viz/src/live',
@@ -114,6 +115,7 @@ const AUDITED_MODULES = [
   'viz/src/scenario',
   'viz/src/scope',
   'viz/src/shift',
+  'viz/src/watch',
 ] as const;
 
 /**

@@ -29,11 +29,15 @@
  * looked at.
  */
 
-import type {
-  DispatcherProfiles,
-  ElevatorSpecs,
-  ResolvedBuilding,
-  TrafficProfiles,
+import {
+  RULE_ACTION_WORDS,
+  RULE_ACTIONS,
+  RULE_CONDITION_WORDS,
+  RULE_CONDITIONS,
+  type DispatcherProfiles,
+  type ElevatorSpecs,
+  type ResolvedBuilding,
+  type TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
 import { restrictedFloorIds } from '../access/zoning.js';
@@ -41,7 +45,8 @@ import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONA
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
-import { batchReport, type BatchReport } from '../batch/report.js';
+import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
+import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
 import { admitProfile } from '../campaign/dimensions.js';
@@ -55,7 +60,7 @@ import { applyControlEdit, controlsFor, defaultValues, resetControl } from '../c
 import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
-import { disclosureItems } from '../mode/disclosure.js';
+import { casualRefusalFor, disclosureItems } from '../mode/disclosure.js';
 import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
@@ -68,22 +73,54 @@ import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
+import {
+  STANDING_EXTRAS,
+  budgetNoteOf,
+  classifyOutcome,
+  emptyFixitState,
+  repairRowOf,
+  spendOf,
+  toggleExtra,
+  toggleRepair,
+  type FixitMeasurement,
+} from '../fixit/engine.js';
+import { figureValuesOf, measuredOf } from '../fixit/run.js';
+import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type FloorQueue, type LandingAssignment } from '../frame/overlay.js';
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
+import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  GHOST_OPTIONS,
+  RACE_NOT_RUN,
+  RACE_PENDING,
+  raceStripViewOf,
+  raceVerdictOf,
+} from '../live/raceStrip.js';
+import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
+import { recordUnreadableReason } from '../watch/record.js';
+import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import type { WatchableRun } from '../watch/types.js';
+import {
+  PLAYER_SHELL_COPY,
+  shellWatchingCopyOf,
+  shellWatchingStrings,
+} from '../watch/shell.js';
+import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
-import { describeFrame } from '../render/describeFrame.js';
+import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { drawOverlay } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { initialState, tomorrowFactsOf } from '../dev/state.js';
+import { ghostPlanOf } from '../dev/ghostRun.js';
+import { initialState, shiftRunConfigOf, tomorrowFactsOf } from '../dev/state.js';
 import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
 import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } from '../render/runSummary.js';
@@ -100,6 +137,7 @@ import {
   occupancyLine,
   SPEC_ROWS,
   specFromBuilding,
+  upPeakAnalysisOf,
   validateSpec,
   type BuildingSpec,
 } from '../authoring/buildingSpec.js';
@@ -154,6 +192,21 @@ import {
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
 import {
+  RULES_EXCLUSIVITY_NOTE,
+  fallbackLineOf,
+  leverLineOf,
+  readbackOf,
+  ruleIssues,
+  ruleProvenanceName,
+  type RuleRow,
+} from '../authoring/ruleSpec.js';
+import {
+  plainLeverEchoOf,
+  plainLeverHelp,
+  plainLeverSub,
+  plainLeversOf,
+} from '../mode/plainLevers.js';
+import {
   goalRowsOf,
   historyBarsOf,
   idleDecisionRow,
@@ -169,6 +222,7 @@ import {
   shiftIsOver,
   statRowsOf,
   streakLineOf,
+  todayShareFor,
 } from '../dev/leftRail.js';
 import { machineRowsOf, ratedSpeedChipsOf, speedLadderOf } from '../dev/machinesEditor.js';
 import {
@@ -201,7 +255,7 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { LOADED_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { bankingRefusalFor, LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -228,17 +282,20 @@ import {
 } from '../shift/types.js';
 import {
   patternLine,
+  patternName,
   policyLine,
   selectorContextFrom,
   selectorIssues,
   specFromProfile as selectorSpecFromProfile,
   type SelectorSpec,
 } from '../authoring/selectorSpec.js';
+import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   armOptionsOf,
   armRowsOf,
   changedNoteOf,
   policyChipsOf,
+  rulesOverrideNoteOf,
   scalarRowsOf,
   selectorAvailability,
 } from '../dev/selectorEditor.js';
@@ -277,7 +334,15 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
-import type { HonestyCase, RenderedText, TextProvenance, TextRole, TextPlayhead } from './types.js';
+import { withheldStates, type WithheldState } from './generate.js';
+import type {
+  HonestyCase,
+  RenderedText,
+  TextProvenance,
+  TextRole,
+  TextPlayhead,
+  WithheldFigure,
+} from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The context an adapter is handed
@@ -479,6 +544,8 @@ interface TextSeed {
   readonly gated?: boolean | undefined;
   /** When the surface said it, for a surface driven at a playhead — see {@link atPlayhead}. */
   readonly playhead?: TextPlayhead | undefined;
+  /** That this cell stands where a figure the state withholds would be — see {@link WithheldFigure}. */
+  readonly withheld?: WithheldFigure | undefined;
 }
 
 /**
@@ -505,6 +572,26 @@ function railBasisAt(recording: VizRecording, at: number): WaitBandBasis {
   return shiftIsOver(recording, at) ? 'whole-run' : 'now';
 }
 
+/**
+ * The dispatcher's display name, resolved exactly as the shell resolves it — `docs/20` defect 9.
+ *
+ * `dev/main.ts#dispatcherNameOf` is the lookup: exact id against the loaded profiles, falling back
+ * to the recording's own string. It is spelled again here rather than imported because
+ * `honesty/` may not import `dev/main.ts` (it mounts a page), and it is the *lookup* that is
+ * duplicated rather than a wording — the string this produces is a profile's authored `name`, from
+ * `data/dispatcher-profiles.json`, which is the same file both readers consult.
+ *
+ * Driving the canvas and the frame description **without** it would sweep the arm no player sees:
+ * the id is the fallback, and a corpus that only ever exercises a fallback measures the surface a
+ * probe gets rather than the one a reader gets.
+ */
+function dispatcherNameOf(context: HonestyContext): string {
+  const found = context.dispatcherProfiles.profiles.find(
+    (profile) => profile.id === context.recording.dispatcherProfileId,
+  );
+  return found?.name ?? context.recording.dispatcherProfileId;
+}
+
 function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly RenderedText[] {
   return seeds
     .filter((seed) => seed.text.trim() !== '')
@@ -519,6 +606,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       energyAxis: seed.energyAxis,
       gated: seed.gated,
       playhead: seed.playhead,
+      withheld: seed.withheld,
     }));
 }
 
@@ -673,7 +761,15 @@ function countOf(count: string): number | null {
 
 const DESCRIBE_FRAME: SurfaceAdapter = {
   id: 'render/describeFrame.ts#describeFrame',
-  covers: ['render/describeFrame.ts#describeFrame'],
+  covers: [
+    'render/describeFrame.ts#describeFrame',
+    /*
+     * The paragraph's refusal clause — `docs/20` defect 3. `describeFrame` is its only non-test
+     * caller and it is seeded again below under its own field, because a clause folded into a
+     * paragraph carries no basis and R6's structural half reads nothing else.
+     */
+    'render/describeFrame.ts#suppressionSentenceOf',
+  ],
   render(context) {
     const seeds: TextSeed[] = [];
     for (const at of sampleTimes(context.recording)) {
@@ -688,6 +784,8 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
           lockedOutLandings: bundle.lockedOut,
           queues: bundle.queues,
           mood: bundle.mood,
+          // The name a player reads, not the id a probe would default to. See `dispatcherNameOf`.
+          dispatcherName: dispatcherNameOf(context),
         }),
         role: 'prose',
         /*
@@ -698,6 +796,28 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
          */
         playhead: atPlayhead(context.recording, at),
       });
+      /*
+       * **The refusal clause, on the temporal axis with its own basis** — `docs/20` defect 3.
+       *
+       * Seeded separately from the paragraph above, and that is what makes it reachable: R6's
+       * structural half reads a declaration, R6's textual half reads a numeral, and this clause has
+       * a declaration and no numeral. Folded into the paragraph it was a `role: 'prose'` string with
+       * no basis, which is exactly how *"Queue length rose by 128.7 persons … the system is
+       * saturated"* travelled the corpus unremarked at 14 % of every case.
+       *
+       * `suppressionSentenceOf` is the **product's** function and returns both halves together, so
+       * the adapter declares what the product declares rather than deciding a window here — the
+       * `railBasisAt` rule, applied to a sentence instead of a card.
+       */
+      const suppression = suppressionSentenceOf(context.recording, bundle.frame);
+      if (suppression !== undefined) {
+        seeds.push({
+          field: `describeFrame(@${at.toFixed(0)}s).suppression`,
+          text: suppression.text,
+          role: 'reason',
+          playhead: atPlayhead(context.recording, at, suppression.basis),
+        });
+      }
     }
     return singleRun(this.id, seeds);
   },
@@ -715,7 +835,15 @@ const OVERLAY: SurfaceAdapter = {
           field: `overlayAt(@${at.toFixed(0)}s).suppressionReason`,
           text: metrics.suppressionReason,
           role: 'reason',
-          playhead: atPlayhead(context.recording, at),
+          /*
+           * The **producer's** field, declared with the producer's own basis. It is `core`'s
+           * whole-run sentence and it is carried on every `OverlayMetrics`, so it is `'whole-run'`
+           * only where `overlayAt` says the playhead has earned it — which is never early, which is
+           * correct: `frame/overlay.ts` is not a surface, and whether this string reaches a reader
+           * early is `render/overlay.ts`'s decision. That decision is swept below, where the panel
+           * is driven.
+           */
+          playhead: atPlayhead(context.recording, at, metrics.suppressionBasis),
         });
       }
       /*
@@ -772,6 +900,16 @@ const CANVAS: SurfaceAdapter = {
     'mode/disclosure.ts#suppressionBannerFor',
     'mode/disclosure.ts#NO_AVERAGE_LEAD',
     /*
+     * The panel's refusal, in both registers — `docs/20` defect 3. `drawOverlay` is their only
+     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
+     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
+     * PENDING` is the engineer's arm of the same gate, drawn by the same function.
+     */
+    'mode/disclosure.ts#casualRefusalFor',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
+    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
+    /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
      *
@@ -827,6 +965,8 @@ const CANVAS: SurfaceAdapter = {
         drawScene(ctx, {
           recording,
           frame: bundle.frame,
+          // See `dispatcherNameOf` — the subtitle a player reads is the profile's name.
+          dispatcherName: dispatcherNameOf(context),
           layout,
           overlay: bundle.metrics,
           ...(selection === undefined ? {} : { selection }),
@@ -883,6 +1023,38 @@ const CANVAS: SurfaceAdapter = {
             playhead: atPlayhead(recording, at),
           });
         }
+      }
+      /*
+       * **The RIGHT NOW panel's refusal, with the window it folds** — `docs/20` defect 3.
+       *
+       * The loop above captures every string the panel draws and can declare a basis for **none** of
+       * them: a text-capturing context returns an array, and per-string provenance is precisely what
+       * it throws away. So the refusal is seeded again, from the shipped function that words it, with
+       * the basis that function returns.
+       *
+       * That is not a duplicate reading of the same thing. The loop asks *what did the panel draw*;
+       * this asks *what did the panel claim about which window*, which is the question R6's
+       * structural half is. Until it was asked, `NO AVERAGE — A RESULT` and *"That is a result, not
+       * a gap"* were `role: 'prose'` strings with no numeral and no declaration — invisible to both
+       * halves of the property that exists to catch exactly them.
+       *
+       * Seeded only where the panel actually draws it (`metrics.suppressed`), because a refusal the
+       * surface does not show is a string the corpus should not contain.
+       */
+      if (bundle.metrics.suppressed) {
+        const refusal = casualRefusalFor(bundle.metrics.suppressionBasis === 'whole-run');
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.head`,
+          text: refusal.heads[0] ?? '',
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.reason`,
+          text: refusal.reason,
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
       }
       if (selection !== undefined) {
         seeds.push({
@@ -996,6 +1168,9 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/honesty.ts#honestyAt',
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
+    'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#interventionStampOf',
+    'live/patternReadout.ts#patternReadoutAt',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -1008,6 +1183,78 @@ const LIVE_RAIL: SurfaceAdapter = {
     for (const segment of timelineOf(recording)) {
       seeds.push({ field: `timeline(${segment.id}).label`, text: segment.label, role: 'label' });
       seeds.push({ field: `timeline(${segment.id}).title`, text: segment.title, role: 'observation' });
+    }
+
+    /*
+     * The stage's intervention control — Everyday Mode slice 3. The label is static; the stamp is
+     * driven at every sample against a log stamped mid-run, so both of its states enter the
+     * corpus: the sentence (`09:14 · parked the cars in the lobby`) at playheads at or after the
+     * stamp, and the deliberate `''` before it — `interventionStampOf` answers for the playhead,
+     * not for the log, which is what keeps the temporal property met by construction rather than
+     * by a guard in the caller.
+     */
+    seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    const interventionLog = [
+      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } as const },
+    ];
+    for (const at of sampleTimes(recording)) {
+      const stamp = interventionStampOf(interventionLog, at);
+      if (stamp === '') continue;
+      seeds.push({
+        field: `interventionStamp(@${at.toFixed(0)}s)`,
+        text: stamp,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
+    }
+
+    /*
+     * The header's pattern readout — slice 4b, driven the way the intervention stamp is: the
+     * corpus's own recordings run every shipped profile at `selection.policy: 'off'`, so the trace
+     * is synthesized onto a copy of the recording, which is a state a player produces by turning
+     * the selector on. Three recordings, four states: the case's own (absent — the label must be
+     * empty, because a run that built no detector may not read as a pattern), a trace whose bank
+     * abstains and then selects (both phrases cross the sampled playheads), and a two-bank trace
+     * in disagreement (the split label names both patterns rather than picking one). The switch
+     * sits mid-run so the temporal axis sees the readout change across it.
+     */
+    const midpoint = (recording.startedAt + recording.endedAt) / 2;
+    const traced: [string, VizRecording][] = [
+      ['own', recording],
+      [
+        'selecting',
+        { ...recording, patternSwitches: [{ atS: midpoint, bankId: 'main', patternId: 'up-peak' }] },
+      ],
+      [
+        'split',
+        {
+          ...recording,
+          patternSwitches: [
+            { atS: recording.startedAt, bankId: 'main', patternId: 'two-way' },
+            { atS: midpoint, bankId: 'north', patternId: 'idle' },
+          ],
+        },
+      ],
+    ];
+    for (const [name, subject] of traced) {
+      for (const at of sampleTimes(subject)) {
+        const readout = patternReadoutAt(subject, at);
+        if (readout.label === '') continue;
+        seeds.push({
+          field: `patternReadout(${name}, @${at.toFixed(0)}s).label`,
+          text: readout.label,
+          role: 'observation',
+          playhead: atPlayhead(subject, at),
+        });
+        if (readout.title !== '') {
+          seeds.push({
+            field: `patternReadout(${name}, @${at.toFixed(0)}s).title`,
+            text: readout.title,
+            role: 'prose',
+            playhead: atPlayhead(subject, at),
+          });
+        }
+      }
     }
 
     for (const at of sampleTimes(recording)) {
@@ -1419,6 +1666,7 @@ const REPLAY: SurfaceAdapter = {
     'record/document.ts#verifyReplay',
     'shift/banking.ts#bankingRefusalFor',
     'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
+    'shift/banking.ts#UNCHOSEN_RUN_CANNOT_BANK',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -1437,6 +1685,19 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'loadedRunCannotBank',
         text: LOADED_RUN_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /*
+       * The same question's other ground — § D232's, given words by `docs/19` defect 1: a run
+       * nobody started banks nothing, and the refusal now speaks instead of returning in silence.
+       * Beside `loadedRunCannotBank` because the two are `shift/banking.ts`'s two answers to *what
+       * must a run be before it may close a day*, and for the same `reason`/`authored` pairing:
+       * it explains a refusal and names what to do instead, and nothing about the run produced it.
+       */
+      {
+        field: 'unchosenRunCannotBank',
+        text: UNCHOSEN_RUN_CANNOT_BANK,
         role: 'reason',
         provenance: 'authored',
       },
@@ -1465,12 +1726,39 @@ function batchText(surfaceId: string, seeds: readonly (TextSeed & { readonly com
 
 const BATCH_REPORT: SurfaceAdapter = {
   id: 'batch/report.ts#batchReport',
-  covers: ['batch/report.ts#batchReport', 'batch/types.ts#BATCH_METRIC_PRESENTATION'],
+  covers: [
+    'batch/report.ts#batchReport',
+    /*
+     * The population line, in words — `docs/20` defect 9. Covered here rather than in an adapter of
+     * its own because it is a *projection of this report*: its whole input is
+     * {@link BatchReport.traceKey}, three panels draw it directly under `crnSentence`, and seeding
+     * it beside that sentence is what puts the two on one surface the way a reader meets them.
+     *
+     * `TRACE_KEY_WORDS`, `spacedKey` and `traceValueWords` — the table, the fallback spelling and
+     * the value renderer — are **not** listed: they are module-private, so the derivation does not
+     * find them and a `covers` entry for them would be a coverage claim for nothing. They are swept
+     * all the same, because every string they hold reaches the corpus through the call below.
+     */
+    'batch/report.ts#populationLineOf',
+    'batch/types.ts#BATCH_METRIC_PRESENTATION',
+  ],
   render(context) {
     const report = context.report;
     const seeds: (TextSeed & { comparison?: RenderedText['comparison'] })[] = [
       { field: 'demandClause', text: report.demandClause, role: 'label' },
       { field: 'crnSentence', text: report.crnSentence, role: 'prose' },
+      /*
+       * Seeded as the panels draw it — the lead-in included, because that is the sentence a reader
+       * meets and the numerals in the rendered key sit inside it. Drawn with the building name, the
+       * arm the product takes wherever it has one.
+       */
+      {
+        field: 'populationLine',
+        text: `Every arm ran this population: ${populationLineOf(report.traceKey, {
+          buildingName: report.buildingName,
+        })}.`,
+        role: 'observation',
+      },
     ];
     if (report.budgetNote !== null) {
       seeds.push({ field: 'budgetNote', text: report.budgetNote, role: 'reason' });
@@ -1595,6 +1883,99 @@ const GOAL_REPORT: SurfaceAdapter = {
         text: goalLabel({ kind: kind as never, threshold: null }),
         role: 'label',
       });
+    }
+    return batchText(this.id, seeds);
+  },
+};
+
+/**
+ * The suite — Everyday Mode slice 7's per-cell view over the bench (`batch/suite.ts`).
+ *
+ * Most of what the suite screen shows is `batchReport`'s own sentences re-rendered, and those are
+ * seeded here **again under this surface's id** because the suite genuinely draws them: a string
+ * on two screens is two chances to mislead, and the comparative checks should see it wherever it
+ * appears. The comparison shape on each row is taken from the report's row — `favours`, verdict
+ * and pairs — exactly as `BATCH_REPORT` attaches it, so a suite row that named a winner the row
+ * was not entitled to would fail here the same way.
+ *
+ * What is *new* prose is driven the way `RESTORE_NOTICE` drives its broken stores — by
+ * manufacturing the state that produces it: the field-of-two refusal through a result carrying a
+ * third arm, and `suitePlanOf`'s tick refusals through an empty and a duplicated tick list. The
+ * two cell-shape refusals (`demandTemplate`, missing horizon) are *not* drivable through the real
+ * `MATRIX_CELLS` — every shipped cell is clean, which is the point of them — so those literals
+ * reach only the static R10 sweep, stated here rather than dressed as coverage.
+ */
+const SUITE_BENCH: SurfaceAdapter = {
+  id: 'batch/suite.ts#suiteCellViewOf',
+  /*
+   * `suitePlanOf` is deliberately not in `covers` although its refusals are seeded below: the
+   * producer derivation does not find it (its prose lives in `throw` messages, which the scanner
+   * does not attribute to the export), and a `covers` entry for a declaration the derivation
+   * cannot find is a coverage claim for nothing — `derive.test.ts` said so when it was listed.
+   * The refusal strings are still in the corpus under this surface, driven for real below.
+   */
+  covers: ['batch/suite.ts#suiteCellViewOf'],
+  render(context) {
+    const cell = { id: 'honesty-suite-cell', label: context.report.buildingName };
+    const view = suiteCellViewOf(cell, context.batch);
+    const seeds: (TextSeed & { comparison?: RenderedText['comparison'] })[] = [];
+    if (view.answer !== null) {
+      seeds.push({
+        field: 'answer',
+        text: view.answer,
+        role: 'prose',
+        declaredCount: view.report.comparisons[0]?.rows[0]?.totalPairs ?? 0,
+      });
+    }
+    for (const [index, arm] of view.arms.entries()) {
+      seeds.push({
+        field: `arms[${String(index)}].sentence`,
+        text: arm.sentence,
+        role: 'observation',
+        declaredCount: view.report.arms[index]?.n ?? 0,
+        countShown: arm.sentence.includes(String(view.report.arms[index]?.n ?? -1)),
+      });
+    }
+    const sourceRows = view.report.comparisons[0]?.rows ?? [];
+    for (const [index, mark] of view.rows.entries()) {
+      const source = sourceRows[index];
+      if (source === undefined) continue;
+      seeds.push({
+        field: `rows[${String(index)}](${mark.metric}).sentence`,
+        text: mark.sentence,
+        role: 'comparison',
+        declaredCount: source.pairs,
+        countShown:
+          mark.sentence.includes(String(source.pairs)) ||
+          mark.sentence.includes(String(source.totalPairs)),
+        comparison: { favours: source.favours, verdict: source.verdict, pairs: source.pairs },
+        energyAxis: BATCH_METRIC_CLASS[mark.metric] === 'axis',
+      });
+    }
+    /* The refusal branches, manufactured on purpose — see the adapter docstring. */
+    const third = context.batch.arms[1];
+    if (third !== undefined) {
+      const tripled = { ...context.batch, arms: [...context.batch.arms, { ...third, armId: 'ghost-arm' }] };
+      const refused = suiteCellViewOf(cell, tripled);
+      if (refused.verdictRefusal !== null) {
+        seeds.push({ field: 'verdictRefusal', text: refused.verdictRefusal, role: 'reason' });
+      }
+    }
+    const field = [
+      { armId: 'baseline', dispatcherProfileId: 'collective' },
+      { armId: 'candidate', dispatcherProfileId: 'eta' },
+    ] as const;
+    for (const [name, cellIds] of [
+      ['planRefusal.noCells', []],
+      ['planRefusal.duplicateTick', ['midtown-up-peak', 'midtown-up-peak']],
+    ] as const) {
+      try {
+        suitePlanOf({ cellIds, seed: '1', replications: 50, field });
+      } catch (error: unknown) {
+        if (error instanceof SuiteError) {
+          seeds.push({ field: name, text: error.message, role: 'reason' });
+        }
+      }
     }
     return batchText(this.id, seeds);
   },
@@ -1729,7 +2110,38 @@ const MODE: SurfaceAdapter = {
          */
         declaredCount: awt?.rendering.count === undefined ? undefined : countOf(awt.rendering.count),
         countShown: awt?.rendering.count !== undefined,
+        // The register a caller with no playhead gets is the whole-run one — said explicitly, at
+        // the one playhead it is earned, so the temporal axis sees this line's terminal form too.
+        playhead: atPlayhead(recording, recording.endedAt),
       });
+      /*
+       * The same line at every sampled playhead — `docs/19` defect 4, on § D307's precedent.
+       *
+       * `dev/main.ts#drawTransportStatus` now derives this line per frame with the playhead
+       * against the run's own end, so the corpus drives the call the shell makes rather than the
+       * one it used to make. The mechanisation is the declaration: a line drawn short of
+       * `endedAt` that is **byte-identical to the whole-run line** is the whole-run register
+       * published early, and it is seeded with `basis: 'whole-run'` so the temporal property's
+       * structural half refuses it without any cue-matching — which matters here, because the
+       * whole-run sentence's own numerals (`29.3 s`, `n = 236 rides`) name quantities the
+       * WHOLE_RUN_COUNTS table has no live counterpart for. The honest mid-run register differs
+       * from the terminal line by construction (it withholds and says so), carries no figure, and
+       * is seeded as the refusal-shaped prose it is.
+       */
+      for (const at of sampleTimes(recording)) {
+        if (at >= recording.endedAt) continue;
+        const early = transportStatusOf(items, mode, { atS: at, endedAt: recording.endedAt });
+        if (early === undefined) continue;
+        seeds.push({
+          field: `${mode}.transportStatus@${at.toFixed(0)}s`,
+          text: early,
+          role: 'prose',
+          playhead:
+            early === status
+              ? { atS: at, endedAt: recording.endedAt, basis: 'whole-run' }
+              : atPlayhead(recording, at),
+        });
+      }
     }
 
     const refusal = parityRefusal(items);
@@ -1991,12 +2403,12 @@ const CAMPAIGN: SurfaceAdapter = {
  *
  * ## Why two days rather than one
  *
- * `goalsForDay` alternates its third bar on `day % 2` — even days ask a reader to hold a landing's
- * depth, odd days ask that nobody crosses the abandonment horizon — so a single day would leave
- * one of the two goal sentences unrendered on every case of every campaign. Day 1 and day 4 also
- * split the two branches of `contractLineFor` and `taughtFor`: day 1 runs the building's **own**
- * scenario, day 4 runs it as *a building the reader drew*, which is the branch that prints
- * *"nothing is being banked"*.
+ * Day 1 and day 4 split the two branches of `contractLineFor` and `taughtFor`: day 1 runs the
+ * building's **own** scenario, day 4 runs it as *a building the reader drew*, which is the branch
+ * that prints *"nothing is being banked"*. (This section used to also cite `goalsForDay`'s
+ * `day % 2` alternation — retired when the worst-wait ceiling subsumed the odd-day horizon goal,
+ * see `shift/goals.ts#goalsForDay` — but the contract branches alone still need both days, and
+ * two days also keep two points of the bar-hardening ladder in the corpus.)
  *
  * ## Why each day is closed twice
  *
@@ -2127,6 +2539,10 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
      */
     const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
+      record: null,
+      // No record and no cause: these bundle days are built from a recording rather than from a
+      // `ViewerState`, so there is no state for `recordRefusalFor` to have refused.
+      recordRefusal: null,
       day,
       dayIdx,
       eventId: event.id,
@@ -2160,6 +2576,29 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       ...common,
       subject: { kind: 'week-day' },
       plan: shiftPlan,
+      /*
+       * An intervened day, so the sheet's log line is in the corpus — `docs/19` defect 10, on the
+       * new producer `live/interventions.ts#interventionLogOf`. One press, mid-run, which is the
+       * state the audit's own repro produced; the stamp's wording is the stage's own and the LIVE
+       * adapter already drives it against a playhead. The five sibling sheets below carry **no**
+       * log on purpose: an untouched day printing nothing is the other arm, and both are shipped
+       * states.
+       */
+      interventions: [
+        { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+      ],
+      /*
+       * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
+       * — `docs/20` defect 2, on `shift/report.ts#ruleLines`. Two rows rather than one, because the
+       * ordinal is part of the claim: `rule 1 · …` and `rule 2 · …` say the engine reads them in
+       * first-match order, and a single row would sweep a sentence that never has to number itself.
+       * The five sibling sheets below carry none, which is the other shipped arm — the same split
+       * the intervention log above is seeded under.
+       */
+      ruleRows: [
+        { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
+        { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
+      ],
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -2305,6 +2744,12 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/report.ts#averageWaitFigure',
     'shift/report.ts#clockRange',
     'shift/report.ts#NOT_RECORDED',
+    /*
+     * The filed sheet's intervention log — `docs/19` defect 10. Authored in `live/` beside the
+     * stage stamp so the two share their verbs and their clock; rendered here because the sheet's
+     * meta block is where its lines land, on the intervened day this bundle drives.
+     */
+    'live/interventions.ts#interventionLogOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
@@ -2381,11 +2826,22 @@ const SHIFT_REPORT: SurfaceAdapter = {
           role: 'label',
         });
       }
-      for (const reading of report.goals) {
+      for (const { reading, was } of report.goals) {
         seeds.push({
           field: `${at}.goals(${reading.goal.id}).label`,
           text: reading.goal.label,
           role: 'label',
+        });
+        /*
+         * The "was" slot, as the panel dresses it — `was 78%`, or the bare em dash on a day with
+         * no yesterday. An observation about the previous run, so it takes the same role as the
+         * reading beside it; the seeded weeks here have no history, so this drives the em-dash
+         * arm, and the RAIL adapter's advanced-day rows drive the figure arm.
+         */
+        seeds.push({
+          field: `${at}.goals(${reading.goal.id}).was`,
+          text: was === '—' ? was : `was ${was}`,
+          role: 'observation',
         });
         /*
          * **Deliberately `observation`, not `goal`, and the distinction is the shift layer's own.**
@@ -2720,6 +3176,7 @@ const AUTHORING: SurfaceAdapter = {
     'authoring/buildingSpec.ts#buildingAdvice',
     'authoring/buildingSpec.ts#occupancyLine',
     'authoring/buildingSpec.ts#validateSpec',
+    'authoring/buildingSpec.ts#upPeakAnalysisOf',
     'authoring/buildingSpec.ts#SPEC_ROWS',
     'authoring/buildingSpec.ts#BLANK_SPEC',
     'authoring/buildingSpec.ts#specFromBuilding',
@@ -2792,6 +3249,25 @@ const AUTHORING: SurfaceAdapter = {
       seeds.push({ field: `buildingSummary(${label})`, text: buildingSummary(spec), role: 'observation' });
       seeds.push({ field: `occupancyLine(${label})`, text: occupancyLine(spec), role: 'observation' });
       seeds.push({ field: `buildingAdvice(${label})`, text: buildingAdvice(spec), role: 'prose' });
+      /*
+       * The sizing block — slice 6. Every string the block can draw goes in: the figures line and
+       * the § 10 reading on the analysable specs, the re-voiced divergence sentences (the shipped
+       * buildings trip them — `from-building` alone raises several), and both refusal shapes (the
+       * `escalators` spec is a document the loader refuses, so it exercises the building-level
+       * one). Empty seeds are filtered by `singleRun`, so a refused bank's empty line costs
+       * nothing.
+       */
+      const sized = upPeakAnalysisOf(spec, context.elevatorSpecs);
+      seeds.push({ field: `upPeakAnalysisOf(${label}).refusal`, text: sized.refusal, role: 'reason' });
+      for (const bank of sized.banks) {
+        const at = `upPeakAnalysisOf(${label}).${bank.bankId}`;
+        seeds.push({ field: `${at}.refusal`, text: bank.refusal, role: 'reason' });
+        seeds.push({ field: `${at}.line`, text: bank.line, role: 'observation' });
+        seeds.push({ field: `${at}.reading`, text: bank.reading, role: 'prose' });
+        for (const [index, warning] of bank.warnings.entries()) {
+          seeds.push({ field: `${at}.warnings[${String(index)}]`, text: warning, role: 'reason' });
+        }
+      }
       const built = buildingFromSpec(spec, { specs: context.elevatorSpecs });
       seeds.push({ field: `buildingFromSpec(${label}).name`, text: built.name, role: 'label' });
       for (const bank of built.banks) {
@@ -3084,11 +3560,29 @@ const RAIL_VIEW: SurfaceAdapter = {
       for (const bar of historyBarsOf([], undefined, entry.dayIdx)) {
         seeds.push({ field: `${at}.historyBarsOf(empty).title`, text: bar.title, role: 'observation' });
       }
-      for (const row of goalRowsOf(entry.readings)) {
+      for (const row of goalRowsOf(entry.readings, entry.week.history, entry.day)) {
         seeds.push({
           field: `${at}.goalRowsOf(${row.label}).value`,
-          // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it.
-          text: `${row.glyph} ${row.label} — ${row.value}`,
+          // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it,
+          // "was" slot included. On the day just closed the history holds no *previous* day, so
+          // this is the em-dash arm; the figure arm is the advanced day below.
+          text: `${row.glyph} ${row.label} — ${row.was} — ${row.value}`,
+          role: 'observation',
+        });
+      }
+      /*
+       * The same rows on the **morning after** — `nextDay` of the closed week, which is the state
+       * a player reaches by pressing the report's own primary button. It is the only shipped state
+       * whose "was" slot carries a figure rather than the em dash (the previous day is now
+       * `history[day-1]`), so without it the corpus would sweep the dash and never the number —
+       * and a mis-attributed yesterday is exactly the claim this slot could get wrong.
+       */
+      const morningAfter = nextDay(entry.week);
+      const tomorrowsGoals = readGoals(goalsForDay(morningAfter.day), bundle.observations);
+      for (const row of goalRowsOf(tomorrowsGoals, morningAfter.history, morningAfter.day)) {
+        seeds.push({
+          field: `${at}.goalRowsOf(nextDay, ${row.label}).was`,
+          text: `${row.glyph} ${row.label} — ${row.was} — ${row.value}`,
           role: 'observation',
         });
       }
@@ -3371,6 +3865,11 @@ const REPORT_PANEL: SurfaceAdapter = {
       if (view.leversHeading !== undefined) {
         seeds.push({ field: `${at}.leversHeading`, text: view.leversHeading, role: 'label' });
       }
+      // The goal block's reframed heading — `docs/19` defect 13. Present exactly on the
+      // single-run shape, where the authored *The shift asked for* would claim a contract.
+      if (view.goalsHeading !== undefined) {
+        seeds.push({ field: `${at}.goalsHeading`, text: view.goalsHeading, role: 'label' });
+      }
       for (const [index, cell] of view.figures.entries()) {
         /*
          * Paired by **id**, not by index. Casual reorders the grid (`casualFigureOrderOf`), so the
@@ -3456,7 +3955,7 @@ const REPORT_PANEL: SurfaceAdapter = {
       /* The two row builders, driven on their own so the coverage claim names what it calls. */
       const firstReading = entry.readings[0];
       if (firstReading !== undefined) {
-        const row = goalRowViewOf(firstReading);
+        const row = goalRowViewOf({ reading: firstReading, was: '—' });
         seeds.push({ field: `${at}.goalRowViewOf.help`, text: row.help, role: 'label' });
       }
       const firstFigure = entry.report.figures[0];
@@ -3543,6 +4042,24 @@ const REPORT_PANEL: SurfaceAdapter = {
     if (empty.framing.kind === 'week-day') {
       seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
     }
+    /*
+     * The empty sheet's two other ledes — `docs/19` defects 1 and 14, each a state a player
+     * produces (a completed run standing unfileable; a reload mid-campaign). The refused arm is a
+     * `reason` — it is `shift/banking.ts`'s refusal, quoted whole, and the refusal is the one
+     * string entitled to name what it refuses. Both grounds are driven so the precedence
+     * (`refusal` first) is a run rather than a sentence.
+     */
+    const refusedEmpty = emptyReportView({
+      refusal: UNCHOSEN_RUN_CANNOT_BANK,
+      fromPreviousSitting: true,
+    });
+    seeds.push({ field: 'emptyReportView(refused).lede', text: refusedEmpty.lede, role: 'reason' });
+    const priorSittingEmpty = emptyReportView({ refusal: undefined, fromPreviousSitting: true });
+    seeds.push({
+      field: 'emptyReportView(previous-sitting).lede',
+      text: priorSittingEmpty.lede,
+      role: 'prose',
+    });
 
     /*
      * The third sheet — issue #16, § D223.
@@ -3944,6 +4461,10 @@ const EDITOR_PANELS: SurfaceAdapter = {
     'dev/dispatcherEditor.ts#flagLineOf',
     'dev/dispatcherEditor.ts#leverRowsOf',
     'dev/dispatcherEditor.ts#dwellHintOf',
+    'mode/plainLevers.ts#plainLeversOf',
+    'mode/plainLevers.ts#plainLeverSub',
+    'mode/plainLevers.ts#plainLeverHelp',
+    'mode/plainLevers.ts#plainLeverEchoOf',
     'dev/machinesEditor.ts#machineRowsOf',
     'dev/machinesEditor.ts#machineFieldOf',
     'dev/machinesEditor.ts#formatMachineValue',
@@ -4323,6 +4844,34 @@ const EDITOR_PANELS: SurfaceAdapter = {
       }
     }
 
+    /*
+     * The Basic register of the term rows — the sub-line reads the term's own player words from
+     * `core` (Everyday handoff §16 rule 11, issue #147). Driven once over a blank spec rather
+     * than per profile, because the words are the model's and do not vary with what a reader has
+     * dragged; the per-profile loop above already drives everything that does.
+     */
+    for (const view of termRowsOf(terms, blankSpec(terms.map((term) => term.id)), [], 'basic')) {
+      seeds.push({
+        field: `termRowsOf(basic).${view.termId}.serves`,
+        text: view.serves,
+        role: 'label',
+      });
+    }
+
+    /*
+     * The four plain levers — Everyday Mode slice 1 (`mode/plainLevers.ts`). The composed
+     * sub-line and tooltip are the model's own compositions, the same two strings the mount
+     * draws, so the sweep and the screen cannot drift apart.
+     */
+    for (const lever of plainLeversOf(blankSpec(terms.map((term) => term.id)), DEFAULT_LEVERS)) {
+      seeds.push({ field: `plainLeversOf.${lever.id}.label`, text: lever.label, role: 'label' });
+      seeds.push({ field: `plainLeversOf.${lever.id}.sub`, text: plainLeverSub(lever), role: 'prose' });
+      seeds.push({ field: `plainLeversOf.${lever.id}.help`, text: plainLeverHelp(lever), role: 'prose' });
+      // The moved-lever echo (docs/19 defect 5) — the same composition the editor draws after a
+      // pull, over the same view, so the acknowledgement a player reads is what is swept.
+      seeds.push({ field: `plainLeverEchoOf.${lever.id}`, text: plainLeverEchoOf(lever), role: 'prose' });
+    }
+
     return singleRun(this.id, seeds);
   },
 };
@@ -4625,6 +5174,7 @@ const MENU: SurfaceAdapter = {
       readonly refusal: string | undefined;
       readonly viewMode?: 'basic' | 'advanced';
       readonly firstVisit?: boolean;
+      readonly everLeftTheMenu?: boolean;
     }[] = [
       { label: 'whole', selection: whole, canPost: true, hasRun: true, refusal: undefined },
       { label: 'broken', selection: broken, canPost: false, hasRun: false, refusal: undefined },
@@ -4650,6 +5200,9 @@ const MENU: SurfaceAdapter = {
         hasRun: true,
         refusal: undefined,
         firstVisit: true,
+        // The state a genuinely first load is in: the menu has never been dismissed, so Resume's
+        // first-sitting wording (docs/19's copy nit) is what this arm sweeps.
+        everLeftTheMenu: false,
       },
     ];
     /*
@@ -4734,6 +5287,7 @@ const MENU: SurfaceAdapter = {
           ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
           ...(arm.viewMode === undefined ? {} : { viewMode: arm.viewMode }),
           ...(arm.firstVisit === undefined ? {} : { firstVisit: arm.firstVisit }),
+          ...(arm.everLeftTheMenu === undefined ? {} : { everLeftTheMenu: arm.everLeftTheMenu }),
           boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
           challenge: challengeInput,
         });
@@ -4914,8 +5468,10 @@ const SELECTOR: SurfaceAdapter = {
     'dev/selectorEditor.ts#armOptionsOf',
     'dev/selectorEditor.ts#changedNoteOf',
     'authoring/selectorSpec.ts#PATTERN_LINES',
+    'authoring/selectorSpec.ts#PATTERN_NAMES',
     'authoring/selectorSpec.ts#INPUT_PHRASES',
     'authoring/selectorSpec.ts#patternLine',
+    'authoring/selectorSpec.ts#patternName',
     'authoring/selectorSpec.ts#signatureLine',
     'authoring/selectorSpec.ts#policyLine',
     'authoring/selectorSpec.ts#patternCards',
@@ -5033,6 +5589,19 @@ const SELECTOR: SurfaceAdapter = {
       text: patternLine(firstPattern) ?? '',
       role: 'prose',
     });
+    /*
+     * The short names, one per declared pattern — the header pill's vocabulary (slice 4b). Driven
+     * over the detector's own `patterns` so a name for a dropped pattern, or a missing one for a
+     * new pattern, changes the corpus the day the data moves; `selectorSpec.test.ts` holds the
+     * key set both ways and this puts the words themselves through R2/R10 with everything else.
+     */
+    for (const patternId of patterns) {
+      seeds.push({
+        field: `patternName(${patternId})`,
+        text: patternName(patternId) ?? '',
+        role: 'label',
+      });
+    }
 
     return singleRun(this.id, seeds);
   },
@@ -5462,7 +6031,7 @@ const REPORT_CARD: SurfaceAdapter = {
           /*
            * Ids `data/` does **not** ship, deliberately: a value taken from the loaded configuration
            * would be reproducible by construction and the refusal arm would render nothing. These
-           * are the two *"yours alone"* refusals a reader is most likely to meet.
+           * are the two *"saved on this device alone"* refusals a reader is most likely to meet.
            */
           reasons: runIdentityIssues(
             { ...initialState(resources, 1n), buildingId: 'my-tower', dispatcherId: 'my-dispatcher' },
@@ -5538,6 +6107,773 @@ const REPORT_CARD: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * Fix-a-building — GAMEPLAY § 10 over `fixit/`'s pure model
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A search case over the context's own building, so every sentence the Fix-a-building engine can
+ * author is rendered against real runs — the figures and the measured rows read
+ * {@link HonestyContext.recording} and {@link HonestyContext.comparisonRecording} (`before` is the
+ * comparison run, `after` the case's own, the `dev/reportPanel.ts#rotatedOn` convention).
+ *
+ * The **authored** halves — complaint, diagnosis, repair names, effects — are synthetic here, like
+ * the escalator fixtures above: the shipped `data/fixit-cases.json` copy is validated at load time
+ * by `fixit/parse.ts` (R10 and § 16 rule 11), which is the campaign precedent — `data/` documents
+ * are refused at the door, and what the search drives is the machinery that wraps them.
+ */
+/** The declarations the FIXIT adapter drives. A list, so `derive.test.ts` can hold it both ways. */
+const FIXIT_COVERS: readonly string[] = [
+  'fixit/engine.ts#classifyOutcome',
+  'fixit/engine.ts#budgetNoteOf',
+  'fixit/engine.ts#repairRowOf',
+  'fixit/engine.ts#STANDING_EXTRAS',
+  'fixit/engine.ts#BASIS_LINE',
+  // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
+  // and the states the adapter renders are built by the two toggles rather than written by hand.
+  'fixit/engine.ts#spendOf',
+  'fixit/engine.ts#affordabilityOf',
+  'fixit/engine.ts#toggleRepair',
+  'fixit/engine.ts#toggleExtra',
+  'fixit/run.ts#figureValuesOf',
+];
+
+function fixitSearchCase(context: HonestyContext): FixitCase {
+  const floors = context.recording.floors.map((floor) => floor.id);
+  const scopeFloors = floors.slice(0, Math.max(1, Math.ceil(floors.length / 2)));
+  const repairPatch = { dispatcher: { idle: { parkingStrategy: 'stay' } } };
+  return {
+    id: 'search-case',
+    name: 'The searched tower',
+    buildingId: context.building.id,
+    dispatcherProfileId: context.case.baselineProfileId,
+    run: { seed: '1', durationS: context.case.durationS, arrivalRatePctPop5min: null },
+    asBuilt: {
+      note: 'The fault is in how it is configured, not in what it is made of.',
+      patch: {},
+    },
+    complaint: {
+      text: 'The wait on my floor is longer than it was last year, and nothing about the building has changed.',
+      complainer: 'tenant, the searched half',
+      measure: {
+        kind: 'long-waits',
+        label: 'waits over a minute starting in the searched half',
+        thresholdS: 60,
+        scope: { mode: 'origin', floorIds: scopeFloors },
+      },
+    },
+    symptom: 'waits over a minute, while cars stand elsewhere',
+    figures: [
+      { kind: 'complaint', label: 'Waits over a minute in the searched half', reading: 'bad' },
+      { kind: 'scope-mean-wait', label: 'Mean wait in the searched half', reading: 'mid' },
+      { kind: 'scope-worst-wait', label: 'Worst wait in the searched half', reading: 'mid' },
+      { kind: 'rest-away-pct', label: 'Rest of the building away inside a minute', reading: 'healthy' },
+    ],
+    diagnosis: {
+      text: 'The idle fleet is parked where the calls are not.',
+      reasoning: 'Every long wait in this run began with the cars standing together at the far end of the shaft.',
+    },
+    budgetUnits: 12,
+    repairs: [
+      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: 0, effect: 'A setting, and the long waits above are the target.', patch: repairPatch },
+      { id: 's-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: 10, effect: 'Faster climbs shorten the worst wait; the parking stays.', patch: repairPatch },
+      { id: 's-cheap', role: 'cheap-fix', name: 'Trim the door dwell', costUnits: 2, effect: 'A second off every stop moves the mean a little.', patch: repairPatch },
+      { id: 's-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: 34, effect: 'A capital conversation with the owner, not a work order.', patch: repairPatch },
+    ],
+    result: {
+      head: 'The building is awake.',
+      body: 'Nothing was bought: the cars were always enough — they were parked in the wrong place.',
+    },
+  };
+}
+
+const FIXIT: SurfaceAdapter = {
+  id: 'fixit/engine.ts#classifyOutcome',
+  covers: FIXIT_COVERS,
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const entry = fixitSearchCase(context);
+
+    /* ---- the standing extras: every name and every line, authored in the engine ---- */
+    for (const extra of STANDING_EXTRAS) {
+      seeds.push({ field: `extra.${extra.id}.name`, text: extra.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `extra.${extra.id}.line`, text: extra.line, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the four figures, measured on the case's own run, both measure kinds ---- */
+    for (const figure of figureValuesOf(entry, context.recording)) {
+      seeds.push({ field: `figure(${figure.label})`, text: `${figure.label}: ${figure.text}`, role: 'observation' });
+    }
+    const meanEntry: FixitCase = {
+      ...entry,
+      complaint: { ...entry.complaint, measure: { ...entry.complaint.measure, kind: 'mean-wait' } },
+    };
+
+    /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
+    const empty = emptyFixitState();
+    let spent = toggleRepair(entry, empty, 's-costly');
+    spent = toggleExtra(entry, spent, 'tenant-notices');
+    for (const state of [empty, spent]) {
+      for (const repair of entry.repairs) {
+        const row = repairRowOf(entry, state, repair);
+        seeds.push({ field: `repair.${repair.id}.price`, text: row.priceLine, role: 'label' });
+        if (row.refusal !== undefined) {
+          seeds.push({ field: `repair.${repair.id}.refusal`, text: row.refusal, role: 'reason' });
+        }
+      }
+      seeds.push({
+        field: 'budget.note',
+        text: budgetNoteOf(entry, spendOf(entry, state)),
+        role: 'prose',
+        provenance: 'authored',
+      });
+    }
+    // The third note — over budget — is unreachable through the reducers by design (§ 10.2), so
+    // it is worded against a fabricated spend, exactly as the outcome below is.
+    seeds.push({
+      field: 'budget.note.over',
+      text: budgetNoteOf(entry, { repairUnits: 34, extraUnits: 0, editorUnits: 0, totalUnits: 34, machineryUnits: 34 }),
+      role: 'prose',
+      provenance: 'authored',
+    });
+
+    /* ---- the measured outcome, before = the comparison run, after = the case's own ---- */
+    for (const [name, subject] of [
+      ['long-waits', entry],
+      ['mean-wait', meanEntry],
+    ] as const) {
+      const measurement = measuredOf(subject, context.comparisonRecording, context.recording);
+      const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty));
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.basis`, text: outcome.basis, role: 'reason', provenance: 'authored' });
+      for (const [index, row] of outcome.rows.entries()) {
+        const isMeanRow = name === 'mean-wait' && index === 0;
+        seeds.push({
+          field: `outcome.${name}.row[${String(index)}]`,
+          text: `${row.label}: ${row.before} → ${row.after} · ${row.verdict}`,
+          role: 'observation',
+          // A scoped mean travels with the count it was taken over, one per side — issue #137's
+          // rule, kept here by construction and declared so the search can hold it.
+          ...(isMeanRow
+            ? { declaredCount: measurement.scopeBoardedAfter, countShown: /\d/.test(row.after) }
+            : {}),
+        });
+      }
+    }
+
+    /* ---- the three outcomes a green pair cannot produce, worded against fabricated measures ---- */
+    const flat: FixitMeasurement = {
+      complaintBefore: 10,
+      complaintAfter: 1,
+      scopeBoardedBefore: 40,
+      scopeBoardedAfter: 40,
+      complaintGonePct: 90,
+      restAwayBeforePct: 95,
+      restAwayAfterPct: 90,
+      restBoardedBefore: 120,
+      restBoardedAfter: 120,
+      restDeltaPoints: -5,
+    };
+    const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
+    const short = classifyOutcome(
+      entry,
+      { ...flat, complaintGonePct: 30, restDeltaPoints: 0 },
+      spendOf(entry, empty),
+    );
+    const over = classifyOutcome(entry, flat, {
+      repairUnits: 34,
+      extraUnits: 0,
+      editorUnits: 0,
+      totalUnits: 34,
+      machineryUnits: 34,
+    });
+    for (const [name, outcome] of [
+      ['worse', worse],
+      ['short', short],
+      ['over', over],
+    ] as const) {
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The Everyday rules editor — GAMEPLAY §11.5's when/then rows, their readbacks, lever lines,
+ * refusals, and the stage header's rule-provenance words.
+ *
+ * Driven over the **whole declared vocabulary** rather than a sample: one row per condition and
+ * one per action, so a template, a lever badge or a caveat added in `core` enters the corpus the
+ * day it lands — the same posture the SELECTOR adapter takes over the detector's patterns. The
+ * refusal arms manufacture each `ruleIssues` message the model can raise, because a refusal is
+ * player copy in exactly the sense a caption is (§ D227: the refusal is the honest half of the
+ * control).
+ */
+const RULES_EDITOR: SurfaceAdapter = {
+  id: 'authoring/ruleSpec.ts#ruleIssues',
+  covers: [
+    'authoring/ruleSpec.ts#ruleIssues',
+    'authoring/ruleSpec.ts#leverLineOf',
+    'authoring/ruleSpec.ts#fallbackLineOf',
+    'authoring/ruleSpec.ts#RULES_EXCLUSIVITY_NOTE',
+    'authoring/ruleSpec.ts#ruleProvenanceName',
+    'dev/selectorEditor.ts#rulesOverrideNoteOf',
+  ],
+  render(this: SurfaceAdapter) {
+    const seeds: TextSeed[] = [];
+
+    // One row per condition, cycling the actions; then one row per action, on a fixed condition
+    // — so every template is substituted at least once and every lever line and caveat renders.
+    const conditionRows: RuleRow[] = RULE_CONDITIONS.map((when, index) => {
+      const then = RULE_ACTIONS[index % RULE_ACTIONS.length]!;
+      return ruleRowOf(when, then);
+    });
+    const actionRows: RuleRow[] = RULE_ACTIONS.map((then) => ruleRowOf('call-waited', then));
+
+    for (const row of [...conditionRows, ...actionRows]) {
+      seeds.push({
+        field: `readback.${row.when}.${row.then}`,
+        text: `Reads as: ${readbackOf(row)}`,
+        role: 'label',
+      });
+      seeds.push({ field: `lever.${row.when}.${row.then}`, text: leverLineOf(row), role: 'prose' });
+    }
+
+    // The provenance naming path — the pill's words for a rule arm, per condition.
+    RULE_CONDITIONS.forEach((when, index) => {
+      const words = RULE_CONDITION_WORDS[when];
+      const value = words.values?.[0]?.value;
+      const suffix = value === undefined ? '' : `:${String(value)}`;
+      seeds.push({
+        field: `provenance.${when}`,
+        text: ruleProvenanceName(`rule-${String(index + 1)}:${when}${suffix}`) ?? '',
+        role: 'label',
+      });
+    });
+
+    // Every refusal the model can raise: the clockless time rule, the invalid pairing, the
+    // duplicated static row, and the out-of-list value.
+    const refusalArms: readonly (readonly [string, readonly RuleRow[], boolean])[] = [
+      ['clockless', [ruleRowOf('time-before', 'hold-at-lobby')], false],
+      ['pairing', [ruleRowOf('call-waited', 'no-new-pickups')], true],
+      [
+        'duplicate',
+        [ruleRowOf('car-fuller-than', 'no-new-pickups'), ruleRowOf('car-fuller-than', 'no-new-pickups')],
+        true,
+      ],
+      ['out-of-list', [{ when: 'call-waited', whenValue: 61, then: 'jump-queue' }], true],
+    ];
+    for (const [name, rows, hasClock] of refusalArms) {
+      for (const [index, issue] of ruleIssues(rows, { hasClock }).entries()) {
+        seeds.push({
+          field: `${name}.issue[${String(index)}]`,
+          text: issue.message,
+          role: 'reason',
+        });
+      }
+    }
+
+    seeds.push({ field: 'fallback', text: fallbackLineOf('Steady hand'), role: 'label' });
+    seeds.push({ field: 'exclusivity', text: RULES_EXCLUSIVITY_NOTE, role: 'prose' });
+    // The switching panel's override note — both arms, because silence is the other claim.
+    seeds.push({ field: 'override.some', text: rulesOverrideNoteOf(2), role: 'reason' });
+    seeds.push({ field: 'override.none', text: rulesOverrideNoteOf(0), role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The race strip and its ghost picker — GAMEPLAY §7.4, Everyday slice 4d.
+ *
+ * The ghost the strip is driven with is the context's own `comparisonRecording` — a real second
+ * recording, exactly what the shipped ghost is (`dev/ghostRun.ts` swaps one field of the primary's
+ * config) — so the verdict enters the corpus computed from two genuine runs rather than from
+ * doctored percentages. Both of the strip's states are driven at every sampled playhead: racing,
+ * and racing **nobody**, whose verdict slot carries the plain figure and whose note is empty (an
+ * empty seed is dropped by `singleRun`, which is the correct rendering of *no note*).
+ *
+ * The verdict is `observation` — two shares of two runs at one instant — and it is driven on the
+ * temporal axis, because it is derived from so-far observations and must never publish a
+ * whole-run figure at a mid-run playhead. The footer is `reason`: it is the strip's standing
+ * refusal of a comparative reading, R2's third narrowing exactly. The three wordings the sampled
+ * pair may not happen to produce are driven through `raceVerdictOf` directly, at shares a player
+ * produces by being ahead, behind, or unserved.
+ *
+ * `ghostPlanOf` is driven through the same shipped plan chain the shift adapter uses
+ * (`shiftRunConfigOf` over `initialState`), in both speaking arms: the refusal when nothing is
+ * saved (`NO_SAVED_DISPATCHER`), and the run arm whose label names the grey line.
+ */
+const RACE_STRIP: SurfaceAdapter = {
+  id: 'live/raceStrip.ts#raceStripViewOf',
+  covers: [
+    'live/raceStrip.ts#GHOST_OPTIONS',
+    'live/raceStrip.ts#RACE_FOOTER',
+    'live/raceStrip.ts#SAME_CROWD_NOTE',
+    'live/raceStrip.ts#RACE_PENDING',
+    'live/raceStrip.ts#RACE_NOT_RUN',
+    'live/raceStrip.ts#raceVerdictOf',
+    'live/raceStrip.ts#raceStripViewOf',
+    'dev/ghostRun.ts#NO_SAVED_DISPATCHER',
+    'dev/ghostRun.ts#ghostPlanOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const { recording, comparisonRecording } = context;
+
+    for (const option of GHOST_OPTIONS) {
+      seeds.push({ field: `ghostOption(${option.id}).label`, text: option.label, role: 'label' });
+      seeds.push({ field: `ghostOption(${option.id}).note`, text: option.note, role: 'prose' });
+    }
+    seeds.push({ field: 'race.pending', text: RACE_PENDING, role: 'prose' });
+    seeds.push({ field: 'race.notRun', text: RACE_NOT_RUN, role: 'prose' });
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const raced = raceStripViewOf({ recording, ghost: comparisonRecording, simTimeS: at });
+      seeds.push({
+        field: `race(@${stamp}s).verdict`,
+        text: raced.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
+      seeds.push({ field: `race(@${stamp}s).note`, text: raced.note, role: 'prose' });
+      seeds.push({ field: `race(@${stamp}s).footer`, text: raced.footer, role: 'reason' });
+      const alone = raceStripViewOf({ recording, ghost: undefined, simTimeS: at });
+      seeds.push({
+        field: `race(nobody, @${stamp}s).verdict`,
+        text: alone.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
+    }
+
+    // The wordings the sampled pair may not produce, at shares a player can hold.
+    seeds.push({ field: 'race.verdict(ahead)', text: raceVerdictOf(61.4, 52.2), role: 'observation' });
+    seeds.push({ field: 'race.verdict(behind)', text: raceVerdictOf(52.2, 61.4), role: 'observation' });
+    seeds.push({ field: 'race.verdict(unserved)', text: raceVerdictOf(undefined, undefined), role: 'reason' });
+
+    // The picker's plan half, through the shipped chain — both speaking arms.
+    const resources = browserResourcesOf(context);
+    const plan = shiftRunConfigOf(resources, {
+      ...initialState(resources, 1n),
+      buildingId: context.case.buildingId,
+      shiftLengthS: 300,
+    });
+    const refused = ghostPlanOf(resources, [], plan.config, 'latest-saved');
+    if (refused.kind === 'refused') {
+      seeds.push({ field: 'race.ghost(latest-saved).refusal', text: refused.reason, role: 'reason' });
+    }
+    const plain = ghostPlanOf(resources, [], plan.config, 'plain-baseline');
+    if (plain.kind === 'run') {
+      seeds.push({ field: 'race.ghost(plain-baseline).label', text: plain.label, role: 'label' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * Watching somebody else's run — GAMEPLAY § 14.1, Everyday Mode slice 8.
+ *
+ * ## What is driven, and what the corpus is
+ *
+ * `watchingStrings(view)` — the **view's own** enumeration of everything it draws, which is also
+ * what `view.test.ts` walks for the no-first-person rule. Reusing it rather than re-listing the
+ * fields here is the point: two lists of *what a watched run says* is how one of them comes to omit
+ * the cell somebody added, and this corpus and that rule would then disagree about which strings
+ * exist.
+ *
+ * Both sources are driven — a day this device filed and a shipped reference run — because
+ * `sourceLine` is the one cell that differs between them and it is § 20.11's disclaimer.
+ *
+ * ## Why the refusals are here too
+ *
+ * A row that cannot be watched says why, and those sentences are player-facing on exactly the
+ * footing the header is. All three grounds are seeded: the day with no record, the record naming
+ * something this build does not ship, and the reproduction refusal — the last one built from a real
+ * drift rather than a literal, so the figures it names are the figures the derivation produces.
+ *
+ * ## Why the posted figures carry no playhead
+ *
+ * They are whole-run counts, and the temporal axis (§ D307) exists to catch a whole-run figure
+ * published at a playhead short of `endedAt`. A watched run's posted result **is** a whole-run
+ * claim, and it is licensed: it is the record's filed result, presented as such by
+ * `POSTED_FIGURES_NOTE`, and it is never a reading of the replay at the instant on screen. So the
+ * seeds carry no playhead and the note that makes them honest is seeded beside them.
+ */
+const WATCH: SurfaceAdapter = {
+  id: 'watch/view.ts#watchingViewOf',
+  covers: [
+    'watch/view.ts#watchingViewOf',
+    'watch/view.ts#postedFiguresOf',
+    'watch/view.ts#REPLAY_PILL_VERB',
+    'watch/view.ts#REFERENCE_RUN_LINE',
+    'watch/view.ts#FILED_DAY_LINE',
+    'watch/view.ts#STOP_WATCHING_LABEL',
+    'watch/view.ts#PLAY_THIS_CROWD_LABEL',
+    'watch/view.ts#POSTED_FIGURES_NOTE',
+    'watch/library.ts#DAY_HAS_NO_RECORD',
+    'watch/library.ts#refusalForDay',
+    /*
+     * `recordRefusalFor` composes no prose of its own — it joins `runIdentityIssues`' sentences,
+     * which `SCOPE_REFUSALS` already sweeps — but it *is* the producer that puts them on a watching
+     * surface, and the seed above renders one through `refusalForDay` in the wording a picker row
+     * prints. Covered here rather than excluded, because the composition is the player-facing act.
+     */
+    'watch/record.ts#recordRefusalFor',
+    'watch/reproduce.ts#reproductionRefusalFor',
+    'watch/record.ts#recordUnreadableReason',
+    /*
+     * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
+     * the strip they contradicted, rather than in an adapter of their own: a reader auditing *what
+     * a watched run says* has to see the race key, the rail's eyebrow, the footer's clause and the
+     * report's note in the same corpus as `THEIR DISPATCHER`, because the defect was precisely that
+     * the two halves of that sentence were written by modules that never met.
+     */
+    'watch/shell.ts#shellWatchingCopyOf',
+    'watch/shell.ts#PLAYER_SHELL_COPY',
+    'watch/shell.ts#RAIL_EYEBROW_PLAYER',
+    'watch/shell.ts#RAIL_EYEBROW_WATCHING',
+    'watch/shell.ts#RAIL_NOTE_PLAYER',
+    'watch/shell.ts#RAIL_NOTE_WATCHING',
+    'watch/shell.ts#footerSeedLineOf',
+    'watch/shell.ts#reportNoteWhileWatching',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const posted = postedResultOf(context.recording);
+
+    for (const source of ['filed-day', 'reference'] as const) {
+      const run: WatchableRun = {
+        id: `watch-${source}`,
+        source,
+        label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
+        buildingName: context.building.name,
+        subtitle: 'day 2 of this week',
+        record: null,
+        posted,
+        blocked: null,
+      };
+      const view = watchingViewOf(run, context.case.baselineProfileId);
+      /*
+       * Through the view's own enumeration, so a cell added to `WatchingView` enters this corpus
+       * on the day it lands rather than on the day somebody remembers.
+       */
+      for (const [index, text] of watchingStrings(view).entries()) {
+        seeds.push({ field: `watch(${source}).string[${String(index)}]`, text, role: 'label' });
+      }
+      seeds.push({ field: `watch(${source}).figuresNote`, text: view.figuresNote, role: 'reason' });
+      /*
+       * The shell's arm of the same view, through the shell module's own enumeration for
+       * `watchingStrings`' stated reason — a surface added to `ShellWatchingCopy` with no line in
+       * `shellWatchingStrings` is outside both this corpus and § 14.1's grep at once.
+       */
+      for (const [index, text] of shellWatchingStrings(shellWatchingCopyOf(view)).entries()) {
+        if (text === '') continue;
+        seeds.push({ field: `watch(${source}).shell[${String(index)}]`, text, role: 'label' });
+      }
+    }
+
+    /*
+     * The player's own arm as well, because it is what the shell says the rest of the time and it
+     * is the arm whose disappearance would satisfy every no-first-person check in the tree.
+     */
+    for (const [index, text] of shellWatchingStrings(PLAYER_SHELL_COPY).entries()) {
+      if (text === '') continue;
+      seeds.push({ field: `watch.player.shell[${String(index)}]`, text, role: 'label' });
+    }
+
+    // The three grounds a row can lose its affordance on, each in the words the picker prints.
+    seeds.push({ field: 'watch.blocked(no-record)', text: DAY_HAS_NO_RECORD, role: 'reason' });
+    /*
+     * And the fourth sentence a `no-record` row can carry — `docs/20` defect 1. A day whose record
+     * was *refused* quotes the issue that refused it, so this seed carries a real scope message
+     * rather than a literal: the wording a reader meets is the wrapper plus whatever
+     * `runIdentityIssues` said, and seeding the wrapper alone would sweep half a sentence.
+     */
+    seeds.push({
+      field: 'watch.blocked(refused)',
+      text: refusalForDay(
+        'the group levers are moved off their defaults, and a selection carries no levers',
+      ),
+      role: 'reason',
+    });
+    const unreadable = recordUnreadableReason(
+      {
+        version: 1,
+        seed: '1',
+        buildingId: 'no-such-tower',
+        dispatcherId: context.case.baselineProfileId,
+        pattern: 'building',
+        demandTemplateId: null,
+        arrivalRatePctPop5min: null,
+        shiftLengthS: 900,
+        windowStartS: null,
+        day: 1,
+        dayIdx: 0,
+        outOfServiceCarIds: [],
+        interventions: [],
+        ruleRows: [],
+      },
+      browserResourcesOf(context),
+    );
+    if (unreadable !== null) {
+      seeds.push({ field: 'watch.blocked(unreadable)', text: unreadable, role: 'reason' });
+    }
+    /*
+     * A real drift rather than a literal pair, so the sentence names the figures the derivation
+     * produces. Two of the four moved, which is also `listOf`'s two-item arm.
+     */
+    const drifted = reproductionRefusalFor(posted, {
+      ...posted,
+      carried: posted.carried + 4,
+      worstWaitS: posted.worstWaitS + 11,
+    });
+    if (drifted !== null) {
+      seeds.push({ field: 'watch.blocked(does-not-reproduce)', text: drifted, role: 'reason' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+
+/**
+ * **The withheld matrix — ENGINE_CONTRACT § 12.2, driven from the state model rather than from
+ * fixtures.**
+ *
+ * ## What this adapter is, and why it is a state sweep rather than a surface
+ *
+ * Every other adapter here drives one surface in the state the case produced. This one drives
+ * **several surfaces in thirty-two states**, because the claim § 12.2 makes is about the states and
+ * not about the surfaces: *"four independent reasons a figure is withheld … and they combine …
+ * every combination renders `—` or a labelled unavailable state; none renders a zero, a spinner or
+ * a stale figure."* `generate.ts#withheldStates` is the enumeration; this is what it is enumerated
+ * *for*.
+ *
+ * The states are enumerated rather than drawn, so a case does not sample the matrix — it renders
+ * all of it. Nothing here runs a simulation: every state is a projection of the case's own two
+ * recordings, with the case's own run standing for the player's and the **candidate** run standing
+ * for the stranger's, which is the only honest way to have two runs without paying for a third.
+ *
+ * ## Which of § 12.2's five surfaces exist in this tree, said rather than assumed
+ *
+ * `docs/18`'s precedent is that this audit corrects the plan, and two of the five named surfaces
+ * are the prototype's rather than this shell's:
+ *
+ * | § 12.2 names | here |
+ * |---|---|
+ * | Your week | **exists** — `dev/leftRail.ts`'s week card: the three run figures, the seven-day sparkline, and `shift/weekLabel.ts#coachWeekLines`' ribbon |
+ * | the report | **exists** — `dev/reportPanel.ts#emptyReportView`, the sheet's own account of why it is empty |
+ * | the board | **exists, without a server** — `menu/screens.ts`'s leaderboard body over `menu/client.ts`'s types |
+ * | the ladder | **does not exist** — a standing dispatcher rating is unbuilt; slice 4d omitted the ghost's *best* arm for the same reason (*"needs a rating that does not exist"*), and a sweep of a ladder would be a sweep of a screen nobody can open |
+ * | the percentile line | **does not exist** — nothing in this tree computes *"better than 64 % of today's players"*: there is no world distribution, and `menu/client.ts` has no endpoint that would carry one |
+ *
+ * The two absences are named here rather than stubbed, on § 20.11's own rule about reference runs
+ * and slice 4d's about the world band: a surface invented in order to be swept is a surface with no
+ * reader, and the sweep would then certify it.
+ *
+ * ## What is marked withheld, and what deliberately is not
+ *
+ * A cell is marked when the state makes its figure **unavailable**, never merely unflattering:
+ *
+ * - *best day so far* under `day-not-closed` — a high-water mark over an empty history.
+ * - *banked this scenario* under `sandbox` — a fraction whose denominator is a contract the week
+ *   does not have.
+ * - the sparkline's provisional bar under `watching` — the stage is showing a stranger's run, so
+ *   there is no figure of the player's own to draw. **This is the one that was wrong**, and
+ *   `dev/leftRail.ts#todayShareFor` is the fix.
+ * - the empty sheet's title under `day-not-closed` or `watching`.
+ * - the board's *Post this run* refusal under `no-post`, `watching` or `day-not-closed`.
+ * - the leaderboard's first notice under `world-absent` — the slot § 16 rule 15 requires to carry a
+ *   labelled unavailable state. Seeded as the empty string when the view produces no notice at all,
+ *   because *nothing where the world figures were* is the defect that rule is about, and a cell the
+ *   sweep never seeds is a cell the property cannot judge.
+ *
+ * **Not marked:** the sparkline's *so far* bar when the run on the stage is the player's own.
+ * § 14's prototype shows `—` there until the day closes; this tree draws a provisional bar whose
+ * title says *"so far"* in the same breath as the number, which is the same licence the temporal
+ * axis grants (`properties.ts#NAMES_ITS_OWN_WINDOW`) and which `docs/18`'s framing lets the code
+ * win. Also not marked: *clean days running* and *N clean shifts banked*, which are counts of
+ * things that happened and are honestly zero.
+ *
+ * **Known limit, stated rather than discovered.** A row the view does **not** draw produces no
+ * string, so *"no board row survives with no server"* is asserted where absences are assertable —
+ * `menu/screens.ts`'s own tests — and not here. This instrument judges what a surface said.
+ */
+const WITHHELD_MATRIX: SurfaceAdapter = {
+  id: 'dev/leftRail.ts#runFiguresOf',
+  covers: [
+    'dev/leftRail.ts#runFiguresOf',
+    'dev/leftRail.ts#historyBarsOf',
+    'shift/weekLabel.ts#coachWeekLines',
+    'dev/reportPanel.ts#emptyReportView',
+    'shift/banking.ts#bankingRefusalFor',
+    'menu/account.ts#postingRefusal',
+    'menu/screens.ts#screenOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+    const day = bundle.days[0];
+    /* c8 ignore next -- `shiftBundleOf` always builds two days; this narrows the type. */
+    if (day === undefined) return [];
+
+    /* The player's own run, and the stranger's — the candidate arm, folded at its own end. */
+    const ownShare = bundle.observations.minutePct;
+    const watched = context.comparisonRecording;
+    const watchedShare = shiftObservationsOf(observationsAt(watched, watched.endedAt)).minutePct;
+
+    const catalogue = catalogueOf({
+      buildings: context.buildings as unknown as CatalogueSource['buildings'],
+      dispatcherProfiles: context.dispatcherProfiles,
+      trafficProfiles: context.trafficProfiles,
+    });
+    const menuState = initialMenuState(catalogue);
+    const player = {
+      id: 'u1',
+      email: 'p@example.test',
+      displayName: 'A player',
+      displayNameChosen: true,
+    };
+
+    for (const state of withheldStates()) {
+      const at = `withheld(${state.id})`;
+      const cell = (
+        because: readonly string[],
+        ifPublished: readonly string[],
+      ): WithheldFigure => ({ state: state.id, because, ifPublished });
+
+      /* ---- Your week: the card, the sparkline and the ribbon ---- */
+      const contractId = state.sandbox ? FREE_PLAY_CONTRACT_ID : day.week.contractId;
+      const week: WeekState = state.dayNotClosed
+        ? openWeek(contractId)
+        : { ...day.week, contractId };
+
+      for (const [index, figure] of runFiguresOf(week).entries()) {
+        const withheldHere =
+          index === 1 && state.dayNotClosed
+            ? cell(['day-not-closed'], [String(ownShare), String(watchedShare)])
+            : index === 2 && state.sandbox
+              ? cell(['sandbox'], [])
+              : undefined;
+        seeds.push({
+          field: `${at}.week.figure(${figure.label})`,
+          text: figure.value,
+          role: withheldHere === undefined ? 'observation' : 'suppressed',
+          ...(withheldHere === undefined ? {} : { withheld: withheldHere }),
+        });
+        seeds.push({
+          field: `${at}.week.figure(${figure.label}).label`,
+          text: figure.label,
+          role: 'label',
+        });
+      }
+
+      /*
+       * The stage's own share, asked of the rail's decision rather than of the recording — the
+       * whole point of `todayShareFor` is that *whose figure is this* is a decision and not a read.
+       */
+      const share = todayShareFor(state.watching, state.watching ? watchedShare : ownShare);
+      const provisional = week.history.length === 0;
+      for (const [index, bar] of historyBarsOf(week.history, share, week.dayIdx).entries()) {
+        const withheldHere =
+          provisional && state.watching ? cell(['watching'], [String(watchedShare)]) : undefined;
+        seeds.push({
+          field: `${at}.week.bar[${String(index)}].title`,
+          text: bar.title,
+          role: withheldHere === undefined ? 'observation' : 'suppressed',
+          ...(withheldHere === undefined ? {} : { withheld: withheldHere }),
+        });
+      }
+
+      const ribbon = coachWeekLines(week, context.case.durationS);
+      seeds.push({ field: `${at}.week.ribbon.label`, text: ribbon.label, role: 'label' });
+      seeds.push({
+        field: `${at}.week.ribbon.progress`,
+        text: ribbon.progress,
+        role: state.sandbox ? 'suppressed' : 'observation',
+        ...(state.sandbox ? { withheld: cell(['sandbox'], []) } : {}),
+      });
+
+      /* ---- The day's sheet ---- */
+      const onScreen = state.watching ? watched : context.recording;
+      const bankingRefusal = bankingRefusalFor(onScreen, context.recording);
+      if (state.dayNotClosed || state.watching) {
+        const refusal =
+          bankingRefusal ?? (state.dayNotClosed ? UNCHOSEN_RUN_CANNOT_BANK : undefined);
+        const sheet = emptyReportView({ refusal, fromPreviousSitting: false });
+        seeds.push({
+          field: `${at}.report.title`,
+          text: sheet.title,
+          role: 'suppressed',
+          withheld: cell(
+            state.watching ? ['watching'] : ['day-not-closed'],
+            [String(ownShare), String(watchedShare)],
+          ),
+        });
+        seeds.push({ field: `${at}.report.lede`, text: sheet.lede, role: 'reason' });
+      }
+
+      /* ---- The board: posting, and the world with nothing behind it ---- */
+      const account = state.noPost ? SIGNED_OUT : signedIn(SIGNED_OUT, 'token', player);
+      const refusalToPost = postingRefusal(account);
+      const board = screenOf({
+        state: { ...menuState, screen: 'leaderboard' },
+        catalogue,
+        canPost: !state.noPost,
+        hasRun: !state.dayNotClosed,
+        ...(refusalToPost === undefined ? {} : { postingRefusal: refusalToPost }),
+        ...(state.watching && bankingRefusal !== null ? { rankingRefusal: bankingRefusal } : {}),
+        /*
+         * No `boards` and no `boardPage` with the API absent — the state issue #123 describes and
+         * the one this build is permanently in. The other arm is a board that answered, which is
+         * what `MENU` already drives; here it is the axis's second value rather than the default.
+         */
+        ...(state.worldAbsent ? {} : { boards: [{ configHash: 'abcdef0123456789', entries: 3 }] }),
+      });
+      const postRow = board.rows.find((row) => row.id === 'leaderboard.submit');
+      const postRefused = state.noPost || state.dayNotClosed || state.watching;
+      seeds.push({
+        field: `${at}.board.submit.why`,
+        text: postRow?.disabledWhy ?? '',
+        role: postRefused ? 'suppressed' : 'label',
+        ...(postRefused
+          ? {
+              withheld: cell(
+                state.reasons.filter((reason) =>
+                  ['no-post', 'day-not-closed', 'watching'].includes(reason),
+                ),
+                [],
+              ),
+            }
+          : {}),
+      });
+      seeds.push({
+        field: `${at}.board.worldFigures`,
+        text: board.notices[0] ?? '',
+        role: state.worldAbsent ? 'suppressed' : 'prose',
+        ...(state.worldAbsent ? { withheld: cell(['world-absent'], []) } : {}),
+      });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/** One rule row with each id's first declared value, for the adapter above. */
+function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
+  const whenValue = RULE_CONDITION_WORDS[when].values?.[0]?.value;
+  const thenValue = RULE_ACTION_WORDS[then].values?.[0]?.value;
+  return {
+    when,
+    ...(whenValue === undefined ? {} : { whenValue }),
+    then,
+    ...(thenValue === undefined ? {} : { thenValue }),
+  };
+}
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -5579,6 +6915,23 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
   REPORT_CARD,
+  // Appended, same reason again: the suite re-seeds the bench's sentences under its own surface
+  // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
+  // originals and move every batch-shaped fault onto this surface.
+  SUITE_BENCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT.
+  FIXIT,
+  // Appended after FIXIT, same reason again: the rules editor's readbacks share phrases
+  // with the selector's copy, and inserting it earlier would move selector-shaped faults
+  // onto this surface.
+  RULES_EDITOR,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
+  RACE_STRIP,
+  WATCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
+  // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
+  // every week-shaped and menu-shaped fault onto this surface.
+  WITHHELD_MATRIX,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

@@ -217,6 +217,8 @@ export function runBatch(
     durationS: request.durationS,
     arrivalRatePctPop5min: request.arrivalRatePctPop5min,
     ...(request.demandLevel === undefined ? {} : { demandLevel: request.demandLevel }),
+    ...(request.demand === undefined ? {} : { demand: request.demand }),
+    ...(request.reportWindow === undefined ? {} : { reportWindow: request.reportWindow }),
     arms,
     crn,
     elapsedMs: (options.clock?.now() ?? 0) - startedMs,
@@ -253,6 +255,9 @@ function baseConfigFor(
     dispatcherProfiles: resources.dispatcherProfiles,
     durationS: request.durationS,
     onTimeout: 'report',
+    // The suite's cells narrow the summary window (`'full-run'`); absent, core's own default
+    // stands and the config is byte-identical to every batch before the field existed.
+    ...(request.reportWindow === undefined ? {} : { reportWindow: request.reportWindow }),
     /*
      * **One `demand` block or none**, rather than two spreads that would let the second delete the
      * first. `demandLevel` and `arrivalRatePctPop5min` are independent fields of one options object
@@ -265,8 +270,15 @@ function baseConfigFor(
   };
 }
 
-/** `{ demand: … }`, or `{}` when the request overrides nothing. See the call site. */
+/**
+ * `{ demand: … }`, or `{}` when the request overrides nothing. See the call site.
+ *
+ * The authored block is passed whole and alone — {@link assertRequest} has already refused a
+ * request carrying both it and the panel's two named fields, so there is no merge here to get
+ * wrong and the report's demand clause has exactly one source to speak for.
+ */
 function demandOptionsFor(request: BatchRequest): { demand?: SimulationDemandOptions } {
+  if (request.demand !== undefined) return { demand: request.demand };
   const demand: { demandLevel?: DemandLevel; arrivalRatePctPop5min?: number } = {
     ...(request.demandLevel === undefined ? {} : { demandLevel: request.demandLevel }),
     ...(request.arrivalRatePctPop5min === null
@@ -323,6 +335,16 @@ function assertRequest(request: BatchRequest): void {
   }
   if (!Number.isFinite(request.durationS) || request.durationS <= 0) {
     throw new BatchError('durationS must be a positive number of simulated seconds.');
+  }
+  if (
+    request.demand !== undefined &&
+    (request.arrivalRatePctPop5min !== null || request.demandLevel !== undefined)
+  ) {
+    throw new BatchError(
+      'a batch carries either the panel’s demand rate and band point or one authored demand ' +
+        'block, never both: two sources for one population is how a provenance sentence goes ' +
+        'stale, and the report refuses to guess which of them ran.',
+    );
   }
 }
 

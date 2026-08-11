@@ -46,9 +46,17 @@ const CLEAN: GoalObservations = {
   minutePct: 96,
   peakQueue: 3,
   abandoned: 0,
+  worstWaitS: 45,
+  worstWaitIsCensored: false,
 };
 
-const POOR: GoalObservations = { ...CLEAN, carryPct: 41, minutePct: 22, peakQueue: 31 };
+const POOR: GoalObservations = {
+  ...CLEAN,
+  carryPct: 41,
+  minutePct: 22,
+  peakQueue: 31,
+  worstWaitS: 620,
+};
 
 /** A day nobody looked at: below `WAKE_UP_ARRIVALS`, so every reading is `pending`. */
 const QUIET: GoalObservations = {
@@ -57,6 +65,8 @@ const QUIET: GoalObservations = {
   minutePct: 100,
   peakQueue: 1,
   abandoned: 0,
+  worstWaitS: 15,
+  worstWaitIsCensored: false,
 };
 
 /** Legs carried, per fixture — `GoalObservations` does not carry it, and `outcomeOf` wants it. */
@@ -77,6 +87,8 @@ function closedWeek(day: number, observations: GoalObservations, contractId = 'c
   return closeDay(
     { ...openWeek(contractId), day, dayIdx },
     outcomeOf({
+      record: null,
+      recordRefusal: null,
       day,
       dayIdx,
       eventId: 'ordinary',

@@ -113,6 +113,32 @@ describe('a Casual note leads the engineer’s note and never replaces it', () =
     }
   });
 
+  it('marks the seam between the two registers — docs/19 defect 8', () => {
+    /*
+     * The engineer's notes are grid captions, not sentences — *"waited past the 15-minute
+     * horizon…"* — and joined to a lead with a bare space they read as broken prose. The lead
+     * branch now announces the register change the way the refusal branch always has ("The
+     * measurement's reason follows, in its own words."), so a led note carries a seam and an
+     * unled note carries none.
+     */
+    for (const id of ['minute', 'average-wait', 'stairs', 'energy-work']) {
+      const source = cell(id);
+      expect(casualNoteFor(source), id).toContain('The cell’s own note:');
+    }
+    expect(casualNoteFor(cell('worst-wait'))).not.toContain('The cell’s own note:');
+  });
+
+  it('claims nothing about which day it is drawn on — docs/19 defect 8’s AWAY caption', () => {
+    /*
+     * The old `minute` lead said the average below it *is* refused, which was false on every day
+     * the average printed. A static lead cannot know the day, so the wording must be generic —
+     * asserted as the conditional's presence and the indicative's absence.
+     */
+    const written = casualNoteFor(cell('minute'));
+    expect(written).toContain('even on days');
+    expect(written).not.toContain('which is why this figure is still here');
+  });
+
   it('restates no figure — the value never appears in the note it did not already appear in', () => {
     /*
      * Rule 1 of the module: a plain retelling of a number is a second copy of a figure. The value

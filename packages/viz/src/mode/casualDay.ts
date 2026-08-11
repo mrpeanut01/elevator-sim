@@ -181,16 +181,36 @@ export function casualFigureOrderOf<T extends { readonly id: string }>(
  * engineer's sentence follows unedited.
  */
 const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
+  /*
+   * Day-independent, where the old sentence was not — `docs/19` defect 8's third finding. It read
+   * *"which is why this figure is still here on a day the average below it is refused"*, a claim
+   * about **today**: on the many days the average is plainly printed one cell down, the caption
+   * explained a refusal that had not happened. A static lead keyed on a cell id cannot know which
+   * day it is drawn on, so it may only say things that are true of every day — hence the
+   * conditional (*even on days*), which is the fix rather than a hedge.
+   */
   minute:
-    'A head count of people, not an estimate — which is why this figure is still here on a day ' +
-    'the average below it is refused.',
+    'A head count of people, not an estimate — so it stays on this sheet even on days the ' +
+    'average below it is refused.',
   'average-wait':
     'Averaged over the busiest five minutes of the day rather than over all of it: this is what ' +
     'a wait came to when the building was under the most pressure, which is the stretch worth ' +
     'judging it on.',
+  /*
+   * Rewritten for `docs/19` defect 3, and the old sentence is quoted because it was false twice
+   * over: *"People who stopped waiting and walked. They are counted here and nowhere else."* The
+   * cell counts **waits that crossed the give-up horizon**, whether or not a car eventually came
+   * — on a saturated no-patience run every one of those riders was still carried, so they were
+   * counted *here and in CARRIED*, and the claim of a disjoint cohort is what made the sheet's
+   * people impossible to total. The lead now says what the count is and defers the overlap to
+   * the cell's own note (`shift/report.ts#stairsNote`), which carries the run's actual split —
+   * a static lead may not restate a figure, so it may not guess the overlap either.
+   */
   stairs:
-    'People who stopped waiting and walked. They are counted here and nowhere else — leaving ' +
-    'them out of the average is what makes an average of the ones who stayed flatter the day.',
+    'People this building made stand past its give-up line. The note beside the count says how ' +
+    'many of them a car still came for — those are inside CARRIED as well, so the two cells can ' +
+    'overlap rather than add. The count is published beside the average and never folded into ' +
+    'it: dropping the longest waits is what would flatter the day.',
   'energy-work':
     'How hard the motors worked. It is read beside the waits and never added to them: a day ' +
     'that spends less by carrying fewer people has not saved anything.',
@@ -207,7 +227,8 @@ const CASUAL_LEAD_BY_CELL: Readonly<Record<string, string>> = Object.freeze({
  *    wording for, and a refusal that carries none at all, both fall back to the ground-free
  *    sentence — which is what every consumer had before codes existed, and is why the fallback is a
  *    behaviour rather than a branch nobody reaches.
- * 2. **A cell with a lead** gets it in front of its own note.
+ * 2. **A cell with a lead** gets it in front of its own note, with {@link CASUAL_NOTE_SEAM}
+ *    between the two.
  * 3. **Everything else** is returned unchanged. That is the honest default: a missing translation
  *    shows the engineer's words rather than nothing.
  *
@@ -220,8 +241,25 @@ export function casualNoteFor(cell: ReportFigure): string {
     return `${suppressionLeadFor(cell.suppressionGround)} ${cell.note}`;
   }
   const lead = CASUAL_LEAD_BY_CELL[cell.id];
-  return lead === undefined ? cell.note : `${lead} ${cell.note}`;
+  return lead === undefined ? cell.note : `${lead} ${CASUAL_NOTE_SEAM} ${cell.note}`;
 }
+
+/**
+ * The seam between a Casual lead and the engineer's note — `docs/19` defect 8.
+ *
+ * The two registers were joined with a bare space, and the engineer's notes are grid captions
+ * rather than sentences — fragments whose implicit subject is the value above them. Under the
+ * value they read exactly right; concatenated after a full stop they read as broken prose:
+ * *"…flatter the day. waited past the 15-minute horizon"*. The refusal branch above never had this
+ * problem, because `suppressionLeadFor`'s own last sentence **is** a seam — *"The measurement's
+ * reason follows, in its own words."* — so this constant is that device applied to the lead
+ * branch: a marker that a different register is about to speak, after which the note stays byte
+ * for byte the engineer's (rule 3, and `casualDay.test.ts` still asserts it with `endsWith`).
+ *
+ * Not exported, for {@link CASUAL_LEAD_BY_CELL}'s stated reason: it reaches the honesty search
+ * through {@link casualNoteFor}, which `honesty/surfaces.ts` drives on both modes.
+ */
+const CASUAL_NOTE_SEAM = 'The cell’s own note:';
 
 /* -------------------------------------------------------------------------- *
  * The two headings, and the small print

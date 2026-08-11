@@ -83,6 +83,14 @@ export const crowdingTerm: CostTermDefinition = Object.freeze({
   id: 'crowding',
   unit: '',
   measures: 'Hall queue length at the pickup floor',
+  // Everyday Mode's words for this term — engine contract §6.3, issue #147. Two readers,
+  // two vocabularies: `measures` stays addressed to an optimizer, these to a player.
+  player: Object.freeze({
+    name: 'crowding',
+    serves: 'parallel service',
+    atZero: 'one car per call',
+    atFull: 'send help to a busy floor',
+  } as const),
   normalization: Object.freeze({ mode: 'bounded', fullScale: 1 } as const),
   evaluate: unservedQueueFraction,
 });

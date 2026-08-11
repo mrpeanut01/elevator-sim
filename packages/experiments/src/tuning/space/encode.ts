@@ -756,7 +756,13 @@ function valueOf(parameter: SearchParameter, coordinate: number): ParameterValue
     }
     case 'integer': {
       const natural = parameter.scale === 'log' ? Math.exp(folded) : folded;
-      return Math.min(parameter.max, Math.max(parameter.min, Math.round(natural)));
+      const rounded = Math.round(natural);
+      // `Math.round(-0.2)` is `-0`, and `candidatesEqual` compares with `Object.is`, which
+      // distinguishes the two zeros — so a dimension whose range crosses zero (the first is
+      // `idle.parkingFloorIndex`, floors below ground being real) could decode to `-0`,
+      // re-encode through `reflectInto` to `+0`, and fail the idempotence `cmaes.ts` relies on.
+      // `+ 0` normalizes exactly the two zeros and nothing else.
+      return Math.min(parameter.max, Math.max(parameter.min, rounded + 0));
     }
     case 'categorical': {
       const index = Math.min(parameter.values.length - 1, Math.max(0, Math.floor(folded)));

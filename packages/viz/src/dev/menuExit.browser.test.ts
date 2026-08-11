@@ -24,10 +24,13 @@
  * the player actually started was then differenced against it.
  *
  * So the case below is the sequence, and the assertion is the **sheet**: after Escape and a full
- * playback, the Day report still reads *Nothing filed yet*. The positive control in the same file is
+ * playback, the Day report still reads *Nothing filed yet* — and, since `docs/19` defect 1, says
+ * **why** in its own lede rather than refusing in silence. The positive control in the same file is
  * what stops that being vacuous — entering a mode properly and playing the same length of run does
  * file a sheet, so the refusal above is about the way out of the menu and not about the playback
- * failing to reach its end.
+ * failing to reach its end. The third case is the other direction of the same gate, the audit's
+ * blocks-play trap: after a reload, **Resume** then **Run this shift** is a run the player started
+ * on purpose, and it must file.
  *
  * § D220 § 4 forbids a browser test asserting a metric. Nothing here asserts one: every reading is
  * the presence or absence of a filed sheet.
@@ -91,6 +94,26 @@ async function coldLoad(): Promise<Page> {
  * so that it passes for the wrong reason.
  */
 async function playToEnd(page: Page): Promise<void> {
+  /*
+   * Wait for the run to be **adopted** before touching the transport. `coldLoad`'s canvas latch
+   * proves the page booted, not that boot's worker run has landed — `adopt` is what enables the
+   * transport (`disableTransport(ui, false)`), and § D232 makes an adoption that lands after the
+   * overlay was dismissed **autoplay**. Reading the label before adoption therefore raced: the
+   * pre-adoption label says *Play*, the queued click is held by actionability until `adopt`
+   * enables the button, and by then autoplay has started the run — so the click *paused* it and
+   * the playhead never reached the end. The wave that landed slices 3/5/6a made boot heavy
+   * enough to lose that race deterministically; the latch below makes the read-then-click
+   * sound in either ordering, because autoplay is decided at construction and cannot intervene
+   * after the button is enabled.
+   */
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector('#play-pause');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.locator('#speed-chips .chip', { hasText: '×900' }).first().click();
   if ((await page.locator('#play-pause').first().getAttribute('aria-label')) === 'Play') {
     await page.locator('#play-pause').first().click();
@@ -102,14 +125,32 @@ async function playToEnd(page: Page): Promise<void> {
   );
 }
 
-/** What the Day report says it is a sheet of, and whether it claims a week. */
-async function sheetOf(page: Page): Promise<{ title: string; streak: string }> {
+/** What the Day report says it is a sheet of, whether it claims a week — and its own lede. */
+async function sheetOf(page: Page): Promise<{ title: string; streak: string; lede: string }> {
   await page.locator('#tab-report').first().click();
   await page.waitForTimeout(300);
   return page.evaluate(() => ({
     title: document.querySelector('#report-title')?.textContent ?? '',
     streak: document.querySelector('#report-streak')?.textContent ?? '',
+    lede: document.querySelector('#report-lede')?.textContent ?? '',
   }));
+}
+
+/**
+ * Boot's (or a re-run's) worker recording has landed and been adopted — the transport enabling is
+ * the adoption signal (`adopt` → `disableTransport(ui, false)`). Every press of `#run` must wait
+ * for this: while a run is in flight, `#run` is the cancel button, and a press that lands
+ * mid-flight cancels the run instead of starting the player's.
+ */
+async function waitForAdoption(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector('#play-pause');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
 }
 
 describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => {
@@ -122,8 +163,23 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
      * Before the split this reached `closeShift` with the gate open and banked a clean Monday.
      */
     const page = await coldLoad();
+    // The overlay must be up before Escape can dismiss it — under load the canvas latch can win
+    // the race against the menu's own first draw, and an Escape into a page with no overlay yet
+    // drives nothing. Latched on visibility, not on a sleep, for the same reason as playToEnd's.
+    await page.waitForFunction(
+      () => {
+        const overlay = document.querySelector<HTMLElement>('.menu-overlay');
+        return overlay !== null && !overlay.hidden;
+      },
+      undefined,
+      { timeout: 30_000 },
+    );
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(
+      () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+      undefined,
+      { timeout: 10_000 },
+    );
     expect(
       await page.evaluate(
         () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden ?? false,
@@ -139,6 +195,14 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
     );
     // And nothing was banked either. § D232's own claim, which the shared flag had quietly widened.
     expect(sheet.streak).toBe('');
+    /*
+     * **And the refusal speaks** — `docs/19` defect 1's second half. This exact state used to keep
+     * the design's placeholder lede, telling the reader to press *Run this shift* about a run
+     * whose completion the gate had just refused in silence. The lede is now
+     * `shift/banking.ts#UNCHOSEN_RUN_CANNOT_BANK`, which names what the run was and what does
+     * count.
+     */
+    expect(sheet.lede).toContain('not by you');
     await page.close();
   });
 
@@ -162,6 +226,8 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
     await pressMenuRow(page, 'main.campaign');
     await pressMenuRow(page, 'campaign.open');
     await page.locator('#tab-run').first().click();
+    // Boot's own run must have landed before #run is pressed — see {@link waitForAdoption}.
+    await waitForAdoption(page);
     await page.locator('#run').first().click();
     await page.waitForTimeout(500);
 
@@ -171,6 +237,68 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
     expect(sheet.title, 'a day the player started did not file — the refusal above proves nothing').not.toBe(
       'Nothing filed yet',
     );
+    await page.close();
+  });
+
+  it('files a run the player starts after reload + Resume — docs/19 defect 1, the blocks-play trap', async () => {
+    /*
+     * The audit's exact repro, and the regression that matters. Before the fix, `playerHasChosen`
+     * latched only in `closeMenu`'s entered-a-mode arms, so a returning player's natural sequence
+     * — reload, **Resume**, **Run this shift**, watch the day out — completed a run the gate then
+     * refused in silence, forever, on the very button the empty sheet names. The latch now also
+     * fires where a run is started on purpose (`playerStartedARun`), so this sequence must file.
+     *
+     * The first half of the case is the setup the audit calls *mid-campaign*: enter the campaign
+     * by a mode door, run a day to its end, and let `closeShift` file it — which is also what
+     * writes the session `page.reload()` then restores. Asserted before the reload, because a
+     * setup that silently failed to file would make the reload restore nothing and the case prove
+     * nothing.
+     */
+    const page = await coldLoad();
+    await pressMenuRow(page, 'main.campaign');
+    await pressMenuRow(page, 'campaign.open');
+    await page.locator('#tab-run').first().click();
+    await waitForAdoption(page);
+    await page.locator('#run').first().click();
+    await page.waitForTimeout(500);
+    await playToEnd(page);
+    const banked = await sheetOf(page);
+    expect(banked.title, 'the setup day did not file, so there is no mid-campaign session to restore').not.toBe(
+      'Nothing filed yet',
+    );
+
+    // The repro proper: reload (session restores; menu up) → Resume → Run this shift → the end.
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
+      timeout: 30_000,
+    });
+    // Resume is disabled until boot's own run lands (issue #97), so waiting for the row to enable
+    // is the same adoption latch the transport waits are — and Escape is not used here on purpose:
+    // Resume is the row the audit's player pressed.
+    await page.waitForFunction(
+      () => {
+        const row = document.querySelector('.menu-overlay [data-menu-control="main.resume"]');
+        return row instanceof HTMLButtonElement && !row.disabled;
+      },
+      undefined,
+      { timeout: 30_000 },
+    );
+    await pressMenuRow(page, 'main.resume');
+    // Back to the run surface first: `syncUrl` keeps the address describing the state, so after
+    // the setup half filed its sheet the reloaded URL opens on the **report** tab — where `#run`
+    // and the transport are not on screen. The audit's player was on the run surface; this is
+    // that click, not a workaround.
+    await page.locator('#tab-run').first().click();
+    await waitForAdoption(page);
+    await page.locator('#run').first().click();
+    await page.waitForTimeout(500);
+    await playToEnd(page);
+    const sheet = await sheetOf(page);
+
+    expect(
+      sheet.title,
+      'after reload + Resume, a run the player explicitly started did not file — docs/19 defect 1 is back',
+    ).not.toBe('Nothing filed yet');
     await page.close();
   });
 });

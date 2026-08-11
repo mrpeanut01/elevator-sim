@@ -41,7 +41,7 @@ import { buildingMood, moodObservationsOf } from '../render/mood.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
-import { openWeek } from '../shift/week.js';
+import { openWeek, outcomeOf } from '../shift/week.js';
 
 import {
   decisionRowViewOf,
@@ -58,6 +58,7 @@ import {
   shiftIsOver,
   statRowsOf,
   streakLineOf,
+  todayShareFor,
   type MoodView,
 } from './leftRail.js';
 
@@ -81,7 +82,10 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     deepestQueueNow: 4,
     deepestQueueFloorId: '12',
     abandoned: 0,
+    abandonedCarried: 0,
     horizonS: 900,
+    worstWaitSoFarS: 42,
+    worstWaitIsCensored: false,
     ...overrides,
   };
 }
@@ -112,7 +116,16 @@ function bandsOf(counts: readonly number[], basis: WaitBandBasis = 'now'): WaitB
 }
 
 function goalObservations(overrides: Partial<GoalObservations> = {}): GoalObservations {
-  return { arrived: 400, carryPct: 90, minutePct: 80, peakQueue: 6, abandoned: 0, ...overrides };
+  return {
+    arrived: 400,
+    carryPct: 90,
+    minutePct: 80,
+    peakQueue: 6,
+    abandoned: 0,
+    worstWaitS: 45,
+    worstWaitIsCensored: false,
+    ...overrides,
+  };
 }
 
 function decisionRow(overrides: Partial<DecisionRow> = {}): DecisionRow {
@@ -176,6 +189,8 @@ describe('statRowsOf — the four rows the design draws', () => {
 
   it('carries the denominator into the tooltip — R13’s `n` for the share', () => {
     expect(servedTitleFor(60, 137)).toContain('Over 137 served legs.');
+    // And in the singular when the sample really is one — docs/19 defect 8's `over 1 legs`.
+    expect(servedTitleFor(60, 1)).toContain('Over 1 served leg.');
   });
 
   /* --- the empty denominator --- */
@@ -281,13 +296,15 @@ describe('moodViewOf — the face, the bar and the legend', () => {
     expect(view.anybodyWaiting).toBe(false);
   });
 
-  it('legends the four bands by the design’s names, with the raw head count beside each', () => {
+  it('legends the four bands by their own names, with the raw head count beside each', () => {
     const view = moodViewOf(bandsOf([5, 4, 3, 2]), moodOf(bandsOf([5, 4, 3, 2])));
+    // Three of the design's, and the fourth the simulator's — `docs/20` defect 4, `docs/12`
+    // § 4.11. `live/bands.test.ts` is where that split is argued and pinned.
     expect(view.legend.map((entry) => entry.label)).toEqual([
       'breezy',
       'tapping foot',
       'checking watch',
-      'taking the stairs',
+      'eyeing the stairs',
     ]);
     expect(view.legend.map((entry) => entry.count)).toEqual([5, 4, 3, 2]);
     expect(view.legend.map((entry) => entry.color)).toEqual(WAIT_BANDS.map((band) => band.color));
@@ -312,7 +329,7 @@ describe('moodViewOf — the face, the bar and the legend', () => {
 
 describe('goalRowsOf — met, missed and pending', () => {
   it('never renders a number for a pending goal', () => {
-    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ arrived: 3 })));
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ arrived: 3 })), [], 1);
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.state).toBe('pending');
@@ -328,6 +345,8 @@ describe('goalRowsOf — met, missed and pending', () => {
   it('marks a met goal with the tick and the band green', () => {
     const rows = goalRowsOf(
       readGoals(goalsForDay(1), goalObservations({ carryPct: 99, minutePct: 99, abandoned: 0 })),
+      [],
+      1,
     );
     for (const row of rows) {
       expect(row.state).toBe('met');
@@ -339,25 +358,52 @@ describe('goalRowsOf — met, missed and pending', () => {
 
   it('gives a missed goal the empty track when nothing has been observed on it', () => {
     const readings = readGoals(goalsForDay(1), goalObservations({ carryPct: 0, minutePct: 0 }));
-    const rows = goalRowsOf(readings);
+    const rows = goalRowsOf(readings, [], 1);
     const zeroObserved = rows.filter((row) => row.state === 'missed' && row.value.startsWith('0'));
     expect(zeroObserved.length).toBeGreaterThan(0);
     for (const row of zeroObserved) expect(row.fill).not.toBe(WAIT_BANDS[1]?.color);
   });
 
-  it('gives a missed goal with progress the band amber', () => {
-    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ minutePct: 40 })));
+  it('gives a missed goal with progress the band amber, and the handoff’s cross', () => {
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ minutePct: 40 })), [], 1);
     const minute = rows.find((row) => row.label.includes('inside a minute'));
     expect(minute?.state).toBe('missed');
     expect(minute?.fill).toBe(WAIT_BANDS[1]?.color);
-    expect(minute?.glyph).toBe('○');
+    // § 20.6: missed draws an ×, not the old prototype's ring.
+    expect(minute?.glyph).toBe('×');
   });
 
   it('passes the goal’s own sentence through rather than composing a second one', () => {
     const readings = readGoals(goalsForDay(4), goalObservations());
-    expect(goalRowsOf(readings).map((row) => row.label)).toEqual(
+    expect(goalRowsOf(readings, [], 4).map((row) => row.label)).toEqual(
       readings.map((reading) => reading.goal.label),
     );
+  });
+
+  it('shows the bare dash for the "was" slot when the building has no previous day', () => {
+    // `was —` would dress an absence as a measurement; the dash alone is the honest slot.
+    for (const row of goalRowsOf(readGoals(goalsForDay(1), goalObservations()), [], 1)) {
+      expect(row.was).toBe(PENDING_DISPLAY);
+      expect(row.was).not.toContain('was');
+    }
+  });
+
+  it('shows last night’s figure, worded as a "was", once a previous day is in the history', () => {
+    const yesterdayReadings = readGoals(goalsForDay(3), goalObservations({ carryPct: 91 }));
+    const yesterday = outcomeOf({
+      record: null,
+      recordRefusal: null,
+      day: 3,
+      dayIdx: 2,
+      eventId: 'ordinary',
+      arrived: 400,
+      carried: 364,
+      minutePct: 80,
+      readings: yesterdayReadings,
+    });
+    const rows = goalRowsOf(readGoals(goalsForDay(4), goalObservations()), [yesterday], 4);
+    const carry = rows.find((row) => row.label.startsWith('Carry'));
+    expect(carry?.was).toBe('was 91%');
   });
 });
 
@@ -379,6 +425,12 @@ describe('runFiguresOf and the sparkline', () => {
     ]);
   });
 
+  it('counts one clean day in the singular — docs/19’s copy nit', () => {
+    // `1 clean days running` shipped; the label follows the value's number.
+    expect(runFiguresOf(week({ streak: 1 }))[0]?.label).toBe('clean day running');
+    expect(runFiguresOf(week({ streak: 2 }))[0]?.label).toBe('clean days running');
+  });
+
   it('banks against the contract’s own needClean', () => {
     const figures = runFiguresOf(week({ cleanRun: 1 }));
     expect(figures[2]?.value).toBe('1/1');
@@ -390,6 +442,50 @@ describe('runFiguresOf and the sparkline', () => {
     expect(figures[2]?.value).toBe(PENDING_DISPLAY);
   });
 
+  it('withholds the best day until a day has closed, rather than publishing 0%', () => {
+    /*
+     * ENGINE_CONTRACT § 12.2's *never a zero*, found by the withheld-matrix sweep on the state a
+     * new player is in for their whole first shift: `openWeek` seeds `bestMinutePct: 0`, and the
+     * card published **0%** under *best day so far* until the first day filed. A best over an empty
+     * sample is not a bad best.
+     */
+    expect(runFiguresOf(week())[1]?.value).toBe(PENDING_DISPLAY);
+
+    // And a real 0 % day is a measurement, so it is published — the gate is the history, not the mark.
+    const zeroDay: DayOutcome = {
+      record: null,
+      recordRefusal: null,
+      day: 1,
+      dayIdx: 0,
+      weekday: 'Monday',
+      eventId: 'ordinary',
+      arrived: 120,
+      carried: 4,
+      minutePct: 0,
+      readings: [],
+      allMet: false,
+    };
+    expect(runFiguresOf(week({ history: [zeroDay], bestMinutePct: 0 }))[1]?.value).toBe('0%');
+    expect(runFiguresOf(week({ history: [zeroDay], bestMinutePct: 74 }))[1]?.value).toBe('74%');
+  });
+
+  it('draws no today figure while the run on the stage is somebody else’s', () => {
+    /*
+     * § 12.2's *never a stale figure*, and the sharpest form of it this tree had: while watching,
+     * `watch/session.ts#watchingStateOf` puts a stranger's recording on the state and leaves the
+     * week alone, so the empty-history arm of the sparkline drew **their** share as the player's own
+     * *today, so far*. The decision is `todayShareFor`; the bar is what it protects.
+     */
+    expect(todayShareFor(true, 66)).toBeUndefined();
+    expect(todayShareFor(false, 66)).toBe(66);
+    // `undefined` is *nobody has said*, which is not watching — the state every caller with no shell is in.
+    expect(todayShareFor(undefined, 66)).toBe(66);
+
+    const watchingBar = historyBarsOf([], todayShareFor(true, 66), 0);
+    expect(watchingBar[0]?.title).toContain('nothing banked yet');
+    expect(watchingBar[0]?.title).not.toContain('66');
+  });
+
   it('reports the streak in words as well as in a colour', () => {
     expect(streakLineOf(week({ streak: 0 })).text).toBe('no streak yet');
     expect(streakLineOf(week({ streak: 3 })).text).toBe('on a roll');
@@ -399,6 +495,8 @@ describe('runFiguresOf and the sparkline', () => {
   it('draws one bar per closed day, each with its own tooltip', () => {
     const days: readonly DayOutcome[] = [
       {
+        record: null,
+        recordRefusal: null,
         day: 1,
         dayIdx: 0,
         weekday: 'Monday',
@@ -410,6 +508,8 @@ describe('runFiguresOf and the sparkline', () => {
         allMet: true,
       },
       {
+        record: null,
+        recordRefusal: null,
         day: 2,
         dayIdx: 1,
         weekday: 'Tuesday',
@@ -574,7 +674,7 @@ describe('a suppressed run yields no mean anywhere in the left rail', () => {
       outputs.push(
         statRowsOf(live),
         moodViewOf(bands, moodOf(bands)),
-        goalRowsOf(readGoals(goalsForDay(3), shiftObservationsOf(live))),
+        goalRowsOf(readGoals(goalsForDay(3), shiftObservationsOf(live)), [], 3),
         decisionRowsAt(recording, t, 6).map(decisionRowViewOf),
         mathsDisclosureOf(honestyAt(recording, t, 'engineer'), true, 'engineer'),
         mathsDisclosureOf(honestyAt(recording, t, 'casual'), true, 'casual'),

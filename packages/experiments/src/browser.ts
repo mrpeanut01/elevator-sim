@@ -303,6 +303,27 @@ export type {
 } from './runner/stopping.js';
 
 /* -------------------------------------------------------------------------- *
+ * benchmark/matrixCells.ts — the experiment matrix's eight operating points.
+ *
+ * Everyday Mode's suite (docs/18 § Slice 7) runs one comparison over multiple
+ * fixed cells, and its fixture list must be imported from `MATRIX_CELLS`,
+ * never retyped — the matrix's eight are building × traffic-pattern cells and
+ * a hand copy would be a second source of truth about which operating points
+ * this project measures. The cells are pure frozen data (their one import is
+ * a type from `runner/types.ts`, already on this graph); the machinery that
+ * runs a cell stays on the Node barrel. The module's docstring carries the
+ * decision (a decision number is owed).
+ *
+ * Deliberately narrow: `EXCLUDED_CELLS` and the study runners are not here —
+ * a name on this barrel is a promise the guard must keep, and the suite
+ * consumes exactly the list and the lookup.
+ * -------------------------------------------------------------------------- */
+
+export { MATRIX_CELLS, matrixCell } from './benchmark/matrixCells.js';
+
+export type { BudgetBasis, MatrixCell } from './benchmark/matrixCells.js';
+
+/* -------------------------------------------------------------------------- *
  * runner/types.ts — only the types the values above need in their signatures.
  *
  * Deliberately not the whole module: most of what it declares describes the

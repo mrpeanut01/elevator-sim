@@ -100,6 +100,13 @@ export interface GroupContextOptions {
   readonly horizonS?: number | undefined;
   /** Shaft indices of the building's entrance floors. Omit and the detector falls back. */
   readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
+  /**
+   * Seconds after local midnight at `t = 0`, from the resolved demand template. The fourth
+   * group fact, for the Everyday rules' time conditions — authored data through the kernel's
+   * time, never a wall clock. Omit and every time clause reads false, which the rules editor
+   * states as a refusal (`DispatchContext.startOfDayS` carries the argument).
+   */
+  readonly startOfDayS?: number | undefined;
 }
 
 /**
@@ -141,6 +148,7 @@ export function groupContext(
     ...(options.entranceFloorIndices === undefined
       ? {}
       : { entranceFloorIndices: options.entranceFloorIndices }),
+    ...(options.startOfDayS === undefined ? {} : { startOfDayS: options.startOfDayS }),
   });
 }
 

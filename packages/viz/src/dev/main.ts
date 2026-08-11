@@ -112,6 +112,17 @@ import {
 import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
+import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import { patternReadoutAt } from '../live/patternReadout.js';
+import {
+  GHOST_OPTIONS,
+  RACE_NOT_RUN,
+  RACE_PENDING,
+  RACE_SAMPLE_INTERVAL_S,
+  raceLaneOf,
+  raceStripViewOf,
+  type GhostPick,
+} from '../live/raceStrip.js';
 import {
   clockAt,
   DAY_START_S,
@@ -150,7 +161,7 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { bankingRefusalFor } from '../shift/banking.js';
+import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
@@ -160,9 +171,18 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
+import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
-import { loadBrowserResources, loadCampaign, type BrowserResources } from './data.js';
+import {
+  loadBrowserResources,
+  loadCampaign,
+  loadFixitCases,
+  loadReferenceRuns,
+  type BrowserResources,
+} from './data.js';
+import { mountFixitPanel } from './fixitPanel.js';
+import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
   ELEMENT_IDS,
@@ -177,6 +197,7 @@ import {
 import { mountEditor } from './editor.js';
 import { mountBuildingEditor } from './buildingEditor.js';
 import { mountDispatcherEditor } from './dispatcherEditor.js';
+import { mountRuleEditor } from './ruleEditor.js';
 import { mountSelectorEditor } from './selectorEditor.js';
 import { mountLeftRail } from './leftRail.js';
 import { mountMachinesEditor } from './machinesEditor.js';
@@ -196,9 +217,10 @@ import {
   saveSession,
 } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
-import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
+  allDispatchers,
   buildingConfigOf,
   shiftDemandTemplateId,
   shiftSubmittedSelection,
@@ -217,6 +239,16 @@ import {
   type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
+import { ghostPlanOf } from './ghostRun.js';
+import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
+import type { WatchableRun } from '../watch/types.js';
+import type { WatchingView } from '../watch/view.js';
+import {
+  PLAYER_SHELL_COPY,
+  footerSeedLineOf,
+  shellWatchingCopyOf,
+} from '../watch/shell.js';
+import { watchingStateOf } from '../watch/session.js';
 import {
   createShiftRunner,
   shiftRunCostOf,
@@ -243,6 +275,14 @@ import {
  * of a day. The handoff's own chips are ×1 / ×10 / ×60 / ×240 / ×900 and those are the five.
  */
 const SPEEDS = [1, 10, 60, 240, 900] as const;
+
+/**
+ * The chip a fresh mode opens on — ×60, the ladder's middle rung, a 1 800 s shift in thirty
+ * seconds of watching. One name for a value two sites hold (`baseSpeed`'s initialiser and
+ * {@link resetTransportSpeed}), so the speed a cold boot gets and the speed a mode entry restores
+ * cannot drift apart.
+ */
+const DEFAULT_BASE_SPEED = 60;
 
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
@@ -311,11 +351,18 @@ export interface WaitLegendEntry {
   /**
    * The band's own boundary, for the entry's tooltip — `0–30 s`, `30–60 s`, `60–120 s`, `120 s+`.
    *
-   * It earns its place on the fourth entry. `WAIT_BANDS[3].legendLabel` is the handoff's word
-   * *gave up* (`:233`), and `bands.ts` is explicit that the band counts **people still standing**
-   * past two minutes rather than people who abandoned — that is `observationsAt(…).abandoned`, a
-   * different population on a different clock. A bare label could carry that ambiguity harmlessly;
-   * a label with a *count* on it is a figure, so the boundary goes beside it.
+   * It earns its place on the fourth entry, and it used to be the **only** thing holding that
+   * entry honest. `WAIT_BANDS[3].legendLabel` was the handoff's word *gave up* (`:233`), and
+   * `bands.ts` is explicit that the band counts **people still standing** past two minutes rather
+   * than people who abandoned — that is `observationsAt(…).abandoned`, a different population on a
+   * different clock. A bare label could carry that ambiguity harmlessly; a label with a *count* on
+   * it is a figure, so the boundary went beside it.
+   *
+   * `docs/20` defect 4 then measured what the tooltip could not reach: the *bar's* own labels sat
+   * beside the Day report's, six centimetres apart, under one phrase and with two different
+   * numbers. The rung now reads *past two minutes* and the band *eyeing the stairs*, so the words
+   * carry it too — and this stays, because a range is the thing a reader checks a count against and
+   * the fourth entry is still the one that most needs checking.
    *
    * **Two numbers and a unit, deliberately, rather than a sentence.** It restates a bound the band
    * already publishes, so it cannot be false unless `WAIT_BANDS` moves, in which case it moves
@@ -329,7 +376,8 @@ export interface WaitLegendEntry {
  * The legend's four entries, in ascending severity — the handoff `:230–233`.
  *
  * **Derived, never written.** Both halves of every entry already exist on `live/bands.ts`'s
- * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *gave up*, and `color`
+ * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *past two minutes*
+ * (`docs/20` defect 4 rejoined the fourth rung to that ladder), and `color`
  * is the same band palette the mood bar, the canvas and the report all read. Until this function
  * existed, `legendLabel` reached **no DOM anywhere** — four authored strings with no non-test
  * caller, which is the dead-seam shape this repository has closed eleven times — and the page drew
@@ -432,16 +480,54 @@ export function stageLayoutFor(options: {
  * `undefined` — never an empty string — when there is no run or the items carry neither figure.
  * The strip's transient messages live in the same element, and writing `''` over one of them would
  * blank the screen at the moment a reader is being told something.
+ *
+ * ## The line is playhead-aware, and the whole-run sentence waits for the end — `docs/19` defect 4
+ *
+ * The figures this line carries are folds of the **finished** day: `disclosureItems` reads
+ * `recording.summary`, which exists before the first paint because `recordRun` simulates the whole
+ * day up front. Drawn unconditionally, the line published *"average wait suppressed … the queues
+ * never settled during this run"* — past tense — from the first second of playback, beside a
+ * stage header that correctly speaks in the *so far* register. That is the violation class the
+ * honesty sweep's temporal axis polices (a whole-run figure at a playhead short of `endedAt`), on
+ * the one line a reader glances at without opening a panel.
+ *
+ * `progress` is the playhead against the run's own end. Short of the end the line **withholds and
+ * says so**, in the register `dev/reportPanel.ts`'s watching sheet established: it names the
+ * figures that are coming and when they file, and prints no number and no verdict — the running
+ * figure a reader can have mid-run is already on the stage header (`render/canvas.ts#meanClause`),
+ * and a second copy here would be a second answer. At `endedAt` (or for a caller with no playhead,
+ * which is how the parity check and the pre-playhead call sites read a whole run) the line is the
+ * whole-run one, unchanged. `honesty/surfaces.ts` drives both registers at five playheads and
+ * declares a whole-run line drawn early as `basis: 'whole-run'`, so the temporal property holds
+ * this seam closed rather than this docstring. A decision number is owed for the register split.
  */
+export interface TransportStatusProgress {
+  /** The playhead, simulated seconds. */
+  readonly atS: number;
+  /** The run's own end — `recording.endedAt`, never a constant. */
+  readonly endedAt: number;
+}
+
 export function transportStatusOf(
   items: readonly DisclosureItem[],
   mode: ViewMode,
+  progress?: TransportStatusProgress | undefined,
 ): string | undefined {
   const drawn = itemsIn(items, mode);
   const shown = [AWT_ID, WT95_ID]
     .map((id) => drawn.find((item) => item.id === id))
     .filter((item) => item !== undefined);
   if (shown.length === 0) return undefined;
+
+  if (progress !== undefined && progress.atS < progress.endedAt) {
+    /*
+     * The so-far register. Labels only — the labels are the reader's names for the two figures,
+     * and naming what is withheld is what makes this a refusal rather than a blank. No numeral:
+     * a count here would be a figure, and the figures are exactly what has not been earned yet.
+     */
+    const labels = shown.map((item) => item.label).join(' and ');
+    return `still playing — ${labels} are read over the finished day, and file when the playhead reaches the end`;
+  }
 
   const figures = shown.map((item) => {
     const { value, count } = item.rendering;
@@ -636,6 +722,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let filedReportInput: DayReportInput | undefined;
   /**
+   * The `(run, mode, register)` key the transport status line was last derived for — see
+   * {@link drawTransportStatus} for why a transient message survives exactly until it changes,
+   * and why the key is these three facts rather than the derived text.
+   */
+  let lastTransportStatusKey: string | undefined;
+  /**
    * Where the service badges were last drawn, for the click handler.
    *
    * Declared **here**, with the other boot-scope bindings, and not beside the function that reads
@@ -713,9 +805,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * genuine run was then differenced against a day the player never asked for: the reporter's
    * `CARRIED was 39 → 621`, a real improvement rendered as a catastrophe.
    *
-   * So the *filing* gate is this flag and it is latched only where a mode is entered; the *autoplay*
-   * gate is {@link menuHasBeenDismissed}, latched on every way out. The two were always two
-   * questions and the second one only looked like the first because both start `false`.
+   * So the *filing* gate is this flag and the *autoplay* gate is {@link menuHasBeenDismissed},
+   * latched on every way out. The two were always two questions and the second one only looked
+   * like the first because both start `false`.
+   *
+   * ## Where it latches: a mode entered, or a run started on purpose — `docs/19` defect 1
+   *
+   * *Latched only where a mode is entered* was the whole rule, and the play-experience audit found
+   * what it swallowed: after any reload, **Resume** is the natural way out of the overlay
+   * (`changed-their-mind`, correctly no latch), and every run the player then explicitly started —
+   * **Run this shift**, *Save it and run it*, a scenario card — completed, reached `closeShift`,
+   * and was refused in silence. The player did exactly what the empty sheet's copy asks and got
+   * *Nothing filed yet* forever; recovery was leaving the menu again by a row that happens to be a
+   * mode. So {@link playerStartedARun} is the second latch site: the flag's meaning is unchanged —
+   * *the player asked for play on purpose* — and a deliberate run-start is that, by a door that is
+   * not the overlay. What still never latches is everything § D232 and issue #117 closed: boot's
+   * own `runShift()`, Resume, Escape, navigation, and the menu's configuration arms
+   * (`set-calendar` re-runs the shift under the overlay to keep the stage honest, and choosing a
+   * calendar is not asking for a day to count).
    */
   let playerHasChosen = false;
   /**
@@ -730,6 +837,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * {@link playerHasChosen} for the half that must not follow it, and for what happened when it did.
    */
   let menuHasBeenDismissed = false;
+  /**
+   * Whether any day has been filed **in this sitting** — `docs/19` defect 14's missing fact.
+   *
+   * `restoreSession` brings the week's banked days back and deliberately not their sheets (the
+   * argument is `dev/reportPanel.ts#emptyReportView`'s), so after a reload the rail says *on a
+   * roll · 1/1 banked* over a sheet reading *Nothing filed yet* — both true, and nothing on the
+   * screen connecting them. `state.week.history` cannot tell that state from mid-session play: the
+   * history is non-empty five minutes after any day closes. This flag is the difference — written
+   * once, where {@link closeShift} files, and read only by {@link viewAt}'s `unfiledSheet` facts.
+   * Never reset: a sitting that has filed a day has a sheet-shaped memory to lose, and one that
+   * has not, has not.
+   */
+  let filedThisSitting = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -760,8 +880,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
    * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
    * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
+   *
+   * Opens on {@link DEFAULT_BASE_SPEED} and returns to it on every **mode entry** — see
+   * {@link resetTransportSpeed} for the boundary and its argument (`docs/19` defect 12).
    */
-  let baseSpeed = 60;
+  let baseSpeed = DEFAULT_BASE_SPEED;
 
   /* ---------------------------------------------------------------------- *
    * The menu — § D214 § 2, and the non-test caller of `menu/`
@@ -823,6 +946,111 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * than one place and baking the origin in would need a rebuild per deployment. The tag is
    * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
    */
+  /**
+   * Fix-a-building — GAMEPLAY § 10, mounted like the menu: a TypeScript-built overlay, so
+   * `index.html` and `elementMap.test.ts`'s contract are untouched. The case file is fetched on
+   * first open (`loadFixitCases`'s own note on why it is not part of boot).
+   */
+  const fixitPanel = mountFixitPanel({
+    document,
+    resources,
+    loadCases: () => loadFixitCases(resources),
+  });
+
+  /**
+   * Watching somebody else's run — GAMEPLAY § 14.1, Everyday Mode slice 8.
+   *
+   * Mounted like the Fix-a-building overlay and for the same reasons, with one addition: the
+   * spectator **chrome** is not an overlay. § 14.1's differentiation is structural, so the strip is
+   * inserted into the page above the header — `parentElement?.insertBefore`, this package's one
+   * insertion idiom — and the header itself is inverted by a class while a run is being watched.
+   *
+   * `simulate` is `recordRun` on the main thread rather than through `shiftRunner`. That is the
+   * same trade `dev/fixitPanel.ts` states: a run costs ~0.2–1.5 s on the shipped buildings, the
+   * whole output is one replay, and a worker round-trip for it is complexity this slice does not
+   * need. Named as a limitation rather than discovered.
+   */
+  const watchPanel = mountWatchPanel({
+    document,
+    resources,
+    stateNow: () => state,
+    loadReferenceRuns: () =>
+      loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
+    simulate: (config) => recordRun(config).recording,
+    buildingNameOf: (id) => buildingNameOf(resources, state.savedBuildings, id),
+    dispatcherNameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+    onWatch: (run, view, recording) => {
+      enterWatch(run, view, recording);
+    },
+    onPlayThisCrowd: (run) => {
+      playThisCrowd(run);
+    },
+    onStopWatching: () => {
+      stopWatching();
+    },
+  });
+  {
+    /*
+     * Above the header, so the inverted strip and the inverted header read as one block — and
+     * **inside a band of their own**, which is `docs/20` defect 12 and a layout bug rather than a
+     * styling preference.
+     *
+     * `.shell` is `grid-template-rows: auto 1fr auto` over exactly three children: the header, the
+     * body, the footer. Inserting the strip as a fourth child *before* the header shifts all three
+     * down a track — the strip takes the leading `auto`, **the header takes the `1fr`**, the body
+     * takes the trailing `auto` and the footer lands in an implicit row — inside a `height: 100vh`
+     * box with `overflow: hidden`. What a player sees is the strip and the header contending for
+     * the top of the page with the wordmark, Menu and clock clipped, which is what the audit
+     * photographed (`61-watching.png`).
+     *
+     * So the two go into one band that occupies the header's own track, and the grid is back to
+     * three children whether or not anybody is watching. The band is inserted with
+     * `parentElement?.insertBefore` — this package's one insertion idiom — before the header is
+     * moved into it. No rule in `index.html` selects the header as a child of `.shell` (there is no
+     * `.shell > *` rule at all), so nothing about the header's own styling moves with it, and
+     * `ui.header.right.closest('header')` — how every other reader finds the header — does not care
+     * about depth. `min-width: 0` is the ordinary grid-item guard: without it the band's minimum
+     * content size would stop `.topbar`'s own ellipsis from ever engaging.
+     */
+    const headerEl = ui.header.right.closest('header');
+    if (headerEl !== null) {
+      const band = el(document, 'div', { className: 'watch-band', style: { 'min-width': '0' } });
+      headerEl.parentElement?.insertBefore(band, headerEl);
+      band.append(watchPanel.chrome, headerEl);
+    }
+  }
+
+  /**
+   * The canvas pill — § 14.1's *"a pill, top left"*.
+   *
+   * Absolutely positioned over `.stage-wrap`, which is given `position: relative` at mount time. A
+   * relative block container lays out exactly as a static one, so nothing on the page moves; what
+   * it buys is that the pill sits **on** the stage rather than above it, which is where § 14.1 puts
+   * it and the only place a spectator's eye is guaranteed to be.
+   */
+  const watchPill = el(document, 'div', {
+    className: 'watch-pill',
+    style: {
+      display: 'none',
+      position: 'absolute',
+      top: '10px',
+      left: '10px',
+      'z-index': '5',
+      background: '#23201C',
+      color: '#FBF7EF',
+      padding: '4px 10px',
+      'border-radius': '999px',
+      font: '11px/1.2 system-ui, sans-serif',
+      'letter-spacing': '0.06em',
+      'pointer-events': 'none',
+    },
+  });
+  {
+    const stageWrap = ui.stage.canvas.parentElement;
+    stageWrap?.style.setProperty('position', 'relative');
+    stageWrap?.insertBefore(watchPill, ui.stage.canvas);
+  }
+
   const apiOrigin =
     document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
   const client = apiOrigin === '' ? undefined : createClient(apiOrigin, fetchTransport(fetch));
@@ -952,14 +1180,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     {
       /*
-       * 120 s: checking watch → taking the stairs, and the rung that stops blaming the cold start.
+       * 120 s: checking watch → eyeing the stairs, and the rung that stops blaming the cold start.
        * A sleeping container was measured at 32.2 s; four times that is not a cold start any more,
        * and going on saying *it is just waking up* would be a reassurance that had stopped being
        * true — which this repository has a standing rule about.
        */
       afterMs: 120_000,
       text:
-        'Two minutes — your mood bar’s last band, taking the stairs, where a tenant gives up. You ' +
+        'Two minutes — your mood bar’s last band, eyeing the stairs, where a tenant starts ' +
+        'looking for another way up. You ' +
         'do not have that option, and a cold start was measured at about half a minute, so this is ' +
         'no longer a sleeping server. Nothing you typed is lost.',
     },
@@ -1531,6 +1760,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // A mode is being entered, so the chip latched in the last one does not travel — docs/19
+        // defect 12, and {@link resetTransportSpeed} owns the boundary.
+        resetTransportSpeed();
         runShift();
         /*
          * After `runShift` and drawn on its own, for the building select's reason: `runShift` spends
@@ -1581,7 +1813,34 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = enterEndless(state);
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
+        return;
+
+      case 'open-fixit':
+        /*
+         * The overlay opens over whatever is running; nothing behind it is torn down, so leaving
+         * it lands back on the shift exactly as it was — which is what the row's `presentation`
+         * scope promises. The menu closes the way `open-campaign` closes it: the player chose a
+         * surface, and two overlays stacked would each claim Escape.
+         */
+        closeMenu('entered-a-mode');
+        fixitPanel.open();
+        return;
+
+      case 'open-watch':
+        /*
+         * `open-fixit`'s arm exactly, and for its reasons: the overlay opens over whatever is
+         * running, nothing behind it is torn down, and the menu closes because two overlays
+         * stacked would each claim Escape.
+         *
+         * Opening the picker enters **nothing** — a row's `Watch it` does, through
+         * `enterWatch`. That split is why the menu row's scope is `presentation`: a list of runs
+         * changes no run.
+         */
+        closeMenu('entered-a-mode');
+        watchPanel.open();
         return;
 
       case 'reopen':
@@ -1640,6 +1899,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
         return;
       }
@@ -1729,6 +1990,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         state = { ...state, tab: 'run' };
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
         return;
 
@@ -2030,6 +2293,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * refusal that exists only in a disabled button is a refusal one keyboard route away from not
      * existing.
      */
+    /*
+     * **The run on screen has to be the run this shell simulated** — Everyday Mode slice 8, and the
+     * same object-identity gate `closeShift` already uses.
+     *
+     * Found while wiring the spectator state, and it is **not only** about watching. `submitScore`
+     * posts `claimedMetricsOf(recording.summary)` — the metrics of whatever is on screen — under
+     * `state.buildingId`, `state.dispatcherId` and `state.seed`, which are the **player's own**
+     * selection. Those two describe the same run for a run this shell simulated and describe
+     * different runs for any other:
+     *
+     * - while **watching**, `state.recording` is somebody else's day and the selection is the
+     *   spectator's;
+     * - for a recording **loaded from a file** (issue #136), they have never agreed, and that hole
+     *   predates this slice.
+     *
+     * Either way the server replays the submitted seed, does not reproduce, and answers
+     * `422 metrics-do-not-reproduce` — *"this product's one accusation, aimed at a player who did
+     * nothing wrong"*, which is `scope/runIdentity.ts`'s own sentence about exactly this shape.
+     * `runIdentityIssues` below cannot see it: it inspects the **state**, and the state is
+     * perfectly reproducible. What is wrong is the *recording beside it*.
+     *
+     * So the gate is `bankingRefusalFor`, reused rather than restated — one answer to *is the run on
+     * screen this shell's own?*, now asked by both the thing that banks a day and the thing that
+     * posts one.
+     */
+    const notOurs = bankingRefusalFor(recording, simulatedRecording);
+    if (notOurs !== null) {
+      accountState = withNotice(accountState, `This run cannot be posted: ${notOurs}.`);
+      drawMenu();
+      return;
+    }
+
     const identity = runIdentityIssues(state, resources, 'ranked');
     if (identity.length > 0) {
       accountState = withNotice(
@@ -2147,6 +2442,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return {
         hasRun: state.recording !== undefined,
         rankingRefusal: issues.length === 0 ? undefined : issues.map((issue) => issue.message).join('; '),
+        /*
+         * Whether the shift behind the overlay is one the player has any relationship with —
+         * `docs/19`'s Resume copy nit. On a **genuinely first** load the recording on screen is
+         * boot's own (issue #97 requires Resume enabled over it), yet *"Back to the shift on
+         * screen"* claims a shift the player has never seen. Two facts only this file holds
+         * decide it: the menu has been dismissed this sitting ({@link menuHasBeenDismissed} —
+         * they have been out there), or the session restored (`!loadedWithNothingRestored` — a
+         * previous sitting's shifts are theirs). `menu/screens.ts#resumeRow` words the row; this
+         * carries the facts, which is the split every panel keeps.
+         */
+        everLeftTheMenu: menuHasBeenDismissed || !loadedWithNothingRestored,
       };
     },
   };
@@ -2240,7 +2546,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * anything, and un-gating `closeShift` from Resume let that recording be filed as a real day and
    * become the baseline the *next* run was differenced against — #117's phantom `was`.
    *
-   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode.
+   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode
+   * — this overlay's half of the question; {@link playerStartedARun} is the other latch site, for
+   * a run the player starts from the shell itself (`docs/19` defect 1).
    * The two are still latched **here** rather than in the five arms, which is the property the
    * previous docstring was protecting and it survives: a sixth way out of the overlay cannot forget
    * to answer, because {@link exit} is a required parameter with two values and no default. That is
@@ -2265,6 +2573,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawMenu();
   }
 
+  /**
+   * The filing gate's second latch site: the player started a run on purpose — `docs/19` defect 1.
+   *
+   * {@link closeMenu} latches {@link playerHasChosen} where a mode is entered, and that set was
+   * complete only for players who never reload: after a reload the natural way out is **Resume**
+   * (a change of mind, correctly no latch), and every run then started with **Run this shift**,
+   * *Save it and run it*, *Open the doors on tomorrow* or a scenario card completed and silently
+   * failed to file. Those controls are this function's two callers:
+   *
+   * - `wireTransport`'s Run button — the control the empty sheet's own copy names; and
+   * - `MountContext.runShift` — the one seam every panel's explicit run-this press goes through
+   *   (the scenario cards, the dispatcher editor's *Save it and run it*, the report's next-day
+   *   button, the right rail's re-run cards, the building and traffic editors' apply-and-run).
+   *
+   * Latching **here** and not inside {@link runShift} is the § D232 line held: `runShift` is also
+   * boot's own call and the menu's `set-calendar` refresh, and a latch inside it would let a page
+   * nobody chose to play file boot's recording — issue #117's phantom, restored by the fix for its
+   * shadow. The latch is on the press, before the worker answers, because the choice is the press:
+   * a run that then refuses or is cancelled changes what is on stage, not what the player asked
+   * for.
+   */
+  function playerStartedARun(): void {
+    playerHasChosen = true;
+  }
+
   drawMenu();
 
   /**
@@ -2275,6 +2608,117 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * `aria-pressed`, written by {@link setLooping} and read by nothing — one source, one writer.
    */
   let looping = false;
+
+  /* ---------------------------------------------------------------------- *
+   * The race — GAMEPLAY §7.4, Everyday slice 4d
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Who the player is racing — closure state on `bankFilter`'s and {@link looping}'s precedent,
+   * deliberately **not** a `ViewerState` field: the pick changes which *comparison* recording is
+   * made and never a leg of the player's own run, so persisting it or probing it as a run input
+   * would claim an effect it does not have. It seeds `'none'` so boot costs no second simulation
+   * — *nobody* is simply not issuing the second request (`dev/ghostRun.ts`).
+   */
+  let ghostPick: GhostPick = 'none';
+  /**
+   * The rival's finished recording, adopted **read-only beside** the primary — never assigned to
+   * `state.recording` or {@link simulatedRecording}, so `bankingRefusalFor`'s identity gate
+   * refuses it by construction and it can touch neither `dayClosed`, the week, nor the board.
+   * `ghostRun.test.ts` asserts that refusal on a real pair rather than trusting this sentence.
+   */
+  let ghostRecording: VizRecording | undefined;
+  /** Why the pick produced no run (`ghostPlanOf`'s `refused` arm), for the verdict slot. */
+  let ghostRefusal: string | undefined;
+  /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
+  let ghostInFlight = false;
+  /** The plan behind the run on screen, held so a pick change can re-race without re-planning. */
+  let lastShiftPlan: ShiftRunConfig | undefined;
+  /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
+  let lastRaceKey = '';
+
+  /* ---------------------------------------------------------------------- *
+   * Watching somebody else's run — GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Everything the shell has to put back when `⤺ Stop watching` is pressed.
+   *
+   * § 14.1: *"stopping the watch returns you exactly where you were."* That is a promise about
+   * **state**, not about a redraw, and the only way to keep it is to hold the state rather than to
+   * recompute it — a rebuild would put the player back on *a* run rather than on *their* run, at
+   * whatever playhead the rebuild happened to produce.
+   *
+   * The playhead is in here for exactly that reason and is the field a reader is most likely to
+   * think unnecessary. It is the one a spectator visibly loses: `adopt` builds a fresh `Playback`
+   * at the start of the recording, so without this a player who paused their own day at 09:41 to
+   * look at somebody else's would come back to 06:00 on a run they had already watched two-thirds
+   * of. `main.test.ts` asserts the round trip on all four — recording, report, week and playhead.
+   */
+  interface WatchedBefore {
+    readonly state: ViewerState;
+    /*
+     * {@link simulatedRecording} is deliberately **not** in here, and its absence is the design.
+     *
+     * The obvious snapshot saves it, clears it and puts it back — and that would make this the
+     * second writer of a field `main.progression.test.ts` requires to have exactly one, which it
+     * caught on the first run of this code. The guard is right and the shape was wrong: a watch
+     * never touches the field at all. While watching, `state.recording` is the watched run and
+     * `simulatedRecording` is still the player's own, so `bankingRefusalFor`'s identity comparison
+     * fails and refuses; on stop, `state.recording` becomes the player's own run again — the same
+     * object — and the comparison succeeds without anything having been restored.
+     *
+     * So the spectator lock is *the field not moving*, which is a stronger guarantee than a
+     * save-and-restore: there is no window in which a bug could put it back early.
+     */
+    readonly ghostRecording: VizRecording | undefined;
+    readonly ghostRefusal: string | undefined;
+    readonly ghostPick: GhostPick;
+    readonly startOfDayS: number | undefined;
+    readonly filedRunId: string | undefined;
+    readonly playheadS: number | undefined;
+    /**
+     * Whether the player's own run was **playing** when they left it.
+     *
+     * The playhead alone is not *"exactly where you were"*, and the browser tier is what said so: a
+     * player who had paused at 08:30 came back to 08:31 and climbing, because `adopt` autoplays.
+     * One second of drift is not a rounding artefact — it is a run that resumed on its own, which
+     * is the same class of surprise as the speed chip latching across a mode (`docs/19` defect 12).
+     */
+    readonly wasPlaying: boolean;
+    /**
+     * The speed chip the player had latched — `docs/20` defect 10, and the same defect `docs/19`
+     * defect 12 found one mode door over.
+     *
+     * Entering a watch is a **mode entry**: the run on the stage is a different day, of a different
+     * length, that the player did not start. The chip they latched belongs to the thing they left,
+     * and at ×900 a shipped reference run is over about a second and a half after `Watch it` — the
+     * audit measured 06:22 of a record ending ~06:26. So {@link enterWatch} calls
+     * {@link resetTransportSpeed} exactly as every other mode door does.
+     *
+     * It is saved here for the *other* half of § 14.1, which the mode doors have no equivalent of:
+     * *"stopping the watch returns you exactly where you were."* A reset with no restore would put
+     * the player back on their own run at a speed they never chose — the same surprise, aimed the
+     * other way — so the chip goes back with the playhead and the pause state.
+     */
+    readonly baseSpeed: number;
+  }
+
+  /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
+  let watching:
+    | { readonly run: WatchableRun; readonly view: WatchingView; readonly before: WatchedBefore }
+    | undefined;
+
+  /**
+   * Whether the shell is in the spectator state — the one question every disabling reads.
+   *
+   * A function over one field rather than a second boolean, because two facts that must agree is
+   * how a control comes to be enabled during a watch: `docs/16` S1's rule, and the reason
+   * `ViewerState.playMode` is a field rather than an inference one module over.
+   */
+  function isWatching(): boolean {
+    return watching !== undefined;
+  }
 
   const clock = systemClock();
 
@@ -2305,6 +2749,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * greying the transport out would give back the thing that was bought.
        */
       ui.coach.run.textContent = running ? 'Cancel this run' : 'Run this shift';
+      /*
+       * Whatever ends, the rival is no longer in flight — completion clears it in the ghost
+       * job's own callback, and this is the one hook that also sees a cancel and a failure, so
+       * the race strip's *waiting* line can never outlive the run it was waiting for.
+       */
+      if (!running) ghostInFlight = false;
     },
     onFailed: (message) => {
       failRun(message);
@@ -2340,6 +2790,84 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let legendCountCells: readonly HTMLElement[] = [];
 
   /* ---------------------------------------------------------------------- *
+   * The intervention strip — Everyday Mode slice 3 (contract § 1.4, § 7.6)
+   * ---------------------------------------------------------------------- */
+
+  /*
+   * The stage's one intervention control and the stamp beside it, built here on
+   * `dispatcherEditor.ts`'s precedent because the canonical markup has no block for them, and
+   * inserted **above the stage and under the coach ribbon** — the ribbon is this surface's
+   * header, and § 7.6 puts the most recent intervention's stamp under the header. Sibling-insert
+   * via `parentElement?.insertBefore`, the idiom every other mount uses and the one the DOM test
+   * recorders answer; the words live in `live/interventions.ts`, pure and honesty-swept, and this
+   * block only decides which element they go in.
+   *
+   * Pressing the button appends `{ atS: playhead, change: park-cars-lobby }` to the state's log
+   * and re-runs the day — the whole § 1.4 mechanism: re-simulate from t = 0, prefix bit-identical
+   * by construction (`sim/interventions.test.ts`), playback resumed at the same playhead by the
+   * `seekTo` in the run's own callback. The seek happens *after* `applyShift` has adopted the new
+   * recording, so it lands on the recording it describes rather than on the one being replaced.
+   *
+   * **`applyShift` still clears `report` and `tomorrow`, deliberately.** An intervention is not a
+   * new day — but the sheet and the beat are accounts of a *recording*, and the recording they
+   * described has just been replaced; a sheet left standing would caption a run that is no longer
+   * on screen, which is § D223's stale-sheet defect. The day itself is untouched: `week` does not
+   * move, and the re-run day files again through the ordinary `closeShift` gate when its playhead
+   * runs out.
+   */
+  const interventionStamp = el(document, 'span', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { color: 'var(--dim)', 'font-size': '11.5px' },
+  });
+  const interventionButton = el(document, 'button', {
+    className: 'chip',
+    text: PARK_CARS_LOBBY_LABEL,
+    attrs: {
+      type: 'button',
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        'everything before this moment is unchanged, and playback resumes here',
+    },
+  });
+  const interventionStrip = el(document, 'div', {
+    style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
+    children: [interventionButton, interventionStamp],
+  });
+  {
+    // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
+    const stageWrap = ui.stage.canvas.parentElement;
+    stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
+  }
+
+  interventionButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    const atS = playback.simTimeS;
+    state = {
+      ...state,
+      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
+    };
+    renderAll();
+    runShift(() => {
+      // After adopt: the new Playback exists by the time a run lands, and seeking does not
+      // start or stop playback — a reader who was paused stays paused at the stamped instant.
+      playback?.seekTo(atS);
+    });
+  });
+
+  /** The strip's two live facts: whether the control can act now, and the latest stamp. */
+  function drawIntervention(view: ViewAt): void {
+    const hasRun = view.recording !== undefined;
+    // Disabled rather than hidden while no run is on screen: a control that cannot act now says
+    // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
+    interventionButton.disabled = !hasRun;
+    setText(
+      interventionStamp,
+      interventionStampOf(view.state.interventions, view.simTimeS, runStartOfDayS),
+    );
+  }
+
+  /* ---------------------------------------------------------------------- *
    * The mount context — the only thing a panel may do to the world
    * ---------------------------------------------------------------------- */
   const context: MountContext = {
@@ -2364,12 +2892,42 @@ function boot(ui: Elements, resources: BrowserResources): void {
       renderAll();
     },
     runShift(onRan) {
+      /*
+       * Every call through this seam is a panel answering an explicit press whose meaning is
+       * *make this run happen* — so it is one of {@link playerStartedARun}'s two sites, and the
+       * gate `closeShift` keeps cannot swallow a run the player asked a panel for (`docs/19`
+       * defect 1). Boot and the menu's own refreshes call the closure `runShift` directly and
+       * never come through here.
+       */
+      playerStartedARun();
       runShift(onRan);
+    },
+    enterMode() {
+      /*
+       * A panel announcing a **mode entry** — today the scenario cards, the one mode door that
+       * does not pass through `dispatchMenu`'s arms. The shell-owned transport state resets here
+       * and nowhere on the ordinary run path; {@link resetTransportSpeed} owns the boundary and
+       * the argument (`docs/19` defect 12).
+       */
+      resetTransportSpeed();
     },
     openTab(tab) {
       const revealed = new Set(state.revealedTabs);
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
+      /*
+       * **A navigation dismisses the drawer** — `docs/19` defect 6. Below the breakpoint the
+       * right rail is an overlay covering the editor column, so *Open dispatcher editor →* opened
+       * the editor **behind** the drawer that launched it, with "EDITING — …" truncated under the
+       * panel the player had to know to close. Leaving for a surface is the reader saying *show me
+       * that surface*, so the overlay yields — every navigation comes through here, which is what
+       * makes this one write cover the four `Open … editor` links, the report's lever cards and
+       * the tab strip alike. Column mode is untouched: there the rail occludes nothing and
+       * `drawerOpen` is the remembered choice `drawerStateFor`'s docstring protects.
+       */
+      if (drawerStateFor(window.innerWidth, state.drawerOpen).isDrawer && state.drawerOpen) {
+        state = { ...state, drawerOpen: false };
+      }
       /*
        * **A navigation files a day only when the day has been played out** — § D232, closing the
        * half § D223 named and could not reach from its own lane.
@@ -2421,6 +2979,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * an edit takes effect on the next Run rather than re-running under the reader.
    */
   const selectorEditor = mountSelectorEditor(ui.selectorEditor, context);
+  /*
+   * The Everyday rules editor, beneath the selector — GAMEPLAY §11.5. The same footing as the
+   * selector in every respect: applied over whoever is driving, next-run rather than mid-run,
+   * and when rules are written they take the run (`rulesOverrideNoteOf` on the selector panel is
+   * the other half of that sentence).
+   */
+  const ruleEditor = mountRuleEditor(ui.ruleEditor, context);
   const trafficEditor = mountTrafficEditor(ui.trafficEditor, context);
   const machinesEditor = mountMachinesEditor(ui.machinesEditor, context);
   const buildingEditor = mountBuildingEditor(ui.buildingEditor, context);
@@ -2430,6 +2995,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     scenariosPanel,
     dispatcherEditor,
     selectorEditor,
+    ruleEditor,
     trafficEditor,
     machinesEditor,
     buildingEditor,
@@ -2505,6 +3071,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
   });
 
   /*
+   * The suite, beside the bench — Everyday Mode slice 7 (docs/18 § Slice 7). One comparison over
+   * ticked matrix cells; the ticks render from `MATRIX_CELLS` inside the mount, so nothing here
+   * or in `index.html` retypes the fixture list. It inherits nothing from the viewer on purpose:
+   * a suite's cells fix the building and the traffic, which is the point of a fixed fixture list.
+   */
+  mountSuitePanel({ elements: ui.suite, resources });
+
+  /*
    * The campaign needs its own data file, which is fetched separately. A page that could not load
    * it must still be a page — the campaign is one of ten surfaces — so the failure is reported in
    * that surface's own alert slot and the other nine come up.
@@ -2529,6 +3103,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   wireNavigation();
   wireCoach();
   wireTransport();
+  wireRaceStrip();
   wireHeaderAndFooter();
   wireKeyboard();
   wireStageClicks();
@@ -2631,6 +3206,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
       resources,
       recording,
       simTimeS,
+      // The header clock's own hour, on the view so every panel prints the same one — `docs/19`
+      // defect 2. See {@link runStartOfDayS} for when it is `undefined`.
+      startOfDayS: runStartOfDayS,
       /*
        * The **last run's** building while a run is on screen, and the building the state is
        * pointing at when there is not — § D234, issue #36.
@@ -2645,7 +3223,44 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
+      /*
+       * The spectator fact, on the view because the rail needs it and cannot reach this closure —
+       * see {@link ViewAt.watching}. Through {@link isWatching} rather than `watching !== undefined`
+       * inline, so there is one answer to *is this somebody else's run* on both sides of the render.
+       */
+      watching: isWatching(),
+      unfiledSheet: unfiledSheetFacts(recording, simTimeS),
     };
+  }
+
+  /**
+   * Why the Day report is empty while the screen suggests otherwise — the two closure facts
+   * `ViewAt.unfiledSheet` exists to carry (`docs/19` defects 1 and 14), computed here because
+   * {@link playerHasChosen}, {@link simulatedRecording} and {@link filedThisSitting} live in this
+   * closure and no panel may.
+   *
+   * The refusal arm answers only for a run that has **run out**: short of `endedAt` the panel's
+   * watching sheet is already the honest account, and a refusal about a day still playing would be
+   * the § D223 defect in a new coat. The two grounds are asked in `closeShift`'s own order —
+   * issue #136's first, § D232's second — so the sentence on the empty sheet is the sentence the
+   * gate actually refused on. `runProgressOf` is the one played-out predicate, not a re-derivation
+   * (§ D223's two-answers rule); it is called on the pair directly rather than through
+   * {@link playheadHasRunOut} because that helper builds a `ViewAt`, and this runs inside one.
+   */
+  function unfiledSheetFacts(
+    recording: VizRecording | undefined,
+    simTimeS: number,
+  ): UnfiledSheetFacts | undefined {
+    if (state.report !== undefined) return undefined;
+    const ranOut =
+      recording !== undefined && runProgressOf({ recording, simTimeS }).kind === 'played-out';
+    const refusal = !ranOut
+      ? undefined
+      : (bankingRefusalFor(recording, simulatedRecording) ??
+        (playerHasChosen ? undefined : UNCHOSEN_RUN_CANNOT_BANK));
+    const fromPreviousSitting = !filedThisSitting && state.week.history.length > 0;
+    if (refusal === undefined && !fromPreviousSitting) return undefined;
+    return { refusal, fromPreviousSitting };
   }
 
   /** Everything. Runs when the state changed. */
@@ -2661,7 +3276,111 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawTransportChrome(view);
     drawParity();
     drawLegend(view);
+    drawRaceStrip(view);
+    drawIntervention(view);
+    drawWatching();
     drawStage();
+  }
+
+  /**
+   * Everything § 14.1's differentiation table asks the **shell** for — drawn from one value, and
+   * cleared by the same function.
+   *
+   * ## Why one function rather than a clause in each of the six draws
+   *
+   * Because the table is a single claim — *this is not your run* — and six independently-guarded
+   * clauses is six chances for one of them to stay behind. § 14.1's own sentence is that a
+   * spectator who cannot tell whose day they are looking at makes the whole board untrustworthy;
+   * the failure mode that produces is a header that reverted while the pill did not, which is worse
+   * than either treatment alone.
+   *
+   * So: one read of {@link watching}, every surface written on both arms, and `main.test.ts`
+   * asserts the whole set appears and disappears together.
+   *
+   * ## The three disablings, and why two of them are not new flags
+   *
+   * `interventionButton` and the ghost `select` are disabled here — contract § 1.5: *"Interventions
+   * are replayed, not offered. The intervention API is disabled in this context; playback controls
+   * (pause, the five speeds) are not interventions."* The transport is therefore **left alone**,
+   * which is the half of that sentence a disabling sweep would have got wrong.
+   *
+   * The third — *a watched run cannot be closed, banked or posted* — has no line here at all,
+   * deliberately. `enterWatch` never writes {@link simulatedRecording}, so `bankingRefusalFor`
+   * refuses the run by object identity and `closeShift` returns before it writes anything. A flag
+   * checked here would be a second answer to a question the product already answers, and the second
+   * answer is the one that goes stale.
+   */
+  function drawWatching(): void {
+    const view = watching?.view;
+    const headerEl = ui.header.right.closest('header');
+    headerEl?.classList.toggle(WATCHING_HEADER_CLASS, view !== undefined);
+    if (headerEl !== null && headerEl !== undefined) {
+      // The inverted treatment — § 14.1's *"the single strongest signal"*. Inline rather than in
+      // `index.html`'s stylesheet for `waitLiveRegion`'s stated reason: the sheet is not this
+      // lane's to edit, and the class above is what a future sheet would hook.
+      headerEl.style.setProperty('background', view === undefined ? '' : '#23201C');
+      headerEl.style.setProperty('color', view === undefined ? '' : '#FBF7EF');
+    }
+    watchPanel.showChrome(view, watching?.run);
+    watchPill.style.display = view === undefined ? 'none' : 'block';
+    setText(watchPill, view?.pill ?? '');
+    /*
+     * § 14.1's rail subline, `WATCHING · <NAME>`, and § 14.1's *"no timeline"*. The timeline is
+     * **hidden rather than disabled**: the table says *no timeline*, and a greyed-out scrubber is
+     * still a timeline telling a spectator that the four-step day is theirs to close.
+     */
+    /*
+     * **Both the attribute and the inline display**, and the pair is a finding rather than belt and
+     * braces. `index.html` gives `#timeline` a `display` of its own, which is more specific than the
+     * user-agent's `[hidden] { display: none }` — so the attribute alone left the scrubber on
+     * screen, and the browser tier caught it on its first run. The attribute stays because it is
+     * what an assistive technology reads; the inline rule is what actually removes it.
+     */
+    ui.transport.timeline.hidden = view !== undefined;
+    ui.transport.timeline.style.setProperty('display', view === undefined ? '' : 'none');
+    /*
+     * § 14.1's rail subline replaces the phase pill, which is the element that carries
+     * `MID-DAY · 08:41` — the table's own example. **Written after `drawHeader`** in both render
+     * paths rather than branched inside it, so the header keeps one derivation of the phase and
+     * this keeps one derivation of the spectator treatment; `drawHeader` re-writes the pill on
+     * every live frame and this re-writes it back, which is why it is in `renderLive` too.
+     */
+    if (view !== undefined) setText(ui.header.phaseLabel, view.railSubline);
+    // Contract § 1.5 — the intervention API is disabled, the playback controls are not.
+    if (view !== undefined) interventionButton.disabled = true;
+    ui.race.ghost.disabled = view !== undefined;
+    /*
+     * **The picker is hidden, not merely disabled** — § 14.1's *"no verdict — you are not in this
+     * comparison"*, and `docs/20` defect 7's least obvious half. A disabled `<select>` still
+     * renders its own selected option, and one of the three is `your latest saved`: the rule the
+     * section states is about the word on the screen, not about which controls respond.
+     *
+     * **The attribute and the inline display**, exactly as the timeline above needs both and for
+     * the identical reason: `index.html` gives `.race-pick` a `display: inline-flex` of its own,
+     * which is more specific than the user-agent's `[hidden] { display: none }`. The attribute
+     * alone left the whole picker — label, control and all three option texts — on the screen, and
+     * the browser tier caught it on the first run of this sweep.
+     */
+    setHidden(ui.race.pick, view !== undefined);
+    ui.race.pick.style.setProperty('display', view === undefined ? '' : 'none');
+
+    /*
+     * The four shell surfaces § 14.1's table does not name — `watch/shell.ts`, `docs/20` defect 7.
+     *
+     * They are written **here** rather than in the four draws that own the elements, for
+     * `drawWatching`'s own stated reason: the differentiation is a single claim, and four
+     * independently-guarded clauses is four chances for one of them to stay behind. Both arms are
+     * written on every call, so nothing can be left saying `Your run` over a stranger's day.
+     *
+     * The Day report's note is `hidden` on the player's arm rather than emptied, because an empty
+     * bordered box is a slot that looks like it failed to fill.
+     */
+    const copy = view === undefined ? PLAYER_SHELL_COPY : shellWatchingCopyOf(view);
+    setText(ui.race.youName, copy.raceKey);
+    setText(ui.shift.eyebrow, copy.railEyebrow);
+    setText(ui.shift.runNote, copy.railNote);
+    setText(ui.report.spectatorNote, copy.reportNote);
+    setHidden(ui.report.spectatorNote, copy.reportNote === '');
   }
 
   /**
@@ -2714,6 +3433,188 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
   }
 
+  /* ---------------------------------------------------------------------- *
+   * The race strip — GAMEPLAY §7.4, Everyday slice 4d
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Issue the rival's run — a second recording of the same crowd, through the same worker.
+   *
+   * Called from `runShift`'s own delivery callback, **after** the player's run has landed and
+   * been drawn: sequential by construction, so the primary is never contended, and cancel-safe
+   * by the runner's own rule — a new primary ask supersedes the rival (*the latest ask wins*),
+   * and the Run button's cancel face stops it like any other run. A rival result arriving for a
+   * day that has since been replaced is dropped by the identity guard below, which is
+   * `bankingRefusalFor`'s object-identity move applied one step earlier.
+   *
+   * The config is the primary's own with the dispatcher swapped (`dev/ghostRun.ts` — same
+   * building, same demand, same seed: the same crowd, which is the whole of CRN). The rival's
+   * recording is adopted **read-only beside** the primary: never `state.recording`, never
+   * {@link simulatedRecording}, so it cannot file, bank, or close a day.
+   */
+  function scheduleGhost(plan: ShiftRunConfig, primaryRecording: VizRecording): void {
+    const ghost = ghostPlanOf(resources, state.savedDispatchers, plan.config, ghostPick);
+    if (ghost.kind === 'none') return; // nobody is free: the second request is simply not made
+    if (ghost.kind === 'refused') {
+      ghostRefusal = ghost.reason;
+      lastRaceKey = '';
+      drawRaceStrip(viewAt());
+      return;
+    }
+    ghostInFlight = true;
+    shiftRunner.start({
+      label: `rival’s day — ${ghost.label}`,
+      config: ghost.config,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+      /*
+       * Off: the decision log is the primary run's surface, nothing reads a rival's decisions,
+       * and the rival's recording is already a second multi-megabyte clone crossing the thread.
+       */
+      recordDecisions: false,
+      cost: costOf(plan),
+      onDone: (recording) => {
+        ghostInFlight = false;
+        if (state.recording !== primaryRecording) return; // a later day superseded this race
+        ghostRecording = recording;
+        lastRaceKey = '';
+        drawRaceStrip(viewAt());
+      },
+    });
+  }
+
+  /** The two lanes' fixed logical boxes — the SVG `viewBox`es in `index.html`, exactly. */
+  const RACE_TOP_BOX = { width: 640, height: 64 } as const;
+  const RACE_BOTTOM_BOX = { width: 640, height: 40 } as const;
+
+  /**
+   * Draw the strip — words from `live/raceStrip.ts`, geometry from `raceLaneOf`, values only.
+   *
+   * Keyed rather than redrawn at 60 Hz: the lanes are §7.4's four-minute samples, so the drawing
+   * only changes when the playhead crosses a grid line, the run or rival changes, or the day
+   * runs out — {@link lastRaceKey} says which drawing is on screen and everything else is a
+   * no-op frame. The verdict therefore updates at the same four-minute cadence as the lanes it
+   * summarises (and once more at the very end), which keeps the strip's whole cost off the
+   * per-frame path a 22 000-leg recording would otherwise pay twice per frame.
+   *
+   * Both recordings are sampled at the **one** playhead — PT-F2's unified clock — so pause and
+   * speed drive both lines by construction; there is no second clock to drift.
+   */
+  function drawRaceStrip(view: ViewAt): void {
+    const recording = view.recording;
+    setHidden(ui.race.root, recording === undefined);
+    if (recording === undefined) return;
+    const ghost = ghostRecording;
+    const bucket = Math.floor((view.simTimeS - recording.startedAt) / RACE_SAMPLE_INTERVAL_S);
+    const key = [
+      recording.runId,
+      ghost?.runId ?? '',
+      ghostPick,
+      ghostRefusal ?? '',
+      ghostInFlight ? 'in-flight' : '',
+      String(bucket),
+      view.simTimeS >= recording.endedAt ? 'end' : '',
+    ].join('|');
+    if (key === lastRaceKey) return;
+    lastRaceKey = key;
+
+    const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
+    const option = GHOST_OPTIONS.find((entry) => entry.id === ghostPick);
+    /*
+     * The verdict slot, in honesty order: a refusal outranks everything (it says why there is no
+     * rival); a picked-but-absent rival says whether one is coming; and only a drawn rival — or
+     * the *nobody* pick, whose slot carries the plain figure — speaks through the view itself.
+     */
+    const verdict =
+      ghostRefusal ??
+      (stripView.ghost !== undefined || ghostPick === 'none'
+        ? stripView.verdict
+        : ghostInFlight
+          ? RACE_PENDING
+          : RACE_NOT_RUN);
+    setText(ui.race.verdict, verdict);
+    setText(ui.race.note, stripView.note);
+    setText(ui.race.footer, stripView.footer);
+    setHidden(ui.race.ghostKey, stripView.ghost === undefined);
+    setText(ui.race.ghostName, stripView.ghost === undefined ? '' : (option?.label ?? ''));
+
+    // One clock, one x-axis: the longer of the two spans, so the lines align instant for
+    // instant. `endedAt` is an outcome, so two runs of one crowd may legitimately differ.
+    const spanEndS = Math.max(recording.endedAt, ghost?.endedAt ?? recording.endedAt);
+    const top = raceLaneOf(
+      stripView.yours,
+      stripView.ghost,
+      (sample) => sample.standingWaitS,
+      RACE_TOP_BOX,
+      spanEndS,
+      60,
+    );
+    const bottom = raceLaneOf(
+      stripView.yours,
+      stripView.ghost,
+      (sample) => sample.standing,
+      RACE_BOTTOM_BOX,
+      spanEndS,
+      10,
+    );
+    ui.race.topYou.setAttribute('points', top.you);
+    ui.race.topGhost.setAttribute('points', top.ghost);
+    ui.race.sixty.setAttribute('y1', top.markY.toFixed(1));
+    ui.race.sixty.setAttribute('y2', top.markY.toFixed(1));
+    ui.race.bottomYou.setAttribute('points', bottom.you);
+    ui.race.bottomGhost.setAttribute('points', bottom.ghost);
+  }
+
+  /**
+   * The picker. Options come from `GHOST_OPTIONS` — the model's own honest three, never markup —
+   * with each option's one-line note as its `title`. The moved-control rule holds at the seam:
+   * a pick maps through `ghostPlanOf` to a different second recording (compared on the legs in
+   * `ghostRun.test.ts`), and *nobody* maps to no second request at all.
+   */
+  function wireRaceStrip(): void {
+    for (const option of GHOST_OPTIONS) {
+      ui.race.ghost.append(
+        el(document, 'option', {
+          text: option.label,
+          attrs: { value: option.id, title: option.note },
+        }),
+      );
+    }
+    ui.race.ghost.value = ghostPick;
+    ui.race.ghost.addEventListener('change', () => {
+      const value = ui.race.ghost.value;
+      ghostPick = GHOST_OPTIONS.some((option) => option.id === value)
+        ? (value as GhostPick)
+        : 'none';
+      ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
+      ghostRecording = undefined;
+      ghostRefusal = undefined;
+      lastRaceKey = '';
+      if (ghostPick === 'none') {
+        // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
+        // in flight is not ours to stop.
+        if (ghostInFlight) shiftRunner.cancel();
+        drawRaceStrip(viewAt());
+        return;
+      }
+      const primary = state.recording;
+      if (
+        lastShiftPlan !== undefined &&
+        primary !== undefined &&
+        /*
+         * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
+         * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
+         * of a *different* day beside it; the strip waits for a run this shell simulated.
+         */
+        primary === simulatedRecording &&
+        // A primary in flight will race this pick when it lands; only a rival may be superseded.
+        (!shiftRunner.isRunning() || ghostInFlight)
+      ) {
+        scheduleGhost(lastShiftPlan, primary);
+      }
+      drawRaceStrip(viewAt());
+    });
+  }
+
   /** Only what the playhead moves. Runs at 60 Hz. */
   function renderLive(): void {
     const view = viewAt();
@@ -2721,10 +3622,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawHeader(view);
     drawFooter(view);
     drawPlayhead(view);
+    // The status strip's register follows the playhead (`docs/19` defect 4): the whole-run line
+    // may not stand while the day is still playing. Writes only when the derived text changed,
+    // so the strip's transient messages survive — see drawTransportStatus.
+    drawTransportStatus();
     // The legend's counts are a reading at `t`, so they belong here and not only in `renderAll`.
     // Left out, the row would state the counts of whichever frame last changed the state — a
     // figure that is stale in exactly the way a scrubbing reader cannot see.
     drawLegend(view);
+    // The race strip follows the playhead the same way — and it keys itself on the four-minute
+    // sample grid, so most frames it is a string compare and nothing else.
+    drawRaceStrip(view);
+    // The stamp is a reading at `t` too: a reader who scrubs back past their own intervention
+    // must watch it disappear, because at that instant on the stage it has not happened yet.
+    drawIntervention(view);
+    // The spectator treatment, re-applied because `drawHeader` above has just overwritten the
+    // phase pill with the run's own phase. See `drawWatching` for why it is one function.
+    drawWatching();
     drawStage();
   }
 
@@ -2866,7 +3780,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * that left the strip on the previous mode's words would be the disclosure selector doing
        * three-quarters of something, which is worse to read than doing none of it.
        */
-      drawTransportStatus();
+      drawTransportStatus(true);
     });
     /*
      * The remembered mode, **unless the link named one**. A deep link is somebody sending a
@@ -2926,8 +3840,32 @@ function boot(ui: Elements, resources: BrowserResources): void {
         ? clockAt(0, runStartOfDayS)
         : clockAt(view.simTimeS, runStartOfDayS),
     );
-    const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
+    // The run's own hour, exactly as the clock two lines up — the pill's segment carries clocked
+    // titles, and a second call site on the default axis is how two clocks come back (defect 2).
+    const phase =
+      view.recording === undefined
+        ? undefined
+        : phaseAt(view.recording, view.simTimeS, { dayStartS: runStartOfDayS ?? DAY_START_S });
     setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
+    /*
+     * Slice 4b — the pattern the selector holds at the playhead, beside the phase pill and
+     * updating as the playhead crosses a switch, because it re-derives per frame from the
+     * recording exactly as the phase pill does. Hidden — not emptied — when the run built no
+     * detector or there is no run yet: the readout's `label` is `''` precisely then, and a
+     * visible empty pill would still *look* like a claim. The words come from the model
+     * (`PATTERN_NAMES`, rule 11), never a bare engine id.
+     */
+    const pattern =
+      view.recording === undefined
+        ? undefined
+        : patternReadoutAt(view.recording, view.simTimeS);
+    ui.header.patternLabel.hidden = pattern === undefined || pattern.label === '';
+    setText(ui.header.patternLabel, pattern?.label ?? '');
+    if (pattern !== undefined && pattern.title !== '') {
+      ui.header.patternLabel.setAttribute('title', pattern.title);
+    } else {
+      ui.header.patternLabel.removeAttribute('title');
+    }
     setText(
       ui.header.dayLabel,
       `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
@@ -2937,8 +3875,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
+  /**
+   * § 1.1 S4 — the counts at the playhead, and **whose run they are of**.
+   *
+   * ## The one branch, and why it is here rather than in `drawWatching`
+   *
+   * `docs/20` defect 7: while watching, this line read `paused · 363 arrived, 363 carried · lobby
+   * holder` with `seed 20260804 · day 1` beneath it — the *spectator's* dispatcher and the
+   * *spectator's* seed, under a strip headed `THEIR DISPATCHER Conventional collective`. The counts
+   * were right, because they come from the recording on the stage; the identity was wrong, because
+   * it came from `state`, and `watch/session.ts#watchingStateOf` deliberately leaves everything but
+   * `recording` alone. A spectator reading their own seed under somebody else's day is § 14.1's own
+   * *"will read the figures as their own"*, arriving through the one surface that names a run
+   * without describing it.
+   *
+   * The branch is **here** rather than in `drawWatching`, which owns every other spectator surface,
+   * because the identity is one clause of a sentence whose other clauses move every frame. Two
+   * writers for one element is how a footer comes to show a stranger's dispatcher beside the
+   * player's counts; one writer reading one `watching` is not.
+   */
   function drawFooter(view: ViewAt): void {
+    const watched = watching;
     const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    // The record's dispatcher, in the words `watch/view.ts` already resolved for the strip's own
+    // `THEIR DISPATCHER` cell — a second lookup here is a second answer to whose run this is.
+    const dispatcherName = watched === undefined ? profile.name : watched.view.dispatcherName;
     const observations =
       view.recording === undefined ? undefined : observationsAt(view.recording, view.simTimeS);
     setText(
@@ -2946,11 +3907,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       observations === undefined
         ? 'no shift run yet'
         : `${view.playing ? 'running' : 'paused'} · ${String(observations.arrived)} arrived, ` +
-          `${String(observations.carried)} carried · ${profile.name.toLowerCase()}`,
+          `${String(observations.carried)} carried · ${dispatcherName.toLowerCase()}` +
+          (watched === undefined ? '' : ` · ${shellWatchingCopyOf(watched.view).footerNote}`),
     );
     setText(
       ui.footer.seedLine,
-      `seed ${state.seed.toString()} · day ${String(state.week.day)}`,
+      watched === undefined
+        ? `seed ${state.seed.toString()} · day ${String(state.week.day)}`
+        : footerSeedLineOf(watched.run.record),
     );
   }
 
@@ -3033,20 +3997,39 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * requirement's own shape one level in: **a call whose return value is dropped looks exactly like
    * a caller and is not one.**
    *
-   * ## Why this is written on adopt and on a mode change, and not in `renderAll`
+   * ## Why this is written on adopt, on a mode change, and on a register change — not per frame
    *
    * `#status` is also where four transient messages land — the copied provenance line, *copied*,
    * *the shift did not run*, a batch's progress — each of which restores itself after its own
-   * moment. A writer inside `renderAll` would clobber whichever of those was on screen the next
-   * time any state moved, which is a regression wearing a fix. So the derived text is written at
-   * the two moments it can actually change: a new recording, and the reader moving the mode
-   * selector. One derivation ({@link transportStatusOf}), two call sites, and the transient
-   * messages keep the screen until one of those two happens — which is exactly what they did
-   * before.
+   * moment. A writer that re-wrote the derived text every frame would clobber whichever of those
+   * was on screen, which is a regression wearing a fix. So the derived text is written only when
+   * it **changed**: {@link lastTransportStatusKey} remembers what the line was derived for, `renderLive`
+   * calls this at 60 Hz, and the write happens exactly when the line's register flips — the
+   * playhead reaching `endedAt`, or scrubbing back off it — plus the two original moments (a new
+   * recording, the mode selector), which pass `force` because they are also the moments a stale
+   * transient must yield. Between those instants the derived text is constant, so the transients
+   * keep the screen exactly as they did when this ran on two call sites.
    */
-  function drawTransportStatus(): void {
-    const text = transportStatusOf(disclosureNow(), state.mode);
-    if (text !== undefined) setText(ui.transport.status, text);
+  function drawTransportStatus(force = false): void {
+    const recording = state.recording;
+    /*
+     * The register is a function of three facts — which run, which mode, and whether the playhead
+     * has reached the run's end — and of nothing that moves between those flips. Keyed on them so
+     * the 60 Hz caller pays one string compare per frame, not a `disclosureItems` rebuild: the
+     * items fold the whole recording and are exactly the work this line must not redo per frame.
+     */
+    const progress =
+      recording === undefined
+        ? undefined
+        : { atS: playback?.simTimeS ?? recording.startedAt, endedAt: recording.endedAt };
+    const key = `${recording?.runId ?? 'none'}|${state.mode}|${
+      progress !== undefined && progress.atS < progress.endedAt ? 'playing' : 'ended'
+    }`;
+    if (!force && key === lastTransportStatusKey) return;
+    const text = transportStatusOf(disclosureNow(), state.mode, progress);
+    if (text === undefined) return;
+    lastTransportStatusKey = key;
+    setText(ui.transport.status, text);
   }
 
   /* ---------------------------------------------------------------------- *
@@ -3284,6 +4267,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;
       calendarCaption = plan.calendarLine;
+      // The race's inputs move with the run: the plan is what a pick change re-races against,
+      // and whatever was in flight is about to be superseded by this start — the latest ask wins,
+      // so the flag follows the runner rather than trailing it.
+      lastShiftPlan = plan;
+      ghostInFlight = false;
       shiftRunner.start({
         label: 'shift',
         config: plan.config,
@@ -3313,6 +4301,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
            * member on {@link MountContext}.
            */
           onRan?.(recording);
+          /*
+           * The rival runs **after the player's own lands** — sequential, on the same runner, so
+           * it is cancel-safe by the runner's own rule: a new primary ask supersedes it, and
+           * Cancel stops it. Last in this callback so every panel above armed against the
+           * primary, not against a race that has not happened yet.
+           */
+          scheduleGhost(plan, recording);
         },
       });
     } catch (error) {
@@ -3337,6 +4332,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // The run this shell simulated — GitHub issue #136, and the only place it is written. See
     // {@link simulatedRecording}.
     simulatedRecording = recording;
+    // The rival raced the run that has just been replaced, so its recording goes with it —
+    // a ghost line left standing beside a new day would be two different crowds on one scale,
+    // which is the one thing the strip exists to never draw. Re-issued by `runShift`'s own
+    // callback once this recording is on screen.
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
     // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
     // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
     // under today's date, which is the stale-sheet defect § D223 closed one field over.
@@ -3364,6 +4366,179 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * rebuild on every state change is issue #106, a press swallowed mid-`mousedown`.
      */
     if (!menuRoot.hidden) drawMenu();
+  }
+
+  /**
+   * Enter the spectator state — § 14.1, and the whole of what `Watch it` means.
+   *
+   * ## What is deliberately **not** written
+   *
+   * {@link simulatedRecording}. The watched run goes onto `state.recording` so the stage, the
+   * transport and every panel draw it, and it is never the run this shell simulated — so
+   * `shift/banking.ts#bankingRefusalFor`'s object-identity gate refuses it **by construction**,
+   * exactly as slice 4d's ghost is refused. That is § 14.1's *"a watched run cannot be closed,
+   * scored or posted"* enforced through the refusal the product already had, rather than through a
+   * fourth flag `closeShift` would have to remember to consult.
+   *
+   * `state.week`, `state.report` and `state.tomorrow` are not touched either. The day belongs to
+   * somebody else and is already closed; `dayClosed` has no business moving, and the sheet the
+   * player left open is theirs and is still theirs when they come back.
+   */
+  function enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void {
+    if (watching !== undefined) return;
+    watching = {
+      run,
+      view,
+      before: {
+        state,
+        ghostRecording,
+        ghostRefusal,
+        ghostPick,
+        startOfDayS: runStartOfDayS,
+        filedRunId,
+        playheadS: playback?.simTimeS,
+        wasPlaying: playback?.state === 'playing',
+        baseSpeed,
+      },
+    };
+    /*
+     * A mode is being entered, so the latched chip stays behind — `docs/20` defect 10, and
+     * {@link resetTransportSpeed} owns the boundary. Read {@link WatchedBefore.baseSpeed} for why
+     * the value is saved rather than only dropped: § 14.1 promises the player their own run back
+     * exactly as they left it, and the speed is part of *exactly*.
+     *
+     * **Before `adopt`**, which is not stylistic: `adopt` builds the `Playback` with
+     * `playbackRateFor(baseSpeed, …)`, so a reset afterwards would construct the transport at the
+     * latched speed and correct it a frame later — a stranger's day would still start at ×900.
+     */
+    resetTransportSpeed();
+    /*
+     * The rival's line goes down for the run it raced. Leaving it standing beside somebody else's
+     * day would be two different crowds on one scale, which `applyShift` already refuses for the
+     * same reason when a new primary lands.
+     */
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
+    /*
+     * The watched run's own start-of-day hour is not known here — the record carries the
+     * configuration, and `runStartOfDayS` is produced by the runner. `undefined` is the honest
+     * answer and is what the header already draws for a template that declares no hour: an
+     * omission means *this has no hour*, never *midnight*.
+     */
+    runStartOfDayS = undefined;
+    /*
+     * Through `watch/session.ts` rather than spelled out here — § 14.1's *"`dayClosed` is
+     * untouched, and so is your own day's state"* is a checkable claim, and a claim living in a
+     * click handler is a claim nothing checks. `session.test.ts` asserts the untouched half by
+     * object identity.
+     */
+    state = watchingStateOf(state, recording);
+    adopt(recording);
+    renderAll();
+  }
+
+  /**
+   * Leave it, putting back exactly what was there — § 14.1's `⤺ Stop watching`.
+   *
+   * Every field of {@link WatchedBefore} is restored, including the playhead, and the recording is
+   * re-adopted rather than re-simulated: it is the **same object** `applyShift` put on the state,
+   * so the player's own run comes back as the run this shell simulated and `bankingRefusalFor`
+   * stops refusing it — without {@link simulatedRecording} ever having been written. See
+   * {@link WatchedBefore} for why that is the lock rather than a convenience.
+   *
+   * `seekTo` after `adopt`, and only when there was a playhead to put back. `adopt` builds the
+   * `Playback`, so seeking before it would seek a transport that has been replaced; seeking a
+   * `Playback` does not start or stop it, so a player who was paused comes back paused.
+   */
+  function stopWatching(): void {
+    const session = watching;
+    if (session === undefined) return;
+    const before = session.before;
+    watching = undefined;
+    state = before.state;
+    ghostRecording = before.ghostRecording;
+    ghostRefusal = before.ghostRefusal;
+    ghostPick = before.ghostPick;
+    runStartOfDayS = before.startOfDayS;
+    lastRaceKey = '';
+    /*
+     * The chip the player latched before they left — see {@link WatchedBefore.baseSpeed}. Assigned
+     * **before `adopt`** for `enterWatch`'s reason in reverse: `adopt` reads `baseSpeed` when it
+     * builds the `Playback`, so the player's own run comes back at the player's own speed rather
+     * than at the spectator default and a correction.
+     */
+    baseSpeed = before.baseSpeed;
+    if (state.recording === undefined) {
+      /*
+       * A player who had no run of their own gets the stage they had — nothing on it. `adopt`
+       * cannot express that (it takes a recording), so the transport is left as the watch left it
+       * and the state says there is no run, which is what every panel already reads.
+       */
+      playback = undefined;
+      disableTransport(ui, true);
+    } else {
+      adopt(state.recording);
+      if (before.playheadS !== undefined) playback?.seekTo(before.playheadS);
+      /*
+       * And paused if they were paused. `adopt` autoplays whenever the overlay has been dismissed,
+       * so without this a spectator's return silently starts a run the player had stopped — see
+       * {@link WatchedBefore.wasPlaying}. Seeking neither starts nor stops playback, so the order
+       * of these two lines is free; `pause` is written after for the reader.
+       */
+      if (!before.wasPlaying) playback?.pause();
+    }
+    /*
+     * **After `adopt`, which arms the filing gate.** `adopt` sets `filedRunId = undefined`, so a
+     * restore that did not put the old value back would let a day the player had already filed
+     * file a second time — the same double-bank `WeekState.attempt` exists to make impossible,
+     * arriving through the spectator's back door.
+     */
+    filedRunId = before.filedRunId;
+    renderAll();
+  }
+
+  /**
+   * § 14.1's primary — *"drops the spectator state and opens the brief for the same day, which is
+   * the whole reason watching exists."*
+   *
+   * ## What it does, and the half it deliberately does not do
+   *
+   * It leaves the spectator state and puts the watched run's **selection** on the player's own
+   * state — building, dispatcher, pattern, the two Free Play axes, the length and the window — then
+   * runs it. So the player gets the same crowd to play, from their own state, through `runShift`,
+   * which is the one function that turns a state into a run.
+   *
+   * It does **not** carry the record's intervention log or its week day. The log is the other
+   * player's changes of mind and copying them would hand the spectator a run they did not make;
+   * the day number belongs to the watched week and would grow the spectator's building by somebody
+   * else's schedule. Both are omissions with reasons rather than oversights, which is why they are
+   * written here — `docs/16` S1.
+   */
+  function playThisCrowd(run: WatchableRun): void {
+    const record = run.record;
+    stopWatching();
+    if (record === undefined || record === null) return;
+    state = {
+      ...state,
+      buildingId: record.buildingId,
+      dispatcherId: record.dispatcherId,
+      pattern: record.pattern,
+      shiftLengthS: record.shiftLengthS,
+      windowStartS: record.windowStartS,
+      seed: BigInt(record.seed),
+      freePlay:
+        record.demandTemplateId === null
+          ? state.freePlay
+          : {
+              demandTemplateId: record.demandTemplateId,
+              arrivalRatePctPop5min: record.arrivalRatePctPop5min,
+            },
+      // The spectator's own log goes, because the run they are about to play is a different day.
+      interventions: [],
+    };
+    renderAll();
+    runShift();
   }
 
   function adoptEditedBuilding(config: BuildingConfig): void {
@@ -3433,6 +4608,35 @@ function boot(ui: Elements, resources: BrowserResources): void {
     playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
   }
 
+  /**
+   * Return the transport chip to {@link DEFAULT_BASE_SPEED} — called on **mode entry**, and the
+   * boundary is the decision (`docs/19` defect 12).
+   *
+   * The Everyday handoff's §7.3 rule is *"Speed never carries across days: each run opens at the
+   * player's default speed, so a day can never vanish in three seconds because the last one ended
+   * at 30×"*. The defect it names is real and was reproduced here: ×900 latched from a previous
+   * mode ended Free Play's first day before a frame of it was watched. The boundary shipped is
+   * **narrower than the handoff's**, deliberately:
+   *
+   * - **A mode being entered resets** — Free play's Start, *Keep going*, a leaderboard row's
+   *   *beat this*, a commissioning week opening, a scenario card taken
+   *   ({@link MountContext.enterMode}). The player is starting a new thing to watch, and the chip
+   *   they latched belongs to the thing they left.
+   * - **A mid-week re-run keeps the player's chip.** Re-running Tuesday five seconds after
+   *   choosing ×240 is the same sitting, the same mode and the same intent; snapping the chip
+   *   back on every run would fight the player on exactly the surface they are iterating on.
+   *   The handoff's own §4.6 chips survive this deviation because the *settings* multiplier —
+   *   the player's declared preference — is not touched here at all.
+   *
+   * `applyPlaybackSpeed` is called so a playback already adopted follows immediately, and the
+   * chrome is redrawn so the lit chip agrees — the same pair the chip's own `onPick` performs.
+   */
+  function resetTransportSpeed(): void {
+    baseSpeed = DEFAULT_BASE_SPEED;
+    applyPlaybackSpeed();
+    drawTransportChrome(viewAt());
+  }
+
   function adopt(recording: VizRecording): void {
     playback = new Playback(recording, clock, {
       speed: playbackRateFor(baseSpeed, menuState.settings.playbackSpeed),
@@ -3474,7 +4678,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * reads are the ones `drawParity` checks — so the line on screen and the parity claim about it
      * can no longer be about two different lists.
      */
-    drawTransportStatus();
+    drawTransportStatus(true);
   }
 
   /**
@@ -3590,6 +4794,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
     filedRunId = recording.runId;
+    // This sitting now has a filed sheet, so the empty state's previous-sitting sentence retires —
+    // see {@link filedThisSitting}. Written at the latch rather than at the save, because the fact
+    // it records is *a sheet existed*, not *a write succeeded*.
+    filedThisSitting = true;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
     const readings = readGoals(goals, observations);
@@ -3610,6 +4818,29 @@ function boot(ui: Elements, resources: BrowserResources): void {
       minutePct: observations.minutePct,
       carried: observations.carried,
       arrived: observations.arrived,
+      /*
+       * The run this day was, so it can be watched — Everyday Mode slice 8, § 14.1 / § 1.5.
+       *
+       * `undefined` when `watchRecordIssues` has something to say, stored as `null`, and the two
+       * spellings are one decision rather than sloppiness: `watchRecordOf` answers `undefined` in
+       * the language of *"there is no such value"*, and `DayOutcome.record` spells absence the way
+       * a JSON round trip can carry it — `Observations.peakQueueFloorId`'s own note, one struct
+       * over.
+       *
+       * Written from **`state`**, which is the run this shell simulated: `bankingRefusalFor` has
+       * already refused every other case forty lines up, so by here the recording on screen *is*
+       * `simulatedRecording` and `state` is the question that produced it. Reading the menu's
+       * selection instead would be § D318's defect — a record describing whatever a select was
+       * left on after the run.
+       */
+      record: watchRecordOf(state, resources) ?? null,
+      /*
+       * And **why**, when there is no record — `docs/20` defect 1. Written from the same `state` on
+       * the same line for the same reason: the two are one fact with two spellings, and a day that
+       * carried a `null` record with no cause is what made every day filed after a rule was written
+       * unwatchable under a sentence blaming the file format.
+       */
+      recordRefusal: recordRefusalFor(state, resources),
     });
     /*
      * **The week is written only by a mode that owns one** — § D231, issue #64.
@@ -3696,6 +4927,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       dayStartS: runStartOfDayS ?? DAY_START_S,
       /*
+       * The run record's third member, reaching the sheet — `docs/19` defect 10. From `state`,
+       * which is where `shiftRunConfigOf` read it when the run on screen was built, so the log the
+       * sheet prints is the log the legs were simulated under; the clearing ledger that keeps that
+       * true across day and building changes is `ViewerState.interventions`' own docstring.
+       */
+      interventions: state.interventions,
+      /*
+       * The rules the run was driven by — `docs/20` defect 2. From `state` for `interventions`'
+       * reason exactly: `shiftRunConfigOf` applies `profileWithRules(profile, state.ruleRows)` when
+       * it builds the run, so these are the rows the legs on screen were simulated under rather
+       * than whatever the editor happens to be holding now.
+       */
+      ruleRows: state.ruleRows,
+      /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.
        *
@@ -3766,6 +5011,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The stage — § 1.3 M3
    * ---------------------------------------------------------------------- */
 
+  /**
+   * The name a reader knows this recording's dispatcher by — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11, and
+   * `docs/20` defect 9.
+   *
+   * ## Why it is not `profileById`
+   *
+   * `dev/state.ts#profileById` **substitutes the first shipped profile** for an id it cannot
+   * resolve, which is the right answer for *which dispatcher does the reader's state select* (a
+   * selector must select something) and the wrong one for *what did this recording run*: a run
+   * loaded from a file naming a profile this build does not ship would be captioned `Nearest car`,
+   * which is a false statement about the picture rather than a missing one. So the lookup is by
+   * exact id and the fallback is the recording's own string — the same fallback
+   * `shift/report.ts#dayReportOf` takes, so the stage and the sheet degrade to one word rather than
+   * to two.
+   *
+   * Read from `state.savedDispatchers` at call time rather than captured, because the reader can
+   * save a profile — and rename one — while a recording is on screen.
+   */
+  function dispatcherNameOf(recording: VizRecording): string {
+    const found = allDispatchers(resources, state.savedDispatchers).find(
+      (profile) => profile.id === recording.dispatcherProfileId,
+    );
+    return found?.name ?? recording.dispatcherProfileId;
+  }
+
   function drawStage(): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
@@ -3828,6 +5098,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       theme: stageTheme,
       recording,
       frame,
+      dispatcherName: dispatcherNameOf(recording),
       layout,
       overlay: wantsOverlay ? overlay : undefined,
       selection: selectionFor(assignments),
@@ -3860,7 +5131,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       setText(ui.stage.alarmText, `${String(alarm.waiting)} people stacked up at ${alarm.label}`);
       setText(ui.stage.alarmSub, 'a car is on its way — or add one under Building');
     }
-    canvas.setAttribute('aria-label', describeFrame({ recording, frame }));
+    canvas.setAttribute(
+      'aria-label',
+      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording) }),
+    );
   }
 
   function selectionFor(assignments: readonly LandingAssignment[]): SceneSelection | undefined {
@@ -3918,7 +5192,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function announce(): void {
     const recording = state.recording;
     if (recording === undefined || playback === undefined) return;
-    setText(ui.stage.description, describeFrame({ recording, frame: playback.frame() }));
+    setText(
+      ui.stage.description,
+      describeFrame({
+        recording,
+        frame: playback.frame(),
+        dispatcherName: dispatcherNameOf(recording),
+      }),
+    );
   }
 
   /* ---------------------------------------------------------------------- *
@@ -3963,6 +5244,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         shiftRunner.cancel();
         return;
       }
+      // The other {@link playerStartedARun} site — the control the empty sheet's copy names, and
+      // the audit's own repro (`docs/19` defect 1): reload → Resume → this button → a full day →
+      // the day must file. On the start arm only: cancelling is not asking for a day to count,
+      // though by then the press that started the run has already latched.
+      playerStartedARun();
       runShift();
     });
     ui.transport.verify.addEventListener('click', () => {
@@ -4112,7 +5398,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
     );
     fill(
       ui.transport.ticks,
-      ...tickLabelsOf(recording, 5).map((label) =>
+      // The same hour as the segments one call up and the header clock — the tick row was the one
+      // transport surface still on the 06:00 default, so a `lunch-two-way` run was ruled
+      // `06:00 06:07 …` under a header reading `12:00` (`docs/19` defect 2).
+      ...tickLabelsOf(recording, 5, { dayStartS: runStartOfDayS ?? DAY_START_S }).map((label) =>
         el(document, 'span', { text: label.label }),
       ),
     );
@@ -4142,7 +5431,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * so a slider announces its own units instead of a percentage. The header clock stays `hh:mm` —
      * it is a caption on a day, not a readout on a control.
      */
-    ui.transport.timeline.setAttribute('aria-valuetext', clockWithSecondsAt(view.simTimeS));
+    ui.transport.timeline.setAttribute(
+      'aria-valuetext',
+      clockWithSecondsAt(view.simTimeS, runStartOfDayS),
+    );
   }
 
   function fillLandingSelect(recording: VizRecording): void {
@@ -4284,12 +5576,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const report = state.report;
     if (report === undefined) {
       /*
-       * Two reasons there is no sheet, and they are different instructions — GitHub issue #136.
-       * `NO_SHEET_YET` says *run a shift to the end*, which is false advice to a reader who has
-       * just watched a loaded recording to its end: doing it again changes nothing. The banking
-       * refusal names what a loaded run is for and what to do instead.
+       * Three reasons there is no sheet, and they are different instructions — GitHub issue #136,
+       * and `docs/19` defect 1 for the third. `NO_SHEET_YET` says *run a shift to the end*, which
+       * is false advice to a reader who has just watched a loaded recording to its end — and
+       * equally false to one who watched boot's own run to its end without ever choosing to play
+       * (§ D232's ground, which used to fall through to that same sentence). The chain asks in
+       * `closeShift`'s own order, so the status line names the ground the gate actually refused on.
        */
-      setText(ui.transport.status, bankingRefusalFor(state.recording, simulatedRecording) ?? NO_SHEET_YET);
+      setText(
+        ui.transport.status,
+        bankingRefusalFor(state.recording, simulatedRecording) ??
+          (state.recording !== undefined && playheadHasRunOut() && !playerHasChosen
+            ? UNCHOSEN_RUN_CANNOT_BANK
+            : NO_SHEET_YET),
+      );
       return;
     }
     const surface = document.createElement('canvas');
@@ -4521,10 +5821,13 @@ export function spaceBelongsToFocus(focus: ActivationRole): boolean {
  * resolve its own control's smallest move is what made the shortcut look dead.
  *
  * Built from `timeOfDayAt` rather than from a second copy of the day-start offset, so the two
- * clocks cannot come to disagree about what 06:00 means.
+ * clocks cannot come to disagree about what 06:00 means. `dayStartS` follows `timeOfDayAt`'s
+ * contract — the run's own hour, `undefined` falling back to the shared default — because a
+ * readout that announced `06:12:07` over a header reading `08:42` is `docs/19` defect 2 on the
+ * one surface a sighted reader cannot cross-check.
  */
-export function clockWithSecondsAt(simTimeS: number): string {
-  const wrapped = ((timeOfDayAt(simTimeS) % 86_400) + 86_400) % 86_400;
+export function clockWithSecondsAt(simTimeS: number, dayStartS?: number | undefined): string {
+  const wrapped = ((timeOfDayAt(simTimeS, dayStartS) % 86_400) + 86_400) % 86_400;
   const hours = Math.floor(wrapped / 3600);
   const minutes = Math.floor((wrapped % 3600) / 60);
   const seconds = Math.floor(wrapped % 60);

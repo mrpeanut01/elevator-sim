@@ -31,7 +31,11 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
+import { parseFixitCases } from '../fixit/parse.js';
+import type { FixitCases } from '../fixit/types.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
+import { parseReferenceRuns } from '../watch/reference.js';
+import type { WatchableRun } from '../watch/types.js';
 
 /**
  * A building as both the runner and the editor need it.
@@ -245,6 +249,51 @@ export interface LoadedCampaign {
   readonly published: PublishedGoalRates;
   readonly space: SearchSpace;
   readonly dimensionHelp: ReadonlyMap<string, string>;
+}
+
+/**
+ * `data/fixit-cases.json`, fetched and parsed — the Fix-a-building catalogue.
+ *
+ * Not part of {@link loadBrowserResources}, for {@link loadCampaign}'s stated reason: that
+ * function runs on every batch-worker start, and a worker has no use for a tenant's letter. The
+ * Fix-a-building panel is the only caller, and it calls this once, on first open.
+ *
+ * The forbidden-identifier list — GAMEPLAY § 16 rule 11 — is **derived** from the same loaded
+ * data the cases are checked against: every shipped building id and dispatcher profile id. A list
+ * written down in `fixit/parse.ts` would go stale the day a building lands.
+ */
+/**
+ * `data/reference-runs.json`, fetched and parsed — the shipped reference runs a spectator can
+ * watch (GAMEPLAY § 14.1, § 20.11).
+ *
+ * Not part of {@link loadBrowserResources}, on {@link loadFixitCases}' stated ground: it is fetched
+ * once, on the watch picker's first open, and a batch worker has no use for a fixture.
+ *
+ * The building **name** is resolved from the record's own id rather than authored in the file —
+ * `watch/reference.ts` argues why — and `buildingNameOf` is passed **in** rather than reached for:
+ * it lives on `dev/state.ts`, which imports this module's `BrowserResources`, and a value import
+ * back the other way would close a cycle for one string lookup. The caller already holds the
+ * answer the rest of the shell reads.
+ */
+export async function loadReferenceRuns(
+  buildingNameOf: (buildingId: string) => string,
+): Promise<readonly WatchableRun[]> {
+  const raw = await fetchJson('/reference-runs.json');
+  return parseReferenceRuns(raw, buildingNameOf);
+}
+
+export async function loadFixitCases(resources: BrowserResources): Promise<FixitCases> {
+  const raw = await fetchJson('/fixit-cases.json');
+  return parseFixitCases(raw, {
+    floorIdsByBuilding: new Map(
+      resources.buildings.map((building) => [building.id, building.floors.map((floor) => floor.id)]),
+    ),
+    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
+    engineIds: [
+      ...resources.buildings.map((building) => building.id),
+      ...resources.dispatcherProfiles.profiles.map((profile) => profile.id),
+    ],
+  });
 }
 
 /**

@@ -149,9 +149,15 @@ describe('the policy chips', () => {
     expect(Object.keys(POLICY_HINTS).sort()).toStrictEqual([...POLICY_VALUES].sort());
   });
 
-  it('draws them in core’s own declaration order, with the current one pressed', () => {
+  it('draws them in core’s own declaration order, with the current one pressed — and no rules chip', () => {
+    // `rules` is deliberately not a chip: the rules policy is entered by writing rules in the
+    // rules editor, and a chip here would offer a configuration `resolveDispatchConfig` refuses
+    // by name (a rules policy with no rows). Its POLICY_HINTS entry — held by the both-ways
+    // test above — is where the exclusion is explained.
     const rows = policyChipsOf({ ...SPEC, policy: 'fuzzy' });
-    expect(rows.map((row) => row.policy)).toStrictEqual([...POLICY_VALUES]);
+    expect(rows.map((row) => row.policy)).toStrictEqual(
+      POLICY_VALUES.filter((policy) => policy !== 'rules'),
+    );
     expect(rows.filter((row) => row.pressed).map((row) => row.policy)).toStrictEqual(['fuzzy']);
   });
 

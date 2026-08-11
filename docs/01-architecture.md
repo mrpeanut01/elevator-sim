@@ -310,6 +310,8 @@ packages/
 │   ├── editor/            — building-config edits, validation, history, preview geometry
 │   ├── controls/          — the schema-generated parameter form: four control renderers
 │   ├── batch/             — Phase 9 W3: N paired replications, and the paired-t report on them
+│   ├── fixit/             — Everyday Mode slice 6: the Fix-a-building case engine, two real runs sharing a crowd
+│   ├── watch/             — Everyday Mode slice 8: a run replayed from its record, read-only and never scored
 │   ├── scenario/          — Phase 9 W9: goal predicates, their measured across-seed pass rates
 │   ├── campaign/          — Phase 9 W5: the scenario schema, the seven stages, the four fail states
 │   ├── honesty/           — Phase 9 § D163 clause 1: the generated search over every player-facing string

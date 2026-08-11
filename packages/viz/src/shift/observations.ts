@@ -11,8 +11,8 @@
  * The temptation is to compute them where they are used. That is how a repository ends up with two
  * answers to *how many people has this building carried*, and this one has a rule about it — the
  * suppression gate was written three times and two of them were right (`DECISIONS.md` § D111). So
- * `live/` folds and this projects, and the only arithmetic here is the two divisions, each with its
- * empty case stated.
+ * `live/` folds and this projects, and the only arithmetic here is the two divisions and one
+ * rounding, each with its empty case stated.
  *
  * `shift/observations.test-helper.ts` used to stand in for `live/` while the two lanes were built
  * in parallel. It is gone: a helper that outlives its blocker becomes the second source of truth it
@@ -26,12 +26,25 @@ import type { Observations } from './types.js';
 /**
  * Project the live fold into the shape the goals and the report read.
  *
- * The two empty cases are the whole content of this function and neither is arbitrary:
+ * The empty cases are the whole content of this function and none is arbitrary (the third —
+ * `worstWaitS: 0` when nobody has arrived — is stated at the field below, and is `minutePct`'s
+ * argument again):
  *
  * - **`carryPct` is 100 when nobody has arrived.** A building that has been asked for nothing has
  *   failed nobody. The goal gate (`arrived < WAKE_UP_ARRIVALS`) makes the value unreadable anyway,
  *   so this only decides what an ungraded panel shows, and *100 %* is the honest reading of *no
  *   outstanding journeys*.
+ * - **`carryPct`'s basis is arrivals *including* riders who gave up, and abandonment cannot
+ *   improve it** (`docs/19` defect 3, on § D106's footing). The denominator is `live.arrived`,
+ *   which counts every leg from the instant its call registered — a rider who runs out of
+ *   patience and leaves keeps their arrival (`VizLeg` carries no `abandonedAt`; leaving never
+ *   removes a leg) and can never enter the numerator, because `carried` counts only legs that
+ *   alighted. So a rider walking out moves this percentage **down or not at all**, never up —
+ *   unlike AWT, which abandonment improves by construction and which the fifth `awtIsValid`
+ *   ground suppresses for exactly that reason. The carry goal reads this field and inherits the
+ *   basis. When the goal grades ✓ 100 % beside a non-zero TOOK THE STAIRS count, both are true
+ *   of one cohort: those riders' waits crossed the horizon *and* a car still came for them —
+ *   the overlap {@link Observations.abandonedCarried} counts and the sheet now states.
  * - **`minutePct` is 100 when nobody has been served**, and this one is a compromise worth naming.
  *   `live/` deliberately returns `undefined` there — *"the design's prototype returns 100 % on an
  *   empty denominator, which reads as everybody was served promptly about a building where nobody
@@ -57,5 +70,13 @@ export function shiftObservationsOf(live: LiveObservations): Observations {
     peakQueueFloorId: live.peakQueue.floorId ?? null,
     peakQueueAtS: live.peakQueue.atS ?? null,
     abandoned: live.abandoned,
+    abandonedCarried: live.abandonedCarried,
+    horizonS: live.horizonS,
+    // `0` when nobody has arrived, for `minutePct`'s reason one case up: a goal is a comparison
+    // and needs a number, and under the wake-up gate the value is never displayed and never
+    // compared. Whole seconds, matching `worstWaitFigure`'s own `toFixed(0)`, so the goal row
+    // and the report cell cannot round one wait two ways.
+    worstWaitS: live.worstWaitSoFarS === undefined ? 0 : Math.round(live.worstWaitSoFarS),
+    worstWaitIsCensored: live.worstWaitIsCensored,
   };
 }

@@ -196,7 +196,15 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
   ordinary: Object.freeze({
     id: 'ordinary',
     name: 'An ordinary Tuesday-shaped day',
-    note: 'Nothing booked. The building is the only thing in your way.',
+    /*
+     * The handoff's sentence with its pronoun removed — `docs/20` defect 7, and the same deviation
+     * `live/honesty.ts#casualTitle` argues at length. This note is drawn on the left rail's L5,
+     * which keeps describing **the player's own day** while a stranger's run plays on the stage; a
+     * second person there is a sentence addressed to a reader who is, at that moment, watching
+     * somebody else, and § 14.1 calls the word a defect in that mode without asking who it meant.
+     * Third person costs the line nothing and needs no branch to stay correct.
+     */
+    note: 'Nothing booked. The building is the only thing in the way.',
     effect: NO_EFFECT,
   }),
   weekend: Object.freeze({
