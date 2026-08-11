@@ -576,6 +576,7 @@ describe('the press really moves the run, and the strip really reports it — §
     const week = closeDay(
       opened,
       outcomeOf({
+        record: null,
         day,
         dayIdx: opened.dayIdx,
         eventId: 'ordinary',

@@ -102,6 +102,7 @@ import {
   PARKED_WEEKS_MAX,
   SANDBOX_CONTRACT_ID,
 } from '../shift/week.js';
+import type { WatchRecord } from '../watch/types.js';
 
 import {
   EMPTY_LIBRARY,
@@ -344,6 +345,44 @@ const READING_CHECKS: Readonly<Record<keyof GoalReading, FieldCheck>> = Object.f
   glyph: isString,
 });
 
+/**
+ * The run record a filed day carries — Everyday Mode slice 8, `watch/types.ts#WatchRecord`.
+ *
+ * ## Why the checks are this shallow, and where the real gate is
+ *
+ * Every field here is checked for *shape* and nothing more. `buildingId` is a non-empty string, not
+ * a building this build ships; `seed` is a decimal string, not a seed anybody has run. That is
+ * deliberate and it is not laxity: a record naming a building `data/buildings/` no longer ships is
+ * a **readable record of a run this build cannot re-ask**, which is
+ * `watch/record.ts#recordUnreadableReason`'s answer and a row that says so — and refusing the whole
+ * envelope for it would take a player's entire week away because one Tuesday named a building that
+ * was renamed. The three-way split is the same one `validate.ts` already keeps for the library:
+ * frame here, contents where the contents can be judged.
+ *
+ * `interventions` is checked as a list of objects and no further, for the same reason
+ * {@link isDocument} exists: `core`'s `InterventionChange` is a union `core` owns, and a second
+ * copy of its cases here is a second answer that goes stale the day a third intervention lands.
+ * `shiftRunConfigOf` hands the log to `core`, which refuses what it does not recognise.
+ */
+const WATCH_RECORD_CHECKS: Readonly<Record<keyof WatchRecord, FieldCheck>> = Object.freeze({
+  version: isIntegerAtLeast(1),
+  // A decimal string, because `JSON.stringify` throws on the `bigint` this is read back into —
+  // `jsonSafety.ts` is in the tree because that trap is.
+  seed: isNonEmptyString,
+  buildingId: isNonEmptyString,
+  dispatcherId: isNonEmptyString,
+  pattern: isNonEmptyString,
+  // `null` is *no Free Play override*, which is every campaign run — a state, not a missing value.
+  demandTemplateId: nullOr(isNonEmptyString),
+  arrivalRatePctPop5min: nullOr(isFiniteNumber),
+  shiftLengthS: isIntegerAtLeast(1),
+  windowStartS: nullOr(isNumberWithin(0, 86_400)),
+  day: isIntegerAtLeast(1),
+  dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
+  outOfServiceCarIds: isArrayOf(isNonEmptyString, 64, 'car ids'),
+  interventions: isArrayOf(isDocument('an intervention'), 64, 'interventions'),
+});
+
 const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.freeze({
   day: isIntegerAtLeast(1),
   dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
@@ -354,6 +393,10 @@ const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.fr
   minutePct: isNumberWithin(0, 100),
   readings: isArrayOf(isObjectOf(READING_CHECKS, 'a goal reading'), 32, 'goal readings'),
   allMet: isBoolean,
+  // `null` is a day that cannot be re-asked — see `shift/types.ts#DayOutcome.record` for the two
+  // different days that carry one, and `session.ts#withDayRecords` for why a version 1–5 envelope
+  // arrives here with the key already present and `null`.
+  record: nullOr(isObjectOf(WATCH_RECORD_CHECKS, 'a run record')),
 });
 
 const AWARD_CHECKS: Readonly<Record<keyof ClearedAward, FieldCheck>> = Object.freeze({

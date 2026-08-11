@@ -151,6 +151,7 @@ const PERFECT = Object.freeze({
  */
 function playedWeek(): WeekState {
   const day1 = outcomeOf({
+    record: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',
@@ -160,6 +161,7 @@ function playedWeek(): WeekState {
     readings: readGoals(goalsForDay(1), PERFECT),
   });
   const day2 = outcomeOf({
+    record: null,
     day: 2,
     dayIdx: 1,
     eventId: 'move-in',
@@ -218,6 +220,7 @@ const library = (): SavedLibrary => ({
  */
 function parkedWeek(): WeekState {
   const day1 = outcomeOf({
+    record: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',

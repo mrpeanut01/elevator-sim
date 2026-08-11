@@ -2386,6 +2386,7 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
      */
     const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
+      record: null,
       day,
       dayIdx,
       eventId: event.id,

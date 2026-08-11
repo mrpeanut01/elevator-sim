@@ -232,6 +232,7 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf } from './ghostRun.js';
+import { watchRecordOf } from '../watch/record.js';
 import {
   createShiftRunner,
   shiftRunCostOf,
@@ -4259,6 +4260,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
       minutePct: observations.minutePct,
       carried: observations.carried,
       arrived: observations.arrived,
+      /*
+       * The run this day was, so it can be watched — Everyday Mode slice 8, § 14.1 / § 1.5.
+       *
+       * `undefined` when `watchRecordIssues` has something to say, stored as `null`, and the two
+       * spellings are one decision rather than sloppiness: `watchRecordOf` answers `undefined` in
+       * the language of *"there is no such value"*, and `DayOutcome.record` spells absence the way
+       * a JSON round trip can carry it — `Observations.peakQueueFloorId`'s own note, one struct
+       * over.
+       *
+       * Written from **`state`**, which is the run this shell simulated: `bankingRefusalFor` has
+       * already refused every other case forty lines up, so by here the recording on screen *is*
+       * `simulatedRecording` and `state` is the question that produced it. Reading the menu's
+       * selection instead would be § D318's defect — a record describing whatever a select was
+       * left on after the run.
+       */
+      record: watchRecordOf(state, resources) ?? null,
     });
     /*
      * **The week is written only by a mode that owns one** — § D231, issue #64.

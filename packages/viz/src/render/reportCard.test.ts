@@ -121,6 +121,7 @@ function sheetOf(recording: VizRecording, day = 4): ShapedDayReport {
   const week = closeDay(
     opened,
     outcomeOf({
+      record: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',

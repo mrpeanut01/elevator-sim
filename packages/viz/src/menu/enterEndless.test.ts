@@ -59,6 +59,7 @@ function cleanOutcome(week: WeekState): DayOutcome {
     glyph: '✓',
   }));
   return outcomeOf({
+    record: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',

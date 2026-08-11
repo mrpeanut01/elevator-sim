@@ -262,6 +262,7 @@ describe('withBuilding', () => {
       closeDay(
         { ...week, day, dayIdx: (day - 1) % 7 },
         outcomeOf({
+          record: null,
           day,
           dayIdx: (day - 1) % 7,
           eventId: 'ordinary',

@@ -388,6 +388,7 @@ describe('goalRowsOf — met, missed and pending', () => {
   it('shows last night’s figure, worded as a "was", once a previous day is in the history', () => {
     const yesterdayReadings = readGoals(goalsForDay(3), goalObservations({ carryPct: 91 }));
     const yesterday = outcomeOf({
+      record: null,
       day: 3,
       dayIdx: 2,
       eventId: 'ordinary',
@@ -446,6 +447,7 @@ describe('runFiguresOf and the sparkline', () => {
   it('draws one bar per closed day, each with its own tooltip', () => {
     const days: readonly DayOutcome[] = [
       {
+        record: null,
         day: 1,
         dayIdx: 0,
         weekday: 'Monday',
@@ -457,6 +459,7 @@ describe('runFiguresOf and the sparkline', () => {
         allMet: true,
       },
       {
+        record: null,
         day: 2,
         dayIdx: 1,
         weekday: 'Tuesday',

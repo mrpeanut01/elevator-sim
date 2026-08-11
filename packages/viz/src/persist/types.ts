@@ -95,6 +95,8 @@ export const SESSION_KEY = 'elevator-sim.session';
  * | 2 | The same `session` object, **byte for byte**, plus a sibling {@link SavedLibrary}. |
  * | 3 | `session.freePlay` gains `windowStartS` — the first version to change the week's own shape. |
  * | 4 | `session` gains `parkedWeeks` — the weeks the player is not currently playing (issue #107). |
+ * | 5 | No new key: three **value** domains widen inside the week's readings (the worst-wait goal). |
+ * | 6 | `DayOutcome` gains `record` — the run a filed day was, so it can be watched (slice 8). |
  *
  * **A newer payload is still refused**, because this build cannot know what a field it has never
  * seen means — and silently dropping it would hand back a *partially* applied week, which is the
@@ -190,8 +192,33 @@ export const SESSION_KEY = 'elevator-sim.session';
  * measured state of a week played before the fourth goal existed, and `wasDisplayOf` answers the
  * em dash for a quantity yesterday never measured — which is the honest answer, not a default.
  * A decision number is owed for the bump-on-new-values rule; this paragraph is the argument.
+ *
+ * ## Version 6 adds a key to a **nested** shape, and it is read backwards on the same evidence
+ *
+ * Everyday Mode slice 8 (GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5) needed a filed day to be
+ * *watchable*, and the persisted day could not reconstruct its own run: `DayOutcome` carried the
+ * outcome — arrived, carried, `minutePct`, the readings — and nothing about the **question**. Not
+ * the seed, not the building, not the dispatcher, not the intervention log. `shift/banking.ts`
+ * counts the same gap against a `VizRecording` and gets *one of eight*; this counts zero of eight,
+ * because a day's history entry was never meant to describe a run.
+ *
+ * So `DayOutcome` gains `record` — `watch/types.ts#WatchRecord`, or `null`. The key is inside
+ * `week.history[]` and `parkedWeeks[].history[]`, one level deeper than any previous bump has
+ * reached, and the same two questions decide it:
+ *
+ * - **Does the absence determine the value?** Yes, and by the strongest form of the argument this
+ *   docstring has used. `null` means *this day cannot be re-asked*, and a build with no record
+ *   concept could not re-ask any day it filed — no seed was stored, so there is nothing to re-ask
+ *   *with*. Every day in a version 1–5 envelope really is unwatchable, so `null` is the measured
+ *   state and not a stand-in. `session.ts#withDayRecords` performs the completion.
+ * - **Can an older build read what this one writes?** No, which is why the number moves. A
+ *   version-5 reader meets `record` in a history entry and `isObjectOf`'s extra-key branch refuses
+ *   the envelope as *damaged* — the false accusation the version-3 paragraph records. Refusing it
+ *   as *newer* is true; refusing it as damaged is not.
+ *
+ * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
  */
-export const SESSION_SCHEMA_VERSION = 5;
+export const SESSION_SCHEMA_VERSION = 6;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -201,7 +228,7 @@ export const SESSION_SCHEMA_VERSION = 5;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5, 6]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

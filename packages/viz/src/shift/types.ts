@@ -55,6 +55,12 @@
 
 import type { AwtInvalidGround, DirectionalSplit, SimTime } from '@elevator-sim/core/browser';
 
+// Types only, and from the one module in `watch/` that imports nothing but `core` — so a day
+// carrying a record costs `shift/` no dependency on the viewer's state, its resources or its
+// scope table. `watch/types.ts` holds the shape; `watch/record.ts` holds the derivation, and
+// `DayOutcome.record` says why the two are apart.
+import type { WatchRecord } from '../watch/types.js';
+
 /* -------------------------------------------------------------------------- *
  * The week's calendar
  * -------------------------------------------------------------------------- */
@@ -487,6 +493,38 @@ export interface DayOutcome {
    * one so a restored session cannot carry the two disagreeing.
    */
   readonly allMet: boolean;
+  /**
+   * The run this day was, as a question the simulator can be re-asked — Everyday Mode slice 8,
+   * GAMEPLAY § 14.1 and ENGINE_CONTRACT § 1.5. `null` when the day cannot be re-asked.
+   *
+   * ## Why a day had to grow this field at all
+   *
+   * Everything else on this interface is an **outcome**: what arrived, what was carried, what the
+   * goals read. Not one of them says what was *run* — not the seed, not the building, not the
+   * dispatcher — so a filed day could be drawn, sparklined and totalled, and could not be watched.
+   * `shift/banking.ts` makes the identical count one artefact over, against a `VizRecording`: *one
+   * of eight*. This is the other half of that finding, and the answer is the same one § 1.4 gives —
+   * store the **question**, because the answer is a pure function of it and is megabytes.
+   *
+   * ## Why `null` is a value and not a gap
+   *
+   * Two days carry `null` and they are different days, which is why the picker's refusal names its
+   * ground rather than saying *no record*:
+   *
+   * - a day filed by a build that had no record to write — the **measured** state of a session
+   *   written before this field existed, on `persist/types.ts`' own precedent for `windowStartS`
+   *   and `parkedWeeks`;
+   * - a day whose run `watch/record.ts#watchRecordIssues` refused, because something it carried —
+   *   a moved lever, a commissioned fabric, a patience curve, a saved dispatcher — is not
+   *   expressible as a selection. That is not a defect in the day; it is the same honesty
+   *   `scope/runIdentity.ts` applies to the leaderboard, applied to a spectator.
+   *
+   * A record is written by `dev/main.ts#closeShift`, through `watchRecordOf`, and by nothing else.
+   * The **derivation stays out of `shift/`** deliberately: deciding whether a run is re-askable
+   * needs `BrowserResources` and the scope table, and a `shift/` module that reached for either
+   * would be a second answer to `dev/state.ts`'s question about what a run is.
+   */
+  readonly record: WatchRecord | null;
 }
 
 /** The green banner's payload, produced by the day that banked the last clean shift. */

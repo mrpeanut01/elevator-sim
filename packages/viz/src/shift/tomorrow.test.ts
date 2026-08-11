@@ -87,6 +87,7 @@ function closedWeek(day: number, observations: GoalObservations, contractId = 'c
   return closeDay(
     { ...openWeek(contractId), day, dayIdx },
     outcomeOf({
+      record: null,
       day,
       dayIdx,
       eventId: 'ordinary',
