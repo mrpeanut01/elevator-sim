@@ -90,11 +90,12 @@ const AA_BODY = 4.5;
  * nine § D309's mounts insert, plus the two slice 6a's sizing block adds — its standing note at
  * construction and the booted building's single bank reading at first render (a building with
  * more banks draws one reading per bank, so this pin is a fact about the *booted* page, not a
- * ceiling). Pinned rather than bounded below, because the count is the number
+ * ceiling), plus the one the rules editor's mount inserts (slice 4c — its scope note above the
+ * rows). Pinned rather than bounded below, because the count is the number
  * `noteContrast.test.ts` derives from the sources independently, and the two agreeing is the
  * evidence that neither is looking at half the page.
  */
-const NOTES_ON_THE_PAGE = 17;
+const NOTES_ON_THE_PAGE = 18;
 
 /** One paragraph as the browser resolved it. */
 interface Measured {
