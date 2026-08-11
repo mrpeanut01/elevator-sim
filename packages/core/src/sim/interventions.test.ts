@@ -71,7 +71,7 @@ function run(
  */
 function legsOf(result: SimulationResult): readonly (readonly [string, string, number])[] {
   return result.record.passengers.map(
-    (leg) => [leg.id, leg.carId ?? '', leg.boardedAt ?? -1] as const,
+    (leg) => [leg.passengerId, leg.carId ?? '', leg.boardedAt ?? -1] as const,
   );
 }
 
