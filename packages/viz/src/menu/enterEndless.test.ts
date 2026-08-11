@@ -60,6 +60,7 @@ function cleanOutcome(week: WeekState): DayOutcome {
   }));
   return outcomeOf({
     record: null,
+    recordRefusal: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',

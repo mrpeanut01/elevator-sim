@@ -46,6 +46,8 @@
  * the surface that would otherwise publish it.
  */
 
+import type { RuleRow } from '../authoring/ruleSpec.js';
+
 import type { PostedResult, WatchRecord, WatchableRun } from './types.js';
 import { WATCH_RECORD_VERSION } from './types.js';
 import { firstPersonWordsIn } from './view.js';
@@ -159,7 +161,41 @@ function recordOf(raw: unknown, where: string): WatchRecord {
      * keeps paying for. `persist/validate.ts` makes the identical call for the stored copy.
      */
     interventions: asInterventions(entry['interventions'], `${where}.interventions`),
+    /*
+     * The rules the run's dispatcher was driven by — shape 2, `docs/20` defect 1. Read as data for
+     * `interventions`' reason: `core` owns the rule vocabulary and
+     * `record.ts#recordUnreadableReason` refuses a row naming a condition or action this build does
+     * not ship, so a second copy of the union here would be the second answer this file already
+     * declines to keep. Shipped fixtures carry `[]`, and the shape check is what says so out loud
+     * rather than a comment claiming it.
+     */
+    ruleRows: asRuleRows(entry['ruleRows'], `${where}.ruleRows`),
   };
+}
+
+/**
+ * The rule rows of a fixture, as data.
+ *
+ * `when` and `then` are required strings because the ids are what
+ * `record.ts#recordUnreadableReason` checks against the shipped vocabulary; the two values are
+ * passed through untouched, because `RuleRow` declares them `number | string | undefined` and a
+ * narrower reader here would be a third opinion about a shape `core` already owns.
+ */
+function asRuleRows(raw: unknown, where: string): readonly RuleRow[] {
+  if (!Array.isArray(raw)) {
+    throw new ReferenceRunsError(`${where} is not an array of rule rows.`);
+  }
+  return raw.map((value, index) => {
+    const row = asRecord(value, `${where}[${String(index)}]`);
+    const when = asString(row['when'], `${where}[${String(index)}].when`);
+    const then = asString(row['then'], `${where}[${String(index)}].then`);
+    return {
+      when,
+      ...(row['whenValue'] === undefined ? {} : { whenValue: row['whenValue'] }),
+      then,
+      ...(row['thenValue'] === undefined ? {} : { thenValue: row['thenValue'] }),
+    } as RuleRow;
+  });
 }
 
 function postedOf(raw: unknown, where: string): PostedResult {

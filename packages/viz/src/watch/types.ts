@@ -37,6 +37,8 @@
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
 
+import type { RuleRow } from '../authoring/ruleSpec.js';
+
 /* -------------------------------------------------------------------------- *
  * The record
  * -------------------------------------------------------------------------- */
@@ -58,8 +60,25 @@ import type { RunInterventionConfig } from '@elevator-sim/core/browser';
  * | version | what it holds |
  * |---|---|
  * | 1 | The first shape: seed, the six selection axes, the week's day pair, the held cars, the log. |
+ * | 2 | …and the Everyday rules the run's dispatcher was driven by. |
+ *
+ * ## Version 2, and why it is a bump rather than an optional key
+ *
+ * `docs/20` defect 1. Writing one rule made **every day filed afterwards unwatchable**: a written
+ * rule list is not expressible as a selection, `runIdentityIssues` says so, and `watchRecordOf`
+ * refuses to write a record for any state it refuses. The rules are the one refused field that is
+ * **plain data on the profile** — four scalars a `RuleRow` already round-trips through
+ * `localStorage` — so the honest answer was to carry them rather than to keep declining, and
+ * `record.ts#WATCH_RECORD_CARRIES` is where the subtraction is declared.
+ *
+ * A version-1 record is *readable* as a version-2 one carrying no rules, and that is a completion
+ * rather than a guess in the strongest form this repository uses the word: version 1's own write
+ * gate **refused every state with a rule in it**, so `ruleRows: []` is not a default standing in for
+ * something nobody wrote down — it is the only value such a record could have described.
+ * `persist/session.ts` performs that completion on read, which is why the constant here can stay a
+ * single number and `recordUnreadableReason` can stay a plain `!==`.
  */
-export const WATCH_RECORD_VERSION = 1;
+export const WATCH_RECORD_VERSION = 2;
 
 /**
  * A run, as the question that produced it — contract § 1.4's `{ seed, config, interventions[] }`,
@@ -122,6 +141,34 @@ export interface WatchRecord {
   readonly outOfServiceCarIds: readonly string[];
   /** The mid-run interventions, in press order — contract § 1.4. `[]` for a run with none. */
   readonly interventions: readonly RunInterventionConfig[];
+  /**
+   * The Everyday rules the dispatcher was driven by, in first-match order — `docs/20` defect 1.
+   *
+   * `[]` for a run that wrote none, which is every run the shipped profiles produce on their own.
+   *
+   * ## Why the record may hold these when a submission may not
+   *
+   * `interventions` and `outOfServiceCarIds` are already here on exactly this footing, and the
+   * argument is `record.ts`'s: *"this record is not the wire — it is a local file and a local
+   * slot — so it can hold what the wire cannot."* `scope/runIdentity.ts` refuses a rule list
+   * because **no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses one**,
+   * which is a fact about the wire and not about the rules.
+   *
+   * ## Why the rows and not the profile they make
+   *
+   * `authoring/ruleSpec.ts#profileWithRules` turns these four scalars into a whole
+   * `DispatcherProfile` with `selection.policy: 'rules'` on it. Storing that profile would be
+   * storing a resolved artefact — the thing {@link WatchRecord}'s own docstring refuses for the
+   * building — and it would go stale the day the rule vocabulary or the policy wiring moves. The
+   * rows are what the player wrote; the profile is what this build makes of them, and re-making it
+   * is what replaying means.
+   *
+   * The ids are checked against the shipped vocabulary on read
+   * (`record.ts#recordUnreadableReason`), because a record naming a condition this build no longer
+   * has is a record it cannot re-ask — the same answer, and the same sentence shape, as a record
+   * naming a building `data/buildings/` has stopped shipping.
+   */
+  readonly ruleRows: readonly RuleRow[];
 }
 
 /* -------------------------------------------------------------------------- *

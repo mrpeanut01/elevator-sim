@@ -239,9 +239,14 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf } from './ghostRun.js';
-import { watchRecordOf } from '../watch/record.js';
+import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
+import {
+  PLAYER_SHELL_COPY,
+  footerSeedLineOf,
+  shellWatchingCopyOf,
+} from '../watch/shell.js';
 import { watchingStateOf } from '../watch/session.js';
 import {
   createShiftRunner,
@@ -976,9 +981,34 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   });
   {
-    // Above the header, so the inverted strip and the inverted header read as one block.
+    /*
+     * Above the header, so the inverted strip and the inverted header read as one block — and
+     * **inside a band of their own**, which is `docs/20` defect 12 and a layout bug rather than a
+     * styling preference.
+     *
+     * `.shell` is `grid-template-rows: auto 1fr auto` over exactly three children: the header, the
+     * body, the footer. Inserting the strip as a fourth child *before* the header shifts all three
+     * down a track — the strip takes the leading `auto`, **the header takes the `1fr`**, the body
+     * takes the trailing `auto` and the footer lands in an implicit row — inside a `height: 100vh`
+     * box with `overflow: hidden`. What a player sees is the strip and the header contending for
+     * the top of the page with the wordmark, Menu and clock clipped, which is what the audit
+     * photographed (`61-watching.png`).
+     *
+     * So the two go into one band that occupies the header's own track, and the grid is back to
+     * three children whether or not anybody is watching. The band is inserted with
+     * `parentElement?.insertBefore` — this package's one insertion idiom — before the header is
+     * moved into it. No rule in `index.html` selects the header as a child of `.shell` (there is no
+     * `.shell > *` rule at all), so nothing about the header's own styling moves with it, and
+     * `ui.header.right.closest('header')` — how every other reader finds the header — does not care
+     * about depth. `min-width: 0` is the ordinary grid-item guard: without it the band's minimum
+     * content size would stop `.topbar`'s own ellipsis from ever engaging.
+     */
     const headerEl = ui.header.right.closest('header');
-    headerEl?.parentElement?.insertBefore(watchPanel.chrome, headerEl);
+    if (headerEl !== null) {
+      const band = el(document, 'div', { className: 'watch-band', style: { 'min-width': '0' } });
+      headerEl.parentElement?.insertBefore(band, headerEl);
+      band.append(watchPanel.chrome, headerEl);
+    }
   }
 
   /**
@@ -2646,6 +2676,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * is the same class of surprise as the speed chip latching across a mode (`docs/19` defect 12).
      */
     readonly wasPlaying: boolean;
+    /**
+     * The speed chip the player had latched — `docs/20` defect 10, and the same defect `docs/19`
+     * defect 12 found one mode door over.
+     *
+     * Entering a watch is a **mode entry**: the run on the stage is a different day, of a different
+     * length, that the player did not start. The chip they latched belongs to the thing they left,
+     * and at ×900 a shipped reference run is over about a second and a half after `Watch it` — the
+     * audit measured 06:22 of a record ending ~06:26. So {@link enterWatch} calls
+     * {@link resetTransportSpeed} exactly as every other mode door does.
+     *
+     * It is saved here for the *other* half of § 14.1, which the mode doors have no equivalent of:
+     * *"stopping the watch returns you exactly where you were."* A reset with no restore would put
+     * the player back on their own run at a speed they never chose — the same surprise, aimed the
+     * other way — so the chip goes back with the playhead and the pause state.
+     */
+    readonly baseSpeed: number;
   }
 
   /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
@@ -3293,6 +3339,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Contract § 1.5 — the intervention API is disabled, the playback controls are not.
     if (view !== undefined) interventionButton.disabled = true;
     ui.race.ghost.disabled = view !== undefined;
+    /*
+     * **The picker is hidden, not merely disabled** — § 14.1's *"no verdict — you are not in this
+     * comparison"*, and `docs/20` defect 7's least obvious half. A disabled `<select>` still
+     * renders its own selected option, and one of the three is `your latest saved`: the rule the
+     * section states is about the word on the screen, not about which controls respond.
+     *
+     * **The attribute and the inline display**, exactly as the timeline above needs both and for
+     * the identical reason: `index.html` gives `.race-pick` a `display: inline-flex` of its own,
+     * which is more specific than the user-agent's `[hidden] { display: none }`. The attribute
+     * alone left the whole picker — label, control and all three option texts — on the screen, and
+     * the browser tier caught it on the first run of this sweep.
+     */
+    setHidden(ui.race.pick, view !== undefined);
+    ui.race.pick.style.setProperty('display', view === undefined ? '' : 'none');
+
+    /*
+     * The four shell surfaces § 14.1's table does not name — `watch/shell.ts`, `docs/20` defect 7.
+     *
+     * They are written **here** rather than in the four draws that own the elements, for
+     * `drawWatching`'s own stated reason: the differentiation is a single claim, and four
+     * independently-guarded clauses is four chances for one of them to stay behind. Both arms are
+     * written on every call, so nothing can be left saying `Your run` over a stranger's day.
+     *
+     * The Day report's note is `hidden` on the player's arm rather than emptied, because an empty
+     * bordered box is a slot that looks like it failed to fill.
+     */
+    const copy = view === undefined ? PLAYER_SHELL_COPY : shellWatchingCopyOf(view);
+    setText(ui.race.youName, copy.raceKey);
+    setText(ui.shift.eyebrow, copy.railEyebrow);
+    setText(ui.shift.runNote, copy.railNote);
+    setText(ui.report.spectatorNote, copy.reportNote);
+    setHidden(ui.report.spectatorNote, copy.reportNote === '');
   }
 
   /**
@@ -3787,8 +3865,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
+  /**
+   * § 1.1 S4 — the counts at the playhead, and **whose run they are of**.
+   *
+   * ## The one branch, and why it is here rather than in `drawWatching`
+   *
+   * `docs/20` defect 7: while watching, this line read `paused · 363 arrived, 363 carried · lobby
+   * holder` with `seed 20260804 · day 1` beneath it — the *spectator's* dispatcher and the
+   * *spectator's* seed, under a strip headed `THEIR DISPATCHER Conventional collective`. The counts
+   * were right, because they come from the recording on the stage; the identity was wrong, because
+   * it came from `state`, and `watch/session.ts#watchingStateOf` deliberately leaves everything but
+   * `recording` alone. A spectator reading their own seed under somebody else's day is § 14.1's own
+   * *"will read the figures as their own"*, arriving through the one surface that names a run
+   * without describing it.
+   *
+   * The branch is **here** rather than in `drawWatching`, which owns every other spectator surface,
+   * because the identity is one clause of a sentence whose other clauses move every frame. Two
+   * writers for one element is how a footer comes to show a stranger's dispatcher beside the
+   * player's counts; one writer reading one `watching` is not.
+   */
   function drawFooter(view: ViewAt): void {
+    const watched = watching;
     const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    // The record's dispatcher, in the words `watch/view.ts` already resolved for the strip's own
+    // `THEIR DISPATCHER` cell — a second lookup here is a second answer to whose run this is.
+    const dispatcherName = watched === undefined ? profile.name : watched.view.dispatcherName;
     const observations =
       view.recording === undefined ? undefined : observationsAt(view.recording, view.simTimeS);
     setText(
@@ -3796,11 +3897,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       observations === undefined
         ? 'no shift run yet'
         : `${view.playing ? 'running' : 'paused'} · ${String(observations.arrived)} arrived, ` +
-          `${String(observations.carried)} carried · ${profile.name.toLowerCase()}`,
+          `${String(observations.carried)} carried · ${dispatcherName.toLowerCase()}` +
+          (watched === undefined ? '' : ` · ${shellWatchingCopyOf(watched.view).footerNote}`),
     );
     setText(
       ui.footer.seedLine,
-      `seed ${state.seed.toString()} · day ${String(state.week.day)}`,
+      watched === undefined
+        ? `seed ${state.seed.toString()} · day ${String(state.week.day)}`
+        : footerSeedLineOf(watched.run.record),
     );
   }
 
@@ -4284,8 +4388,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
         filedRunId,
         playheadS: playback?.simTimeS,
         wasPlaying: playback?.state === 'playing',
+        baseSpeed,
       },
     };
+    /*
+     * A mode is being entered, so the latched chip stays behind — `docs/20` defect 10, and
+     * {@link resetTransportSpeed} owns the boundary. Read {@link WatchedBefore.baseSpeed} for why
+     * the value is saved rather than only dropped: § 14.1 promises the player their own run back
+     * exactly as they left it, and the speed is part of *exactly*.
+     *
+     * **Before `adopt`**, which is not stylistic: `adopt` builds the `Playback` with
+     * `playbackRateFor(baseSpeed, …)`, so a reset afterwards would construct the transport at the
+     * latched speed and correct it a frame later — a stranger's day would still start at ×900.
+     */
+    resetTransportSpeed();
     /*
      * The rival's line goes down for the run it raced. Leaving it standing beside somebody else's
      * day would be two different crowds on one scale, which `applyShift` already refuses for the
@@ -4336,6 +4452,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ghostPick = before.ghostPick;
     runStartOfDayS = before.startOfDayS;
     lastRaceKey = '';
+    /*
+     * The chip the player latched before they left — see {@link WatchedBefore.baseSpeed}. Assigned
+     * **before `adopt`** for `enterWatch`'s reason in reverse: `adopt` reads `baseSpeed` when it
+     * builds the `Playback`, so the player's own run comes back at the player's own speed rather
+     * than at the spectator default and a correction.
+     */
+    baseSpeed = before.baseSpeed;
     if (state.recording === undefined) {
       /*
        * A player who had no run of their own gets the stage they had — nothing on it. `adopt`
@@ -4701,6 +4824,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * left on after the run.
        */
       record: watchRecordOf(state, resources) ?? null,
+      /*
+       * And **why**, when there is no record — `docs/20` defect 1. Written from the same `state` on
+       * the same line for the same reason: the two are one fact with two spellings, and a day that
+       * carried a `null` record with no cause is what made every day filed after a rule was written
+       * unwatchable under a sentence blaming the file format.
+       */
+      recordRefusal: recordRefusalFor(state, resources),
     });
     /*
      * **The week is written only by a mode that owns one** — § D231, issue #64.
@@ -4793,6 +4923,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * true across day and building changes is `ViewerState.interventions`' own docstring.
        */
       interventions: state.interventions,
+      /*
+       * The rules the run was driven by — `docs/20` defect 2. From `state` for `interventions`'
+       * reason exactly: `shiftRunConfigOf` applies `profileWithRules(profile, state.ruleRows)` when
+       * it builds the run, so these are the rows the legs on screen were simulated under rather
+       * than whatever the editor happens to be holding now.
+       */
+      ruleRows: state.ruleRows,
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.

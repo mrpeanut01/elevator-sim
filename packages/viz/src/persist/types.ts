@@ -217,8 +217,40 @@ export const SESSION_KEY = 'elevator-sim.session';
  *   as *newer* is true; refusing it as damaged is not.
  *
  * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
+ *
+ * ## Version 7 adds a key at **two** depths at once, and both absences determine their value
+ *
+ * `docs/20` defect 1. Two things were wrong with a filed day that could not be watched, and fixing
+ * either without the other leaves a half-answer:
+ *
+ * - **The refusal had no cause.** Every unwatchable day said one sentence — *"filed without the
+ *   record of what it ran … days closed from here on carry one"* — which blamed the file format and
+ *   was false in its second clause: whatever refused this day refuses the next one identically.
+ *   `DayOutcome` gains `recordRefusal`, the sentence `watch/record.ts#recordRefusalFor` composes at
+ *   the moment the day closes, because nothing can recover it afterwards.
+ * - **The commonest cause did not have to be a cause at all.** Writing one Everyday rule made every
+ *   later day unwatchable, and rules are four scalars per row that this envelope already carries
+ *   elsewhere. `WatchRecord` gains `ruleRows` and moves to shape 2, so a rules run is watchable
+ *   instead of refused.
+ *
+ * The two questions, as every paragraph above asks them:
+ *
+ * - **Does the absence determine the value?** For both, and by the strongest form of the argument.
+ *   `recordRefusal: null` on a version 1–6 day is a *measurement*: those builds composed no
+ *   sentence, so there is none to recover, and `watch/library.ts` says exactly that rather than
+ *   inventing a cause. `ruleRows: []` on a stored record is stronger still — shape 1's **own write
+ *   gate refused every state with a rule in it**, so an empty list is the only list such a record
+ *   could ever have described. That is why `session.ts#withRecordRefusals` may also set the stored
+ *   record's `version` to 2: after the completion the value *is* a shape-2 record, and the claim is
+ *   justified by the gate that wrote it rather than by a hope about what it contained.
+ * - **Can an older build read what this one writes?** No, twice. A version-6 reader meets
+ *   `recordRefusal` in a history entry and `ruleRows` inside its record, and `isObjectOf`'s
+ *   extra-key branch refuses the envelope as *damaged* — the false accusation the version-3
+ *   paragraph records. Refusing it as *newer* is true; refusing it as damaged is not.
+ *
+ * The newer direction stays a refusal for the ordinary reason. A decision number is owed.
  */
-export const SESSION_SCHEMA_VERSION = 6;
+export const SESSION_SCHEMA_VERSION = 7;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -228,7 +260,7 @@ export const SESSION_SCHEMA_VERSION = 6;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5, 6]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5, 6, 7]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

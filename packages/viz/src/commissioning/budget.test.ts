@@ -109,6 +109,7 @@ describe('the budget does not reach a results page', () => {
       opened,
       outcomeOf({
         record: null,
+        recordRefusal: null,
         day: opened.day,
         dayIdx: opened.dayIdx,
         eventId: 'ordinary',

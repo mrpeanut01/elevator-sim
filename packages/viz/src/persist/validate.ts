@@ -381,6 +381,21 @@ const WATCH_RECORD_CHECKS: Readonly<Record<keyof WatchRecord, FieldCheck>> = Obj
   dayIdx: isIntegerWithin(0, WEEKDAYS.length - 1),
   outOfServiceCarIds: isArrayOf(isNonEmptyString, 64, 'car ids'),
   interventions: isArrayOf(isDocument('an intervention'), 64, 'interventions'),
+  /*
+   * The Everyday rules — shape 2, `docs/20` defect 1, and checked exactly as shallowly as
+   * `interventions` for the identical reason. `RULE_CONDITIONS` and `RULE_ACTIONS` are `core`'s
+   * unions; a second copy of them here goes stale the day a condition lands, and
+   * `watch/record.ts#recordUnreadableReason` already refuses a row naming one this build does not
+   * ship — with a sentence a reader can act on, where a validator failure takes the whole week away.
+   *
+   * The bound is **this file's**, and it is stated as such: nothing in `dev/ruleEditor.ts` or in
+   * `core`'s schema caps a rule list, so a sentence attributing this number to an editor limit
+   * would be a stated mechanism with nothing behind it. It sits where `interventions` and `car ids`
+   * sit — a length past which an envelope is better described as damaged than as large — and a
+   * player who genuinely writes a thirty-third rule is the reason to raise it rather than a reason
+   * it was wrong.
+   */
+  ruleRows: isArrayOf(isDocument('a rule row'), 32, 'rule rows'),
 });
 
 const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.freeze({
@@ -397,6 +412,13 @@ const OUTCOME_CHECKS: Readonly<Record<keyof DayOutcome, FieldCheck>> = Object.fr
   // different days that carry one, and `session.ts#withDayRecords` for why a version 1–5 envelope
   // arrives here with the key already present and `null`.
   record: nullOr(isObjectOf(WATCH_RECORD_CHECKS, 'a run record')),
+  /*
+   * Why there is no record, or `null` — `docs/20` defect 1. A sentence rather than a code, and
+   * `shift/types.ts#DayOutcome.recordRefusal` argues why; here it only has to be a string or the
+   * absence of one, and `session.ts#withRecordRefusals` is why a version 1–6 envelope arrives with
+   * the key already present.
+   */
+  recordRefusal: nullOr(isString),
 });
 
 const AWARD_CHECKS: Readonly<Record<keyof ClearedAward, FieldCheck>> = Object.freeze({

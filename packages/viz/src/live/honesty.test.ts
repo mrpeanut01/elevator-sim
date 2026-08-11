@@ -142,15 +142,20 @@ describe('the casual copy is the design’s, keyed on an observation', () => {
     expect(fallingBehindAt(small, 200)).toBe(false);
   });
 
-  it('writes the design’s two sentences, and nothing else', () => {
+  it('writes the design’s two sentences, in the third person, and nothing else', () => {
     const behind = syntheticRecording({
       legs: Array.from({ length: 200 }, (_unused, i) => waitingLeg(`p${String(i)}`, 0)),
       summary: { handlingCapacity: { personsPer5Min: 1, offeredPer5Min: 10, pctPopulationPer5Min: 1 } },
     });
     const card = honestyAt(behind, 200, 'casual');
     expect(card.title).toBe('The building is falling behind');
+    /*
+     * The design's sentence with its pronoun removed — the deviation `casualTitle`'s docstring
+     * argues, and `docs/20` defect 7. `your cars` is the handoff's own § 14.1 defect condition when
+     * the day on the stage belongs to somebody else, and this card is drawn on a watched run.
+     */
     expect(card.plain).toBe(
-      'People are arriving faster than your cars can clear them. Add a shaft, zone the tower, ' +
+      'People are arriving faster than the cars can clear them. Add a shaft, zone the tower, ' +
         'or ride out a rough morning and read the post-mortem.',
     );
     // Token names, not the dark band's value — § D251. A wash is not a word, so this copy of the

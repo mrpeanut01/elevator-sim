@@ -96,6 +96,7 @@ const AWFUL: GoalObservations = Object.freeze({
 function outcome(week: WeekState, observed: GoalObservations) {
   return outcomeOf({
     record: null,
+    recordRefusal: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',

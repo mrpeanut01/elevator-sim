@@ -72,6 +72,7 @@ function day(
 ): DayOutcome {
   return outcomeOf({
     record: null,
+    recordRefusal: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',
@@ -123,6 +124,7 @@ describe('unjudged is not passed', () => {
     // indistinguishable from one that proved everything.
     const outcome = outcomeOf({
       record: null,
+      recordRefusal: null,
       day: 1,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -457,6 +459,7 @@ describe('re-closing the same day replays it rather than adding to it', () => {
   const cleanDay = (day: number): DayOutcome =>
     outcomeOf({
       record: null,
+      recordRefusal: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -468,6 +471,7 @@ describe('re-closing the same day replays it rather than adding to it', () => {
   const missedDay = (day: number): DayOutcome =>
     outcomeOf({
       record: null,
+      recordRefusal: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',

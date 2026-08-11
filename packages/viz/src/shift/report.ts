@@ -98,6 +98,7 @@
 import type { RunInterventionConfig, SimTime } from '@elevator-sim/core/browser';
 
 import type { VizRecording, VizSummary } from '../contract/types.js';
+import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { interventionLogOf } from '../live/interventions.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
@@ -533,6 +534,40 @@ export interface DayReportInput {
    * `state.interventions`, which is the log the run on screen was re-simulated under.
    */
   readonly interventions?: readonly RunInterventionConfig[] | undefined;
+  /**
+   * The Everyday rules the run's dispatcher was driven by, in first-match order — `docs/20`
+   * defect 2, and {@link DayReportInput.interventions}' exact shape one mechanism over.
+   *
+   * ## The defect this closes
+   *
+   * A player wrote `when the lobby queue passes 30 people, hold a car at the lobby`, watched the
+   * stage header name it live for forty minutes of simulated time, filed the day — and the sheet
+   * said *"Midtown Office · Conventional collective"*. The word **rule** appeared on it zero times.
+   * That is `docs/19` defect 10 exactly, on the mechanism that landed after it was fixed: the
+   * surface built to answer *what happened today* did not name the thing that decided it.
+   *
+   * ## Why they sit with identity rather than with the interventions
+   *
+   * Because they are config and the interventions are not. `authoring/ruleSpec.ts` says it
+   * outright — *"a run is `{ seed, config, interventions[] }` and rules are config"*, which is also
+   * why a rule edit is next-run and never mid-run. So the lines go with the things that were
+   * **asked for** — the dispatcher, the seed, the selection, the booking — and above the log of
+   * what the player did to the day once it was running.
+   *
+   * ## Why the readback rather than a count
+   *
+   * `readbackOf` is the rules editor's own sentence — *"Reads as: when the lobby queue passes 30
+   * people, hold a car at the lobby"* — and a sheet quoting a different wording for the same row
+   * would be the second account of one decision this file spends most of its docstrings avoiding.
+   * *"2 rules"* would say a rule was in force without saying which, which is the shape of caption
+   * `docs/10` R3 refuses.
+   *
+   * Optional, and `undefined` **is** the empty list rather than a guess at one, for
+   * {@link DayReportInput.interventions}' stated reason: `profileWithRules` returns the driving
+   * profile by object identity for an empty list, so a run built with no rows is the run the
+   * dispatcher id already implies. Every caller that passes nothing is describing exactly that.
+   */
+  readonly ruleRows?: readonly RuleRow[] | undefined;
 }
 
 /**
@@ -577,6 +612,13 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
     `seed ${recording.seed} · ${clockRange(recording.startedAt, recording.endedAt, dayStartS)} · one replication`,
     ...(subject.kind === 'single-run' ? selectionLines(subject.selection) : []),
     ...bookedLine(input.event, subject),
+    /*
+     * The rules in force, before the attempt count and well before the intervention log —
+     * `docs/20` defect 2. Config, so it belongs with what was asked for; see
+     * {@link DayReportInput.ruleRows} for why that placement is a decision rather than a habit.
+     * An empty list prints nothing, exactly as an untouched day prints no intervention lines.
+     */
+    ...ruleLines(input.ruleRows ?? [], dispatcherName),
     ...attemptLine(subject, week.attempt),
     /*
      * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
@@ -589,6 +631,29 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
      * every one of its sheets has always read.
      */
     ...interventionLogOf(input.interventions ?? [], dayStartS),
+  ];
+}
+
+/**
+ * The rules the run was driven by, one line each, in the words the editor read them back in.
+ *
+ * `docs/20` defect 2. Each line is `readbackOf`'s sentence with its ordinal, so the sheet, the
+ * editor's readback and the stage header's live pill are three renderings of one string producer
+ * rather than three authors — `interventionLogOf`'s arrangement, and its reason: two accounts of
+ * what a control was called is how they come to disagree.
+ *
+ * The fallback is stated **once, under the list**, and only when there is a list. It is
+ * `fallbackLineOf`'s own sentence, and it is the answer to the question this sheet's identity line
+ * otherwise raises by itself: a reader who sees *Conventional collective* on the first line and a
+ * rule on the third is owed the relationship between them, which is that the dispatcher decides
+ * every call no rule matched. Without a rule there is nothing to qualify and the line would be a
+ * caption over nothing — `docs/10` R3, and `interventionLogOf`'s empty arm.
+ */
+function ruleLines(rows: readonly RuleRow[], dispatcherName: string): readonly string[] {
+  if (rows.length === 0) return [];
+  return [
+    ...rows.map((row, index) => `rule ${String(index + 1)} · ${readbackOf(row)}`),
+    fallbackLineOf(dispatcherName),
   ];
 }
 

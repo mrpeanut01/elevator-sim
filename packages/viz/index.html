@@ -957,6 +957,12 @@
       }
       .report-meta { text-align: right; font: 500 11px/1.6 var(--mono); color: var(--dim); }
       .report-lede { font-size: 15px; line-height: 1.6; color: var(--dim); margin: 18px 0 0; }
+      /* The spectator's note above the sheet — § 14.1. Ink on the sheet's own paper, bordered on
+         the leading edge so it reads as a statement *about* the sheet rather than a line of it. */
+      .report-spectator-note {
+        margin: 0 0 16px; padding: 9px 12px; font: 500 12px/1.5 var(--sans);
+        color: var(--dim); border-left: 3px solid var(--accent); background: var(--panel);
+      }
       .report-figures {
         display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 1px; background: var(--edge); border: 1px solid var(--edge);
@@ -1643,18 +1649,21 @@
                observations either way, and a deeper read belongs under the headline it explains. -->
           <div id="mood-drivers" style="margin-top: 12px"></div>
 
-          <!-- L4 — YOUR RUN. -->
+          <!-- L4 — YOUR RUN.
+
+               The eyebrow and the note are written from `watch/shell.ts` rather than authored here
+               — `docs/20` defect 7. Both said *your* over a stranger's day and neither could
+               branch, because static markup has no arms. The figures under them are the player's
+               week either way; what the spectator arm changes is the label, not the subject. -->
           <div class="eyebrow-row">
-            <span class="eyebrow">Your run</span>
+            <span class="eyebrow" id="run-eyebrow"></span>
             <span class="eyebrow-note eyebrow-note-strong" id="streak-line"></span>
           </div>
           <div class="card" style="margin-bottom: 14px">
             <div class="run-figures" id="run-figures"></div>
             <div style="padding: 12px 13px; border-top: 1px solid var(--edge)">
               <div class="history" id="history"></div>
-              <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.45">
-                Share of riders away within a minute. No losing — just a line you are trying to bend upward.
-              </p>
+              <p id="run-note" style="margin: 10px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.45"></p>
             </div>
           </div>
 
@@ -1848,7 +1857,10 @@
             <div class="race" id="race-strip" hidden>
               <div class="race-head">
                 <span class="legend-title">The race</span>
-                <label class="race-pick">race against
+                <!-- Hidden while watching — § 14.1's *"no verdict — you are not in this
+                     comparison"*. It was merely disabled, which left the option list's own
+                     *your latest saved* on screen beside somebody else's day. -->
+                <label class="race-pick" id="race-pick">race against
                   <select id="race-ghost"></select>
                 </label>
                 <span class="race-verdict" id="race-verdict"></span>
@@ -1870,7 +1882,11 @@
                 </svg>
               </div>
               <div class="race-key">
-                <span class="legend-entry"><span class="legend-swatch race-swatch-you" aria-hidden="true"></span>you</span>
+                <!-- The key's own word is written from `watch/shell.ts` — `docs/20` defect 7. It
+                     read a literal "you" here, which is § 14.1's stated defect condition on a
+                     watched run and could not branch, because nothing wrote it. Both arms now have
+                     one author and the honesty sweep drives them; empty here, like `#race-note`. -->
+                <span class="legend-entry"><span class="legend-swatch race-swatch-you" aria-hidden="true"></span><span id="race-you-name"></span></span>
                 <span class="legend-entry" id="race-ghost-key" hidden><span class="legend-swatch race-swatch-ghost" aria-hidden="true"></span><span id="race-ghost-name"></span></span>
               </div>
               <p class="race-footer" id="race-footer"></p>
@@ -1972,6 +1988,13 @@
           <section role="tabpanel" id="panel-report" aria-labelledby="tab-report" hidden>
             <div class="sheet">
               <div class="report">
+                <!-- What this sheet is *of*, while a replay is on the stage — `docs/20` defect 7.
+                     Pressing Day report while watching showed the spectator's own last filed sheet
+                     with nothing saying it was not the run on screen. Written by
+                     `dev/main.ts#drawWatching` from `watch/shell.ts`, on both arms, and hidden the
+                     rest of the time: the sheet itself is untouched, which is § 14.1's own promise
+                     that the sheet the player left open is still theirs. -->
+                <p id="report-spectator-note" class="report-spectator-note" role="note" hidden></p>
                 <div class="report-head">
                   <div>
                     <div class="eyebrow">Vertical transportation — daily observation sheet</div>

@@ -29,10 +29,17 @@
  * tomorrow with a `within-day` scope is refused here on the day it lands rather than on the day
  * somebody remembers.
  *
- * The three *"yours alone"* refusals are the exception and are kept explicit, because they are not
- * about a scope at all: `buildingId` is `between-games` and perfectly legal to move, and it is still
+ * The three *"saved on this device alone"* refusals are the exception and are kept explicit, because
+ * they are not about a scope at all: `buildingId` is `between-games` and perfectly legal to move, and it is still
  * unreproducible when it names a building `data/buildings/` does not ship. That is a question about
  * the **value**, not the field, and only `resources` can answer it.
+ *
+ * They said *"is yours alone"* until `docs/20` defect 1, and the wording moved because the audience
+ * did. These messages are quoted verbatim by `watch/library.ts#refusalForDay` onto the watch
+ * picker, and GAMEPLAY § 14.1 forbids first-person copy on a watching surface in as many words —
+ * *"the word `you` on a watched run is a defect"*. The replacement is not a euphemism: **saved on
+ * this device** is the fact the refusal turns on (only this browser has the artefact), where
+ * *yours* was a claim about ownership that the leaderboard's own copy never needed either.
  *
  * ## The unstated premise that sentence had, and the two questions it conflated — issue #129
  *
@@ -561,14 +568,14 @@ export function runIdentityIssues(
     issues.push({
       key: 'viewer.buildingId',
       scope: 'between-games',
-      message: `the building “${state.buildingId}” is yours alone and data/buildings/ does not ship it`,
+      message: `the building “${state.buildingId}” is saved on this device alone and data/buildings/ does not ship it`,
     });
   }
   if (!resources.dispatcherProfiles.profiles.some((profile) => profile.id === state.dispatcherId)) {
     issues.push({
       key: 'viewer.dispatcherId',
       scope: 'between-games',
-      message: `the dispatcher “${state.dispatcherId}” is yours alone and data/dispatcher-profiles.json does not ship it`,
+      message: `the dispatcher “${state.dispatcherId}” is saved on this device alone and data/dispatcher-profiles.json does not ship it`,
     });
   }
   if (
@@ -578,7 +585,7 @@ export function runIdentityIssues(
     issues.push({
       key: 'viewer.pattern',
       scope: 'between-games',
-      message: `the arrival pattern “${state.pattern}” is yours alone and no selection names a saved pattern`,
+      message: `the arrival pattern “${state.pattern}” is saved on this device alone and no selection names a saved pattern`,
     });
   }
 

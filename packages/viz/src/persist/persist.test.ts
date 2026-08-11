@@ -152,6 +152,7 @@ const PERFECT = Object.freeze({
 function playedWeek(): WeekState {
   const day1 = outcomeOf({
     record: null,
+    recordRefusal: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',
@@ -162,6 +163,7 @@ function playedWeek(): WeekState {
   });
   const day2 = outcomeOf({
     record: null,
+    recordRefusal: null,
     day: 2,
     dayIdx: 1,
     eventId: 'move-in',
@@ -221,6 +223,7 @@ const library = (): SavedLibrary => ({
 function parkedWeek(): WeekState {
   const day1 = outcomeOf({
     record: null,
+    recordRefusal: null,
     day: 1,
     dayIdx: 0,
     eventId: 'ordinary',
@@ -932,6 +935,55 @@ describe('a payload this build cannot read is refused, with the reason', () => {
     if (result.ok) return;
     expect(result.failure.kind).toBe('shape');
     expect(result.failure.message).toContain('library');
+  });
+
+  /*
+   * The version 6 → 7 completion — `docs/20` defect 1, and the one arm of this module that
+   * **rewrites** a stored value rather than filling a gap beside it.
+   *
+   * A version-6 day carries no `recordRefusal` and its record carries no `ruleRows` and says
+   * `version: 1`. Read as-is, `recordUnreadableReason` refuses every such record with a true and
+   * useless sentence about shapes, which would take the `Watch it` button off every day a player
+   * has ever filed. `session.ts#withRecordRefusals` completes both keys and moves the record's own
+   * shape number, on the evidence shape 1's write gate provides: it refused every state with a rule
+   * in it, so `[]` is the only list such a record could have described.
+   */
+  it('reads a version-6 envelope, completing the day’s refusal and the record’s rules', () => {
+    const slots = saved();
+    tamper(slots, (envelope) => {
+      envelope['schemaVersion'] = 6;
+      const history = weekOf(envelope)['history'] as Record<string, unknown>[];
+      expect(history.length, 'the fixture week must have days, or this asserts nothing').toBeGreaterThan(0);
+      for (const day of history) {
+        delete day['recordRefusal'];
+        day['record'] = {
+          version: 1,
+          seed: '42',
+          buildingId: 'garden-apartments',
+          dispatcherId: 'collective',
+          pattern: 'building',
+          demandTemplateId: null,
+          arrivalRatePctPop5min: null,
+          shiftLengthS: 1800,
+          windowStartS: null,
+          day: 1,
+          dayIdx: 0,
+          outOfServiceCarIds: [],
+          interventions: [],
+        };
+      }
+    });
+    const result = loadSession(slots.store);
+    expect(
+      result.ok ? '' : `${result.failure.kind}: ${result.failure.message}`,
+      'a version-6 envelope is refused rather than completed',
+    ).toBe('');
+    if (!result.ok) return;
+    for (const day of result.snapshot.week.history) {
+      expect(day.recordRefusal, 'a build that kept no reason must not acquire one').toBeNull();
+      expect(day.record?.ruleRows, 'shape 1 refused every rules run, so the list is []').toEqual([]);
+      expect(day.record?.version, 'the completed record is a shape-2 record and must say so').toBe(2);
+    }
   });
 
   it('refuses an envelope carrying a key this build does not know', () => {

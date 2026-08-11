@@ -158,6 +158,16 @@ export interface MoodElements {
 
 /** § 1.2 L4, L5 — YOUR RUN and TODAY'S SHIFT. */
 export interface ShiftElements {
+  /**
+   * L4's eyebrow and the note under its history bars — `docs/20` defect 7.
+   *
+   * Both were static markup reading *Your run* and *a line you are trying to bend upward*, six
+   * centimetres from a stranger's day with nothing saying which was which. They are written from
+   * `watch/shell.ts` on both arms now, which is the only way a string can have a spectator arm at
+   * all: nothing wrote them, so nothing could stop.
+   */
+  readonly eyebrow: HTMLElement;
+  readonly runNote: HTMLElement;
   readonly streakLine: HTMLElement;
   readonly runFigures: HTMLElement;
   readonly history: HTMLElement;
@@ -237,6 +247,14 @@ export interface RaceElements {
   readonly note: HTMLElement;
   /** §7.4's permanent footer, written from `RACE_FOOTER` so the string has one author. */
   readonly footer: HTMLElement;
+  /**
+   * The picker's label, hidden while watching — § 14.1's *"no verdict — you are not in this
+   * comparison"*. Disabling the `<select>` left its own option list, *your latest saved* included,
+   * legible beside somebody else's day.
+   */
+  readonly pick: HTMLElement;
+  /** The key entry naming the player's line — `you`, or the watched run's name (`watch/shell.ts`). */
+  readonly youName: HTMLElement;
   /** The key entry naming the grey line. Hidden with nobody — the strip never invents a rival. */
   readonly ghostKey: HTMLElement;
   readonly ghostName: HTMLElement;
@@ -281,6 +299,14 @@ export interface TransportElements {
 
 /** § 1.3 M6 — the daily observation sheet. */
 export interface ReportElements {
+  /**
+   * What the sheet is *of* while a replay is on the stage — `docs/20` defect 7, § 14.1.
+   *
+   * Written by `dev/main.ts#drawWatching` and by nothing in `dev/reportPanel.ts`: the sheet is the
+   * player's own and stays untouched (§ 14.1, `watch/session.ts`), so the statement about it is a
+   * separate element with a separate writer rather than a clause the sheet's own view has to carry.
+   */
+  readonly spectatorNote: HTMLElement;
   readonly title: HTMLElement;
   readonly meta: HTMLElement;
   readonly lede: HTMLElement;
@@ -611,6 +637,8 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     stats: 'live-stats',
   }),
   shift: Object.freeze({
+    eyebrow: 'run-eyebrow',
+    runNote: 'run-note',
     streakLine: 'streak-line',
     runFigures: 'run-figures',
     history: 'history',
@@ -654,6 +682,8 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     verdict: 'race-verdict',
     note: 'race-note',
     footer: 'race-footer',
+    pick: 'race-pick',
+    youName: 'race-you-name',
     ghostKey: 'race-ghost-key',
     ghostName: 'race-ghost-name',
     topYou: 'race-top-you',
@@ -682,6 +712,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     landingSelect: 'landing-select',
   }),
   report: Object.freeze({
+    spectatorNote: 'report-spectator-note',
     title: 'report-title',
     meta: 'report-meta',
     lede: 'report-lede',

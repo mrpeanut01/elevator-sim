@@ -141,6 +141,7 @@ function reportOf(
     opened,
     outcomeOf({
       record: null,
+      recordRefusal: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
@@ -219,6 +220,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
       week,
       outcomeOf({
         record: null,
+        recordRefusal: null,
         day,
         dayIdx: week.dayIdx,
         eventId: 'ordinary',

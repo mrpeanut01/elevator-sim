@@ -390,6 +390,7 @@ describe('goalRowsOf — met, missed and pending', () => {
     const yesterdayReadings = readGoals(goalsForDay(3), goalObservations({ carryPct: 91 }));
     const yesterday = outcomeOf({
       record: null,
+      recordRefusal: null,
       day: 3,
       dayIdx: 2,
       eventId: 'ordinary',
@@ -451,6 +452,7 @@ describe('runFiguresOf and the sparkline', () => {
     // And a real 0 % day is a measurement, so it is published — the gate is the history, not the mark.
     const zeroDay: DayOutcome = {
       record: null,
+      recordRefusal: null,
       day: 1,
       dayIdx: 0,
       weekday: 'Monday',
@@ -492,6 +494,7 @@ describe('runFiguresOf and the sparkline', () => {
     const days: readonly DayOutcome[] = [
       {
         record: null,
+        recordRefusal: null,
         day: 1,
         dayIdx: 0,
         weekday: 'Monday',
@@ -504,6 +507,7 @@ describe('runFiguresOf and the sparkline', () => {
       },
       {
         record: null,
+        recordRefusal: null,
         day: 2,
         dayIdx: 1,
         weekday: 'Tuesday',

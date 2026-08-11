@@ -99,10 +99,15 @@ import {
   raceStripViewOf,
   raceVerdictOf,
 } from '../live/raceStrip.js';
-import { DAY_HAS_NO_RECORD } from '../watch/library.js';
+import { DAY_HAS_NO_RECORD, refusalForDay } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
 import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
 import type { WatchableRun } from '../watch/types.js';
+import {
+  PLAYER_SHELL_COPY,
+  shellWatchingCopyOf,
+  shellWatchingStrings,
+} from '../watch/shell.js';
 import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
@@ -2404,6 +2409,9 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
     const event = scheduledEventFor(null, day, dayIdx);
     const outcome = outcomeOf({
       record: null,
+      // No record and no cause: these bundle days are built from a recording rather than from a
+      // `ViewerState`, so there is no state for `recordRefusalFor` to have refused.
+      recordRefusal: null,
       day,
       dayIdx,
       eventId: event.id,
@@ -2447,6 +2455,18 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
        */
       interventions: [
         { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+      ],
+      /*
+       * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
+       * — `docs/20` defect 2, on `shift/report.ts#ruleLines`. Two rows rather than one, because the
+       * ordinal is part of the claim: `rule 1 · …` and `rule 2 · …` say the engine reads them in
+       * first-match order, and a single row would sweep a sentence that never has to number itself.
+       * The five sibling sheets below carry none, which is the other shipped arm — the same split
+       * the intervention log above is seeded under.
+       */
+      ruleRows: [
+        { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
+        { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
       ],
     }) as WeekDayReport;
     /*
@@ -5880,7 +5900,7 @@ const REPORT_CARD: SurfaceAdapter = {
           /*
            * Ids `data/` does **not** ship, deliberately: a value taken from the loaded configuration
            * would be reproducible by construction and the refusal arm would render nothing. These
-           * are the two *"yours alone"* refusals a reader is most likely to meet.
+           * are the two *"saved on this device alone"* refusals a reader is most likely to meet.
            */
           reasons: runIdentityIssues(
             { ...initialState(resources, 1n), buildingId: 'my-tower', dispatcherId: 'my-dispatcher' },
@@ -6365,8 +6385,31 @@ const WATCH: SurfaceAdapter = {
     'watch/view.ts#PLAY_THIS_CROWD_LABEL',
     'watch/view.ts#POSTED_FIGURES_NOTE',
     'watch/library.ts#DAY_HAS_NO_RECORD',
+    'watch/library.ts#refusalForDay',
+    /*
+     * `recordRefusalFor` composes no prose of its own — it joins `runIdentityIssues`' sentences,
+     * which `SCOPE_REFUSALS` already sweeps — but it *is* the producer that puts them on a watching
+     * surface, and the seed above renders one through `refusalForDay` in the wording a picker row
+     * prints. Covered here rather than excluded, because the composition is the player-facing act.
+     */
+    'watch/record.ts#recordRefusalFor',
     'watch/reproduce.ts#reproductionRefusalFor',
     'watch/record.ts#recordUnreadableReason',
+    /*
+     * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
+     * the strip they contradicted, rather than in an adapter of their own: a reader auditing *what
+     * a watched run says* has to see the race key, the rail's eyebrow, the footer's clause and the
+     * report's note in the same corpus as `THEIR DISPATCHER`, because the defect was precisely that
+     * the two halves of that sentence were written by modules that never met.
+     */
+    'watch/shell.ts#shellWatchingCopyOf',
+    'watch/shell.ts#PLAYER_SHELL_COPY',
+    'watch/shell.ts#RAIL_EYEBROW_PLAYER',
+    'watch/shell.ts#RAIL_EYEBROW_WATCHING',
+    'watch/shell.ts#RAIL_NOTE_PLAYER',
+    'watch/shell.ts#RAIL_NOTE_WATCHING',
+    'watch/shell.ts#footerSeedLineOf',
+    'watch/shell.ts#reportNoteWhileWatching',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -6392,10 +6435,41 @@ const WATCH: SurfaceAdapter = {
         seeds.push({ field: `watch(${source}).string[${String(index)}]`, text, role: 'label' });
       }
       seeds.push({ field: `watch(${source}).figuresNote`, text: view.figuresNote, role: 'reason' });
+      /*
+       * The shell's arm of the same view, through the shell module's own enumeration for
+       * `watchingStrings`' stated reason — a surface added to `ShellWatchingCopy` with no line in
+       * `shellWatchingStrings` is outside both this corpus and § 14.1's grep at once.
+       */
+      for (const [index, text] of shellWatchingStrings(shellWatchingCopyOf(view)).entries()) {
+        if (text === '') continue;
+        seeds.push({ field: `watch(${source}).shell[${String(index)}]`, text, role: 'label' });
+      }
+    }
+
+    /*
+     * The player's own arm as well, because it is what the shell says the rest of the time and it
+     * is the arm whose disappearance would satisfy every no-first-person check in the tree.
+     */
+    for (const [index, text] of shellWatchingStrings(PLAYER_SHELL_COPY).entries()) {
+      if (text === '') continue;
+      seeds.push({ field: `watch.player.shell[${String(index)}]`, text, role: 'label' });
     }
 
     // The three grounds a row can lose its affordance on, each in the words the picker prints.
     seeds.push({ field: 'watch.blocked(no-record)', text: DAY_HAS_NO_RECORD, role: 'reason' });
+    /*
+     * And the fourth sentence a `no-record` row can carry — `docs/20` defect 1. A day whose record
+     * was *refused* quotes the issue that refused it, so this seed carries a real scope message
+     * rather than a literal: the wording a reader meets is the wrapper plus whatever
+     * `runIdentityIssues` said, and seeding the wrapper alone would sweep half a sentence.
+     */
+    seeds.push({
+      field: 'watch.blocked(refused)',
+      text: refusalForDay(
+        'the group levers are moved off their defaults, and a selection carries no levers',
+      ),
+      role: 'reason',
+    });
     const unreadable = recordUnreadableReason(
       {
         version: 1,
@@ -6411,6 +6485,7 @@ const WATCH: SurfaceAdapter = {
         dayIdx: 0,
         outOfServiceCarIds: [],
         interventions: [],
+        ruleRows: [],
       },
       browserResourcesOf(context),
     );
