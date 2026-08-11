@@ -726,6 +726,42 @@
          entry tints it, so `▮ ▯ ◂▸ OOS ⏻` read as marks rather than as decoration. */
       .legend-glyph { color: var(--text); font-weight: 600; }
 
+      /* The race strip — GAMEPLAY §7.4, Everyday slice 4d. Two lanes under the stage, drawn as
+         SVG polylines with fixed viewBoxes so the strip scales with the column and the geometry
+         module (`live/raceStrip.ts#raceLaneOf`) never needs a pixel measurement. `vector-effect:
+         non-scaling-stroke` keeps the line weights honest under the non-uniform scale.
+
+         Colour, a stated deviation: the casual handoff draws *you* in its terracotta and the
+         ghost in grey. This shell's design language carries *yours* in `--accent` everywhere a
+         thing is the player's (the primary Run control, the selected chip), so the strip follows
+         the shell rather than importing one terracotta for one component — docs/12's pattern of
+         a deviation with the constraint that forced it, recorded in docs/18's register. The line
+         is never the only signal: it is heavier than the ghost's and the key below names both. */
+      .race {
+        display: flex; flex-direction: column; gap: 5px;
+        margin: 0 14px 10px; padding: 8px 10px;
+        border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel);
+        font: 500 11.5px var(--mono); color: var(--dim);
+      }
+      .race[hidden] { display: none; }
+      .race-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .race-pick { display: inline-flex; align-items: baseline; gap: 6px; color: var(--dim); }
+      .race-verdict { margin-left: auto; font-weight: 600; color: var(--text); }
+      .race-note { margin: 0; color: var(--faint); }
+      .race-lane { display: grid; grid-template-columns: 168px 1fr; gap: 8px; align-items: center; }
+      .race-lane-label { color: var(--faint); }
+      .race-lane svg {
+        width: 100%; height: 44px; display: block;
+        background: var(--card); border: 1px solid var(--edge); border-radius: 4px;
+      }
+      .race-line-you { fill: none; stroke: var(--accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+      .race-line-ghost { fill: none; stroke: var(--dimmer); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+      .race-sixty { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+      .race-key { display: flex; gap: 14px; align-items: baseline; }
+      .race-swatch-you { background: var(--accent); }
+      .race-swatch-ghost { background: var(--dimmer); }
+      .race-footer { margin: 0; color: var(--faint); }
+
       /* The transport, § 1.3 M5. */
       .transport {
         margin: 0 14px 12px; border: 1px solid var(--edge);
@@ -1765,6 +1801,55 @@
               <span class="legend-entry"><span class="legend-glyph">▸◂</span>closing</span>
               <span class="legend-entry"><span class="legend-glyph">OOS</span>out of service, and dimmed</span>
               <span class="legend-entry"><span class="legend-glyph">⏻</span>in service</span>
+            </div>
+
+            <!-- ============================================================
+                 The race strip — GAMEPLAY §7.4, Everyday slice 4d.
+
+                 Two lanes against the clock, sampled every four simulated
+                 minutes: how long the people standing right now have stood
+                 (with a dashed sixty-second line), and how many are standing.
+                 Your line against a ghost's — a SECOND RECORDING of the same
+                 crowd, same seed, only the dispatcher differing — both
+                 replayed at the one playhead, so pause and speed drive both
+                 by construction.
+
+                 Every word here is written by `dev/main.ts#drawRaceStrip`
+                 from `live/raceStrip.ts`'s producers; the only static copy is
+                 the two lane labels and the key's "you". The picker's options
+                 come from `GHOST_OPTIONS`, never from markup. The footer is
+                 `RACE_FOOTER`, §7.4's permanent sentence, written from code
+                 so the string has one author and the honesty sweep drives it.
+                 ============================================================ -->
+            <div class="race" id="race-strip" hidden>
+              <div class="race-head">
+                <span class="legend-title">The race</span>
+                <label class="race-pick">race against
+                  <select id="race-ghost"></select>
+                </label>
+                <span class="race-verdict" id="race-verdict"></span>
+              </div>
+              <p class="race-note" id="race-note"></p>
+              <div class="race-lane">
+                <span class="race-lane-label">how long people are waiting · dashes mark 60 s</span>
+                <svg viewBox="0 0 640 64" preserveAspectRatio="none" aria-hidden="true">
+                  <line id="race-sixty" class="race-sixty" x1="0" x2="640" y1="0" y2="0"></line>
+                  <polyline id="race-top-ghost" class="race-line-ghost" points=""></polyline>
+                  <polyline id="race-top-you" class="race-line-you" points=""></polyline>
+                </svg>
+              </div>
+              <div class="race-lane">
+                <span class="race-lane-label">still standing</span>
+                <svg viewBox="0 0 640 40" preserveAspectRatio="none" aria-hidden="true">
+                  <polyline id="race-bottom-ghost" class="race-line-ghost" points=""></polyline>
+                  <polyline id="race-bottom-you" class="race-line-you" points=""></polyline>
+                </svg>
+              </div>
+              <div class="race-key">
+                <span class="legend-entry"><span class="legend-swatch race-swatch-you" aria-hidden="true"></span>you</span>
+                <span class="legend-entry" id="race-ghost-key" hidden><span class="legend-swatch race-swatch-ghost" aria-hidden="true"></span><span id="race-ghost-name"></span></span>
+              </div>
+              <p class="race-footer" id="race-footer"></p>
             </div>
 
             <!-- M5 — the transport. -->

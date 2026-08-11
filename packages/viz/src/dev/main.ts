@@ -115,6 +115,15 @@ import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
+  GHOST_OPTIONS,
+  RACE_NOT_RUN,
+  RACE_PENDING,
+  RACE_SAMPLE_INTERVAL_S,
+  raceLaneOf,
+  raceStripViewOf,
+  type GhostPick,
+} from '../live/raceStrip.js';
+import {
   clockAt,
   DAY_START_S,
   phaseAt,
@@ -222,6 +231,7 @@ import {
   type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
+import { ghostPlanOf } from './ghostRun.js';
 import {
   createShiftRunner,
   shiftRunCostOf,
@@ -2402,6 +2412,34 @@ function boot(ui: Elements, resources: BrowserResources): void {
    */
   let looping = false;
 
+  /* ---------------------------------------------------------------------- *
+   * The race — GAMEPLAY §7.4, Everyday slice 4d
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Who the player is racing — closure state on `bankFilter`'s and {@link looping}'s precedent,
+   * deliberately **not** a `ViewerState` field: the pick changes which *comparison* recording is
+   * made and never a leg of the player's own run, so persisting it or probing it as a run input
+   * would claim an effect it does not have. It seeds `'none'` so boot costs no second simulation
+   * — *nobody* is simply not issuing the second request (`dev/ghostRun.ts`).
+   */
+  let ghostPick: GhostPick = 'none';
+  /**
+   * The rival's finished recording, adopted **read-only beside** the primary — never assigned to
+   * `state.recording` or {@link simulatedRecording}, so `bankingRefusalFor`'s identity gate
+   * refuses it by construction and it can touch neither `dayClosed`, the week, nor the board.
+   * `ghostRun.test.ts` asserts that refusal on a real pair rather than trusting this sentence.
+   */
+  let ghostRecording: VizRecording | undefined;
+  /** Why the pick produced no run (`ghostPlanOf`'s `refused` arm), for the verdict slot. */
+  let ghostRefusal: string | undefined;
+  /** Whether the job in flight on {@link shiftRunner} is the rival's — see {@link scheduleGhost}. */
+  let ghostInFlight = false;
+  /** The plan behind the run on screen, held so a pick change can re-race without re-planning. */
+  let lastShiftPlan: ShiftRunConfig | undefined;
+  /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
+  let lastRaceKey = '';
+
   const clock = systemClock();
 
   /**
@@ -2431,6 +2469,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * greying the transport out would give back the thing that was bought.
        */
       ui.coach.run.textContent = running ? 'Cancel this run' : 'Run this shift';
+      /*
+       * Whatever ends, the rival is no longer in flight — completion clears it in the ghost
+       * job's own callback, and this is the one hook that also sees a cancel and a failure, so
+       * the race strip's *waiting* line can never outlive the run it was waiting for.
+       */
+      if (!running) ghostInFlight = false;
     },
     onFailed: (message) => {
       failRun(message);
@@ -2757,6 +2801,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
   wireNavigation();
   wireCoach();
   wireTransport();
+  wireRaceStrip();
   wireHeaderAndFooter();
   wireKeyboard();
   wireStageClicks();
@@ -2923,6 +2968,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawTransportChrome(view);
     drawParity();
     drawLegend(view);
+    drawRaceStrip(view);
     drawIntervention(view);
     drawStage();
   }
@@ -2977,6 +3023,188 @@ function boot(ui: Elements, resources: BrowserResources): void {
     }
   }
 
+  /* ---------------------------------------------------------------------- *
+   * The race strip — GAMEPLAY §7.4, Everyday slice 4d
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Issue the rival's run — a second recording of the same crowd, through the same worker.
+   *
+   * Called from `runShift`'s own delivery callback, **after** the player's run has landed and
+   * been drawn: sequential by construction, so the primary is never contended, and cancel-safe
+   * by the runner's own rule — a new primary ask supersedes the rival (*the latest ask wins*),
+   * and the Run button's cancel face stops it like any other run. A rival result arriving for a
+   * day that has since been replaced is dropped by the identity guard below, which is
+   * `bankingRefusalFor`'s object-identity move applied one step earlier.
+   *
+   * The config is the primary's own with the dispatcher swapped (`dev/ghostRun.ts` — same
+   * building, same demand, same seed: the same crowd, which is the whole of CRN). The rival's
+   * recording is adopted **read-only beside** the primary: never `state.recording`, never
+   * {@link simulatedRecording}, so it cannot file, bank, or close a day.
+   */
+  function scheduleGhost(plan: ShiftRunConfig, primaryRecording: VizRecording): void {
+    const ghost = ghostPlanOf(resources, state.savedDispatchers, plan.config, ghostPick);
+    if (ghost.kind === 'none') return; // nobody is free: the second request is simply not made
+    if (ghost.kind === 'refused') {
+      ghostRefusal = ghost.reason;
+      lastRaceKey = '';
+      drawRaceStrip(viewAt());
+      return;
+    }
+    ghostInFlight = true;
+    shiftRunner.start({
+      label: `rival’s day — ${ghost.label}`,
+      config: ghost.config,
+      outOfServiceCarIds: plan.outOfServiceCarIds,
+      /*
+       * Off: the decision log is the primary run's surface, nothing reads a rival's decisions,
+       * and the rival's recording is already a second multi-megabyte clone crossing the thread.
+       */
+      recordDecisions: false,
+      cost: costOf(plan),
+      onDone: (recording) => {
+        ghostInFlight = false;
+        if (state.recording !== primaryRecording) return; // a later day superseded this race
+        ghostRecording = recording;
+        lastRaceKey = '';
+        drawRaceStrip(viewAt());
+      },
+    });
+  }
+
+  /** The two lanes' fixed logical boxes — the SVG `viewBox`es in `index.html`, exactly. */
+  const RACE_TOP_BOX = { width: 640, height: 64 } as const;
+  const RACE_BOTTOM_BOX = { width: 640, height: 40 } as const;
+
+  /**
+   * Draw the strip — words from `live/raceStrip.ts`, geometry from `raceLaneOf`, values only.
+   *
+   * Keyed rather than redrawn at 60 Hz: the lanes are §7.4's four-minute samples, so the drawing
+   * only changes when the playhead crosses a grid line, the run or rival changes, or the day
+   * runs out — {@link lastRaceKey} says which drawing is on screen and everything else is a
+   * no-op frame. The verdict therefore updates at the same four-minute cadence as the lanes it
+   * summarises (and once more at the very end), which keeps the strip's whole cost off the
+   * per-frame path a 22 000-leg recording would otherwise pay twice per frame.
+   *
+   * Both recordings are sampled at the **one** playhead — PT-F2's unified clock — so pause and
+   * speed drive both lines by construction; there is no second clock to drift.
+   */
+  function drawRaceStrip(view: ViewAt): void {
+    const recording = view.recording;
+    setHidden(ui.race.root, recording === undefined);
+    if (recording === undefined) return;
+    const ghost = ghostRecording;
+    const bucket = Math.floor((view.simTimeS - recording.startedAt) / RACE_SAMPLE_INTERVAL_S);
+    const key = [
+      recording.runId,
+      ghost?.runId ?? '',
+      ghostPick,
+      ghostRefusal ?? '',
+      ghostInFlight ? 'in-flight' : '',
+      String(bucket),
+      view.simTimeS >= recording.endedAt ? 'end' : '',
+    ].join('|');
+    if (key === lastRaceKey) return;
+    lastRaceKey = key;
+
+    const stripView = raceStripViewOf({ recording, ghost, simTimeS: view.simTimeS });
+    const option = GHOST_OPTIONS.find((entry) => entry.id === ghostPick);
+    /*
+     * The verdict slot, in honesty order: a refusal outranks everything (it says why there is no
+     * rival); a picked-but-absent rival says whether one is coming; and only a drawn rival — or
+     * the *nobody* pick, whose slot carries the plain figure — speaks through the view itself.
+     */
+    const verdict =
+      ghostRefusal ??
+      (stripView.ghost !== undefined || ghostPick === 'none'
+        ? stripView.verdict
+        : ghostInFlight
+          ? RACE_PENDING
+          : RACE_NOT_RUN);
+    setText(ui.race.verdict, verdict);
+    setText(ui.race.note, stripView.note);
+    setText(ui.race.footer, stripView.footer);
+    setHidden(ui.race.ghostKey, stripView.ghost === undefined);
+    setText(ui.race.ghostName, stripView.ghost === undefined ? '' : (option?.label ?? ''));
+
+    // One clock, one x-axis: the longer of the two spans, so the lines align instant for
+    // instant. `endedAt` is an outcome, so two runs of one crowd may legitimately differ.
+    const spanEndS = Math.max(recording.endedAt, ghost?.endedAt ?? recording.endedAt);
+    const top = raceLaneOf(
+      stripView.yours,
+      stripView.ghost,
+      (sample) => sample.standingWaitS,
+      RACE_TOP_BOX,
+      spanEndS,
+      60,
+    );
+    const bottom = raceLaneOf(
+      stripView.yours,
+      stripView.ghost,
+      (sample) => sample.standing,
+      RACE_BOTTOM_BOX,
+      spanEndS,
+      10,
+    );
+    ui.race.topYou.setAttribute('points', top.you);
+    ui.race.topGhost.setAttribute('points', top.ghost);
+    ui.race.sixty.setAttribute('y1', top.markY.toFixed(1));
+    ui.race.sixty.setAttribute('y2', top.markY.toFixed(1));
+    ui.race.bottomYou.setAttribute('points', bottom.you);
+    ui.race.bottomGhost.setAttribute('points', bottom.ghost);
+  }
+
+  /**
+   * The picker. Options come from `GHOST_OPTIONS` — the model's own honest three, never markup —
+   * with each option's one-line note as its `title`. The moved-control rule holds at the seam:
+   * a pick maps through `ghostPlanOf` to a different second recording (compared on the legs in
+   * `ghostRun.test.ts`), and *nobody* maps to no second request at all.
+   */
+  function wireRaceStrip(): void {
+    for (const option of GHOST_OPTIONS) {
+      ui.race.ghost.append(
+        el(document, 'option', {
+          text: option.label,
+          attrs: { value: option.id, title: option.note },
+        }),
+      );
+    }
+    ui.race.ghost.value = ghostPick;
+    ui.race.ghost.addEventListener('change', () => {
+      const value = ui.race.ghost.value;
+      ghostPick = GHOST_OPTIONS.some((option) => option.id === value)
+        ? (value as GhostPick)
+        : 'none';
+      ui.race.ghost.title = GHOST_OPTIONS.find((option) => option.id === ghostPick)?.note ?? '';
+      ghostRecording = undefined;
+      ghostRefusal = undefined;
+      lastRaceKey = '';
+      if (ghostPick === 'none') {
+        // A rival in flight is cancelled — its result would be dropped unread anyway. A primary
+        // in flight is not ours to stop.
+        if (ghostInFlight) shiftRunner.cancel();
+        drawRaceStrip(viewAt());
+        return;
+      }
+      const primary = state.recording;
+      if (
+        lastShiftPlan !== undefined &&
+        primary !== undefined &&
+        /*
+         * Identity, not configuration — `shift/banking.ts`'s own move. A recording loaded from
+         * a file has no plan behind it, and racing `lastShiftPlan` under it would draw a rival
+         * of a *different* day beside it; the strip waits for a run this shell simulated.
+         */
+        primary === simulatedRecording &&
+        // A primary in flight will race this pick when it lands; only a rival may be superseded.
+        (!shiftRunner.isRunning() || ghostInFlight)
+      ) {
+        scheduleGhost(lastShiftPlan, primary);
+      }
+      drawRaceStrip(viewAt());
+    });
+  }
+
   /** Only what the playhead moves. Runs at 60 Hz. */
   function renderLive(): void {
     const view = viewAt();
@@ -2992,6 +3220,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Left out, the row would state the counts of whichever frame last changed the state — a
     // figure that is stale in exactly the way a scrubbing reader cannot see.
     drawLegend(view);
+    // The race strip follows the playhead the same way — and it keys itself on the four-minute
+    // sample grid, so most frames it is a string compare and nothing else.
+    drawRaceStrip(view);
     // The stamp is a reading at `t` too: a reader who scrubs back past their own intervention
     // must watch it disappear, because at that instant on the stage it has not happened yet.
     drawIntervention(view);
@@ -3597,6 +3828,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
       const plan = shiftRunConfigOf(resources, state);
       building = plan.building;
       calendarCaption = plan.calendarLine;
+      // The race's inputs move with the run: the plan is what a pick change re-races against,
+      // and whatever was in flight is about to be superseded by this start — the latest ask wins,
+      // so the flag follows the runner rather than trailing it.
+      lastShiftPlan = plan;
+      ghostInFlight = false;
       shiftRunner.start({
         label: 'shift',
         config: plan.config,
@@ -3626,6 +3862,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
            * member on {@link MountContext}.
            */
           onRan?.(recording);
+          /*
+           * The rival runs **after the player's own lands** — sequential, on the same runner, so
+           * it is cancel-safe by the runner's own rule: a new primary ask supersedes it, and
+           * Cancel stops it. Last in this callback so every panel above armed against the
+           * primary, not against a race that has not happened yet.
+           */
+          scheduleGhost(plan, recording);
         },
       });
     } catch (error) {
@@ -3650,6 +3893,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // The run this shell simulated — GitHub issue #136, and the only place it is written. See
     // {@link simulatedRecording}.
     simulatedRecording = recording;
+    // The rival raced the run that has just been replaced, so its recording goes with it —
+    // a ghost line left standing beside a new day would be two different crowds on one scale,
+    // which is the one thing the strip exists to never draw. Re-issued by `runShift`'s own
+    // callback once this recording is on screen.
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
     // `tomorrow` goes with `report`: both are accounts of a day that has been closed, and a new
     // run has not closed one. Leaving the beat standing would put yesterday's overnight reveal
     // under today's date, which is the stale-sheet defect § D223 closed one field over.

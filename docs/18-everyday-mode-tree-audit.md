@@ -354,6 +354,54 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   than implied:** row persistence across reloads (`ruleRows` is session state exactly as
   `selectorSpec` is), the reworded urgency action, and any claim that a rule *helps* — no copy
   anywhere asserts an outcome, for § D145/§ D156/§ D169's standing reason.
+- **Slice 4 item (d), the ghost picker and race strip — LANDED.** §20.4's ghost, on exactly the
+  seam the work-order above names: the ghost is a **second recording of the same crowd** — the
+  primary's own `SimulationConfig` with one field swapped (`dev/ghostRun.ts#ghostPlanOf`:
+  `dispatcherProfile`, and the player's mid-run `interventions` dropped as no key at all) — run
+  through the shipped `dev/shiftRunner.ts` as a second request **after the player's run lands**
+  (sequential, cancel-safe by the runner's own *latest ask wins*), and adopted **read-only
+  beside** the primary: never `state.recording`, never `simulatedRecording`, so
+  `bankingRefusalFor`'s identity gate refuses it by construction and it can touch neither
+  `dayClosed`, the week, nor the board (`dev/ghostRun.test.ts` asserts the refusal on a real
+  pair). Both recordings replay at **one playhead** on PT-F2's one clock, so contract §4.6's
+  both-sims-step-together is satisfied trivially by construction — there is no second live sim to
+  drift — and speed/pause drive both lines for free. **The picker offers the honest three only**
+  (`live/raceStrip.ts#GHOST_OPTIONS`): *the plain baseline* (§ D134's preference list through
+  `dev/defaults.ts` — the profile a fresh shift opens on, `collective` in the shipped data, never
+  a private literal), *your latest saved* (most recent save, and the option's own copy says
+  *latest* because there is no rating to make *best* mean anything), and *nobody* — no second
+  request, one line per lane, no note, no verdict, the strip never invents a rival (asserted in
+  `raceStrip.test.ts`). The handoff's world/previous-day arms are **omitted, not stubbed** (no
+  posting infrastructure). The strip (`index.html#race-strip`, under the stage) draws §7.4's two
+  lanes — mean standing wait of those standing *now* with the dashed 60 s line, and
+  still-standing count — as SVG polylines from the pure `live/raceStrip.ts` (samples every 240 s
+  on a grid anchored at `startedAt` so the two lines are comparable point for point; who stands
+  is `frame/overlay.ts#isWaitingAt`, exported and called rather than re-answered, and the lanes
+  are asserted against `observationsAt` as a second code path). The live verdict is §6.5's own
+  rule — *level with* under three points, else *ahead/behind by N points* — from each recording's
+  away-inside-a-minute-**so-far**, playhead-honest by construction, and the footer is §7.4's
+  sentence verbatim with **no interval claim anywhere** (`raceStrip.test.ts` greps every producer;
+  the bench keeps proof). §7.4's band is **not drawn** — the world band and the different-morning
+  band would both require data this build does not have — and the one §7.4 meaning that *is* true
+  of a same-seed ghost is stated instead: *same crowd both runs — the gap is your change, not the
+  morning*. Colour deviates from the handoff's terracotta to the shell's own `--accent` for *you*
+  (the shell carries *yours* in accent everywhere; heavier stroke + named key keep KB-15), the
+  documented-deviation pattern of docs/12. The pick is closure state on `bankFilter`'s precedent
+  — it changes which comparison recording is made and no leg of the player's run, so it is
+  deliberately not a `ViewerState` field, not persisted, and seeds *nobody* so boot costs no
+  second simulation. Moved-control at the seam (§ D177 before the panel, § D219's lesson):
+  `ghostRun.test.ts` compares the two picks' second recordings **on the legs**, pins CRN (every
+  arrival identical to the primary's, service different), and pins determinism (same pick, same
+  seed → fingerprint-identical across two runs, structured-clone included). Honesty: the
+  `RACE_STRIP` adapter (appended, fault-ordering rule kept) drives every wording — the options,
+  both strip states at every sampled playhead with the context's own `comparisonRecording` as a
+  real second run, the three verdict arms, the footer as `reason` (R2's third narrowing), and
+  `ghostPlanOf`'s two speaking arms through the shipped `shiftRunConfigOf` chain. **Not built,
+  named rather than implied:** the world/previous arms and their bands (posting infrastructure
+  first), a *best* saved arm (needs a rating that does not exist), the report's closing honesty
+  block reusing the verdict expression (§6.5 — the report is another lane's surface), and any
+  persistence of the pick. Honesty-corpus string counts are deliberately not re-measured here:
+  a figure measured per branch is stale on merge (CLAUDE.md's rule).
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
   `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at
