@@ -26,7 +26,7 @@
  * the defect from correct behaviour.
  */
 
-import { loadConfig, runSimulation, type LoadedConfig } from '@elevator-sim/core';
+import { loadConfig, runSimulation, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -477,5 +477,105 @@ describe('the passenger model reaches the recording', () => {
     const roundTripped = JSON.parse(JSON.stringify(recording)) as typeof recording;
     expect(JSON.stringify(roundTripped)).toBe(JSON.stringify(recording));
     expect(roundTripped.passengerModel).toBe('destination-dispatch');
+  }, 300_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * The selector trace — schema 9, Everyday Mode slice 4b
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A run whose policy genuinely selects: `midtown-office` at 900 s under `collective` with the
+ * shipped `patternSwitching` arms — § D153's own operating point, chosen for the reason
+ * `dev/selectorEditor.test.ts` states: the contrast has to be measured somewhere the traffic
+ * actually changes regime, and Garden Apartments would sit in one arm for the whole run.
+ */
+function selectingConfig(): SimulationConfig {
+  const base = fixtureConfig(config, {
+    buildingId: 'midtown-office',
+    dispatcherId: 'collective',
+    durationS: 900,
+    onTimeout: 'report',
+  });
+  return {
+    ...base,
+    dispatcherProfile: { ...base.dispatcherProfile, selection: { policy: 'fuzzy' } },
+    // The file-level arm map the weight sets resolve from — the same source `Simulation` derives
+    // its library through on the shipped path.
+    dispatcherProfiles: config.dispatcherProfiles,
+  };
+}
+
+describe('the selector trace (schema 9)', () => {
+  it('records the switches the policy reports, on a run whose pattern actually changes', () => {
+    const { recording } = recordRun(selectingConfig());
+    const switches = recording.patternSwitches;
+    expect(switches).toBeDefined();
+    if (switches === undefined) return;
+
+    // The pattern genuinely moved: at § D153's cell the detector leaves abstention, so an empty
+    // trace here would mean the sampling missed what the policy did.
+    expect(switches.length).toBeGreaterThan(0);
+    expect(switches.some((entry) => entry.patternId !== null)).toBe(true);
+
+    // Every value is the detector's own vocabulary or the abstention, every bank is the run's,
+    // and the order is the sorted `(atS, bankId)` the contract promises.
+    const declared = new Set(
+      config.dispatcherProfiles.patternSwitching?.patternDetector.patterns ?? [],
+    );
+    const bankIds = new Set(recording.shafts.map((shaft) => shaft.bankId));
+    for (const entry of switches) {
+      if (entry.patternId !== null) expect(declared.has(entry.patternId), entry.patternId).toBe(true);
+      expect(bankIds.has(entry.bankId), entry.bankId).toBe(true);
+      expect(entry.atS).toBeGreaterThanOrEqual(recording.startedAt);
+      expect(entry.atS).toBeLessThanOrEqual(recording.endedAt);
+    }
+    for (let i = 1; i < switches.length; i += 1) {
+      const previous = switches[i - 1];
+      const current = switches[i];
+      if (previous === undefined || current === undefined) continue;
+      expect(
+        current.atS > previous.atS ||
+          (current.atS === previous.atS && current.bankId >= previous.bankId),
+      ).toBe(true);
+    }
+  }, 300_000);
+
+  it('is deterministic in the config, and survives a JSON round trip', () => {
+    // The trace is policy state sampled during a deterministic run, so two recordings of the
+    // same config must agree on it byte for byte — the replay property, asserted on the new
+    // field directly. The round trip is the schema test: `atS` numbers, `bankId` strings and
+    // `null` abstentions all survive `JSON.parse(JSON.stringify(x))`.
+    const first = recordRun(selectingConfig()).recording;
+    const second = recordRun(selectingConfig()).recording;
+    expect(JSON.stringify(second.patternSwitches)).toBe(JSON.stringify(first.patternSwitches));
+    const roundTripped = JSON.parse(JSON.stringify(first)) as typeof first;
+    expect(JSON.stringify(roundTripped)).toBe(JSON.stringify(first));
+    expect(roundTripped.patternSwitches).toEqual(first.patternSwitches);
+  }, 300_000);
+
+  it('does not change the run it observes', () => {
+    // The wrapper reads a getter after each decision and nothing else; the RunRecord of an
+    // instrumented selecting run must equal an uninstrumented one's, which is the same
+    // neutrality `decisionLog.test.ts` asserts extended to the selecting policy class.
+    const simulationConfig = selectingConfig();
+    const plain = runSimulation(simulationConfig);
+    const recorded = recordRun(simulationConfig);
+    expect(JSON.stringify(recorded.result.record)).toBe(JSON.stringify(plain.record));
+  }, 300_000);
+
+  it('a run whose selection is off carries no trace at all', () => {
+    // Honest absence, not an empty list: `fixtureConfig` runs every shipped profile as shipped
+    // (`selection.policy: 'off'`), no detector is built, and a recording that claimed even an
+    // empty watch would be describing a mechanism the run did not contain.
+    const { recording } = recordRun(fixtureConfig(config));
+    expect('patternSwitches' in recording).toBe(false);
+  }, 120_000);
+
+  it('a selecting run recorded without instrumentation carries the honest absence too', () => {
+    // The batch path: `recordDecisions: false` means no wrapper, so nothing sampled the policy
+    // and the recording says so by omission rather than pretending to an empty watch.
+    const { recording } = recordRun(selectingConfig(), { recordDecisions: false });
+    expect('patternSwitches' in recording).toBe(false);
   }, 300_000);
 });

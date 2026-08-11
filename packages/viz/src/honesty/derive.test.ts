@@ -387,7 +387,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'id tuples the two shift unions are derived from — the same id-table case as ' +
         '`campaign/types.ts#FAIL_STATES` above — and every event a reader sees is its ' +
         '`ShiftEvent.name` and `note`, both of which `SHIFT_REPORT` drives. ' +
-        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 8; it is derived only because the ' +
+        '`contract/types.ts#VIZ_SCHEMA_VERSION` is the integer 9; it is derived only because the ' +
         'declaration scanner gives a `const` the span up to the next `const`, which in a file of ' +
         'interfaces swallows the string-literal unions of the types below it. A version number ' +
         'reaches a reader only through `record/document.ts#verifyReplay`, which is driven.',
@@ -536,6 +536,22 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'set-by-hand branch, which is what makes this an exclusion rather than a gap. ' +
         '`specIsDirty` returns a boolean and is derived only through the transitive clause.',
       ids: ['authoring/buildingSpec.ts#transportModesOf', 'authoring/buildingSpec.ts#specIsDirty'],
+    },
+    {
+      reason:
+        'The decision log’s collector and its two wrappers, producers since slice 4b’s selector ' +
+        'trace. Their strings are `VizDecision`/`VizPatternSwitch` fields copied from core plus ' +
+        'one thrown invariant — the policy-to-bank ordinal check in `buildPatternSwitches` — ' +
+        'which is a developer diagnostic in exactly `recordRun`’s own class (excluded below): it ' +
+        'reports a bug in this package’s construction, fires before any recording exists, and is ' +
+        'pinned by `recordRun.test.ts` rather than swept as player copy. The sentences a player ' +
+        'actually reads from a decision or a switch are `live/decisions.ts#decisionRowsAt`’s and ' +
+        '`live/patternReadout.ts#patternReadoutAt`’s, both driven by the LIVE_RAIL adapter.',
+      ids: [
+        'record/decisionLog.ts#DecisionCollector',
+        'record/decisionLog.ts#recordingPolicyFactory',
+        'record/decisionLog.ts#wrapPolicy',
+      ],
     },
     {
       reason:

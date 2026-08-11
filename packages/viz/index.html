@@ -1490,6 +1490,11 @@
                  § S5's sentence steps *secondary text* aside; the traffic phase is not secondary,
                  it is what the run is read against, and it is six characters wide. -->
             <span class="phase-pill" id="phase-label"></span>
+            <!-- Slice 4b — the detected traffic pattern in force at the playhead, from the
+                 recording's own selector trace (schema 9). `hidden` until a run that built the
+                 detector provides one: an absent detector draws no placeholder that reads as a
+                 pattern, which is the same honesty rule the timeline keeps about unknown bands. -->
+            <span class="phase-pill" id="pattern-label" hidden></span>
           </div>
           <div class="topbar-day">
             <div class="topbar-day-name" id="day-label">Day 1</div>
