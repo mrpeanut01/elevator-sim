@@ -67,3 +67,35 @@ export function interventionStampOf(
   if (latest === undefined) return '';
   return `${clockAt(latest.atS, dayStartS)} · ${STAMP_VERBS[latest.change.kind]}`;
 }
+
+/**
+ * The whole log, one stamped line per intervention in time order — the filed sheet's record of
+ * what the player changed mid-run (`docs/19` defect 10).
+ *
+ * ## Why this exists beside {@link interventionStampOf} rather than inside it
+ *
+ * The stamp answers for a **playhead** and deliberately names one entry; the Day report is an
+ * account of the **whole day** (§ D223 — a reader who paused at 09:00 has not made the afternoon
+ * not happen), so its lines are the whole log and no playhead enters the signature. The two are
+ * different claims — *what has taken effect on the stage* against *what this day's record holds* —
+ * and folding them into one function would put a playhead parameter on a surface that must not
+ * consult one.
+ *
+ * Each line is the stage's own stamp, verbatim (`09:14 · parked the cars in the lobby`): shared
+ * {@link STAMP_VERBS}, shared {@link clockAt}, so the sheet and the stage can never disagree about
+ * what a press was called or when it landed. The sort is a defensive copy in time order — the log
+ * is authored in press order, which is time order for a control that appends at the playhead, but
+ * the sheet's claim is *in time order* and it holds that claim itself rather than inheriting it.
+ *
+ * `[]` for an empty log, never a placeholder line: a day the player did not touch reads exactly as
+ * it always did, and *"no interventions"* would be a caption over nothing (`docs/10` R3's blank,
+ * inverted — {@link interventionStampOf}'s own rule, kept).
+ */
+export function interventionLogOf(
+  interventions: readonly RunInterventionConfig[],
+  dayStartS?: number | undefined,
+): readonly string[] {
+  return [...interventions]
+    .sort((a, b) => a.atS - b.atS)
+    .map((entry) => `${clockAt(entry.atS, dayStartS)} · ${STAMP_VERBS[entry.change.kind]}`);
+}

@@ -218,7 +218,7 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { LOADED_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -1513,6 +1513,7 @@ const REPLAY: SurfaceAdapter = {
     'record/document.ts#verifyReplay',
     'shift/banking.ts#bankingRefusalFor',
     'shift/banking.ts#LOADED_RUN_CANNOT_BANK',
+    'shift/banking.ts#UNCHOSEN_RUN_CANNOT_BANK',
   ],
   render(context) {
     const verdict = verifyReplay(context.recording, context.recording);
@@ -1531,6 +1532,19 @@ const REPLAY: SurfaceAdapter = {
       {
         field: 'loadedRunCannotBank',
         text: LOADED_RUN_CANNOT_BANK,
+        role: 'reason',
+        provenance: 'authored',
+      },
+      /*
+       * The same question's other ground — § D232's, given words by `docs/19` defect 1: a run
+       * nobody started banks nothing, and the refusal now speaks instead of returning in silence.
+       * Beside `loadedRunCannotBank` because the two are `shift/banking.ts`'s two answers to *what
+       * must a run be before it may close a day*, and for the same `reason`/`authored` pairing:
+       * it explains a refusal and names what to do instead, and nothing about the run produced it.
+       */
+      {
+        field: 'unchosenRunCannotBank',
+        text: UNCHOSEN_RUN_CANNOT_BANK,
         role: 'reason',
         provenance: 'authored',
       },
@@ -2347,6 +2361,17 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       ...common,
       subject: { kind: 'week-day' },
       plan: shiftPlan,
+      /*
+       * An intervened day, so the sheet's log line is in the corpus — `docs/19` defect 10, on the
+       * new producer `live/interventions.ts#interventionLogOf`. One press, mid-run, which is the
+       * state the audit's own repro produced; the stamp's wording is the stage's own and the LIVE
+       * adapter already drives it against a playhead. The five sibling sheets below carry **no**
+       * log on purpose: an untouched day printing nothing is the other arm, and both are shipped
+       * states.
+       */
+      interventions: [
+        { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
+      ],
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.
@@ -2492,6 +2517,12 @@ const SHIFT_REPORT: SurfaceAdapter = {
     'shift/report.ts#averageWaitFigure',
     'shift/report.ts#clockRange',
     'shift/report.ts#NOT_RECORDED',
+    /*
+     * The filed sheet's intervention log — `docs/19` defect 10. Authored in `live/` beside the
+     * stage stamp so the two share their verbs and their clock; rendered here because the sheet's
+     * meta block is where its lines land, on the intervened day this bundle drives.
+     */
+    'live/interventions.ts#interventionLogOf',
     'shift/goals.ts#goalsForDay',
     'shift/goals.ts#readGoal',
     'shift/goals.ts#readGoals',
@@ -3607,6 +3638,11 @@ const REPORT_PANEL: SurfaceAdapter = {
       if (view.leversHeading !== undefined) {
         seeds.push({ field: `${at}.leversHeading`, text: view.leversHeading, role: 'label' });
       }
+      // The goal block's reframed heading — `docs/19` defect 13. Present exactly on the
+      // single-run shape, where the authored *The shift asked for* would claim a contract.
+      if (view.goalsHeading !== undefined) {
+        seeds.push({ field: `${at}.goalsHeading`, text: view.goalsHeading, role: 'label' });
+      }
       for (const [index, cell] of view.figures.entries()) {
         /*
          * Paired by **id**, not by index. Casual reorders the grid (`casualFigureOrderOf`), so the
@@ -3779,6 +3815,24 @@ const REPORT_PANEL: SurfaceAdapter = {
     if (empty.framing.kind === 'week-day') {
       seeds.push({ field: 'emptyReportView.nextDayLabel', text: empty.framing.nextDayLabel, role: 'label' });
     }
+    /*
+     * The empty sheet's two other ledes — `docs/19` defects 1 and 14, each a state a player
+     * produces (a completed run standing unfileable; a reload mid-campaign). The refused arm is a
+     * `reason` — it is `shift/banking.ts`'s refusal, quoted whole, and the refusal is the one
+     * string entitled to name what it refuses. Both grounds are driven so the precedence
+     * (`refusal` first) is a run rather than a sentence.
+     */
+    const refusedEmpty = emptyReportView({
+      refusal: UNCHOSEN_RUN_CANNOT_BANK,
+      fromPreviousSitting: true,
+    });
+    seeds.push({ field: 'emptyReportView(refused).lede', text: refusedEmpty.lede, role: 'reason' });
+    const priorSittingEmpty = emptyReportView({ refusal: undefined, fromPreviousSitting: true });
+    seeds.push({
+      field: 'emptyReportView(previous-sitting).lede',
+      text: priorSittingEmpty.lede,
+      role: 'prose',
+    });
 
     /*
      * The third sheet — issue #16, § D223.

@@ -152,7 +152,7 @@ import { DEFAULT_LEVERS } from '../authoring/dispatcherSpec.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
 import { demandFromSpec, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
-import { bankingRefusalFor } from '../shift/banking.js';
+import { bankingRefusalFor, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { dayReportOf, type DayReportInput, type ShapedDayReport } from '../shift/report.js';
@@ -200,7 +200,7 @@ import {
   saveSession,
 } from '../persist/session.js';
 import type { SessionStore } from '../persist/types.js';
-import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
   buildingConfigOf,
@@ -717,9 +717,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * genuine run was then differenced against a day the player never asked for: the reporter's
    * `CARRIED was 39 → 621`, a real improvement rendered as a catastrophe.
    *
-   * So the *filing* gate is this flag and it is latched only where a mode is entered; the *autoplay*
-   * gate is {@link menuHasBeenDismissed}, latched on every way out. The two were always two
-   * questions and the second one only looked like the first because both start `false`.
+   * So the *filing* gate is this flag and the *autoplay* gate is {@link menuHasBeenDismissed},
+   * latched on every way out. The two were always two questions and the second one only looked
+   * like the first because both start `false`.
+   *
+   * ## Where it latches: a mode entered, or a run started on purpose — `docs/19` defect 1
+   *
+   * *Latched only where a mode is entered* was the whole rule, and the play-experience audit found
+   * what it swallowed: after any reload, **Resume** is the natural way out of the overlay
+   * (`changed-their-mind`, correctly no latch), and every run the player then explicitly started —
+   * **Run this shift**, *Save it and run it*, a scenario card — completed, reached `closeShift`,
+   * and was refused in silence. The player did exactly what the empty sheet's copy asks and got
+   * *Nothing filed yet* forever; recovery was leaving the menu again by a row that happens to be a
+   * mode. So {@link playerStartedARun} is the second latch site: the flag's meaning is unchanged —
+   * *the player asked for play on purpose* — and a deliberate run-start is that, by a door that is
+   * not the overlay. What still never latches is everything § D232 and issue #117 closed: boot's
+   * own `runShift()`, Resume, Escape, navigation, and the menu's configuration arms
+   * (`set-calendar` re-runs the shift under the overlay to keep the stage honest, and choosing a
+   * calendar is not asking for a day to count).
    */
   let playerHasChosen = false;
   /**
@@ -734,6 +749,19 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * {@link playerHasChosen} for the half that must not follow it, and for what happened when it did.
    */
   let menuHasBeenDismissed = false;
+  /**
+   * Whether any day has been filed **in this sitting** — `docs/19` defect 14's missing fact.
+   *
+   * `restoreSession` brings the week's banked days back and deliberately not their sheets (the
+   * argument is `dev/reportPanel.ts#emptyReportView`'s), so after a reload the rail says *on a
+   * roll · 1/1 banked* over a sheet reading *Nothing filed yet* — both true, and nothing on the
+   * screen connecting them. `state.week.history` cannot tell that state from mid-session play: the
+   * history is non-empty five minutes after any day closes. This flag is the difference — written
+   * once, where {@link closeShift} files, and read only by {@link viewAt}'s `unfiledSheet` facts.
+   * Never reset: a sitting that has filed a day has a sheet-shaped memory to lose, and one that
+   * has not, has not.
+   */
+  let filedThisSitting = false;
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -2266,7 +2294,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * anything, and un-gating `closeShift` from Resume let that recording be filed as a real day and
    * become the baseline the *next* run was differenced against — #117's phantom `was`.
    *
-   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode.
+   * So {@link menuHasBeenDismissed} is set on every arm and {@link playerHasChosen} only on a mode
+   * — this overlay's half of the question; {@link playerStartedARun} is the other latch site, for
+   * a run the player starts from the shell itself (`docs/19` defect 1).
    * The two are still latched **here** rather than in the five arms, which is the property the
    * previous docstring was protecting and it survives: a sixth way out of the overlay cannot forget
    * to answer, because {@link exit} is a required parameter with two values and no default. That is
@@ -2289,6 +2319,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     menuHasBeenDismissed = true;
     if (exit === 'entered-a-mode') playerHasChosen = true;
     drawMenu();
+  }
+
+  /**
+   * The filing gate's second latch site: the player started a run on purpose — `docs/19` defect 1.
+   *
+   * {@link closeMenu} latches {@link playerHasChosen} where a mode is entered, and that set was
+   * complete only for players who never reload: after a reload the natural way out is **Resume**
+   * (a change of mind, correctly no latch), and every run then started with **Run this shift**,
+   * *Save it and run it*, *Open the doors on tomorrow* or a scenario card completed and silently
+   * failed to file. Those controls are this function's two callers:
+   *
+   * - `wireTransport`'s Run button — the control the empty sheet's own copy names; and
+   * - `MountContext.runShift` — the one seam every panel's explicit run-this press goes through
+   *   (the scenario cards, the dispatcher editor's *Save it and run it*, the report's next-day
+   *   button, the right rail's re-run cards, the building and traffic editors' apply-and-run).
+   *
+   * Latching **here** and not inside {@link runShift} is the § D232 line held: `runShift` is also
+   * boot's own call and the menu's `set-calendar` refresh, and a latch inside it would let a page
+   * nobody chose to play file boot's recording — issue #117's phantom, restored by the fix for its
+   * shadow. The latch is on the press, before the worker answers, because the choice is the press:
+   * a run that then refuses or is cancelled changes what is on stage, not what the player asked
+   * for.
+   */
+  function playerStartedARun(): void {
+    playerHasChosen = true;
   }
 
   drawMenu();
@@ -2468,6 +2523,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       renderAll();
     },
     runShift(onRan) {
+      /*
+       * Every call through this seam is a panel answering an explicit press whose meaning is
+       * *make this run happen* — so it is one of {@link playerStartedARun}'s two sites, and the
+       * gate `closeShift` keeps cannot swallow a run the player asked a panel for (`docs/19`
+       * defect 1). Boot and the menu's own refreshes call the closure `runShift` directly and
+       * never come through here.
+       */
+      playerStartedARun();
       runShift(onRan);
     },
     openTab(tab) {
@@ -2757,7 +2820,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
+      unfiledSheet: unfiledSheetFacts(recording, simTimeS),
     };
+  }
+
+  /**
+   * Why the Day report is empty while the screen suggests otherwise — the two closure facts
+   * `ViewAt.unfiledSheet` exists to carry (`docs/19` defects 1 and 14), computed here because
+   * {@link playerHasChosen}, {@link simulatedRecording} and {@link filedThisSitting} live in this
+   * closure and no panel may.
+   *
+   * The refusal arm answers only for a run that has **run out**: short of `endedAt` the panel's
+   * watching sheet is already the honest account, and a refusal about a day still playing would be
+   * the § D223 defect in a new coat. The two grounds are asked in `closeShift`'s own order —
+   * issue #136's first, § D232's second — so the sentence on the empty sheet is the sentence the
+   * gate actually refused on. `runProgressOf` is the one played-out predicate, not a re-derivation
+   * (§ D223's two-answers rule); it is called on the pair directly rather than through
+   * {@link playheadHasRunOut} because that helper builds a `ViewAt`, and this runs inside one.
+   */
+  function unfiledSheetFacts(
+    recording: VizRecording | undefined,
+    simTimeS: number,
+  ): UnfiledSheetFacts | undefined {
+    if (state.report !== undefined) return undefined;
+    const ranOut =
+      recording !== undefined && runProgressOf({ recording, simTimeS }).kind === 'played-out';
+    const refusal = !ranOut
+      ? undefined
+      : (bankingRefusalFor(recording, simulatedRecording) ??
+        (playerHasChosen ? undefined : UNCHOSEN_RUN_CANNOT_BANK));
+    const fromPreviousSitting = !filedThisSitting && state.week.history.length > 0;
+    if (refusal === undefined && !fromPreviousSitting) return undefined;
+    return { refusal, fromPreviousSitting };
   }
 
   /** Everything. Runs when the state changed. */
@@ -3725,6 +3819,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return;
     }
     filedRunId = recording.runId;
+    // This sitting now has a filed sheet, so the empty state's previous-sitting sentence retires —
+    // see {@link filedThisSitting}. Written at the latch rather than at the save, because the fact
+    // it records is *a sheet existed*, not *a write succeeded*.
+    filedThisSitting = true;
     const observations = shiftObservationsOf(observationsAt(recording, recording.endedAt));
     const goals = goalsForDay(state.week.day);
     const readings = readGoals(goals, observations);
@@ -3830,6 +3928,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * See {@link runStartOfDayS} for why this is captured from the run rather than from `state`.
        */
       dayStartS: runStartOfDayS ?? DAY_START_S,
+      /*
+       * The run record's third member, reaching the sheet — `docs/19` defect 10. From `state`,
+       * which is where `shiftRunConfigOf` read it when the run on screen was built, so the log the
+       * sheet prints is the log the legs were simulated under; the clearing ledger that keeps that
+       * true across day and building changes is `ViewerState.interventions`' own docstring.
+       */
+      interventions: state.interventions,
       /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.
@@ -4098,6 +4203,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
         shiftRunner.cancel();
         return;
       }
+      // The other {@link playerStartedARun} site — the control the empty sheet's copy names, and
+      // the audit's own repro (`docs/19` defect 1): reload → Resume → this button → a full day →
+      // the day must file. On the start arm only: cancelling is not asking for a day to count,
+      // though by then the press that started the run has already latched.
+      playerStartedARun();
       runShift();
     });
     ui.transport.verify.addEventListener('click', () => {
@@ -4419,12 +4529,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
     const report = state.report;
     if (report === undefined) {
       /*
-       * Two reasons there is no sheet, and they are different instructions — GitHub issue #136.
-       * `NO_SHEET_YET` says *run a shift to the end*, which is false advice to a reader who has
-       * just watched a loaded recording to its end: doing it again changes nothing. The banking
-       * refusal names what a loaded run is for and what to do instead.
+       * Three reasons there is no sheet, and they are different instructions — GitHub issue #136,
+       * and `docs/19` defect 1 for the third. `NO_SHEET_YET` says *run a shift to the end*, which
+       * is false advice to a reader who has just watched a loaded recording to its end — and
+       * equally false to one who watched boot's own run to its end without ever choosing to play
+       * (§ D232's ground, which used to fall through to that same sentence). The chain asks in
+       * `closeShift`'s own order, so the status line names the ground the gate actually refused on.
        */
-      setText(ui.transport.status, bankingRefusalFor(state.recording, simulatedRecording) ?? NO_SHEET_YET);
+      setText(
+        ui.transport.status,
+        bankingRefusalFor(state.recording, simulatedRecording) ??
+          (state.recording !== undefined && playheadHasRunOut() && !playerHasChosen
+            ? UNCHOSEN_RUN_CANNOT_BANK
+            : NO_SHEET_YET),
+      );
       return;
     }
     const surface = document.createElement('canvas');
