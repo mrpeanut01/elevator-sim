@@ -396,6 +396,8 @@ const NOT_PERSISTED: Readonly<Record<string, string>> = Object.freeze({
     'a bigint, and the trap this module is built around: JSON.stringify throws on one. The seed a session means is menu.freePlay.seed, which is decimal digits because a seed is an identity rather than a quantity',
   'viewer.outOfServiceCarIds':
     'a car held out of service is a within-day attempt, not a saved game, and nothing in a selection holds one — enterFreePlay clears it for exactly that reason',
+  'viewer.interventions':
+    'the run record’s mid-run intervention log, a within-day attempt on outOfServiceCarIds’ exact ground: it is stamped against one day’s run, the day boundary clears it (reportPanel’s next-day patch), and a restored log would replay yesterday’s change of mind onto a day that never carried it',
   'viewer.levers':
     'the group levers are the same case: moved off their defaults they make a run unreproducible elsewhere, and a reload is not the moment to inherit that silently',
   'viewer.selectorSpec':

@@ -556,6 +556,35 @@ export const PROBES: Readonly<Record<SurfaceKey, ScopeProbe>> = Object.freeze({
       }),
     ],
   },
+  'viewer.interventions': {
+    /*
+     * **The standing requirement, pointed at the stage's one intervention** — press the control's
+     * model path (append to the log → build the config → run) and require the legs to move.
+     *
+     * On Midtown Office at `atS: 120`, and the cell is a measured fact about the probe rather
+     * than a preference, exactly as the two rows below it record for their own controls. Both
+     * arms of eight cells were compared on the legs before this was written: Garden Apartments'
+     * 900 s refit is inert at every probed `atS` (120/300/450/600) — the compressed trickle
+     * keeps its two cars answering from where they stand, so stage 7 is never consulted where a
+     * lobby park would beat `stay` — and Midtown moves at 120 s and nowhere later, because early
+     * in the office morning the cars have just made their first deliveries upstairs and are idle
+     * at the top when the override calls them down; once the peak is on, no car is idle long
+     * enough for parking to exist. A probe has to be run on a cell where the thing it is probing
+     * can happen; `sim/interventions.test.ts` holds the same seam on Garden Apartments at the
+     * full 1 800 s day, where the trickle *does* leave cars idle.
+     *
+     * The empty arm doubles as the identity half core pins: `[]` spreads no `interventions` key
+     * onto the config at all, so this probe's left leg is the run before the field existed.
+     */
+    states: [
+      (s) => ({ ...s, buildingId: 'midtown-office', interventions: [] }),
+      (s) => ({
+        ...s,
+        buildingId: 'midtown-office',
+        interventions: [{ atS: 120, change: { kind: 'park-cars-lobby' } }],
+      }),
+    ],
+  },
   'viewer.outOfServiceCarIds': {
     /*
      * On Midtown Office, not Garden Apartments — and the reason is a measured fact about the probe
