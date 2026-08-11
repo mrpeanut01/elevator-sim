@@ -36,6 +36,8 @@ import { STATE_GLYPHS, STATE_WORDS } from '../access/zoning.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { SANDBOX_CONTRACT_ID } from '../shift/week.js';
 
+import type { MountContext } from './mountTypes.js';
+import { mountRecorder } from './mountRecorder.test-helper.js';
 import {
   SHAFT_LEFT_PX,
   elevationStageWidthPx,
@@ -44,6 +46,7 @@ import {
   accessMatrixOf,
   checkBuilding,
   elevationCarsOf,
+  mountBuildingEditor,
   elevationNoteOf,
   elevationRowHeightPx,
   elevationRowsOf,
@@ -1121,5 +1124,66 @@ describe('the save confirms, names, and can be run — issue #54', () => {
     expect(JSON.parse(control)).not.toHaveLength(0);
     expect(JSON.parse(moved)).not.toHaveLength(0);
     expect(moved).not.toBe(control);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The sizing block reaches the page — slice 6
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The non-test caller, named and driven: `mountBuildingEditor` builds the sizing block during
+ * construction and inserts it before the advice line with `parentElement?.insertBefore` — the
+ * insert the document recorder answers. What this proves is `dev/scopeNotes.test.ts`'s tier and
+ * no more: the node is in the page, beside the element the mount named, with the framing note the
+ * stylesheet cannot fake. The *figures* are written during `render`, which no Node recorder can
+ * drive (`sliderHandlesOf` needs a real `HTMLInputElement`), so the moved-control half of the
+ * requirement is pinned on the producer in `authoring/upPeak.test.ts` — change cars or speed and
+ * the printed line changes — and `render` passes that producer's output to `drawSizing` verbatim.
+ */
+describe('the sizing block reaches the page — slice 6', () => {
+  const inertContext = (): MountContext => ({
+    update: () => undefined,
+    runShift: () => undefined,
+    openTab: () => undefined,
+    fail: () => undefined,
+  });
+
+  it('inserts the block before the advice line, carrying its framing note', () => {
+    const made = mountRecorder();
+    mountBuildingEditor(made.elements.buildingEditor, inertContext());
+    const siblings = made.around(made.elements.buildingEditor.advice);
+    const block = siblings.find((sibling) => sibling.className === 'sizing-block');
+    expect(block, 'the mount inserted no sizing block beside #building-advice').toBeDefined();
+    /*
+     * The framing line is the block's honesty: where the numbers come from (the oracle's closed
+     * form) and what they cannot say (anything about waiting). Both halves are asserted, so a
+     * copy edit cannot quietly drop the refusal half and leave a figures panel that overpromises.
+     */
+    const texts = (block?.children ?? []).map((child) => child.textContent).join(' ');
+    expect(texts).toContain('same closed-form up-peak arithmetic');
+    expect(texts).toContain('says nothing about how long anyone waits');
+    // Before the advice line, not merely somewhere in the parent.
+    const at = siblings.indexOf(block as (typeof siblings)[number]);
+    const advice = siblings.findIndex((sibling) => sibling.id === 'building-advice');
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(advice).toBeGreaterThan(at);
+  });
+
+  it('starts with an empty rows container — the figures are render’s, never construction’s', () => {
+    /*
+     * A block seeded with figures at construction would be a stale number the moment the first
+     * render disagreed with it. Construction owes the page the container and the framing note;
+     * the numbers belong to the spec on screen, which only `render` has.
+     */
+    const made = mountRecorder();
+    mountBuildingEditor(made.elements.buildingEditor, inertContext());
+    const block = made
+      .around(made.elements.buildingEditor.advice)
+      .find((sibling) => sibling.className === 'sizing-block');
+    const rows = (block?.children ?? []).find((child) => child.className === 'sizing-rows');
+    expect(rows).toBeDefined();
+    expect(rows?.children).toHaveLength(0);
+    expect(rows?.textContent).toBe('');
   });
 });

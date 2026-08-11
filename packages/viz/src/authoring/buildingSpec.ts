@@ -107,7 +107,15 @@
  * defect `experiments/src/validation/documentation.test.ts` exists to catch one level up.
  */
 
-import { expandFloors } from '@elevator-sim/core/browser';
+import {
+  IMPLAUSIBLE_PERCENT_POPULATION_5MIN,
+  UP_PEAK_WARNING_CODES,
+  analyzeUpPeak,
+  expandFloors,
+  parseBuilding,
+  passengerTransferSecondsFor,
+  resolveBuilding,
+} from '@elevator-sim/core/browser';
 import type {
   AccessZone,
   BankConfig,
@@ -117,10 +125,15 @@ import type {
   DirectionalTraversalTime,
   ElevatorSpecs,
   FloorConfig,
+  ResolvedBank,
+  ResolvedBuilding,
+  RoundTripResult,
   ServiceEventConfig,
   StairsUseConfig,
   TransportModeConfig,
   TransportModeKind,
+  UpPeakAnalysis,
+  UpPeakWarning,
 } from '@elevator-sim/core/browser';
 
 import { credentialGroupsIn } from '../access/zoning.js';
@@ -2150,10 +2163,357 @@ export function buildingAdvice(spec: BuildingSpec): string {
   /*
    * Not the handoff's "Plausible." — `honesty/` refuses a probability word in player-facing text
    * (§ D163's R10), and it is right to: *plausible* is a claim about how likely this design is to
-   * work, made about a building nobody has run yet. What can honestly be said is which term will
-   * dominate the round trip, which is a fact about the geometry and is true before the run.
+   * work, made about a building nobody has run yet.
+   *
+   * This arm used to return *"Round-trip time here will be dominated by stops and door time, not
+   * by speed."* unconditionally, under a comment calling that "a fact about the geometry" — while
+   * computing nothing about the geometry at all. That is a stated mechanism with no measurement
+   * behind it, the defect class CLAUDE.md opens on, and it stopped being necessary the day
+   * {@link upPeakAnalysisOf} started evaluating the split for real: the same sentence now appears
+   * beside the closed-form figures exactly when `stopTimeS + transferTimeS` actually exceeds
+   * `travelTimeS`, and its travel-dominated twin appears when it does not. So this arm says
+   * nothing, rather than repeating a claim a panel two lines down can now contradict.
    */
-  return 'Round-trip time here will be dominated by stops and door time, not by speed.';
+  return '';
+}
+
+/* -------------------------------------------------------------------------- *
+ * Analytic sizing — the correctness oracle's closed form, at the controls
+ * -------------------------------------------------------------------------- */
+
+/** The closed form's outputs for one bank, unrounded. Formatting is the line's job, not these. */
+export interface SpecBankFigures {
+  readonly roundTripTimeS: number;
+  readonly intervalS: number;
+  readonly handlingCapacity5Min: number;
+  readonly percentPopulation5Min: number;
+  /** `U` — the population the percentage is measured against. */
+  readonly servedPopulation: number;
+  readonly travelTimeS: number;
+  readonly stopTimeS: number;
+  readonly transferTimeS: number;
+}
+
+/** One bank's sizing: figures with their reading and divergences, or a labelled refusal. */
+export interface SpecBankAnalysis {
+  readonly bankId: string;
+  readonly carCount: number;
+  /** `''` when {@link figures} holds; otherwise why the closed form has nothing to say here. */
+  readonly refusal: string;
+  readonly figures: SpecBankFigures | undefined;
+  /** The printed figures line. `''` when refused — a refusal never keeps a stale figure beside it. */
+  readonly line: string;
+  /** Which term dominates the round trip — `docs/design` ENGINE_CONTRACT § 10's reading, computed. */
+  readonly reading: string;
+  /** One sentence per divergence the derivation recorded, in the analysis's own order. */
+  readonly warnings: readonly string[];
+}
+
+/** The designer's sizing block: per-bank analyses, or one refusal when nothing resolves. */
+export interface SpecUpPeakAnalysis {
+  /** `''` when the building resolved; otherwise the block's single labelled refusal. */
+  readonly refusal: string;
+  readonly banks: readonly SpecBankAnalysis[];
+}
+
+/**
+ * The spec's interval, round trip and handling capacity, computed by **the same closed form the
+ * correctness oracle uses** — `analyzeUpPeak`, against the building this spec actually writes.
+ *
+ * ## Why this is a call and not a formula
+ *
+ * The design handoff's § 10 (`docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md`) sketches
+ * its own five-line RTT arithmetic and then states the rule that overrides the sketch: *"it must be
+ * the same code the engine uses to size a group."* This module therefore computes nothing itself.
+ * The spec goes through {@link buildingFromSpec} → `parseBuilding` → `resolveBuilding` — the exact
+ * path a save takes — and each resolved bank goes through `analyzeUpPeak`, the Barney/CIBSE closed
+ * form that `CLAUDE.md` § Correctness oracle holds the simulator to. A second copy of that
+ * arithmetic here would eventually disagree with the oracle by a term, silently, which is the
+ * published-number-goes-stale defect at the width of a whole panel.
+ *
+ * ## Per bank, never averaged
+ *
+ * `analyzeUpPeak` refuses a multi-bank building without a `bankId`, and its reason is quoted here
+ * because it decides this function's shape: *"Averaging across banks would be meaningless: each has
+ * its own zone, speed and population, and an interval is a property of one group controller."* So a
+ * spec that deals two banks gets two rows, each named.
+ *
+ * ## `tp` comes from the bank's own cars when the reference table has no row
+ *
+ * The closed form's default reads `elevator-specs.json → timing.passengerTransferS` by building
+ * type, and that table deliberately has no `mixed-use` row — so left to the default, every bank of
+ * both shipped mixed-use towers would refuse with a `RangeError` while the reference data states
+ * the answer per car. The rule applied instead is the oracle driver's own
+ * (`experiments/src/oracle/upPeakCase.ts#passengerTransferForBank`): when the table has a row, let
+ * the default read it; when it has none and every resolved car declares a value, pass their mean;
+ * when some car declares none, pass nothing and let `analyzeUpPeak` refuse — 1.2 s is the office
+ * figure, and assuming it is the exact defect `config/resolveCar.ts` exists to make impossible.
+ * The function is re-stated here rather than imported because the oracle module is not on
+ * `@elevator-sim/experiments`' browser surface and drags the simulator with it; what is duplicated
+ * is six lines of reading reference data, not arithmetic, and `upPeak.test.ts` pins the behaviour
+ * on the shipped mixed-use tower.
+ *
+ * ## Refusals are labelled, and no figure survives one
+ *
+ * A spec the loader refuses returns one building-level refusal and no banks; a bank the closed
+ * form cannot model (a shuttle whose destinations carry no population, a zone of zero height)
+ * returns a per-bank refusal quoting the thrown message, with `figures: undefined` and an empty
+ * line. Never `NaN`, never the previous spec's numbers — a labelled refusal beats both.
+ *
+ * ## The warnings are re-voiced, keyed on the codes, and that is deliberate
+ *
+ * `UpPeakAnalysis.warnings` must reach the reader — the shipped buildings trip them (a second
+ * entrance, an express zone, a heterogeneous group), and a figure shown without its warning is
+ * this repository's named failure mode. What reaches the reader is one sentence per **code**
+ * ({@link UP_PEAK_WARNING_CODES}, the stable machine-readable contract), not `warning.message`
+ * verbatim: core's messages are addressed to a caller of the API — they name `options` fields a
+ * reader has no control for — and one of them carries a probability word
+ * (*"almost certainly"*, on `destinationsAreTransferFloors`) that the player-facing register
+ * refuses outright (`docs/10` § 1 R10, `campaign/words.ts`). Each sentence draws its numbers from
+ * the analysis object itself, and `upPeak.test.ts` holds every code to a sentence and every
+ * sentence to R10.
+ *
+ * ## What the closed form cannot say, so this does not
+ *
+ * It predicts a mean interval and a handling capacity under pure up-peak. It has no queueing model
+ * and no variance, so it cannot predict AWT, WT95 or any waiting figure — the mount's framing line
+ * says so beside the block, and nothing here prints one.
+ *
+ * Pure, like everything in this module: same spec and specs in, same analysis out.
+ */
+export function upPeakAnalysisOf(spec: BuildingSpec, specs: ElevatorSpecs): SpecUpPeakAnalysis {
+  const file = `${spec.id}.json`;
+  let resolved: ResolvedBuilding;
+  try {
+    const config = buildingFromSpec(spec, { specs });
+    resolved = resolveBuilding(parseBuilding(config as unknown, file), specs, { file });
+  } catch {
+    /*
+     * The refusal itself is not repeated here: `checkBuilding` renders the loader's own message on
+     * this panel already, and a paraphrase of it would be a second copy that can go stale. What
+     * this block owes the reader is only that its figures are gone *because* of that refusal.
+     */
+    return {
+      refusal:
+        'The loader refuses this building, so there is nothing to size — its refusal is printed on this panel.',
+      banks: [],
+    };
+  }
+  const named = resolved.banks.length > 1;
+  return {
+    refusal: '',
+    banks: resolved.banks.map((bank) => bankAnalysisOf(resolved, bank, specs, named)),
+  };
+}
+
+/**
+ * `tp` for one bank where the reference table is silent — the oracle driver's rule, restated.
+ * See {@link upPeakAnalysisOf}'s docstring for why it is restated rather than imported.
+ *
+ * `undefined` means *pass no option*: either the table has a row and the closed form's default
+ * will read it, or some car declares nothing and the honest outcome is `analyzeUpPeak`'s refusal.
+ */
+function bankTransferSecondsOf(
+  building: ResolvedBuilding,
+  bank: ResolvedBank,
+  specs: ElevatorSpecs,
+): number | undefined {
+  if (passengerTransferSecondsFor(specs, building.type) !== undefined) return undefined;
+  const declared: number[] = [];
+  for (const car of bank.cars) {
+    if (car.passengerTransferS === undefined) return undefined;
+    declared.push(car.passengerTransferS);
+  }
+  if (declared.length === 0) return undefined;
+  return declared.reduce((sum, value) => sum + value, 0) / declared.length;
+}
+
+/** One bank through the closed form: figures, reading and re-voiced warnings, or the refusal. */
+function bankAnalysisOf(
+  building: ResolvedBuilding,
+  bank: ResolvedBank,
+  specs: ElevatorSpecs,
+  named: boolean,
+): SpecBankAnalysis {
+  const bankId = bank.id;
+  const carCount = bank.cars.length;
+  try {
+    const transfer = bankTransferSecondsOf(building, bank, specs);
+    const analysis = analyzeUpPeak(building, specs, {
+      bankId,
+      ...(transfer === undefined ? {} : { passengerTransferS: transfer }),
+    });
+    const { result } = analysis;
+    return {
+      bankId,
+      carCount,
+      refusal: '',
+      figures: {
+        roundTripTimeS: result.roundTripTimeS,
+        intervalS: result.intervalS,
+        handlingCapacity5Min: result.handlingCapacity5Min,
+        percentPopulation5Min: result.percentPopulation5Min,
+        servedPopulation: analysis.servedPopulation,
+        travelTimeS: result.travelTimeS,
+        stopTimeS: result.stopTimeS,
+        transferTimeS: result.transferTimeS,
+      },
+      line: bankLineOf(analysis, named),
+      reading: readingOf(result),
+      warnings: analysis.warnings.map((warning) => warningSentenceOf(warning, analysis)),
+    };
+  } catch (error) {
+    /*
+     * The thrown message is quoted rather than paraphrased — `checkBuilding` set the precedent for
+     * rendering core's own refusals — because it names the thing the model cannot fit (no terminal,
+     * no populated destination, a zone of zero height), and a softer sentence would name less.
+     */
+    const why = error instanceof Error ? error.message : String(error);
+    return {
+      bankId,
+      carCount,
+      refusal: `The closed form refuses bank ${bankId}: ${why}`,
+      figures: undefined,
+      line: '',
+      reading: '',
+      warnings: [],
+    };
+  }
+}
+
+/**
+ * One bank's figures as a line — round trip, interval, and handling capacity as people per five
+ * minutes with the share of the population it serves.
+ *
+ * The words are the closed form's own vocabulary (*round trip*, *interval*), never *average* or
+ * *typical*: these are analytic predictions with no sample behind them, and the estimate register
+ * belongs to quantities a run measures. Every number is a local before it reaches the template —
+ * `transportCommentFor`'s stated constraint, and `honesty/derive` is why.
+ */
+function bankLineOf(analysis: UpPeakAnalysis, named: boolean): string {
+  const result = analysis.result;
+  const rtt = result.roundTripTimeS.toFixed(1);
+  const interval = result.intervalS.toFixed(1);
+  const lifted = result.handlingCapacity5Min.toFixed(1);
+  const pct = result.percentPopulation5Min.toFixed(1);
+  const served = String(analysis.servedPopulation);
+  const figures =
+    `round trip ${rtt} s · interval ${interval} s · ` +
+    `lifts ${lifted} people per 5 min — ${pct} % of the ${served} it serves`;
+  if (!named) return `Pure up-peak: ${figures}`;
+  const bankId = analysis.bankId;
+  const cars = String(analysis.roundTripTerms.carsInGroup);
+  return `Bank ${bankId} (${cars} cars), pure up-peak: ${figures}`;
+}
+
+/**
+ * ENGINE_CONTRACT § 10's reading — *stop-time-dominated* versus *travel-dominated* — computed from
+ * the closed form's own terms rather than asserted.
+ *
+ * The mapping is stated because the two sides itemise differently: § 10's `stopTime` folds door
+ * time and per-stop dwell into one term, while the closed form charges door and levelling time in
+ * `stopTimeS` and passenger transfer separately in `transferTimeS`. "Stops and door time" here is
+ * therefore `stopTimeS + transferTimeS` — everything that happens while the car is not moving —
+ * against `travelTimeS`, the seconds in flight. A tie goes to the stop side, which errs toward the
+ * advice that spends less money.
+ */
+function readingOf(result: RoundTripResult): string {
+  const stopped = result.stopTimeS + result.transferTimeS;
+  if (stopped >= result.travelTimeS) {
+    return (
+      'Round-trip time here is dominated by stops and door time, not by speed — ' +
+      'a faster machine buys very little.'
+    );
+  }
+  return 'Round-trip time here is dominated by travel — speed and rise are what you are paying for.';
+}
+
+/**
+ * One divergence, said to a reader — keyed on the warning's stable code, with its numbers drawn
+ * from the analysis it arrived on. See {@link upPeakAnalysisOf}'s docstring for why the core
+ * message is not printed verbatim; see `upPeak.test.ts` for the pin that every code has an arm
+ * here and no arm says a probability word.
+ *
+ * The default arm is reachable only if core ships a code this switch has no case for — the union
+ * type turns that into a failing test (`upPeak.test.ts` iterates {@link UP_PEAK_WARNING_CODES})
+ * before it becomes a silent gap. It names the code and claims nothing else.
+ */
+function warningSentenceOf(warning: UpPeakWarning, analysis: UpPeakAnalysis): string {
+  const result = analysis.result;
+  switch (warning.code) {
+    case UP_PEAK_WARNING_CODES.multipleEntrances: {
+      const terminal = analysis.terminalFloorId;
+      return (
+        `This bank serves more than one entrance floor, and the closed form boards everyone at ` +
+        `${terminal} alone — a real round trip runs longer than these figures say.`
+      );
+    }
+    case UP_PEAK_WARNING_CODES.nonUniformFloorPopulations:
+      return (
+        'Floor populations differ across the served zone; the closed form treats every floor as ' +
+        'an equal draw, which over-counts stops on a skewed tower.'
+      );
+    case UP_PEAK_WARNING_CODES.unpopulatedFloorsExcluded:
+      return (
+        'Served floors with nobody on them were left out of the stop count — they are not ' +
+        'up-peak destinations, though a run may still stop there for other traffic.'
+      );
+    case UP_PEAK_WARNING_CODES.nonUniformInterfloorDistance: {
+      /*
+       * Not "its mean": `honesty/properties.ts` R3 reads *mean*, *average* and *typical* as
+       * estimate cues for a run's refused waiting figure, and a divergence note about geometry
+       * has no business wearing the estimate register. "Flattens" says the same thing about a
+       * rise without borrowing a word that belongs to measured quantities.
+       */
+      const rise = analysis.interfloorDistanceM.toFixed(2);
+      return `Floor-to-floor rise varies across the served zone; the figures flatten it to ${rise} m per floor.`;
+    }
+    case UP_PEAK_WARNING_CODES.heterogeneousGroup: {
+      const cars = String(analysis.roundTripTerms.carsInGroup);
+      return `This bank mixes car specifications; speed, capacity and timings are averaged across its ${cars} cars.`;
+    }
+    case UP_PEAK_WARNING_CODES.doubleDeck:
+      return (
+        'This bank has double-deck cars and this is the single-deck round trip — it under-counts ' +
+        'stops and over-states capacity, so a simulated day on this bank is deliberately not ' +
+        'comparable with these figures.'
+      );
+    case UP_PEAK_WARNING_CODES.expressZone: {
+      const rise = analysis.expressRiseM.toFixed(1);
+      const each = (analysis.expressRiseM / analysis.ratedSpeedMps).toFixed(1);
+      return (
+        `The bank runs ${rise} m express below its served zone — about ${each} s each way, ` +
+        'charged as its own term here and left out of the textbook expression.'
+      );
+    }
+    case UP_PEAK_WARNING_CODES.saturatedStops: {
+      const people = analysis.roundTripTerms.passengersPerTrip.toFixed(1);
+      const floors = String(analysis.floorsAboveTerminal);
+      return (
+        `A design-load car carries ${people} people over ${floors} served floors, so it stops at ` +
+        'most of them on every trip — the round trip has stopped responding to load.'
+      );
+    }
+    case UP_PEAK_WARNING_CODES.destinationsAreTransferFloors:
+      return (
+        'These destination floors hand riders on to another bank, so the population behind the ' +
+        'percentage is not the population this bank lifts — the percentage is not meaningful, ' +
+        'and nothing in this editor can state the true figure.'
+      );
+    case UP_PEAK_WARNING_CODES.implausibleHandlingCapacity: {
+      const pct = result.percentPopulation5Min.toFixed(1);
+      const bound = String(IMPLAUSIBLE_PERCENT_POPULATION_5MIN);
+      return (
+        `${pct} % of population in five minutes is past the ${bound} % sanity bound — real ` +
+        'demand runs 3 to 17 % — so the population behind this figure is smaller than what the ' +
+        'bank really lifts.'
+      );
+    }
+    default: {
+      const code = warning.code;
+      return `The closed form recorded a divergence (${code}) between this bank and its model.`;
+    }
+  }
 }
 
 export function specIsDirty(spec: BuildingSpec, source: BuildingSpec): boolean {

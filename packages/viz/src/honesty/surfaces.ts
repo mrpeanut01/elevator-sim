@@ -100,6 +100,7 @@ import {
   occupancyLine,
   SPEC_ROWS,
   specFromBuilding,
+  upPeakAnalysisOf,
   validateSpec,
   type BuildingSpec,
 } from '../authoring/buildingSpec.js';
@@ -2720,6 +2721,7 @@ const AUTHORING: SurfaceAdapter = {
     'authoring/buildingSpec.ts#buildingAdvice',
     'authoring/buildingSpec.ts#occupancyLine',
     'authoring/buildingSpec.ts#validateSpec',
+    'authoring/buildingSpec.ts#upPeakAnalysisOf',
     'authoring/buildingSpec.ts#SPEC_ROWS',
     'authoring/buildingSpec.ts#BLANK_SPEC',
     'authoring/buildingSpec.ts#specFromBuilding',
@@ -2792,6 +2794,25 @@ const AUTHORING: SurfaceAdapter = {
       seeds.push({ field: `buildingSummary(${label})`, text: buildingSummary(spec), role: 'observation' });
       seeds.push({ field: `occupancyLine(${label})`, text: occupancyLine(spec), role: 'observation' });
       seeds.push({ field: `buildingAdvice(${label})`, text: buildingAdvice(spec), role: 'prose' });
+      /*
+       * The sizing block — slice 6. Every string the block can draw goes in: the figures line and
+       * the § 10 reading on the analysable specs, the re-voiced divergence sentences (the shipped
+       * buildings trip them — `from-building` alone raises several), and both refusal shapes (the
+       * `escalators` spec is a document the loader refuses, so it exercises the building-level
+       * one). Empty seeds are filtered by `singleRun`, so a refused bank's empty line costs
+       * nothing.
+       */
+      const sized = upPeakAnalysisOf(spec, context.elevatorSpecs);
+      seeds.push({ field: `upPeakAnalysisOf(${label}).refusal`, text: sized.refusal, role: 'reason' });
+      for (const bank of sized.banks) {
+        const at = `upPeakAnalysisOf(${label}).${bank.bankId}`;
+        seeds.push({ field: `${at}.refusal`, text: bank.refusal, role: 'reason' });
+        seeds.push({ field: `${at}.line`, text: bank.line, role: 'observation' });
+        seeds.push({ field: `${at}.reading`, text: bank.reading, role: 'prose' });
+        for (const [index, warning] of bank.warnings.entries()) {
+          seeds.push({ field: `${at}.warnings[${String(index)}]`, text: warning, role: 'reason' });
+        }
+      }
       const built = buildingFromSpec(spec, { specs: context.elevatorSpecs });
       seeds.push({ field: `buildingFromSpec(${label}).name`, text: built.name, role: 'label' });
       for (const bank of built.banks) {
