@@ -18,6 +18,18 @@
 > 1 skipped** · core sim+dispatch 764 · zero merge-only defects. Corpus string counts moved and
 > are measured at integration only, not per lane. Worktrees and lane branches pruned after merge.
 >
+> **Wave complete through slice 8's build.** Merged in order, each verified after its own merge:
+> S3 `838305d` · S6a `d6b811c` · S5 `8be2c8b` · S6b `1990174` · PT-F1 (blocks-play) · PT-F2
+> (clocks/accounting) · S4b `0cfb79e` · S7 `3bd44fe` · S4c (rules editor) · S4d (ghost + race
+> strip) · PT-F3 (layout/copy polish). Slice 8 in build; slice 10 (close-out) last by design.
+>
+> **Four integration defects no single branch could see**, all caught and fixed here rather than
+> in CI: three lanes appending to one honesty-adapter registry (resolved by reconstruction, both
+> adapters whole); core's public barrel missing eight of the rules editor's new dispatch exports;
+> the prepositioning study auto-adopting `fixed-floor` and producing four unpinned figures (pinned
+> from its own measured run, n = 500); and the booted page's note count, where **two lanes each
+> counted their own addition and each wrote 18** — the integrated page holds both, measured 19.
+>
 > Known-red carried honestly: three `server` store tests time out at the 5 s default under
 > full-suite load only (pass alone, 29/29 in 73 s) — pre-existing, evidenced on issue #149,
 > not this delivery's to fix silently.
