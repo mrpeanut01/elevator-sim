@@ -59,6 +59,28 @@ describe.each(BUILDING_IDS)('%s — the frame description', (buildingId) => {
     const frame = frameAt(recording, recording.endedAt / 3);
     expect(describeFrame({ recording, frame })).toBe(describeFrame({ recording, frame }));
   }, 300_000);
+
+  /**
+   * `docs/20` defect 9 — the subtitle named the dispatcher `yours-1` where every other surface
+   * said *Lobby holder*.
+   *
+   * Asserted both ways, because both are the contract: a caller that has the display name gets it
+   * and the id is **gone** (not merely joined by a name, which would leave the engine string on
+   * the surface), and a caller that has none gets exactly the sentence it had before the field
+   * existed. The id used here is deliberately one that could not be a display name.
+   */
+  it('names the dispatcher a reader knows, and falls back to the id when given no name', () => {
+    const { recording } = recordRun(breadthConfig(config, buildingId));
+    const frame = frameAt(recording, recording.endedAt / 3);
+
+    const named = describeFrame({ recording, frame, dispatcherName: 'Lobby holder' });
+    expect(named).toContain('dispatcher Lobby holder');
+    expect(named).not.toContain(recording.dispatcherProfileId);
+
+    expect(describeFrame({ recording, frame })).toContain(
+      `dispatcher ${recording.dispatcherProfileId}`,
+    );
+  }, 300_000);
 });
 
 describe('the description carries the two facts a picture must not hide', () => {

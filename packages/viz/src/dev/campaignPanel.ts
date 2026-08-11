@@ -40,7 +40,7 @@ import type { DispatcherProfile } from '@elevator-sim/core/browser';
 
 import { credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { restrictedFloorIds } from '../access/zoning.js';
-import { batchReport, type BatchReport } from '../batch/report.js';
+import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import type { VizRecording } from '../contract/types.js';
 import { briefingFor, type StageBriefing } from '../campaign/brief.js';
@@ -842,14 +842,16 @@ export function mountCampaignPanel(options: CampaignPanelOptions): CampaignPanel
       );
     }
 
-    ui.output.append(
-      row(
-        'the measurements behind the verdict',
-        `${report.buildingName} · ${String(report.replications)} runs per setting · ${report.demandClause}`,
-        `Every arm ran this population: ${report.traceKey}`,
-        'figure-observation',
-      ),
+    // The population in words, the exact key on the row's `title` — `docs/20` defect 9, and
+    // `batch/report.ts#populationLineOf` for why the key is kept rather than dropped.
+    const measurementsRow = row(
+      'the measurements behind the verdict',
+      `${report.buildingName} · ${String(report.replications)} runs per setting · ${report.demandClause}`,
+      `Every arm ran this population: ${populationLineOf(report.traceKey, { buildingName: report.buildingName })}.`,
+      'figure-observation',
     );
+    measurementsRow.title = report.traceKey;
+    ui.output.append(measurementsRow);
     for (const arm of report.arms) {
       ui.output.append(
         row(

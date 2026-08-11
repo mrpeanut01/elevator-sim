@@ -70,6 +70,15 @@ export interface DescribeFrameInput {
   readonly maxQueueFloors?: number;
   /** The building's mood, said in words — D4, and observation-only, so it survives suppression. */
   readonly mood?: BuildingMood | undefined;
+  /**
+   * The dispatcher's **display name** — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11, and `SceneInput.dispatcherName`.
+   *
+   * The same substitution the canvas subtitle makes, on the surface that has to make it *more*
+   * strongly: this paragraph is the canvas's `aria-label`, so a reader who cannot see the stage has
+   * no second surface to reconcile `yours-1` against. Falls back to the recording's id for
+   * `dayReportOf`'s reason — a caller with no name to give gets the string it had before.
+   */
+  readonly dispatcherName?: string | undefined;
 }
 
 /** Words for a load factor. The `!` glyph's spoken equivalent. */
@@ -95,7 +104,8 @@ export function describeFrame(input: DescribeFrameInput): string {
   const parts: string[] = [];
 
   parts.push(
-    `${recording.buildingName}, dispatcher ${recording.dispatcherProfileId}, seed ${recording.seed}, ` +
+    `${recording.buildingName}, dispatcher ${input.dispatcherName ?? recording.dispatcherProfileId}, ` +
+      `seed ${recording.seed}, ` +
       `at ${formatClock(frame.simTimeS)} of ${formatClock(recording.endedAt)}.`,
   );
 

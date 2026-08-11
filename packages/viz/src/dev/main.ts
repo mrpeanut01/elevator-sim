@@ -220,6 +220,7 @@ import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
+  allDispatchers,
   buildingConfigOf,
   shiftDemandTemplateId,
   shiftSubmittedSelection,
@@ -4864,6 +4865,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The stage — § 1.3 M3
    * ---------------------------------------------------------------------- */
 
+  /**
+   * The name a reader knows this recording's dispatcher by — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11, and
+   * `docs/20` defect 9.
+   *
+   * ## Why it is not `profileById`
+   *
+   * `dev/state.ts#profileById` **substitutes the first shipped profile** for an id it cannot
+   * resolve, which is the right answer for *which dispatcher does the reader's state select* (a
+   * selector must select something) and the wrong one for *what did this recording run*: a run
+   * loaded from a file naming a profile this build does not ship would be captioned `Nearest car`,
+   * which is a false statement about the picture rather than a missing one. So the lookup is by
+   * exact id and the fallback is the recording's own string — the same fallback
+   * `shift/report.ts#dayReportOf` takes, so the stage and the sheet degrade to one word rather than
+   * to two.
+   *
+   * Read from `state.savedDispatchers` at call time rather than captured, because the reader can
+   * save a profile — and rename one — while a recording is on screen.
+   */
+  function dispatcherNameOf(recording: VizRecording): string {
+    const found = allDispatchers(resources, state.savedDispatchers).find(
+      (profile) => profile.id === recording.dispatcherProfileId,
+    );
+    return found?.name ?? recording.dispatcherProfileId;
+  }
+
   function drawStage(): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
@@ -4926,6 +4952,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       theme: stageTheme,
       recording,
       frame,
+      dispatcherName: dispatcherNameOf(recording),
       layout,
       overlay: wantsOverlay ? overlay : undefined,
       selection: selectionFor(assignments),
@@ -4958,7 +4985,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       setText(ui.stage.alarmText, `${String(alarm.waiting)} people stacked up at ${alarm.label}`);
       setText(ui.stage.alarmSub, 'a car is on its way — or add one under Building');
     }
-    canvas.setAttribute('aria-label', describeFrame({ recording, frame }));
+    canvas.setAttribute(
+      'aria-label',
+      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording) }),
+    );
   }
 
   function selectionFor(assignments: readonly LandingAssignment[]): SceneSelection | undefined {
@@ -5016,7 +5046,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function announce(): void {
     const recording = state.recording;
     if (recording === undefined || playback === undefined) return;
-    setText(ui.stage.description, describeFrame({ recording, frame: playback.frame() }));
+    setText(
+      ui.stage.description,
+      describeFrame({
+        recording,
+        frame: playback.frame(),
+        dispatcherName: dispatcherNameOf(recording),
+      }),
+    );
   }
 
   /* ---------------------------------------------------------------------- *

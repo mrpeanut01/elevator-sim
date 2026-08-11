@@ -567,6 +567,26 @@ function railBasisAt(recording: VizRecording, at: number): WaitBandBasis {
   return shiftIsOver(recording, at) ? 'whole-run' : 'now';
 }
 
+/**
+ * The dispatcher's display name, resolved exactly as the shell resolves it — `docs/20` defect 9.
+ *
+ * `dev/main.ts#dispatcherNameOf` is the lookup: exact id against the loaded profiles, falling back
+ * to the recording's own string. It is spelled again here rather than imported because
+ * `honesty/` may not import `dev/main.ts` (it mounts a page), and it is the *lookup* that is
+ * duplicated rather than a wording — the string this produces is a profile's authored `name`, from
+ * `data/dispatcher-profiles.json`, which is the same file both readers consult.
+ *
+ * Driving the canvas and the frame description **without** it would sweep the arm no player sees:
+ * the id is the fallback, and a corpus that only ever exercises a fallback measures the surface a
+ * probe gets rather than the one a reader gets.
+ */
+function dispatcherNameOf(context: HonestyContext): string {
+  const found = context.dispatcherProfiles.profiles.find(
+    (profile) => profile.id === context.recording.dispatcherProfileId,
+  );
+  return found?.name ?? context.recording.dispatcherProfileId;
+}
+
 function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly RenderedText[] {
   return seeds
     .filter((seed) => seed.text.trim() !== '')
@@ -751,6 +771,8 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
           lockedOutLandings: bundle.lockedOut,
           queues: bundle.queues,
           mood: bundle.mood,
+          // The name a player reads, not the id a probe would default to. See `dispatcherNameOf`.
+          dispatcherName: dispatcherNameOf(context),
         }),
         role: 'prose',
         /*
@@ -890,6 +912,8 @@ const CANVAS: SurfaceAdapter = {
         drawScene(ctx, {
           recording,
           frame: bundle.frame,
+          // See `dispatcherNameOf` — the subtitle a player reads is the profile's name.
+          dispatcherName: dispatcherNameOf(context),
           layout,
           overlay: bundle.metrics,
           ...(selection === undefined ? {} : { selection }),

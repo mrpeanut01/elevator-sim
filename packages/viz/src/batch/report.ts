@@ -1058,6 +1058,115 @@ function format(value: number, places: number): string {
   return value.toFixed(places);
 }
 
+/* -------------------------------------------------------------------------- *
+ * The population line, in words — `docs/20` defect 9
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How each field of a trace key is said to a reader. `null` means *say the value alone*.
+ *
+ * A table rather than a `switch` for `render/overlay.ts#CASUAL_WORDS`' reason: the vocabulary of a
+ * surface belongs in one readable block, including the entries that needed no translating. The
+ * keys are `runner/crn.ts#traceKeyOf`'s own, and an entry missing from here is **not** dropped —
+ * {@link spacedKey} renders it — because {@link BatchReport.traceKey}'s docstring promises the
+ * population line carries *every* field, and a curated subset would quietly stop being that.
+ */
+const TRACE_KEY_WORDS: Readonly<Record<string, string | null>> = Object.freeze({
+  building: null,
+  template: 'demand shape',
+  durationS: 'seconds of demand',
+  demandLevel: 'demand level',
+  arrivalRatePctPop5min: '% of population arriving per 5 minutes',
+  directionalSplit: 'mix',
+  batchSharesDestination: 'groups share a destination',
+  entranceWeights: 'entrances',
+  interfloorWeighting: 'interfloor weighting',
+  credentialAssignment: 'credentials',
+  credentialGap: 'share of riders holding the wrong badge',
+  maxLegs: 'legs at most',
+  peakWindowS: 'second peak window',
+  baselineFraction: 'baseline fraction',
+  mixAmplitude: 'mix amplitude',
+  batchSize: 'mean group size',
+  passengerMass: 'passenger mass',
+  patience: 'patience',
+  stairsUptake: 'stairs uptake',
+});
+
+/** `arrivalRatePctPop5min` → `arrival rate pct pop 5 min`. The fallback, never the first choice. */
+function spacedKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .toLowerCase();
+}
+
+/** One value, said plainly. Nested blocks become `incoming 1, outgoing 0` rather than JSON. */
+function traceValueWords(value: unknown): string {
+  if (value === null) return 'none';
+  if (Array.isArray(value)) return value.map((entry) => traceValueWords(entry)).join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, inner]) => `${spacedKey(key)} ${traceValueWords(inner)}`)
+      .join(', ');
+  }
+  if (typeof value === 'number') return String(value);
+  return String(value);
+}
+
+/**
+ * {@link BatchReport.traceKey}, said in words — `docs/20` defect 9, `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11.
+ *
+ * ## Why the key is not simply printed
+ *
+ * It was. Three panels drew `Every arm ran this population:
+ * `{"arrivalRatePctPop5min":2,"building":"garden-apartments","durationS":3600,"peakWindowS":300}``
+ * at a player, on the suite screen a first-timer reaches by ticking a cell out of curiosity. Raw
+ * JSON on a player surface is § 16 rule 11's own example, and the reader who most needs this line —
+ * somebody deciding whether two arms are comparable — is the one least likely to parse it.
+ *
+ * ## What it may not become
+ *
+ * A **summary**. {@link BatchReport.traceKey}'s docstring promises the population line carries
+ * every field of the demand block, and `demandClause` points at it in those words for the authored
+ * case. So this is a *rendering* of the key and never a selection from it: every entry is drawn,
+ * unknown keys included, and the exact key stays available to a caller that needs to reproduce the
+ * run elsewhere (the panels hang it on the row's `title`). A field added to `traceKeyOf` therefore
+ * appears here the day it is added, under {@link spacedKey}'s spelling, rather than the day
+ * somebody remembers to widen a list.
+ *
+ * `buildingName` substitutes for the `building` entry when a caller has one, because the id is the
+ * other engine string on this line. Absent, the id is drawn — a wrong name would be worse than a
+ * technical one.
+ *
+ * A key this cannot parse comes back verbatim: it is provenance, and a renderer that swallowed it
+ * would be hiding the one thing this line exists to publish.
+ */
+export function populationLineOf(
+  traceKey: string,
+  options?: { readonly buildingName?: string | undefined },
+): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(traceKey);
+  } catch {
+    return traceKey;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return traceKey;
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (value === undefined) continue;
+    if (key === 'building') {
+      parts.push(options?.buildingName ?? String(value));
+      continue;
+    }
+    const words = key in TRACE_KEY_WORDS ? TRACE_KEY_WORDS[key] : spacedKey(key);
+    const said = traceValueWords(value);
+    parts.push(words === null || words === undefined ? said : `${said} ${words}`);
+  }
+  return parts.length === 0 ? traceKey : parts.join(' · ');
+}
+
 function signed(value: number, places: number): string {
   const text = Math.abs(value).toFixed(places);
   return `${value < 0 ? '−' : '+'}${text}`;

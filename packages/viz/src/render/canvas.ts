@@ -458,6 +458,27 @@ export interface SceneInput {
    */
   readonly mood?: BuildingMood | undefined;
   /**
+   * The dispatcher's **display name**, for the subtitle — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11.
+   *
+   * ## Why the recording's own field is not it
+   *
+   * `VizRecording.dispatcherProfileId` is an id, and on a profile the reader authored it is a
+   * *generated* one: the second dispatcher a player saves is `yours-1`. The header drew that
+   * string, under a building drawn by its display name, while every other surface in the product —
+   * the sheet's identity line, the drawer, the footer, the compare rows — said **Lobby holder**.
+   * A player who reads `yours-1` on the stage and `Lobby holder` on the sheet has two runs as far
+   * as they can tell.
+   *
+   * Passed in rather than looked up, for {@link SceneInput.overlay}'s reason and for one more:
+   * the id-to-name map is `data/dispatcher-profiles.json` plus whatever the reader has saved, which
+   * is `dev/state.ts`'s to know and not a renderer's. This is `shift/report.ts#dayReportOf`'s own
+   * idiom (`input.dispatcherName ?? recording.dispatcherProfileId`), spelled the same way here so
+   * the stage and the sheet fall back to the same string when a caller has no name to give — a
+   * headless probe, a fixture, a recording loaded from a file whose profile this build does not
+   * ship.
+   */
+  readonly dispatcherName?: string | undefined;
+  /**
    * The reader's disclosure level, for the strings on this canvas that have two registers.
    *
    * ## It reached `render/overlay.ts` and nothing else, and that claim has been retired
@@ -831,7 +852,9 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
 
   ctx.font = FONT;
   ctx.fillStyle = theme.textDim;
-  const meta = `${recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
+  // The name a reader knows this dispatcher by, never the generated id. See
+  // {@link SceneInput.dispatcherName} for why the renderer is handed it rather than resolving one.
+  const meta = `${input.dispatcherName ?? recording.dispatcherProfileId} · seed ${recording.seed} · ${formatClock(frame.simTimeS)} / ${formatClock(recording.endedAt)}`;
   ctx.fillText(meta, 12, layout.header.metaY);
 
   ctx.textAlign = 'right';
