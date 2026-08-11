@@ -2456,6 +2456,18 @@ function shiftBundleOf(context: HonestyContext): ShiftBundle {
       interventions: [
         { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } },
       ],
+      /*
+       * And a **ruled** day, so the sheet's rule lines and its fallback sentence are in the corpus
+       * — `docs/20` defect 2, on `shift/report.ts#ruleLines`. Two rows rather than one, because the
+       * ordinal is part of the claim: `rule 1 · …` and `rule 2 · …` say the engine reads them in
+       * first-match order, and a single row would sweep a sentence that never has to number itself.
+       * The five sibling sheets below carry none, which is the other shipped arm — the same split
+       * the intervention log above is seeded under.
+       */
+      ruleRows: [
+        { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
+        { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
+      ],
     }) as WeekDayReport;
     /*
      * The four sheets a **pairing** needs — issue #127, and each is one axis away from `report`.

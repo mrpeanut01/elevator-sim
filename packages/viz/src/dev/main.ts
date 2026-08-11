@@ -4924,6 +4924,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       interventions: state.interventions,
       /*
+       * The rules the run was driven by — `docs/20` defect 2. From `state` for `interventions`'
+       * reason exactly: `shiftRunConfigOf` applies `profileWithRules(profile, state.ruleRows)` when
+       * it builds the run, so these are the rows the legs on screen were simulated under rather
+       * than whatever the editor happens to be holding now.
+       */
+      ruleRows: state.ruleRows,
+      /*
        * **The one caller with a player** — GitHub issue #70, and the second half of § D250's
        * one-field-and-one-caller fix.
        *

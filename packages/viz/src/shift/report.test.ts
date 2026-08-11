@@ -28,6 +28,7 @@
 import { loadConfig, type LoadedConfig, type SimulationConfig } from '@elevator-sim/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { fallbackLineOf, readbackOf, type RuleRow } from '../authoring/ruleSpec.js';
 import { DATA_DIR, fixtureConfig, fixtureSummary } from '../fixtures.test-helper.js';
 import { recordRun } from '../record/recordRun.js';
 import type { VizRecording, VizSummary } from '../contract/types.js';
@@ -779,6 +780,54 @@ describe('the rest of the sheet', () => {
     // An untouched day prints nothing — no placeholder line, and an absent key is the empty log
     // (core's own contract, `sim/interventions.test.ts`).
     expect(sheet(undefined).some((line) => line.includes('parked'))).toBe(false);
+    expect(sheet(undefined)).toEqual(sheet([]));
+  });
+
+  it('names the rules the run was driven by, in the editor’s own readback — docs/20 defect 2', () => {
+    /*
+     * The audit's finding: a rule governed the run, the stage header named it live for forty
+     * minutes, and the filed sheet said *"Midtown Office · Conventional collective"* with the word
+     * **rule** on it zero times. `docs/19` defect 10 exactly, on the mechanism that landed after it
+     * was fixed.
+     *
+     * Asserted through `readbackOf` rather than against a typed literal, because the claim is that
+     * the sheet, the editor's readback and the stage pill are three renderings of **one** producer.
+     * A literal here would pass on the day somebody rewrote the readback and left the sheet behind,
+     * which is the disagreement the shared producer exists to prevent.
+     */
+    const sheet = (ruleRows: DayReportInput['ruleRows']): readonly string[] =>
+      dayReportOf({
+        recording: clean,
+        observations: observationsOfRun(clean),
+        goals: goalsForDay(4),
+        week: openWeek('c2'),
+        contract: contractById('c2'),
+        event: SHIFT_EVENTS.ordinary,
+        plan: PLAN,
+        calendar: null,
+        subject: { kind: 'week-day' },
+        dispatcherName: 'Conventional collective',
+        ruleRows,
+      }).metaLines;
+
+    const rows: readonly RuleRow[] = [
+      { when: 'lobby-queue-passes', whenValue: 30, then: 'hold-at-lobby' },
+      { when: 'call-waited', whenValue: 30, then: 'jump-queue' },
+    ];
+    const meta = sheet(rows);
+    expect(meta).toContain(`rule 1 · ${readbackOf(rows[0] as RuleRow)}`);
+    expect(meta).toContain(`rule 2 · ${readbackOf(rows[1] as RuleRow)}`);
+    // The ordinals are the first-match order the engine reads them in, not a set.
+    expect(meta.findIndex((line) => line.startsWith('rule 1'))).toBeLessThan(
+      meta.findIndex((line) => line.startsWith('rule 2')),
+    );
+    // And the relationship to the dispatcher on the identity line above, stated once, under the
+    // list — the question a sheet naming both otherwise leaves a reader holding.
+    expect(meta).toContain(fallbackLineOf('Conventional collective'));
+
+    // A day with no rules prints nothing: no ordinal, no fallback line, no caption over nothing.
+    expect(sheet(undefined).some((line) => line.startsWith('rule '))).toBe(false);
+    expect(sheet(undefined).some((line) => line.includes('If no rule fits'))).toBe(false);
     expect(sheet(undefined)).toEqual(sheet([]));
   });
 
