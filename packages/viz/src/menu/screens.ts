@@ -145,6 +145,14 @@ export type MenuIntent =
    * shell's switch fail to compile until something performs it.
    */
   | { readonly kind: 'start-endless' }
+  /**
+   * Open the Fix-a-building surface — GAMEPLAY § 10's mode 4, mounted as an overlay.
+   *
+   * A member rather than a call, for this union's founding reason: the shell does not compile
+   * until something performs it, and `dev/main.ts`'s arm is what opening the surface *means* —
+   * this module decides nothing about it, exactly as `open-campaign` decides nothing about tabs.
+   */
+  | { readonly kind: 'open-fixit' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   /**
    * Take a board row's own configuration and run it — GitHub issue #93 § 1.
@@ -321,6 +329,7 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'start':
     case 'open-campaign':
     case 'start-endless':
+    case 'open-fixit':
     case 'open-board':
     case 'beat-score':
     case 'account-form':
@@ -1485,6 +1494,24 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
       intent: { kind: 'navigate', to: 'commissioning' },
     },
     {
+      /*
+       * GAMEPLAY § 10 — mode 4. It sits on this screen rather than the root for
+       * `campaign.endless`'s own reason one row down: the root's six rows are pinned by § D299's
+       * add-a-door-take-nothing-away test, and this surface is a mode a player chooses from the
+       * scenario board's neighbourhood rather than a seventh peer of Free play. The arm is
+       * `dev/main.ts`'s: close the menu, open the Fix-a-building overlay. No week is touched —
+       * a case runs its own building, and leaving the overlay lands back on the shift exactly as
+       * it was, which is why the scope is `presentation`.
+       */
+      id: 'campaign.fixit',
+      label: 'Fix a building',
+      detail: 'A tower with one thing wrong and a tenant who has written in — the diagnosis is printed, the decision is what to spend',
+      kind: 'commit',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'open-fixit' },
+    },
+    {
       id: 'campaign.endless',
       label: 'Keep going',
       detail: 'The same week with no assignment: it grows, nothing is banked, nothing clears',
@@ -2275,6 +2302,7 @@ export function applyIntent(
     case 'start':
     case 'open-campaign':
     case 'start-endless':
+    case 'open-fixit':
     case 'open-board':
     case 'account-form':
     case 'account-submit':

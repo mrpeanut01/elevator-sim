@@ -165,7 +165,8 @@ import { mountBatchPanel } from './batchPanel.js';
 import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
-import { loadBrowserResources, loadCampaign, type BrowserResources } from './data.js';
+import { loadBrowserResources, loadCampaign, loadFixitCases, type BrowserResources } from './data.js';
+import { mountFixitPanel } from './fixitPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
   ELEMENT_IDS,
@@ -826,6 +827,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * than one place and baking the origin in would need a rebuild per deployment. The tag is
    * optional, so `index.html` is unchanged and `elementMap.test.ts`'s contract is untouched.
    */
+  /**
+   * Fix-a-building — GAMEPLAY § 10, mounted like the menu: a TypeScript-built overlay, so
+   * `index.html` and `elementMap.test.ts`'s contract are untouched. The case file is fetched on
+   * first open (`loadFixitCases`'s own note on why it is not part of boot).
+   */
+  const fixitPanel = mountFixitPanel({
+    document,
+    resources,
+    loadCases: () => loadFixitCases(resources),
+  });
+
   const apiOrigin =
     document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
   const client = apiOrigin === '' ? undefined : createClient(apiOrigin, fetchTransport(fetch));
@@ -1585,6 +1597,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
         runShift();
+        return;
+
+      case 'open-fixit':
+        /*
+         * The overlay opens over whatever is running; nothing behind it is torn down, so leaving
+         * it lands back on the shift exactly as it was — which is what the row's `presentation`
+         * scope promises. The menu closes the way `open-campaign` closes it: the player chose a
+         * surface, and two overlays stacked would each claim Escape.
+         */
+        closeMenu('entered-a-mode');
+        fixitPanel.open();
         return;
 
       case 'reopen':

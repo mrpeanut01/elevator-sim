@@ -79,6 +79,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/parameterForm.ts#appliedNoteFor',
         'dev/data.ts#loadBrowserResources',
         'dev/data.ts#loadCampaign',
+        'dev/data.ts#loadFixitCases',
         'dev/data.ts#resolveEdited',
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
@@ -115,6 +116,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * static sweep below. That is weaker than driving them and is stated as a limitation.
          */
         'dev/menuPanel.ts#renderMenu',
+        /*
+         * The Fix-a-building overlay, `menuRoot`'s mount pattern: TypeScript-built, appended to
+         * `document.body`, and undrivable under Node for the same reason as every mount above.
+         * Every decision it draws is `fixit/engine.ts`'s or `fixit/run.ts`'s, which the FIXIT
+         * adapter drives; its own literals (headings, the running-total line) reach only the
+         * static sweep below, which is a stated limitation exactly as it is for the menu.
+         */
+        'dev/fixitPanel.ts#mountFixitPanel',
       ],
     },
     {
@@ -510,6 +519,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'campaign/parse.ts#editableIdsOf',
         'campaign/parse.ts#parseCampaign',
         'campaign/parse.ts#validateCampaign',
+        /*
+         * `fixit/parse.ts` is `campaign/parse.ts` one surface over, and the same argument holds:
+         * its sentences refuse a malformed `data/fixit-cases.json` to the person authoring it,
+         * `fixit/parse.test.ts` drives every refusal, and what a *player* reads is the parsed
+         * copy, which travels through the panel and the FIXIT adapter's drivers.
+         * `playerFacingStringsOf` returns that authored copy labelled for the copy sweep — the
+         * validation instrument, not a surface.
+         */
+        'fixit/parse.ts#FixitCasesError',
+        'fixit/parse.ts#parseFixitCases',
+        'fixit/parse.ts#playerFacingStringsOf',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',
@@ -570,6 +590,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
       ids: [
         'batch/runBatch.ts#runBatch',
         'batch/runBatch.ts#firstTraceDisagreement',
+        /*
+         * The Fix-a-building run pairing and its measurement: configs in, numbers out. Both are
+         * derived only transitively — `fixitRunPlanOf` through `configOf`'s thrown diagnostics
+         * and a template file name, `measuredOf` through the scope-mode ids — and every sentence
+         * built *from* their numbers is `fixit/engine.ts`'s, which the FIXIT adapter drives. The
+         * two steppers return a `FixitState` and reach prose only through `affordabilityOf`,
+         * which that adapter drives directly.
+         */
+        'fixit/run.ts#fixitRunPlanOf',
+        'fixit/run.ts#measuredOf',
+        'fixit/engine.ts#stepSpeed',
+        'fixit/engine.ts#stepCapacity',
         'frame/overlay.ts#queueAt',
         'frame/overlay.ts#landingAssignmentsAt',
         'frame/sequence.ts#frameSequence',
@@ -829,6 +861,11 @@ describe('R10 statically — no authored prose literal contains a probability wo
         module: 'campaign/parse.ts',
         contains: 'a probability word; say a frequency over runs',
         why: 'the refusal `validateCampaign` gives an author who wrote one. Naming the rule is not breaking it.',
+      },
+      {
+        module: 'fixit/parse.ts',
+        contains: 'probability word.',
+        why: 'the same refusal, one data file over — `parseFixitCases` quoting the rule to a case author.',
       },
     ]);
 

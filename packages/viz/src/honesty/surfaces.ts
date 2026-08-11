@@ -69,6 +69,19 @@ import { itemsIn, VIEW_MODES, type DisclosureOrigin } from '../mode/types.js';
 import { OPERATIONAL_ZONING_NOTE } from '../editor/editorEdits.js';
 import { previewGeometry } from '../editor/editorPreview.js';
 import { summariseReport, validateBuilding, type ValidationReport } from '../editor/editorValidate.js';
+import {
+  STANDING_EXTRAS,
+  budgetNoteOf,
+  classifyOutcome,
+  emptyFixitState,
+  repairRowOf,
+  spendOf,
+  toggleExtra,
+  toggleRepair,
+  type FixitMeasurement,
+} from '../fixit/engine.js';
+import { figureValuesOf, measuredOf } from '../fixit/run.js';
+import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
 import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type FloorQueue, type LandingAssignment } from '../frame/overlay.js';
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
@@ -5804,6 +5817,200 @@ const REPORT_CARD: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * Fix-a-building — GAMEPLAY § 10 over `fixit/`'s pure model
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A search case over the context's own building, so every sentence the Fix-a-building engine can
+ * author is rendered against real runs — the figures and the measured rows read
+ * {@link HonestyContext.recording} and {@link HonestyContext.comparisonRecording} (`before` is the
+ * comparison run, `after` the case's own, the `dev/reportPanel.ts#rotatedOn` convention).
+ *
+ * The **authored** halves — complaint, diagnosis, repair names, effects — are synthetic here, like
+ * the escalator fixtures above: the shipped `data/fixit-cases.json` copy is validated at load time
+ * by `fixit/parse.ts` (R10 and § 16 rule 11), which is the campaign precedent — `data/` documents
+ * are refused at the door, and what the search drives is the machinery that wraps them.
+ */
+/** The declarations the FIXIT adapter drives. A list, so `derive.test.ts` can hold it both ways. */
+const FIXIT_COVERS: readonly string[] = [
+  'fixit/engine.ts#classifyOutcome',
+  'fixit/engine.ts#budgetNoteOf',
+  'fixit/engine.ts#repairRowOf',
+  'fixit/engine.ts#STANDING_EXTRAS',
+  'fixit/engine.ts#BASIS_LINE',
+  // Driven through the rows above: `repairRowOf` asks `affordabilityOf`, which sums `spendOf`,
+  // and the states the adapter renders are built by the two toggles rather than written by hand.
+  'fixit/engine.ts#spendOf',
+  'fixit/engine.ts#affordabilityOf',
+  'fixit/engine.ts#toggleRepair',
+  'fixit/engine.ts#toggleExtra',
+  'fixit/run.ts#figureValuesOf',
+];
+
+function fixitSearchCase(context: HonestyContext): FixitCase {
+  const floors = context.recording.floors.map((floor) => floor.id);
+  const scopeFloors = floors.slice(0, Math.max(1, Math.ceil(floors.length / 2)));
+  const repairPatch = { dispatcher: { idle: { parkingStrategy: 'stay' } } };
+  return {
+    id: 'search-case',
+    name: 'The searched tower',
+    buildingId: context.building.id,
+    dispatcherProfileId: context.case.baselineProfileId,
+    run: { seed: '1', durationS: context.case.durationS, arrivalRatePctPop5min: null },
+    asBuilt: {
+      note: 'The fault is in how it is configured, not in what it is made of.',
+      patch: {},
+    },
+    complaint: {
+      text: 'The wait on my floor is longer than it was last year, and nothing about the building has changed.',
+      complainer: 'tenant, the searched half',
+      measure: {
+        kind: 'long-waits',
+        label: 'waits over a minute starting in the searched half',
+        thresholdS: 60,
+        scope: { mode: 'origin', floorIds: scopeFloors },
+      },
+    },
+    symptom: 'waits over a minute, while cars stand elsewhere',
+    figures: [
+      { kind: 'complaint', label: 'Waits over a minute in the searched half', reading: 'bad' },
+      { kind: 'scope-mean-wait', label: 'Mean wait in the searched half', reading: 'mid' },
+      { kind: 'scope-worst-wait', label: 'Worst wait in the searched half', reading: 'mid' },
+      { kind: 'rest-away-pct', label: 'Rest of the building away inside a minute', reading: 'healthy' },
+    ],
+    diagnosis: {
+      text: 'The idle fleet is parked where the calls are not.',
+      reasoning: 'Every long wait in this run began with the cars standing together at the far end of the shaft.',
+    },
+    budgetUnits: 12,
+    repairs: [
+      { id: 's-diagnosed', role: 'diagnosed', name: 'Let the idle fleet wait along its stops', costUnits: 0, effect: 'A setting, and the long waits above are the target.', patch: repairPatch },
+      { id: 's-costly', role: 'costly-fix', name: 'Re-gear the machines', costUnits: 10, effect: 'Faster climbs shorten the worst wait; the parking stays.', patch: repairPatch },
+      { id: 's-cheap', role: 'cheap-fix', name: 'Trim the door dwell', costUnits: 2, effect: 'A second off every stop moves the mean a little.', patch: repairPatch },
+      { id: 's-shaft', role: 'new-shaft', name: 'A new shaft · beyond a repair budget', costUnits: 34, effect: 'A capital conversation with the owner, not a work order.', patch: repairPatch },
+    ],
+    result: {
+      head: 'The building is awake.',
+      body: 'Nothing was bought: the cars were always enough — they were parked in the wrong place.',
+    },
+  };
+}
+
+const FIXIT: SurfaceAdapter = {
+  id: 'fixit/engine.ts#classifyOutcome',
+  covers: FIXIT_COVERS,
+  render(this: SurfaceAdapter, context) {
+    const seeds: TextSeed[] = [];
+    const entry = fixitSearchCase(context);
+
+    /* ---- the standing extras: every name and every line, authored in the engine ---- */
+    for (const extra of STANDING_EXTRAS) {
+      seeds.push({ field: `extra.${extra.id}.name`, text: extra.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `extra.${extra.id}.line`, text: extra.line, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the four figures, measured on the case's own run, both measure kinds ---- */
+    for (const figure of figureValuesOf(entry, context.recording)) {
+      seeds.push({ field: `figure(${figure.label})`, text: `${figure.label}: ${figure.text}`, role: 'observation' });
+    }
+    const meanEntry: FixitCase = {
+      ...entry,
+      complaint: { ...entry.complaint, measure: { ...entry.complaint.measure, kind: 'mean-wait' } },
+    };
+
+    /* ---- affordability and the budget notes, on states the reducers themselves build ---- */
+    const empty = emptyFixitState();
+    let spent = toggleRepair(entry, empty, 's-costly');
+    spent = toggleExtra(entry, spent, 'tenant-notices');
+    for (const state of [empty, spent]) {
+      for (const repair of entry.repairs) {
+        const row = repairRowOf(entry, state, repair);
+        seeds.push({ field: `repair.${repair.id}.price`, text: row.priceLine, role: 'label' });
+        if (row.refusal !== undefined) {
+          seeds.push({ field: `repair.${repair.id}.refusal`, text: row.refusal, role: 'reason' });
+        }
+      }
+      seeds.push({
+        field: 'budget.note',
+        text: budgetNoteOf(entry, spendOf(entry, state)),
+        role: 'prose',
+        provenance: 'authored',
+      });
+    }
+    // The third note — over budget — is unreachable through the reducers by design (§ 10.2), so
+    // it is worded against a fabricated spend, exactly as the outcome below is.
+    seeds.push({
+      field: 'budget.note.over',
+      text: budgetNoteOf(entry, { repairUnits: 34, extraUnits: 0, editorUnits: 0, totalUnits: 34, machineryUnits: 34 }),
+      role: 'prose',
+      provenance: 'authored',
+    });
+
+    /* ---- the measured outcome, before = the comparison run, after = the case's own ---- */
+    for (const [name, subject] of [
+      ['long-waits', entry],
+      ['mean-wait', meanEntry],
+    ] as const) {
+      const measurement = measuredOf(subject, context.comparisonRecording, context.recording);
+      const outcome = classifyOutcome(subject, measurement, spendOf(subject, empty));
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.basis`, text: outcome.basis, role: 'reason', provenance: 'authored' });
+      for (const [index, row] of outcome.rows.entries()) {
+        const isMeanRow = name === 'mean-wait' && index === 0;
+        seeds.push({
+          field: `outcome.${name}.row[${String(index)}]`,
+          text: `${row.label}: ${row.before} → ${row.after} · ${row.verdict}`,
+          role: 'observation',
+          // A scoped mean travels with the count it was taken over, one per side — issue #137's
+          // rule, kept here by construction and declared so the search can hold it.
+          ...(isMeanRow
+            ? { declaredCount: measurement.scopeBoardedAfter, countShown: /\d/.test(row.after) }
+            : {}),
+        });
+      }
+    }
+
+    /* ---- the three outcomes a green pair cannot produce, worded against fabricated measures ---- */
+    const flat: FixitMeasurement = {
+      complaintBefore: 10,
+      complaintAfter: 1,
+      scopeBoardedBefore: 40,
+      scopeBoardedAfter: 40,
+      complaintGonePct: 90,
+      restAwayBeforePct: 95,
+      restAwayAfterPct: 90,
+      restBoardedBefore: 120,
+      restBoardedAfter: 120,
+      restDeltaPoints: -5,
+    };
+    const worse = classifyOutcome(entry, flat, spendOf(entry, empty));
+    const short = classifyOutcome(
+      entry,
+      { ...flat, complaintGonePct: 30, restDeltaPoints: 0 },
+      spendOf(entry, empty),
+    );
+    const over = classifyOutcome(entry, flat, {
+      repairUnits: 34,
+      extraUnits: 0,
+      editorUnits: 0,
+      totalUnits: 34,
+      machineryUnits: 34,
+    });
+    for (const [name, outcome] of [
+      ['worse', worse],
+      ['short', short],
+      ['over', over],
+    ] as const) {
+      seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -5849,6 +6056,8 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
   // originals and move every batch-shaped fault onto this surface.
   SUITE_BENCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT.
+  FIXIT,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

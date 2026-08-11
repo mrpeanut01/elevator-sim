@@ -287,6 +287,29 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   fixture list. Honesty-corpus string counts are deliberately **not** re-measured here: a figure
   measured per branch is stale on merge (CLAUDE.md's rule), and the SUITE_BENCH adapter will move
   both tiers' counts when the integrated tree is measured.
+- **Slice 6, first pass — LANDED.** Fix-a-building, scored on **two single runs sharing the
+  traffic seed** rather than the prototype's closed-form model, with § 9's thresholds unchanged
+  and § 10.4's basis line printed verbatim. The engine is pure (`fixit/types.ts`, `parse.ts`,
+  `engine.ts`, `run.ts`): case state, § 9 editor pricing (shaft 34 u · speed 6 u/0.5 m/s ·
+  capacity 8 u/2 places · dwell free), affordability with the short-by wording, the run pairing
+  through `parseBuilding`/`resolveBuilding`/`recordRun` — the loader's own door — and the four
+  outcomes with their copy verbatim. Three cases ship in `data/fixit-cases.json` (§ 10.5's #1, #2,
+  #4, each adapted to the shipped building and validated per § 10.6 rule 6 by
+  `fixit/cases.test.ts`, which pins every figure the copy quotes: 9→0 long waits on the sky-lobby
+  case, a 341.1 s→56.5 s scoped mean on the zoning case, 7→0 on the bunching case, with the rest
+  of each building inside the 2-point floor). Every repair patch is held to § D177 — changed legs,
+  or for the one deliberately inert purchase (the fourth lift under a nearest-car rule), a § D227
+  pin that the run is byte-identical, which is the § 10.2 lesson made mechanical. The five
+  standing extras' fix-nothing claim is pinned the same way (config equality). The mount is a
+  TypeScript-built overlay (`dev/fixitPanel.ts`, `menuRoot`'s pattern — `index.html` and
+  `elementMap` untouched), reached by a `Fix a building` row on the Scenarios menu screen through
+  the new `open-fixit` intent; the case file is the viewer's seventh fixed-name fetch, added to
+  both ends of the cache contract. Honesty: the `FIXIT` adapter drives the engine's every sentence
+  over the context's own run pair; `fixit/parse.ts` refuses R10 words and engine ids (§ 16 rule
+  11) in authored copy at load time. **Not built:** § 10.3's full elevation-grid editor (the
+  machinery steppers and the priced repairs are the editor surface this slice ships), FIXED
+  persistence across reloads, the worker-thread run pairing (the pair runs synchronously,
+  ~0.5–2 s), and the dispatcher-commissioning row of § 9's dispatcher table.
 
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
