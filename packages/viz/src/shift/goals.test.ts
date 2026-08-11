@@ -14,8 +14,22 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_BARS, PENDING_DISPLAY, bestLineFor, goalsForDay, readGoal, readGoals } from './goals.js';
-import { GOAL_OBSERVATION_IDS, WAKE_UP_ARRIVALS, type GoalObservations } from './types.js';
+import {
+  GOAL_BARS,
+  PENDING_DISPLAY,
+  bestLineFor,
+  goalsForDay,
+  readGoal,
+  readGoals,
+  wasDisplayOf,
+} from './goals.js';
+import { outcomeOf } from './week.js';
+import {
+  GOAL_OBSERVATION_IDS,
+  WAKE_UP_ARRIVALS,
+  type DayOutcome,
+  type GoalObservations,
+} from './types.js';
 
 function observations(overrides: Partial<GoalObservations> = {}): GoalObservations {
   return {
@@ -24,16 +38,38 @@ function observations(overrides: Partial<GoalObservations> = {}): GoalObservatio
     minutePct: 80,
     peakQueue: 6,
     abandoned: 0,
+    worstWaitS: 90,
+    worstWaitIsCensored: false,
     ...overrides,
   };
 }
 
+/** A closed day, through the real `outcomeOf`, so the history entries are the shipped shape. */
+function closedDay(day: number, forDay: GoalObservations): DayOutcome {
+  return outcomeOf({
+    day,
+    dayIdx: (day - 1) % 7,
+    eventId: 'ordinary',
+    arrived: forDay.arrived,
+    carried: Math.round((forDay.carryPct / 100) * forDay.arrived),
+    minutePct: forDay.minutePct,
+    readings: readGoals(goalsForDay(day), forDay),
+  });
+}
+
 describe('the bars harden with the day, and then stop', () => {
-  it('asks for three goals every day', () => {
-    for (let day = 1; day <= 30; day += 1) expect(goalsForDay(day)).toHaveLength(3);
+  it('asks for the handoff’s four tests every day — § 8.6, all four hold or the day misses', () => {
+    for (let day = 1; day <= 30; day += 1) {
+      expect(goalsForDay(day).map((goal) => goal.id)).toEqual([
+        'carry',
+        'minute',
+        'queue',
+        'worst-wait',
+      ]);
+    }
   });
 
-  it('raises the shares and lowers the queue depth as the week goes on', () => {
+  it('raises the shares and lowers the queue depth and the wait ceiling as the week goes on', () => {
     const early = goalsForDay(2);
     const late = goalsForDay(8);
     const barOf = (goals: readonly { readonly id: string; readonly bar: number }[], id: string): number =>
@@ -41,6 +77,7 @@ describe('the bars harden with the day, and then stop', () => {
     expect(barOf(late, 'carry')).toBeGreaterThan(barOf(early, 'carry'));
     expect(barOf(late, 'minute')).toBeGreaterThan(barOf(early, 'minute'));
     expect(barOf(late, 'queue')).toBeLessThan(barOf(early, 'queue'));
+    expect(barOf(late, 'worst-wait')).toBeLessThan(barOf(early, 'worst-wait'));
   });
 
   it('caps every bar, so the week never becomes unwinnable', () => {
@@ -54,19 +91,41 @@ describe('the bars harden with the day, and then stop', () => {
       expect(minute?.bar).toBe(GOAL_BARS.minuteMax);
     }
     expect(goalsForDay(50).find((goal) => goal.id === 'queue')?.bar).toBe(GOAL_BARS.queueMin);
+    expect(goalsForDay(50).find((goal) => goal.id === 'worst-wait')?.bar).toBe(GOAL_BARS.worstMinS);
   });
 
-  it('alternates the third goal, so a bad day is not three inverted bars', () => {
-    expect(goalsForDay(2).map((goal) => goal.id)).toEqual(['carry', 'minute', 'queue']);
-    expect(goalsForDay(3).map((goal) => goal.id)).toEqual(['carry', 'minute', 'stairs']);
+  it('floors the wait ceiling at the handoff’s Hard tier, short of the one named Impossible', () => {
+    // § 8.6's own table: Easy 240 s, Hard 150 s, Impossible 120 s. The floor is a promise the
+    // line stays bendable, and converging on a tier named Impossible would break it.
+    expect(GOAL_BARS.worstMinS).toBe(150);
+    expect(GOAL_BARS.worstBaseS).toBe(240);
+  });
+
+  it('subsumes the retired odd-day horizon goal — a met ceiling implies nobody abandoned', () => {
+    /*
+     * The argument `goalsForDay`'s docstring retires the alternation on, checked: every shipped
+     * worst-wait bar sits far under the 900 s abandonment horizon, so `worst-wait` met (and
+     * uncensored) implies `abandoned` would have read 0 — the ceiling is strictly the stronger
+     * test of the same tail, and alternating them would alternate difficulty by parity.
+     */
+    for (let day = 1; day <= 30; day += 1) {
+      const worst = goalsForDay(day).find((goal) => goal.id === 'worst-wait');
+      expect(worst).toBeDefined();
+      expect(worst?.bar ?? Number.NaN).toBeLessThan(900);
+    }
   });
 
   it('puts the bar in the label, so the sentence and the test agree', () => {
     const goals = goalsForDay(4);
     for (const goal of goals) {
-      if (goal.id === 'stairs') continue;
       expect(goal.label, goal.id).toContain(String(goal.bar));
     }
+  });
+
+  it('keeps the retired goal’s observation id readable, for restored histories', () => {
+    // `persist/validate.ts` checks restored readings' `reads` against this list, and a saved
+    // week that closed an odd day under the old build carries an `abandoned` reading.
+    expect(GOAL_OBSERVATION_IDS).toContain('abandoned');
   });
 });
 
@@ -139,13 +198,42 @@ describe('reading a goal that is being graded', () => {
     expect(readGoal(queue, observations({ peakQueue: queue.bar + 1 })).state).toBe('missed');
   });
 
-  it('treats one abandonment as the whole failure of the horizon goal', () => {
-    const stairs = goalsForDay(3).find((goal) => goal.id === 'stairs');
-    expect(stairs).toBeDefined();
-    if (stairs === undefined) return;
-    expect(readGoal(stairs, observations({ abandoned: 0 })).state).toBe('met');
-    expect(readGoal(stairs, observations({ abandoned: 1 })).state).toBe('missed');
-    expect(readGoal(stairs, observations({ abandoned: 1 })).progressPct).toBe(0);
+  it('meets the wait ceiling at the bar and misses above it', () => {
+    const worst = goalsForDay(4).find((goal) => goal.id === 'worst-wait');
+    expect(worst).toBeDefined();
+    if (worst === undefined) return;
+    expect(readGoal(worst, observations({ worstWaitS: worst.bar })).state).toBe('met');
+    expect(readGoal(worst, observations({ worstWaitS: worst.bar + 1 })).state).toBe('missed');
+  });
+
+  it('refuses to grade a censored worst wait, in either direction', () => {
+    /*
+     * The second gate. Under the bar the number is a lower bound, so `met` would be a guess; and
+     * `missed` is refused too because the recording carries no `abandonedAt`, so an "unresolved"
+     * leg may be a rider who walked out long ago — a bound that might overstate proves nothing.
+     * See `readGoal`'s docstring; the em dash and the null observed are the same refusals the
+     * wake-up gate makes.
+     */
+    const worst = goalsForDay(4).find((goal) => goal.id === 'worst-wait');
+    expect(worst).toBeDefined();
+    if (worst === undefined) return;
+    for (const worstWaitS of [worst.bar - 1, worst.bar + 500]) {
+      const reading = readGoal(worst, observations({ worstWaitS, worstWaitIsCensored: true }));
+      expect(reading.state, `censored at ${String(worstWaitS)} s`).toBe('pending');
+      expect(reading.display).toBe(PENDING_DISPLAY);
+      expect(reading.observed).toBeNull();
+    }
+  });
+
+  it('leaves the other goals graded while the worst wait is censored', () => {
+    // The censoring flag gates the one observation it names, not the day: the wake-up gate is the
+    // only whole-day refusal.
+    const readings = readGoals(goalsForDay(4), observations({ worstWaitIsCensored: true }));
+    const states = new Map(readings.map((reading) => [reading.goal.id, reading.state]));
+    expect(states.get('worst-wait')).toBe('pending');
+    expect(states.get('carry')).toBe('met');
+    expect(states.get('minute')).toBe('met');
+    expect(states.get('queue')).toBe('met');
   });
 
   it('keeps the bar decorative — rounding it can never move a verdict', () => {
@@ -160,9 +248,14 @@ describe('reading a goal that is being graded', () => {
   });
 
   it('appends the unit and never invents one', () => {
-    const readings = readGoals(goalsForDay(4), observations({ carryPct: 91, peakQueue: 5 }));
+    const readings = readGoals(
+      goalsForDay(4),
+      observations({ carryPct: 91, peakQueue: 5, worstWaitS: 87 }),
+    );
     expect(readings.find((reading) => reading.goal.id === 'carry')?.display).toBe('91%');
     expect(readings.find((reading) => reading.goal.id === 'queue')?.display).toBe('5');
+    // SI style, space before the unit — the same spelling `worstWaitFigure` prints.
+    expect(readings.find((reading) => reading.goal.id === 'worst-wait')?.display).toBe('87 s');
   });
 
   it('carries a glyph that is never the only signal', () => {
@@ -171,5 +264,63 @@ describe('reading a goal that is being graded', () => {
       // KB-15: the state is on the reading beside the glyph, so a surface can say the word.
       expect(['met', 'missed', 'pending']).toContain(reading.state);
     }
+  });
+
+  it('draws missed as the handoff’s cross, not the prototype’s ring', () => {
+    // § 20.6: *"the calendar draws an ×"*. The handoff wins what the screen looks like.
+    const carry = goalsForDay(4).find((goal) => goal.id === 'carry');
+    expect(carry).toBeDefined();
+    if (carry === undefined) return;
+    expect(readGoal(carry, observations({ carryPct: 0 })).glyph).toBe('×');
+    expect(readGoal(carry, observations({ carryPct: 100 })).glyph).toBe('✓');
+  });
+});
+
+describe('the "was" figures — last night’s actual result, never a constant', () => {
+  it('answers the em dash when there is no previous day', () => {
+    const goal = goalsForDay(1)[0];
+    expect(goal).toBeDefined();
+    if (goal === undefined) return;
+    expect(wasDisplayOf([], 1, goal)).toBe(PENDING_DISPLAY);
+  });
+
+  it('reads the previous day’s display for the same quantity', () => {
+    const yesterday = closedDay(3, observations({ carryPct: 91, worstWaitS: 87 }));
+    const today = goalsForDay(4);
+    const carry = today.find((goal) => goal.id === 'carry');
+    const worst = today.find((goal) => goal.id === 'worst-wait');
+    expect(carry && wasDisplayOf([yesterday], 4, carry)).toBe('91%');
+    expect(worst && wasDisplayOf([yesterday], 4, worst)).toBe('87 s');
+  });
+
+  it('finds yesterday by day number, so a re-closed today cannot pose as last night', () => {
+    /*
+     * The retry loop is the product's most-used verb (`WeekState.attempt`), and after a re-close
+     * the history's **last** entry is today. A `was` that read `history[length - 1]` would show
+     * this attempt's own figures as last night's — the mis-attribution this lookup exists to
+     * refuse.
+     */
+    const yesterday = closedDay(3, observations({ carryPct: 91 }));
+    const todayClosed = closedDay(4, observations({ carryPct: 62 }));
+    const carry = goalsForDay(4).find((goal) => goal.id === 'carry');
+    expect(carry && wasDisplayOf([yesterday, todayClosed], 4, carry)).toBe('91%');
+  });
+
+  it('answers the em dash for a quantity yesterday never measured', () => {
+    // A restored session from the three-goal build has no worst-wait reading in its history —
+    // and the honest answer is the dash, not a stand-in.
+    const yesterday = closedDay(3, observations());
+    const stripped: DayOutcome = {
+      ...yesterday,
+      readings: yesterday.readings.filter((reading) => reading.goal.reads !== 'worstWaitS'),
+    };
+    const worst = goalsForDay(4).find((goal) => goal.id === 'worst-wait');
+    expect(worst && wasDisplayOf([stripped], 4, worst)).toBe(PENDING_DISPLAY);
+  });
+
+  it('passes an ungraded yesterday through as the dash it printed', () => {
+    const quiet = closedDay(3, observations({ arrived: 3 }));
+    const carry = goalsForDay(4).find((goal) => goal.id === 'carry');
+    expect(carry && wasDisplayOf([quiet], 4, carry)).toBe(PENDING_DISPLAY);
   });
 });

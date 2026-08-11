@@ -78,6 +78,8 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
   let carried = 0;
   let servedUnderThresholdCount = 0;
   let abandoned = 0;
+  let worstWaitSoFarS: number | undefined;
+  let worstWaitIsCensored = false;
 
   for (const leg of recording.legs) {
     if (leg.arrivedAt > t) break; // sorted by `(arrivedAt, passengerId)` — see `VizLeg`
@@ -92,6 +94,25 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     // Strictly past, not at: waiting *exactly* the horizon is inside it, matching `core`'s own
     // `overHorizonCount`, which counts arrivals whose wait is **known to exceed** the horizon.
     if (crossesHorizonAt(leg, horizonS) < t) abandoned += 1;
+
+    /*
+     * The worst wait known at `t` — `diagnoseServiceLevel`'s ending rules with `censoredAtS`
+     * set to the playhead. A boarded or refused leg's wait ended, exactly, at that instant; a
+     * leg with neither by `t` reads as still standing, so `t - arrivedAt` is recorded with
+     * `censored` set — and `censored` here means *unprovable* rather than merely *unfinished*,
+     * because `VizLeg` carries no `abandonedAt` and a rider who walked out is indistinguishable
+     * from one still waiting (see `LiveObservations.worstWaitIsCensored`). Strict `>` keeps ties
+     * on the first leg in record order, matching `core`'s own tie rule, so the maximum is
+     * deterministic. Clamped at 0 like `core`'s, so a malformed record cannot drag the maximum
+     * negative.
+     */
+    const resolvedAt = leg.boardedAt ?? leg.refusedAt;
+    const resolved = resolvedAt !== undefined && resolvedAt <= t;
+    const waitS = Math.max(0, (resolved ? resolvedAt : t) - leg.arrivedAt);
+    if (worstWaitSoFarS === undefined || waitS > worstWaitSoFarS) {
+      worstWaitSoFarS = waitS;
+      worstWaitIsCensored = !resolved;
+    }
   }
 
   const queues = sweepQueues(recording, t);
@@ -114,6 +135,8 @@ export function observationsAt(recording: VizRecording, simTimeS: SimTime): Live
     deepestQueueFloorId: queues.deepestNowFloorId,
     abandoned,
     horizonS,
+    worstWaitSoFarS,
+    worstWaitIsCensored,
   };
 }
 

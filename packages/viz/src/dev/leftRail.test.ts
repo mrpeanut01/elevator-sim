@@ -41,7 +41,7 @@ import { buildingMood, moodObservationsOf } from '../render/mood.js';
 import { PENDING_DISPLAY, goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
-import { openWeek } from '../shift/week.js';
+import { openWeek, outcomeOf } from '../shift/week.js';
 
 import {
   decisionRowViewOf,
@@ -82,6 +82,8 @@ function observations(overrides: Partial<LiveObservations> = {}): LiveObservatio
     deepestQueueFloorId: '12',
     abandoned: 0,
     horizonS: 900,
+    worstWaitSoFarS: 42,
+    worstWaitIsCensored: false,
     ...overrides,
   };
 }
@@ -112,7 +114,16 @@ function bandsOf(counts: readonly number[], basis: WaitBandBasis = 'now'): WaitB
 }
 
 function goalObservations(overrides: Partial<GoalObservations> = {}): GoalObservations {
-  return { arrived: 400, carryPct: 90, minutePct: 80, peakQueue: 6, abandoned: 0, ...overrides };
+  return {
+    arrived: 400,
+    carryPct: 90,
+    minutePct: 80,
+    peakQueue: 6,
+    abandoned: 0,
+    worstWaitS: 45,
+    worstWaitIsCensored: false,
+    ...overrides,
+  };
 }
 
 function decisionRow(overrides: Partial<DecisionRow> = {}): DecisionRow {
@@ -312,7 +323,7 @@ describe('moodViewOf — the face, the bar and the legend', () => {
 
 describe('goalRowsOf — met, missed and pending', () => {
   it('never renders a number for a pending goal', () => {
-    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ arrived: 3 })));
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ arrived: 3 })), [], 1);
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) {
       expect(row.state).toBe('pending');
@@ -328,6 +339,8 @@ describe('goalRowsOf — met, missed and pending', () => {
   it('marks a met goal with the tick and the band green', () => {
     const rows = goalRowsOf(
       readGoals(goalsForDay(1), goalObservations({ carryPct: 99, minutePct: 99, abandoned: 0 })),
+      [],
+      1,
     );
     for (const row of rows) {
       expect(row.state).toBe('met');
@@ -339,25 +352,50 @@ describe('goalRowsOf — met, missed and pending', () => {
 
   it('gives a missed goal the empty track when nothing has been observed on it', () => {
     const readings = readGoals(goalsForDay(1), goalObservations({ carryPct: 0, minutePct: 0 }));
-    const rows = goalRowsOf(readings);
+    const rows = goalRowsOf(readings, [], 1);
     const zeroObserved = rows.filter((row) => row.state === 'missed' && row.value.startsWith('0'));
     expect(zeroObserved.length).toBeGreaterThan(0);
     for (const row of zeroObserved) expect(row.fill).not.toBe(WAIT_BANDS[1]?.color);
   });
 
-  it('gives a missed goal with progress the band amber', () => {
-    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ minutePct: 40 })));
+  it('gives a missed goal with progress the band amber, and the handoff’s cross', () => {
+    const rows = goalRowsOf(readGoals(goalsForDay(1), goalObservations({ minutePct: 40 })), [], 1);
     const minute = rows.find((row) => row.label.includes('inside a minute'));
     expect(minute?.state).toBe('missed');
     expect(minute?.fill).toBe(WAIT_BANDS[1]?.color);
-    expect(minute?.glyph).toBe('○');
+    // § 20.6: missed draws an ×, not the old prototype's ring.
+    expect(minute?.glyph).toBe('×');
   });
 
   it('passes the goal’s own sentence through rather than composing a second one', () => {
     const readings = readGoals(goalsForDay(4), goalObservations());
-    expect(goalRowsOf(readings).map((row) => row.label)).toEqual(
+    expect(goalRowsOf(readings, [], 4).map((row) => row.label)).toEqual(
       readings.map((reading) => reading.goal.label),
     );
+  });
+
+  it('shows the bare dash for the "was" slot when the building has no previous day', () => {
+    // `was —` would dress an absence as a measurement; the dash alone is the honest slot.
+    for (const row of goalRowsOf(readGoals(goalsForDay(1), goalObservations()), [], 1)) {
+      expect(row.was).toBe(PENDING_DISPLAY);
+      expect(row.was).not.toContain('was');
+    }
+  });
+
+  it('shows last night’s figure, worded as a "was", once a previous day is in the history', () => {
+    const yesterdayReadings = readGoals(goalsForDay(3), goalObservations({ carryPct: 91 }));
+    const yesterday = outcomeOf({
+      day: 3,
+      dayIdx: 2,
+      eventId: 'ordinary',
+      arrived: 400,
+      carried: 364,
+      minutePct: 80,
+      readings: yesterdayReadings,
+    });
+    const rows = goalRowsOf(readGoals(goalsForDay(4), goalObservations()), [yesterday], 4);
+    const carry = rows.find((row) => row.label.startsWith('Carry'));
+    expect(carry?.was).toBe('was 91%');
   });
 });
 
@@ -574,7 +612,7 @@ describe('a suppressed run yields no mean anywhere in the left rail', () => {
       outputs.push(
         statRowsOf(live),
         moodViewOf(bands, moodOf(bands)),
-        goalRowsOf(readGoals(goalsForDay(3), shiftObservationsOf(live))),
+        goalRowsOf(readGoals(goalsForDay(3), shiftObservationsOf(live)), [], 3),
         decisionRowsAt(recording, t, 6).map(decisionRowViewOf),
         mathsDisclosureOf(honestyAt(recording, t, 'engineer'), true, 'engineer'),
         mathsDisclosureOf(honestyAt(recording, t, 'casual'), true, 'casual'),

@@ -225,6 +225,47 @@ export interface LiveObservations {
    * non-decreasing in `t` and independent of what happens after the playhead.
    */
   readonly abandoned: number;
+  /**
+   * The longest wait any leg arrived by `t` had realised **or accrued** by `t`, seconds.
+   * `undefined` when nobody has arrived.
+   *
+   * **This is the playhead's own maximum, never `summary.serviceLevel.longestWaitS`.** The
+   * summary's figure is a statement about the whole run's reporting window, and a surface drawn
+   * at a part-way playhead that printed it would be publishing a figure that can only be true of
+   * the whole run — the exact violation class the honesty sweep's temporal axis exists to find
+   * (§ D307: a stage banner reading *127 undelivered at 00:00*). So this is folded from the legs
+   * like every other field here: a resolved leg (boarded or refused by `t`) contributes its
+   * exact wait, an unresolved one contributes `t - arrivedAt`, marked censored. The ending rules
+   * are `core`'s own — `metrics/summarize.ts#diagnoseServiceLevel` ends a wait at
+   * `boardedAt ?? abandonedAt ?? refusedAt ?? censoredAtS`, and this fold is that computation
+   * with `censoredAtS` set to the playhead, over **every** leg arrived by `t`.
+   *
+   * That last clause is a measured difference from the summary, not an approximation of it:
+   * `serviceLevel.longestWaitS` is taken over the reporting window's arrivals, and **every
+   * shipped template narrows its window** — measured by `observations.test.ts`, whose
+   * non-vacuity guard found zero spanning windows across all eight buildings — so this maximum
+   * at `endedAt` is an upper bound on the summary's figure (asserted per building, no patience
+   * declared) and equals it only on the unshipped spanning-window case. The two are two stated
+   * cohorts; `shift/report.ts`'s small print says which figure is which.
+   *
+   * Non-decreasing in `t`: a resolved wait never shrinks, and an unresolved one only grows.
+   */
+  readonly worstWaitSoFarS: number | undefined;
+  /**
+   * Whether {@link worstWaitSoFarS} belongs to a leg still unresolved at `t`, and is therefore a
+   * **lower bound** rather than a wait anybody realised. `false` when nobody has arrived.
+   *
+   * The same distinction `VizServiceLevel.longestWaitIsCensored` carries for the whole run,
+   * applied at the playhead. `shift/goals.ts` reads it as a gate: a censored maximum is never
+   * graded at all, in either direction, and the reason it may not even be graded `missed` is a
+   * fact about the recording rather than generosity. `VizLeg` carries no `abandonedAt` — a rider
+   * who ran out of patience and left is indistinguishable here from one still standing — so a
+   * "lower bound" over an unresolved leg can overstate a walked-out rider's wait by every second
+   * since they departed, which is exactly the mis-crediting `diagnoseServiceLevel`'s own
+   * docstring refuses in `core`. A bound that might overstate can prove nothing, so the goal
+   * refuses (`pending`) rather than guesses.
+   */
+  readonly worstWaitIsCensored: boolean;
   /** The abandonment horizon applied — `summary.serviceLevel.horizonS`. Copied, never assumed. */
   readonly horizonS: number;
 }

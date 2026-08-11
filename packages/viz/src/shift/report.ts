@@ -100,7 +100,7 @@ import type { SimTime } from '@elevator-sim/core/browser';
 import type { VizRecording, VizSummary } from '../contract/types.js';
 
 import { scheduledEventFor, type CalendarPeriod } from './calendar.js';
-import { readGoals } from './goals.js';
+import { readGoals, wasDisplayOf } from './goals.js';
 import { growthFactor } from './growth.js';
 import { ENDLESS_CONTRACT_ID, wasGraded } from './week.js';
 import {
@@ -730,7 +730,17 @@ export function dayReportOf(input: DayReportInput): ShapedDayReport {
     verdict: judgement.verdict,
     verdictLine: judgement.verdictLine,
     diagnosisHeading: judgement.diagnosisHeading,
-    goals: readings,
+    /*
+     * Each reading with last night's figure beside it — the handoff's "was" column (§ 8.6),
+     * derived from the week's history by the same function the rail's rows call, so the two
+     * surfaces cannot show two different yesterdays. On a single-run sheet the week is a
+     * scaffold with no history, so every `was` is the em dash — which is the honest answer:
+     * one run has no previous day.
+     */
+    goals: readings.map((reading) => ({
+      reading,
+      was: wasDisplayOf(week.history, week.day, reading.goal),
+    })),
     diagnosis: diagnosisFor(recording, observations, dayStartS, judgement.verdict),
     levers: leversFor(recording, observations, summary, readings),
     smallPrint: smallPrintFor(dispatcherName, summary, dayStartS),
@@ -1452,10 +1462,11 @@ function leverPointersFor(
 
   /*
    * Zone the tower — the pile-up sat on one landing rather than spreading over the tower. The bar is
-   * **today's own** queue goal where the day set one (even days do; odd days grade abandonment
-   * instead), so this is the run measured against what the run was asked for rather than against a
-   * number invented here. Where there is no queue goal, the sheet's own DEEPEST QUEUE tone bar
-   * stands in — the same threshold the cell above is already coloured by.
+   * **today's own** queue goal where the day set one (every shipped day does, since `goalsForDay`
+   * retired the odd-day alternation), so this is the run measured against what the run was asked
+   * for rather than against a number invented here. Where there is no queue goal — a sheet built
+   * over a custom goal list — the sheet's own DEEPEST QUEUE tone bar stands in, the same
+   * threshold the cell above is already coloured by.
    */
   const floorId = observations.peakQueueFloorId;
   const deep = missedGoal('peakQueue') || observations.peakQueue > DEEP_QUEUE;
@@ -1655,8 +1666,9 @@ function smallPrintFor(
     `Every cohort figure above is the ${reportWindow.id} window, ` +
     `${clockRange(reportWindow.startS, reportWindow.endS, dayStartS)}: “Riders waited twenty-five ` +
     'seconds on average” is false without “during the busiest five minutes”. The counts — carried, ' +
-    'took the stairs, the deepest queue — are over the whole shift; the means and the longest wait ' +
-    'are over that window and nothing else. ' +
+    'took the stairs, the deepest queue, and every goal reading above, the worst-wait bar ' +
+    'included — are over the whole shift; the means and the WORST WAIT figure are over that ' +
+    'window and nothing else. ' +
     'The levers above are ordered by what today showed, never by what any of them is worth: which ' +
     'one helps this building is the question that needs the paired runs, not the one day.'
   );

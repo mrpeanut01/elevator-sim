@@ -302,7 +302,14 @@ const GOAL_COMPARISONS: Readonly<Record<GoalComparison, true>> = Object.freeze({
   'at-most': true,
 });
 
-const GOAL_UNITS: Readonly<Record<ShiftGoal['unit'], true>> = Object.freeze({ '%': true, '': true });
+// ` s` joined with the worst-wait goal (slice 5): a restored reading may carry `187 s`. The other
+// two are unchanged, and a version-4 build meeting ` s` refuses by version rather than by shape —
+// see `SESSION_SCHEMA_VERSION`'s version-5 paragraph.
+const GOAL_UNITS: Readonly<Record<ShiftGoal['unit'], true>> = Object.freeze({
+  '%': true,
+  ' s': true,
+  '': true,
+});
 
 const THEMES: Readonly<Record<Settings['theme'], true>> = Object.freeze({
   system: true,

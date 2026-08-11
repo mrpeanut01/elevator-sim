@@ -34,10 +34,34 @@ import type { DayOutcome, GoalReading, WeekState } from './types.js';
 function readings(day: number, kind: 'met' | 'missed' | 'pending'): readonly GoalReading[] {
   const observations =
     kind === 'pending'
-      ? { arrived: 3, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 }
+      ? {
+          arrived: 3,
+          carryPct: 100,
+          minutePct: 100,
+          peakQueue: 0,
+          abandoned: 0,
+          worstWaitS: 20,
+          worstWaitIsCensored: false,
+        }
       : kind === 'met'
-        ? { arrived: 400, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 }
-        : { arrived: 400, carryPct: 10, minutePct: 10, peakQueue: 99, abandoned: 9 };
+        ? {
+            arrived: 400,
+            carryPct: 100,
+            minutePct: 100,
+            peakQueue: 0,
+            abandoned: 0,
+            worstWaitS: 40,
+            worstWaitIsCensored: false,
+          }
+        : {
+            arrived: 400,
+            carryPct: 10,
+            minutePct: 10,
+            peakQueue: 99,
+            abandoned: 9,
+            worstWaitS: 940,
+            worstWaitIsCensored: false,
+          };
   return readGoals(goalsForDay(day), observations);
 }
 
