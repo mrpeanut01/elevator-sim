@@ -1,5 +1,21 @@
 # Agent status board
 
+> ## ↩️ REOPENED 2026-08-11 for the **Everyday Mode delivery** (PR #153, branch
+> `claude/casual-gameplay-implementation-ycybr1`). Plan banner: `MULTI_AGENT_PLAN.md` § Everyday
+> Mode. Live lanes:
+>
+> | lane | task | branch/worktree | status | next action |
+> |---|---|---|---|---|
+> | S0 | Vendor handoff docs + docs/12 pointer | main branch (direct) | **MERGED** (pushed, `ea40a64`) | — |
+> | S2 | Player words beside the model (`core`, #147) | main branch (direct) | **MERGED** (pushed, `0f7f57f`) | corpus figures re-measure at integration |
+> | S1 | Four plain levers as views (`viz`, §20.1) | main branch (direct) | **MERGED** (pushed, `5ff2e60`–`1910d57`) | a decision number is owed for the lever ownership mapping |
+> | S3 | Intervention run record (§7.6, contract §1.4) | builder in isolated worktree | **IN BUILD** | integrate on report; full suite after merge; then push |
+> | V47 | Verify slices 4–7 against the tree | read-only lane | **IN FLIGHT** | scope builder lanes from its verified work-orders |
+>
+> Known-red carried honestly: three `server` store tests time out at the 5 s default under
+> full-suite load only (pass alone, 29/29 in 73 s) — pre-existing, evidenced on issue #149,
+> not this delivery's to fix silently.
+
 > ## ↩️ REOPENED 2026-07-28 for **wave 5**, which has now **CLOSED**. The board is
 > [§ Wave 5](#wave-5--live) at the foot of this file; everything between here and it is the
 > **unaltered** waves 1–4 record.
