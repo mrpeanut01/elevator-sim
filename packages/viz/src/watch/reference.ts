@@ -48,6 +48,7 @@
 
 import type { PostedResult, WatchRecord, WatchableRun } from './types.js';
 import { WATCH_RECORD_VERSION } from './types.js';
+import { firstPersonWordsIn } from './view.js';
 
 /**
  * The sentence `data/reference-runs.json` must carry, verbatim — § 20.11's *"explicit `FIXTURE`
@@ -107,14 +108,14 @@ function runOf(
      * that could declare itself a player is a fixture that eventually will.
      */
     source: 'reference',
-    label: asString(entry['label'], `${where}.label`),
+    label: authoredCopy(entry['label'], `${where}.label`),
     /*
      * Resolved from the record's own id, never authored in the file. A name written beside an id
      * is a second answer to *what is this building called*, and it is the copy that goes stale —
      * `dev/state.ts#buildingNameOf` is the one the rest of the shell reads.
      */
     buildingName: buildingNameOf(record.buildingId),
-    subtitle: asString(entry['subtitle'], `${where}.subtitle`),
+    subtitle: authoredCopy(entry['subtitle'], `${where}.subtitle`),
     record,
     posted: postedOf(entry['posted'], `${where}.posted`),
     /*
@@ -169,6 +170,31 @@ function postedOf(raw: unknown, where: string): PostedResult {
     minutePct: asNumber(entry['minutePct'], `${where}.minutePct`),
     worstWaitS: asNumber(entry['worstWaitS'], `${where}.worstWaitS`),
   };
+}
+
+/**
+ * A string that will land on a watching surface — refused at load time if it is first-person.
+ *
+ * § 14.1's rule is *"no first-person copy anywhere in the mode"*, and `view.test.ts` holds every
+ * string the **view** composes to it. The fixture file's `label` and `subtitle` are neither
+ * composed nor derived: they are authored, and they are printed verbatim on the header, the pill,
+ * the eyebrow and the rail subline. A rule enforced over everything except the words a human types
+ * is a rule enforced in the one place a human can break it.
+ *
+ * So it is checked here, at the same moment and for the same reason `fixit/parse.ts` refuses R10
+ * words and engine ids in authored case copy: a load-time refusal reaches the person authoring the
+ * file, where a test reaches whoever runs the suite next.
+ */
+function authoredCopy(value: unknown, where: string): string {
+  const text = asString(value, where);
+  const found = firstPersonWordsIn(text);
+  if (found.length > 0) {
+    throw new ReferenceRunsError(
+      `${where} says “${found.join('”, “')}” — GAMEPLAY § 14.1 forbids first-person copy on a ` +
+        'watched run, and this string is printed verbatim on the spectator header.',
+    );
+  }
+  return text;
 }
 
 /* --- the small readers ---------------------------------------------------- */

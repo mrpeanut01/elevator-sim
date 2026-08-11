@@ -99,6 +99,11 @@ import {
   raceStripViewOf,
   raceVerdictOf,
 } from '../live/raceStrip.js';
+import { DAY_HAS_NO_RECORD } from '../watch/library.js';
+import { recordUnreadableReason } from '../watch/record.js';
+import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
+import type { WatchableRun } from '../watch/types.js';
+import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
@@ -6307,6 +6312,115 @@ const RACE_STRIP: SurfaceAdapter = {
   },
 };
 
+/**
+ * Watching somebody else's run — GAMEPLAY § 14.1, Everyday Mode slice 8.
+ *
+ * ## What is driven, and what the corpus is
+ *
+ * `watchingStrings(view)` — the **view's own** enumeration of everything it draws, which is also
+ * what `view.test.ts` walks for the no-first-person rule. Reusing it rather than re-listing the
+ * fields here is the point: two lists of *what a watched run says* is how one of them comes to omit
+ * the cell somebody added, and this corpus and that rule would then disagree about which strings
+ * exist.
+ *
+ * Both sources are driven — a day this device filed and a shipped reference run — because
+ * `sourceLine` is the one cell that differs between them and it is § 20.11's disclaimer.
+ *
+ * ## Why the refusals are here too
+ *
+ * A row that cannot be watched says why, and those sentences are player-facing on exactly the
+ * footing the header is. All three grounds are seeded: the day with no record, the record naming
+ * something this build does not ship, and the reproduction refusal — the last one built from a real
+ * drift rather than a literal, so the figures it names are the figures the derivation produces.
+ *
+ * ## Why the posted figures carry no playhead
+ *
+ * They are whole-run counts, and the temporal axis (§ D307) exists to catch a whole-run figure
+ * published at a playhead short of `endedAt`. A watched run's posted result **is** a whole-run
+ * claim, and it is licensed: it is the record's filed result, presented as such by
+ * `POSTED_FIGURES_NOTE`, and it is never a reading of the replay at the instant on screen. So the
+ * seeds carry no playhead and the note that makes them honest is seeded beside them.
+ */
+const WATCH: SurfaceAdapter = {
+  id: 'watch/view.ts#watchingViewOf',
+  covers: [
+    'watch/view.ts#watchingViewOf',
+    'watch/view.ts#postedFiguresOf',
+    'watch/view.ts#REPLAY_PILL_VERB',
+    'watch/view.ts#REFERENCE_RUN_LINE',
+    'watch/view.ts#FILED_DAY_LINE',
+    'watch/view.ts#STOP_WATCHING_LABEL',
+    'watch/view.ts#PLAY_THIS_CROWD_LABEL',
+    'watch/view.ts#POSTED_FIGURES_NOTE',
+    'watch/library.ts#DAY_HAS_NO_RECORD',
+    'watch/reproduce.ts#reproductionRefusalFor',
+    'watch/record.ts#recordUnreadableReason',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const posted = postedResultOf(context.recording);
+
+    for (const source of ['filed-day', 'reference'] as const) {
+      const run: WatchableRun = {
+        id: `watch-${source}`,
+        source,
+        label: source === 'reference' ? 'The house baseline' : 'Tuesday \u00b7 day 2',
+        buildingName: context.building.name,
+        subtitle: 'day 2 of this week',
+        record: null,
+        posted,
+        blocked: null,
+      };
+      const view = watchingViewOf(run, context.case.baselineProfileId);
+      /*
+       * Through the view's own enumeration, so a cell added to `WatchingView` enters this corpus
+       * on the day it lands rather than on the day somebody remembers.
+       */
+      for (const [index, text] of watchingStrings(view).entries()) {
+        seeds.push({ field: `watch(${source}).string[${String(index)}]`, text, role: 'label' });
+      }
+      seeds.push({ field: `watch(${source}).figuresNote`, text: view.figuresNote, role: 'reason' });
+    }
+
+    // The three grounds a row can lose its affordance on, each in the words the picker prints.
+    seeds.push({ field: 'watch.blocked(no-record)', text: DAY_HAS_NO_RECORD, role: 'reason' });
+    const unreadable = recordUnreadableReason(
+      {
+        version: 1,
+        seed: '1',
+        buildingId: 'no-such-tower',
+        dispatcherId: context.case.baselineProfileId,
+        pattern: 'building',
+        demandTemplateId: null,
+        arrivalRatePctPop5min: null,
+        shiftLengthS: 900,
+        windowStartS: null,
+        day: 1,
+        dayIdx: 0,
+        outOfServiceCarIds: [],
+        interventions: [],
+      },
+      browserResourcesOf(context),
+    );
+    if (unreadable !== null) {
+      seeds.push({ field: 'watch.blocked(unreadable)', text: unreadable, role: 'reason' });
+    }
+    /*
+     * A real drift rather than a literal pair, so the sentence names the figures the derivation
+     * produces. Two of the four moved, which is also `listOf`'s two-item arm.
+     */
+    const drifted = reproductionRefusalFor(posted, {
+      ...posted,
+      carried: posted.carried + 4,
+      worstWaitS: posted.worstWaitS + 11,
+    });
+    if (drifted !== null) {
+      seeds.push({ field: 'watch.blocked(does-not-reproduce)', text: drifted, role: 'reason' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 /** One rule row with each id's first declared value, for the adapter above. */
 function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
   const whenValue = RULE_CONDITION_WORDS[when].values?.[0]?.value;
@@ -6372,6 +6486,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RULES_EDITOR,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
   RACE_STRIP,
+  WATCH,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
