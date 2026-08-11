@@ -102,7 +102,7 @@ const AA_BODY = 4.5;
  * **Two lanes each counted their own addition and each wrote 18; the integrated page holds
  * both.** The number below is measured on the merged tree rather than reasoned from either.
  */
-const NOTES_ON_THE_PAGE = 18;
+const NOTES_ON_THE_PAGE = 19;
 
 /** One paragraph as the browser resolved it. */
 interface Measured {
