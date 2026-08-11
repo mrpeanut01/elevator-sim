@@ -103,6 +103,11 @@ import { DAY_HAS_NO_RECORD } from '../watch/library.js';
 import { recordUnreadableReason } from '../watch/record.js';
 import { postedResultOf, reproductionRefusalFor } from '../watch/reproduce.js';
 import type { WatchableRun } from '../watch/types.js';
+import {
+  PLAYER_SHELL_COPY,
+  shellWatchingCopyOf,
+  shellWatchingStrings,
+} from '../watch/shell.js';
 import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
@@ -6367,6 +6372,21 @@ const WATCH: SurfaceAdapter = {
     'watch/library.ts#DAY_HAS_NO_RECORD',
     'watch/reproduce.ts#reproductionRefusalFor',
     'watch/record.ts#recordUnreadableReason',
+    /*
+     * The shell's own spectator surfaces — `docs/20` defect 7. They are covered **here**, beside
+     * the strip they contradicted, rather than in an adapter of their own: a reader auditing *what
+     * a watched run says* has to see the race key, the rail's eyebrow, the footer's clause and the
+     * report's note in the same corpus as `THEIR DISPATCHER`, because the defect was precisely that
+     * the two halves of that sentence were written by modules that never met.
+     */
+    'watch/shell.ts#shellWatchingCopyOf',
+    'watch/shell.ts#PLAYER_SHELL_COPY',
+    'watch/shell.ts#RAIL_EYEBROW_PLAYER',
+    'watch/shell.ts#RAIL_EYEBROW_WATCHING',
+    'watch/shell.ts#RAIL_NOTE_PLAYER',
+    'watch/shell.ts#RAIL_NOTE_WATCHING',
+    'watch/shell.ts#footerSeedLineOf',
+    'watch/shell.ts#reportNoteWhileWatching',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -6392,6 +6412,24 @@ const WATCH: SurfaceAdapter = {
         seeds.push({ field: `watch(${source}).string[${String(index)}]`, text, role: 'label' });
       }
       seeds.push({ field: `watch(${source}).figuresNote`, text: view.figuresNote, role: 'reason' });
+      /*
+       * The shell's arm of the same view, through the shell module's own enumeration for
+       * `watchingStrings`' stated reason — a surface added to `ShellWatchingCopy` with no line in
+       * `shellWatchingStrings` is outside both this corpus and § 14.1's grep at once.
+       */
+      for (const [index, text] of shellWatchingStrings(shellWatchingCopyOf(view)).entries()) {
+        if (text === '') continue;
+        seeds.push({ field: `watch(${source}).shell[${String(index)}]`, text, role: 'label' });
+      }
+    }
+
+    /*
+     * The player's own arm as well, because it is what the shell says the rest of the time and it
+     * is the arm whose disappearance would satisfy every no-first-person check in the tree.
+     */
+    for (const [index, text] of shellWatchingStrings(PLAYER_SHELL_COPY).entries()) {
+      if (text === '') continue;
+      seeds.push({ field: `watch.player.shell[${String(index)}]`, text, role: 'label' });
     }
 
     // The three grounds a row can lose its affordance on, each in the words the picker prints.

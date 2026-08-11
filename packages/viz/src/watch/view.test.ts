@@ -20,7 +20,15 @@ import { describe, expect, it } from 'vitest';
 
 import { DAY_HAS_NO_RECORD } from './library.js';
 import { reproductionRefusalFor } from './reproduce.js';
-import type { PostedResult, WatchableRun } from './types.js';
+import {
+  PLAYER_SHELL_COPY,
+  RACE_KEY_PLAYER,
+  RAIL_EYEBROW_PLAYER,
+  footerSeedLineOf,
+  shellWatchingCopyOf,
+  shellWatchingStrings,
+} from './shell.js';
+import type { PostedResult, WatchableRun, WatchRecord } from './types.js';
 import {
   FILED_DAY_LINE,
   PLAY_THIS_CROWD_LABEL,
@@ -57,6 +65,61 @@ describe('the watching view', () => {
         expect(firstPersonWordsIn(text), `“${text}” is first-person on a watched run`).toEqual([]);
       }
     }
+  });
+
+  /*
+   * The same grep, over the half of the screen the case above cannot see — `docs/20` defect 7.
+   *
+   * The three assertions above this comment were **all green** while a player watching a reference
+   * run read `you` in the race key, `Your run` on the rail, their own dispatcher and their own seed
+   * in the footer, and their own filed sheet on the Day report tab with nothing saying it was not
+   * the run on screen. Every one of those is § 14.1's stated defect condition and every one was in
+   * `dev/main.ts`, outside the module this file greps. So the corpus is widened to the value the
+   * shell draws those surfaces from, and the browser tier reads the same rule off the rendered page
+   * (`dev/watch.browser.test.ts`) — the model and the pixels, because the model alone is what was
+   * being checked when the defect shipped.
+   */
+  it('says none of you, your or yours on the shell surfaces either', () => {
+    for (const source of ['filed-day', 'reference'] as const) {
+      const view = watchingViewOf(runOf({ source }), 'Steady hand');
+      for (const text of shellWatchingStrings(shellWatchingCopyOf(view))) {
+        expect(firstPersonWordsIn(text), `“${text}” is first-person on a watched shell`).toEqual([]);
+      }
+    }
+    // Including the footer's seed line, which is the one shell string composed from a record.
+    const record = { seed: '20260804', day: 3 } as unknown as WatchRecord;
+    expect(firstPersonWordsIn(footerSeedLineOf(record))).toEqual([]);
+    expect(footerSeedLineOf(record)).toContain('20260804');
+    expect(footerSeedLineOf(null)).not.toBe('');
+  });
+
+  /*
+   * And the other direction, which is what stops the case above from being satisfiable by deleting
+   * words: the **player's** arm is required to still say them. A spectator arm that quietly became
+   * the only arm would pass every grep in this file and would have taken `Your run` off the rail of
+   * a player looking at their own week.
+   */
+  it('keeps the player’s own arm first-person, so the branch is a branch', () => {
+    expect(PLAYER_SHELL_COPY.raceKey).toBe(RACE_KEY_PLAYER);
+    expect(firstPersonWordsIn(PLAYER_SHELL_COPY.raceKey)).toEqual(['you']);
+    expect(PLAYER_SHELL_COPY.railEyebrow).toBe(RAIL_EYEBROW_PLAYER);
+    expect(firstPersonWordsIn(PLAYER_SHELL_COPY.railNote)).toEqual(['you']);
+    // The player's own sheet carries no note at all — there is nothing to tell it apart from.
+    expect(PLAYER_SHELL_COPY.reportNote).toBe('');
+    expect(PLAYER_SHELL_COPY.footerNote).toBe('');
+  });
+
+  /* The corpus-covers-the-value case, for the shell's value — `walks every string the view carries`
+   * at the other end of the screen. A surface added to `ShellWatchingCopy` with no line in
+   * `shellWatchingStrings` is unchecked, and unchecked is how this defect shipped. */
+  it('walks every string the shell copy carries', () => {
+    const copy = shellWatchingCopyOf(watchingViewOf(runOf(), 'Steady hand'));
+    const walked = new Set(shellWatchingStrings(copy));
+    const missing = Object.entries(copy)
+      .filter(([, value]) => typeof value === 'string' && !walked.has(value))
+      .map(([key]) => key);
+    expect(missing, 'a string field of ShellWatchingCopy that shellWatchingStrings does not walk')
+      .toEqual([]);
   });
 
   it('lets the handoff’s own primary through, and only by its word boundary', () => {

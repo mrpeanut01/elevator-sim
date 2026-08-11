@@ -242,6 +242,11 @@ import { ghostPlanOf } from './ghostRun.js';
 import { watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
+import {
+  PLAYER_SHELL_COPY,
+  footerSeedLineOf,
+  shellWatchingCopyOf,
+} from '../watch/shell.js';
 import { watchingStateOf } from '../watch/session.js';
 import {
   createShiftRunner,
@@ -3334,6 +3339,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Contract § 1.5 — the intervention API is disabled, the playback controls are not.
     if (view !== undefined) interventionButton.disabled = true;
     ui.race.ghost.disabled = view !== undefined;
+    /*
+     * **The picker is hidden, not merely disabled** — § 14.1's *"no verdict — you are not in this
+     * comparison"*, and `docs/20` defect 7's least obvious half. A disabled `<select>` still
+     * renders its own selected option, and one of the three is `your latest saved`: the rule the
+     * section states is about the word on the screen, not about which controls respond.
+     *
+     * **The attribute and the inline display**, exactly as the timeline above needs both and for
+     * the identical reason: `index.html` gives `.race-pick` a `display: inline-flex` of its own,
+     * which is more specific than the user-agent's `[hidden] { display: none }`. The attribute
+     * alone left the whole picker — label, control and all three option texts — on the screen, and
+     * the browser tier caught it on the first run of this sweep.
+     */
+    setHidden(ui.race.pick, view !== undefined);
+    ui.race.pick.style.setProperty('display', view === undefined ? '' : 'none');
+
+    /*
+     * The four shell surfaces § 14.1's table does not name — `watch/shell.ts`, `docs/20` defect 7.
+     *
+     * They are written **here** rather than in the four draws that own the elements, for
+     * `drawWatching`'s own stated reason: the differentiation is a single claim, and four
+     * independently-guarded clauses is four chances for one of them to stay behind. Both arms are
+     * written on every call, so nothing can be left saying `Your run` over a stranger's day.
+     *
+     * The Day report's note is `hidden` on the player's arm rather than emptied, because an empty
+     * bordered box is a slot that looks like it failed to fill.
+     */
+    const copy = view === undefined ? PLAYER_SHELL_COPY : shellWatchingCopyOf(view);
+    setText(ui.race.youName, copy.raceKey);
+    setText(ui.shift.eyebrow, copy.railEyebrow);
+    setText(ui.shift.runNote, copy.railNote);
+    setText(ui.report.spectatorNote, copy.reportNote);
+    setHidden(ui.report.spectatorNote, copy.reportNote === '');
   }
 
   /**
@@ -3828,8 +3865,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
     setText(ui.header.tenantsLine, `${population.toLocaleString('en-GB')} tenants`);
   }
 
+  /**
+   * § 1.1 S4 — the counts at the playhead, and **whose run they are of**.
+   *
+   * ## The one branch, and why it is here rather than in `drawWatching`
+   *
+   * `docs/20` defect 7: while watching, this line read `paused · 363 arrived, 363 carried · lobby
+   * holder` with `seed 20260804 · day 1` beneath it — the *spectator's* dispatcher and the
+   * *spectator's* seed, under a strip headed `THEIR DISPATCHER Conventional collective`. The counts
+   * were right, because they come from the recording on the stage; the identity was wrong, because
+   * it came from `state`, and `watch/session.ts#watchingStateOf` deliberately leaves everything but
+   * `recording` alone. A spectator reading their own seed under somebody else's day is § 14.1's own
+   * *"will read the figures as their own"*, arriving through the one surface that names a run
+   * without describing it.
+   *
+   * The branch is **here** rather than in `drawWatching`, which owns every other spectator surface,
+   * because the identity is one clause of a sentence whose other clauses move every frame. Two
+   * writers for one element is how a footer comes to show a stranger's dispatcher beside the
+   * player's counts; one writer reading one `watching` is not.
+   */
   function drawFooter(view: ViewAt): void {
+    const watched = watching;
     const profile = profileById(resources, state.savedDispatchers, state.dispatcherId);
+    // The record's dispatcher, in the words `watch/view.ts` already resolved for the strip's own
+    // `THEIR DISPATCHER` cell — a second lookup here is a second answer to whose run this is.
+    const dispatcherName = watched === undefined ? profile.name : watched.view.dispatcherName;
     const observations =
       view.recording === undefined ? undefined : observationsAt(view.recording, view.simTimeS);
     setText(
@@ -3837,11 +3897,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       observations === undefined
         ? 'no shift run yet'
         : `${view.playing ? 'running' : 'paused'} · ${String(observations.arrived)} arrived, ` +
-          `${String(observations.carried)} carried · ${profile.name.toLowerCase()}`,
+          `${String(observations.carried)} carried · ${dispatcherName.toLowerCase()}` +
+          (watched === undefined ? '' : ` · ${shellWatchingCopyOf(watched.view).footerNote}`),
     );
     setText(
       ui.footer.seedLine,
-      `seed ${state.seed.toString()} · day ${String(state.week.day)}`,
+      watched === undefined
+        ? `seed ${state.seed.toString()} · day ${String(state.week.day)}`
+        : footerSeedLineOf(watched.run.record),
     );
   }
 

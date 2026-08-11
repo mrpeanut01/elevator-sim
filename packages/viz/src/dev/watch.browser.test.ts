@@ -58,10 +58,20 @@ afterAll(async () => {
   await server?.close();
 });
 
+/**
+ * The seed the *spectator's* own page is opened on.
+ *
+ * Deliberately **not** `data/reference-runs.json`'s, which is `20260811`: the footer assertion below
+ * is that the player's seed leaves the line while a record is on the stage, and the first run of it
+ * passed for the wrong reason because the two numbers were the same. A fixture and a test that
+ * happen to agree is a test that cannot see the defect it was written for.
+ */
+const SPECTATOR_SEED = '20260101';
+
 /** A loaded page with a run of its own on the stage, paused where the player left it. */
 async function pageWithARun(): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
-  await page.goto(`${origin}?seed=20260811`, { waitUntil: 'load' });
+  await page.goto(`${origin}?seed=${SPECTATOR_SEED}`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
@@ -220,12 +230,73 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
     expect(await page.locator('#race-ghost').first().isDisabled()).toBe(true);
     expect(await page.locator('#play-pause').first().isDisabled()).toBe(false);
 
-    // no first-person copy anywhere on the watching surfaces — § 14.1's own defect condition, read
-    // off the rendered page rather than off the view model this time.
-    const chromeText = (await page.locator('.watch-chrome').first().textContent()) ?? '';
-    for (const word of [' you ', ' your ', ' yours ']) {
-      expect(` ${chromeText.toLowerCase()} `.replace(/\s+/g, ' ')).not.toContain(word);
+    /* --- `docs/20` defect 7 — the rule, over the screen rather than over the module ---------- */
+
+    /*
+     * § 14.1: *"No first-person copy anywhere in the mode. Not `you`, not `your run`, not `your
+     * best`. The word `you` on a watched run is a defect."*
+     *
+     * That rule was already asserted — over `watchingStrings`, the strip's own value — and it was
+     * green while the audit read `you` in the race key, `Your run` on the rail, and the spectator's
+     * own dispatcher and seed in the footer. The corpus was the module and the player reads the
+     * **screen**, so this sweeps the rendered text of every shell surface that describes,
+     * identifies or attributes the day on the stage.
+     *
+     * `innerText`, never `textContent`: it is what is *rendered*, so a hidden control's own words
+     * are out — which is load bearing here, because the race picker is hidden while watching
+     * precisely so its `your latest saved` option leaves the screen with it.
+     *
+     * **The limit, stated rather than discovered.** The four surfaces below are the Run tab's
+     * chrome plus the strip. A spectator can still open the dispatcher editor and read *Write your
+     * own rules*; that copy addresses the player about their own next run and is correct where it
+     * stands. The line is *does this surface describe the run on screen* — `watch/shell.ts` holds
+     * the same sentence, so the model and this sweep draw it in one place.
+     */
+    const SWEPT: readonly string[] = ['.watch-chrome', 'header.topbar', '.rail-l', '#race-strip', 'footer'];
+    for (const selector of SWEPT) {
+      const rendered = await page.locator(selector).first().innerText();
+      const words = rendered.toLowerCase().match(/[a-z']+/g) ?? [];
+      const found = words.filter((word) => ['you', 'your', 'yours'].includes(word));
+      expect(
+        found,
+        `“${selector}” says ${found.join(', ')} while watching somebody else’s run — § 14.1’s own defect condition\n${rendered}`,
+      ).toEqual([]);
     }
+
+    /*
+     * The footer's half of defect 7 is a **wrong identity** rather than a forbidden word, so the
+     * sweep above cannot see it: `seed 20260804 · day 1` is first-person-free and was the
+     * spectator's own seed, printed under the strip's `THEIR DISPATCHER`. The page was opened on
+     * {@link SPECTATOR_SEED}, so the assertion is that the spectator's seed is *gone* from the line while
+     * a record is on the stage — a check that a fix writing some other plausible number would still
+     * have to satisfy honestly, because the strip's own record is the only other seed in the room.
+     */
+    const seedLine = await page.locator('#seed-line').first().innerText();
+    expect(seedLine, 'the footer prints the spectator’s own seed under a watched run').not.toContain(
+      SPECTATOR_SEED,
+    );
+    expect(seedLine.toLowerCase()).toContain('record');
+    // And the race key names the run rather than the reader — the audit's `you`.
+    const raceKey = await page.locator('#race-you-name').first().innerText();
+    expect(raceKey.trim().toLowerCase(), 'the race strip still keys a lane “you”').not.toBe('you');
+    expect(raceKey.trim().length, 'the race lane lost its key entirely').toBeGreaterThan(0);
+
+    /*
+     * And the Day report tab, which is the fourth surface and the only one whose defect was a
+     * *silence*: pressing it while watching showed the spectator's own last filed sheet with
+     * nothing on it saying which run it described. The note is asserted by what it claims rather
+     * than only by what it avoids — an empty element would pass the sweep above and say nothing.
+     */
+    await page.locator('#tab-report').first().click();
+    await page.waitForTimeout(300);
+    const note = page.locator('#report-spectator-note').first();
+    expect(await note.isVisible(), 'the Day report says nothing about whose run is on the stage').toBe(true);
+    const noteText = await note.innerText();
+    expect(noteText).toContain('replaying');
+    expect(noteText.toLowerCase()).toContain('files nothing');
+    expect((noteText.toLowerCase().match(/[a-z']+/g) ?? []).filter((w) => ['you', 'your'].includes(w))).toEqual([]);
+    await page.locator('#tab-run').first().click();
+    await page.waitForTimeout(200);
 
     /* --- ⤺ Stop watching, and the round trip ------------------------------- */
 
