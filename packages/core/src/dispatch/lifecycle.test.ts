@@ -87,6 +87,29 @@ function plainShaft(count = 21): CarShaft {
   );
 }
 
+/**
+ * The same envelope with two declared deck pairs — the `vertical-city` shuttle in miniature.
+ *
+ * One stop opens onto two floors, so a car standing at `4` has its upper deck at `5` **at the
+ * same instant**, and a landing call at `5` is a call at a floor it is standing at. Floors
+ * outside the two pairs are ordinary, which is what lets one fixture carry both readings.
+ */
+function doubleDeckShaft(): CarShaft {
+  return createShaft(
+    Array.from({ length: 21 }, (_, index) => ({
+      id: String(index),
+      index,
+      heightM: index * FLOOR_PITCH_M,
+    })),
+    {
+      floorPairs: [
+        ['4', '5'],
+        ['10', '11'],
+      ],
+    },
+  );
+}
+
 /** Floors 8 and above need the `exec` credential — the Secure Tower shape in miniature. */
 function securedShaft(): CarShaft {
   return createShaft(
@@ -631,6 +654,63 @@ describe('stage 6: answering', () => {
     expect(answerDecisionFor(snapshot, subject, guarded, ['A'], [snapshot]).reason).toBe(
       'sole-eligible-override',
     );
+  });
+
+  /* ---- decks: a stop is a position, not a floor ---- */
+
+  it('answers a call at its upper deck, which is a landing it is standing at', () => {
+    // The regression witness. `CarSnapshot.floorId` is the LOWER deck's stop floor, so the
+    // literal `car.floorId !== call.floorId` refused every upper-deck call outright — and the
+    // runner had already decided the car was there (`Simulation.#serveHere` gates on
+    // `Car.stopFloorFor`). Measured on `vertical-city` at seed 20 270 000: 45–126 stage-6
+    // `not-at-floor` refusals per run, 13 of 13 dispatchers, and **100 % of them** a car
+    // refusing its own upper deck.
+    const car = makeCar('A', '4', clockAt(0), doubleDeckShaft()).snapshot(0);
+    expect(car.floorId).toBe('4');
+    expect(answerDecisionFor(car, call('5', 'up'), DEFAULT_CONFIG, ['A'], [car])).toMatchObject({
+      answer: true,
+      reason: 'assigned',
+    });
+  });
+
+  it('answers the lower deck’s own floor exactly as it always did', () => {
+    const car = makeCar('A', '4', clockAt(0), doubleDeckShaft()).snapshot(0);
+    expect(answerDecisionFor(car, call('4', 'up'), DEFAULT_CONFIG, ['A'], [car]).reason).toBe(
+      'assigned',
+    );
+  });
+
+  it('still refuses a landing neither deck opens onto', () => {
+    const car = makeCar('A', '4', clockAt(0), doubleDeckShaft()).snapshot(0);
+    for (const floorId of ['3', '6', '10', '11']) {
+      expect(answerDecisionFor(car, call(floorId, 'up'), DEFAULT_CONFIG, ['A'], [car]).reason).toBe(
+        'not-at-floor',
+      );
+    }
+  });
+
+  it('is unchanged on a single-deck car, where the floor above really is another place', () => {
+    // The control the whole change rests on: `stopFloorIdOf` is the identity on a shaft with no
+    // declared pairs, so every conventional building's dispatch is the run it was before.
+    const car = makeCar('A', '4').snapshot(0);
+    expect(answerDecisionFor(car, call('5', 'up'), DEFAULT_CONFIG, ['A'], [car]).reason).toBe(
+      'not-at-floor',
+    );
+  });
+
+  it('refuses while the car is still moving, upper deck or not', () => {
+    // A guard rather than a regression witness — this verdict is the same before and after. It
+    // is here because "either deck opens onto that landing" and "the car is standing" are two
+    // conditions, and a deck-aware rewrite that kept only the first would open the doors of a
+    // car in flight.
+    const car = makeCar('A', '4', clockAt(0), doubleDeckShaft());
+    car.departFor('10', 0);
+    const snapshot = car.snapshot(0);
+    expect(snapshot.floorId).toBe('4');
+    expect(snapshot.motion).toBeDefined();
+    expect(
+      answerDecisionFor(snapshot, call('5', 'up'), DEFAULT_CONFIG, ['A'], [snapshot]).reason,
+    ).toBe('not-at-floor');
   });
 
   it('refuses an opposite-direction pickup when the profile forbids one', () => {

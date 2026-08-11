@@ -34,6 +34,7 @@
 
 import { isDestinationCallType, type CallType } from '../config/types.js';
 import { estimateCost } from '../model/car/estimateCost.js';
+import { stopFloorIdOf } from '../model/car/types.js';
 import type { CarSnapshot, CostEstimate, CostRequest, ServedFloor } from '../model/car/types.js';
 import { phaseByName, travelTime } from '../physics/motion/index.js';
 
@@ -569,6 +570,33 @@ export function clearsHysteresis(
  * -------------------------------------------------------------------------- */
 
 /**
+ * Where this car has to stand for its decks to open onto `floorId` — the dispatch layer's copy
+ * of the one normalization `Car.stopFloorFor` applies at every boundary a floor id crosses.
+ *
+ * **This is the only coordinate in which "the car is at that floor" is a well-posed question for
+ * a double-deck car.** `CarSnapshot.floorId` is a *stop position*: the floor the **lower** deck
+ * opens onto. The upper deck is at the paired floor at the same instant, and a landing call
+ * there is a call at a floor the car is already standing at. Comparing the two ids literally
+ * answers "no" for every such call, which is what this function exists to stop — measured on
+ * `vertical-city` at seed 20 270 000, every one of the 45–126 stage-6 `not-at-floor` refusals
+ * (13 of 13 dispatchers, `rise-and-fall`) was a car refusing a call at its own upper deck, and
+ * the `carFloor → callFloor` pairs were exactly the four the building declares.
+ *
+ * It reads {@link stopFloorIdOf} rather than re-deriving the pairing, so the dispatcher and the
+ * runner cannot disagree about where a car stands: `Simulation.#serveHere` gates the same call on
+ * `Car.stopFloorFor`, which is the same function over the same shaft.
+ *
+ * Identity on a single-deck shaft — `isDoubleDeck` is false, `stopFloorIdOf` returns its
+ * argument, and every comparison below is the literal one it replaced. That is a structural
+ * property rather than an assertion, and it is why no conventional building's run moves.
+ *
+ * Pure.
+ */
+function stopFloorFor(car: CarSnapshot, call: Pick<DispatchCall, 'floorId'>): string {
+  return stopFloorIdOf(car.shaft, call.floorId);
+}
+
+/**
  * **Stage 6.** Whether this car should stop here for this call.
  *
  * Distinct from stage 2 because the questions are asked at different times about different
@@ -605,7 +633,9 @@ export function answerDecisionFor(
   const decision = (answer: boolean, reason: AnswerDecision['reason']): AnswerDecision =>
     Object.freeze({ carId: car.carId, callId: call.id, answer, reason });
 
-  if (car.floorId !== call.floorId || car.motion !== undefined) {
+  // "At this call's floor" is "at the stop position that opens onto it" — either deck, since
+  // both are at the landing at the same instant. See {@link stopFloorFor}.
+  if (stopFloorFor(car, call) !== car.floorId || car.motion !== undefined) {
     return decision(false, 'not-at-floor');
   }
   if (!assignedCarIds.includes(car.carId)) {
