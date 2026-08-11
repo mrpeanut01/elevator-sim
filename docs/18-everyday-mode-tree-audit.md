@@ -240,6 +240,11 @@ published a different correct-where-it-stood figure:
 | tier | cases | strings | simulations | surfaces | verdict |
 |---|---|---|---|---|---|
 | always-on | 49 | **374 420** | 606 | **36** | **green** |
+| deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **474 029** | 4 710 | *(measured separately)* | **green** — 24/24, exit 0 |
+
+Both tiers green on the same tree in one sitting. The deep tier's own surface count is measured
+by its own run rather than inherited from the always-on row — they differ by construction, and
+this file's own § D307 lesson is that a count carried across tiers is a count nobody measured.
 
 The surface count moved 30 → 36 and the always-on strings 335 950 → 374 420 across this delivery:
 the plain levers, the sizing block, the detector readout, the suite bench, the rules editor, the
