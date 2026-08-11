@@ -101,6 +101,7 @@ import {
   specIsDirty,
   transportModesOf,
   traversalTimeLabel,
+  upPeakAnalysisOf,
   validateSpec,
   withTransportEnd,
   withTransportSeconds,
@@ -111,6 +112,7 @@ import {
   type SpecAccessZone,
   type SpecRow,
   type SpecTransportMode,
+  type SpecUpPeakAnalysis,
 } from '../authoring/buildingSpec.js';
 import {
   CREDENTIAL_STATES,
@@ -1416,6 +1418,24 @@ const DRAFT_NOTE =
     : '';
 
 /*
+ * The sizing block's framing line — slice 6's cheap half, module-private for
+ * {@link TRANSPORT_LANDING_TITLE}'s stated constraint (an exported prose declaration is a surface
+ * only `honesty/surfaces.ts` can classify, and the strings this block *draws* are all produced by
+ * `authoring/buildingSpec.ts#upPeakAnalysisOf`, which that file does drive).
+ *
+ * Both halves of the sentence are load-bearing. The first says where the numbers come from — the
+ * same closed form the correctness oracle holds the simulator to, so the designer's figures cannot
+ * drift from the oracle's. The second says what the closed form cannot do: it has no queueing
+ * model and no variance, so it predicts an interval and a capacity and can say nothing about
+ * waiting times — printing this beside the figures is what keeps a reader from taking a good
+ * interval as a promise about AWT.
+ */
+const SIZING_NOTE =
+  'Computed by the same closed-form up-peak arithmetic the correctness oracle checks the ' +
+  'simulator against — a prediction from the geometry, not a measurement of a run. It has no ' +
+  'queueing model, so it says nothing about how long anyone waits: run a day for that.';
+
+/*
  * Issue #43 § 4: this said *"core’s own semantics"* — `core` is a source package and means nothing to
  * a player — and *"what four of the five shipped buildings declare"*, which was wrong in both halves.
  * Eight buildings ship and **three** of them declare no access zone. The count is dropped rather than
@@ -1761,6 +1781,56 @@ export function mountBuildingEditor(
       el(doc, 'p', { className: 'advice', text: DRAFT_NOTE, style: { 'margin-bottom': '10px' } }),
       elements.rows,
     );
+  }
+
+  /*
+   * The sizing block — the closed-form interval, round trip and handling capacity, between the
+   * summary line and the advice line so the figures sit under the geometry they are computed from.
+   * Built once here and filled by {@link drawSizing} on every render; every string it draws comes
+   * from `authoring/buildingSpec.ts#upPeakAnalysisOf`, so the mount decides nothing.
+   * `parentElement?.insertBefore` rather than `ChildNode.before` — the document recorders answer
+   * the former, and `dev/buildingEditor.test.ts` reads this block back through one.
+   */
+  const sizingRows = el(doc, 'div', { className: 'sizing-rows' });
+  const sizingBlock = el(doc, 'div', {
+    className: 'sizing-block',
+    children: [
+      sizingRows,
+      el(doc, 'p', { className: 'advice', text: SIZING_NOTE, style: { margin: '4px 0 0' } }),
+    ],
+  });
+  elements.advice.parentElement?.insertBefore(sizingBlock, elements.advice);
+
+  /** Fill the sizing block: per-bank figures with their reading and divergences, or the refusal. */
+  function drawSizing(analysis: SpecUpPeakAnalysis): void {
+    if (analysis.refusal !== '') {
+      fill(sizingRows, el(doc, 'div', { className: 'summary-line', text: analysis.refusal }));
+      return;
+    }
+    const nodes: HTMLElement[] = [];
+    for (const bank of analysis.banks) {
+      if (bank.refusal !== '') {
+        nodes.push(el(doc, 'div', { className: 'summary-line', text: bank.refusal }));
+        continue;
+      }
+      nodes.push(el(doc, 'div', { className: 'summary-line', text: bank.line }));
+      nodes.push(el(doc, 'p', { className: 'advice', text: bank.reading, style: { margin: '2px 0 0' } }));
+      if (bank.warnings.length > 0) {
+        nodes.push(
+          el(doc, 'p', {
+            className: 'sizing-warnings',
+            text: bank.warnings.join(' '),
+            style: {
+              font: '500 10.5px var(--mono)',
+              color: 'var(--warn)',
+              'line-height': '1.6',
+              margin: '2px 0 0',
+            },
+          }),
+        );
+      }
+    }
+    fill(sizingRows, ...nodes);
   }
 
   /** The building the confirmation is about. Cleared the moment the reader edits again. */
@@ -2591,6 +2661,13 @@ export function mountBuildingEditor(
 
     setText(elements.summary, buildingSummary(current));
     setText(elements.advice, buildingAdvice(current));
+    /*
+     * The moved-control requirement, wired: this recomputes the closed form from the current spec
+     * on every render, so dragging the car slider or picking a speed chip moves the printed
+     * interval — `upPeak.test.ts` pins that on the producer, and the block never keeps a previous
+     * spec's figures beside a refusal.
+     */
+    drawSizing(upPeakAnalysisOf(current, specs));
 
     /* The elevation, then access zoning — the second kind, in its own block — then the machines
      * that are not lifts, which are neither. */
