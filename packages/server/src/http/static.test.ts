@@ -36,7 +36,7 @@ const DOCUMENT = '<!doctype html>\n<html lang="en">\n  <head>\n    <title>viewer
  *
  * The list is here rather than imported because `core/` and this package must build with `viz`
  * absent (CLAUDE.md invariant 6). It is kept honest from the other end instead:
- * `viz`'s own `data.test.ts` asserts these six are the paths it requests, so a seventh cannot be
+ * `viz`'s own `data.test.ts` asserts these seven are the paths it requests, so an eighth cannot be
  * added there and quietly go uncached-tested here.
  */
 const VIEWER_FETCHES = [
@@ -46,6 +46,7 @@ const VIEWER_FETCHES = [
   '/__buildings.json',
   '/campaign.json',
   '/scenario-goals.json',
+  '/fixit-cases.json',
 ] as const;
 
 beforeAll(async () => {

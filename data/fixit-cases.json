@@ -1,0 +1,323 @@
+{
+  "$comment": "Fix-a-building cases — docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md §10, scored per ENGINE_CONTRACT.md §9 with the closed-form inputs replaced by two real single runs sharing the traffic seed (the spec's own basis line, §10.4). Each case names a shipped building and carries the as-built deltas that make the fault real, a complaint whose measure is computed from the runs and never authored, four repairs whose patches are real config changes, and the authored success copy. Every case was validated against a real run pair before shipping (§10.6 rule 6); packages/viz/src/fixit/cases.test.ts pins the measured numbers, so an effect line's quoted figure that stops reproducing turns the suite red rather than going quietly stale. Player-facing copy carries no engine identifier (GAMEPLAY §16 rule 11) — buildings are named by their display names, dispatch changes by what they do. The seeds and demand levels are choices, not measurements: each was picked so the authored fault is visible in one run at that operating point, and the validation test is what says the diagnosed fix clears the contract's two bars there.",
+  "version": 1,
+  "cases": [
+    {
+      "id": "sleeping-sky-lobby",
+      "name": "The sleeping sky lobby",
+      "buildingId": "vertical-city",
+      "dispatcherProfileId": "collective",
+      "run": { "seed": "20260815", "durationS": 1800, "arrivalRatePctPop5min": 2 },
+      "asBuilt": {
+        "note": "Eight shuttles link the street to three sky lobbies; local banks hang off each lobby. The fault is in how it is configured, not in what it is made of.",
+        "patch": { "dispatcher": { "idle": { "parkingStrategy": "lobby" } } }
+      },
+      "complaint": {
+        "text": "Every evening I finish up and wait an age on the sky lobby for a car down to the street. You can see the shuttles from the window — all eight of them, sat at the ground floor.",
+        "complainer": "tenant, floor 62",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute for a car down from a sky lobby",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin-to-destination",
+            "floorIds": ["26", "27", "51", "52", "76", "77"],
+            "destinationFloorIds": ["G", "2"]
+          }
+        }
+      },
+      "symptom": "waits over a minute for a car down, while the shuttles sit at the street",
+      "figures": [
+        { "kind": "complaint", "label": "Waits over a minute, sky lobby down to street", "reading": "bad" },
+        { "kind": "scope-worst-wait", "label": "Worst wait for a down shuttle", "reading": "mid" },
+        { "kind": "scope-mean-wait", "label": "Mean wait for a down shuttle", "reading": "mid" },
+        { "kind": "rest-away-pct", "label": "Rest of the building away inside a minute", "reading": "healthy" }
+      ],
+      "diagnosis": {
+        "text": "Idle cars are sent home to the ground floor — all of them, including the shuttles, whose calls come from the top of the building.",
+        "reasoning": "The standing order parks every idle car at the bottom of its run. For each local bank that is its own lobby, which is where its calls start, so the locals are fine — the rest of the building is away inside a minute on every ride. For the shuttles the bottom of the run is the street, three hundred metres from the lobbies they serve. All 9 waits over a minute in this half hour are riders heading down from a sky lobby, and each one began with every shuttle parked at ground."
+      },
+      "budgetUnits": 12,
+      "repairs": [
+        {
+          "id": "spread-the-idle-fleet",
+          "role": "diagnosed",
+          "name": "Let the idle fleet wait along its stops",
+          "costUnits": 0,
+          "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street. The 9 waits over a minute are the target, and it is a setting.",
+          "patch": {
+            "dispatcher": {
+              "idle": { "parkingStrategy": "zone-center", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
+            }
+          }
+        },
+        {
+          "id": "regear-the-shuttles",
+          "role": "costly-fix",
+          "name": "Re-gear the shuttles for another half metre per second",
+          "costUnits": 10,
+          "effect": "Every shuttle covers its three hundred metres sooner, so the 70 s worst wait shortens — but the cars still start from the street, and you are buying machinery to race a parking rule.",
+          "patch": {
+            "building": {
+              "cars": [
+                { "carIds": ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"], "set": { "ratedSpeedDeltaMps": 0.5 } }
+              ]
+            }
+          }
+        },
+        {
+          "id": "quicker-doors",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell at every stop",
+          "costUnits": 2,
+          "effect": "A second or two off every stop moves the 23.9 s mean wait a little. The empty three-hundred-metre climb that makes the long waits is not a door.",
+          "patch": {
+            "building": {
+              "cars": [
+                { "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }
+              ]
+            }
+          }
+        },
+        {
+          "id": "ninth-shuttle",
+          "role": "new-shaft",
+          "name": "A ninth shuttle · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car on the sky-lobby run. That is a capital conversation with the owner — and eight parked at the wrong floor would become nine.",
+          "patch": {
+            "building": { "addCars": [{ "bankId": "shuttle", "copyCarId": "S8", "id": "S9" }] }
+          }
+        }
+      ],
+      "result": {
+        "head": "The lobby is awake.",
+        "body": "A shuttle now waits where the building finishes its day, and the letter-writer rides down inside a minute. Nothing was bought: the cars were always enough — they were parked in the wrong place."
+      }
+    },
+    {
+      "id": "zoning-starves-the-top",
+      "name": "Zoning that starves the top",
+      "buildingId": "midtown-office",
+      "dispatcherProfileId": "collective",
+      "run": { "seed": "20260813", "durationS": 1800, "arrivalRatePctPop5min": 3 },
+      "asBuilt": {
+        "note": "Four cars split into a low-rise and a high-rise bank; the upper floors were re-let to a dense tenant after the split was drawn. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "floorPopulations": [
+              { "floorIds": ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"], "population": 60 },
+              { "floorIds": ["12", "13", "14", "15", "16", "17", "18", "19", "20"], "population": 130 }
+            ],
+            "banks": [
+              {
+                "id": "low",
+                "name": "Low-rise bank",
+                "servesFloors": ["P1", "G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+                "cars": [
+                  { "id": "A", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+                  { "id": "B", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+                  { "id": "C", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                ]
+              },
+              {
+                "id": "high",
+                "name": "High-rise bank",
+                "servesFloors": ["P1", "G", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+                "cars": [
+                  { "id": "D", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Getting to or from the upper floors takes the best part of ten minutes around the shift start. Downstairs never waits — they have three cars to our one.",
+        "complainer": "office manager, floor 18",
+        "measure": {
+          "kind": "mean-wait",
+          "label": "mean wait to board, journeys touching the upper floors",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": ["12", "13", "14", "15", "16", "17", "18", "19", "20"]
+          }
+        }
+      },
+      "symptom": "a 341 s mean wait to board, on one car for nine dense floors",
+      "figures": [
+        { "kind": "complaint", "label": "Mean wait to board, upper-floor journeys", "reading": "bad" },
+        { "kind": "scope-long-waits", "label": "Upper-floor journeys waiting over a minute", "reading": "mid" },
+        { "kind": "scope-worst-wait", "label": "Worst wait to board, upper floors", "reading": "mid" },
+        { "kind": "rest-away-pct", "label": "Rest of the building away inside a minute", "reading": "healthy" }
+      ],
+      "diagnosis": {
+        "text": "The split was drawn by floor count — ten floors against nine — and the heads are the other way round. Three cars carry 600 people; one car carries 1,170.",
+        "reasoning": "The low bank's three cars cover 600 people and every one of their riders is away inside a minute. The high bank's single car covers 1,170, and the mean wait to board on journeys touching those floors is 341 s with a worst of 914 s. Nothing about the machines differs: same class, same speed, same doors. The only asymmetry is where the line was drawn."
+      },
+      "budgetUnits": 12,
+      "repairs": [
+        {
+          "id": "redraw-by-headcount",
+          "role": "diagnosed",
+          "name": "Redraw the split by headcount — move one car across",
+          "costUnits": 6,
+          "effect": "Two cars a side puts 585 people on each upper car instead of 1,170. The 341 s mean upstairs is the target; downstairs keeps the slack its own figures show.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "low",
+                  "name": "Low-rise bank",
+                  "servesFloors": ["P1", "G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+                  "cars": [
+                    { "id": "A", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+                    { "id": "B", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                  ]
+                },
+                {
+                  "id": "high",
+                  "name": "High-rise bank",
+                  "servesFloors": ["P1", "G", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+                  "cars": [
+                    { "id": "C", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
+                    { "id": "D", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "regear-the-upper-car",
+          "role": "costly-fix",
+          "name": "Re-gear the upper car for another metre per second",
+          "costUnits": 12,
+          "effect": "The single upper car cycles sooner, so its 914 s worst wait shortens — but its queue is still one car's queue for 1,170 people, and this is the whole budget.",
+          "patch": {
+            "building": {
+              "cars": [{ "carIds": ["D"], "set": { "ratedSpeedDeltaMps": 1.0 } }]
+            }
+          }
+        },
+        {
+          "id": "snappier-doors",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell across both banks",
+          "costUnits": 2,
+          "effect": "A second off every stop moves the 341 s mean a little. The queue at the upper car is hundreds of seconds deep; its doors are not.",
+          "patch": {
+            "building": {
+              "cars": [{ "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }]
+            }
+          }
+        },
+        {
+          "id": "fifth-shaft",
+          "role": "new-shaft",
+          "name": "A fifth shaft for the upper zone · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "A second car upstairs without taking one from downstairs. That is a capital conversation with the owner, and the redrawn split gets there without pouring concrete.",
+          "patch": {
+            "building": { "addCars": [{ "bankId": "high", "copyCarId": "D", "id": "E" }] }
+          }
+        }
+      ],
+      "result": {
+        "head": "The top floors are served like the rest.",
+        "body": "Two cars a side, drawn by headcount instead of floor count. The upper mean falls under a minute, and downstairs never noticed — the slack was theirs all along, and the figures on this page said so."
+      }
+    },
+    {
+      "id": "three-cars-one-cars-work",
+      "name": "Three cars, one car's work",
+      "buildingId": "garden-apartments",
+      "dispatcherProfileId": "nearest-car",
+      "run": { "seed": "20260823", "durationS": 2700, "arrivalRatePctPop5min": 7 },
+      "asBuilt": {
+        "note": "Six floors, one bank, three identical cars. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": { "addCars": [{ "bankId": "main", "copyCarId": "B", "id": "C" }] }
+        }
+      },
+      "complaint": {
+        "text": "We are six floors with three lifts and I still watch all three sit downstairs together. From the fourth floor you can wait long enough to give up and carry the shopping.",
+        "complainer": "resident, floor 4",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute starting at the upper flats",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": ["4", "5", "6"]
+          }
+        }
+      },
+      "symptom": "waits over a minute for a car up, while three cars stand together below",
+      "figures": [
+        { "kind": "complaint", "label": "Waits over a minute starting at the upper flats", "reading": "bad" },
+        { "kind": "scope-worst-wait", "label": "Worst wait at the upper flats", "reading": "mid" },
+        { "kind": "scope-mean-wait", "label": "Mean wait at the upper flats", "reading": "mid" },
+        { "kind": "rest-away-pct", "label": "The lower floors away inside a minute", "reading": "healthy" }
+      ],
+      "diagnosis": {
+        "text": "The standing order always sends the nearest car and never spreads the fleet, so the three cars drift to the same busy floor and wait there together.",
+        "reasoning": "Sending the nearest car minimises each trip and moves the fleet as little as possible — which is exactly how all three end up standing where the last call was. The next call from a flat then starts with every car at the bottom: 7 waits over a minute began on the top three floors this shift, against a worst of 112 s, while every journey from the lobby was away inside a minute. Traffic here is sparse; where the idle cars stand matters more than which one is chosen."
+      },
+      "budgetUnits": 10,
+      "repairs": [
+        {
+          "id": "push-the-idle-cars-apart",
+          "role": "diagnosed",
+          "name": "Push the idle cars apart",
+          "costUnits": 0,
+          "effect": "Parks one idle car per stretch of the building instead of three together. The 7 waits over a minute from the flats are the target, and it is a setting.",
+          "patch": {
+            "dispatcher": {
+              "idle": { "parkingStrategy": "zone-center", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
+            }
+          }
+        },
+        {
+          "id": "faster-machines",
+          "role": "costly-fix",
+          "name": "Re-plant all three machines for another half metre per second",
+          "costUnits": 8,
+          "effect": "Each climb is quicker, so the 112 s worst wait shortens — but the cars still start it from the wrong floor, together, and this is most of the budget.",
+          "patch": {
+            "building": {
+              "cars": [{ "carIds": ["A", "B", "C"], "set": { "ratedSpeedDeltaMps": 0.5 } }]
+            }
+          }
+        },
+        {
+          "id": "shorter-door-hold",
+          "role": "cheap-fix",
+          "name": "Shorten the door hold at every landing",
+          "costUnits": 1,
+          "effect": "A second off each stop moves the 48.9 s mean a little. The wait that prompted the letter is a car climbing five floors empty, not a door.",
+          "patch": {
+            "building": {
+              "cars": [{ "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }]
+            }
+          }
+        },
+        {
+          "id": "fourth-lift",
+          "role": "new-shaft",
+          "name": "A fourth lift · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "A fourth car for six floors that already have three standing idle together. Measured on this very day it moves not one wait — the parking rule leaves it standing with the rest.",
+          "patch": {
+            "building": { "addCars": [{ "bankId": "main", "copyCarId": "C", "id": "D" }] }
+          }
+        }
+      ],
+      "result": {
+        "head": "Three cars doing three cars' work.",
+        "body": "The fleet now waits spread through the tower, and a call from the flats starts with a car already nearby. Nothing was bought — the third car was never the problem, and neither were the first two."
+      }
+    }
+  ]
+}

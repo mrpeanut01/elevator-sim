@@ -1,7 +1,7 @@
 /**
  * Which documents the viewer fetches by name, and why the list is pinned rather than described.
  *
- * These six paths are a **cross-package contract with the server**, and until this file existed
+ * These seven paths are a **cross-package contract with the server**, and until this file existed
  * only one end of it was written down. `server/src/http/static.ts` decides `cache-control` per
  * asset, and a document the viewer re-fetches under a fixed name must never be `immutable`: the
  * name does not change when the bytes do, so a cached copy is never superseded and a reload
@@ -14,7 +14,7 @@
  * refused the cached file for a missing block, and the viewer showed *"could not load data/"* with
  * no run available at all.
  *
- * `server/src/http/static.test.ts` holds the same six and asserts none of them is cached. It
+ * `server/src/http/static.test.ts` holds the same seven and asserts none of them is cached. It
  * cannot import this list — invariant 6 keeps `server` and `core` building with `viz` absent — so
  * the two are kept in step from this end: **add a seventh fetch and this test fails**, naming the
  * file that has to learn about it. The assertion is on the requests `loadBrowserResources` really
@@ -28,7 +28,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
-import { loadBrowserResources, loadCampaign } from './data.js';
+import { loadBrowserResources, loadCampaign, loadFixitCases } from './data.js';
 
 /**
  * The contract, and the reason each entry is on it.
@@ -42,6 +42,7 @@ const EXPECTED_FETCHES = [
   '/campaign.json',
   '/dispatcher-profiles.json',
   '/elevator-specs.json',
+  '/fixit-cases.json',
   '/scenario-goals.json',
   '/traffic-profiles.json',
 ] as const;
@@ -80,13 +81,15 @@ describe('the documents the viewer fetches by a fixed name', () => {
       });
     });
 
-    // Both loaders, because the split is deliberate and neither alone is the contract.
+    // All three loaders, because the split is deliberate and none alone is the contract.
     // `loadBrowserResources` is what `dev/batchWorker.ts` runs on every worker start and fetches
-    // four; `loadCampaign` is the Campaign panel's only call and fetches the other two. A test
-    // that drove one would leave two documents unpinned — which is how `campaign.json` and
-    // `scenario-goals.json` came to be absent from the first draft of this list.
+    // four; `loadCampaign` is the Campaign panel's only call and fetches two more; `loadFixitCases`
+    // is the Fix-a-building panel's only call and fetches the seventh. A test that drove one would
+    // leave documents unpinned — which is how `campaign.json` and `scenario-goals.json` came to be
+    // absent from the first draft of this list.
     const resources = await loadBrowserResources();
     await loadCampaign(resources);
+    await loadFixitCases(resources);
 
     // Non-vacuous first: a stub that fetched nothing would satisfy a set comparison against an
     // empty list, and every assertion below it would be true of a viewer that loads no data.
@@ -97,7 +100,7 @@ describe('the documents the viewer fetches by a fixed name', () => {
 
     // Every one of them revalidated, which is the half of the cache repair a response header
     // cannot do. The clients poisoned by the old `immutable` will not revalidate on their own —
-    // that is what `immutable` means — so the request has to ask. Asserted for all six rather
+    // that is what `immutable` means — so the request has to ask. Asserted for all seven rather
     // than for the one that broke, because the next stale document will be a different one.
     expect(modes).toEqual(EXPECTED_FETCHES.map(() => 'no-cache'));
   });

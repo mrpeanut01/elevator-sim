@@ -31,6 +31,8 @@ import { collectSearchSpace, type SearchSpace } from '@elevator-sim/experiments/
 import { restrictedFloorIds } from '../access/zoning.js';
 import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
+import { parseFixitCases } from '../fixit/parse.js';
+import type { FixitCases } from '../fixit/types.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
 
 /**
@@ -245,6 +247,31 @@ export interface LoadedCampaign {
   readonly published: PublishedGoalRates;
   readonly space: SearchSpace;
   readonly dimensionHelp: ReadonlyMap<string, string>;
+}
+
+/**
+ * `data/fixit-cases.json`, fetched and parsed — the Fix-a-building catalogue.
+ *
+ * Not part of {@link loadBrowserResources}, for {@link loadCampaign}'s stated reason: that
+ * function runs on every batch-worker start, and a worker has no use for a tenant's letter. The
+ * Fix-a-building panel is the only caller, and it calls this once, on first open.
+ *
+ * The forbidden-identifier list — GAMEPLAY § 16 rule 11 — is **derived** from the same loaded
+ * data the cases are checked against: every shipped building id and dispatcher profile id. A list
+ * written down in `fixit/parse.ts` would go stale the day a building lands.
+ */
+export async function loadFixitCases(resources: BrowserResources): Promise<FixitCases> {
+  const raw = await fetchJson('/fixit-cases.json');
+  return parseFixitCases(raw, {
+    floorIdsByBuilding: new Map(
+      resources.buildings.map((building) => [building.id, building.floors.map((floor) => floor.id)]),
+    ),
+    profileIds: new Set(resources.dispatcherProfiles.profiles.map((profile) => profile.id)),
+    engineIds: [
+      ...resources.buildings.map((building) => building.id),
+      ...resources.dispatcherProfiles.profiles.map((profile) => profile.id),
+    ],
+  });
 }
 
 /**
