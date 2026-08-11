@@ -52,7 +52,15 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 0 },
+    /*
+     * A port of this file's own, not `port: 0` — the tier's third encounter with the same trap,
+     * and this time it was caught at integration rather than in CI. `vite.config.ts` pins
+     * `{ port: 5174, strictPort: true }`, so `port: 0` does **not** mean *an ephemeral port*: it
+     * resolves to that pinned default, `boot.browser.test.ts` asks for the same one, and under
+     * `strictPort` the loser gets no URL at all — a red file for a reason with nothing to do with
+     * canvas height. Green on its own branch, red the moment the tier held nine files.
+     */
+    server: { port: 5194, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
