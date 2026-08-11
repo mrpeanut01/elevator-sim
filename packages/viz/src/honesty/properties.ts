@@ -970,14 +970,40 @@ const WHOLE_RUN_COUNTS: readonly {
  *    detector, and it is why the live value comes from `observationsAt` rather than from arithmetic
  *    written here.
  *
- * ## The one role that is exempt, and why it is the opposite of a loophole
+ * ## The one role that is exempt, and why the exemption is now **half** what it was
  *
- * `role === 'reason'`. A refusal published early **withholds** a figure; R6 is a rule about
- * publishing an outcome, and a retraction is the absence of one. The rail's own retraction row —
- * *"the readings that fold the whole shift … are withheld until the playhead reaches the end"* — is
- * drawn **only** while the shift is unfinished, so a property that refused it would forbid the fix
- * § D293 landed. `role === 'label'` is exempt on the textual half alone, for R3's reason: a caption
- * carries a threshold, not a result.
+ * `role === 'reason'` is exempt from the **textual** half. A refusal published early withholds a
+ * figure; the textual half is a rule about *printing a count*, and a retraction prints none. The
+ * rail's own retraction row — *"the readings that fold the whole shift … are withheld until the
+ * playhead reaches the end"* — is drawn **only** while the shift is unfinished, so a property that
+ * refused it would forbid the fix § D293 landed. `role === 'label'` is exempt from the same half,
+ * for R3's reason: a caption carries a threshold, not a result.
+ *
+ * ## Why a refusal is **not** exempt from the structural half — `docs/20` defect 3
+ *
+ * The exemption used to be total, on the argument *"a refusal is the absence of a claim"*, and that
+ * sentence is true of a refusal and false of a **verdict**. `render/overlay.ts`'s RIGHT NOW panel
+ * drew, at 14 % of playback, under a label reading *average wait so far*:
+ *
+ * > **`NO AVERAGE — A RESULT`** … *"This run's own statistics refuse an average here. That is a
+ * > result, not a gap."*
+ *
+ * Nothing there is a figure, and every word of it is a claim about the **finished** day, published
+ * over a building whose queues had not formed yet. The search could not see it: the textual half
+ * looks for a number and there is none, and the structural half returned before it read the basis.
+ * So a whole class of early whole-run claims — the ones with no numeral in them — was outside the
+ * property that exists to catch early whole-run claims.
+ *
+ * The fix is to move the `continue`, not to widen a cue list. A refusal that **declares** it folds
+ * the whole run is asserting something about the whole run, whatever its role; a refusal that
+ * declares nothing, or declares `'now'`, is the retraction § D293 landed and is untouched. The
+ * rail's retraction seeds no basis (`honesty/surfaces.ts`'s MOOD adapter passes `driver?.basis`,
+ * `undefined` on that row) and so stays exempt in practice as well as in principle — which is the
+ * property the narrowing is safe by, and `honesty.test.ts` drives it rather than assuming it.
+ *
+ * The declaration this now reaches is `mode/disclosure.ts#CasualRefusal.basis`, produced beside the
+ * words themselves, in the module that owns the refusal's vocabulary — `MoodDriver.basis`'s pattern
+ * applied to the one kind of string that has no figure to declare a window for.
  */
 function checkWholeRunFigureEarly(
   context: HonestyContext,
@@ -993,9 +1019,13 @@ function checkWholeRunFigureEarly(
     if (at === undefined) continue;
     // The rule is *short of `endedAt`*, and it is the run's own comparison — see TextPlayhead.
     if (at.atS >= at.endedAt) continue;
-    // A refusal is the absence of a claim. See the docstring: this is § D293's own fix.
-    if (text.role === 'reason') continue;
 
+    /*
+     * The structural half runs on **every** role, refusals included — `docs/20` defect 3. A
+     * refusal that declares `'whole-run'` is a verdict about the finished day and is exactly what
+     * this half is for; a refusal that declares nothing, as § D293's retraction does, never
+     * reaches the branch below. See the docstring for what the total exemption cost.
+     */
     if (at.basis === 'whole-run') {
       found.push(
         violation(
@@ -1009,7 +1039,9 @@ function checkWholeRunFigureEarly(
       continue;
     }
 
-    if (text.role === 'label') continue;
+    // The textual half only. A refusal prints no count and a caption carries a threshold rather
+    // than a result — see the docstring's two paragraphs on the exemptions.
+    if (text.role === 'label' || text.role === 'reason') continue;
     let live = liveAt.get(at.atS);
     if (live === undefined) {
       live = observationsAt(context.recording, at.atS);

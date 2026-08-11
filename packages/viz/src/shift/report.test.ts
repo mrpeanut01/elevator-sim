@@ -41,6 +41,9 @@ import { contractById } from './contracts.js';
 import { SHIFT_EVENTS, eventFor } from './events.js';
 import { goalsForDay } from './goals.js';
 import { observationsAt } from '../live/observations.js';
+// `docs/20` defect 4 — the rail's fourth band label, derived rather than retyped. See the test
+// that asserts the two *stairs* cohorts share no phrase.
+import { WAIT_BANDS } from '../live/bands.js';
 import { shiftObservationsOf } from './observations.js';
 
 /**
@@ -178,7 +181,7 @@ function reportOf(
 function figure(
   report: ShapedDayReport,
   id: string,
-): { value: string; note: string; tone: string; axisOnly: boolean } {
+): { label: string; value: string; note: string; tone: string; axisOnly: boolean } {
   const found = report.figures.find((candidate) => candidate.id === id);
   if (found === undefined) throw new Error(`no figure "${id}" on the sheet`);
   return found;
@@ -365,6 +368,31 @@ describe('TOOK THE STAIRS names its true cohort, and the people can be totalled 
     const everything = JSON.stringify(report);
     expect(everything).not.toContain('gave up and took the stairs');
     expect(everything).not.toContain('counted here and nowhere else');
+  });
+
+  /**
+   * The two *stairs* cohorts may not share a phrase — `docs/20` defect 4, `docs/12` § 4.11.
+   *
+   * The left rail's fourth mood band and this cell were both called *taking the stairs*, on one
+   * screen, with two different numbers under them (534 against 288) and the cell's own note saying
+   * all 288 of the second cohort **were carried**. Both labels are derived here rather than
+   * retyped — the cell's off a real report, the band's off `WAIT_BANDS` — so this fails if either
+   * surface drifts back onto the other's words, which no assertion inside a single module could
+   * catch.
+   *
+   * Compared on the distinctive phrase rather than on equality: *TOOK THE STAIRS* and *taking the
+   * stairs* are not equal strings and were exactly the collision.
+   */
+  it('does not share its words with the rail’s fourth mood band', () => {
+    const cellLabel = figure(reportOf(saturated), 'stairs').label.toLowerCase();
+    const bandLabel = WAIT_BANDS[WAIT_BANDS.length - 1]?.label.toLowerCase() ?? '';
+
+    expect(cellLabel).toContain('stairs');
+    expect(bandLabel).toContain('stairs');
+    // The verb is what separates them: one cohort has gone, the other is still standing there.
+    expect(cellLabel).toContain('took the stairs');
+    expect(bandLabel).not.toContain('took the stairs');
+    expect(bandLabel).not.toContain('taking the stairs');
   });
 
   it('grounds the carry goal in arrivals including the horizon-crossers, so abandonment cannot flatter it', () => {
@@ -655,8 +683,60 @@ describe('where it went wrong is derived from the run', () => {
       expect(report.diagnosis.map((row) => row.id)).not.toContain('report-window');
       expect(report.smallPrint).toContain(recording.summary.reportWindow.id);
       expect(report.smallPrint).toContain(clockOf(recording.summary.reportWindow.startS));
-      expect(report.smallPrint).toContain('during the busiest five minutes');
+      /*
+       * `docs/20` defect 5. This used to pin *during the busiest five minutes*, and the phrase was
+       * a claim the sheet could not support: `summary.reportWindow` is labelled `peak-5min`
+       * whenever it is 300 s long, and the shift path only ever produced the **demand template's
+       * declared band**, not the busiest five minutes by arrivals. On Garden Apartments the band
+       * held **zero** of the day's arrivals on 14 of 500 seeds, and the sheet went on calling it
+       * the busiest.
+       *
+       * What replaces it refers to the span the sentence has already printed rather than
+       * characterising it — and the *absence* is pinned as hard as the presence, because a
+       * superlative reappearing here is the whole defect.
+       */
+      expect(report.smallPrint).toContain('during that window');
+      expect(report.smallPrint).not.toContain('busiest');
     }
+  });
+
+  /**
+   * The whole-shift rows say they are whole-shift rows — `docs/20` defect 6.
+   *
+   * The sheet publishes two windows and named neither on the rows: *the tightest moment* and *the
+   * worst of it* are the whole shift's deepest queue and the phase it fell in, while the figure
+   * grid four inches up quotes means over `summary.reportWindow`. On the audit's Chancery day those
+   * were 08:50 and 08:42–08:47.
+   *
+   * Both arms are asserted from the run's own numbers rather than from a snapshot of the words,
+   * because the clause states *which case this run is in* — see `windowRelationClause`. The
+   * predicate here is the same comparison the product makes, written out, so a run that stops being
+   * one case fails rather than quietly reading the other's sentence.
+   */
+  it('says on both diagnosis rows whether the worst moment is inside the window the means used', () => {
+    for (const recording of [clean, saturated, missedWithoutSaturating]) {
+      const report = reportOf(recording);
+      const observations = observationsOfRun(recording);
+      const at = observations.peakQueueAtS;
+      if (at === null) continue;
+      const window = recording.summary.reportWindow;
+      const inside = at >= window.startS && at < window.endS;
+
+      for (const id of ['peak-queue', 'peak-phase']) {
+        const row = report.diagnosis.find((entry) => entry.id === id);
+        expect(row?.why).toContain(`${window.id} window the means above are read over`);
+        expect(row?.why?.includes('That instant is inside')).toBe(inside);
+        expect(row?.why?.includes('two different parts of it')).toBe(!inside);
+      }
+    }
+  });
+
+  it('reconciles the two windows in the small print as well as on the rows', () => {
+    // A reconciliation that lives only on the thing being reconciled is not one: this is the
+    // paragraph a reader goes to when the heading and the figure grid disagree.
+    const smallPrint = reportOf(saturated).smallPrint;
+    expect(smallPrint).toContain('read the whole shift too');
+    expect(smallPrint).toContain('need not be inside the window the means came from');
   });
 
   it('files only rows that are events, on every run', () => {

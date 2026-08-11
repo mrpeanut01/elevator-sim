@@ -27,6 +27,7 @@ import {
   playheadHasReachedEnd,
   undeliveredAt,
   type Canvas2DLike,
+  type SceneInput,
   type Theme,
 } from './canvas.js';
 import { themeFor } from './theme.js';
@@ -1655,5 +1656,42 @@ describe('the header band speaks a player’s words in Casual — issue #100', (
     const engineerEarly = textsOf(refused('saturated'), early, 'advanced');
     expect(casualEarly.length).toBe(engineerEarly.length);
     expect(casualEarly.filter((text, index) => text !== engineerEarly[index]).length).toBe(1);
+  });
+});
+
+/**
+ * The subtitle names the dispatcher a reader knows — `docs/20` defect 9, `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11.
+ *
+ * The audit read `yours-1` on the stage under a building drawn by its display name, while the
+ * sheet four inches away said *Lobby holder*. The two assertions are the two halves of the
+ * contract: a caller with a name gets it **instead of** the id, and a caller with none gets the
+ * string this line has always drawn.
+ */
+describe('the header subtitle', () => {
+  const textsOf = (input: Partial<SceneInput>): readonly string[] => {
+    const ctx = new RecordingContext();
+    drawScene(ctx, {
+      recording: RECORDING,
+      frame: frame(),
+      layout,
+      theme: DEFAULT_THEME,
+      ...input,
+    });
+    return ctx.calls
+      .filter((call) => call.op === 'fillText')
+      .map((call) => String(call.args[0] ?? ''));
+  };
+
+  it('draws the display name when it is given one, and never the id beside it', () => {
+    const texts = textsOf({ dispatcherName: 'Lobby holder' });
+    expect(texts.some((text) => text.startsWith('Lobby holder · seed 7'))).toBe(true);
+    expect(texts.some((text) => text.includes(RECORDING.dispatcherProfileId))).toBe(false);
+  });
+
+  it('falls back to the recording’s own id, so a caller with no name loses nothing', () => {
+    const texts = textsOf({});
+    expect(
+      texts.some((text) => text.startsWith(`${RECORDING.dispatcherProfileId} · seed 7`)),
+    ).toBe(true);
   });
 });

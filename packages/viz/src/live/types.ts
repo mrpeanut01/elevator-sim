@@ -40,13 +40,15 @@ import type { VizDecision, VizPhase } from '../contract/types.js';
 /**
  * The four wait-age bands, by the names the design gives the mood card's legend.
  *
- * **These are ages, not outcomes.** `taking-the-stairs` is the fourth *band* — somebody who is
- * standing at a landing right now and has been for at least two minutes. It is **not** the count
- * of people who gave up: that is {@link LiveObservations.abandoned}, which is a different
- * quantity over a different population (legs whose wait passed the run's own abandonment
- * horizon, whether or not anybody is still standing). The design keeps both, in two places, and
- * conflating them would let a rail report four people "taking the stairs" while nobody had
- * abandoned anything.
+ * **These are ages, not outcomes.** `taking-the-stairs` — drawn as *eyeing the stairs* since
+ * `docs/20` defect 4, and see `live/bands.ts` for why the id kept the older spelling — is the
+ * fourth *band*: somebody who is standing at a landing right now and has been for at least two
+ * minutes. It is **not** the count of people who gave up: that is
+ * {@link LiveObservations.abandoned}, the Day report's *TOOK THE STAIRS*, a different quantity
+ * over a different population (legs whose wait passed the run's own abandonment horizon, whether
+ * or not anybody is still standing). The design keeps both, in two places, and **gave them the
+ * same words**, which let the rail report 534 people "taking the stairs" beside a sheet reporting
+ * 288 — the collision the rename closes.
  */
 export type WaitBandId = 'breezy' | 'tapping-foot' | 'checking-watch' | 'taking-the-stairs';
 

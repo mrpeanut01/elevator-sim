@@ -57,17 +57,24 @@ describe('the band definitions are the design’s, and the prose is pinned to th
     ]);
     expect(WAIT_BANDS.map((band) => band.fromS)).toEqual([0, 30, 60, 120]);
     expect(WAIT_BANDS.map((band) => band.toS)).toEqual([30, 60, 120, undefined]);
+    /*
+     * The fourth pair is the simulator's rather than the design's — `docs/20` defect 4, and
+     * `docs/12` § 4.11. The handoff spells them *taking the stairs* and *gave up*; it also gives
+     * the Day report's abandonment cell the phrase *TOOK THE STAIRS*, and the product puts the two
+     * on one screen, where the audit read 534 against 288 under one label. The other three are the
+     * handoff's, byte for byte, which is what makes this one entry a deviation rather than a drift.
+     */
     expect(WAIT_BANDS.map((band) => band.label)).toEqual([
       'breezy',
       'tapping foot',
       'checking watch',
-      'taking the stairs',
+      'eyeing the stairs',
     ]);
     expect(WAIT_BANDS.map((band) => band.legendLabel)).toEqual([
       'under 30 s',
       'a minute',
       'two minutes',
-      'gave up',
+      'past two minutes',
     ]);
     /*
      * Token names, not hexes — § D251. The four values live in `index.html`'s two `:root` blocks,

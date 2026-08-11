@@ -32,7 +32,7 @@
 import { MATRIX_CELLS } from '@elevator-sim/experiments/browser';
 
 import { intervalPlotFor } from '../batch/intervalPlot.js';
-import type { BatchComparisonRow } from '../batch/report.js';
+import { populationLineOf, type BatchComparisonRow } from '../batch/report.js';
 import {
   suiteCellViewOf,
   suitePlanOf,
@@ -295,14 +295,21 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
   function draw(views: readonly SuiteCellView[]): void {
     ui.output.replaceChildren();
     for (const view of views) {
-      ui.output.append(
-        row(
-          view.label,
-          `${view.buildingName} · ${String(view.replications)} replications per arm · seed ${view.report.seed}`,
-          `Every arm ran this population: ${view.report.traceKey}`,
-          'figure-observation',
-        ),
+      /*
+       * The population **in words**, with the exact trace key on the row's `title` — `docs/20`
+       * defect 9. The key is provenance (seed plus this reproduces the run elsewhere), so it is
+       * kept rather than dropped; what it stops being is the sentence a first-timer reads.
+       * `batch/report.ts#populationLineOf` renders every field of it, so nothing is summarised
+       * away — see its docstring for why that is the load-bearing half.
+       */
+      const cellRow = row(
+        view.label,
+        `${view.buildingName} · ${String(view.replications)} replications per arm · seed ${view.report.seed}`,
+        `Every arm ran this population: ${populationLineOf(view.report.traceKey, { buildingName: view.buildingName })}.`,
+        'figure-observation',
       );
+      cellRow.title = view.report.traceKey;
+      ui.output.append(cellRow);
       if (view.verdictShown && view.answer !== null) {
         ui.output.append(row('the answer', view.answer, undefined, 'figure-estimate'));
       }
@@ -360,8 +367,18 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
         'The bench above compares two dispatchers at one operating point. The suite runs the same ' +
           'two-arm comparison over the experiment matrix’s fixed cells — building × traffic ' +
           'pattern, each with its measured rationale — one batch per ticked cell.',
-        'The cells are the eight the project measures (packages/experiments’ MATRIX_CELLS), not ' +
-          'the eight buildings. Each cell reports with the same rules as a single batch: an ' +
+        /*
+         * `docs/20` defect 9: the identifier is gone and the **fact** it was carrying is not.
+         * A reader needed to know two things from that clause — that these eight are the
+         * project's own measured operating points rather than a list assembled here, and that
+         * eight cells is not eight buildings — and a module-qualified constant name delivered
+         * neither to a player. Both are said in words instead. The claim stays true by import:
+         * this panel's tick list is rendered from `MATRIX_CELLS` (line 104), never retyped, which
+         * is the seam `benchmark/matrixCells.ts` exists to keep open.
+         */
+        'The cells are the eight operating points this project measures — building × traffic ' +
+          'pattern, over five buildings — not the eight buildings. Each cell reports with the ' +
+          'same rules as a single batch: an ' +
           'interval that includes zero is “not resolved”, a suppressed mean shows its reason, and ' +
           'below 50 replications no winner is named.',
         'figure-observation',

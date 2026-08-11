@@ -12,7 +12,12 @@
 import { isReplicationMetric } from '@elevator-sim/experiments/browser';
 import { describe, expect, it } from 'vitest';
 
-import { batchReport, type BatchComparisonRow, type BatchReport } from './report.js';
+import {
+  batchReport,
+  populationLineOf,
+  type BatchComparisonRow,
+  type BatchReport,
+} from './report.js';
 import { fakeArm, fakeReplication, fakeResult } from './fixtures.test-helper.js';
 import {
   BATCH_METRICS,
@@ -619,5 +624,53 @@ describe('what a batch with no mean can still say', () => {
      * Office at its own demand — 50 of 50 saturated either way, and nothing to choose between them.
      */
     expect(summaryOf(batchReport(fakeResult({ delta: -3 }))).capacityFinding).toBeNull();
+  });
+});
+
+/**
+ * The population line, said in words — `docs/20` defect 9.
+ *
+ * The load-bearing assertion is the third one. A humaniser that *selected* fields would read
+ * better and would quietly break {@link BatchReport.traceKey}'s promise that this line carries
+ * every field of the demand block, which `demandClause` points a reader at in as many words. So
+ * the test drives a key carrying a field the table has never heard of and requires it through.
+ */
+describe('populationLineOf', () => {
+  const KEY =
+    '{"arrivalRatePctPop5min":2,"building":"garden-apartments","durationS":3600,"peakWindowS":300}';
+
+  it('says every field in words, with no braces, quotes or colons left in it', () => {
+    const line = populationLineOf(KEY);
+    expect(line).toContain('garden-apartments');
+    expect(line).toContain('2 % of population arriving per 5 minutes');
+    expect(line).toContain('3600 seconds of demand');
+    expect(line).toContain('300 second peak window');
+    for (const glyph of ['{', '}', '"', ':']) expect(line).not.toContain(glyph);
+  });
+
+  it('substitutes the building’s display name when the caller has one', () => {
+    const named = populationLineOf(KEY, { buildingName: 'Garden Apartments' });
+    expect(named).toContain('Garden Apartments');
+    expect(named).not.toContain('garden-apartments');
+  });
+
+  it('carries a field it has no words for rather than dropping it', () => {
+    /*
+     * A field added to `traceKeyOf` must appear on this line the day it is added, not the day
+     * somebody widens a table. `somethingNewS` stands in for that field.
+     */
+    expect(populationLineOf('{"building":"b","somethingNewS":42}')).toContain('42 something new s');
+  });
+
+  it('renders a nested block as words rather than as JSON', () => {
+    const line = populationLineOf('{"directionalSplit":{"incoming":1,"interfloor":0,"outgoing":0}}');
+    expect(line).toContain('incoming 1');
+    expect(line).toContain('outgoing 0');
+    expect(line).not.toContain('{');
+  });
+
+  it('returns a key it cannot parse verbatim, because provenance may not be swallowed', () => {
+    expect(populationLineOf('not json at all')).toBe('not json at all');
+    expect(populationLineOf('[1,2]')).toBe('[1,2]');
   });
 });

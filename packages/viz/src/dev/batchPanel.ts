@@ -53,7 +53,12 @@ import type { DemandLevel } from '@elevator-sim/core/browser';
 
 import type { BatchRequest, BatchWorkerMessage, BatchWorkerRequest } from '../batch/types.js';
 import { intervalPlotFor, type IntervalPlot } from '../batch/intervalPlot.js';
-import { batchReport, type BatchComparisonRow, type BatchReport } from '../batch/report.js';
+import {
+  batchReport,
+  populationLineOf,
+  type BatchComparisonRow,
+  type BatchReport,
+} from '../batch/report.js';
 import type { GlossaryTerm } from '../mode/glossary.js';
 import { goalReport, type GoalReport, type GoalReportRow } from '../scenario/goalReport.js';
 import type { BrowserResources } from './data.js';
@@ -680,16 +685,21 @@ export function mountBatchPanel(options: BatchPanelOptions): BatchPanelHandle {
         'figure-observation',
       ),
     );
-    ui.output.append(
-      row(
-        'common random numbers',
-        report.crnSentence,
-        // The equivalence class, verbatim. Seed plus this is what reproduces the batch elsewhere,
-        // and it is the half the seed field does not carry.
-        `Every arm ran this population: ${report.traceKey}`,
-        'figure-observation',
-      ),
+    /*
+     * The equivalence class. Seed plus this is what reproduces the batch elsewhere, and it is the
+     * half the seed field does not carry — so it is **kept**, on the row's `title`, while the
+     * sentence a reader gets is `populationLineOf`'s rendering of the same key (`docs/20` defect 9).
+     * Drawn the same way on all three panels that publish this line, because two spellings of one
+     * provenance string is the defect this repository closes most often.
+     */
+    const crnRow = row(
+      'common random numbers',
+      report.crnSentence,
+      `Every arm ran this population: ${populationLineOf(report.traceKey, { buildingName: report.buildingName })}.`,
+      'figure-observation',
     );
+    crnRow.title = report.traceKey;
+    ui.output.append(crnRow);
     if (report.budgetNote !== null) {
       ui.output.append(row('replication budget', report.budgetNote, undefined, 'figure-warning'));
     }

@@ -230,6 +230,36 @@ export const wholeRunDriverDrawnEarly: TextFault = (texts) =>
   );
 
 /**
+ * R6 a third time — **a refusal that dates itself to a day that has not finished.**
+ *
+ * `docs/20` defect 3, and the fault the narrowing owes. R6's `role === 'reason'` exemption used to
+ * be total, on the argument *"a refusal is the absence of a claim"*, and the RIGHT NOW panel spent
+ * a wave publishing **`NO AVERAGE — A RESULT`** and *"That is a result, not a gap"* at 14 % of
+ * playback under a label reading *average wait so far*. Nothing there is a figure, so the textual
+ * half could never see it; the structural half returned before it read the basis; and the whole
+ * class of numberless early verdicts sat outside the property built to catch early verdicts.
+ *
+ * The exemption is now half what it was — refusals are exempt from the **textual** check only — and
+ * this is what that narrowing must catch. It stamps `'whole-run'` onto the first early refusal,
+ * which is exactly what a regression in `mode/disclosure.ts#casualRefusalFor` would produce: the
+ * words come back and the declaration comes back with them.
+ *
+ * Deliberately **not** a wording fault. It changes no string, so a check that read the refusal's
+ * text — grepping for *A RESULT*, say — would not see it, which is the property that makes this
+ * the structural half's fault rather than a second copy of the one above with a different role.
+ */
+export const wholeRunRefusalDrawnEarly: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.playhead !== undefined && text.playhead.atS < text.playhead.endedAt && text.role === 'reason',
+    /* c8 ignore next -- the predicate above already established `playhead` is defined. */
+    (text) =>
+      text.playhead === undefined
+        ? text
+        : { ...text, playhead: { ...text.playhead, basis: 'whole-run' as const } },
+  );
+
+/**
  * R6 again, textually only — **the sentence § D293 was written about, verbatim.**
  *
  * > `All 34 people got where they were going`
@@ -341,8 +371,14 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
     ],
     'energy-wait-blend': [{ name: 'energyScore', fault: energyScore }],
     'goal-without-rate': [{ name: 'goalWithoutRate', fault: goalWithoutRate }],
+    /*
+     * Three, and the third is the one `docs/20` defect 3 owes: R6's `role === 'reason'` exemption
+     * was narrowed from both halves to the textual half alone, and a narrowing with nothing it must
+     * still catch is a narrowing nobody is running. `wholeRunRefusalDrawnEarly` is that something.
+     */
     'whole-run-figure-early': [
       { name: 'wholeRunDriverDrawnEarly', fault: wholeRunDriverDrawnEarly },
+      { name: 'wholeRunRefusalDrawnEarly', fault: wholeRunRefusalDrawnEarly },
       { name: 'wholeRunCountInProse', fault: wholeRunCountInProse },
     ],
     /*

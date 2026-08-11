@@ -637,13 +637,32 @@ describe('the press really moves the run, and the strip really reports it — §
   /**
    * Midtown Office, because it is the arm where the sheet has something to say.
    *
-   * Garden Apartments is the suite's default and is used below for the opposite case: at 900 s it
-   * carries five people and **prints every figure identically under both dispatchers** while the
-   * legs are entirely different. Both cases are real and both are asserted; pinning only the busy
-   * one would leave the quiet one to be discovered by a player.
+   * Garden Apartments is the suite's default and is used below for the opposite case — a pair of
+   * sheets whose eight cells coincide, where the strip owes the identity row and nothing else.
+   *
+   * ## The quiet case used to be a *different* one, and `docs/20` defect 5 took it away
+   *
+   * It read: *"at 900 s it carries five people and prints every figure identically under both
+   * dispatchers while the legs are entirely different"*. That was true, and it was true **because
+   * the sheet was reading the wrong five minutes**: the shift path set no `reportWindow`, so Garden
+   * was measured over the demand template's fixed band — which on this building holds 0 to 25 of a
+   * day's arrivals — and the band was blunt enough to print two genuinely different days to the
+   * same digits.
+   *
+   * With `shift/reportWindow.ts` giving Garden the full-run window the matrix already measured for
+   * it, that stops being available: swept over 40 seeds and seven shift lengths, **no**
+   * (seed, length) on this building now produces different legs and identical cells. The sheet can
+   * see the difference it was blind to, which is the fix working rather than a test going stale.
+   *
+   * So the quiet case is now the *other* honest one, and it is the one that still exists at 600 s:
+   * two dispatchers that produced the **same day**. It exercises the same property — the strip must
+   * not manufacture a reading, and must not collapse *same numbers* into *same run* — on a pairing
+   * a player can actually reach.
    */
   const BUSY = 'midtown-office';
   const QUIET = 'garden-apartments';
+  /** Where `collective` and `nearest-car` land on the identical day. See the note above. */
+  const QUIET_SHIFT_LENGTH_S = 600;
 
   it('moves the legs, and moves what the strip prints — one press, both readings', () => {
     /*
@@ -672,32 +691,66 @@ describe('the press really moves the run, and the strip really reports it — §
     expect(strip.figures.length).toBeGreaterThan(1);
   });
 
-  it('reports no figure when no figure moved, on a run that was entirely different', () => {
+  it('reports no figure when no figure moved, and still does not call it the same run', () => {
     /*
-     * **The case that decides whether this strip is honest**, and it is not a hypothetical: Garden
-     * Apartments at 900 s carries five people, and `collective` and `nearest-car` produce completely
-     * different legs while printing the same eight cells to the same digits.
+     * **The case that decides whether this strip is honest**, and it is not a hypothetical: on
+     * Garden Apartments at 600 s the two dispatchers reach the same day, so every cell coincides
+     * while the *selection* has genuinely moved.
      *
      * What the strip owes there is the identity row and nothing else. A block that reached for
      * *something* to show — a sub-rounding difference, a percentage of a percentage — would be
      * manufacturing a reading out of a sheet that declined to make one, which is the failure mode
-     * this whole design is arranged against.
+     * this whole design is arranged against. The other half is the one a lazier block gets wrong in
+     * the opposite direction: identical numbers are **not** *the same run*, and saying so would be
+     * false about two different dispatchers.
+     *
+     * See the note on `QUIET` for the case this replaced and why `docs/20` defect 5 removed it.
      */
+    const base: ViewerState = {
+      ...baseState(),
+      buildingId: QUIET,
+      shiftLengthS: QUIET_SHIFT_LENGTH_S,
+    };
+    const collective = sheetOf(runOf({ ...base, dispatcherId: 'collective' }));
+    const nearestCar = sheetOf(runOf({ ...base, dispatcherId: 'nearest-car' }));
+
+    // The premise, asserted rather than assumed — this pairing is only interesting while the two
+    // arms really do coincide, and a shipped change that separated them must fail here loudly.
+    expect(nearestCar.figures.map((cell) => cell.value)).toEqual(
+      collective.figures.map((cell) => cell.value),
+    );
+
+    const strip = stripOf(collective, nearestCar);
+    expect(strip.figures).toEqual([]);
+    expect(strip.selection.map((row) => row.label)).toEqual(['BUILDING & DISPATCHER']);
+    expect(strip.note).toContain('Two runs are two runs');
+    expect(strip.note).not.toContain('Nothing moved');
+  });
+
+  /**
+   * The window is what made the old quiet case quiet — `docs/20` defect 5, and the standing
+   * requirement pointed at a window rather than at a slider.
+   *
+   * *Move the control and require the run to change, compared on the legs.* Here the "control" is
+   * the reporting window the shift path now sets, and the thing required to change is what the
+   * **sheet can see**: at 900 s the two dispatchers produce different legs, and the sheet must now
+   * report a difference where the template's band printed one set of digits for both. A regression
+   * that dropped `shiftReportWindowFor` would restore the blindness silently — every other test on
+   * this building would keep passing, because they assert what the sheet says rather than what it
+   * can distinguish.
+   */
+  it('lets the sheet see a dispatcher difference the template’s band hid', () => {
     const base: ViewerState = { ...baseState(), buildingId: QUIET };
     expect(legsOf({ ...base, dispatcherId: 'nearest-car' })).not.toBe(
       legsOf({ ...base, dispatcherId: 'collective' }),
     );
-    const [before, after] = pairOn(QUIET);
-    expect(after.figures.map((cell) => cell.value)).toEqual(before.figures.map((cell) => cell.value));
 
-    const strip = stripOf(before, after);
-    expect(strip.figures).toEqual([]);
-    expect(strip.selection.map((row) => row.label)).toEqual(['BUILDING & DISPATCHER']);
-    // And it does **not** claim the run reproduced. The selection moved, so the pairing note is the
-    // one that says two runs are two runs — not the *nothing moved, it is the same day* line, which
-    // would be false about two different dispatchers.
-    expect(strip.note).toContain('Two runs are two runs');
-    expect(strip.note).not.toContain('Nothing moved');
+    const [before, after] = pairOn(QUIET);
+    expect(before.figures.some((cell) => cell.id === 'average-wait')).toBe(true);
+    expect(after.figures.map((cell) => cell.value)).not.toEqual(
+      before.figures.map((cell) => cell.value),
+    );
+    expect(stripOf(before, after).figures.length).toBeGreaterThan(0);
   });
 
   it('quotes the two sheets rather than deriving anything from them', () => {

@@ -220,6 +220,7 @@ import type { SessionStore } from '../persist/types.js';
 import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
 import {
   allBuildingIds,
+  allDispatchers,
   buildingConfigOf,
   shiftDemandTemplateId,
   shiftSubmittedSelection,
@@ -350,11 +351,18 @@ export interface WaitLegendEntry {
   /**
    * The band's own boundary, for the entry's tooltip — `0–30 s`, `30–60 s`, `60–120 s`, `120 s+`.
    *
-   * It earns its place on the fourth entry. `WAIT_BANDS[3].legendLabel` is the handoff's word
-   * *gave up* (`:233`), and `bands.ts` is explicit that the band counts **people still standing**
-   * past two minutes rather than people who abandoned — that is `observationsAt(…).abandoned`, a
-   * different population on a different clock. A bare label could carry that ambiguity harmlessly;
-   * a label with a *count* on it is a figure, so the boundary goes beside it.
+   * It earns its place on the fourth entry, and it used to be the **only** thing holding that
+   * entry honest. `WAIT_BANDS[3].legendLabel` was the handoff's word *gave up* (`:233`), and
+   * `bands.ts` is explicit that the band counts **people still standing** past two minutes rather
+   * than people who abandoned — that is `observationsAt(…).abandoned`, a different population on a
+   * different clock. A bare label could carry that ambiguity harmlessly; a label with a *count* on
+   * it is a figure, so the boundary went beside it.
+   *
+   * `docs/20` defect 4 then measured what the tooltip could not reach: the *bar's* own labels sat
+   * beside the Day report's, six centimetres apart, under one phrase and with two different
+   * numbers. The rung now reads *past two minutes* and the band *eyeing the stairs*, so the words
+   * carry it too — and this stays, because a range is the thing a reader checks a count against and
+   * the fourth entry is still the one that most needs checking.
    *
    * **Two numbers and a unit, deliberately, rather than a sentence.** It restates a bound the band
    * already publishes, so it cannot be false unless `WAIT_BANDS` moves, in which case it moves
@@ -368,7 +376,8 @@ export interface WaitLegendEntry {
  * The legend's four entries, in ascending severity — the handoff `:230–233`.
  *
  * **Derived, never written.** Both halves of every entry already exist on `live/bands.ts`'s
- * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *gave up*, and `color`
+ * `WAIT_BANDS`: `legendLabel` is *under 30 s* / *a minute* / *two minutes* / *past two minutes*
+ * (`docs/20` defect 4 rejoined the fourth rung to that ladder), and `color`
  * is the same band palette the mood bar, the canvas and the report all read. Until this function
  * existed, `legendLabel` reached **no DOM anywhere** — four authored strings with no non-test
  * caller, which is the dead-seam shape this repository has closed eleven times — and the page drew
@@ -1171,14 +1180,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
     {
       /*
-       * 120 s: checking watch → taking the stairs, and the rung that stops blaming the cold start.
+       * 120 s: checking watch → eyeing the stairs, and the rung that stops blaming the cold start.
        * A sleeping container was measured at 32.2 s; four times that is not a cold start any more,
        * and going on saying *it is just waking up* would be a reassurance that had stopped being
        * true — which this repository has a standing rule about.
        */
       afterMs: 120_000,
       text:
-        'Two minutes — your mood bar’s last band, taking the stairs, where a tenant gives up. You ' +
+        'Two minutes — your mood bar’s last band, eyeing the stairs, where a tenant starts ' +
+        'looking for another way up. You ' +
         'do not have that option, and a cold start was measured at about half a minute, so this is ' +
         'no longer a sleeping server. Nothing you typed is lost.',
     },
@@ -5001,6 +5011,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * The stage — § 1.3 M3
    * ---------------------------------------------------------------------- */
 
+  /**
+   * The name a reader knows this recording's dispatcher by — `GAMEPLAY_AND_NAVIGATION.md` § 16 rule 11, and
+   * `docs/20` defect 9.
+   *
+   * ## Why it is not `profileById`
+   *
+   * `dev/state.ts#profileById` **substitutes the first shipped profile** for an id it cannot
+   * resolve, which is the right answer for *which dispatcher does the reader's state select* (a
+   * selector must select something) and the wrong one for *what did this recording run*: a run
+   * loaded from a file naming a profile this build does not ship would be captioned `Nearest car`,
+   * which is a false statement about the picture rather than a missing one. So the lookup is by
+   * exact id and the fallback is the recording's own string — the same fallback
+   * `shift/report.ts#dayReportOf` takes, so the stage and the sheet degrade to one word rather than
+   * to two.
+   *
+   * Read from `state.savedDispatchers` at call time rather than captured, because the reader can
+   * save a profile — and rename one — while a recording is on screen.
+   */
+  function dispatcherNameOf(recording: VizRecording): string {
+    const found = allDispatchers(resources, state.savedDispatchers).find(
+      (profile) => profile.id === recording.dispatcherProfileId,
+    );
+    return found?.name ?? recording.dispatcherProfileId;
+  }
+
   function drawStage(): void {
     const recording = state.recording;
     const canvas = ui.stage.canvas;
@@ -5063,6 +5098,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
       theme: stageTheme,
       recording,
       frame,
+      dispatcherName: dispatcherNameOf(recording),
       layout,
       overlay: wantsOverlay ? overlay : undefined,
       selection: selectionFor(assignments),
@@ -5095,7 +5131,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       setText(ui.stage.alarmText, `${String(alarm.waiting)} people stacked up at ${alarm.label}`);
       setText(ui.stage.alarmSub, 'a car is on its way — or add one under Building');
     }
-    canvas.setAttribute('aria-label', describeFrame({ recording, frame }));
+    canvas.setAttribute(
+      'aria-label',
+      describeFrame({ recording, frame, dispatcherName: dispatcherNameOf(recording) }),
+    );
   }
 
   function selectionFor(assignments: readonly LandingAssignment[]): SceneSelection | undefined {
@@ -5153,7 +5192,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
   function announce(): void {
     const recording = state.recording;
     if (recording === undefined || playback === undefined) return;
-    setText(ui.stage.description, describeFrame({ recording, frame: playback.frame() }));
+    setText(
+      ui.stage.description,
+      describeFrame({
+        recording,
+        frame: playback.frame(),
+        dispatcherName: dispatcherNameOf(recording),
+      }),
+    );
   }
 
   /* ---------------------------------------------------------------------- *

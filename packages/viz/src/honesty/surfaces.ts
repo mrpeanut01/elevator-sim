@@ -45,7 +45,7 @@ import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONA
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
-import { batchReport, type BatchReport } from '../batch/report.js';
+import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
@@ -60,7 +60,7 @@ import { applyControlEdit, controlsFor, defaultValues, resetControl } from '../c
 import { admitEditedVector, resolveEditedProfile, type EditedVector } from '../controls/editedProfile.js';
 import type { ControlValues } from '../controls/types.js';
 import { renderControls, renderUnsearchable, type ControlNode } from '../controls/render.js';
-import { disclosureItems } from '../mode/disclosure.js';
+import { casualRefusalFor, disclosureItems } from '../mode/disclosure.js';
 import { GLOSSARY_TERMS, glossaryFor } from '../mode/glossary.js';
 import { parityRefusal, parityViolations } from '../mode/parity.js';
 import { SIGNED_OUT, formIssues, postingRefusal, signedIn, updateForm } from '../menu/account.js';
@@ -112,7 +112,7 @@ import { watchingStrings, watchingViewOf } from '../watch/view.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
-import { describeFrame } from '../render/describeFrame.js';
+import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { drawOverlay } from '../render/overlay.js';
@@ -572,6 +572,26 @@ function railBasisAt(recording: VizRecording, at: number): WaitBandBasis {
   return shiftIsOver(recording, at) ? 'whole-run' : 'now';
 }
 
+/**
+ * The dispatcher's display name, resolved exactly as the shell resolves it — `docs/20` defect 9.
+ *
+ * `dev/main.ts#dispatcherNameOf` is the lookup: exact id against the loaded profiles, falling back
+ * to the recording's own string. It is spelled again here rather than imported because
+ * `honesty/` may not import `dev/main.ts` (it mounts a page), and it is the *lookup* that is
+ * duplicated rather than a wording — the string this produces is a profile's authored `name`, from
+ * `data/dispatcher-profiles.json`, which is the same file both readers consult.
+ *
+ * Driving the canvas and the frame description **without** it would sweep the arm no player sees:
+ * the id is the fallback, and a corpus that only ever exercises a fallback measures the surface a
+ * probe gets rather than the one a reader gets.
+ */
+function dispatcherNameOf(context: HonestyContext): string {
+  const found = context.dispatcherProfiles.profiles.find(
+    (profile) => profile.id === context.recording.dispatcherProfileId,
+  );
+  return found?.name ?? context.recording.dispatcherProfileId;
+}
+
 function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly RenderedText[] {
   return seeds
     .filter((seed) => seed.text.trim() !== '')
@@ -741,7 +761,15 @@ function countOf(count: string): number | null {
 
 const DESCRIBE_FRAME: SurfaceAdapter = {
   id: 'render/describeFrame.ts#describeFrame',
-  covers: ['render/describeFrame.ts#describeFrame'],
+  covers: [
+    'render/describeFrame.ts#describeFrame',
+    /*
+     * The paragraph's refusal clause — `docs/20` defect 3. `describeFrame` is its only non-test
+     * caller and it is seeded again below under its own field, because a clause folded into a
+     * paragraph carries no basis and R6's structural half reads nothing else.
+     */
+    'render/describeFrame.ts#suppressionSentenceOf',
+  ],
   render(context) {
     const seeds: TextSeed[] = [];
     for (const at of sampleTimes(context.recording)) {
@@ -756,6 +784,8 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
           lockedOutLandings: bundle.lockedOut,
           queues: bundle.queues,
           mood: bundle.mood,
+          // The name a player reads, not the id a probe would default to. See `dispatcherNameOf`.
+          dispatcherName: dispatcherNameOf(context),
         }),
         role: 'prose',
         /*
@@ -766,6 +796,28 @@ const DESCRIBE_FRAME: SurfaceAdapter = {
          */
         playhead: atPlayhead(context.recording, at),
       });
+      /*
+       * **The refusal clause, on the temporal axis with its own basis** — `docs/20` defect 3.
+       *
+       * Seeded separately from the paragraph above, and that is what makes it reachable: R6's
+       * structural half reads a declaration, R6's textual half reads a numeral, and this clause has
+       * a declaration and no numeral. Folded into the paragraph it was a `role: 'prose'` string with
+       * no basis, which is exactly how *"Queue length rose by 128.7 persons … the system is
+       * saturated"* travelled the corpus unremarked at 14 % of every case.
+       *
+       * `suppressionSentenceOf` is the **product's** function and returns both halves together, so
+       * the adapter declares what the product declares rather than deciding a window here — the
+       * `railBasisAt` rule, applied to a sentence instead of a card.
+       */
+      const suppression = suppressionSentenceOf(context.recording, bundle.frame);
+      if (suppression !== undefined) {
+        seeds.push({
+          field: `describeFrame(@${at.toFixed(0)}s).suppression`,
+          text: suppression.text,
+          role: 'reason',
+          playhead: atPlayhead(context.recording, at, suppression.basis),
+        });
+      }
     }
     return singleRun(this.id, seeds);
   },
@@ -783,7 +835,15 @@ const OVERLAY: SurfaceAdapter = {
           field: `overlayAt(@${at.toFixed(0)}s).suppressionReason`,
           text: metrics.suppressionReason,
           role: 'reason',
-          playhead: atPlayhead(context.recording, at),
+          /*
+           * The **producer's** field, declared with the producer's own basis. It is `core`'s
+           * whole-run sentence and it is carried on every `OverlayMetrics`, so it is `'whole-run'`
+           * only where `overlayAt` says the playhead has earned it — which is never early, which is
+           * correct: `frame/overlay.ts` is not a surface, and whether this string reaches a reader
+           * early is `render/overlay.ts`'s decision. That decision is swept below, where the panel
+           * is driven.
+           */
+          playhead: atPlayhead(context.recording, at, metrics.suppressionBasis),
         });
       }
       /*
@@ -840,6 +900,16 @@ const CANVAS: SurfaceAdapter = {
     'mode/disclosure.ts#suppressionBannerFor',
     'mode/disclosure.ts#NO_AVERAGE_LEAD',
     /*
+     * The panel's refusal, in both registers — `docs/20` defect 3. `drawOverlay` is their only
+     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
+     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
+     * PENDING` is the engineer's arm of the same gate, drawn by the same function.
+     */
+    'mode/disclosure.ts#casualRefusalFor',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
+    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
+    /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
      *
@@ -895,6 +965,8 @@ const CANVAS: SurfaceAdapter = {
         drawScene(ctx, {
           recording,
           frame: bundle.frame,
+          // See `dispatcherNameOf` — the subtitle a player reads is the profile's name.
+          dispatcherName: dispatcherNameOf(context),
           layout,
           overlay: bundle.metrics,
           ...(selection === undefined ? {} : { selection }),
@@ -951,6 +1023,38 @@ const CANVAS: SurfaceAdapter = {
             playhead: atPlayhead(recording, at),
           });
         }
+      }
+      /*
+       * **The RIGHT NOW panel's refusal, with the window it folds** — `docs/20` defect 3.
+       *
+       * The loop above captures every string the panel draws and can declare a basis for **none** of
+       * them: a text-capturing context returns an array, and per-string provenance is precisely what
+       * it throws away. So the refusal is seeded again, from the shipped function that words it, with
+       * the basis that function returns.
+       *
+       * That is not a duplicate reading of the same thing. The loop asks *what did the panel draw*;
+       * this asks *what did the panel claim about which window*, which is the question R6's
+       * structural half is. Until it was asked, `NO AVERAGE — A RESULT` and *"That is a result, not
+       * a gap"* were `role: 'prose'` strings with no numeral and no declaration — invisible to both
+       * halves of the property that exists to catch exactly them.
+       *
+       * Seeded only where the panel actually draws it (`metrics.suppressed`), because a refusal the
+       * surface does not show is a string the corpus should not contain.
+       */
+      if (bundle.metrics.suppressed) {
+        const refusal = casualRefusalFor(bundle.metrics.suppressionBasis === 'whole-run');
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.head`,
+          text: refusal.heads[0] ?? '',
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
+        seeds.push({
+          field: `drawOverlay(@${at.toFixed(0)}s).refusal.reason`,
+          text: refusal.reason,
+          role: 'reason',
+          playhead: atPlayhead(recording, at, refusal.basis),
+        });
       }
       if (selection !== undefined) {
         seeds.push({
@@ -1622,12 +1726,39 @@ function batchText(surfaceId: string, seeds: readonly (TextSeed & { readonly com
 
 const BATCH_REPORT: SurfaceAdapter = {
   id: 'batch/report.ts#batchReport',
-  covers: ['batch/report.ts#batchReport', 'batch/types.ts#BATCH_METRIC_PRESENTATION'],
+  covers: [
+    'batch/report.ts#batchReport',
+    /*
+     * The population line, in words — `docs/20` defect 9. Covered here rather than in an adapter of
+     * its own because it is a *projection of this report*: its whole input is
+     * {@link BatchReport.traceKey}, three panels draw it directly under `crnSentence`, and seeding
+     * it beside that sentence is what puts the two on one surface the way a reader meets them.
+     *
+     * `TRACE_KEY_WORDS`, `spacedKey` and `traceValueWords` — the table, the fallback spelling and
+     * the value renderer — are **not** listed: they are module-private, so the derivation does not
+     * find them and a `covers` entry for them would be a coverage claim for nothing. They are swept
+     * all the same, because every string they hold reaches the corpus through the call below.
+     */
+    'batch/report.ts#populationLineOf',
+    'batch/types.ts#BATCH_METRIC_PRESENTATION',
+  ],
   render(context) {
     const report = context.report;
     const seeds: (TextSeed & { comparison?: RenderedText['comparison'] })[] = [
       { field: 'demandClause', text: report.demandClause, role: 'label' },
       { field: 'crnSentence', text: report.crnSentence, role: 'prose' },
+      /*
+       * Seeded as the panels draw it — the lead-in included, because that is the sentence a reader
+       * meets and the numerals in the rendered key sit inside it. Drawn with the building name, the
+       * arm the product takes wherever it has one.
+       */
+      {
+        field: 'populationLine',
+        text: `Every arm ran this population: ${populationLineOf(report.traceKey, {
+          buildingName: report.buildingName,
+        })}.`,
+        role: 'observation',
+      },
     ];
     if (report.budgetNote !== null) {
       seeds.push({ field: 'budgetNote', text: report.budgetNote, role: 'reason' });

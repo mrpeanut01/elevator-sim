@@ -108,13 +108,36 @@ export function spendOf(entry: FixitCase, state: FixitState): FixitSpend {
   };
 }
 
-/** § 10.3's running total note — one of three, decided by what the spend actually is. */
+/**
+ * § 10.3's running total note — one of **four**, decided by what the spend actually is.
+ *
+ * ## The free arm is keyed on spend, not on machinery spend — `docs/20` defect 8
+ *
+ * It used to be three, and the last was reached whenever `machineryUnits === 0`. So the panel drew
+ * *"11 of 12 u committed, 0 u of it machinery — **Everything you changed is a setting, and settings
+ * are free**"*: eleven of twelve units committed, on the same line, under a sentence saying nothing
+ * had been spent. The two repairs that produced it are priced 5 u and 6 u and are neither machinery
+ * nor free.
+ *
+ * The confusion is between two different questions the panel asks at once — *what did this cost?*
+ * and *did you buy steel or move a setting?* — and the old third branch answered the second while
+ * being read as the first. A player deciding whether they can still afford the shaft they want is
+ * reading it as the first.
+ *
+ * So *free* now means **nothing was committed**, which is the only reading of the word that a
+ * running total can support, and a spend with no machinery in it gets its own line rather than
+ * borrowing the free one. The machinery branch is unchanged, and the over-budget branch still
+ * outranks everything: an over-budget total is the only state the owner acts on.
+ */
 export function budgetNoteOf(entry: FixitCase, spend: FixitSpend): string {
   if (spend.totalUnits > entry.budgetUnits) {
     return 'Over the budget, and this is where the owner stops reading and asks what you can do without buying anything.';
   }
   if (spend.machineryUnits > 0) {
     return 'You are buying machinery — compare it against the free change first.';
+  }
+  if (spend.totalUnits > 0) {
+    return 'No machinery in that, and none of it free either — committed budget is committed, whatever it buys.';
   }
   return 'Everything you changed is a setting, and settings are free.';
 }
@@ -231,9 +254,41 @@ export interface FixitOutcome {
  * Classify the pair into § 10.4's four outcomes and word the three rows.
  *
  * Budget first: an over-budget spec was refused by the owner before anything ran, and the copy
- * says so. Then the complaint, then the rest — a run that fixed nothing *and* hurt the rest is
- * *"Better, and the complaint still stands"* only when it is actually better, so the not-enough
- * arm is the fall-through rather than a claim.
+ * says so. Then the complaint, then the rest.
+ *
+ * ## *Better* requires a measurement — `docs/20` defect 8
+ *
+ * The paragraph above used to end *"a run that fixed nothing and hurt the rest is 'Better, and the
+ * complaint still stands' only when it is actually better, so the not-enough arm is the fall-through
+ * rather than a claim"*, and the code did the opposite of what its own docstring claimed: the head
+ * was the **unconditional** fall-through. The audit bought two repairs the product itself describes
+ * as doing nothing (*"Nothing here is broken"*, *"The letter is not the works"*), ran, and read
+ * **"Better, and the complaint still stands."** above a row reading *9 waits → 9 waits · **0 %** of
+ * it went away*.
+ *
+ * That is the shape this repository names most often — a sentence that stopped describing the thing
+ * under it — and it is the worst version of it, because the word being asserted is the one the whole
+ * screen exists to earn. A player who is told *better* by a screen showing 0 % learns that the
+ * verdict line is decoration.
+ *
+ * So the fall-through splits on {@link FixitMeasurement.complaintGonePct}, which is the measurement
+ * the row beside the head already publishes:
+ *
+ * | the run | head |
+ * |---|---|
+ * | some of the complaint went away, short of the bar | *Better, and the complaint still stands.* |
+ * | none of it did, or the run showed none to remove | *No change, and the complaint still stands.* |
+ *
+ * The threshold is **greater than zero**, not a second bar: § 9's `COMPLAINT_GONE_PCT` is what
+ * decides *fixed*, and inventing a *slightly better* bar here would be a third threshold nobody
+ * argued. `null` — the run showed none of the complaint — takes the no-change arm, because a
+ * complaint that was never there cannot have been improved; the row already says *"this run shows
+ * none of it, so there is nothing to remove"* and the head now agrees with it.
+ *
+ * `kind` stays `not-enough` for both. It is the outcome's *class* — the repair did not clear the
+ * bar — and both arms are that; splitting the kind would make every consumer branch on a
+ * distinction only the copy draws. The head is what a reader reads, and it is the head that was
+ * lying.
  */
 export function classifyOutcome(
   entry: FixitCase,
@@ -254,7 +309,13 @@ export function classifyOutcome(
     };
   }
   if (complaintRow.passed && restRow.passed) {
-    return { kind: 'fixed', head: entry.result.head, body: entry.result.body, rows, basis: BASIS_LINE };
+    return {
+      kind: 'fixed',
+      head: entry.result.head,
+      body: `${entry.result.body}${spentAnywayClause(entry, spend)}`,
+      rows,
+      basis: BASIS_LINE,
+    };
   }
   if (complaintRow.passed) {
     return {
@@ -267,13 +328,58 @@ export function classifyOutcome(
       basis: BASIS_LINE,
     };
   }
+  // *Better* is a claim about the measurement in the row above it. See the docstring.
+  const improved = measurement.complaintGonePct !== null && measurement.complaintGonePct > 0;
   return {
     kind: 'not-enough',
-    head: 'Better, and the complaint still stands.',
-    body: 'Change something else and run it again.',
+    head: improved
+      ? 'Better, and the complaint still stands.'
+      : 'No change, and the complaint still stands.',
+    body: improved
+      ? 'Change something else and run it again.'
+      : 'Nothing you changed reached the thing the letter is about. Change something else and run ' +
+        'it again.',
     rows,
     basis: BASIS_LINE,
   };
+}
+
+/**
+ * What the authored *fixed* copy cannot know: that the player bought things anyway — `docs/20`
+ * defect 8.
+ *
+ * ## The sentence this exists to stop being false
+ *
+ * Two of the shipped cases end their result body with a punchline about the fix having been free:
+ * *"**Nothing was bought**: the cars were always enough — they were parked in the wrong place."*
+ * That is the best moment in the product and it is true **of the repair**. It is not true of the
+ * order: the audit reached it having also ticked 11 u of repairs that changed nothing, and read the
+ * punchline directly above a Spent row saying `budget 12 u → 11 u`.
+ *
+ * ## Why a clause after it rather than an edit to it
+ *
+ * The body is authored in `data/fixit-cases.json`, per case, in the tenant's voice, and the claim
+ * takes a different form in each (*"Nothing was bought — the third car was never the problem"*).
+ * Rewriting arbitrary prose from here is not available, and CLAUDE.md invariant 7 puts the copy in
+ * `data/` deliberately. What is available is to say the fact the authored sentence is silent about,
+ * derived from the spend the same panel is drawing, and to say it **as a correction** so the two
+ * sentences read as one statement rather than as a contradiction — *the fix was free; your order was
+ * not* is coherent, *nothing was bought / 11 u committed* is not.
+ *
+ * Empty at zero spend, which is the case the authored punchline was written for and the case the
+ * audit's own best moment was: nothing is appended, and the copy comes back byte-identical to what
+ * it has always been. So a case whose player bought nothing cannot tell this function exists.
+ */
+function spentAnywayClause(entry: FixitCase, spend: FixitSpend): string {
+  if (spend.totalUnits <= 0) return '';
+  const machinery =
+    spend.machineryUnits > 0
+      ? `, ${String(spend.machineryUnits)} u of it machinery`
+      : ', none of it machinery';
+  return (
+    ` That is about the repair, not about your order: you committed ${String(spend.totalUnits)} of ` +
+    `${String(entry.budgetUnits)} u${machinery}, and this run does not say what any of it bought.`
+  );
 }
 
 function rowsOf(
