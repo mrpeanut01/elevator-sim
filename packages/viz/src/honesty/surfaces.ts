@@ -169,7 +169,7 @@ import {
   leverRowsOf,
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
-import { plainLeverHelp, plainLeverSub, plainLeversOf } from '../mode/plainLevers.js';
+import { plainLeverEchoOf, plainLeverHelp, plainLeverSub, plainLeversOf } from '../mode/plainLevers.js';
 import {
   goalRowsOf,
   historyBarsOf,
@@ -4268,6 +4268,7 @@ const EDITOR_PANELS: SurfaceAdapter = {
     'mode/plainLevers.ts#plainLeversOf',
     'mode/plainLevers.ts#plainLeverSub',
     'mode/plainLevers.ts#plainLeverHelp',
+    'mode/plainLevers.ts#plainLeverEchoOf',
     'dev/machinesEditor.ts#machineRowsOf',
     'dev/machinesEditor.ts#machineFieldOf',
     'dev/machinesEditor.ts#formatMachineValue',
@@ -4670,6 +4671,9 @@ const EDITOR_PANELS: SurfaceAdapter = {
       seeds.push({ field: `plainLeversOf.${lever.id}.label`, text: lever.label, role: 'label' });
       seeds.push({ field: `plainLeversOf.${lever.id}.sub`, text: plainLeverSub(lever), role: 'prose' });
       seeds.push({ field: `plainLeversOf.${lever.id}.help`, text: plainLeverHelp(lever), role: 'prose' });
+      // The moved-lever echo (docs/19 defect 5) — the same composition the editor draws after a
+      // pull, over the same view, so the acknowledgement a player reads is what is swept.
+      seeds.push({ field: `plainLeverEchoOf.${lever.id}`, text: plainLeverEchoOf(lever), role: 'prose' });
     }
 
     return singleRun(this.id, seeds);
@@ -4974,6 +4978,7 @@ const MENU: SurfaceAdapter = {
       readonly refusal: string | undefined;
       readonly viewMode?: 'basic' | 'advanced';
       readonly firstVisit?: boolean;
+      readonly everLeftTheMenu?: boolean;
     }[] = [
       { label: 'whole', selection: whole, canPost: true, hasRun: true, refusal: undefined },
       { label: 'broken', selection: broken, canPost: false, hasRun: false, refusal: undefined },
@@ -4999,6 +5004,9 @@ const MENU: SurfaceAdapter = {
         hasRun: true,
         refusal: undefined,
         firstVisit: true,
+        // The state a genuinely first load is in: the menu has never been dismissed, so Resume's
+        // first-sitting wording (docs/19's copy nit) is what this arm sweeps.
+        everLeftTheMenu: false,
       },
     ];
     /*
@@ -5083,6 +5091,7 @@ const MENU: SurfaceAdapter = {
           ...(arm.refusal === undefined ? {} : { rankingRefusal: arm.refusal }),
           ...(arm.viewMode === undefined ? {} : { viewMode: arm.viewMode }),
           ...(arm.firstVisit === undefined ? {} : { firstVisit: arm.firstVisit }),
+          ...(arm.everLeftTheMenu === undefined ? {} : { everLeftTheMenu: arm.everLeftTheMenu }),
           boards: [{ configHash: 'abcdef0123456789', entries: 3 }],
           challenge: challengeInput,
         });

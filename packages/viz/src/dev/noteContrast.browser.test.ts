@@ -87,14 +87,18 @@ const AA_BODY = 4.5;
 
 /**
  * How many `.advice` / `.rail-prose` paragraphs a booted page holds: `index.html`'s six, the
- * nine § D309's mounts insert, plus the two slice 6a's sizing block adds — its standing note at
+ * nine § D309's mounts insert, the two slice 6a's sizing block adds — its standing note at
  * construction and the booted building's single bank reading at first render (a building with
  * more banks draws one reading per bank, so this pin is a fact about the *booted* page, not a
- * ceiling). Pinned rather than bounded below, because the count is the number
- * `noteContrast.test.ts` derives from the sources independently, and the two agreeing is the
- * evidence that neither is looking at half the page.
+ * ceiling) — plus the plain-lever echo `docs/19` defect 5 added (`dispatcherEditor.ts`'s
+ * `plainEcho`, an `.advice` built at mount and hidden until a lever moves; hidden nodes are in
+ * the sweep, which is right — a note's ink must clear AA before the press that reveals it).
+ * Pinned rather than bounded below, because the count is the number `noteContrast.test.ts`
+ * derives from the sources independently — the echo is a child of the mount's own node, which
+ * that tier's recorder cannot resolve and its own prose names as this tier's to reach — and the
+ * two agreeing on the shared sites is the evidence that neither is looking at half the page.
  */
-const NOTES_ON_THE_PAGE = 17;
+const NOTES_ON_THE_PAGE = 18;
 
 /** One paragraph as the browser resolved it. */
 interface Measured {

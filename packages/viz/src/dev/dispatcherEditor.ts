@@ -78,6 +78,7 @@ import {
 
 import {
   applyPlainLever,
+  plainLeverEchoOf,
   plainLeverHelp,
   plainLeverSub,
   plainLeversOf,
@@ -1045,6 +1046,23 @@ export function mountDispatcherEditor(
    */
   const plainSliderRows = new Map<PlainLeverId, SliderHandles>();
   const plainSlots = new Map<PlainLeverId, HTMLElement>();
+  /** The four lever rows' own container, so the echo and cost line below stay below. */
+  const plainSlotsBox = el(doc, 'div');
+  /*
+   * The acknowledgement pair — `docs/19` defect 5, and the audit's *surface the lever's
+   * consequence where the eye is*. At 1280 the thirteen terms — and `#dispatcher-summary`'s cost
+   * line, *"the best feedback in the editor"* — are below the fold, so a moved lever changed
+   * nothing visible. `plainEcho` names what the press just wrote (`plainLeverEchoOf`, derived
+   * from the current view each render so it cannot go stale); `plainCost` is **the same
+   * `costFunctionLine` call the summary makes** — one composition, drawn in a second place,
+   * never a second composition (`authoring/dispatcherSpec.ts#costFunctionLine` stays the only
+   * author of that expression).
+   */
+  const plainEcho = el(doc, 'p', {
+    className: 'advice',
+    style: { margin: '8px 0 0' },
+  });
+  const plainCost = el(doc, 'div', { className: 'summary-line', style: { 'margin-top': '6px' } });
   const plainBlock = el(doc, 'div', {
     style: { margin: '0 0 14px' },
     children: [
@@ -1060,6 +1078,9 @@ export function mountDispatcherEditor(
           'engineer’s own controls show, so the two can never disagree.',
         style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
       }),
+      plainSlotsBox,
+      plainEcho,
+      plainCost,
     ],
   });
 
@@ -1287,11 +1308,23 @@ export function mountDispatcherEditor(
 
   /* --- the four plain levers ---------------------------------------------- */
 
+  /**
+   * Which lever the reader last pulled, and on which draft — the echo's key, never its words.
+   *
+   * The words come from {@link plainLeverEchoOf} over the **current** view on every render, so
+   * the line cannot describe a value the state has since left; what is remembered is only *that*
+   * a lever was pulled and *which*. Keyed on `editingDispatcherId` so switching to another
+   * profile clears it — an echo about a draft no longer on screen would be the stale-confirmation
+   * defect {@link forgetConfirmation} exists for, one element down.
+   */
+  let pulledLever: { readonly id: PlainLeverId; readonly editingId: string } | undefined;
+
   /** Route a lever's new value through the model and into state, both documents at once. */
   function pullPlainLever(id: PlainLeverId, value: number | boolean): void {
     const at = view;
     if (at === undefined) return;
     const applied = applyPlainLever(at.state.dispatcherSpec, at.state.levers, id, value);
+    pulledLever = { id, editingId: at.state.editingDispatcherId };
     context.update({ dispatcherSpec: applied.spec, levers: applied.levers });
   }
 
@@ -1301,7 +1334,7 @@ export function mountDispatcherEditor(
       if (slot === undefined) {
         slot = el(doc, 'div');
         plainSlots.set(row.id, slot);
-        plainBlock.append(slot);
+        plainSlotsBox.append(slot);
       }
       const sub = plainLeverSub(row);
       const help = plainLeverHelp(row);
@@ -1440,7 +1473,21 @@ export function mountDispatcherEditor(
     setText(elements.yoursCount, `${String(yours)} of your own saved`);
     if (elements.name.value !== current.name) elements.name.value = current.name;
 
-    drawPlainLevers(plainLeversOf(current, state.levers));
+    const plainRows = plainLeversOf(current, state.levers);
+    drawPlainLevers(plainRows);
+    /*
+     * The acknowledgement pair — docs/19 defect 5. The echo is cleared when the draft under it
+     * changes (same rule as {@link forgetConfirmation}: a sentence about a document no longer on
+     * screen), and is otherwise re-derived from the current rows so it always states the value
+     * the lever now holds. The cost line is the summary's own call, verbatim.
+     */
+    if (pulledLever !== undefined && pulledLever.editingId !== state.editingDispatcherId) {
+      pulledLever = undefined;
+    }
+    const pulledRow = plainRows.find((row) => row.id === pulledLever?.id);
+    setText(plainEcho, pulledRow === undefined ? '' : plainLeverEchoOf(pulledRow));
+    setHidden(plainEcho, pulledRow === undefined);
+    setText(plainCost, costFunctionLine(current, (id) => shortTermNameOf(id, allIds)));
 
     const rows = termRowsOf(terms, current, inertTerms(current), state.mode);
     const weighted = rows.filter((row) => row.weighted).length;

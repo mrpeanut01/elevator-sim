@@ -441,7 +441,8 @@ export function servedTitleFor(thresholdS: number, servedCount: number): string 
       ? SERVED_TITLE
       : `Share of served calls whose hall wait was under ${thresholdS.toFixed(0)} s — this run's ` +
         'own long-wait threshold, rather than the conventional sixty.';
-  return `${base} Over ${String(servedCount)} served legs.`;
+  // `1 served leg` singular — docs/19 defect 8's `over 1 legs`, on this rail's copy of the idiom.
+  return `${base} Over ${String(servedCount)} served leg${servedCount === 1 ? '' : 's'}.`;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -479,7 +480,9 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
   return [
     {
       value: String(week.streak),
-      label: 'clean days running',
+      // `1 clean day running` singular — docs/19's copy nit. The label is read beside the value,
+      // so the value decides its number the same way `shift/tomorrow.ts#streakValue` does.
+      label: week.streak === 1 ? 'clean day running' : 'clean days running',
       color: week.streak > 0 ? GOOD : DIM,
     },
     { value: `${String(week.bestMinutePct)}%`, label: 'best day so far', color: undefined },

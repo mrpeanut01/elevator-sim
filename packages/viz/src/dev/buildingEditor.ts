@@ -2731,3 +2731,38 @@ function sourceBuildingOf(at: ViewAt): BuildingSpec {
   if (config === undefined) return { ...BLANK_SPEC, id: at.state.editingBuildingId };
   return specFromBuilding(config, at.state.editingBuildingId);
 }
+
+/**
+ * The patch that opens this editor **on the building that is on stage**, or `undefined` to leave
+ * the draft alone — `docs/19` defect 11.
+ *
+ * *Open building editor →* moved to this surface and did nothing else, on the stated ground that
+ * seeding would clobber an unsaved edit — sound for a **dirty** draft, and the audit concedes it.
+ * But with no draft at all the editor opened on whatever it last held (*EDITING — GARDEN
+ * APARTMENTS* over a Midtown stage), which reads as a bug and sends the report's *Add a car*
+ * advice to the wrong building. So the rule is decided here, once, for every navigation that
+ * means *edit the building I am looking at* — the rail's link and the Day report's lever cards:
+ *
+ * - the draft differs from its own source (`specIsDirty` against {@link sourceBuildingOf}) —
+ *   **no patch**; the no-clobber rule stands unweakened;
+ * - the editor is already on the staged building — **no patch**; nothing to move;
+ * - the staged id resolves to no config (a recording loaded from a file can stage a building this
+ *   catalogue does not hold) — **no patch**; seeding `BLANK_SPEC` under the staged name would
+ *   *look* like the staged building while being an empty tower;
+ * - otherwise — the staged building's own spec, exactly as picking it in the editor's list would.
+ *
+ * Pure and exported: the decision is testable without a document (`buildingEditor.test.ts`), and
+ * its two callers cannot drift apart. The callers pass it through `MountContext.update` **before**
+ * `openTab`, so the editor's next render already draws the seeded draft.
+ */
+export function buildingEditorSeedOf(at: ViewAt): Partial<ViewerState> | undefined {
+  const { state } = at;
+  if (state.editingBuildingId === state.buildingId) return undefined;
+  if (specIsDirty(state.buildingSpec, sourceBuildingOf(at))) return undefined;
+  const config = buildingConfigOf(at.resources, state.savedBuildings, state.buildingId);
+  if (config === undefined) return undefined;
+  return {
+    editingBuildingId: state.buildingId,
+    buildingSpec: specFromBuilding(config, state.buildingId),
+  };
+}

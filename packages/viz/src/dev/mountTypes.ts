@@ -112,6 +112,23 @@ export interface MountContext {
    * strip depends on.
    */
   runShift(onRan?: (recording: VizRecording) => void): void;
+  /**
+   * Announce that this press **enters a mode** — a scenario card taken, a week restarted — as
+   * opposed to re-running the day already on screen.
+   *
+   * The distinction exists for shell-owned transport state: the speed chips reset on mode entry
+   * and survive mid-week re-runs (`docs/19` defect 12; `dev/main.ts#resetTransportSpeed` owns the
+   * boundary and its argument). The menu's own mode doors reset directly in their `dispatchMenu`
+   * arms; this member is for the one mode door that lives on a panel — the scenario cards. It is
+   * **not** implied by {@link runShift}: every re-run comes through that seam, and resetting there
+   * would fight the player on exactly the surface they iterate on.
+   *
+   * Optional, because ten of the eleven panels never enter a mode and a recorder-backed test
+   * context should not have to stub a member its mount cannot call. A panel that gains a mode
+   * door calls it with `?.` — an absent implementation means the context's owner keeps no
+   * transport state, which is true of every context but the shell's.
+   */
+  enterMode?(): void;
   /** Move to a surface, revealing its tab if it is one of the four contextual editors. */
   openTab(tab: TabName): void;
   /**

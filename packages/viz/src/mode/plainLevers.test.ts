@@ -8,7 +8,7 @@ import {
 } from '../authoring/dispatcherSpec.js';
 import { shortTermNameOf } from '../dev/dispatcherEditor.js';
 
-import { applyPlainLever, plainLeversOf, type PlainLeverId } from './plainLevers.js';
+import { applyPlainLever, plainLeverEchoOf, plainLeversOf, type PlainLeverId } from './plainLevers.js';
 
 /**
  * The four plain levers — BUILD_PLAN slice 1 (`docs/design/design_handoff_casual_mode/`).
@@ -124,6 +124,39 @@ describe('the words (guide §11.3, §16 rule 11)', () => {
         expect(text, `${row.id}: "${text}"`).not.toMatch(/\b[a-z]+[A-Z][A-Za-z]*\b/);
         expect(text, `${row.id}: "${text}"`).not.toMatch(/\b(?:AWT|WT95|TTD)\b/);
       }
+    }
+  });
+});
+
+describe('the echo — docs/19 defect 5', () => {
+  it('names the position a slider now holds and the field that holds it', () => {
+    const applied = applyPlainLever(SPEC, LEVERS, 'patience', 85);
+    const echo = plainLeverEchoOf(lever('patience', applied.spec, applied.levers));
+    expect(echo).toContain('How long anyone should wait');
+    expect(echo).toContain('85');
+    expect(echo).toContain('weights.starvation');
+  });
+
+  it('names the state a toggle now holds and the group control it wrote', () => {
+    const applied = applyPlainLever(SPEC, LEVERS, 'lobby', true);
+    const echo = plainLeverEchoOf(lever('lobby', applied.spec, applied.levers));
+    expect(echo).toContain('Keep a car downstairs');
+    expect(echo).toContain('is now on');
+    expect(echo).toContain('idle.parkingStrategy: lobby');
+    expect(plainLeverEchoOf(lever('lobby'))).toContain('is now off');
+  });
+
+  it('is derived from the view, so it cannot describe a value the state has left', () => {
+    // The echo takes no remembered press: composed twice over the same view it is byte-identical,
+    // and composed over a moved view it moves with it.
+    expect(plainLeverEchoOf(lever('room'))).toBe(plainLeverEchoOf(lever('room')));
+    const applied = applyPlainLever(SPEC, LEVERS, 'room', 55);
+    expect(plainLeverEchoOf(lever('room', applied.spec, applied.levers))).toContain('55');
+  });
+
+  it('does not restate the cost formula — costFunctionLine stays the only composition of it', () => {
+    for (const row of plainLeversOf(SPEC, LEVERS)) {
+      expect(plainLeverEchoOf(row)).not.toContain('cost =');
     }
   });
 });

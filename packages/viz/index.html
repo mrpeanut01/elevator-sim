@@ -604,6 +604,13 @@
            pressed. The handoff's toggle IS the close control (`design.html` :2447 — no close
            control exists inside the drawer), so it stacks above the overlay's z-index: 20. */
         #drawer-toggle { display: inline-flex !important; position: relative; z-index: 21; }
+        /* docs/19 defect 6's second half: the toggle stacked above the drawer then sat ON the
+           drawer's own segment strip — measured at 1280×800, 'Close controls' (x 979–1057, y
+           64–88) covered the 'Dispatcher' and 'Traffic' segment labels (y 69–93). The drawer's
+           content starts below the strip the toggle lives in, so the two controls that both must
+           stay pressable stop sharing pixels. Padding, not margin: the overlay's edge and shadow
+           still reach the top of the body, so it reads as one sheet. */
+        .rail-r { padding-top: 52px; }
       }
       @media (max-width: 899px) { .body { grid-template-columns: 236px minmax(0, 1fr); } }
 
@@ -671,12 +678,29 @@
          than at the report sheet's. The same scoping `.transport-tail .chip` already does. */
       .coach-controls .primary { padding: 6px 12px; font-size: 12px; }
 
-      /* The stage, § 1.3 M3. */
+      /* The stage, § 1.3 M3.
+
+         docs/19 defect 7: `min-height: 0` let the canvas absorb every pixel the chrome around it
+         grew — measured at 1280×800 on a campaign Midtown day, the 21-floor tower had collapsed
+         to a 103 px sliver under the coach ribbon, two legend rows and the transport, and the
+         wait-age ramp the stage exists to show was sub-pixel. The floor is sized to the drawing,
+         not to taste: `render/layout.ts` spends MIN_HEADER_PX (90) + MIN_FOOTER_PX (51) on the
+         canvas's own bands, and `render/canvas.ts` degrades rider glyphs below a 12 px floor
+         pitch — 21 floors × 12 px + 141 px of bands ≈ 393, so 400 keeps the shipped tallest
+         tower legible. When the viewport genuinely cannot hold stage + chrome, #panel-run
+         scrolls (below) rather than the picture vanishing; the 767 px block's 60vh override
+         later in this sheet still wins on phones. `stageHeight.browser.test.ts` measures this in
+         a real browser at 1280×800 and 1440×1000. */
       .stage-wrap {
-        flex: 1; min-height: 0; position: relative; margin: 0 14px 8px;
+        flex: 1; min-height: 400px; position: relative; margin: 0 14px 8px;
         border: 1px solid var(--edge); border-radius: var(--r-card);
         overflow: hidden; background: var(--bg);
       }
+      /* The half that makes the floor above honest: with a real min-height the run panel's
+         content can exceed the column, and a `.stagecol` that is `overflow: hidden` would clip
+         the transport silently. Scrolling is the honest overflow — the stage keeps its size and
+         the provenance rows go below the fold instead of the building. */
+      #panel-run { overflow-y: auto; }
       #stage { width: 100%; height: 100%; display: block; }
       .alarm {
         position: absolute; left: 14px; top: 14px;

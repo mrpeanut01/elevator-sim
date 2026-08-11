@@ -131,6 +131,7 @@ import type {
 import { nextDay, switchWeek } from '../shift/week.js';
 import type { TomorrowBriefing } from '../shift/tomorrow.js';
 
+import { buildingEditorSeedOf } from './buildingEditor.js';
 import { el, figure, fill, setHidden, setStyle, setText } from './dom.js';
 import type { ReportElements, TabName } from './elementMap.js';
 import type { MountContext, Panel, UnfiledSheetFacts, ViewAt } from './mountTypes.js';
@@ -1727,6 +1728,19 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
           children: words,
         });
         card.addEventListener('click', () => {
+          /*
+           * **The crisis points at the fix, on the right building** — `docs/19` defect 11 and its
+           * *point the crisis at the fix* note. This card's advice (*Add a car*, *Zone the tower*)
+           * is about the day the sheet describes, so arriving at the Building tab with some other
+           * building's draft open converts the report's advice into an edit of the wrong tower.
+           * `buildingEditorSeedOf` is the whole rule — it declines for a dirty draft, so an
+           * unsaved edit still wins over this navigation — and the rail's own link goes through
+           * the same function, which is what keeps the two doors from drifting.
+           */
+          if (surface === 'building' && latest !== undefined) {
+            const seed = buildingEditorSeedOf(latest);
+            if (seed !== undefined) context.update(seed);
+          }
           context.openTab(surface);
         });
         return card;

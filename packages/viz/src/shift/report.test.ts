@@ -251,6 +251,13 @@ describe('AVERAGE WAIT', () => {
     const noReason = averageWaitFigure(fixtureSummary({ saturated: true, awtIsValid: true }));
     expect(noReason.note.length).toBeGreaterThan(20);
   });
+
+  it('numbers a one-leg denominator in the singular — docs/19 defect 8’s “over 1 legs”', () => {
+    // A window can legitimately carry one served leg, and R13 makes the count part of what the
+    // mean means — so its grammar is asserted, not left to luck.
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 1 })).note).toContain('over 1 leg in');
+    expect(averageWaitFigure(fixtureSummary({ waitCount: 2 })).note).toContain('over 2 legs in');
+  });
 });
 
 describe('the observations, which are never suppressed', () => {

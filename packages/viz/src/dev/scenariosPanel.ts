@@ -310,6 +310,13 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
       tomorrow: undefined,
       withheld: [],
     });
+    /*
+     * Taking an assignment is a **mode entry**, and the one that does not pass through the menu —
+     * so the shell resets its transport speed here exactly as Free play's Start does, and a ×900
+     * latched on the last building cannot eat this scenario's first day before a frame is seen
+     * (`docs/19` defect 12; `MountContext.enterMode` carries the boundary's argument).
+     */
+    context.enterMode?.();
     context.openTab('run');
     context.runShift();
   }
