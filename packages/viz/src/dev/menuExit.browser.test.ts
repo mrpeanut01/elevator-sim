@@ -91,6 +91,26 @@ async function coldLoad(): Promise<Page> {
  * so that it passes for the wrong reason.
  */
 async function playToEnd(page: Page): Promise<void> {
+  /*
+   * Wait for the run to be **adopted** before touching the transport. `coldLoad`'s canvas latch
+   * proves the page booted, not that boot's worker run has landed — `adopt` is what enables the
+   * transport (`disableTransport(ui, false)`), and § D232 makes an adoption that lands after the
+   * overlay was dismissed **autoplay**. Reading the label before adoption therefore raced: the
+   * pre-adoption label says *Play*, the queued click is held by actionability until `adopt`
+   * enables the button, and by then autoplay has started the run — so the click *paused* it and
+   * the playhead never reached the end. The wave that landed slices 3/5/6a made boot heavy
+   * enough to lose that race deterministically; the latch below makes the read-then-click
+   * sound in either ordering, because autoplay is decided at construction and cannot intervene
+   * after the button is enabled.
+   */
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector('#play-pause');
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
   await page.locator('#speed-chips .chip', { hasText: '×900' }).first().click();
   if ((await page.locator('#play-pause').first().getAttribute('aria-label')) === 'Play') {
     await page.locator('#play-pause').first().click();
@@ -122,8 +142,23 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
      * Before the split this reached `closeShift` with the gate open and banked a clean Monday.
      */
     const page = await coldLoad();
+    // The overlay must be up before Escape can dismiss it — under load the canvas latch can win
+    // the race against the menu's own first draw, and an Escape into a page with no overlay yet
+    // drives nothing. Latched on visibility, not on a sleep, for the same reason as playToEnd's.
+    await page.waitForFunction(
+      () => {
+        const overlay = document.querySelector<HTMLElement>('.menu-overlay');
+        return overlay !== null && !overlay.hidden;
+      },
+      undefined,
+      { timeout: 30_000 },
+    );
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(
+      () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+      undefined,
+      { timeout: 10_000 },
+    );
     expect(
       await page.evaluate(
         () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden ?? false,
@@ -162,6 +197,19 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
     await pressMenuRow(page, 'main.campaign');
     await pressMenuRow(page, 'campaign.open');
     await page.locator('#tab-run').first().click();
+    // Boot's own run must have landed before #run is pressed: while a run is in flight, #run is
+    // the cancel button, and a press that lands mid-flight cancels boot's run instead of starting
+    // the player's — after which nothing ever adopts and the transport never enables. The enabled
+    // transport is the adoption signal (`adopt` → `disableTransport(ui, false)`), the same latch
+    // playToEnd uses and for the same reason.
+    await page.waitForFunction(
+      () => {
+        const button = document.querySelector('#play-pause');
+        return button instanceof HTMLButtonElement && !button.disabled;
+      },
+      undefined,
+      { timeout: 30_000 },
+    );
     await page.locator('#run').first().click();
     await page.waitForTimeout(500);
 
