@@ -78,6 +78,8 @@ import {
 
 import {
   applyPlainLever,
+  plainLeverHelp,
+  plainLeverSub,
   plainLeversOf,
   type PlainLeverId,
   type PlainLeverView,
@@ -1299,8 +1301,8 @@ export function mountDispatcherEditor(
         plainSlots.set(row.id, slot);
         plainBlock.append(slot);
       }
-      const sub = `${row.reads} · ${row.atZero} → ${row.atFull}`;
-      const help = row.serves === undefined ? `writes ${row.writes}` : `${row.serves} — writes ${row.writes}`;
+      const sub = plainLeverSub(row);
+      const help = plainLeverHelp(row);
       if (row.kind === 'toggle') {
         fill(
           slot,

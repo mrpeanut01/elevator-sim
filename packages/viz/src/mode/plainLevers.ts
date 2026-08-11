@@ -142,6 +142,24 @@ export function plainLeversOf(
 }
 
 /**
+ * The sub-line a surface draws under a lever — the read and both ends, composed once.
+ *
+ * Composed here rather than at each caller because two callers exist — the editor's mount and
+ * the honesty sweep's adapter — and a string composed twice is two screens waiting to disagree
+ * (the handoff's §1 rule 3, applied to a sentence).
+ */
+export function plainLeverSub(view: PlainLeverView): string {
+  return `${view.reads} · ${view.atZero} → ${view.atFull}`;
+}
+
+/** The tooltip: the serves clause where there is one, and the field the claim is checkable by. */
+export function plainLeverHelp(view: PlainLeverView): string {
+  return view.serves === undefined
+    ? `writes ${view.writes}`
+    : `${view.serves} — writes ${view.writes}`;
+}
+
+/**
  * Write one lever into the model it is a view of. Returns the new spec and group levers; only
  * the owned field differs from what went in.
  *

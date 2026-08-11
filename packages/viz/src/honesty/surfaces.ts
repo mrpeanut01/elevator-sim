@@ -153,6 +153,7 @@ import {
   leverRowsOf,
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
+import { plainLeverHelp, plainLeverSub, plainLeversOf } from '../mode/plainLevers.js';
 import {
   goalRowsOf,
   historyBarsOf,
@@ -3944,6 +3945,9 @@ const EDITOR_PANELS: SurfaceAdapter = {
     'dev/dispatcherEditor.ts#flagLineOf',
     'dev/dispatcherEditor.ts#leverRowsOf',
     'dev/dispatcherEditor.ts#dwellHintOf',
+    'mode/plainLevers.ts#plainLeversOf',
+    'mode/plainLevers.ts#plainLeverSub',
+    'mode/plainLevers.ts#plainLeverHelp',
     'dev/machinesEditor.ts#machineRowsOf',
     'dev/machinesEditor.ts#machineFieldOf',
     'dev/machinesEditor.ts#formatMachineValue',
@@ -4321,6 +4325,31 @@ const EDITOR_PANELS: SurfaceAdapter = {
         seeds.push({ field: `leverRowsOf(${row.key}).hint`, text: row.hint, role: 'prose' });
         seeds.push({ field: `leverRowsOf(${row.key}).help`, text: row.help, role: 'prose' });
       }
+    }
+
+    /*
+     * The Basic register of the term rows — the sub-line reads the term's own player words from
+     * `core` (Everyday handoff §16 rule 11, issue #147). Driven once over a blank spec rather
+     * than per profile, because the words are the model's and do not vary with what a reader has
+     * dragged; the per-profile loop above already drives everything that does.
+     */
+    for (const view of termRowsOf(terms, blankSpec(terms.map((term) => term.id)), [], 'basic')) {
+      seeds.push({
+        field: `termRowsOf(basic).${view.termId}.serves`,
+        text: view.serves,
+        role: 'label',
+      });
+    }
+
+    /*
+     * The four plain levers — Everyday Mode slice 1 (`mode/plainLevers.ts`). The composed
+     * sub-line and tooltip are the model's own compositions, the same two strings the mount
+     * draws, so the sweep and the screen cannot drift apart.
+     */
+    for (const lever of plainLeversOf(blankSpec(terms.map((term) => term.id)), DEFAULT_LEVERS)) {
+      seeds.push({ field: `plainLeversOf.${lever.id}.label`, text: lever.label, role: 'label' });
+      seeds.push({ field: `plainLeversOf.${lever.id}.sub`, text: plainLeverSub(lever), role: 'prose' });
+      seeds.push({ field: `plainLeversOf.${lever.id}.help`, text: plainLeverHelp(lever), role: 'prose' });
     }
 
     return singleRun(this.id, seeds);
