@@ -16,9 +16,10 @@
  * **A goal reads an observation. Never a mean, and never anything `awtIsValid` could suppress.**
  *
  * {@link GoalObservations} is the structural form of that rule. It is the *only* type
- * `readGoal` accepts, and it carries five numbers, four of which are the design's own
- * (`design.html` :1428–1439): a carried share, an away-inside-a-minute share, a peak queue depth
- * and an abandonment count. There is no `meanWaitS` on it, no `wait95S`, no
+ * `readGoal` accepts, and it carries six numbers and a censoring flag. Four of the numbers are
+ * the design's own (`design.html` :1428–1439): a carried share, an away-inside-a-minute share, a
+ * peak queue depth and an abandonment count; the fifth gradeable one is the worst wait the
+ * casual handoff's fourth test grades (§ 8.6). There is no `meanWaitS` on it, no `wait95S`, no
  * `meanTimeToDestinationS` — so a goal that wanted to grade a suppressible estimate could not be
  * written against this type without changing the type, which is a visible diff and a decision
  * somebody has to make out loud. CLAUDE.md: *"If a configuration saturates, flag it and suppress
@@ -266,19 +267,44 @@ export interface ShiftEvent {
  * Observations — the only thing a goal is allowed to read
  * -------------------------------------------------------------------------- */
 
-/** The four quantities the design's goals read, by name. See the module docstring. */
-export const GOAL_OBSERVATION_IDS = ['carryPct', 'minutePct', 'peakQueue', 'abandoned'] as const;
+/**
+ * The quantities a goal may read, by name. See the module docstring.
+ *
+ * `worstWaitS` joined for the handoff's four-tests-a-day (§ 8.6, § 20.6): worst wait was a report
+ * figure only, and the fourth test needs it gradeable. `abandoned` **stays although no shipped
+ * goal reads it any more** — `goals.ts#goalsForDay` retired the odd-day horizon goal when the
+ * worst-wait ceiling subsumed it — because `persist/validate.ts` checks every restored reading's
+ * `reads` against this list, and a player's saved history legitimately carries readings the
+ * retired goal wrote. Removing the id would refuse every session that ever closed an odd day.
+ * The *field* it names is also still read on every sheet: `report.ts`'s *took the stairs* figure
+ * and its add-a-car lever both consume `Observations.abandoned`.
+ */
+export const GOAL_OBSERVATION_IDS = [
+  'carryPct',
+  'minutePct',
+  'peakQueue',
+  'abandoned',
+  'worstWaitS',
+] as const;
 
 export type GoalObservationId = (typeof GOAL_OBSERVATION_IDS)[number];
 
 /**
  * Everything a goal may read — **and structurally nothing that `awtIsValid` could suppress**.
  *
- * Five fields, four of them gradeable and one of them the gate. Every one is a *count* or a ratio
- * of counts: how many turned up, what share got carried, what share was away inside a minute, how
- * deep the worst landing got, how many gave up. None of them is an estimate over a cohort, so none
- * of them is refused on a saturated run, so a goal can be graded on a day the building was outrun —
- * which is the day a reader most needs a verdict.
+ * Seven fields: five gradeable, and two gates. Every gradeable one is a *count*, a ratio of
+ * counts, or a maximum of measured durations: how many turned up, what share got carried, what
+ * share was away inside a minute, how deep the worst landing got, how many gave up, how long the
+ * worst-served rider stood. None of them is an estimate over a cohort, so none of them is refused
+ * on a saturated run, so a goal can be graded on a day the building was outrun — which is the day
+ * a reader most needs a verdict.
+ *
+ * `worstWaitS` is the one whose honesty needs a second gate. A maximum is only exact once the leg
+ * it belongs to has resolved; while the worst wait on the board belongs to somebody still
+ * standing, the number is a lower bound the recording cannot even promise is one (see
+ * `live/types.ts#LiveObservations.worstWaitIsCensored`), so {@link worstWaitIsCensored} rides
+ * beside it and `goals.ts#readGoal` refuses to grade the pair. It is a **gate, not a goal**: it
+ * is deliberately not in {@link GOAL_OBSERVATION_IDS}, exactly as {@link arrived} is not.
  *
  * See the module docstring for why this type's *shape* is the enforcement and not a comment.
  */
@@ -296,6 +322,25 @@ export interface GoalObservations {
   readonly peakQueue: number;
   /** Legs that crossed the 900 s abandonment horizon. The handoff calls them *took the stairs*. */
   readonly abandoned: number;
+  /**
+   * The longest wait known so far, whole seconds. `0` when nobody has arrived — never displayed
+   * or compared there, because {@link arrived} is then under {@link WAKE_UP_ARRIVALS}.
+   *
+   * Projected from `live/`'s playhead fold, **never** from `summary.serviceLevel.longestWaitS`:
+   * the rail draws goal readings at any playhead, and the summary's figure is true only of the
+   * run's reporting window — publishing it mid-run is the violation class the honesty sweep's
+   * temporal axis exists to find (§ D307). The two are two stated cohorts even at day close,
+   * and not as an edge case: **every** shipped template narrows its reporting window
+   * (`live/observations.test.ts` measured 0 of 8 spanning), so this goal grades the whole
+   * shift while the WORST WAIT cell reports the window, and the sheet's small print says which
+   * figure is which.
+   */
+  readonly worstWaitS: number;
+  /**
+   * Whether {@link worstWaitS} belongs to a leg not yet resolved — the second gate. A censored
+   * maximum grades neither `met` nor `missed`; see the interface docstring and `readGoal`.
+   */
+  readonly worstWaitIsCensored: boolean;
 }
 
 /**
@@ -333,15 +378,19 @@ export type GoalComparison = 'at-least' | 'at-most';
  *
  * {@link reads} is a **key of {@link GoalObservations}** rather than a closure, deliberately: a
  * predicate carrying its own reader can read anything it closes over, and the whole point of this
- * layer is that a goal cannot reach a suppressible figure. A key can only name one of four
- * numbers, and the compiler is the thing that says so.
+ * layer is that a goal cannot reach a suppressible figure. A key can only name one of
+ * {@link GOAL_OBSERVATION_IDS}' five numbers, and the compiler is the thing that says so.
  */
 export interface ShiftGoal {
   readonly id: string;
   /** The sentence the rail and the report both print. Built by `goalsForDay`. */
   readonly label: string;
-  /** `%` or the empty string. Appended to the observed value for display. */
-  readonly unit: '%' | '';
+  /**
+   * `%`, ` s`, or the empty string. Appended to the observed value for display. The seconds
+   * variant carries its own leading space (`187 s`, SI style with a space before the unit) so
+   * `readGoal`'s one concatenation stays one concatenation.
+   */
+  readonly unit: '%' | ' s' | '';
   /** The bar itself, in {@link unit}. */
   readonly bar: number;
   readonly compare: GoalComparison;
@@ -366,8 +415,33 @@ export interface GoalReading {
   readonly display: string;
   /** `0`–`100`, for the progress bar. `0` while pending — the bar is empty, not full. */
   readonly progressPct: number;
-  /** `✓`, `○` or `·`, matching `design.html` :2383–2391. Never the only signal — KB-15. */
+  /** `✓`, `×` or `·` — `GOAL_GLYPHS`, whose docstring owns the `×`. Never the only signal — KB-15. */
   readonly glyph: string;
+}
+
+/**
+ * One goal on the report sheet: today's reading, and last night's figure beside it.
+ *
+ * ## Why `was` is a sibling here and not a field of {@link GoalReading}
+ *
+ * The handoff (§ 8.6) puts *"what it was last time"* beside each test, read from *"the building's
+ * previous day, not constants"*. That figure is derivable, always, from
+ * {@link WeekState.history} — `goals.ts#wasDisplayOf` is the one derivation — and readings are
+ * **persisted** inside {@link DayOutcome.readings}. Storing the derivable string beside the
+ * reading would be a second answer a restored session could carry disagreeing with the history
+ * under it, which is the exact shape `wasGraded`'s docstring refuses for the same struct; it
+ * would also widen the persisted reading, which moves `SESSION_SCHEMA_VERSION` for a value the
+ * absence already determines. So the pair exists only where a sheet is being drawn, built fresh
+ * from the history each time.
+ */
+export interface GoalLine {
+  readonly reading: GoalReading;
+  /**
+   * The previous day's display for the same observation — `78%`, `187 s` — or the em dash when
+   * there is no previous day, or the previous day never measured this quantity, or its reading
+   * was itself ungraded. Never a number invented to fill the slot.
+   */
+  readonly was: string;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -645,7 +719,8 @@ export interface DayReport {
   /** `Scenario 2 — The morning rush · 1 of 2 clean shifts banked`. */
   readonly contractLine: string;
   readonly cleared: ClearedAward | null;
-  readonly goals: readonly GoalReading[];
+  /** Today's readings, each with last night's figure beside it. See {@link GoalLine}. */
+  readonly goals: readonly GoalLine[];
   readonly diagnosis: readonly ReportDiagnosis[];
   readonly levers: readonly ReportLever[];
   readonly forecast: ReportForecast;

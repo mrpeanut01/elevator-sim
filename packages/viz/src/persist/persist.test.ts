@@ -137,6 +137,8 @@ const PERFECT = Object.freeze({
   minutePct: 100,
   peakQueue: 0,
   abandoned: 0,
+  worstWaitS: 30,
+  worstWaitIsCensored: false,
 });
 
 /**

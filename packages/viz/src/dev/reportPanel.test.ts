@@ -873,7 +873,7 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   it('gives every state a glyph and a word, not only a colour', () => {
     const seen = new Set<string>();
     for (const state of ['met', 'missed', 'pending'] as const) {
-      const row = goalRowViewOf(reading(state));
+      const row = goalRowViewOf({ reading: reading(state), was: '—' });
       expect(row.glyph).toBe(GOAL_GLYPHS[state]);
       expect(row.help.length).toBeGreaterThan(0);
       seen.add(row.colour);
@@ -884,10 +884,17 @@ describe('the goal rows carry a second, non-colour signal — KB-15', () => {
   });
 
   it('draws a pending goal as neither met nor missed', () => {
-    const row = goalRowViewOf(reading('pending'));
+    const row = goalRowViewOf({ reading: reading('pending'), was: '—' });
     expect(row.background).toBe('transparent');
     expect(row.help).toContain('not graded');
     expect(row.display).toBe('—');
+  });
+
+  it('dresses the "was" slot as the rail does — the word only when there is a figure', () => {
+    // One spelling of yesterday on both surfaces: `dev/leftRail.ts#goalRowsOf` makes the same
+    // two-way choice, and a sheet that said `was —` would dress an absence as a measurement.
+    expect(goalRowViewOf({ reading: reading('met'), was: '—' }).was).toBe('—');
+    expect(goalRowViewOf({ reading: reading('met'), was: '91%' }).was).toBe('was 91%');
   });
 });
 

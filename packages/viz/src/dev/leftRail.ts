@@ -41,7 +41,7 @@
  * | mood card's **basis** | nothing — it is never a colour | the headline's tense and the sub-line's *across the whole shift*, both in the `aria-label` too |
  * | *longest wait* | band amber / band red | the figure itself — `142 s` is the state |
  * | *served under N s* | band green / amber / red | the percentage, and `—` when there is no denominator |
- * | goal rows | met green / missed amber / pending grey | `GOAL_GLYPHS`' `✓ ○ ·`, plus the value or `—` |
+ * | goal rows | met green / missed amber / pending grey | `GOAL_GLYPHS`' `✓ × ·`, plus the value or `—` |
  * | honesty card | amber or green edge | the `⚠`/`✓` glyph and the title sentence |
  * | decision rows | the outcome palette | the head reads `A → Level 12`, `A ⇄ Level 12` or `no car for Level 12` — three different sentences, not three colours |
  * | mood drivers | the three level colours | `MOOD_GLYPH`'s `○ ◑ ●`, and each row states its own number |
@@ -78,7 +78,13 @@ import type { ViewMode } from '../mode/types.js';
 import { MOOD_GLYPH, buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
 import { contractById } from '../shift/contracts.js';
 import { scheduledEventFor } from '../shift/calendar.js';
-import { PENDING_DISPLAY, bestLineFor, goalsForDay, readGoals } from '../shift/goals.js';
+import {
+  PENDING_DISPLAY,
+  bestLineFor,
+  goalsForDay,
+  readGoals,
+  wasDisplayOf,
+} from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import {
   weekdayOf,
@@ -562,11 +568,17 @@ function shareColor(pct: number): string {
  * -------------------------------------------------------------------------- */
 
 export interface GoalRow {
-  /** `✓`, `○` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
+  /** `✓`, `×` or `·` — `GOAL_GLYPHS`. Never the only signal; {@link value} is the other. */
   readonly glyph: string;
   readonly label: string;
   /** The observed value with its unit, or `PENDING_DISPLAY`. Never a number while pending. */
   readonly value: string;
+  /**
+   * `was 78%`, or the bare em dash when the building has no previous day — the handoff's "was"
+   * figure (§ 8.6), derived by `shift/goals.ts#wasDisplayOf` so this screen and the report sheet
+   * cannot show two different yesterdays.
+   */
+  readonly was: string;
   readonly state: GoalReading['state'];
   readonly barPct: number;
   /** Glyph and value colour. */
@@ -576,22 +588,31 @@ export interface GoalRow {
 }
 
 /**
- * One row per reading — design `:130–140`.
+ * One row per reading — design `:130–140`, plus the "was" slot the casual handoff adds (§ 8.6).
  *
  * The three states are the design's three, and `pending` is not a `missed` in a grey coat: a
  * morning under twenty arrivals has not been judged, so its row shows the em dash and a flat
  * track. `readGoal` decides that; this only paints it, which is why the assertion *a pending goal
  * never renders a number* is a property of {@link GoalReading.display} that this function may not
  * be able to break.
+ *
+ * The `was` slot prints the word only when there is a figure to attribute: `was —` would dress an
+ * absence as a measurement, so a day with no yesterday shows the bare dash.
  */
-export function goalRowsOf(readings: readonly GoalReading[]): readonly GoalRow[] {
+export function goalRowsOf(
+  readings: readonly GoalReading[],
+  history: readonly DayOutcome[],
+  day: number,
+): readonly GoalRow[] {
   return readings.map((reading) => {
     const met = reading.state === 'met';
     const pending = reading.state === 'pending';
+    const was = wasDisplayOf(history, day, reading.goal);
     return {
       glyph: reading.glyph,
       label: reading.goal.label,
       value: reading.display,
+      was: was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${was}`,
       state: reading.state,
       barPct: reading.progressPct,
       color: pending ? FAINT : met ? GOOD : CAUTION,
@@ -1146,9 +1167,11 @@ function drawShift(
   setText(ui.event, event.name);
   setText(ui.note, event.note);
 
-  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations));
+  const goals = goalRowsOf(readGoals(goalsForDay(week.day), observations), week.history, week.day);
   surfaces.goals(
-    goals.map((goal) => `${goal.label}=${goal.value}=${String(goal.barPct)}`).join('|'),
+    goals
+      .map((goal) => `${goal.label}=${goal.value}=${goal.was}=${String(goal.barPct)}`)
+      .join('|'),
     () =>
       goals.map((goal) =>
         el(doc, 'div', {
@@ -1163,6 +1186,9 @@ function drawShift(
                   style: { color: goal.color },
                 }),
                 el(doc, 'span', { className: 'goal-label', text: goal.label }),
+                // Last night's figure, dim, before today's — reading order is claim, precedent,
+                // verdict. The dash carries no "was": see `goalRowsOf`.
+                el(doc, 'span', { className: 'goal-was', text: goal.was }),
                 el(doc, 'span', {
                   className: 'goal-got',
                   text: goal.value,
@@ -1199,7 +1225,15 @@ function goalObservationsOf(
   t: SimTime,
 ): GoalObservations {
   if (recording === undefined) {
-    return { arrived: 0, carryPct: 100, minutePct: 100, peakQueue: 0, abandoned: 0 };
+    return {
+      arrived: 0,
+      carryPct: 100,
+      minutePct: 100,
+      peakQueue: 0,
+      abandoned: 0,
+      worstWaitS: 0,
+      worstWaitIsCensored: false,
+    };
   }
   return shiftObservationsOf(observationsAt(recording, t));
 }

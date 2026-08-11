@@ -652,7 +652,7 @@ describe('the rest of the sheet', () => {
 
   it('clears the shift when every goal was met', () => {
     const report = reportOf(clean);
-    expect(report.goals.every((reading) => reading.state === 'met')).toBe(true);
+    expect(report.goals.every((line) => line.reading.state === 'met')).toBe(true);
     expect(report.verdict).toBe('cleared');
     expect(report.verdictLine).toBe('Shift cleared');
   });
@@ -918,7 +918,7 @@ describe('one judgement, four sentences — issue #53', () => {
     expect(summary.awtIsValid).toBe(true);
     const report = reportOf(missedWithoutSaturating);
     expect(report.verdict).toBe('missed');
-    expect(report.goals.some((reading) => reading.state === 'missed')).toBe(true);
+    expect(report.goals.some((line) => line.reading.state === 'missed')).toBe(true);
   });
 
   it('cannot congratulate a day the banner says was missed — the reported defect', () => {
@@ -1025,10 +1025,10 @@ describe('one judgement, four sentences — issue #53', () => {
 
   it('names the bars that went unmet rather than only that some did', () => {
     const report = reportOf(missedWithoutSaturating);
-    const unmet = report.goals.filter((reading) => reading.state === 'missed');
+    const unmet = report.goals.filter((line) => line.reading.state === 'missed');
     expect(unmet.length).toBeGreaterThan(0);
-    for (const reading of unmet) expect(report.lede).toContain(reading.goal.label);
-    for (const reading of report.goals.filter((r) => r.state === 'met')) {
+    for (const { reading } of unmet) expect(report.lede).toContain(reading.goal.label);
+    for (const { reading } of report.goals.filter((line) => line.reading.state === 'met')) {
       expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
     }
   });
@@ -1048,7 +1048,7 @@ describe('one judgement, four sentences — issue #53', () => {
      * unmet would be false, and saying nothing would be `docs/10` R3's blank. It still says why.
      */
     const report = sheetWith(clean, goalsForDay(4), tooQuiet(clean));
-    expect(report.goals.every((reading) => reading.state === 'pending')).toBe(true);
+    expect(report.goals.every((line) => line.reading.state === 'pending')).toBe(true);
     expect(report.verdict).toBe('ungraded');
     expect(report.verdictLine).toBe('Too quiet to grade');
     expect(report.lede).toContain('Too quiet to grade');
@@ -1056,7 +1056,7 @@ describe('one judgement, four sentences — issue #53', () => {
     expect(report.lede).toContain(`${String(WAKE_UP_ARRIVALS)}`);
     expect(report.lede).toContain('4 people called');
     // And no goal named, on a day none was read.
-    for (const reading of report.goals) {
+    for (const { reading } of report.goals) {
       expect(report.lede, reading.goal.label).not.toContain(`“${reading.goal.label}”`);
     }
     expect(report.lede).not.toContain('A day it could handle');
@@ -1249,7 +1249,7 @@ describe('what the sheet is a report of — docs/17 § 5 clause 1', () => {
       report.nextStep.label,
       report.nextStep.why,
       ...report.figures.flatMap((cell) => [cell.label, cell.value, cell.note]),
-      ...report.goals.map((reading) => reading.goal.label),
+      ...report.goals.map((line) => line.reading.goal.label),
       ...report.diagnosis.flatMap((row) => [row.when, row.what, row.why]),
       ...report.levers.flatMap((lever) => [lever.title, lever.body]),
     ];

@@ -2019,12 +2019,12 @@ const CAMPAIGN: SurfaceAdapter = {
  *
  * ## Why two days rather than one
  *
- * `goalsForDay` alternates its third bar on `day % 2` — even days ask a reader to hold a landing's
- * depth, odd days ask that nobody crosses the abandonment horizon — so a single day would leave
- * one of the two goal sentences unrendered on every case of every campaign. Day 1 and day 4 also
- * split the two branches of `contractLineFor` and `taughtFor`: day 1 runs the building's **own**
- * scenario, day 4 runs it as *a building the reader drew*, which is the branch that prints
- * *"nothing is being banked"*.
+ * Day 1 and day 4 split the two branches of `contractLineFor` and `taughtFor`: day 1 runs the
+ * building's **own** scenario, day 4 runs it as *a building the reader drew*, which is the branch
+ * that prints *"nothing is being banked"*. (This section used to also cite `goalsForDay`'s
+ * `day % 2` alternation — retired when the worst-wait ceiling subsumed the odd-day horizon goal,
+ * see `shift/goals.ts#goalsForDay` — but the contract branches alone still need both days, and
+ * two days also keep two points of the bar-hardening ladder in the corpus.)
  *
  * ## Why each day is closed twice
  *
@@ -2409,11 +2409,22 @@ const SHIFT_REPORT: SurfaceAdapter = {
           role: 'label',
         });
       }
-      for (const reading of report.goals) {
+      for (const { reading, was } of report.goals) {
         seeds.push({
           field: `${at}.goals(${reading.goal.id}).label`,
           text: reading.goal.label,
           role: 'label',
+        });
+        /*
+         * The "was" slot, as the panel dresses it — `was 78%`, or the bare em dash on a day with
+         * no yesterday. An observation about the previous run, so it takes the same role as the
+         * reading beside it; the seeded weeks here have no history, so this drives the em-dash
+         * arm, and the RAIL adapter's advanced-day rows drive the figure arm.
+         */
+        seeds.push({
+          field: `${at}.goals(${reading.goal.id}).was`,
+          text: was === '—' ? was : `was ${was}`,
+          role: 'observation',
         });
         /*
          * **Deliberately `observation`, not `goal`, and the distinction is the shift layer's own.**
@@ -3132,11 +3143,29 @@ const RAIL_VIEW: SurfaceAdapter = {
       for (const bar of historyBarsOf([], undefined, entry.dayIdx)) {
         seeds.push({ field: `${at}.historyBarsOf(empty).title`, text: bar.title, role: 'observation' });
       }
-      for (const row of goalRowsOf(entry.readings)) {
+      for (const row of goalRowsOf(entry.readings, entry.week.history, entry.day)) {
         seeds.push({
           field: `${at}.goalRowsOf(${row.label}).value`,
-          // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it.
-          text: `${row.glyph} ${row.label} — ${row.value}`,
+          // The glyph is never the only signal — KB-15 — so the row is driven as a reader sees it,
+          // "was" slot included. On the day just closed the history holds no *previous* day, so
+          // this is the em-dash arm; the figure arm is the advanced day below.
+          text: `${row.glyph} ${row.label} — ${row.was} — ${row.value}`,
+          role: 'observation',
+        });
+      }
+      /*
+       * The same rows on the **morning after** — `nextDay` of the closed week, which is the state
+       * a player reaches by pressing the report's own primary button. It is the only shipped state
+       * whose "was" slot carries a figure rather than the em dash (the previous day is now
+       * `history[day-1]`), so without it the corpus would sweep the dash and never the number —
+       * and a mis-attributed yesterday is exactly the claim this slot could get wrong.
+       */
+      const morningAfter = nextDay(entry.week);
+      const tomorrowsGoals = readGoals(goalsForDay(morningAfter.day), bundle.observations);
+      for (const row of goalRowsOf(tomorrowsGoals, morningAfter.history, morningAfter.day)) {
+        seeds.push({
+          field: `${at}.goalRowsOf(nextDay, ${row.label}).was`,
+          text: `${row.glyph} ${row.label} — ${row.was} — ${row.value}`,
           role: 'observation',
         });
       }
@@ -3504,7 +3533,7 @@ const REPORT_PANEL: SurfaceAdapter = {
       /* The two row builders, driven on their own so the coverage claim names what it calls. */
       const firstReading = entry.readings[0];
       if (firstReading !== undefined) {
-        const row = goalRowViewOf(firstReading);
+        const row = goalRowViewOf({ reading: firstReading, was: '—' });
         seeds.push({ field: `${at}.goalRowViewOf.help`, text: row.help, role: 'label' });
       }
       const firstFigure = entry.report.figures[0];

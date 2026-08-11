@@ -173,8 +173,25 @@ export const SESSION_KEY = 'elevator-sim.session';
  * in the tree: `ViewerState.seed` is a `bigint` and `JSON.stringify` throws on one. Nothing in a
  * {@link SessionSnapshot} is a `bigint` today; the guard is what makes that a checked property of
  * the value rather than a claim about the types, which are erased by the time this code runs.
+ *
+ * ## Version 5 moves for new *values*, not a new key, and it is read backwards on the evidence
+ *
+ * The worst-wait goal (Everyday Mode slice 5) widened three value domains inside the week's
+ * persisted readings without adding or removing a single key: `ShiftGoal.reads` gained
+ * `worstWaitS`, `ShiftGoal.unit` gained ` s`, and the missed glyph became `×`. A version-4 build's
+ * `validate.ts` checks `reads` and `unit` against **its** closed lists, so a session written here
+ * and met by that build would be refused as *damaged* — the exact false accusation the version-3
+ * paragraph records — where a version it does not read is refused as *newer*, which is true. Both
+ * directions are the same rule the extra-key branch states: the envelope version changes when the
+ * payload can say something an older reader has never seen, whether the novelty is a key or a
+ * value.
+ *
+ * Reading versions 1–4 here invents nothing: a history whose days carry three readings is the
+ * measured state of a week played before the fourth goal existed, and `wasDisplayOf` answers the
+ * em dash for a quantity yesterday never measured — which is the honest answer, not a default.
+ * A decision number is owed for the bump-on-new-values rule; this paragraph is the argument.
  */
-export const SESSION_SCHEMA_VERSION = 4;
+export const SESSION_SCHEMA_VERSION = 5;
 
 /**
  * Every envelope shape this build can read, newest last.
@@ -184,7 +201,7 @@ export const SESSION_SCHEMA_VERSION = 4;
  * and it always writes the newest; the reader is the half that meets a player who has not reloaded
  * since the last deploy.
  */
-export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4]);
+export const SESSION_SCHEMA_VERSIONS_READ: readonly number[] = Object.freeze([1, 2, 3, 4, 5]);
 
 /* -------------------------------------------------------------------------- *
  * What is persisted

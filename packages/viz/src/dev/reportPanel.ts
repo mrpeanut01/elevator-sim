@@ -30,7 +30,7 @@
  *
  * Every tone maps to a colour *and* is already carried by the words `shift/report.ts` put in the
  * note, which is why the note is not optional in {@link FigureView}. The goal rows go further and
- * carry a glyph (`✓ ○ ·`, from `shift/goals.ts`) plus a `title` naming the state in words, because
+ * carry a glyph (`✓ × ·`, from `shift/goals.ts`) plus a `title` naming the state in words, because
  * the met/missed pair differs by a green that reads as grey under `prefers-contrast`.
  *
  * ## The pure part and the dumb part
@@ -104,7 +104,7 @@
  * has no *finished* instant to agree with.
  */
 
-import { GOAL_GLYPHS } from '../shift/goals.js';
+import { GOAL_GLYPHS, PENDING_DISPLAY } from '../shift/goals.js';
 import { contractById } from '../shift/contracts.js';
 import {
   CASUAL_LEVERS_HEADING,
@@ -123,7 +123,7 @@ import {
 import type {
   ClearedAward,
   FigureTone,
-  GoalReading,
+  GoalLine,
   ReportDiagnosis,
   ReportFigure,
   ReportLever,
@@ -176,6 +176,12 @@ export interface GoalRowView {
   readonly label: string;
   /** The observed value, or the em dash while the building has not woken up. */
   readonly display: string;
+  /**
+   * `was 78%`, or the bare em dash when the building has no previous day — `GoalLine.was`,
+   * dressed exactly as the rail's `goalRowsOf` dresses it, because two spellings of yesterday
+   * would be two screens disagreeing.
+   */
+  readonly was: string;
   readonly colour: string;
   readonly background: string;
   /** The state in words, as a `title`. The glyph is the shorthand; this is the message. KB-15. */
@@ -616,7 +622,8 @@ export function figureViewOf(cell: ReportFigure, mode: ViewMode = 'advanced'): F
  * -------------------------------------------------------------------------- */
 
 /** The design's two goal-row treatments, widened to the third state the implementation has. */
-export function goalRowViewOf(reading: GoalReading): GoalRowView {
+export function goalRowViewOf(line: GoalLine): GoalRowView {
+  const { reading } = line;
   const dressing =
     reading.state === 'met'
       ? { colour: 'var(--ok)', background: 'rgb(63 178 127 / 0.07)', help: 'met' }
@@ -637,6 +644,9 @@ export function goalRowViewOf(reading: GoalReading): GoalRowView {
     glyph: GOAL_GLYPHS[reading.state],
     label: reading.goal.label,
     display: reading.display,
+    // The word only when there is a figure to attribute — `was —` would dress an absence as a
+    // measurement. The same rule `dev/leftRail.ts#goalRowsOf` applies, spelled the same way.
+    was: line.was === PENDING_DISPLAY ? PENDING_DISPLAY : `was ${line.was}`,
     ...dressing,
   };
 }
@@ -1521,6 +1531,9 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
               style: { color: row.colour },
             }),
             el(doc, 'span', { className: 'goal-label', text: row.label }),
+            // Last night's figure before today's — the handoff's "was" column (§ 8.6), in the
+            // same reading order the rail draws: claim, precedent, verdict.
+            el(doc, 'span', { className: 'goal-was', text: row.was }),
             el(doc, 'span', {
               className: 'goal-got',
               text: row.display,

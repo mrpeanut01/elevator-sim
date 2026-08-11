@@ -1022,12 +1022,16 @@ const HOW_TO_PLAY: MenuGuide = Object.freeze({
       heading: 'What a shift is',
       body: Object.freeze([
         'A shift is one day in one building. Passengers arrive, cars answer, and the day is read ' +
-          'against three goals: carry a share of the people who turned up, get a share of riders ' +
-          'away inside a minute, and — alternating by day — either hold the deepest landing ' +
-          'queue under a number, or let nobody wait past the 15-minute horizon.',
+          'against four goals, all four every day: carry a share of the people who turned up, ' +
+          'get a share of riders away inside a minute, hold the deepest landing queue under a ' +
+          'number, and keep the worst wait inside a ceiling. The four are in tension — a group ' +
+          'that chases the shares cannot also park a car for the landing that stacks, and the ' +
+          'worst wait is the bar that slips when you serve the average rider first. That ' +
+          'tension is the day’s actual puzzle.',
         'The bars harden as the week goes on, and then they stop. Away-inside-a-minute tops out ' +
-          'at 84 %, carried tops out at 96 %, and the queue bar bottoms out at 12 people. There ' +
-          'is no losing here. There is a line you are trying to bend upward.',
+          'at 84 %, carried tops out at 96 %, the queue bar bottoms out at 12 people, and the ' +
+          'worst-wait ceiling bottoms out at 150 seconds. There is no losing here. There is a ' +
+          'line you are trying to bend upward.',
         'Nothing is graded before the building wakes up: under 20 arrivals every goal reads a ' +
           'dash instead of a verdict, because a carried share over three riders is arithmetic ' +
           'rather than competence. Every goal is read from counts — never from an average — so a ' +
