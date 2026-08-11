@@ -242,6 +242,7 @@ import { ghostPlanOf } from './ghostRun.js';
 import { watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
+import { watchingStateOf } from '../watch/session.js';
 import {
   createShiftRunner,
   shiftRunCostOf,
@@ -2604,6 +2605,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
     readonly startOfDayS: number | undefined;
     readonly filedRunId: string | undefined;
     readonly playheadS: number | undefined;
+    /**
+     * Whether the player's own run was **playing** when they left it.
+     *
+     * The playhead alone is not *"exactly where you were"*, and the browser tier is what said so: a
+     * player who had paused at 08:30 came back to 08:31 and climbing, because `adopt` autoplays.
+     * One second of drift is not a rounding artefact — it is a run that resumed on its own, which
+     * is the same class of surprise as the speed chip latching across a mode (`docs/19` defect 12).
+     */
+    readonly wasPlaying: boolean;
   }
 
   /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
@@ -3225,7 +3235,15 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * **hidden rather than disabled**: the table says *no timeline*, and a greyed-out scrubber is
      * still a timeline telling a spectator that the four-step day is theirs to close.
      */
+    /*
+     * **Both the attribute and the inline display**, and the pair is a finding rather than belt and
+     * braces. `index.html` gives `#timeline` a `display` of its own, which is more specific than the
+     * user-agent's `[hidden] { display: none }` — so the attribute alone left the scrubber on
+     * screen, and the browser tier caught it on its first run. The attribute stays because it is
+     * what an assistive technology reads; the inline rule is what actually removes it.
+     */
     ui.transport.timeline.hidden = view !== undefined;
+    ui.transport.timeline.style.setProperty('display', view === undefined ? '' : 'none');
     /*
      * § 14.1's rail subline replaces the phase pill, which is the element that carries
      * `MID-DAY · 08:41` — the table's own example. **Written after `drawHeader`** in both render
@@ -4227,6 +4245,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
         startOfDayS: runStartOfDayS,
         filedRunId,
         playheadS: playback?.simTimeS,
+        wasPlaying: playback?.state === 'playing',
       },
     };
     /*
@@ -4244,7 +4263,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * omission means *this has no hour*, never *midnight*.
      */
     runStartOfDayS = undefined;
-    state = { ...state, recording };
+    /*
+     * Through `watch/session.ts` rather than spelled out here — § 14.1's *"`dayClosed` is
+     * untouched, and so is your own day's state"* is a checkable claim, and a claim living in a
+     * click handler is a claim nothing checks. `session.test.ts` asserts the untouched half by
+     * object identity.
+     */
+    state = watchingStateOf(state, recording);
     adopt(recording);
     renderAll();
   }
@@ -4284,6 +4309,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     } else {
       adopt(state.recording);
       if (before.playheadS !== undefined) playback?.seekTo(before.playheadS);
+      /*
+       * And paused if they were paused. `adopt` autoplays whenever the overlay has been dismissed,
+       * so without this a spectator's return silently starts a run the player had stopped — see
+       * {@link WatchedBefore.wasPlaying}. Seeking neither starts nor stops playback, so the order
+       * of these two lines is free; `pause` is written after for the reader.
+       */
+      if (!before.wasPlaying) playback?.pause();
     }
     /*
      * **After `adopt`, which arms the filing gate.** `adopt` sets `filedRunId = undefined`, so a

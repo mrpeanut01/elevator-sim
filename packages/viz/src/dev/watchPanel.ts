@@ -314,6 +314,23 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
   let currentRun: WatchableRun | undefined;
 
   /**
+   * What the chrome was last drawn for — GitHub issue #106's rule, applied before it could bite.
+   *
+   * The shell calls `showChrome` from `renderLive`, which runs at 60 Hz, and the strip contains two
+   * **buttons**. `fill` is `replaceChildren`, which removes and re-inserts every child — and a
+   * browser decides whether to fire `click` by remembering the element the pointer went *down* on,
+   * a memory it throws away when that element leaves the document. So a rebuilt-every-frame action
+   * bar is a bar whose buttons can never be pressed.
+   *
+   * It is not a hypothetical here: the browser tier caught it, reporting sixty attempts at
+   * `⤺ Stop watching` and *"element was detached from the DOM, retrying"* on every one. `dom.ts`
+   * offers `fillKeeping` for exactly this, and keying is better still — the strip's contents are a
+   * pure function of the view, so a frame on which the view did not change has no work to do at
+   * all. `drawRaceStrip`'s `lastRaceKey` is the same arrangement for the same reason.
+   */
+  let lastChromeKey = '';
+
+  /**
    * The strip that carries § 14.1's identity block, posted figures and action bar.
    *
    * Inserted **before** the header by the shell, through `parentElement?.insertBefore` — this
@@ -333,10 +350,17 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
 
   function showChrome(view: WatchingView | undefined): void {
     if (view === undefined) {
+      if (lastChromeKey === '') return;
+      lastChromeKey = '';
       chrome.style.display = 'none';
       fill(chrome);
       return;
     }
+    // The whole view, because every field of it is drawn — a key over a subset is a key that stops
+    // noticing the field somebody adds next.
+    const key = JSON.stringify(view);
+    if (key === lastChromeKey) return;
+    lastChromeKey = key;
     chrome.style.display = 'block';
     fill(
       chrome,

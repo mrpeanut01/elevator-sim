@@ -188,7 +188,7 @@ describe('a record replays the run it was taken from', () => {
     if (record === undefined) return;
     const loaded = {
       ...baseState(),
-      levers: { ...baseState().levers, parking: 'lobby' as const },
+      levers: { ...baseState().levers, parking: !baseState().levers.parking },
       patience: { distribution: 'exponential' as const, meanS: 90 },
       outOfServiceCarIds: ['main-1'],
     };
