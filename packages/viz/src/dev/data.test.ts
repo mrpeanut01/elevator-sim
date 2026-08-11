@@ -28,7 +28,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DATA_DIR } from '../fixtures.test-helper.js';
 
-import { loadBrowserResources, loadCampaign, loadFixitCases } from './data.js';
+import { loadBrowserResources, loadCampaign, loadFixitCases, loadReferenceRuns } from './data.js';
 
 /**
  * The contract, and the reason each entry is on it.
@@ -43,6 +43,7 @@ const EXPECTED_FETCHES = [
   '/dispatcher-profiles.json',
   '/elevator-specs.json',
   '/fixit-cases.json',
+  '/reference-runs.json',
   '/scenario-goals.json',
   '/traffic-profiles.json',
 ] as const;
@@ -84,12 +85,14 @@ describe('the documents the viewer fetches by a fixed name', () => {
     // All three loaders, because the split is deliberate and none alone is the contract.
     // `loadBrowserResources` is what `dev/batchWorker.ts` runs on every worker start and fetches
     // four; `loadCampaign` is the Campaign panel's only call and fetches two more; `loadFixitCases`
-    // is the Fix-a-building panel's only call and fetches the seventh. A test that drove one would
-    // leave documents unpinned — which is how `campaign.json` and `scenario-goals.json` came to be
-    // absent from the first draft of this list.
+    // is the Fix-a-building panel's only call and fetches the seventh; `loadReferenceRuns` is the
+    // watch picker's only call and fetches the eighth. A test that drove one would leave documents
+    // unpinned — which is how `campaign.json` and `scenario-goals.json` came to be absent from the
+    // first draft of this list.
     const resources = await loadBrowserResources();
     await loadCampaign(resources);
     await loadFixitCases(resources);
+    await loadReferenceRuns((id) => id);
 
     // Non-vacuous first: a stub that fetched nothing would satisfy a set comparison against an
     // empty list, and every assertion below it would be true of a viewer that loads no data.
@@ -100,7 +103,7 @@ describe('the documents the viewer fetches by a fixed name', () => {
 
     // Every one of them revalidated, which is the half of the cache repair a response header
     // cannot do. The clients poisoned by the old `immutable` will not revalidate on their own —
-    // that is what `immutable` means — so the request has to ask. Asserted for all seven rather
+    // that is what `immutable` means — so the request has to ask. Asserted for all eight rather
     // than for the one that broke, because the next stale document will be a different one.
     expect(modes).toEqual(EXPECTED_FETCHES.map(() => 'no-cache'));
   });
