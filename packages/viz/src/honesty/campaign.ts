@@ -65,6 +65,13 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
   let skipped = 0;
   let suppressedCases = 0;
   const temporal = { atPlayhead: 0, early: 0, declaredNow: 0, declaredWholeRun: 0 };
+  /*
+   * Cells summed, states **maximised**: every case renders the whole matrix independently, so the
+   * campaign's figure is the widest any one case reached — a sum would multiply thirty-two by the
+   * corpus size and say nothing about coverage. See `types.ts#WithheldReach`.
+   */
+  let withheldCells = 0;
+  let withheldStatesSeen = 0;
   const shrunkSignatures = new Set<string>();
 
   for (const seed of options.seeds) {
@@ -81,6 +88,8 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
     temporal.early += outcome.temporal.early;
     temporal.declaredNow += outcome.temporal.declaredNow;
     temporal.declaredWholeRun += outcome.temporal.declaredWholeRun;
+    withheldCells += outcome.withheld.cells;
+    withheldStatesSeen = Math.max(withheldStatesSeen, outcome.withheld.states);
     if (outcome.skipped !== undefined) skipped += 1;
     if (outcome.suppressed) suppressedCases += 1;
 
@@ -124,6 +133,7 @@ export function runHonestyCampaign(options: HonestyCampaignOptions): HonestyCamp
       buildings: Object.freeze(buildings),
       modes: Object.freeze(modes),
       temporal: Object.freeze({ ...temporal }),
+      withheld: Object.freeze({ cells: withheldCells, states: withheldStatesSeen }),
     }),
   };
 }
@@ -150,6 +160,8 @@ export function formatHonestyStats(stats: HonestyCampaignStats): string {
      */
     `at a playhead    ${String(stats.temporal.atPlayhead)} (${String(stats.temporal.early)} short of endedAt)`,
     `declared basis   now=${String(stats.temporal.declaredNow)} whole-run=${String(stats.temporal.declaredWholeRun)}`,
+    // The withheld matrix's own size, for the same reason and asserted the same way (§ 12.2).
+    `withheld cells   ${String(stats.withheld.cells)} in ${String(stats.withheld.states)} combinations`,
   ].join('\n');
 }
 

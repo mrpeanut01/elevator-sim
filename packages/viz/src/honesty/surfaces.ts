@@ -217,6 +217,7 @@ import {
   shiftIsOver,
   statRowsOf,
   streakLineOf,
+  todayShareFor,
 } from '../dev/leftRail.js';
 import { machineRowsOf, ratedSpeedChipsOf, speedLadderOf } from '../dev/machinesEditor.js';
 import {
@@ -249,7 +250,7 @@ import {
 import { moodOf } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { CONTRACTS, contractById, contractForBuilding, nextContract, statLineOf } from '../shift/contracts.js';
-import { LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
+import { bankingRefusalFor, LOADED_RUN_CANNOT_BANK, UNCHOSEN_RUN_CANNOT_BANK } from '../shift/banking.js';
 import { baseDemandOf, SHIFT_EVENTS, shiftRunPatch } from '../shift/events.js';
 import { bestLineFor, goalsForDay, readGoal, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
@@ -328,7 +329,15 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 
 import type { WaitBandBasis } from '../live/types.js';
 
-import type { HonestyCase, RenderedText, TextProvenance, TextRole, TextPlayhead } from './types.js';
+import { withheldStates, type WithheldState } from './generate.js';
+import type {
+  HonestyCase,
+  RenderedText,
+  TextProvenance,
+  TextRole,
+  TextPlayhead,
+  WithheldFigure,
+} from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * The context an adapter is handed
@@ -530,6 +539,8 @@ interface TextSeed {
   readonly gated?: boolean | undefined;
   /** When the surface said it, for a surface driven at a playhead — see {@link atPlayhead}. */
   readonly playhead?: TextPlayhead | undefined;
+  /** That this cell stands where a figure the state withholds would be — see {@link WithheldFigure}. */
+  readonly withheld?: WithheldFigure | undefined;
 }
 
 /**
@@ -570,6 +581,7 @@ function singleRun(surfaceId: string, seeds: readonly TextSeed[]): readonly Rend
       energyAxis: seed.energyAxis,
       gated: seed.gated,
       playhead: seed.playhead,
+      withheld: seed.withheld,
     }));
 }
 
@@ -6421,6 +6433,229 @@ const WATCH: SurfaceAdapter = {
   },
 };
 
+
+/**
+ * **The withheld matrix — ENGINE_CONTRACT § 12.2, driven from the state model rather than from
+ * fixtures.**
+ *
+ * ## What this adapter is, and why it is a state sweep rather than a surface
+ *
+ * Every other adapter here drives one surface in the state the case produced. This one drives
+ * **several surfaces in thirty-two states**, because the claim § 12.2 makes is about the states and
+ * not about the surfaces: *"four independent reasons a figure is withheld … and they combine …
+ * every combination renders `—` or a labelled unavailable state; none renders a zero, a spinner or
+ * a stale figure."* `generate.ts#withheldStates` is the enumeration; this is what it is enumerated
+ * *for*.
+ *
+ * The states are enumerated rather than drawn, so a case does not sample the matrix — it renders
+ * all of it. Nothing here runs a simulation: every state is a projection of the case's own two
+ * recordings, with the case's own run standing for the player's and the **candidate** run standing
+ * for the stranger's, which is the only honest way to have two runs without paying for a third.
+ *
+ * ## Which of § 12.2's five surfaces exist in this tree, said rather than assumed
+ *
+ * `docs/18`'s precedent is that this audit corrects the plan, and two of the five named surfaces
+ * are the prototype's rather than this shell's:
+ *
+ * | § 12.2 names | here |
+ * |---|---|
+ * | Your week | **exists** — `dev/leftRail.ts`'s week card: the three run figures, the seven-day sparkline, and `shift/weekLabel.ts#coachWeekLines`' ribbon |
+ * | the report | **exists** — `dev/reportPanel.ts#emptyReportView`, the sheet's own account of why it is empty |
+ * | the board | **exists, without a server** — `menu/screens.ts`'s leaderboard body over `menu/client.ts`'s types |
+ * | the ladder | **does not exist** — a standing dispatcher rating is unbuilt; slice 4d omitted the ghost's *best* arm for the same reason (*"needs a rating that does not exist"*), and a sweep of a ladder would be a sweep of a screen nobody can open |
+ * | the percentile line | **does not exist** — nothing in this tree computes *"better than 64 % of today's players"*: there is no world distribution, and `menu/client.ts` has no endpoint that would carry one |
+ *
+ * The two absences are named here rather than stubbed, on § 20.11's own rule about reference runs
+ * and slice 4d's about the world band: a surface invented in order to be swept is a surface with no
+ * reader, and the sweep would then certify it.
+ *
+ * ## What is marked withheld, and what deliberately is not
+ *
+ * A cell is marked when the state makes its figure **unavailable**, never merely unflattering:
+ *
+ * - *best day so far* under `day-not-closed` — a high-water mark over an empty history.
+ * - *banked this scenario* under `sandbox` — a fraction whose denominator is a contract the week
+ *   does not have.
+ * - the sparkline's provisional bar under `watching` — the stage is showing a stranger's run, so
+ *   there is no figure of the player's own to draw. **This is the one that was wrong**, and
+ *   `dev/leftRail.ts#todayShareFor` is the fix.
+ * - the empty sheet's title under `day-not-closed` or `watching`.
+ * - the board's *Post this run* refusal under `no-post`, `watching` or `day-not-closed`.
+ * - the leaderboard's first notice under `world-absent` — the slot § 16 rule 15 requires to carry a
+ *   labelled unavailable state. Seeded as the empty string when the view produces no notice at all,
+ *   because *nothing where the world figures were* is the defect that rule is about, and a cell the
+ *   sweep never seeds is a cell the property cannot judge.
+ *
+ * **Not marked:** the sparkline's *so far* bar when the run on the stage is the player's own.
+ * § 14's prototype shows `—` there until the day closes; this tree draws a provisional bar whose
+ * title says *"so far"* in the same breath as the number, which is the same licence the temporal
+ * axis grants (`properties.ts#NAMES_ITS_OWN_WINDOW`) and which `docs/18`'s framing lets the code
+ * win. Also not marked: *clean days running* and *N clean shifts banked*, which are counts of
+ * things that happened and are honestly zero.
+ *
+ * **Known limit, stated rather than discovered.** A row the view does **not** draw produces no
+ * string, so *"no board row survives with no server"* is asserted where absences are assertable —
+ * `menu/screens.ts`'s own tests — and not here. This instrument judges what a surface said.
+ */
+const WITHHELD_MATRIX: SurfaceAdapter = {
+  id: 'dev/leftRail.ts#runFiguresOf',
+  covers: [
+    'dev/leftRail.ts#runFiguresOf',
+    'dev/leftRail.ts#historyBarsOf',
+    'shift/weekLabel.ts#coachWeekLines',
+    'dev/reportPanel.ts#emptyReportView',
+    'shift/banking.ts#bankingRefusalFor',
+    'menu/account.ts#postingRefusal',
+    'menu/screens.ts#screenOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+    const day = bundle.days[0];
+    /* c8 ignore next -- `shiftBundleOf` always builds two days; this narrows the type. */
+    if (day === undefined) return [];
+
+    /* The player's own run, and the stranger's — the candidate arm, folded at its own end. */
+    const ownShare = bundle.observations.minutePct;
+    const watched = context.comparisonRecording;
+    const watchedShare = shiftObservationsOf(observationsAt(watched, watched.endedAt)).minutePct;
+
+    const catalogue = catalogueOf({
+      buildings: context.buildings as unknown as CatalogueSource['buildings'],
+      dispatcherProfiles: context.dispatcherProfiles,
+      trafficProfiles: context.trafficProfiles,
+    });
+    const menuState = initialMenuState(catalogue);
+    const player = {
+      id: 'u1',
+      email: 'p@example.test',
+      displayName: 'A player',
+      displayNameChosen: true,
+    };
+
+    for (const state of withheldStates()) {
+      const at = `withheld(${state.id})`;
+      const cell = (
+        because: readonly string[],
+        ifPublished: readonly string[],
+      ): WithheldFigure => ({ state: state.id, because, ifPublished });
+
+      /* ---- Your week: the card, the sparkline and the ribbon ---- */
+      const contractId = state.sandbox ? FREE_PLAY_CONTRACT_ID : day.week.contractId;
+      const week: WeekState = state.dayNotClosed
+        ? openWeek(contractId)
+        : { ...day.week, contractId };
+
+      for (const [index, figure] of runFiguresOf(week).entries()) {
+        const withheldHere =
+          index === 1 && state.dayNotClosed
+            ? cell(['day-not-closed'], [String(ownShare), String(watchedShare)])
+            : index === 2 && state.sandbox
+              ? cell(['sandbox'], [])
+              : undefined;
+        seeds.push({
+          field: `${at}.week.figure(${figure.label})`,
+          text: figure.value,
+          role: withheldHere === undefined ? 'observation' : 'suppressed',
+          ...(withheldHere === undefined ? {} : { withheld: withheldHere }),
+        });
+        seeds.push({
+          field: `${at}.week.figure(${figure.label}).label`,
+          text: figure.label,
+          role: 'label',
+        });
+      }
+
+      /*
+       * The stage's own share, asked of the rail's decision rather than of the recording — the
+       * whole point of `todayShareFor` is that *whose figure is this* is a decision and not a read.
+       */
+      const share = todayShareFor(state.watching, state.watching ? watchedShare : ownShare);
+      const provisional = week.history.length === 0;
+      for (const [index, bar] of historyBarsOf(week.history, share, week.dayIdx).entries()) {
+        const withheldHere =
+          provisional && state.watching ? cell(['watching'], [String(watchedShare)]) : undefined;
+        seeds.push({
+          field: `${at}.week.bar[${String(index)}].title`,
+          text: bar.title,
+          role: withheldHere === undefined ? 'observation' : 'suppressed',
+          ...(withheldHere === undefined ? {} : { withheld: withheldHere }),
+        });
+      }
+
+      const ribbon = coachWeekLines(week, context.case.durationS);
+      seeds.push({ field: `${at}.week.ribbon.label`, text: ribbon.label, role: 'label' });
+      seeds.push({
+        field: `${at}.week.ribbon.progress`,
+        text: ribbon.progress,
+        role: state.sandbox ? 'suppressed' : 'observation',
+        ...(state.sandbox ? { withheld: cell(['sandbox'], []) } : {}),
+      });
+
+      /* ---- The day's sheet ---- */
+      const onScreen = state.watching ? watched : context.recording;
+      const bankingRefusal = bankingRefusalFor(onScreen, context.recording);
+      if (state.dayNotClosed || state.watching) {
+        const refusal =
+          bankingRefusal ?? (state.dayNotClosed ? UNCHOSEN_RUN_CANNOT_BANK : undefined);
+        const sheet = emptyReportView({ refusal, fromPreviousSitting: false });
+        seeds.push({
+          field: `${at}.report.title`,
+          text: sheet.title,
+          role: 'suppressed',
+          withheld: cell(
+            state.watching ? ['watching'] : ['day-not-closed'],
+            [String(ownShare), String(watchedShare)],
+          ),
+        });
+        seeds.push({ field: `${at}.report.lede`, text: sheet.lede, role: 'reason' });
+      }
+
+      /* ---- The board: posting, and the world with nothing behind it ---- */
+      const account = state.noPost ? SIGNED_OUT : signedIn(SIGNED_OUT, 'token', player);
+      const refusalToPost = postingRefusal(account);
+      const board = screenOf({
+        state: { ...menuState, screen: 'leaderboard' },
+        catalogue,
+        canPost: !state.noPost,
+        hasRun: !state.dayNotClosed,
+        ...(refusalToPost === undefined ? {} : { postingRefusal: refusalToPost }),
+        ...(state.watching && bankingRefusal !== null ? { rankingRefusal: bankingRefusal } : {}),
+        /*
+         * No `boards` and no `boardPage` with the API absent — the state issue #123 describes and
+         * the one this build is permanently in. The other arm is a board that answered, which is
+         * what `MENU` already drives; here it is the axis's second value rather than the default.
+         */
+        ...(state.worldAbsent ? {} : { boards: [{ configHash: 'abcdef0123456789', entries: 3 }] }),
+      });
+      const postRow = board.rows.find((row) => row.id === 'leaderboard.submit');
+      const postRefused = state.noPost || state.dayNotClosed || state.watching;
+      seeds.push({
+        field: `${at}.board.submit.why`,
+        text: postRow?.disabledWhy ?? '',
+        role: postRefused ? 'suppressed' : 'label',
+        ...(postRefused
+          ? {
+              withheld: cell(
+                state.reasons.filter((reason) =>
+                  ['no-post', 'day-not-closed', 'watching'].includes(reason),
+                ),
+                [],
+              ),
+            }
+          : {}),
+      });
+      seeds.push({
+        field: `${at}.board.worldFigures`,
+        text: board.notices[0] ?? '',
+        role: state.worldAbsent ? 'suppressed' : 'prose',
+        ...(state.worldAbsent ? { withheld: cell(['world-absent'], []) } : {}),
+      });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 /** One rule row with each id's first declared value, for the adapter above. */
 function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
   const whenValue = RULE_CONDITION_WORDS[when].values?.[0]?.value;
@@ -6487,6 +6722,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
   RACE_STRIP,
   WATCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
+  // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
+  // every week-shaped and menu-shaped fault onto this surface.
+  WITHHELD_MATRIX,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

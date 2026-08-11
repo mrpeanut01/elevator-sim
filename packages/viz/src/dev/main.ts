@@ -3167,6 +3167,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
        */
       building: recording === undefined ? resolvedBuildingOf(resources, state) : building,
       playing: playback?.state === 'playing',
+      /*
+       * The spectator fact, on the view because the rail needs it and cannot reach this closure —
+       * see {@link ViewAt.watching}. Through {@link isWatching} rather than `watching !== undefined`
+       * inline, so there is one answer to *is this somebody else's run* on both sides of the render.
+       */
+      watching: isWatching(),
       unfiledSheet: unfiledSheetFacts(recording, simTimeS),
     };
   }

@@ -474,9 +474,30 @@ export function streakLineOf(week: WeekState): StreakLine {
  * there is no contract behind it to bank against and a fraction with no denominator is not a
  * progress figure. `contractById` returns `undefined` there rather than throwing, which is the
  * behaviour `week.ts` relies on for restored state naming a scenario since renamed.
+ *
+ * ## *best day so far* reads `—` until a day has closed, and it used to read `0%`
+ *
+ * Found by the withheld-matrix sweep (ENGINE_CONTRACT § 12.2, `honesty/generate.ts#withheldStates`)
+ * on the state a **new player is in for their whole first shift**: `openWeek` seeds
+ * `bestMinutePct: 0`, so the middle figure published *0%* under the label *best day so far* from
+ * boot until the first day filed. § 12.2's rule for a withheld cell is *never a zero*, and § 16
+ * rule 1 says why in the reader's terms: an unfinished thing shows `—`. A best over an empty sample
+ * is not a bad best, and the two are indistinguishable at a glance — the same distinction
+ * `awtIsValid` draws when it refuses a mean over an empty window rather than reporting one.
+ *
+ * The gate is `history.length === 0` rather than `bestMinutePct === 0`, because the question is
+ * *has any day closed* and `closeDay` is the only writer of either: it appends the day and raises
+ * the high-water mark in the same expression, so an empty history is exactly *nothing has been
+ * banked in this week*. Reading the mark instead would also withhold a genuine 0 % day, which is a
+ * measured figure and belongs on screen.
+ *
+ * `historyBarsOf` has always drawn its own version of this state — *"nothing banked yet — no shift
+ * has closed"* — one figure to the right of this one, which is what makes the old `0%` a
+ * disagreement between two cells of one card rather than only a wrong number.
  */
 export function runFiguresOf(week: WeekState): readonly RunFigure[] {
   const contract = contractById(week.contractId);
+  const banked = week.history.length > 0;
   return [
     {
       value: String(week.streak),
@@ -485,7 +506,11 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
       label: week.streak === 1 ? 'clean day running' : 'clean days running',
       color: week.streak > 0 ? GOOD : DIM,
     },
-    { value: `${String(week.bestMinutePct)}%`, label: 'best day so far', color: undefined },
+    {
+      value: banked ? `${String(week.bestMinutePct)}%` : PENDING_DISPLAY,
+      label: 'best day so far',
+      color: banked ? undefined : DIM,
+    },
     {
       value:
         contract === undefined
@@ -495,6 +520,42 @@ export function runFiguresOf(week: WeekState): readonly RunFigure[] {
       color: BANKED,
     },
   ];
+}
+
+/**
+ * The *today, so far* figure the week strip may read — or `undefined`, which is every state where
+ * the run on the stage is not the player's own day.
+ *
+ * ## The defect this closes, which is § 12.2's *stale figure* in its sharpest form
+ *
+ * {@link historyBarsOf}'s second argument is the share of riders away inside a minute **so far**,
+ * and `drawShift` took it from `observationsAt(view.recording, …)` — the recording on the stage.
+ * While watching somebody else's posted day (`watch/session.ts#watchingStateOf`) that recording is
+ * a stranger's, and `WeekState` is deliberately untouched, so on a week with no closed day the
+ * player's own strip drew one bar reading **“Tuesday, so far: 66 % away inside a minute”** — the
+ * watched player's figure, in the player's own week, labelled as theirs by nothing.
+ *
+ * It is reachable on a first sitting and nowhere else: the empty-history arm is the only one that
+ * reads this argument, so the state is *a player who has filed no day yet opens somebody else's
+ * run*, which is the shipped reference runs' whole purpose. Found by the withheld-matrix sweep
+ * (`honesty/generate.ts#withheldStates`, the `watching` axis) rather than by review.
+ *
+ * ## Why a function rather than a ternary at the call site
+ *
+ * `dev/state.ts`'s standing rule: a decision made inside a render body cannot be tested, because the
+ * body needs a document and a canvas. This is the decision — *whose figure is this* — and it is the
+ * one the sweep drives. The call site is `drawShift`, its non-test caller, and `ViewAt.watching` is
+ * the fact it reads.
+ *
+ * A **withheld** figure rather than a substituted one: there is no honest number to put here while
+ * watching. The strip's empty-history arm already says *"nothing banked yet — no shift has closed"*,
+ * which is true of the spectator's own week and is what the reader then sees.
+ */
+export function todayShareFor(
+  watching: boolean | undefined,
+  minutePct: number | undefined,
+): number | undefined {
+  return watching === true ? undefined : minutePct;
 }
 
 /** One bar of the seven-day sparkline. */
@@ -1140,7 +1201,8 @@ function drawShift(
   const observations = goalObservationsOf(recording, view.simTimeS);
   const bars = historyBarsOf(
     week.history,
-    recording === undefined ? undefined : observations.minutePct,
+    // Not the run on the stage when the run on the stage is somebody else's — {@link todayShareFor}.
+    todayShareFor(view.watching, recording === undefined ? undefined : observations.minutePct),
     week.dayIdx,
   );
   surfaces.history(bars.map((bar) => `${bar.short}:${String(bar.heightPct)}`).join('|'), () =>

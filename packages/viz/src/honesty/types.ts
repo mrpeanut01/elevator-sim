@@ -86,6 +86,8 @@ export const HONESTY_PROPERTIES = [
   'goal-without-rate',
   /** R6 / § D223 — no figure that can only be true of the whole run, at a playhead short of its end. */
   'whole-run-figure-early',
+  /** § 12.2 / § 16 rules 1 and 15 — a withheld cell reads `—` or a label, never a zero or a leak. */
+  'withheld-figure-published',
 ] as const;
 
 export type HonestyProperty = (typeof HONESTY_PROPERTIES)[number];
@@ -198,6 +200,37 @@ export interface TextPlayhead {
   readonly basis?: WaitBandBasis | undefined;
 }
 
+/**
+ * A cell standing where a figure the shell **may not publish** would be — the withheld matrix's
+ * unit of observation (ENGINE_CONTRACT § 12.2).
+ *
+ * ## Why the adapter declares it rather than the property inferring it
+ *
+ * *"Is this cell one that must be withheld right now?"* is not answerable from the string. It is a
+ * fact about the state the surface was driven in — which is why § 12.2 asks for an enumeration of
+ * **states** rather than a scan of words — so the adapter that put the surface in the state is the
+ * only thing that knows, and it says so here. `TextPlayhead` is declared the same way and for the
+ * same reason.
+ *
+ * {@link ifPublished} is what makes the *stale figure* half decidable rather than a guess: the
+ * adapter knows what the cell would have carried had the figure been available (the watched run's
+ * share, the day's percentage), and a withheld cell carrying that numeral is a leak whatever words
+ * surround it. An empty list is honest and common — many cells have nothing that could leak into
+ * them — and it narrows this property to its other three clauses for that cell.
+ */
+export interface WithheldFigure {
+  /** The combination this cell was drawn under — `generate.ts#WithheldState.id`. */
+  readonly state: string;
+  /** The reasons that withhold **this** cell, a subset of the state's. Never empty. */
+  readonly because: readonly string[];
+  /**
+   * What the cell would carry if the figure were available — numerals that may not appear here.
+   *
+   * Rendered forms, not raw numbers, so the comparison is against what a reader would read.
+   */
+  readonly ifPublished: readonly string[];
+}
+
 /** One string a player would actually see, with the structural facts the surface knows about it. */
 export interface RenderedText {
   /** `<module>#<export>`, matching the ids `derive.ts` produces from the source tree. */
@@ -262,6 +295,13 @@ export interface RenderedText {
    * against, which is a different fact from passing it.
    */
   readonly playhead?: TextPlayhead | undefined;
+  /**
+   * That this string stands in a **withheld** figure's place, and under which state. § 12.2.
+   *
+   * `undefined` for every string that is not one — which is nearly all of them, and is a different
+   * fact from a cell that is withheld and honest about it. See {@link WithheldFigure}.
+   */
+  readonly withheld?: WithheldFigure | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -355,6 +395,8 @@ export interface HonestyOutcome {
   readonly suppressed: boolean;
   /** How much of this case's text the temporal axis reached, and how it was declared. */
   readonly temporal: TemporalReach;
+  /** How much of it the withheld matrix reached. See {@link WithheldReach}. */
+  readonly withheld: WithheldReach;
 }
 
 /**
@@ -385,6 +427,24 @@ export interface TemporalReach {
   readonly declaredWholeRun: number;
 }
 
+/**
+ * The size of the withheld matrix, measured rather than assumed — {@link TemporalReach}'s reason,
+ * one axis over.
+ *
+ * `withheld-figure-published` is answerable only about cells an adapter **marked**, so a corpus that
+ * stopped marking them would leave the property iterating an empty set and reporting zero
+ * violations, which is byte-identical to the property holding. {@link states} is the sharper of the
+ * two: it counts the distinct combinations that produced at least one marked cell, and § 12.2's
+ * whole claim is about *every* combination — a number below `2 ** WITHHELD_REASONS.length` is a
+ * matrix with a hole in it, whatever the cell count says.
+ */
+export interface WithheldReach {
+  /** Cells drawn where a figure the state withholds would be. */
+  readonly cells: number;
+  /** Distinct `WithheldState.id`s that produced at least one of them. */
+  readonly states: number;
+}
+
 /** What a whole campaign measured. Printed by the always-on suite so the cost is never silent. */
 export interface HonestyCampaignStats {
   readonly cases: number;
@@ -401,4 +461,6 @@ export interface HonestyCampaignStats {
   readonly modes: Readonly<Record<string, number>>;
   /** The temporal axis's own size, summed over the campaign. See {@link TemporalReach}. */
   readonly temporal: TemporalReach;
+  /** The withheld matrix's own size, summed over the campaign. See {@link WithheldReach}. */
+  readonly withheld: WithheldReach;
 }

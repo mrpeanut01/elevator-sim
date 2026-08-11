@@ -52,7 +52,13 @@ import {
   type HonestyContext,
   type StageBundle,
 } from './surfaces.js';
-import type { HonestyCase, HonestyOutcome, RenderedText, TemporalReach } from './types.js';
+import type {
+  HonestyCase,
+  HonestyOutcome,
+  RenderedText,
+  TemporalReach,
+  WithheldReach,
+} from './types.js';
 
 /**
  * Everything a case needs that is not the case.
@@ -109,6 +115,27 @@ const NO_TEMPORAL_REACH: TemporalReach = Object.freeze({
   declaredNow: 0,
   declaredWholeRun: 0,
 });
+
+/** The same, for the withheld matrix. Zero cells in zero states, never an absent field. */
+const NO_WITHHELD_REACH: WithheldReach = Object.freeze({ cells: 0, states: 0 });
+
+/**
+ * How far the withheld matrix reached into this case's strings — measured, never assumed.
+ *
+ * Counted after `corruptTexts` for {@link temporalReachOf}'s reason, and counting **states** as well
+ * as cells because § 12.2's claim is about every combination: a corpus that marked a thousand cells
+ * in four states would satisfy a cell count and leave twenty-eight combinations unswept.
+ */
+function withheldReachOf(texts: readonly RenderedText[]): WithheldReach {
+  const states = new Set<string>();
+  let cells = 0;
+  for (const text of texts) {
+    if (text.withheld === undefined) continue;
+    cells += 1;
+    states.add(text.withheld.state);
+  }
+  return { cells, states: states.size };
+}
 
 /**
  * How far the temporal axis reached into this case's strings — measured, never assumed.
@@ -355,6 +382,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
         simulations: 0,
         suppressed: false,
         temporal: NO_TEMPORAL_REACH,
+        withheld: NO_WITHHELD_REACH,
       };
     }
     return {
@@ -366,6 +394,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       simulations: 0,
       suppressed: false,
       temporal: NO_TEMPORAL_REACH,
+      withheld: NO_WITHHELD_REACH,
     };
   }
 
@@ -393,6 +422,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       simulations,
       suppressed: context.suppressed,
       temporal: temporalReachOf(texts),
+      withheld: withheldReachOf(texts),
     };
   } catch (error) {
     return {
@@ -404,6 +434,7 @@ export function evaluateCase(honestyCase: HonestyCase, resources: HonestyResourc
       simulations,
       suppressed: context.suppressed,
       temporal: NO_TEMPORAL_REACH,
+      withheld: NO_WITHHELD_REACH,
     };
   }
 }

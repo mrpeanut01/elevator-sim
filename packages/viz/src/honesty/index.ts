@@ -89,4 +89,6 @@ export type {
   TextPlayhead,
   TextProvenance,
   TextRole,
+  WithheldFigure,
+  WithheldReach,
 } from './types.js';

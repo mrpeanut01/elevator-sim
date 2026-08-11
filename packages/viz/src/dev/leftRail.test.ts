@@ -58,6 +58,7 @@ import {
   shiftIsOver,
   statRowsOf,
   streakLineOf,
+  todayShareFor,
   type MoodView,
 } from './leftRail.js';
 
@@ -436,6 +437,49 @@ describe('runFiguresOf and the sparkline', () => {
     // A building the reader built has no scenario behind it, so there is nothing to bank against.
     const figures = runFiguresOf(week({ contractId: 'not-a-contract' }));
     expect(figures[2]?.value).toBe(PENDING_DISPLAY);
+  });
+
+  it('withholds the best day until a day has closed, rather than publishing 0%', () => {
+    /*
+     * ENGINE_CONTRACT § 12.2's *never a zero*, found by the withheld-matrix sweep on the state a
+     * new player is in for their whole first shift: `openWeek` seeds `bestMinutePct: 0`, and the
+     * card published **0%** under *best day so far* until the first day filed. A best over an empty
+     * sample is not a bad best.
+     */
+    expect(runFiguresOf(week())[1]?.value).toBe(PENDING_DISPLAY);
+
+    // And a real 0 % day is a measurement, so it is published — the gate is the history, not the mark.
+    const zeroDay: DayOutcome = {
+      record: null,
+      day: 1,
+      dayIdx: 0,
+      weekday: 'Monday',
+      eventId: 'ordinary',
+      arrived: 120,
+      carried: 4,
+      minutePct: 0,
+      readings: [],
+      allMet: false,
+    };
+    expect(runFiguresOf(week({ history: [zeroDay], bestMinutePct: 0 }))[1]?.value).toBe('0%');
+    expect(runFiguresOf(week({ history: [zeroDay], bestMinutePct: 74 }))[1]?.value).toBe('74%');
+  });
+
+  it('draws no today figure while the run on the stage is somebody else’s', () => {
+    /*
+     * § 12.2's *never a stale figure*, and the sharpest form of it this tree had: while watching,
+     * `watch/session.ts#watchingStateOf` puts a stranger's recording on the state and leaves the
+     * week alone, so the empty-history arm of the sparkline drew **their** share as the player's own
+     * *today, so far*. The decision is `todayShareFor`; the bar is what it protects.
+     */
+    expect(todayShareFor(true, 66)).toBeUndefined();
+    expect(todayShareFor(false, 66)).toBe(66);
+    // `undefined` is *nobody has said*, which is not watching — the state every caller with no shell is in.
+    expect(todayShareFor(undefined, 66)).toBe(66);
+
+    const watchingBar = historyBarsOf([], todayShareFor(true, 66), 0);
+    expect(watchingBar[0]?.title).toContain('nothing banked yet');
+    expect(watchingBar[0]?.title).not.toContain('66');
   });
 
   it('reports the streak in words as well as in a colour', () => {
