@@ -57,6 +57,8 @@ import type {
   ParkingStrategy,
   PassengerAssignmentMode,
   ReassignmentPolicy,
+  RuleActionId,
+  RuleConditionId,
   SelectionStageConfig,
 } from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
@@ -64,6 +66,7 @@ import type { CarSnapshot, CostEstimate, CostRequest } from '../model/car/types.
 import type { CredentialGroup, Direction } from '../model/types.js';
 
 import type {
+  ResolvedRuleSets,
   ResolvedSelection,
   ResolvedWeightSets,
   WeightSetPolicy,
@@ -638,6 +641,18 @@ export interface DispatchContext {
    * with nothing below the lobby, and stated rather than silent.
    */
   readonly entranceFloorIndices?: ReadonlySet<number> | undefined;
+  /**
+   * Seconds after local midnight at which the run's `t = 0` falls, from the resolved demand
+   * template's `startOfDayS` — authored data, never a wall clock (invariant 3 intact).
+   *
+   * The input `dispatch/selector.ts`'s header said this file would gain *"if a scenario ever
+   * carries a start-of-day"*. Six shipped templates author `startOfDayMin`, and the Everyday
+   * rules' time conditions read `(startOfDayS + at) mod 86400` through this field. Read **only**
+   * under `selection.policy: 'rules'`; absent — a template with no clock, or a hand-built caller
+   * — every time clause evaluates false, which the rules editor states as a refusal rather than
+   * leaving silent (§ D227).
+   */
+  readonly startOfDayS?: number | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -817,11 +832,30 @@ export interface ResolvedAnswerStage {
   readonly allowBypassIfSoleEligibleCar: boolean;
 }
 
+/**
+ * The `idle.parkingFloorIndex` value that means *this shaft's own highest served floor*.
+ *
+ * Written only by the rules compiler, for `park the idle cars at the top floor`: parking is a
+ * per-car decision, `parkingCandidates` resolves it against the shaft it is deciding for, and a
+ * profile that wants a *specific* top floor authors that floor's real index. An integer so the
+ * resolved shape stays one numeric field, and `MAX_SAFE_INTEGER` rather than `Infinity` so the
+ * sentinel survives JSON. No shaft serves a floor at this index, which is what makes the branch
+ * in `parkingCandidates` total rather than a collision.
+ */
+export const PARK_AT_TOP_FLOOR_INDEX: number = Number.MAX_SAFE_INTEGER;
+
 /** Stage 7 settings, resolved. */
 export interface ResolvedIdleStage {
   readonly parkingStrategy: ParkingStrategy;
   readonly repositionThresholdS: number;
   readonly repositionEnergyWeight: number;
+  /**
+   * The shaft floor index `fixed-floor` parks at; {@link PARK_AT_TOP_FLOOR_INDEX} for the
+   * shaft's top served floor. Read by no other strategy, and resolved to its declared default
+   * of 0 so the field is always present — an optimizer sampling `fixed-floor` starts at the
+   * datum floor rather than at an undefined it cannot write back.
+   */
+  readonly parkingFloorIndex: number;
 }
 
 /** Which hard constraints are on. The boolean form a generic optimizer can sample. */
@@ -891,6 +925,16 @@ export interface ResolvedDispatchConfig {
    * `data/dispatcher-profiles.json`, and not a dimension an optimizer samples.
    */
   readonly weightSets?: ResolvedWeightSets | undefined;
+  /**
+   * The Everyday rules' compiled arms, present exactly when `selection.policy` is `'rules'`.
+   *
+   * Beside {@link weightSets} rather than inside `selection`, for `weightSets`' own reason:
+   * `parameters.ts` enumerates `selection`'s keys against declared tunables and a compiled arm
+   * list is not a tunable — it is the resolved form of the profile's `rules.rows`, the same kind
+   * of thing as the arm library. The two are mutually exclusive by construction: the resolver
+   * builds `weightSets` only under `fuzzy`/`contextual` and `ruleSets` only under `rules`.
+   */
+  readonly ruleSets?: ResolvedRuleSets | undefined;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -1169,10 +1213,28 @@ export interface DispatcherProfileSource {
   readonly idle?:
     | {
         readonly parkingStrategy?: ParkingStrategy | undefined;
+        readonly parkingFloorIndex?: number | undefined;
         readonly repositionThresholdS?: number | undefined;
         readonly repositionEnergyWeight?: number | undefined;
       }
     | undefined;
   /** Stage 3's weight-set selection. Absent is `policy: 'off'`, which every shipped profile is. */
   readonly selection?: SelectionStageConfig | undefined;
+  /**
+   * The Everyday rules rows (§11.5). The id unions rather than bare strings, so a
+   * `DispatcherProfile` — whose `rules` uses them — stays assignable here; `resolveRuleArms`
+   * still validates at runtime, because a hand-built fixture can cast past any type.
+   */
+  readonly rules?:
+    | {
+        readonly rows?:
+          | readonly {
+              readonly when: RuleConditionId;
+              readonly whenValue?: number | string | undefined;
+              readonly then: RuleActionId;
+              readonly thenValue?: number | string | undefined;
+            }[]
+          | undefined;
+      }
+    | undefined;
 }

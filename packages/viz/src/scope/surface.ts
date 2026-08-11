@@ -187,6 +187,14 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
       'configuring an automatic policy in advance rather than intervening — the run still has to be ' +
       'simulated again to see it.',
   ),
+  'viewer.ruleRows': control(
+    'within-day',
+    'The Everyday rules — when/then rows compiled onto the weight-set selector, first match ' +
+      'wins. within-day for selectorSpec’s reason: a rule is the product’s one genuine mid-day ' +
+      'mechanism configured in advance, and editing the list still re-runs the day. Written ' +
+      'after the selector in shiftRunConfigOf, so a non-empty list drives the run under ' +
+      'selection.policy rules and the switching panel says so.',
+  ),
   'viewer.patience': control(
     'within-day',
     'How long a rider will stand at a landing before giving up — the one schema on the Parameters ' +

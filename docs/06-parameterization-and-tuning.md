@@ -197,7 +197,8 @@ everything else.
 
 | Parameter | Values | Notes |
 |---|---|---|
-| `parkingStrategy` | `stay` \| `lobby` \| `zone-center` \| `predicted-demand` | |
+| `parkingStrategy` | `stay` \| `lobby` \| `zone-center` \| `predicted-demand` \| `fixed-floor` | |
+| `parkingFloorIndex` | floor index | The floor `fixed-floor` parks at; an unserved index parks nothing (`no-target`) |
 | `repositionThresholdS` | seconds | Do not move for gains smaller than this |
 | `repositionEnergyWeight` | float | Trades anticipated wait saving against energy spent |
 | `predictorHorizonS` | seconds | How far ahead the demand forecast looks |

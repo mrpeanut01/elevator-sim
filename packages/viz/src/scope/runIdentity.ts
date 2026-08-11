@@ -241,6 +241,21 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       ? undefined
       : `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and no selection or submission carries an intervention log — a replay without it is a different run`,
 
+  /**
+   * The Everyday rules — `interventions`' exact footing, one mechanism over.
+   *
+   * The empty list carries: `profileWithRules` returns the driving profile by object identity,
+   * so the run is the run the submitted dispatcher id already implies. A written list does not —
+   * no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a rule list —
+   * and the failure direction is `patience`'s: the server would re-simulate the seed on the
+   * profile's own weights, get different legs, and refuse an honest run as
+   * `metrics-do-not-reproduce`.
+   */
+  ruleRows: (state) =>
+    state.ruleRows.length === 0
+      ? undefined
+      : `${String(state.ruleRows.length)} Everyday rule(s) drive this run's dispatcher, and no selection or submission carries a rule list — a replay without them is a different run`,
+
   levers: (state) =>
     state.levers.parking === DEFAULT_LEVERS.parking &&
     state.levers.express === DEFAULT_LEVERS.express &&

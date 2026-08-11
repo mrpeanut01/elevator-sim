@@ -304,6 +304,8 @@ describe('every field the module is asked about has an answer, and no answer is 
     // mind, the field the contract's own replay-verification would otherwise turn into an
     // accusation. It arrived here the day the field landed, by the same walk that forced
     // `patience` in — the probe was compulsory before this list knew the name.
+    // `ruleRows` is the tenth and is slice 4c: the Everyday rules, on `interventions`' exact
+    // footing — the empty list carries by object identity, and a written list has no wire field.
     expect(sorted(fieldsAnsweredFor('ranked').map(({ field }) => field))).toEqual([
       'calendar',
       'commissioning',
@@ -311,6 +313,7 @@ describe('every field the module is asked about has an answer, and no answer is 
       'levers',
       'outOfServiceCarIds',
       'patience',
+      'ruleRows',
       'savedClasses',
       'selectorSpec',
       'week',

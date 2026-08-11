@@ -311,6 +311,49 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   persistence across reloads, the worker-thread run pairing (the pair runs synchronously,
   ~0.5–2 s), and the dispatcher-commissioning row of § 9's dispatcher table.
 
+- **Slice 4 item (c), the rules editor — LANDED.** §11.5's when/then rows, compiled onto the
+  weight-set selector as a **fourth policy** (`selection.policy: 'rules'`) rather than a second
+  mechanism: `dispatch/selector.ts#selectRuleArm` is a sibling of `selectWeightSet` — shared
+  `SelectorState` and dwell arithmetic, untouched fuzzy/contextual path (golden runs and fuzz
+  determinism re-run green) — with the two semantics §11.5 owns: first match wins in row order,
+  and **no match releases to the profile's own weights** (*If no rule fits, Steady hand
+  decides*), the release itself gated by the dwell. Rows are player data on the profile
+  (`rules.rows`, the schema's eighth auto-discovered section); the nine conditions read **no
+  rates and no window** — queue lengths, ages, load factors, structural facts, and a clock that
+  is authored data end to end (`ResolvedDemandTemplate.startOfDayS` through
+  `DispatchContext.startOfDayS`; a clockless crowd makes every time clause false and the editor
+  says so as a refusal, § D227). Eight of §11.5's ten actions ship — four weight arms raising
+  one term to `RULE_EMPHASIS` (0.5, a named constant with its argument), three idle arms
+  (`lobby`, the new `fixed-floor` stage-7 strategy with its point-mass demand model, and
+  `zone-center`, whose flagged inertness trap was **measured, not argued** — `Simulation.#park`
+  resolves the per-car partition unconditionally, and the moved-control run proves it), and one
+  **static compile** (`no-new-pickups` → `eligibility.maxLoadFactorForAssignment`, valid only
+  against *a car is fuller than*). The two refused actions are **omitted vocabulary, with the
+  reasons on `RULE_ACTIONS`**: *skip everything above* (service range is building fabric,
+  §11.4's own boundary) and *treat up-calls as urgent* (no direction-conditional cost term — the
+  reword *treat every call as urgent* is flagged as a design-owner decision, not made). Every
+  buildable action is held by a moved-control run at a named measured cell
+  (`dispatch/rules.test.ts`), and two cells are themselves findings: `prefer-same-direction` is
+  **structurally inert on `collective`** (its `noDirectionReversal` hard constraint filters
+  wrong-way cars before the soft term prices anything — measured on `eta`, where the lever
+  exists), and `emptiest-car` needs a prestige-level 16 %/5min morning before load separates the
+  fleet. Idle precedence is intervention `idleOverride` > rule arm > profile, most recent
+  explicit statement first. The editor (`authoring/ruleSpec.ts`, `dev/ruleEditor.ts`) renders
+  every word from core's own `RULE_CONDITION_WORDS`/`RULE_ACTION_WORDS` — `{v}` templates
+  substituted, never concatenated, every row naming the lever its `moves` claim asserts — and
+  writes through `dev/state.ts#shiftRunConfigOf` **after** the selector (most explicit last), so
+  written rules take the run and the switching panel says so
+  (`selectorEditor.ts#rulesOverrideNoteOf`; the `rules` policy is deliberately **not a chip**
+  there — it is entered by writing rules). Rule arms expose provenance ids
+  (`rule-2:lobby-queue-passes:12`) through the same `activePattern` getter, land in
+  `VizRecording.patternSwitches` (the `enrollPolicy` gate widened to `ruleSets`), and the stage
+  header names them in player words through `ruleProvenanceName` — `PATTERN_NAMES`' naming path
+  extended, honest fallback kept. Byte identity everywhere nothing opts in: no shipped profile
+  or `data/` change, `profileWithRules([])` is the identity by object, and the empty-rows arm of
+  the `viewer.ruleRows` probe is the run before the field existed. **Not built, named rather
+  than implied:** row persistence across reloads (`ruleRows` is session state exactly as
+  `selectorSpec` is), the reworded urgency action, and any claim that a rule *helps* — no copy
+  anywhere asserts an outcome, for § D145/§ D156/§ D169's standing reason.
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
   `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at

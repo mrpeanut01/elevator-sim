@@ -1027,6 +1027,10 @@ describe('every parking strategy moves a car on data/buildings/midtown-office.js
       // Caller-supplied data, which is the strategy's declared prerequisite — Phase 5 learns
       // it. An up-peak morning: arrivals at the two entrances, plus one busy tenant.
       'predicted-demand': { demandForecast: new Map([['G', 10], ['P1', 3], ['12', 5]]) },
+      // Nothing: the strategy's whole context is the profile's own `idle.parkingFloorIndex`,
+      // whose declared default (0) is midtown's `G` — so under defaults alone every idle car
+      // above the datum has a park to pay for, exactly like `lobby` with one entrance.
+      'fixed-floor': {},
     };
 
     for (const strategy of PARKING_STRATEGIES) {

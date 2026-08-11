@@ -123,15 +123,20 @@ export class DecisionCollector {
    * Register a policy the factory just built, and decide whether it can select.
    *
    * A selector trace is opened only for a {@link WeightedCostDispatchPolicy} whose resolved
-   * config carries a weight-set library — the same condition under which the policy constructs
-   * its `ArrivalWindow`, so *has a trace* and *built the detector* are one fact rather than two
-   * readings of it. An auction policy, or a weighted-cost policy with `selection.policy: 'off'`,
-   * is enrolled for the ordinal count and traced by nothing: it will never switch, and a trace
-   * for it would let the recording claim a watch that never happened.
+   * config carries something to select between — the fuzzy/contextual weight-set library, or
+   * the Everyday rules' compiled arms (`ruleSets`), whose provenance ids flow through the same
+   * `activePattern` getter and onto the same recording field, so the stage header can say
+   * either *everyone arriving* or *rule 2 — the lobby queue passes 12 people* from one field.
+   * An auction policy, or a weighted-cost policy with `selection.policy: 'off'`, is enrolled
+   * for the ordinal count and traced by nothing: it will never switch, and a trace for it would
+   * let the recording claim a watch that never happened.
    */
   enrollPolicy(policy: DispatchPolicy): void {
     this.#policies.push(policy);
-    if (policy instanceof WeightedCostDispatchPolicy && policy.config.weightSets !== undefined) {
+    if (
+      policy instanceof WeightedCostDispatchPolicy &&
+      (policy.config.weightSets !== undefined || policy.config.ruleSets !== undefined)
+    ) {
       this.#traces.set(policy, { policy, previous: null, switches: [] });
     }
   }

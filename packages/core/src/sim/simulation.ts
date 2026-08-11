@@ -487,6 +487,8 @@ export class Simulation {
    * arrivals off calls.
    */
   readonly #entranceFloorIndices: ReadonlySet<number>;
+  /** Seconds after local midnight at `t = 0`, or `undefined` on a template with no clock. */
+  readonly #startOfDayS: number | undefined;
   readonly #deadlineS: SimTime;
   /**
    * The run's intervention log, in authored order — `SimulationConfig.interventions`, or `[]`.
@@ -918,6 +920,11 @@ export class Simulation {
     this.#entranceFloorIndices = new Set(
       this.#building.entranceFloors.map((floor) => floor.index),
     );
+    // The trace's own start-of-day — resolved template data, copied once, `undefined` for a
+    // template with no clock. Supplied to every group context unconditionally: the field is
+    // read only under `selection.policy: 'rules'`, and `traffic/dayStartIdentity.test.ts` plus
+    // the golden runs are what hold "supplied and unread is byte-identical" as a measurement.
+    this.#startOfDayS = this.#trace.startOfDayS;
     this.#deadlineS = this.#trace.durationS + this.#options.drainGraceS;
     this.#reportWindow = traceReportWindow(this.#trace);
     this.#windowSelection = config.reportWindow;
@@ -3518,6 +3525,9 @@ export class Simulation {
       // walk in at — on `midtown-office` the `main` bank's lowest served floor is the garage.
       // Resolved once for the run in the constructor, so this costs a property read per pass.
       entranceFloorIndices: this.#entranceFloorIndices,
+      // The fourth group fact — the run's start-of-day, for the Everyday rules' time
+      // conditions. Spread-if-defined so a clockless template's context carries no key at all.
+      ...(this.#startOfDayS === undefined ? {} : { startOfDayS: this.#startOfDayS }),
     });
   }
 

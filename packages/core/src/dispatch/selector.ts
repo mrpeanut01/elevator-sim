@@ -74,12 +74,20 @@
  * shipped*, and that is exactly the surface this file switches.
  */
 
-import type { WeightSetPolicy } from '../config/types.js';
+import {
+  DAY_PERIOD_WINDOWS,
+  RULE_ACTION_WORDS,
+  RULE_CONDITION_WORDS,
+  type RuleActionId,
+  type RuleConditionId,
+  type WeightSetPolicy,
+} from '../config/types.js';
 import type { SimTime } from '../kernel/types.js';
 import type { CarSnapshot } from '../model/car/types.js';
 import type { Direction } from '../model/types.js';
 
-import { DispatchError } from './types.js';
+import { DispatchError, PARK_AT_TOP_FLOOR_INDEX } from './types.js';
+import type { CallLifecycle, DispatchContext, ResolvedIdleStage } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * Vocabulary
@@ -521,6 +529,18 @@ export function armMembership(arm: WeightSetArm, traffic: TrafficObservation): n
  * own authored weights. That is an abstention rather than a guess: the detector saying "this is
  * none of the regimes I know" is information, and picking the least-bad arm would hide it.
  */
+/**
+ * Whether the arm in force has held the run for less than the dwell — the one anti-oscillation
+ * gate {@link selectWeightSet} and {@link selectRuleArm} share.
+ *
+ * Factored rather than duplicated for the file header's own "one mechanism, two policies"
+ * argument, applied a third time: the dwell arithmetic is one question, and two copies of it
+ * would be two answers waiting to disagree about the boundary instant.
+ */
+function dwellHolds(state: SelectorState, at: SimTime, hysteresisS: number): boolean {
+  return state.since !== undefined && at - state.since < hysteresisS;
+}
+
 export function selectWeightSet(
   sets: ResolvedWeightSets,
   selection: ResolvedSelection,
@@ -568,7 +588,7 @@ export function selectWeightSet(
     };
   }
 
-  if (state.since !== undefined && at - state.since < selection.hysteresisS) {
+  if (dwellHolds(state, at, selection.hysteresisS)) {
     return {
       state,
       arm: incumbent,
@@ -598,6 +618,555 @@ export function selectWeightSet(
     arm: preferred,
     preferred,
     preferredMembership: best,
+    switched: true,
+    held: undefined,
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The Everyday rules — GAMEPLAY_AND_NAVIGATION.md §11.5, compiled onto this mechanism
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How far a rule raises the cost term it names: `weights[term] = max(styleWeight, RULE_EMPHASIS)`.
+ *
+ * A named constant rather than a tunable, on `PARK_CALL_HORIZON`'s argument: it enters the
+ * arithmetic only as the floor a rule lifts one term to, so declaring it would hand an optimizer
+ * a knob degenerate with the style's own weight for that term. Half the canonical
+ * `waitTime: 1.0`, and deliberately **not** the aggressive end of any declared range — CLAUDE.md
+ * § Tuning discipline leaves aggressive ends as the operator's to opt into, and a rule is a
+ * player's sentence, not a tuning pass. Its proof obligation is the moved-control test in
+ * `rules.test.ts` — every weight action must change a run at a measured cell — not this number.
+ */
+export const RULE_EMPHASIS = 0.5;
+
+/**
+ * Open landing calls above the named floor at which "calls are stacking" — ≥ 3.
+ *
+ * A constant, not a tunable, the `PARK_CALL_HORIZON` pattern: one call above a floor is a call,
+ * two are a coincidence, three are a queue forming out of the lobby's sight — and a declared
+ * knob here would only ever move a threshold the player's own value list (`floor 4/6/8/10`)
+ * already parameterises on the axis that matters, which floor "above" starts at.
+ */
+export const STACKING_MIN_CALLS = 3;
+
+/** The scalar inputs a rule clause may compare. Derived per decision, never from a stream. */
+export type RuleScalarId =
+  | 'longestWaitS'
+  | 'lobbyQueue'
+  | 'maxCarLoadFactor'
+  | 'carsOutOfService';
+
+/**
+ * One compiled crisp clause. A row matches iff **all** its clauses hold.
+ *
+ * Two comparator kinds rather than the draft's one, because the §11.5 phrasings genuinely
+ * differ at the boundary: *a call has waited 60 s* is true at exactly 60 (`scalarAtLeast`),
+ * while *the lobby queue passes 12* and *a car is fuller than 70%* are false at exactly the
+ * value (`scalarAbove`). A `scalarBelow` was drafted and is deliberately absent — no shipped
+ * condition compiles to it, and an unused clause kind is dead vocabulary.
+ */
+export type RuleClause =
+  | { readonly kind: 'scalarAtLeast'; readonly input: RuleScalarId; readonly threshold: number }
+  | { readonly kind: 'scalarAbove'; readonly input: RuleScalarId; readonly threshold: number }
+  | {
+      readonly kind: 'timeWithin';
+      /** Seconds after local midnight, half-open `[startS, endS)`; wraps midnight when start > end. */
+      readonly startS: number;
+      readonly endS: number;
+      readonly negate: boolean;
+    }
+  | { readonly kind: 'callsAbove'; readonly floorIndex: number; readonly minCalls: number }
+  | { readonly kind: 'nobodyWaitingBelow'; readonly floorIndex: number };
+
+/**
+ * Traffic state as the rules see it — queue lengths, ages, load factors, clock time and
+ * structural facts. **No rates**: none of §11.5's conditions is an arrival rate, so rules mode
+ * never constructs an {@link ArrivalWindow} and costs common random numbers exactly what the
+ * fuzzy detector does — nothing.
+ */
+export interface RulesObservation {
+  /** Max `at − registeredAt` over open lifecycles, seconds. 0 with no open call. */
+  readonly longestWaitS: number;
+  /** Σ waiting passengers over open calls at entrance floors. Absolute people — the player's value list is people. */
+  readonly lobbyQueue: number;
+  /** Max load factor over in-service cars. 0 with none. */
+  readonly maxCarLoadFactor: number;
+  /** Cars whose mode is not `in-service`. */
+  readonly carsOutOfService: number;
+  /**
+   * `(startOfDayS + at) mod 86400`, or `undefined` when the run's template carries no
+   * start-of-day — under which every time clause is false, stated rather than silent.
+   */
+  readonly timeOfDayS: number | undefined;
+  /** Every open landing call, for the two floor-parameterised clause kinds. */
+  readonly openCalls: readonly {
+    readonly floorIndex: number;
+    readonly waitingPassengers: number;
+  }[];
+}
+
+/**
+ * One compiled rule row: its clauses and its payload.
+ *
+ * The payload moves **weights and idle, never dispatch/answer/eligibility mid-run** — the
+ * "why only the weights switch" boundary above is about the passenger model, and an idle
+ * override does not cross it (`RepositionContext.idleOverride` is Slice 3's shipped precedent).
+ * The one eligibility action, `no-new-pickups`, is a **static compile** into
+ * `eligibility.maxLoadFactorForAssignment` and never becomes an arm: the engine's stage-2 load
+ * ceiling *is* that condition, evaluated per car per decision, and compiling it to an arm would
+ * be a second, worse copy of an existing conditional mechanism.
+ */
+export interface RuleArm {
+  /**
+   * Provenance: `rule-<n>:<conditionId>[:<value>]`, 1-based row order. Carried for reports and
+   * for the stage header's readout; **never** read to decide anything — the same discipline as
+   * {@link WeightSetArm.patternId}.
+   */
+  readonly patternId: string;
+  readonly clauses: readonly RuleClause[];
+  /** The style's own vector with one term raised to {@link RULE_EMPHASIS}, or absent for an idle-only arm. */
+  readonly weights?: ReadonlyMap<string, number> | undefined;
+  /** The stage-7 settings in force while this arm holds, or absent for a weight-only arm. */
+  readonly idle?: ResolvedIdleStage | undefined;
+}
+
+/** The compiled rules, in row order. The sibling of {@link ResolvedWeightSets}. */
+export interface ResolvedRuleSets {
+  readonly arms: readonly RuleArm[];
+}
+
+/** What `resolveRuleArms` hands back: the arms, plus the one statically-compiled field. */
+export interface CompiledRules {
+  readonly ruleSets: ResolvedRuleSets;
+  /**
+   * The load ceiling `no-new-pickups` compiled to, or `undefined` when no row used it. Outranks
+   * the profile's own authored `eligibility.maxLoadFactorForAssignment`, being the more recent,
+   * more explicit statement — the `dev/state.ts` write-order argument, applied to a resolve.
+   */
+  readonly maxLoadFactorForAssignment: number | undefined;
+}
+
+/** The row shape this compiler accepts — structural, so a fixture needs no cast. */
+export interface RuleRowSource {
+  readonly when: string;
+  readonly whenValue?: number | string | undefined;
+  readonly then: string;
+  readonly thenValue?: number | string | undefined;
+}
+
+function isRuleCondition(id: string): id is RuleConditionId {
+  return Object.hasOwn(RULE_CONDITION_WORDS, id);
+}
+
+function isRuleAction(id: string): id is RuleActionId {
+  return Object.hasOwn(RULE_ACTION_WORDS, id);
+}
+
+/** The declared value, verified against the id's own list. Refuses, never coerces. */
+function ruleValue(
+  id: string,
+  declared: { readonly values?: readonly { readonly value: number | string }[] | undefined },
+  value: number | string | undefined,
+  rowIndex: number,
+  profileId: string,
+): number | string | undefined {
+  const values = declared.values;
+  if (values === undefined) {
+    if (value !== undefined) {
+      throw new DispatchError(
+        `Dispatcher "${profileId}" rules row ${String(rowIndex + 1)}: "${id}" carries no value, and ${JSON.stringify(value)} was authored. A value nothing reads is decoration wearing a setting's name.`,
+      );
+    }
+    return undefined;
+  }
+  if (value === undefined || !values.some((option) => option.value === value)) {
+    throw new DispatchError(
+      `Dispatcher "${profileId}" rules row ${String(rowIndex + 1)}: "${id}" requires one of ${values.map((option) => JSON.stringify(option.value)).join(', ')}; received ${JSON.stringify(value)}. An out-of-list value is refused rather than rounded, because the player's list is the contract.`,
+    );
+  }
+  return value;
+}
+
+/** The clauses one condition compiles to. Total over the validated vocabulary. */
+function clausesFor(
+  when: RuleConditionId,
+  value: number | string | undefined,
+): readonly RuleClause[] {
+  switch (when) {
+    case 'call-waited':
+      return [{ kind: 'scalarAtLeast', input: 'longestWaitS', threshold: value as number }];
+    case 'lobby-queue-passes':
+      return [{ kind: 'scalarAbove', input: 'lobbyQueue', threshold: value as number }];
+    case 'car-fuller-than':
+      return [{ kind: 'scalarAbove', input: 'maxCarLoadFactor', threshold: value as number }];
+    case 'time-before':
+      return [{ kind: 'timeWithin', startS: 0, endS: value as number, negate: false }];
+    case 'time-after':
+      return [{ kind: 'timeWithin', startS: value as number, endS: 86400, negate: false }];
+    case 'day-period': {
+      if (value === 'quiet-stretch') {
+        // The complement: outside all three named windows. Expressible because clauses AND.
+        return (['morning-rush', 'lunch', 'evening'] as const).map((period): RuleClause => {
+          const [startS, endS] = DAY_PERIOD_WINDOWS[period];
+          return { kind: 'timeWithin', startS, endS, negate: true };
+        });
+      }
+      const window = DAY_PERIOD_WINDOWS[value as 'morning-rush' | 'lunch' | 'evening'];
+      return [{ kind: 'timeWithin', startS: window[0], endS: window[1], negate: false }];
+    }
+    case 'shaft-out':
+      return [{ kind: 'scalarAtLeast', input: 'carsOutOfService', threshold: 1 }];
+    case 'calls-stacking-above':
+      return [{ kind: 'callsAbove', floorIndex: value as number, minCalls: STACKING_MIN_CALLS }];
+    case 'nobody-below':
+      return [{ kind: 'nobodyWaitingBelow', floorIndex: value as number }];
+  }
+}
+
+/** The style's own vector with one term raised to {@link RULE_EMPHASIS}. */
+function emphasised(
+  styleWeights: ReadonlyMap<string, number>,
+  termId: string,
+): ReadonlyMap<string, number> {
+  const weights = new Map(styleWeights);
+  weights.set(termId, Math.max(weights.get(termId) ?? 0, RULE_EMPHASIS));
+  return weights;
+}
+
+/**
+ * Compile a profile's `rules.rows` into ordered arms, or refuse — the {@link resolveWeightSets}
+ * posture, row by row: an unknown id, an out-of-list value, an invalid pairing and a duplicated
+ * static row each produce a plausible-looking run of a system nobody configured, so each throws
+ * with the profile id and row number in the message.
+ *
+ * The weight actions borrow the style's own vector and raise one term
+ * ({@link RULE_EMPHASIS}); the idle actions carry the style's own deadband and energy weight
+ * with only the strategy (and, for `park-at-floor`, the floor) replaced — the
+ * `RepositionContext.idleOverride` argument, applied per arm: the player's rule is about *where*
+ * cars wait, not what a repositioning trip is worth.
+ */
+export function resolveRuleArms(
+  rows: readonly RuleRowSource[],
+  styleWeights: ReadonlyMap<string, number>,
+  styleIdle: ResolvedIdleStage,
+  profileId: string,
+): CompiledRules {
+  if (rows.length === 0) {
+    throw new DispatchError(
+      `Dispatcher "${profileId}" sets selection.policy "rules" with no rows. A dispatcher that declares it follows rules and has none to follow does not switch; it runs its own weights while claiming otherwise.`,
+    );
+  }
+
+  const arms: RuleArm[] = [];
+  let maxLoadFactorForAssignment: number | undefined;
+
+  rows.forEach((row, index) => {
+    if (!isRuleCondition(row.when)) {
+      throw new DispatchError(
+        `Dispatcher "${profileId}" rules row ${String(index + 1)}: unknown condition "${row.when}". Known conditions: ${Object.keys(RULE_CONDITION_WORDS).join(', ')}. A condition that is silently dropped is a rule that silently never fires.`,
+      );
+    }
+    if (!isRuleAction(row.then)) {
+      throw new DispatchError(
+        `Dispatcher "${profileId}" rules row ${String(index + 1)}: unknown action "${row.then}". Known actions: ${Object.keys(RULE_ACTION_WORDS).join(', ')}.`,
+      );
+    }
+    const whenValue = ruleValue(
+      row.when,
+      RULE_CONDITION_WORDS[row.when],
+      row.whenValue,
+      index,
+      profileId,
+    );
+    const thenValue = ruleValue(
+      row.then,
+      RULE_ACTION_WORDS[row.then],
+      row.thenValue,
+      index,
+      profileId,
+    );
+
+    if (row.then === 'no-new-pickups') {
+      // The static compile. The engine's stage-2 load ceiling *is* the condition "a car is
+      // fuller than v", evaluated per car per decision — so this row lands in
+      // `eligibility.maxLoadFactorForAssignment` and never becomes an arm. Any other pairing
+      // leaves "it" naming nothing, and two such rows would be two writers of one field.
+      if (row.when !== 'car-fuller-than') {
+        throw new DispatchError(
+          `Dispatcher "${profileId}" rules row ${String(index + 1)}: "no-new-pickups" only pairs with "car-fuller-than" — the action stops giving new pickups to *the car that is fuller than v*, so any other condition leaves "it" naming nothing.`,
+        );
+      }
+      if (maxLoadFactorForAssignment !== undefined) {
+        throw new DispatchError(
+          `Dispatcher "${profileId}" rules row ${String(index + 1)}: a second "no-new-pickups" row. Both would write eligibility.maxLoadFactorForAssignment, and two writers of one field is a rule list that lies about one of them.`,
+        );
+      }
+      maxLoadFactorForAssignment = whenValue as number;
+      return;
+    }
+
+    const clauses = clausesFor(row.when, whenValue);
+    const suffix = whenValue === undefined ? '' : `:${String(whenValue)}`;
+    const patternId = `rule-${String(index + 1)}:${row.when}${suffix}`;
+
+    switch (row.then) {
+      case 'nearest-car':
+        arms.push(
+          Object.freeze({
+            patternId,
+            clauses,
+            weights: emphasised(styleWeights, 'distanceTravelled'),
+          }),
+        );
+        return;
+      case 'emptiest-car':
+        arms.push(
+          Object.freeze({ patternId, clauses, weights: emphasised(styleWeights, 'loadFactor') }),
+        );
+        return;
+      case 'jump-queue':
+        arms.push(
+          Object.freeze({ patternId, clauses, weights: emphasised(styleWeights, 'starvation') }),
+        );
+        return;
+      case 'prefer-same-direction':
+        arms.push(
+          Object.freeze({
+            patternId,
+            clauses,
+            weights: emphasised(styleWeights, 'directionReversal'),
+          }),
+        );
+        return;
+      case 'hold-at-lobby':
+        arms.push(
+          Object.freeze({
+            patternId,
+            clauses,
+            idle: Object.freeze({ ...styleIdle, parkingStrategy: 'lobby' as const }),
+          }),
+        );
+        return;
+      case 'spread-out':
+        arms.push(
+          Object.freeze({
+            patternId,
+            clauses,
+            idle: Object.freeze({ ...styleIdle, parkingStrategy: 'zone-center' as const }),
+          }),
+        );
+        return;
+      case 'park-at-floor': {
+        if (thenValue === 'lobby') {
+          // "Park at the lobby" and "hold at the lobby" are honestly the same stage-7 fact,
+          // compiled identically rather than as differently-labelled copies of one mechanism.
+          arms.push(
+            Object.freeze({
+              patternId,
+              clauses,
+              idle: Object.freeze({ ...styleIdle, parkingStrategy: 'lobby' as const }),
+            }),
+          );
+          return;
+        }
+        const floorIndex = thenValue === 'top' ? PARK_AT_TOP_FLOOR_INDEX : (thenValue as number);
+        arms.push(
+          Object.freeze({
+            patternId,
+            clauses,
+            idle: Object.freeze({
+              ...styleIdle,
+              parkingStrategy: 'fixed-floor' as const,
+              parkingFloorIndex: floorIndex,
+            }),
+          }),
+        );
+        return;
+      }
+    }
+  });
+
+  return Object.freeze({
+    ruleSets: Object.freeze({ arms: Object.freeze(arms) }),
+    maxLoadFactorForAssignment,
+  });
+}
+
+/**
+ * The rules' observation for one decision — pure, per decision, from things the policy already
+ * holds. No stream, no clock, no allocation beyond the arrays returned: the same CRN cost as
+ * the fuzzy detector, which is zero, asserted by re-running `validation/goldenRuns.test.ts` and
+ * `fuzz/determinism.test.ts` rather than by this sentence.
+ *
+ * The lobby queue **must** use the entrance set, not the lowest served floor — the midtown P1/G
+ * regression documented on `DispatchContext.entranceFloorIndices`. A hand-built caller that
+ * supplies no context gets the same stated fallback the {@link ArrivalWindow} keeps: the lowest
+ * served floor across the cars supplied.
+ */
+export function rulesObservationOf(
+  lifecycles: Iterable<CallLifecycle>,
+  cars: readonly CarSnapshot[],
+  at: SimTime,
+  context: Pick<DispatchContext, 'entranceFloorIndices' | 'startOfDayS'> | undefined,
+): RulesObservation {
+  let lowestIndex = Number.POSITIVE_INFINITY;
+  let maxCarLoadFactor = 0;
+  let carsOutOfService = 0;
+  for (const car of cars) {
+    if (car.shaft.lowestIndex < lowestIndex) lowestIndex = car.shaft.lowestIndex;
+    if (car.mode !== 'in-service') {
+      carsOutOfService += 1;
+      continue;
+    }
+    if (car.load.loadFactor > maxCarLoadFactor) maxCarLoadFactor = car.load.loadFactor;
+  }
+
+  const entrances = context?.entranceFloorIndices;
+  const isEntrance = (floorIndex: number): boolean =>
+    entrances === undefined ? floorIndex <= lowestIndex : entrances.has(floorIndex);
+
+  let longestWaitS = 0;
+  let lobbyQueue = 0;
+  const openCalls: { floorIndex: number; waitingPassengers: number }[] = [];
+  for (const lifecycle of lifecycles) {
+    const waited = at - lifecycle.registeredAt;
+    if (waited > longestWaitS) longestWaitS = waited;
+    if (isEntrance(lifecycle.call.floorIndex)) lobbyQueue += lifecycle.waitingPassengers;
+    openCalls.push({
+      floorIndex: lifecycle.call.floorIndex,
+      waitingPassengers: lifecycle.waitingPassengers,
+    });
+  }
+
+  const startOfDayS = context?.startOfDayS;
+  return Object.freeze({
+    longestWaitS,
+    lobbyQueue,
+    maxCarLoadFactor,
+    carsOutOfService,
+    timeOfDayS: startOfDayS === undefined ? undefined : (startOfDayS + at) % 86400,
+    openCalls: Object.freeze(openCalls),
+  });
+}
+
+/** Whether one clause holds. Total; a missing clock makes a time clause false, negated or not. */
+export function ruleClauseHolds(clause: RuleClause, observation: RulesObservation): boolean {
+  switch (clause.kind) {
+    case 'scalarAtLeast':
+      return observation[clause.input] >= clause.threshold;
+    case 'scalarAbove':
+      return observation[clause.input] > clause.threshold;
+    case 'timeWithin': {
+      const t = observation.timeOfDayS;
+      // A clockless crowd fails every time clause, **including negated ones**: `negate` inverts
+      // membership of the window, not knowledge of the clock, and a "quiet stretch" asserted
+      // about a day with no clock would be a claim about nothing.
+      if (t === undefined) return false;
+      const inside =
+        clause.startS <= clause.endS
+          ? t >= clause.startS && t < clause.endS
+          : t >= clause.startS || t < clause.endS;
+      return clause.negate ? !inside : inside;
+    }
+    case 'callsAbove': {
+      let count = 0;
+      for (const call of observation.openCalls) {
+        if (call.floorIndex > clause.floorIndex) count += 1;
+        if (count >= clause.minCalls) return true;
+      }
+      return false;
+    }
+    case 'nobodyWaitingBelow': {
+      for (const call of observation.openCalls) {
+        if (call.floorIndex < clause.floorIndex && call.waitingPassengers > 0) return false;
+      }
+      return true;
+    }
+  }
+}
+
+/** Whether every clause of one arm holds — crisp AND, short-circuit, in clause order. */
+export function ruleArmMatches(arm: RuleArm, observation: RulesObservation): boolean {
+  for (const clause of arm.clauses) {
+    if (!ruleClauseHolds(clause, observation)) return false;
+  }
+  return true;
+}
+
+/** What a rule selection decided. The rules sibling of {@link WeightSetSelectionResult}. */
+export interface RuleSelectionResult {
+  readonly state: SelectorState;
+  /** The arm in force after this call, or `undefined` when the style's own settings stand. */
+  readonly arm: RuleArm | undefined;
+  /** The first matching arm this instant, ignoring the dwell. */
+  readonly preferred: RuleArm | undefined;
+  readonly switched: boolean;
+  /** Why the selection did not move, when it did not. The same vocabulary, minus `margin`. */
+  readonly held: 'hysteresis' | 'incumbent-preferred' | undefined;
+}
+
+/**
+ * **First match wins, and no match releases.** The rules sibling of {@link selectWeightSet} —
+ * a separate function rather than a mode flag threaded through it, because the fuzzy tests pin
+ * that function's anti-oscillation branches and a flag inside them would be a fork wearing one
+ * name. Shared instead of duplicated: {@link SelectorState}, {@link INITIAL_SELECTOR_STATE} and
+ * the dwell comparison ({@link dwellHolds}).
+ *
+ * Two deliberate divergences from the fuzzy semantics, each §11.5's own:
+ *
+ * - **Ordering decides, not membership.** The scan takes the first row whose clauses all hold;
+ *   a later row that "matches harder" does not exist as a concept, and reordering rows is the
+ *   player's priority control.
+ * - **No match releases the run to the profile's weights** — *"If no rule fits, Steady hand
+ *   decides"* — where the fuzzy detector's incumbent keeps it. The release is itself gated by
+ *   the dwell, which is what stops *lobby queue passes 12* flapping at 11.9/12.1: a rule keeps
+ *   the run for at least `hysteresisS` from when it took it, and so does the released state
+ *   (`since` is set on release, so the next rule to fire also waits the dwell out — one
+ *   deliberate divergence from {@link SelectorState}'s "`since` undefined while nothing is
+ *   selected" reading, documented here because the released state *is* a selection: the
+ *   player's fallback line names it).
+ *
+ * `switchMargin` and the learned gains are meaningless over crisp clauses and are **not read**;
+ * the rules editor says so beside the controls rather than leaving them to look live.
+ */
+export function selectRuleArm(
+  arms: readonly RuleArm[],
+  selection: ResolvedSelection,
+  observation: RulesObservation,
+  state: SelectorState,
+  at: SimTime,
+): RuleSelectionResult {
+  let preferredIndex = -1;
+  for (let index = 0; index < arms.length; index += 1) {
+    if (ruleArmMatches(arms[index]!, observation)) {
+      preferredIndex = index;
+      break;
+    }
+  }
+
+  const incumbent = state.activeIndex === undefined ? undefined : arms[state.activeIndex];
+  const preferred = preferredIndex < 0 ? undefined : arms[preferredIndex];
+  const wantedIndex = preferredIndex < 0 ? undefined : preferredIndex;
+
+  if (wantedIndex === state.activeIndex) {
+    return {
+      state,
+      arm: incumbent,
+      preferred,
+      switched: false,
+      held: incumbent === undefined ? undefined : 'incumbent-preferred',
+    };
+  }
+
+  if (dwellHolds(state, at, selection.hysteresisS)) {
+    return { state, arm: incumbent, preferred, switched: false, held: 'hysteresis' };
+  }
+
+  return {
+    state: Object.freeze({ activeIndex: wantedIndex, since: at }),
+    arm: preferred,
+    preferred,
     switched: true,
     held: undefined,
   };

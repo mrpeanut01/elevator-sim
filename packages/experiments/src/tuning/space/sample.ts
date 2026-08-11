@@ -167,7 +167,10 @@ function clampNumber(value: number, parameter: NumericParameter): number {
 }
 
 function clampInteger(value: number, parameter: NumericParameter): number {
-  return clampNumber(value, parameter);
+  // `+ 0` folds `-0` — which `Math.round` produces for `(-0.5, 0)` on a range crossing zero —
+  // into `+0`, because `candidatesEqual` compares with `Object.is` and the two zeros are one
+  // integer. See `encode.ts#valueOf`'s integer case for the measured occurrence.
+  return clampNumber(value + 0, parameter);
 }
 
 function pick(parameter: CategoricalParameter, index: number): string {

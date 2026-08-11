@@ -485,7 +485,20 @@ export type PassengerAssignmentMode = (typeof PASSENGER_ASSIGNMENT_MODES)[number
 export const DWELL_POLICIES = ['fixed', 'adaptive'] as const;
 export type DwellPolicy = (typeof DWELL_POLICIES)[number];
 
-export const PARKING_STRATEGIES = ['stay', 'lobby', 'zone-center', 'predicted-demand'] as const;
+/**
+ * `fixed-floor` landed with the Everyday rules editor (GAMEPLAY §11.5's *park a spare car at v*):
+ * the idle cars head for the served floor at `idle.parkingFloorIndex`, or report `no-target` when
+ * the shaft does not serve it — total and stated, like lobby-with-no-served-entrance. Its implied
+ * demand model is a point mass on that floor, the same *strategy's own belief* rule `lobby`
+ * follows (`dispatch/lifecycle.ts#responseWeights`).
+ */
+export const PARKING_STRATEGIES = [
+  'stay',
+  'lobby',
+  'zone-center',
+  'predicted-demand',
+  'fixed-floor',
+] as const;
 export type ParkingStrategy = (typeof PARKING_STRATEGIES)[number];
 
 /**
@@ -495,13 +508,16 @@ export type ParkingStrategy = (typeof PARKING_STRATEGIES)[number];
  * weight vector for the run, which is what every published number in this repository was
  * measured under. `fuzzy` is a trapezoidal traffic-pattern detector with hysteresis driving the
  * per-pattern weight sets `patternSwitching` authors; `contextual` is the same arms under a
- * small learned reparameterization. `dispatch/selector.ts` implements both and neither is a
- * class — the rule is a categorical value and the arms are data (CLAUDE.md invariant 7).
+ * small learned reparameterization. `rules` is the Everyday rules editor's compilation target
+ * (GAMEPLAY §11.5): the profile's own `rules.rows`, compiled to ordered crisp arms, first match
+ * wins, and the profile's own weights when no row fits. `dispatch/selector.ts` implements all
+ * three and none is a class — the rule is a categorical value and the arms are data (CLAUDE.md
+ * invariant 7).
  *
  * Here rather than in `dispatch/` for the reason {@link SERVICE_MODES} gives: `config/` is a
  * closed module graph and every declared vocabulary a schema validates lives in it.
  */
-export const WEIGHT_SET_POLICIES = ['off', 'fuzzy', 'contextual'] as const;
+export const WEIGHT_SET_POLICIES = ['off', 'fuzzy', 'contextual', 'rules'] as const;
 export type WeightSetPolicy = (typeof WEIGHT_SET_POLICIES)[number];
 
 /**
@@ -610,6 +626,8 @@ export interface AnswerStageConfig extends Commented {
 /** Where cars go when idle (lifecycle stage 7). Dominates sparse-traffic buildings. */
 export interface IdleStageConfig extends Commented {
   readonly parkingStrategy?: ParkingStrategy | undefined;
+  /** The shaft floor index `fixed-floor` parks at. Read by no other strategy. */
+  readonly parkingFloorIndex?: number | undefined;
   /** Do not reposition for anticipated gains smaller than this, seconds. */
   readonly repositionThresholdS?: number | undefined;
   /** Trades anticipated wait saving against energy spent moving. */
@@ -683,6 +701,11 @@ export interface DispatcherProfile extends Commented {
    * which is what every profile in `data/dispatcher-profiles.json` ships.
    */
   readonly selection?: SelectionStageConfig | undefined;
+  /**
+   * The Everyday rules rows (§11.5), read only under `selection.policy: 'rules'` and refused —
+   * not tolerated — under any other policy. Absent everywhere in the shipped file.
+   */
+  readonly rules?: ProfileRulesConfig | undefined;
 }
 
 /**
@@ -700,6 +723,303 @@ export interface SelectionStageConfig extends Commented {
   readonly interfloorRateGain?: number | undefined;
   readonly downPeakRateGain?: number | undefined;
   readonly switchMargin?: number | undefined;
+}
+
+/* ---------------------------------------------------------------------------
+ * The Everyday rules vocabulary — GAMEPLAY_AND_NAVIGATION.md §11.5
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The nine conditions a when/then rule row may name, in the order §11.5 lists them.
+ *
+ * A declared vocabulary in the manner of `PARKING_STRATEGIES`: `dispatch/selector.ts`'s
+ * `resolveRuleArms` rejects an id outside this set rather than ignoring it, because a condition
+ * that is silently dropped is a rule that silently never fires. The player words, `{v}` template
+ * and admissible values for each id live in {@link RULE_CONDITION_WORDS}, **beside the id rather
+ * than in a screen** — the same ownership argument `PlayerTermWords` makes (issue #147): the
+ * vocabulary is a property of the model, and two views over one table cannot drift.
+ */
+export const RULE_CONDITIONS = [
+  'call-waited',
+  'lobby-queue-passes',
+  'car-fuller-than',
+  'time-before',
+  'time-after',
+  'day-period',
+  'shaft-out',
+  'calls-stacking-above',
+  'nobody-below',
+] as const;
+export type RuleConditionId = (typeof RULE_CONDITIONS)[number];
+
+/**
+ * The eight actions a rule row may take. §11.5 lists ten; the two missing ids are **refused by
+ * omission, deliberately**, and the reasons are load-bearing:
+ *
+ * - **`skip everything above floor v` is not here.** Service range is building fabric
+ *   (`servesFloors`), and §11.4's own header ships the boundary sentence — *zoning and service
+ *   ranges belong to the building, not the dispatcher*. A dispatcher-side floor mask would be a
+ *   second source of truth about which floors a shaft serves.
+ * - **`treat up-calls as urgent` is not here.** No term in the cost library prices
+ *   direction-conditional urgency; every wait/starvation weight prices up and down calls alike,
+ *   so the honest compile would move both and the label would lie. A reworded action — *treat
+ *   every call as urgent* — is a design-owner decision, flagged in the rules editor's docstring
+ *   rather than made silently here.
+ */
+export const RULE_ACTIONS = [
+  'nearest-car',
+  'emptiest-car',
+  'jump-queue',
+  'hold-at-lobby',
+  'park-at-floor',
+  'no-new-pickups',
+  'spread-out',
+  'prefer-same-direction',
+] as const;
+export type RuleActionId = (typeof RULE_ACTIONS)[number];
+
+/** One admissible value for a value-carrying rule id, with the words a player reads for it. */
+export interface RuleValueOption {
+  /** The value as authored in a profile's `rules.rows` — seconds, people, a fraction, an id. */
+  readonly value: number | string;
+  /** The label substituted for `{v}` — `2 min`, `12 people`, `floor 7`, `the lobby`. */
+  readonly label: string;
+}
+
+/**
+ * One rule condition's player words: a **template with a `{v}` placeholder**, never text a screen
+ * concatenates a value onto — §11.5's own rule, verbatim: *"Value-carrying phrases are templates
+ * with a placeholder … otherwise you get 'park a spare car at floor the lobby'."*
+ */
+export interface RuleConditionWords {
+  /** The row as a player reads it, `{v}` marking the value slot. No `{v}` for a valueless id. */
+  readonly template: string;
+  /** The plain lever this condition belongs to on the §11.5 table — `patience`, `lobby`, … */
+  readonly lever: string;
+  /** The admissible values, absent for a valueless condition. Out-of-list is refused at resolve. */
+  readonly values?: readonly RuleValueOption[] | undefined;
+}
+
+/** One rule action's player words, plus the claim of which owned field it moves — checkable. */
+export interface RuleActionWords {
+  readonly template: string;
+  readonly lever: string;
+  /**
+   * The field this action writes when its row is in force — `weights.starvation`,
+   * `idle.parkingStrategy`, `eligibility.maxLoadFactorForAssignment`. §11.5's *every row shows
+   * the lever it moves*, as data a test can hold against the compiler rather than as prose.
+   */
+  readonly moves: string;
+  readonly values?: readonly RuleValueOption[] | undefined;
+  /**
+   * A stated limitation the readback must carry, or absent when the compile is clean. Never
+   * dropped by a surface: a caveat is the honest half of the row (§ D227 — a control that does
+   * less than its label must say so beside the control).
+   */
+  readonly caveat?: string | undefined;
+}
+
+/**
+ * Seconds after local midnight, half-open `[startS, endS)`, for {@link RULE_CONDITION_WORDS}'
+ * `day-period` values. Data constants beside the vocabulary they serve; *a quiet stretch* is the
+ * complement of all three, expressible because rule clauses AND and `timeWithin` negates.
+ */
+export const DAY_PERIOD_WINDOWS: Readonly<
+  Record<'morning-rush' | 'lunch' | 'evening', readonly [number, number]>
+> = Object.freeze({
+  'morning-rush': [7 * 3600, 10 * 3600],
+  lunch: [11.5 * 3600, 14 * 3600],
+  evening: [16 * 3600, 19.5 * 3600],
+});
+
+/** The nine conditions' words and values. Both-ways key-set guarded in `playerWords.test.ts`. */
+export const RULE_CONDITION_WORDS: Readonly<Record<RuleConditionId, RuleConditionWords>> =
+  Object.freeze({
+    'call-waited': Object.freeze({
+      template: 'a call has waited {v}',
+      lever: 'patience',
+      values: Object.freeze([
+        { value: 30, label: '30 s' },
+        { value: 45, label: '45 s' },
+        { value: 60, label: '60 s' },
+        { value: 90, label: '90 s' },
+        { value: 120, label: '2 min' },
+      ]),
+    }),
+    'lobby-queue-passes': Object.freeze({
+      template: 'the lobby queue passes {v}',
+      lever: 'lobby',
+      values: Object.freeze([
+        { value: 6, label: '6 people' },
+        { value: 12, label: '12 people' },
+        { value: 20, label: '20 people' },
+        { value: 30, label: '30 people' },
+        { value: 50, label: '50 people' },
+      ]),
+    }),
+    'car-fuller-than': Object.freeze({
+      template: 'a car is fuller than {v}',
+      lever: 'room',
+      // Load factors, the unit `CarSnapshot.loadFactor` and `maxLoadFactorForAssignment` share.
+      values: Object.freeze([
+        { value: 0.5, label: '50%' },
+        { value: 0.6, label: '60%' },
+        { value: 0.7, label: '70%' },
+        { value: 0.8, label: '80%' },
+        { value: 0.9, label: '90%' },
+      ]),
+    }),
+    'time-before': Object.freeze({
+      template: 'the time is before {v}',
+      lever: 'patience',
+      // Seconds after local midnight, the unit `ResolvedDemandTemplate.startOfDayS` carries.
+      values: Object.freeze([
+        { value: 28800, label: '08:00' },
+        { value: 32400, label: '09:00' },
+        { value: 34200, label: '09:30' },
+        { value: 36000, label: '10:00' },
+        { value: 43200, label: 'noon' },
+      ]),
+    }),
+    'time-after': Object.freeze({
+      template: 'the time is after {v}',
+      lever: 'lobby',
+      values: Object.freeze([
+        { value: 43200, label: 'noon' },
+        { value: 54000, label: '15:00' },
+        { value: 59400, label: '16:30' },
+        { value: 63000, label: '17:30' },
+      ]),
+    }),
+    'day-period': Object.freeze({
+      template: 'the day is in {v}',
+      lever: 'patience',
+      values: Object.freeze([
+        { value: 'morning-rush', label: 'the morning rush' },
+        { value: 'lunch', label: 'the lunch hour' },
+        { value: 'evening', label: 'the evening' },
+        { value: 'quiet-stretch', label: 'a quiet stretch' },
+      ]),
+    }),
+    'shaft-out': Object.freeze({
+      template: 'a shaft is out of service',
+      lever: 'spread',
+    }),
+    'calls-stacking-above': Object.freeze({
+      template: 'calls are stacking above {v}',
+      lever: 'spread',
+      // Shaft floor indices, the unit `DispatchCall.floorIndex` carries.
+      values: Object.freeze([
+        { value: 4, label: 'floor 4' },
+        { value: 6, label: 'floor 6' },
+        { value: 8, label: 'floor 8' },
+        { value: 10, label: 'floor 10' },
+      ]),
+    }),
+    'nobody-below': Object.freeze({
+      template: 'nobody is waiting below {v}',
+      lever: 'spread',
+      values: Object.freeze([
+        { value: 3, label: 'floor 3' },
+        { value: 5, label: 'floor 5' },
+        { value: 7, label: 'floor 7' },
+      ]),
+    }),
+  });
+
+/**
+ * The eight actions' words, `moves` claims and values.
+ *
+ * Two §11.5 value lists are deliberately narrower than the prototype's, each with its reason in
+ * the row: `hold-at-lobby` offers no *one car / two cars* count because stage 7 decides one car
+ * at a time with no group budget (`repositionDecisionFor` sees one car), so the honest control is
+ * on/off and its copy says *the idle cars*; `park-at-floor`'s `top` resolves per shaft to the
+ * highest served floor, because parking is per-car and a shaft that stops short of the building's
+ * top has no better honest reading of *the top floor* than its own.
+ */
+export const RULE_ACTION_WORDS: Readonly<Record<RuleActionId, RuleActionWords>> = Object.freeze({
+  'nearest-car': Object.freeze({
+    template: 'send the nearest free car',
+    lever: 'distance',
+    moves: 'weights.distanceTravelled',
+    caveat:
+      '"free" is whatever room weight the style already carries — this raises distance only, so ' +
+      'the group prefers the closest car',
+  }),
+  'emptiest-car': Object.freeze({
+    template: 'send the emptiest car',
+    lever: 'room',
+    moves: 'weights.loadFactor',
+  }),
+  'jump-queue': Object.freeze({
+    template: 'let it jump the queue',
+    lever: 'patience',
+    moves: 'weights.starvation',
+    caveat:
+      'a regime, not a per-call flag: while anyone has waited that long, the group chases the ' +
+      'longest wait first',
+  }),
+  'hold-at-lobby': Object.freeze({
+    template: 'hold a car at the lobby',
+    lever: 'lobby',
+    moves: 'idle.parkingStrategy',
+    caveat: 'the idle cars head for the lobby — there is no per-car count to promise',
+  }),
+  'park-at-floor': Object.freeze({
+    template: 'park the idle cars at {v}',
+    lever: 'spread',
+    moves: 'idle.parkingStrategy',
+    values: Object.freeze([
+      { value: 'lobby', label: 'the lobby' },
+      { value: 5, label: 'floor 5' },
+      { value: 7, label: 'floor 7' },
+      { value: 9, label: 'floor 9' },
+      { value: 'top', label: 'the top floor' },
+    ]),
+    caveat: 'a floor this shaft does not serve parks nothing, and the row says so when it runs',
+  }),
+  'no-new-pickups': Object.freeze({
+    template: 'stop giving it new pickups',
+    lever: 'room',
+    moves: 'eligibility.maxLoadFactorForAssignment',
+    caveat:
+      'checked car-by-car on every decision, outside the top-to-bottom scan — first match does ' +
+      'not gate it, and it only pairs with "a car is fuller than"',
+  }),
+  'spread-out': Object.freeze({
+    template: 'spread the other cars across the tower',
+    lever: 'spread',
+    moves: 'idle.parkingStrategy',
+    caveat:
+      'parks the cars spread across the tower; how calls are shared between cars stays the ' +
+      'run’s own setting',
+  }),
+  'prefer-same-direction': Object.freeze({
+    template: 'prefer a car already going that way',
+    lever: 'distance',
+    moves: 'weights.directionReversal',
+  }),
+});
+
+/** One when/then row, as a profile authors it. Values are refused at resolve, not coerced. */
+export interface RuleRowConfig extends Commented {
+  readonly when: RuleConditionId;
+  readonly whenValue?: number | string | undefined;
+  readonly then: RuleActionId;
+  readonly thenValue?: number | string | undefined;
+}
+
+/**
+ * The Everyday rules section: ordered rows, read top to bottom, first match wins.
+ *
+ * Player data on the profile (invariant 7), schema-validated (invariant 8), compiled by
+ * `resolveDispatchConfig` into `ResolvedDispatchConfig.ruleSets` when `selection.policy` is
+ * `'rules'` — and **refused when authored under any other policy**, because rows nothing reads
+ * are this repository's signature defect, configured-validated-dead.
+ */
+export interface ProfileRulesConfig extends Commented {
+  /** Optional so the section accepts `{}` like every other (`schema.test.ts`'s parser oracle). */
+  readonly rows?: readonly RuleRowConfig[] | undefined;
 }
 
 /** Fuzzy traffic-pattern detector. Hysteresis prevents detector oscillation. */
