@@ -9,8 +9,14 @@
 > | S0 | Vendor handoff docs + docs/12 pointer | main branch (direct) | **MERGED** (pushed, `ea40a64`) | — |
 > | S2 | Player words beside the model (`core`, #147) | main branch (direct) | **MERGED** (pushed, `0f7f57f`) | corpus figures re-measure at integration |
 > | S1 | Four plain levers as views (`viz`, §20.1) | main branch (direct) | **MERGED** (pushed, `5ff2e60`–`1910d57`) | a decision number is owed for the lever ownership mapping |
-> | S3 | Intervention run record (§7.6, contract §1.4) | builder in isolated worktree | **IN BUILD** | integrate on report; full suite after merge; then push |
-> | V47 | Verify slices 4–7 against the tree | read-only lane | **IN FLIGHT** | scope builder lanes from its verified work-orders |
+> | S3 | Intervention run record (§7.6, contract §1.4) | worktree lane, merged `838305d` | **MERGED** | second `InterventionChange` arm (dispatcher switch), report listing, wire field — registered in docs/18 |
+> | V47 | Verify slices 4–7 against the tree | read-only lane | **DONE** | findings are `docs/18-everyday-mode-tree-audit.md`; slices 4–7 scoped from it |
+> | S5 | The four-goal day (docs/18 § Slice 5) | worktree lane, merged `8be2c8b` | **MERGED** | three decision numbers owed (alternation retirement, schema v5, glyph) — arguments in docstrings |
+> | S6a | Designer runs the oracle (docs/18 § Slice 6) | worktree lane, merged `d6b811c` | **MERGED** | §10 thresholds honestly skipped (office-calibrated); shuttle-destination refusal noted |
+>
+> Integrated-tree verification 2026-08-11: typecheck clean · full viz suite **3 347 passed,
+> 1 skipped** · core sim+dispatch 764 · zero merge-only defects. Corpus string counts moved and
+> are measured at integration only, not per lane. Worktrees and lane branches pruned after merge.
 >
 > Known-red carried honestly: three `server` store tests time out at the 5 s default under
 > full-suite load only (pass alone, 29/29 in 73 s) — pre-existing, evidenced on issue #149,
