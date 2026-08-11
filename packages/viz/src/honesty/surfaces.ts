@@ -231,12 +231,14 @@ import {
 } from '../shift/types.js';
 import {
   patternLine,
+  patternName,
   policyLine,
   selectorContextFrom,
   selectorIssues,
   specFromProfile as selectorSpecFromProfile,
   type SelectorSpec,
 } from '../authoring/selectorSpec.js';
+import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   armOptionsOf,
   armRowsOf,
@@ -1001,6 +1003,7 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
     'live/interventions.ts#interventionStampOf',
+    'live/patternReadout.ts#patternReadoutAt',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -1036,6 +1039,55 @@ const LIVE_RAIL: SurfaceAdapter = {
         role: 'observation',
         playhead: atPlayhead(recording, at),
       });
+    }
+
+    /*
+     * The header's pattern readout — slice 4b, driven the way the intervention stamp is: the
+     * corpus's own recordings run every shipped profile at `selection.policy: 'off'`, so the trace
+     * is synthesized onto a copy of the recording, which is a state a player produces by turning
+     * the selector on. Three recordings, four states: the case's own (absent — the label must be
+     * empty, because a run that built no detector may not read as a pattern), a trace whose bank
+     * abstains and then selects (both phrases cross the sampled playheads), and a two-bank trace
+     * in disagreement (the split label names both patterns rather than picking one). The switch
+     * sits mid-run so the temporal axis sees the readout change across it.
+     */
+    const midpoint = (recording.startedAt + recording.endedAt) / 2;
+    const traced: [string, VizRecording][] = [
+      ['own', recording],
+      [
+        'selecting',
+        { ...recording, patternSwitches: [{ atS: midpoint, bankId: 'main', patternId: 'up-peak' }] },
+      ],
+      [
+        'split',
+        {
+          ...recording,
+          patternSwitches: [
+            { atS: recording.startedAt, bankId: 'main', patternId: 'two-way' },
+            { atS: midpoint, bankId: 'north', patternId: 'idle' },
+          ],
+        },
+      ],
+    ];
+    for (const [name, subject] of traced) {
+      for (const at of sampleTimes(subject)) {
+        const readout = patternReadoutAt(subject, at);
+        if (readout.label === '') continue;
+        seeds.push({
+          field: `patternReadout(${name}, @${at.toFixed(0)}s).label`,
+          text: readout.label,
+          role: 'observation',
+          playhead: atPlayhead(subject, at),
+        });
+        if (readout.title !== '') {
+          seeds.push({
+            field: `patternReadout(${name}, @${at.toFixed(0)}s).title`,
+            text: readout.title,
+            role: 'prose',
+            playhead: atPlayhead(subject, at),
+          });
+        }
+      }
     }
 
     for (const at of sampleTimes(recording)) {
@@ -5019,8 +5071,10 @@ const SELECTOR: SurfaceAdapter = {
     'dev/selectorEditor.ts#armOptionsOf',
     'dev/selectorEditor.ts#changedNoteOf',
     'authoring/selectorSpec.ts#PATTERN_LINES',
+    'authoring/selectorSpec.ts#PATTERN_NAMES',
     'authoring/selectorSpec.ts#INPUT_PHRASES',
     'authoring/selectorSpec.ts#patternLine',
+    'authoring/selectorSpec.ts#patternName',
     'authoring/selectorSpec.ts#signatureLine',
     'authoring/selectorSpec.ts#policyLine',
     'authoring/selectorSpec.ts#patternCards',
@@ -5138,6 +5192,19 @@ const SELECTOR: SurfaceAdapter = {
       text: patternLine(firstPattern) ?? '',
       role: 'prose',
     });
+    /*
+     * The short names, one per declared pattern — the header pill's vocabulary (slice 4b). Driven
+     * over the detector's own `patterns` so a name for a dropped pattern, or a missing one for a
+     * new pattern, changes the corpus the day the data moves; `selectorSpec.test.ts` holds the
+     * key set both ways and this puts the words themselves through R2/R10 with everything else.
+     */
+    for (const patternId of patterns) {
+      seeds.push({
+        field: `patternName(${patternId})`,
+        text: patternName(patternId) ?? '',
+        role: 'label',
+      });
+    }
 
     return singleRun(this.id, seeds);
   },

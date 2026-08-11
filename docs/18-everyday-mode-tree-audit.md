@@ -235,6 +235,30 @@ Slice status lives here rather than in the vendored BUILD_PLAN, because the vend
 a record and records do not move (docs/12's rule; the plan's own "keep the documents updated"
 clause is satisfied by this file). One entry per landed slice beyond 0–2:
 
+- **Slice 4 item (b), the detector readout — LANDED.** The pattern in force now travels into the
+  run record and onto the stage header, end to end: `VizRecording.patternSwitches` (schema **9**,
+  `contract/types.ts` — one `{atS, bankId, patternId}` entry per change, `null` recording the
+  detector's abstention) is populated in `recordRun` by sampling the policy's own `activePattern`
+  after every `dispatch`/`reconsider` — the same read `selectionSweep.ts:768` performs, and the
+  only two methods `#refreshWeightSet` runs from, so the trace is exact rather than sampled on a
+  grid. Per **bank**, because a group controller is per bank and a merged stream would record a
+  two-bank disagreement as detector oscillation. A run whose `selection.policy` is `off` — every
+  shipped profile — carries **no field**, and a live detector that never left abstention carries
+  an **empty** one; the two absences are different claims and both are asserted
+  (`record/recordRun.test.ts` § the selector trace, on § D153's own `midtown-office` cell). The
+  header pill (`index.html#pattern-label`, `dev/main.ts#drawHeader`) derives through the pure
+  `live/patternReadout.ts#patternReadoutAt`, updates as the playhead crosses a switch, and hides
+  — rather than placeholds — when there is no detector. Words are the model's, never a bare
+  engine id (rule 11): `authoring/selectorSpec.ts#PATTERN_NAMES`, the short companion to
+  `PATTERN_LINES` under the same both-ways key-set guard, with the honest fallback (*a pattern
+  this build cannot name (id)*) for a recording written against edited data. New producers are
+  driven in the honesty corpus (`PATTERN_NAMES` under the selector-editor adapter,
+  `patternReadoutAt` under LIVE_RAIL, including a synthesized two-bank disagreement). Old
+  recordings are refused by `record/document.ts`'s existing version rule — re-record from the
+  seed — which is the bump discipline every prior version row followed. **Not built here,
+  deliberately:** items (a) and (c) of the slice 4 work-order — the Everyday-words mount for the
+  flags/levers, the rule compiler and the ghost — each its own lane, as the order above says.
+
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
   `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at

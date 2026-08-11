@@ -75,6 +75,7 @@ import type {
  * | 6 | {@link VizLeg.credentialGroup} added — `docs/10` § 10.4's *"one genuine contract widening U8 needs"*, so the recording can tell **nobody came** from **nobody may come**. Its consumers land in the same change: `src/access/lockedOut.ts` classifies a locked-out landing by it, `src/render/canvas.ts` marks the landing and banners it, and `src/render/describeFrame.ts` says which credential went unread. § 10.4 asked for version 5 and W2 took that number first; this is the same field at the next one. |
  * | 7 | {@link VizLeg.alightedAt}, {@link VizRecording.decisions} and {@link VizRecording.demandPhases} added, for `docs/12-design-handoff.md` § 3.1 BE1, BE2 and BE4. Each lands with the surface that reads it: *carried today* and the report's carried figure read `alightedAt`, the left rail's **WHY IT DID THAT** log reads `decisions`, and the transport timeline reads `demandPhases`. None of the three is derivable from version 6 — `boardedAt` is not delivery, a decision's losing bids are discarded by the time the run returns, and the phase schedule lives on the resolved template rather than on the result. |
  * | 8 | {@link VizSummary.awtInvalidGround} added — the machine-readable half of a refused mean, beside the sentence {@link VizSummary.awtInvalidReason} has carried since version 1. `core` publishes it on `RunSummary` from `metrics/awtValidity.ts`'s ground table (`the root DECISIONS.md` § D183), and **the consumer landed one commit before the transport**: `src/mode/disclosure.ts` already words a Basic suppression lead per ground and, without this field, fell back to the ground-free sentence on every recording this build produced. So this is the reverse of the usual order and the reason is stated rather than implied — a field arriving before its reader is this repository's dead seam, a reader arriving before its field is a fallback that fires. Not derivable from version 7: which of the four grounds fired is a decision `diagnoseAwtValidity` makes in its own precedence order, and re-deriving it here from `saturated`, `waitCount`, `unservedCount` and `serviceLevel` would be a second answer to a question `core` has already answered — wrong in exactly the case the fourth ground exists for. |
+ * | 9 | {@link VizRecording.patternSwitches} added — the weight-set selector's pattern-in-force over time, sampled from the policy's own `activePattern` accessor during the run (Everyday Mode slice 4b, `docs/18` § Slice 4). Until this version the detector classified, switched weight vectors, and told nobody: `dispatch/policy.ts` has exposed `activePattern` since the selector landed and its only readers were in `packages/experiments`, so the one thing a player could not see about a selecting run was the selection. Its consumers land in the same change — the stage header's pattern pill (`dev/main.ts`, deriving through `live/patternReadout.ts#patternReadoutAt`) — because a field with no consumer is this repository's signature defect. Not derivable from version 8: the arm in force is the policy's own deterministic state, discarded when `run()` returns, and re-deriving it here would mean re-implementing the detector over the recording — a second answer that drifts the day a ramp is recalibrated. |
  *
  * ## What version 4 fixed, measured rather than predicted
  *
@@ -107,7 +108,7 @@ import type {
  * a recording arrives from somewhere other than this build and the versions genuinely can
  * disagree (`UX.md` `PB-07`/`PB-15`).
  */
-export const VIZ_SCHEMA_VERSION = 8;
+export const VIZ_SCHEMA_VERSION = 9;
 
 /* -------------------------------------------------------------------------- *
  * Geometry
@@ -457,6 +458,48 @@ export interface VizDecision {
   readonly waitingPassengers?: number | undefined;
 }
 
+/**
+ * One change of the weight-set selector's pattern-in-force — version 9.
+ *
+ * ## What it is a record of
+ *
+ * A projection of `WeightedCostDispatchPolicy.activePattern`, the policy's own provenance
+ * accessor — *"the pattern in force, or `undefined` while the profile's own weights stand"* —
+ * sampled after every `dispatch` and `reconsider` call, which are exactly the two places
+ * `#refreshWeightSet` can move it. So the trace is complete rather than sampled on a grid: a
+ * switch cannot fall between observations, because there is no instant between observations at
+ * which the policy re-selects. This is the same read `experiments/benchmark/selectionSweep.ts`'s
+ * `traceLearnedRegimes` performs, moved into the recording so a player can see it.
+ *
+ * ## The step semantics
+ *
+ * Entries are ascending by `(atS, bankId)`. The pattern in force at playhead `t` for a bank is
+ * the `patternId` of that bank's last entry with `atS <= t`, and **none** before its first entry
+ * — a run opens with the profile's own weights standing, which is also what {@link patternId}
+ * `null` records mid-run: the detector abstained (*"none of the declared regimes"*), and the
+ * profile's weights stand again. `null` rather than an absent field because an abstention is a
+ * fact the detector produced, not a fact the recording lacks — and because `JSON.stringify`
+ * keeps `null`, so a recording equals itself after the replay harness's round trip.
+ *
+ * ## Why the bank is named
+ *
+ * A group controller is per bank, so a selector is too: each bank's policy watches its own
+ * arrival window and holds its own pattern, and on a multi-bank building (`mixed-use-high-rise`,
+ * `secure-tower`, `vertical-city`) two banks genuinely can read different traffic at the same
+ * instant. A merged single stream would record the disagreement as oscillation — a switch each
+ * time a differently-minded bank happened to decide — which is a picture of a detector defect
+ * the run does not have. The renderer (`live/patternReadout.ts`) folds per-bank values back into
+ * one honest readout, saying so when the banks disagree rather than picking one.
+ */
+export interface VizPatternSwitch {
+  /** When this bank's pattern-in-force changed. The kernel's own seconds. */
+  readonly atS: SimTime;
+  /** The bank whose policy switched — the same runtime id {@link VizShaft.bankId} carries. */
+  readonly bankId: string;
+  /** The pattern now in force, or `null` when the detector abstained. */
+  readonly patternId: string | null;
+}
+
 /** One weighted term's share of a decision. A projection of `core`'s `ScoreBreakdown`. */
 export interface VizDecisionTerm {
   readonly termId: string;
@@ -795,6 +838,25 @@ export interface VizRecording {
    * that inferred *out of service* from *never moved* would mark an idle car on a quiet morning.
    */
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * The weight-set selector's pattern-in-force over time — version 9. See {@link VizPatternSwitch}.
+   *
+   * **Absent when the run built no detector**, which is every run whose `selection.policy` is
+   * `'off'` — every shipped profile — and every run recorded without the policy instrumentation
+   * (`RecordRunOptions.recordDecisions: false`, or a caller who claimed `createPolicy`). Absent
+   * rather than empty, because the two states are different claims: a run that never constructed
+   * an `ArrivalWindow` has no pattern to report and must not appear to have watched for one.
+   *
+   * **Present and possibly empty when a selector was live.** An empty list is the honest record
+   * of a detector that watched the whole run and never left abstention — the profile's own
+   * weights stood throughout — which is a state `garden-apartments`' residential trickle
+   * genuinely produces. The header then says the detector found no clear pattern, rather than
+   * saying nothing, because *watching and finding nothing* is a fact about the run.
+   *
+   * Written as absent (never an explicit `undefined`) by the same JSON-round-trip rule
+   * {@link VizLeg}'s optional fields keep.
+   */
+  readonly patternSwitches?: readonly VizPatternSwitch[] | undefined;
   /** Non-fatal diagnostics from the run, for the viewer's warning strip. */
   readonly warnings: readonly string[];
 }

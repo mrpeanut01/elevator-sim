@@ -119,6 +119,12 @@ export interface HeaderElements {
   readonly buildingSub: HTMLElement;
   readonly clock: HTMLElement;
   readonly phaseLabel: HTMLElement;
+  /**
+   * Slice 4b — the selector's pattern-in-force beside the phase pill. Hidden, not emptied, when
+   * the run built no detector: `drawHeader` toggles `hidden` from the readout's own absence so
+   * nothing on the header reads as a pattern that was never detected.
+   */
+  readonly patternLabel: HTMLElement;
   readonly dayLabel: HTMLElement;
   readonly tenantsLine: HTMLElement;
   /** § 4's mode toggle, and the place `mode/parity.ts` puts a refusal it finds. */
@@ -532,6 +538,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     buildingSub: 'building-sub',
     clock: 'clock',
     phaseLabel: 'phase-label',
+    patternLabel: 'pattern-label',
     dayLabel: 'day-label',
     tenantsLine: 'tenants-line',
     viewMode: 'view-mode',

@@ -65,6 +65,7 @@ import {
   type VizLanding,
   type VizLeg,
   type VizDecision,
+  type VizPatternSwitch,
   type VizPhase,
   type VizProgress,
   type VizRecording,
@@ -161,6 +162,17 @@ export function recordRun(config: SimulationConfig, options: RecordRunOptions = 
       decisions: instrumented ? collector.build() : [],
       phases: describePhases(config, result),
       outOfServiceCarIds: outOfService,
+      /*
+       * The selector trace, version 9. `undefined` — written as an absent field — on every run the
+       * wrapper did not instrument *and* on every instrumented run whose policies built no
+       * detector, which is what "a run that never built the detector must not claim a pattern"
+       * reduces to in code: the collector returns `undefined` unless some policy actually carried
+       * a weight-set library. Bank ids come from the runtime building in declaration order, the
+       * same order the constructor's policy loop enrolled them in.
+       */
+      patternSwitches: instrumented
+        ? collector.buildPatternSwitches(simulation.building.banks.map((bank) => bank.id))
+        : undefined,
     }),
     result,
   };
@@ -311,11 +323,13 @@ function labelOfPhase(kind: VizPhase['kind'], start: number, end: number): strin
  * The fold
  * -------------------------------------------------------------------------- */
 
-/** The version-7 facts the fold cannot derive, gathered by {@link recordRun} around the run. */
+/** The version-7+ facts the fold cannot derive, gathered by {@link recordRun} around the run. */
 interface RecordedExtras {
   readonly decisions: readonly VizDecision[];
   readonly phases: readonly VizPhase[];
   readonly outOfServiceCarIds: readonly string[];
+  /** Version 9's selector trace, or `undefined` for the honest absence. See the contract. */
+  readonly patternSwitches: readonly VizPatternSwitch[] | undefined;
 }
 
 function describeRun(
@@ -358,7 +372,9 @@ function describeRun(
   const { landings, progress } = foldPassengers(result.record.passengers);
   const legs = describeLegs(result.record.passengers);
 
-  return {
+  const recording: {
+    -readonly [K in keyof VizRecording]: VizRecording[K];
+  } = {
     schemaVersion: VIZ_SCHEMA_VERSION,
     runId: result.runId,
     seed: result.seed,
@@ -384,6 +400,9 @@ function describeRun(
     outOfServiceCarIds: extras.outOfServiceCarIds,
     warnings: result.warnings,
   };
+  // Absent, never an explicit `undefined` — the JSON-round-trip rule `describeLegs` states.
+  if (extras.patternSwitches !== undefined) recording.patternSwitches = extras.patternSwitches;
+  return recording;
 }
 
 /* -------------------------------------------------------------------------- *

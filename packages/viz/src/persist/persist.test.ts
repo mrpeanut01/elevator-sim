@@ -53,6 +53,7 @@ import {
 } from '../dev/state.js';
 import { catalogueOf } from '../menu/catalogue.js';
 import { initialMenuState, updateFreePlay, updateSettings } from '../menu/menu.js';
+import { VIZ_SCHEMA_VERSION } from '../contract/types.js';
 import { DEFAULT_SETTINGS, PLAYBACK_SPEEDS, type MenuState } from '../menu/types.js';
 import { CONTRACTS } from '../shift/contracts.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
@@ -1326,7 +1327,10 @@ describe('what the bytes must not contain', () => {
 
   it('carries neither the recording nor the report', () => {
     const text = saved().written.get(SESSION_KEY) ?? '';
-    expect(text).not.toContain('schemaVersion":8');
+    // The literal is the *current* recording schema, derived rather than pinned: a pinned `8`
+    // went stale the day slice 4b bumped the contract to 9, and a stale pin here checks that the
+    // session does not embed a recording shape no build writes any more.
+    expect(text).not.toContain(`schemaVersion":${String(VIZ_SCHEMA_VERSION)}`);
     expect(text).not.toContain('smallPrint');
     expect(text).not.toContain('diagnosis');
   });

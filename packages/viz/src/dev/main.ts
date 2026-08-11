@@ -113,6 +113,7 @@ import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
 import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   clockAt,
   DAY_START_S,
@@ -3011,6 +3012,25 @@ function boot(ui: Elements, resources: BrowserResources): void {
     );
     const phase = view.recording === undefined ? undefined : phaseAt(view.recording, view.simTimeS);
     setText(ui.header.phaseLabel, phase?.label ?? 'no run yet');
+    /*
+     * Slice 4b — the pattern the selector holds at the playhead, beside the phase pill and
+     * updating as the playhead crosses a switch, because it re-derives per frame from the
+     * recording exactly as the phase pill does. Hidden — not emptied — when the run built no
+     * detector or there is no run yet: the readout's `label` is `''` precisely then, and a
+     * visible empty pill would still *look* like a claim. The words come from the model
+     * (`PATTERN_NAMES`, rule 11), never a bare engine id.
+     */
+    const pattern =
+      view.recording === undefined
+        ? undefined
+        : patternReadoutAt(view.recording, view.simTimeS);
+    ui.header.patternLabel.hidden = pattern === undefined || pattern.label === '';
+    setText(ui.header.patternLabel, pattern?.label ?? '');
+    if (pattern !== undefined && pattern.title !== '') {
+      ui.header.patternLabel.setAttribute('title', pattern.title);
+    } else {
+      ui.header.patternLabel.removeAttribute('title');
+    }
     setText(
       ui.header.dayLabel,
       `Day ${String(state.week.day)} · ${weekdayOf(state.week.dayIdx)}`,
