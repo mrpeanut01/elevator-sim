@@ -443,6 +443,18 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   not moving* is the stronger lock, because there is no window in which a bug could put it back
   early. Interventions and the ghost picker are disabled (contract §1.5); the transport is
   deliberately **not**, which is the half of that sentence a disabling sweep gets wrong.
+  **Posting was the hole, and it was not only a watching one.** *A watched run cannot be closed,
+  banked or posted* is enforced through the refusal the product already had for the first two —
+  but `submitScore` had no such gate: it posts `claimedMetricsOf(recording.summary)`, the metrics of
+  **whatever is on screen**, under `state.buildingId`/`dispatcherId`/`seed`, which are the
+  **player's own** selection. `runIdentityIssues` cannot see it — it inspects the *state*, and a
+  spectator's state is perfectly reproducible; what is wrong is the recording beside it. The server
+  would replay the submitted seed, fail to reproduce, and answer `422 metrics-do-not-reproduce`,
+  which is `scope/runIdentity.ts`'s own named outcome: *this product's one accusation, aimed at a
+  player who did nothing wrong*. Closed with `bankingRefusalFor`, reused rather than restated, so
+  one answer to *is the run on screen this shell's own?* is now asked by both the thing that banks a
+  day and the thing that posts one — **and it closes the same hole for a recording loaded from a
+  file, which predates this slice** (issue #136 gated banking and not posting).
   §14.1's two stated defect conditions are both driven: `view.test.ts` walks every string the view
   draws — a corpus that is a *function of the view*, with a third case settling that it covers the
   view — and requires none to say `you`/`your`; the action bar is a closed list of two.

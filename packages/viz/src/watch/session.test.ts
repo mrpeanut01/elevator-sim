@@ -13,6 +13,7 @@ import { recordRun } from '../record/recordRun.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf } from '../dev/state.js';
 import { bankingRefusalFor } from '../shift/banking.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
 
 import { watchingStateOf } from './session.js';
 
@@ -45,6 +46,31 @@ describe('the state a spectator watches under', () => {
     watchingStateOf(before, watched);
     expect(before).toBe(snapshot);
     expect(before.recording).toBeUndefined();
+  }, 60_000);
+
+  it('cannot be posted either, through the same gate rather than a second one', () => {
+    /*
+     * `dev/main.ts#submitScore` posts `claimedMetricsOf(recording.summary)` under `state`'s own
+     * building, dispatcher and seed. While watching those describe two different runs, so the
+     * server would replay the spectator's seed, fail to reproduce, and answer
+     * `422 metrics-do-not-reproduce` — this product's one accusation, aimed at somebody who did
+     * nothing wrong.
+     *
+     * `runIdentityIssues` cannot catch it: it inspects the **state**, and the spectator's state is
+     * perfectly reproducible. What is wrong is the recording beside it, which is exactly what
+     * `bankingRefusalFor` answers. Asserted here as the pair `submitScore` compares, so the gate is
+     * pinned by a run rather than by the paragraph in `main.ts` (§ D227).
+     */
+    const own = recordRun(shiftRunConfigOf(RESOURCES, baseState()).config).recording;
+    /*
+     * A spectator whose **own** state is perfectly postable — `baseState()` rather than the
+     * day-3-with-a-log state the other cases use, because the whole point is that the state passes
+     * and the recording beside it does not. On a state that already had refusals of its own, this
+     * would be green for the wrong reason.
+     */
+    const during = watchingStateOf(baseState(), watched);
+    expect(runIdentityIssues(during, RESOURCES, 'ranked')).toEqual([]);
+    expect(bankingRefusalFor(during.recording, own)).not.toBeNull();
   }, 60_000);
 
   it('cannot bank, because the watched run is not the run this shell simulated', () => {

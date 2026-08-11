@@ -2253,6 +2253,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * refusal that exists only in a disabled button is a refusal one keyboard route away from not
      * existing.
      */
+    /*
+     * **The run on screen has to be the run this shell simulated** — Everyday Mode slice 8, and the
+     * same object-identity gate `closeShift` already uses.
+     *
+     * Found while wiring the spectator state, and it is **not only** about watching. `submitScore`
+     * posts `claimedMetricsOf(recording.summary)` — the metrics of whatever is on screen — under
+     * `state.buildingId`, `state.dispatcherId` and `state.seed`, which are the **player's own**
+     * selection. Those two describe the same run for a run this shell simulated and describe
+     * different runs for any other:
+     *
+     * - while **watching**, `state.recording` is somebody else's day and the selection is the
+     *   spectator's;
+     * - for a recording **loaded from a file** (issue #136), they have never agreed, and that hole
+     *   predates this slice.
+     *
+     * Either way the server replays the submitted seed, does not reproduce, and answers
+     * `422 metrics-do-not-reproduce` — *"this product's one accusation, aimed at a player who did
+     * nothing wrong"*, which is `scope/runIdentity.ts`'s own sentence about exactly this shape.
+     * `runIdentityIssues` below cannot see it: it inspects the **state**, and the state is
+     * perfectly reproducible. What is wrong is the *recording beside it*.
+     *
+     * So the gate is `bankingRefusalFor`, reused rather than restated — one answer to *is the run on
+     * screen this shell's own?*, now asked by both the thing that banks a day and the thing that
+     * posts one.
+     */
+    const notOurs = bankingRefusalFor(recording, simulatedRecording);
+    if (notOurs !== null) {
+      accountState = withNotice(accountState, `This run cannot be posted: ${notOurs}.`);
+      drawMenu();
+      return;
+    }
+
     const identity = runIdentityIssues(state, resources, 'ranked');
     if (identity.length > 0) {
       accountState = withNotice(
