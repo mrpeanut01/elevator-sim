@@ -477,6 +477,58 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   checked **when it is pressed** rather than on open, because checking every row would run one
   simulation per filed day to draw a list. Honesty-corpus string counts are deliberately not
   re-measured here: a figure measured per branch is stale on merge (CLAUDE.md's rule).
+- **Slice 10a, the honesty half — LANDED.** ENGINE_CONTRACT §12.2's withheld matrix, **enumerated
+  from the state model** rather than written as fixtures: `honesty/generate.ts#WITHHELD_REASONS`
+  declares the axes and `withheldStates()` takes their power set, so a sixth reason adds
+  thirty-two states to the corpus without anybody listing one. §12.2 names four (*day not closed ·
+  replay · sandbox · `noPost`*); there are **five** here and every one names the seam in this tree
+  that makes it real, because three of the four names are the prototype's. **There is no
+  `settings.noPost` in this tree** — what is real is the pair of gates that refuse a post
+  (`menu/account.ts#postingRefusal`, and slice 8's `bankingRefusalFor` in front of `submitScore`) —
+  and the fifth axis is §12.2's own second paragraph, *the API unreachable* (§16 rule 15, issue
+  #123), which is an **axis rather than a constant** precisely because this build has no server: the
+  other four would otherwise only ever be swept in it.
+  **Two of §12.2's five surfaces do not exist here, and they are named rather than stubbed**
+  (`surfaces.ts#WITHHELD_MATRIX`'s docstring carries the table): *Your week* is `dev/leftRail.ts`'s
+  card, the *report* is `dev/reportPanel.ts#emptyReportView`, the *board* is `menu/screens.ts`'s
+  leaderboard body — but **the ladder** needs a standing dispatcher rating that is unbuilt (slice 4d
+  omitted the ghost's *best* arm for the same reason) and **the percentile line** needs a world
+  distribution nothing in this tree computes and no endpoint carries. A surface invented in order to
+  be swept is a surface with no reader, and the sweep would then certify it.
+  The rule is an **eighth property** — `withheld-figure-published`: a cell standing where a withheld
+  figure would be reads `—` or a labelled unavailable state, never a blank, a zero, a spinner or a
+  stale figure. Two populations reach it: the marked cells, and **every string whose role is already
+  `suppressed`** — a rule `TextRole`'s own docstring has carried since it was written (*"never a
+  blank, never a zero"*) and that no property enforced. *Stale* is the half that needs the adapter:
+  a number is a leak only if it is the figure that cell may not carry, so `WithheldFigure.ifPublished`
+  is declared where the state is known, exactly as `TextPlayhead.basis` is.
+  **It found two, and both were shipping.** `runFiguresOf` published **0 %** under *best day so far*
+  on a week with no closed day — a new player's whole first shift, and a best over an empty sample is
+  not a bad best; and while watching somebody else's run the week strip's provisional bar drew the
+  **watched** player's share as the spectator's own *today, so far*, because `drawShift` read the
+  recording on the stage and `watch/session.ts#watchingStateOf` deliberately leaves the week
+  untouched. Both are fixed in the product (`dev/leftRail.ts#todayShareFor` over a new
+  `ViewAt.watching`; the history gate on the best-day cell) and both are **restored as faults**, so
+  the property is shown to fire on the defects it was written for rather than only on invented ones.
+  The axis's own size is measured beside the temporal axis's and for the same reason — **31 of 32
+  states mark a cell**, and the missing one is `nothing-withheld`, because a state that withholds
+  nothing marks nothing and asserting otherwise would demand the false claim the property refuses.
+  §20.11 and §16 rule 15 are closed the same way, mechanically: every numeral in a fix-a-building
+  case's authored copy must be a figure the run produced (at the copy's own precision, so *341 s*
+  matches a measured `341.1`) or an entry in `cases.test.ts`'s `AUTHORED_FACTS` naming its source —
+  a floor of the building, a served headcount off the building document — asserted in both
+  directions; and `boundaries.test.ts` confines **value-level** imports of the leaderboard client to
+  two files. That list came out shorter than it was written: `dev/menuPanel.ts` draws every board in
+  the product and imports the client **for its types only**, so it is handed a page and, handed
+  none, draws the labelled example (issue #28) rather than an empty table. The Everyday surfaces this
+  delivery built hold no client at all, which is what makes them complete with no server by
+  construction rather than by inspection. **Not built, named rather than implied:** the ladder and
+  the percentile line (both need machinery that does not exist); *"no board row survives with no
+  server"*, which is the absence of a string and belongs where absences are assertable
+  (`menu/screens.ts`'s own tests) rather than in an instrument that judges what a surface said; and
+  the three DOM panels, which are still statically swept. Honesty-corpus string counts are
+  deliberately **not** re-measured here: a figure measured per branch is stale on merge (CLAUDE.md's
+  rule), and this lane moves both tiers' counts and the surface count.
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
   `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at
@@ -507,3 +559,8 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
    distinctions one phrase would collapse.
 8. No gauntlet, no forty cases, no ghost, no rule list, no `testsCount`; the nearest shared
    fixture list is `MATRIX_CELLS`, which is not "the eight buildings".
+9. ENGINE_CONTRACT §12.2 names five surfaces the withheld matrix must be swept across and **two of
+   them do not exist here**: the dispatcher ladder needs a standing rating (unbuilt), and the
+   percentile line needs a world distribution nothing computes and no endpoint carries. Its four
+   withheld *reasons* are the prototype's names — `noPost` in particular is a `settings` flag this
+   tree does not have, and what is real is the pair of gates that refuse a post.

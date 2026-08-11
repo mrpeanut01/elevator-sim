@@ -42,6 +42,9 @@ import {
   STANDARD_CORPUS,
   STANDARD_SPACE,
   SURFACE_ADAPTERS,
+  WITHHELD_REASON_IDS,
+  WITHHELD_REASONS,
+  withheldStates,
   evaluateCase,
   shrinkCase,
   type HonestyCampaignResult,
@@ -158,6 +161,51 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
     );
     expect(early).toEqual([]);
     expect(temporal.declaredWholeRun).toBeGreaterThan(0);
+  });
+
+  it('the withheld matrix reaches every combination it can — § 12.2', () => {
+    /*
+     * **The same false-negative shape the temporal axis has, and the reason both are measured.**
+     *
+     * `withheld-figure-published` is answerable only about cells an adapter *marked*, so an adapter
+     * that stopped marking them — a refactor, a renamed field — would leave the property iterating
+     * an empty set and reporting zero violations, which is byte-identical to it holding. The cell
+     * count is the cheap half; the state count is the one § 12.2 is actually about, because the
+     * clause is *every* combination and a matrix with a hole in it satisfies any cell count.
+     *
+     * **31 rather than 32**, and the missing one is the point: `nothing-withheld` is the state in
+     * which no reason holds, and a state that withholds nothing marks no cell. Asserting the full
+     * `2 ** n` would require the adapter to mark a cell in a state where nothing is unavailable,
+     * which is precisely the false claim this property exists to refuse.
+     */
+    const { withheld } = standard.stats;
+    expect(withheld.states).toBe(2 ** WITHHELD_REASONS.length - 1);
+    expect(withheld.cells).toBeGreaterThan(withheld.states);
+    // And the enumeration itself is the power set, so the number above is a coverage claim.
+    expect(withheldStates()).toHaveLength(2 ** WITHHELD_REASONS.length);
+    expect(new Set(withheldStates().map((state) => state.id)).size).toBe(2 ** WITHHELD_REASONS.length);
+    for (const reason of WITHHELD_REASON_IDS) {
+      expect(
+        withheldStates().filter((state) => state.reasons.includes(reason)).length,
+        reason,
+      ).toBe(2 ** (WITHHELD_REASONS.length - 1));
+    }
+  });
+
+  it('every withheld reason names a seam in this tree, not a prototype identifier', () => {
+    /*
+     * § 12.2's four names are the prototype's — `docs/18`'s framing correction — and three of them
+     * mean something different here. A reason whose `seam` were empty would be a state the sweep
+     * invented rather than one a player can reach, which is the fixture-list defect arriving through
+     * the door built to close it.
+     */
+    for (const reason of WITHHELD_REASONS) {
+      expect(reason.seam.length, reason.id).toBeGreaterThan(20);
+      expect(reason.holds.length, reason.id).toBeGreaterThan(20);
+      // Named after what is true of the shell, never after a `settings` flag this tree lacks.
+      expect(reason.seam, reason.id).toMatch(/\.ts#|\.ts /);
+    }
+    expect(WITHHELD_REASONS.map((reason) => reason.id)).toEqual([...WITHHELD_REASON_IDS]);
   });
 
   it('the corpus reaches every shipped building and every generated mode', () => {

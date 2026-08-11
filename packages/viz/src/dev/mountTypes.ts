@@ -53,6 +53,23 @@ export interface ViewAt {
   /** Whether playback is running, for the transport's glyph and the status line. */
   readonly playing: boolean;
   /**
+   * Whether the run on the stage is **somebody else's**, replayed from its record — slice 8.
+   *
+   * Here rather than derivable by a panel for `unfiledSheet`'s reason: the fact lives in `boot()`'s
+   * closure (`dev/main.ts#isWatching`) and no panel can reach it. `watch/session.ts#watchingStateOf`
+   * deliberately leaves `ViewerState` otherwise untouched — the spectator's week, report and
+   * interventions are still their own — so `state` carries no trace of the watch and a panel asking
+   * *"is this recording mine?"* of the state alone would always answer yes.
+   *
+   * One panel needs it and the reason is ENGINE_CONTRACT § 12.2: the left rail's week strip draws a
+   * *today, so far* figure off `recording`, and while watching that recording is a stranger's run.
+   * See `dev/leftRail.ts#todayShareFor`.
+   *
+   * `undefined` means *nobody has said*, treated as **not watching** — the state every caller that
+   * has no shell is in.
+   */
+  readonly watching?: boolean | undefined;
+  /**
    * Why the Day report has nothing on it while the rest of the screen suggests otherwise, or
    * `undefined` when the empty sheet is empty for the plain reason (nothing has been run).
    *

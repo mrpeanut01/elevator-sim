@@ -273,6 +273,50 @@ export const wholeRunCountInProse: TextFault = (texts, context) => {
 };
 
 /**
+ * § 12.2 — a withheld cell drawn as a zero.
+ *
+ * **The defect the withheld-matrix sweep found, restored to the exact string it produced.**
+ * `dev/leftRail.ts#runFiguresOf` published `0%` under *best day so far* on every week whose history
+ * was empty, which is every new player's whole first shift. `0%` rather than a number chosen here,
+ * because the shape of this defect is precisely that the cell keeps rendering a figure's *format*
+ * while nothing has been measured — a reader cannot tell it from a genuinely bad day.
+ *
+ * Structural in the sense that matters: the string is judged because the **adapter** declared the
+ * cell withheld, not because of anything in the words. A search that decided *"this looks like a
+ * placeholder"* from the text could not have caught the real one.
+ */
+export const withheldFigureAsZero: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.withheld !== undefined,
+    (text) => ({ ...text, text: '0%' }),
+  );
+
+/**
+ * § 12.2 again, and the other half — a withheld cell carrying the figure it may not publish.
+ *
+ * **The second defect the sweep found, in its own words**: while watching somebody else's run, the
+ * week strip's *today, so far* bar read the watched player's share in the spectator's own week —
+ * *"Tuesday, so far: 66 % away inside a minute"*. The number is taken from the cell's own
+ * `ifPublished`, so the fault carries whatever that state's forbidden figure actually is rather than
+ * a literal that could drift away from it.
+ *
+ * It lands only on a cell that declares one, which is the guard `wholeRunCountInProse` needs for the
+ * same reason: a fault injected where the property is right to stay quiet would read as the property
+ * failing to fire. It is also the half no wording rule could catch — the sentence is well formed,
+ * labelled, and about the wrong run.
+ */
+export const withheldFigureStale: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => text.withheld !== undefined && text.withheld.ifPublished.length > 0,
+    (text) => ({
+      ...text,
+      text: `${text.withheld?.ifPublished[0] ?? '66'}% away inside a minute, so far`,
+    }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -300,5 +344,15 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
     'whole-run-figure-early': [
       { name: 'wholeRunDriverDrawnEarly', fault: wholeRunDriverDrawnEarly },
       { name: 'wholeRunCountInProse', fault: wholeRunCountInProse },
+    ],
+    /*
+     * The fourth pair, and the same reason again: § 12.2 forbids three things in one clause and two
+     * of them are unrelated failures. A zero is a cell that kept a figure's format with nothing
+     * behind it; a stale figure is a cell that carries a real number about the wrong run. Both were
+     * shipping when the axis landed, and each is the fault for the half the other cannot show.
+     */
+    'withheld-figure-published': [
+      { name: 'withheldFigureAsZero', fault: withheldFigureAsZero },
+      { name: 'withheldFigureStale', fault: withheldFigureStale },
     ],
   });

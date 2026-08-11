@@ -21,8 +21,22 @@
  * adapter — see the tuple's own docstring for what the axis does and does not buy today.
  */
 
-export { caseFromSeed, formatHonestyCase, DEEP_SPACE, STANDARD_SPACE } from './generate.js';
-export type { GenerateOptions, HonestySpace } from './generate.js';
+export {
+  caseFromSeed,
+  formatHonestyCase,
+  withheldStates,
+  DEEP_SPACE,
+  STANDARD_SPACE,
+  WITHHELD_REASON_IDS,
+  WITHHELD_REASONS,
+} from './generate.js';
+export type {
+  GenerateOptions,
+  HonestySpace,
+  WithheldReason,
+  WithheldReasonId,
+  WithheldState,
+} from './generate.js';
 
 export {
   deepCampaignRequested,
@@ -75,4 +89,6 @@ export type {
   TextPlayhead,
   TextProvenance,
   TextRole,
+  WithheldFigure,
+  WithheldReach,
 } from './types.js';
