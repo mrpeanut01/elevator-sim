@@ -149,13 +149,16 @@ const ALLOWED_EXTERNALS = ['@elevator-sim/core'];
 /**
  * Every module a browser bundle of `src/browser.ts` contains. Asserted by equality.
  *
- * Thirteen files: the barrel, the five of `tuning/space`, `reports/statistics.ts` and the
- * `reports/types.ts` it is declared against, the four pure `runner/` modules, and `oracle/types.ts`
+ * Fourteen files: the barrel, the five of `tuning/space`, `reports/statistics.ts` and the
+ * `reports/types.ts` it is declared against, the four pure `runner/` modules, `oracle/types.ts`
  * — which is here only because `runner/types.ts` imports one type from it, and which is the module
- * most likely to surprise a reader. If this list changes, one of two things happened and both want
- * a human: the barrel's surface moved, or the walk stopped following an edge.
+ * most likely to surprise a reader — and `benchmark/matrixCells.ts`, the experiment matrix's
+ * fixture data, split out of `matrix.ts` (whose graph reaches `node:url`) so Everyday Mode's suite
+ * can import the cells rather than retype them. If this list changes, one of two things happened
+ * and both want a human: the barrel's surface moved, or the walk stopped following an edge.
  */
 const BROWSER_GRAPH = [
+  'benchmark/matrixCells.ts',
   'browser.ts',
   'oracle/types.ts',
   'reports/statistics.ts',

@@ -2446,6 +2446,34 @@
             <div class="instrument-body">
               <div class="instrument-form batch-report" id="batch-output" aria-label="Batch report"></div>
             </div>
+            <!-- ============ Everyday Mode slice 7: the suite (docs/18 § Slice 7) ============ -->
+            <!--
+              One comparison over multiple fixed cells, beside the pairwise bench rather than in
+              place of it — §20.8 is inverted for this tree (the bench above IS the pairwise one;
+              the suite is what was missing). Sibling sections rather than children of the bench's
+              `.instrument-body`, because that container is a flex ROW: children inserted into it
+              lay out beside the report and intercept its clicks — found by the compare-lab
+              browser test, not by inspection. The cell ticks are NOT in this file: they render
+              from packages/experiments' MATRIX_CELLS at mount time, so the fixture list is
+              imported, never retyped, and a ninth cell appears with no edit here.
+            -->
+            <div class="instrument-bar">
+              <label>baseline <select id="suite-baseline"></select></label>
+              <label>candidate <select id="suite-candidate"></select></label>
+              <label title="50–200 replications per configuration is this project’s budget; below 50 every separating row refuses to name a winner">
+                replications <input id="suite-replications" type="number" min="1" max="400" step="1" value="50" size="4" />
+              </label>
+              <label>seed <input id="suite-seed" size="18" inputmode="numeric" value="20260729" /></label>
+              <button id="suite-run">Run suite</button>
+              <button id="suite-cancel">Cancel</button>
+              <progress id="suite-progress" value="0" max="1" aria-label="suite progress"></progress>
+              <span id="suite-status" role="status"></span>
+              <span id="suite-error" role="alert" tabindex="-1"></span>
+            </div>
+            <div class="instrument-bar" id="suite-cells" aria-label="Matrix cells to run"></div>
+            <div class="instrument-body">
+              <div class="instrument-form batch-report" id="suite-output" aria-label="Suite report"></div>
+            </div>
           </section>
 
           <!-- =================== Retained: Campaign (§ 2.3) ==================== -->

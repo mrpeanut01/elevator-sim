@@ -43,8 +43,10 @@ import type {
   ElevatorSpecs,
   ResolvedBuilding,
   ServiceLevelVerdict,
+  SimulationDemandOptions,
   SimulationStatus,
   TrafficProfiles,
+  WindowSelection,
 } from '@elevator-sim/core/browser';
 import type { ReplicationMetric } from '@elevator-sim/experiments/browser';
 
@@ -248,6 +250,35 @@ export interface BatchRequest {
    * populations. `traceKeyOf` reads it, so it is part of the equivalence class the report prints.
    */
   readonly demandLevel?: DemandLevel | undefined;
+  /**
+   * A whole authored demand block — Everyday Mode's suite (docs/18 § Slice 7), which runs the
+   * experiment matrix's cells, and a cell is more than a rate: `MATRIX_CELLS`' two Midtown 900 s
+   * cells differ **only** in `directionalSplit`, so without this field the suite's two ticks would
+   * run one population twice and the move-the-control test fails on the trace.
+   *
+   * On the request and never on an arm, for exactly {@link arrivalRatePctPop5min}'s reason: every
+   * field of it is one the passenger trace is a function of (`traceKeyOf` reads the whole block),
+   * so two arms differing here would be two populations and no paired interval could be honest.
+   *
+   * **Mutually exclusive with {@link arrivalRatePctPop5min} and {@link demandLevel}, and
+   * `runBatch` refuses the combination by name.** The panel's two fields and this block are two
+   * sources for one population; letting them merge would make the report's demand clause a
+   * sentence about half the truth, which is the published-number defect with words. A request
+   * that omits it is byte-identical to every batch run before the field existed.
+   */
+  readonly demand?: SimulationDemandOptions | undefined;
+  /**
+   * Which window the summary is computed over, or absent for each run's own default.
+   *
+   * Carried for the same suite: three matrix cells declare `reportWindow: 'full-run'` because at
+   * their sparse rates the peak-5min window is empty often enough to invalidate the cell
+   * (`matrixCells.ts`, garden-residential's rationale) — dropping it would make the suite
+   * suppress rows the matrix measures. It narrows the **summary**, not the trace, so it is not
+   * part of the CRN equivalence class and `traceKeyOf` rightly ignores it; it sits on the request
+   * because a window is a property of the comparison, and two arms summarised over different
+   * windows would be two quantities under one label.
+   */
+  readonly reportWindow?: WindowSelection | undefined;
 }
 
 /** The resolved objects a batch needs. Assembled by the caller; never fetched here. */
@@ -365,6 +396,14 @@ export interface BatchResult {
    * reads as `undefined`, which is core's `typical`, which is what it ran at.
    */
   readonly demandLevel?: DemandLevel | undefined;
+  /**
+   * The authored demand block the batch ran under, when the request carried one — copied so
+   * `batchReport`'s demand clause can say so rather than claiming the building's own profile ran.
+   * Absent on every result recorded before the field existed, which is also what those ran under.
+   */
+  readonly demand?: SimulationDemandOptions | undefined;
+  /** The summary window the request named, if any, for the same provenance reason. */
+  readonly reportWindow?: WindowSelection | undefined;
   readonly arms: readonly BatchArmResult[];
   readonly crn: BatchCrnAudit;
   /** Wall-clock milliseconds the batch took, from the injected clock. Diagnostic only. */

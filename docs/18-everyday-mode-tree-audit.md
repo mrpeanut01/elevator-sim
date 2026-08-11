@@ -258,6 +258,35 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   seed — which is the bump discipline every prior version row followed. **Not built here,
   deliberately:** items (a) and (c) of the slice 4 work-order — the Everyday-words mount for the
   flags/levers, the rule compiler and the ghost — each its own lane, as the order above says.
+- **Slice 7, first pass — LANDED.** The suite is a consumer of the bench, exactly as the
+  work-order above scopes it: `packages/viz/src/batch/suite.ts` is the pure model — the field of
+  two arms is a *tuple* (`SuiteField`), one `BatchRequest` per ticked cell, and the view model is
+  read off `batchReport` with best-in-cell taken from `BatchComparisonRow.favours` alone and the
+  pairwise verdict drawn **only when `comparisons.length === 1`**; `dev/suitePanel.ts` mounts it
+  beside `dev/batchPanel.ts` inside the Compare panel (worker per cell-batch through the shipped
+  `dev/batchWorker.ts`, cells sequential, cancel terminates and reports nothing), and the ticks
+  render from `MATRIX_CELLS` at mount time so neither this file nor `index.html` retypes a cell.
+  **The first decision landed as a module split**: the cells are imported through
+  `@elevator-sim/experiments/browser` — measured first, the data is pure but `matrix.ts`'s graph
+  reaches `node:url`, so the cells moved to `benchmark/matrixCells.ts` (docstring carries the
+  argument; a decision number is owed) and `matrix.ts` re-exports them byte-identically; the
+  `data/` fallback was rejected there. **The mapping forced the request to grow**:
+  `BatchRequest.demand` (a whole authored block, mutually exclusive with the panel's rate/level —
+  `runBatch` refuses the combination by name) and `BatchRequest.reportWindow`, because the two
+  Midtown 900 s cells differ *only* in directional split and three cells need `full-run`;
+  `batchReport`'s demand clause now names an authored condition rather than claiming the
+  building's own profile ran. Held by `batch/suite.test.ts` — the cell→request mapping exact over
+  all eight cells, the two Midtown cells separated **on the trace key in a real run**, CRN audited
+  per cell, the field-of-two refusals driven, and one cheap garden-apartments cell end to end at
+  n = 2 proving the under-budget refusal survives the suite (no winner named however the interval
+  fell) — and driven by `honesty/surfaces.ts`'s `SUITE_BENCH` adapter, appended so no fault moves
+  surface. **Not built, named rather than implied:** per-cell derived budgets (one replications
+  control for the whole suite; each cell's report says what leaving 50–200 costs), the bench's
+  drawn interval bars (the suite reuses `intervalPlotFor`'s geometry for a text form), and any
+  viewer inheritance — a suite's cells fix building and traffic, which is the point of a fixed
+  fixture list. Honesty-corpus string counts are deliberately **not** re-measured here: a figure
+  measured per branch is stale on merge (CLAUDE.md's rule), and the SUITE_BENCH adapter will move
+  both tiers' counts when the integrated tree is measured.
 
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through

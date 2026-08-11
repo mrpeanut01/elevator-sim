@@ -46,6 +46,15 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'than presented as coverage.',
       ids: [
         'dev/batchPanel.ts#mountBatchPanel',
+        /*
+         * Everyday Mode slice 7's suite mount, beside the bench and excluded on the bench's own
+         * ground: it mounts DOM, and its authored copy is the empty state, the derived cost line
+         * and the worker-lifecycle status text. Every *claim about a run* it draws is authored in
+         * `batch/suite.ts` — whose producers the SUITE_BENCH adapter drives — or is `batchReport`'s
+         * own sentence re-rendered. The inline copy reaches the static sweep below, which is
+         * weaker than driving it and is stated as a limitation, exactly as for the mount above.
+         */
+        'dev/suitePanel.ts#mountSuitePanel',
         'dev/campaignPanel.ts#mountCampaignPanel',
         'dev/editor.ts#mountEditor',
         'dev/parameterForm.ts#mountParameterForm',

@@ -397,6 +397,21 @@ function reportText(report: Omit<BatchReport, 'glossary'>): readonly string[] {
  * be the published-number defect with words instead of digits.
  */
 function demandClause(result: BatchResult): string {
+  /*
+   * The authored block first, and it cannot collide with the two branches below it: `runBatch`
+   * refuses a request carrying both, so a result with `demand` set ran that block and nothing
+   * else. The clause names the block's own rate when it declares one — every matrix cell does —
+   * and points at the trace key for the rest (the split, the entrance weights, the window),
+   * because restating a whole options object in prose is how a sentence and a run drift apart.
+   */
+  if (result.demand !== undefined) {
+    const rate = result.demand.arrivalRatePctPop5min;
+    const rateClause =
+      rate === undefined
+        ? 'at an authored demand condition'
+        : `at an authored demand condition arriving at ${String(rate)} % of population per 5 minutes`;
+    return `${rateClause} — not the building's own profile; the population line carries every field of it`;
+  }
   if (result.arrivalRatePctPop5min !== null) {
     return `at ${String(result.arrivalRatePctPop5min)} % of population arriving per 5 minutes`;
   }
