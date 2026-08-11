@@ -98,8 +98,14 @@ export interface OverlayOptions {
  * at exactly `t` is waiting at `t`, and one that boards at exactly `t` is not. That agreement is
  * what makes {@link OverlayMetrics.waitingNow} equal `Frame.totalWaiting`, which
  * `overlay.test.ts` asserts on every shipped building rather than trusting the reading.
+ *
+ * Exported since slice 4d: this module is the one that decides who is waiting, and the race
+ * strip's standing-count lane asks it rather than re-deriving the answer — a second answer over
+ * there would be the two-answers divergence this package has a rule about. Non-test callers:
+ * {@link overlayAt}, {@link landingAssignmentsAt} and {@link queueAt} here, and
+ * `live/raceStrip.ts#raceSamplesOf`.
  */
-function isWaitingAt(leg: VizLeg, t: SimTime): boolean {
+export function isWaitingAt(leg: VizLeg, t: SimTime): boolean {
   if (leg.arrivedAt > t) return false;
   /*
    * **A rider the building turned away is not waiting** — `DECISIONS.md` § D266. They never board

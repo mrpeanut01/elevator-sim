@@ -92,6 +92,13 @@ import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
 import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  GHOST_OPTIONS,
+  RACE_NOT_RUN,
+  RACE_PENDING,
+  raceStripViewOf,
+  raceVerdictOf,
+} from '../live/raceStrip.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
@@ -102,7 +109,8 @@ import { drawOverlay } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
-import { initialState, tomorrowFactsOf } from '../dev/state.js';
+import { ghostPlanOf } from '../dev/ghostRun.js';
+import { initialState, shiftRunConfigOf, tomorrowFactsOf } from '../dev/state.js';
 import { tomorrowBriefingOf } from '../shift/tomorrow.js';
 import { describeQueue, planQueueRow } from '../render/riderQueue.js';
 import { AWT_ID, ENERGY_ID, TTD_ID, WT95_ID, runSummaryFigures, windowClause } from '../render/runSummary.js';
@@ -6195,6 +6203,95 @@ const RULES_EDITOR: SurfaceAdapter = {
   },
 };
 
+/**
+ * The race strip and its ghost picker — GAMEPLAY §7.4, Everyday slice 4d.
+ *
+ * The ghost the strip is driven with is the context's own `comparisonRecording` — a real second
+ * recording, exactly what the shipped ghost is (`dev/ghostRun.ts` swaps one field of the primary's
+ * config) — so the verdict enters the corpus computed from two genuine runs rather than from
+ * doctored percentages. Both of the strip's states are driven at every sampled playhead: racing,
+ * and racing **nobody**, whose verdict slot carries the plain figure and whose note is empty (an
+ * empty seed is dropped by `singleRun`, which is the correct rendering of *no note*).
+ *
+ * The verdict is `observation` — two shares of two runs at one instant — and it is driven on the
+ * temporal axis, because it is derived from so-far observations and must never publish a
+ * whole-run figure at a mid-run playhead. The footer is `reason`: it is the strip's standing
+ * refusal of a comparative reading, R2's third narrowing exactly. The three wordings the sampled
+ * pair may not happen to produce are driven through `raceVerdictOf` directly, at shares a player
+ * produces by being ahead, behind, or unserved.
+ *
+ * `ghostPlanOf` is driven through the same shipped plan chain the shift adapter uses
+ * (`shiftRunConfigOf` over `initialState`), in both speaking arms: the refusal when nothing is
+ * saved (`NO_SAVED_DISPATCHER`), and the run arm whose label names the grey line.
+ */
+const RACE_STRIP: SurfaceAdapter = {
+  id: 'live/raceStrip.ts#raceStripViewOf',
+  covers: [
+    'live/raceStrip.ts#GHOST_OPTIONS',
+    'live/raceStrip.ts#RACE_FOOTER',
+    'live/raceStrip.ts#SAME_CROWD_NOTE',
+    'live/raceStrip.ts#RACE_PENDING',
+    'live/raceStrip.ts#RACE_NOT_RUN',
+    'live/raceStrip.ts#raceVerdictOf',
+    'live/raceStrip.ts#raceStripViewOf',
+    'dev/ghostRun.ts#NO_SAVED_DISPATCHER',
+    'dev/ghostRun.ts#ghostPlanOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const { recording, comparisonRecording } = context;
+
+    for (const option of GHOST_OPTIONS) {
+      seeds.push({ field: `ghostOption(${option.id}).label`, text: option.label, role: 'label' });
+      seeds.push({ field: `ghostOption(${option.id}).note`, text: option.note, role: 'prose' });
+    }
+    seeds.push({ field: 'race.pending', text: RACE_PENDING, role: 'prose' });
+    seeds.push({ field: 'race.notRun', text: RACE_NOT_RUN, role: 'prose' });
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const raced = raceStripViewOf({ recording, ghost: comparisonRecording, simTimeS: at });
+      seeds.push({
+        field: `race(@${stamp}s).verdict`,
+        text: raced.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
+      seeds.push({ field: `race(@${stamp}s).note`, text: raced.note, role: 'prose' });
+      seeds.push({ field: `race(@${stamp}s).footer`, text: raced.footer, role: 'reason' });
+      const alone = raceStripViewOf({ recording, ghost: undefined, simTimeS: at });
+      seeds.push({
+        field: `race(nobody, @${stamp}s).verdict`,
+        text: alone.verdict,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
+    }
+
+    // The wordings the sampled pair may not produce, at shares a player can hold.
+    seeds.push({ field: 'race.verdict(ahead)', text: raceVerdictOf(61.4, 52.2), role: 'observation' });
+    seeds.push({ field: 'race.verdict(behind)', text: raceVerdictOf(52.2, 61.4), role: 'observation' });
+    seeds.push({ field: 'race.verdict(unserved)', text: raceVerdictOf(undefined, undefined), role: 'reason' });
+
+    // The picker's plan half, through the shipped chain — both speaking arms.
+    const resources = browserResourcesOf(context);
+    const plan = shiftRunConfigOf(resources, {
+      ...initialState(resources, 1n),
+      buildingId: context.case.buildingId,
+      shiftLengthS: 300,
+    });
+    const refused = ghostPlanOf(resources, [], plan.config, 'latest-saved');
+    if (refused.kind === 'refused') {
+      seeds.push({ field: 'race.ghost(latest-saved).refusal', text: refused.reason, role: 'reason' });
+    }
+    const plain = ghostPlanOf(resources, [], plan.config, 'plain-baseline');
+    if (plain.kind === 'run') {
+      seeds.push({ field: 'race.ghost(plain-baseline).label', text: plain.label, role: 'label' });
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 /** One rule row with each id's first declared value, for the adapter above. */
 function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
   const whenValue = RULE_CONDITION_WORDS[when].values?.[0]?.value;
@@ -6258,6 +6355,8 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // with the selector's copy, and inserting it earlier would move selector-shaped faults
   // onto this surface.
   RULES_EDITOR,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
+  RACE_STRIP,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

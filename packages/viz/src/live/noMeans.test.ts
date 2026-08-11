@@ -36,6 +36,7 @@ import { moodAt, waitBandsAt } from './bands.js';
 import { decisionRowsAt } from './decisions.js';
 import { honestyAt } from './honesty.js';
 import { observationsAt } from './observations.js';
+import { raceSamplesOf, raceStripViewOf } from './raceStrip.js';
 import { phaseAt, tickLabelsOf, timelineOf } from './timeline.js';
 
 const LIVE_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -117,6 +118,12 @@ describe(`${SUPPRESSED_ID} — a suppressed run yields no mean anywhere`, () => 
         decisionRowsAt(recording, t),
         honestyAt(recording, t, 'casual'),
         honestyAt(recording, t, 'engineer'),
+        // Slice 4d: the race strip's samples and view. Its top lane is the mean of the *standing*
+        // riders' current waits — an observation about the picture at `t`, not one of the three
+        // figures the gate speaks for — and this walk is what holds that distinction to be true
+        // numerically on a run whose own mean is refused.
+        raceSamplesOf(recording, t),
+        raceStripViewOf({ recording, ghost: recording, simTimeS: t }),
       );
     }
 

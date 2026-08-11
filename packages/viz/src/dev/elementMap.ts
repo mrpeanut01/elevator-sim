@@ -219,6 +219,36 @@ export interface StageElements {
 }
 
 /**
+ * GAMEPLAY §7.4 — the race strip and its ghost picker, under the stage (Everyday slice 4d).
+ *
+ * The strip's words come from `live/raceStrip.ts` and its geometry from `raceLaneOf`; `main.ts`'s
+ * `drawRaceStrip` only copies values onto these elements. The four polylines and the sixty-second
+ * line are SVG children with fixed `viewBox`es, so the strip scales without a resize observer and
+ * the geometry module needs no pixel measurements.
+ */
+export interface RaceElements {
+  /** The whole strip. Hidden when there is no run on screen. */
+  readonly root: HTMLElement;
+  /** The ghost picker. Options are built from `GHOST_OPTIONS`, never written in markup. */
+  readonly ghost: HTMLSelectElement;
+  /** The live verdict — or the plain figure with nobody picked, or a refusal, or the pending line. */
+  readonly verdict: HTMLElement;
+  /** `SAME_CROWD_NOTE` while a rival is drawn; empty with nobody. */
+  readonly note: HTMLElement;
+  /** §7.4's permanent footer, written from `RACE_FOOTER` so the string has one author. */
+  readonly footer: HTMLElement;
+  /** The key entry naming the grey line. Hidden with nobody — the strip never invents a rival. */
+  readonly ghostKey: HTMLElement;
+  readonly ghostName: HTMLElement;
+  readonly topYou: SVGPolylineElement;
+  readonly topGhost: SVGPolylineElement;
+  /** The dashed sixty-second line in the top lane. */
+  readonly sixty: SVGLineElement;
+  readonly bottomYou: SVGPolylineElement;
+  readonly bottomGhost: SVGPolylineElement;
+}
+
+/**
  * § 1.3 M5 — the transport, plus the provenance block under it (`docs/12` § 4.7).
  *
  * The six the handoff specifies are {@link playPause}, {@link timeline}, {@link playhead},
@@ -505,6 +535,8 @@ export interface Elements {
   readonly decisionLog: HTMLElement;
   readonly coach: CoachElements;
   readonly stage: StageElements;
+  /** The race strip under the stage — GAMEPLAY §7.4, slice 4d. */
+  readonly race: RaceElements;
   readonly transport: TransportElements;
   readonly report: ReportElements;
   /** § 1.3 M7 — where the five scenario cards go. */
@@ -615,6 +647,20 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     description: 'frame-description',
     legend: 'legend',
     legendTitle: 'legend-title',
+  }),
+  race: Object.freeze({
+    root: 'race-strip',
+    ghost: 'race-ghost',
+    verdict: 'race-verdict',
+    note: 'race-note',
+    footer: 'race-footer',
+    ghostKey: 'race-ghost-key',
+    ghostName: 'race-ghost-name',
+    topYou: 'race-top-you',
+    topGhost: 'race-top-ghost',
+    sixty: 'race-sixty',
+    bottomYou: 'race-bottom-you',
+    bottomGhost: 'race-bottom-ghost',
   }),
   transport: Object.freeze({
     playPause: 'play-pause',
