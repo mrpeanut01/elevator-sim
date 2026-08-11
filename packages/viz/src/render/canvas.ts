@@ -917,13 +917,30 @@ function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
    * factored into one condition because the engineer arm's *first* branch is not a suppression
    * test — it reports saturation, which is a fact about the queues — and collapsing them would
    * make the two lines look like one decision when they are two.
+   *
+   * ## And it waits for the playhead — `docs/19` defect 4, {@link undeliveredAt}'s rule again
+   *
+   * Every clause on this arm is a verdict about the **finished** run — `SATURATED`, and *the
+   * queues never settled during this run*, past tense — and it was drawn from the first frame of
+   * playback, over a building whose queues had not formed yet. That is the same class § D307's
+   * temporal axis caught in the undelivered count two clauses up, closed the same way: the
+   * whole-run sentence appears when {@link playheadHasReachedEnd}, and not before.
+   *
+   * What a mid-run frame keeps is the *so far* register the counters line already speaks:
+   * {@link meanClause} prints `no average` / `mean wait suppressed` at every playhead, gated on
+   * the same `meansAreSuppressed`, so a PNG exported mid-run still refuses the mean on the bitmap
+   * — § D294's concern — while claiming nothing about how the day ends. The engineer strings
+   * themselves are unchanged, byte for byte; what moved is *when* the banner earns them, which is
+   * the distinction § D299 § 1 permits. A decision number is owed for the gate.
    */
-  if (casual) {
-    if (meansAreSuppressed(recording)) {
-      banner.push(suppressionBannerFor(recording.summary.awtInvalidGround));
-    }
-  } else if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
-  else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
+  if (playheadHasReachedEnd(recording, frame)) {
+    if (casual) {
+      if (meansAreSuppressed(recording)) {
+        banner.push(suppressionBannerFor(recording.summary.awtInvalidGround));
+      }
+    } else if (recording.summary.saturated) banner.push('SATURATED — AWT suppressed');
+    else if (!recording.summary.awtIsValid) banner.push('AWT suppressed');
+  }
   // `D10` — a call no car answered is never left to the landing selector alone. See
   // {@link SceneInput.unansweredCallFloorIds}.
   const unanswered = input.unansweredCallFloorIds ?? [];

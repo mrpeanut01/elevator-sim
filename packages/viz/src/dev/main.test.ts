@@ -251,6 +251,32 @@ describe('the status strip is worded by the reader’s mode', () => {
       'the same refusal is printed once per figure — twice, for one gate',
     ).toBe(1);
   }, 300_000);
+
+  it('withholds the whole-run line while the playhead is short of the end — docs/19 defect 4', () => {
+    /*
+     * The audit watched this line carry the finished day's figures — `average wait suppressed
+     * (n = 236 rides) … the queues never settled during this run`, past tense — from the first
+     * second of playback. The figures are folds of the whole recording, so short of `endedAt` the
+     * line speaks the *so far* register: it names what is withheld and when it files, and prints
+     * no figure, no count and no past-tense verdict. At the end, the whole-run line, unchanged.
+     */
+    const items = itemsOf();
+    for (const mode of ['advanced', 'basic'] as const) {
+      const whole = transportStatusOf(items, mode) ?? '';
+      const early = transportStatusOf(items, mode, { atS: 60, endedAt: 1800 }) ?? '';
+      expect(early, 'the mid-run register is missing').not.toBe('');
+      expect(early, 'the whole-run line leaked past the playhead').not.toBe(whole);
+      expect(early).toContain('file when the playhead reaches the end');
+      // No figure and no sample — the only digits allowed are a label's own ("95th-percentile").
+      expect(early, 'the so-far register may carry no figure').not.toMatch(/\d+(\.\d+)?\s*s\b/);
+      expect(early, 'the so-far register may carry no sample').not.toContain('n =');
+      expect(early, 'the whole-run refusal leaked into the so-far register').not.toContain(
+        'suppressed',
+      );
+      // At the end, and for a caller with no playhead at all, the line is the whole-run one.
+      expect(transportStatusOf(items, mode, { atS: 1800, endedAt: 1800 })).toBe(whole);
+    }
+  }, 300_000);
 });
 
 /* -------------------------------------------------------------------------- *

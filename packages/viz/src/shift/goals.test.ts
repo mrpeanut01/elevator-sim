@@ -122,6 +122,18 @@ describe('the bars harden with the day, and then stop', () => {
     }
   });
 
+  it('says on the worst-wait label which window it grades — the whole shift (docs/19 defect 3)', () => {
+    /*
+     * The sheet carries a second “worst wait” — the WORST WAIT cell, which is the reporting
+     * window's — and on the audit's Midtown day the two read 1 725 s and 1 488 s four inches
+     * apart, reconciled only in the small print. The goal reads `Observations.worstWaitS`, the
+     * shift-wide maximum, so its label says so where it stands.
+     */
+    const worst = goalsForDay(4).find((goal) => goal.id === 'worst-wait');
+    expect(worst?.label).toContain('across the whole shift');
+    expect(worst?.reads).toBe('worstWaitS');
+  });
+
   it('keeps the retired goal’s observation id readable, for restored histories', () => {
     // `persist/validate.ts` checks restored readings' `reads` against this list, and a saved
     // week that closed an odd day under the old build carries an `abandoned` reading.

@@ -23,6 +23,7 @@ import { recordRun } from '../record/recordRun.js';
 
 import { TERM_PHRASES, decisionRowsAt } from './decisions.js';
 import { syntheticRecording } from './synthetic.test-helper.js';
+import { clockAt, phaseAt, tickLabelsOf } from './timeline.js';
 
 const BUILDING_ID = 'midtown-office';
 
@@ -273,5 +274,54 @@ describe('the three outcomes each say something honest', () => {
     const row = decisionRowsAt(syntheticRecording({ decisions: [decision()] }), 300)[0];
     expect(row?.title).toContain('estimated wait for the new passenger');
     expect(row?.title).toContain('serves AWT');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * One clock per run — `docs/19` defect 2
+ * -------------------------------------------------------------------------- */
+
+describe('one clock per run: the feed, the ticks and the bands agree with the header (docs/19 defect 2)', () => {
+  /*
+   * The audit's screenshot: the header read `09:26` while the decision feed read `06:53` and the
+   * phase bands ruled `06:00 06:14 …` — the run's own 08:30 axis on one surface and the 06:00
+   * template default on the others. The header's clock is `clockAt(t, runStartOfDayS)`; these
+   * pins hold every other reader to the same expression, at one instant, on the audit's own hour.
+   */
+  const DAY = 8 * 3600 + 30 * 60; // 08:30 — the wall-time axis the audit's header spoke
+
+  it('is not vacuous: the run’s own hour and the fallback disagree about the same instant', () => {
+    expect(clockAt(0, DAY)).toBe('08:30');
+    expect(clockAt(0)).toBe('06:00');
+  });
+
+  it('stamps every decision row with the header’s own clock at that decision’s instant', () => {
+    const rows = decisionRowsAt(recording, recording.endedAt, 6, DAY);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]?.outcome).not.toBe('empty');
+    for (const row of rows) {
+      // `DecisionRow.key` is `${at}-${callId}` — the decision's own instant, recovered rather
+      // than recomputed, so the assertion is against the stamp the screen actually draws.
+      const at = Number(row.key.split('-')[0]);
+      expect(Number.isFinite(at)).toBe(true);
+      expect(row.t).toBe(clockAt(at, DAY));
+    }
+  });
+
+  it('agrees with the tick row and the phase band about the first instant of the run', () => {
+    const header = clockAt(recording.startedAt, DAY);
+    const ticks = tickLabelsOf(recording, 5, { dayStartS: DAY });
+    expect(ticks[0]?.label).toBe(header);
+    const band = phaseAt(recording, recording.startedAt, { dayStartS: DAY });
+    // Segment titles read `LABEL · hh:mm …` — the clock inside is the header's, same axis.
+    expect(band?.title).toContain(header);
+  });
+
+  it('stamps the standing-by row on the header’s axis too, and falls back together', () => {
+    const empty = syntheticRecording({});
+    // The run's own hour…
+    expect(decisionRowsAt(empty, 300, 6, DAY)[0]?.t).toBe(clockAt(300, DAY));
+    // …and, where a run declares none, the same shared fallback as the header — never two axes.
+    expect(decisionRowsAt(empty, 300)[0]?.t).toBe(clockAt(300));
   });
 });

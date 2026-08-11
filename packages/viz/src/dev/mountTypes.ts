@@ -37,6 +37,17 @@ export interface ViewAt {
   readonly recording: VizRecording | undefined;
   /** The playhead, in simulated seconds. Clamped into the recording when there is one. */
   readonly simTimeS: number;
+  /**
+   * The run's own start-of-day, seconds since midnight, or `undefined` when the run declares no
+   * hour (`constant-iso`, and a recording loaded from a file — `VizRecording` does not carry it).
+   *
+   * **One clock per run** (`docs/19` defect 2). This is the value the shell feeds the header
+   * clock, and it is on `ViewAt` so every panel that prints a time of day reads the same hour —
+   * the decision feed's stamps and the honesty card's window range used to take `clockAt`'s
+   * 06:00 default while the header read the run's own 08:30, which is two clocks about one
+   * instant. `undefined` makes every reader fall back to the shared `DAY_START_S` **together**.
+   */
+  readonly startOfDayS?: number | undefined;
   /** The building the current run resolved to, for the plates. `undefined` before the first run. */
   readonly building: ResolvedBuilding | undefined;
   /** Whether playback is running, for the transport's glyph and the status line. */

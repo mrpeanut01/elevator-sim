@@ -155,11 +155,22 @@ const EMPTY_WHY = 'no calls registered yet — the building is still waking up';
  * Returns the design's single *standing by* row when the recording carries no decision at all —
  * which is a legal state, not a bug: `RecordRunOptions.recordDecisions` turns the instrumentation
  * off for the replication batch, and a recording loaded from a pre-schema-7 file has none.
+ *
+ * ## `dayStartS` — one clock per run (`docs/19` defect 2)
+ *
+ * The stamp on every row goes through {@link clockAt} with **the run's own hour**, which is the
+ * same value `dev/main.ts` feeds the header clock. This feed used to take the 06:00 default
+ * unconditionally, so on a run whose template declares 08:30 the header read `09:26` while the
+ * row beside it read `06:53` — two clocks on one screen, about one instant. The parameter follows
+ * `clockAt`'s own contract: `undefined` means *this run declares no hour*, and every surface then
+ * falls back to the shared `DAY_START_S` offset **together** — one clock still, just an assumed
+ * one. `live/oneClock.test.ts` pins the agreement.
  */
 export function decisionRowsAt(
   recording: VizRecording,
   simTimeS: SimTime,
   limit: number = DEFAULT_DECISION_ROWS,
+  dayStartS?: number | undefined,
 ): readonly DecisionRow[] {
   const t = clamp(simTimeS, recording.startedAt, recording.endedAt);
   const rows: DecisionRow[] = [];
@@ -171,14 +182,14 @@ export function decisionRowsAt(
     const decision = recording.decisions[index];
     if (decision === undefined) continue;
     if (decision.at > t) continue;
-    rows.push(rowOf(recording, decision));
+    rows.push(rowOf(recording, decision, dayStartS));
   }
 
   if (rows.length > 0) return rows;
   return [
     {
       key: 'standing-by',
-      t: clockAt(t),
+      t: clockAt(t, dayStartS),
       head: 'standing by',
       why: EMPTY_WHY,
       title: EMPTY_WHY,
@@ -188,12 +199,16 @@ export function decisionRowsAt(
   ];
 }
 
-function rowOf(recording: VizRecording, decision: VizDecision): DecisionRow {
+function rowOf(
+  recording: VizRecording,
+  decision: VizDecision,
+  dayStartS?: number | undefined,
+): DecisionRow {
   const floorLabel = floorLabelOf(recording, decision.floorId);
   const carLabel = carLabelOf(recording, decision.carId);
   return {
     key: `${String(decision.at)}-${decision.callId}`,
-    t: clockAt(decision.at),
+    t: clockAt(decision.at, dayStartS),
     head: headOf(decision, carLabel, floorLabel),
     why: whyOf(decision),
     title: titleOf(decision),
