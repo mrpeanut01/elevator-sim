@@ -161,6 +161,7 @@ import { coachWeekLines, weekKeptLine } from '../shift/weekLabel.js';
 import { weekdayOf, type DayOutcome, type WeekState } from '../shift/types.js';
 
 import { mountBatchPanel } from './batchPanel.js';
+import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
 import { loadBrowserResources, loadCampaign, type BrowserResources } from './data.js';
@@ -2582,6 +2583,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
       durationS: String(state.shiftLengthS),
     }),
   });
+
+  /*
+   * The suite, beside the bench — Everyday Mode slice 7 (docs/18 § Slice 7). One comparison over
+   * ticked matrix cells; the ticks render from `MATRIX_CELLS` inside the mount, so nothing here
+   * or in `index.html` retypes the fixture list. It inherits nothing from the viewer on purpose:
+   * a suite's cells fix the building and the traffic, which is the point of a fixed fixture list.
+   */
+  mountSuitePanel({ elements: ui.suite, resources });
 
   /*
    * The campaign needs its own data file, which is fetched separately. A page that could not load

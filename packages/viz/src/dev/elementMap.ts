@@ -50,6 +50,7 @@
  */
 
 import type { BatchPanelElements } from './batchPanel.js';
+import type { SuitePanelElements } from './suitePanel.js';
 import type { CampaignPanelElements } from './campaignPanel.js';
 
 /**
@@ -502,6 +503,8 @@ export interface Elements {
   readonly paramRefusal: HTMLElement;
   /** The Compare surface's controls — `docs/10` § 11 **W3**. */
   readonly batch: BatchPanelElements;
+  /** The suite beside the bench — Everyday Mode slice 7, docs/18 § Slice 7. */
+  readonly suite: SuitePanelElements;
   /** The Campaign surface's controls — `docs/10` § 5, W5. */
   readonly campaign: CampaignPanelElements;
   readonly confirm: HTMLDialogElement;
@@ -826,6 +829,22 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     status: 'batch-status',
     error: 'batch-error',
     output: 'batch-output',
+  }),
+  // Everyday Mode slice 7: the suite, beside the bench in the same Compare panel. The cell
+  // ticks have no ids of their own — they render from MATRIX_CELLS into `cells` at mount time,
+  // which is what keeps the fixture list imported rather than retyped into markup.
+  suite: Object.freeze({
+    baseline: 'suite-baseline',
+    candidate: 'suite-candidate',
+    replications: 'suite-replications',
+    seed: 'suite-seed',
+    cells: 'suite-cells',
+    run: 'suite-run',
+    cancel: 'suite-cancel',
+    progress: 'suite-progress',
+    status: 'suite-status',
+    error: 'suite-error',
+    output: 'suite-output',
   }),
   campaign: Object.freeze({
     stage: 'campaign-stage',

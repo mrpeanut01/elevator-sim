@@ -42,6 +42,7 @@ import { checkAccessCompatibility, credentialCapabilityOf } from '../access/disp
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
 import { batchReport, type BatchReport } from '../batch/report.js';
+import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
 import { admitProfile } from '../campaign/dimensions.js';
@@ -1623,6 +1624,99 @@ const GOAL_REPORT: SurfaceAdapter = {
         text: goalLabel({ kind: kind as never, threshold: null }),
         role: 'label',
       });
+    }
+    return batchText(this.id, seeds);
+  },
+};
+
+/**
+ * The suite — Everyday Mode slice 7's per-cell view over the bench (`batch/suite.ts`).
+ *
+ * Most of what the suite screen shows is `batchReport`'s own sentences re-rendered, and those are
+ * seeded here **again under this surface's id** because the suite genuinely draws them: a string
+ * on two screens is two chances to mislead, and the comparative checks should see it wherever it
+ * appears. The comparison shape on each row is taken from the report's row — `favours`, verdict
+ * and pairs — exactly as `BATCH_REPORT` attaches it, so a suite row that named a winner the row
+ * was not entitled to would fail here the same way.
+ *
+ * What is *new* prose is driven the way `RESTORE_NOTICE` drives its broken stores — by
+ * manufacturing the state that produces it: the field-of-two refusal through a result carrying a
+ * third arm, and `suitePlanOf`'s tick refusals through an empty and a duplicated tick list. The
+ * two cell-shape refusals (`demandTemplate`, missing horizon) are *not* drivable through the real
+ * `MATRIX_CELLS` — every shipped cell is clean, which is the point of them — so those literals
+ * reach only the static R10 sweep, stated here rather than dressed as coverage.
+ */
+const SUITE_BENCH: SurfaceAdapter = {
+  id: 'batch/suite.ts#suiteCellViewOf',
+  /*
+   * `suitePlanOf` is deliberately not in `covers` although its refusals are seeded below: the
+   * producer derivation does not find it (its prose lives in `throw` messages, which the scanner
+   * does not attribute to the export), and a `covers` entry for a declaration the derivation
+   * cannot find is a coverage claim for nothing — `derive.test.ts` said so when it was listed.
+   * The refusal strings are still in the corpus under this surface, driven for real below.
+   */
+  covers: ['batch/suite.ts#suiteCellViewOf'],
+  render(context) {
+    const cell = { id: 'honesty-suite-cell', label: context.report.buildingName };
+    const view = suiteCellViewOf(cell, context.batch);
+    const seeds: (TextSeed & { comparison?: RenderedText['comparison'] })[] = [];
+    if (view.answer !== null) {
+      seeds.push({
+        field: 'answer',
+        text: view.answer,
+        role: 'prose',
+        declaredCount: view.report.comparisons[0]?.rows[0]?.totalPairs ?? 0,
+      });
+    }
+    for (const [index, arm] of view.arms.entries()) {
+      seeds.push({
+        field: `arms[${String(index)}].sentence`,
+        text: arm.sentence,
+        role: 'observation',
+        declaredCount: view.report.arms[index]?.n ?? 0,
+        countShown: arm.sentence.includes(String(view.report.arms[index]?.n ?? -1)),
+      });
+    }
+    const sourceRows = view.report.comparisons[0]?.rows ?? [];
+    for (const [index, mark] of view.rows.entries()) {
+      const source = sourceRows[index];
+      if (source === undefined) continue;
+      seeds.push({
+        field: `rows[${String(index)}](${mark.metric}).sentence`,
+        text: mark.sentence,
+        role: 'comparison',
+        declaredCount: source.pairs,
+        countShown:
+          mark.sentence.includes(String(source.pairs)) ||
+          mark.sentence.includes(String(source.totalPairs)),
+        comparison: { favours: source.favours, verdict: source.verdict, pairs: source.pairs },
+        energyAxis: BATCH_METRIC_CLASS[mark.metric] === 'axis',
+      });
+    }
+    /* The refusal branches, manufactured on purpose — see the adapter docstring. */
+    const third = context.batch.arms[1];
+    if (third !== undefined) {
+      const tripled = { ...context.batch, arms: [...context.batch.arms, { ...third, armId: 'ghost-arm' }] };
+      const refused = suiteCellViewOf(cell, tripled);
+      if (refused.verdictRefusal !== null) {
+        seeds.push({ field: 'verdictRefusal', text: refused.verdictRefusal, role: 'reason' });
+      }
+    }
+    const field = [
+      { armId: 'baseline', dispatcherProfileId: 'collective' },
+      { armId: 'candidate', dispatcherProfileId: 'eta' },
+    ] as const;
+    for (const [name, cellIds] of [
+      ['planRefusal.noCells', []],
+      ['planRefusal.duplicateTick', ['midtown-up-peak', 'midtown-up-peak']],
+    ] as const) {
+      try {
+        suitePlanOf({ cellIds, seed: '1', replications: 50, field });
+      } catch (error: unknown) {
+        if (error instanceof SuiteError) {
+          seeds.push({ field: name, text: error.message, role: 'reason' });
+        }
+      }
     }
     return batchText(this.id, seeds);
   },
@@ -5684,6 +5778,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
   REPORT_CARD,
+  // Appended, same reason again: the suite re-seeds the bench's sentences under its own surface
+  // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
+  // originals and move every batch-shaped fault onto this surface.
+  SUITE_BENCH,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
