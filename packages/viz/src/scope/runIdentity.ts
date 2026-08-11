@@ -225,6 +225,22 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       ? undefined
       : `${String(state.outOfServiceCarIds.length)} car(s) are held out of service, and nothing in a selection holds one`,
 
+  /**
+   * The intervention log — Everyday Mode's run record, on `outOfServiceCarIds`' exact footing.
+   *
+   * The empty log carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
+   * pins that run byte-identical to one built before the field existed. A non-empty log does
+   * not — no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses one —
+   * and the consequence is the contract's own replay-verification clause pointed the other way:
+   * the server would re-simulate the seed *without* the log, get different legs, and refuse an
+   * honest run as `metrics-do-not-reproduce`. When the wire grows a field for the record
+   * (contract § 1.4 says it must, for spectating), this arm is the one that comes back out.
+   */
+  interventions: (state) =>
+    state.interventions.length === 0
+      ? undefined
+      : `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and no selection or submission carries an intervention log — a replay without it is a different run`,
+
   levers: (state) =>
     state.levers.parking === DEFAULT_LEVERS.parking &&
     state.levers.express === DEFAULT_LEVERS.express &&

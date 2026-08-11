@@ -59,6 +59,7 @@ export {
   carArrivedEvent,
   carDoorEvent,
   dispatchTickEvent,
+  interventionEvent,
   queueSampleEvent,
   serviceChangeEvent,
   transferArrivalEvent,
@@ -68,6 +69,7 @@ export type {
   BatchArrivalPayload,
   CarEventPayload,
   DispatchTickPayload,
+  InterventionPayload,
   QueueSamplePayload,
   ServiceChangePayload,
   SimEventType,
@@ -97,6 +99,8 @@ export {
 
 export type {
   ConservationAudit,
+  InterventionChange,
+  RunInterventionConfig,
   SimParameterSpec,
   SimParameterType,
   SimulationConfig,

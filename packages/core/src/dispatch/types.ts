@@ -730,6 +730,23 @@ export interface RepositionContext {
    * strategy reports `no-forecast` rather than guessing.
    */
   readonly demandForecast?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Stage 7 settings in force **instead of** the profile's own `idle` section, for this decision.
+   *
+   * The seam Everyday Mode's interventions travel through (`sim/types.ts#RunInterventionConfig`).
+   * A *park the cars in the lobby* intervention is the profile's own idle stage with
+   * `parkingStrategy` replaced by `'lobby'` — the deadband and the energy exchange rate stay the
+   * operator's, because the player's instruction is about *where* cars wait, not about what a
+   * repositioning trip is worth. `Simulation.#park` computes it as a pure function of
+   * `(interventions, at)` and passes it here; the policy stays one stateless pass-through to
+   * `repositionDecisionFor`, which is what makes before/after delegation unnecessary — the
+   * lifecycle and batch maps in `policy.ts` never fork.
+   *
+   * **Absent means the profile's `idle` is read untouched, by identity** — `repositionDecisionFor`
+   * takes the branch it always took and hands the scorer the same frozen config object, so a run
+   * with no interventions is byte-identical to one built before this field existed.
+   */
+  readonly idleOverride?: ResolvedIdleStage | undefined;
 }
 
 /* -------------------------------------------------------------------------- *

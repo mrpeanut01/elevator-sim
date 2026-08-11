@@ -1,5 +1,5 @@
 /**
- * The nine things that can happen in a run, as kernel events.
+ * The ten things that can happen in a run, as kernel events.
  *
  * The whole simulation is these and nothing else. There is no tick, no polling loop and no
  * "advance by dt": the clock jumps from one of these to the next, which is what makes a
@@ -17,6 +17,7 @@
  * | `sim.queueSample` | a sample point on the demand horizon | records the building-wide queue length |
  * | `sim.serviceChange` | a `serviceEvents` entry's time comes | changes a car's service mode and re-offers whatever it had to drop |
  * | `sim.abandonment` | a waiting leg's drawn patience runs out | the rider leaves the landing, and the call goes with them if nobody else holds it |
+ * | `sim.intervention` | a `SimulationConfig.interventions` entry's time comes | walks the fleet's idle cars through stage 7 under the newly in-force override |
  *
  * ## Why the payloads are ids and not objects
  *
@@ -52,6 +53,7 @@ export const SIM_EVENT_TYPES = Object.freeze({
   queueSample: 'sim.queueSample',
   serviceChange: 'sim.serviceChange',
   abandonment: 'sim.abandonment',
+  intervention: 'sim.intervention',
 } as const);
 
 export type SimEventType = (typeof SIM_EVENT_TYPES)[keyof typeof SIM_EVENT_TYPES];
@@ -131,6 +133,18 @@ export interface QueueSamplePayload {
  */
 export interface ServiceChangePayload {
   /** Index into `ResolvedBuilding.serviceEvents`. */
+  readonly index: number;
+}
+
+/**
+ * One entry of the run's `interventions` log coming due (Everyday Mode contract § 1.4).
+ *
+ * Indexed into `SimulationConfig.interventions` for the reason every other payload gives: the
+ * handler must read the log the run is actually driving, and an index cannot be a stale copy of
+ * an entry from a different record.
+ */
+export interface InterventionPayload {
+  /** Index into `SimulationConfig.interventions`. */
   readonly index: number;
 }
 
@@ -240,4 +254,21 @@ export function abandonmentEvent(
   handler: EventHandler<AbandonmentPayload>,
 ): SimEvent<AbandonmentPayload> {
   return createEvent(SIM_EVENT_TYPES.abandonment, payload, handler);
+}
+
+/**
+ * One intervention taking effect at its scheduled simulated time.
+ *
+ * The event exists for the already-parked fleet: the override itself is read by every later
+ * `#park` decision whether or not this fires, but a car that is *currently* idle takes a stage 7
+ * decision only when something asks it to, and without this event a fleet standing still at
+ * `atS` would ignore *park the cars in the lobby* until the next arrival happened to free a car.
+ * Scheduled from `SimulationConfig.interventions` at `run()`, beside the trace and the service
+ * schedule, so its time is the kernel's and never a wall clock (CLAUDE.md invariant 3).
+ */
+export function interventionEvent(
+  payload: InterventionPayload,
+  handler: EventHandler<InterventionPayload>,
+): SimEvent<InterventionPayload> {
+  return createEvent(SIM_EVENT_TYPES.intervention, payload, handler);
 }

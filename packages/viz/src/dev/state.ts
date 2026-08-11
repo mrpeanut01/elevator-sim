@@ -31,6 +31,7 @@ import {
   type ElevatorSpecs,
   type PatienceConfig,
   type ResolvedBuilding,
+  type RunInterventionConfig,
   type SimulationConfig,
 } from '@elevator-sim/core/browser';
 
@@ -396,6 +397,35 @@ export interface ViewerState {
   readonly seed: bigint;
   /** Cars the reader took out of service by clicking a badge under a shaft. § 1.5 B7. */
   readonly outOfServiceCarIds: readonly string[];
+  /**
+   * The player's mid-run interventions, in press order — Everyday Mode's run record (contract
+   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until the stage control is pressed.
+   *
+   * ## What survives, and what clears it — the decision, stated
+   *
+   * The log is a fact about **this day's run**, so it lives and dies with the day rather than
+   * with the session:
+   *
+   * - **It survives a plain re-run of the same day** — levers moved, patience set, the Run
+   *   button pressed again. The contract's whole point is that the record replays: a re-run that
+   *   silently dropped the log would put a different day on screen under the same stamp.
+   * - **It clears when the day changes** — *Open the doors on tomorrow* (`dev/reportPanel.ts`),
+   *   taking the next assignment, starting a scenario, and `enterFreePlay`, each of which
+   *   already clears `outOfServiceCarIds` on the same argument: a run inheriting Thursday's
+   *   intervention would not be the run the screen just described.
+   * - **It clears when the building changes** ({@link withBuilding}) — an intervention is
+   *   stamped against one day in one tower, and the contract's own line is that changing the
+   *   tower is a different kind of act than changing your mind.
+   *
+   * It deliberately survives a **seed** change: the log is part of the record being re-rolled,
+   * and re-rolling the crowd under the same change of mind is a legitimate question to ask. What
+   * makes that honest rather than sneaky is `scope/runIdentity.ts`, which refuses to post any
+   * run carrying a non-empty log — no selection, CLI line or submission can express one yet.
+   *
+   * Not persisted (`persist.test.ts`'s ledger): a within-day attempt, on
+   * `outOfServiceCarIds`' exact ground.
+   */
+  readonly interventions: readonly RunInterventionConfig[];
   readonly levers: GroupLevers;
   /**
    * The weight-set selector's configuration — `docs/17` § 5 finding 6, given a surface.
@@ -732,7 +762,10 @@ export function withBuilding(
     buildingId,
     week: switched.week,
     parkedWeeks: switched.parked,
-    ...(moved ? { commissioning: [] } : {}),
+    // The intervention log goes with the fabric and under the same guard: it is stamped against
+    // one day in one tower, and a re-pick of the running building may not discard it — see
+    // ViewerState.interventions for the full clearing ledger.
+    ...(moved ? { commissioning: [], interventions: [] } : {}),
   };
   const withPattern = moved ? withReseededPattern(next, resources, state) : next;
   const source = buildingConfigOf(resources, state.savedBuildings, state.editingBuildingId);
@@ -953,6 +986,9 @@ export function initialState(resources: BrowserResources, seed: bigint): ViewerS
     freePlay: undefined,
     seed,
     outOfServiceCarIds: [],
+    // Nothing has been intervened on. The stage control is the only writer; see the field's
+    // docstring for what clears it.
+    interventions: [],
     levers: DEFAULT_LEVERS,
     /*
      * Seeded from the opening dispatcher and the loaded file, not from a blank: every shipped
@@ -1364,6 +1400,15 @@ export function shiftRunConfigOf(
        * asserted-in-prose.
        */
       ...(state.patience === null ? {} : { patience: state.patience }),
+      /*
+       * The run record's intervention log — contract § 1.4, and plain data, so it crosses the
+       * shift worker's structured clone like every other field here. **Spread rather than written
+       * as `interventions: state.interventions`**, for `patience`'s stated reason one line up: an
+       * empty log carries no key at all, and `core` promises a run with no `interventions` key is
+       * byte-identical to one built before the field existed — `sim/interventions.test.ts` pins
+       * that with a fingerprint, and this spread is what lets the viewer inherit the pin.
+       */
+      ...(state.interventions.length === 0 ? {} : { interventions: state.interventions }),
       /*
        * `report`, not the kernel's default `throw`. At the shipped traffic rates three of the five
        * buildings routinely end a run with people still in the system, and `Simulation` treats

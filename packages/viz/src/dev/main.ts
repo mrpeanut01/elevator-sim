@@ -112,6 +112,7 @@ import {
 import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
+import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
 import {
   clockAt,
   DAY_START_S,
@@ -2340,6 +2341,84 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let legendCountCells: readonly HTMLElement[] = [];
 
   /* ---------------------------------------------------------------------- *
+   * The intervention strip — Everyday Mode slice 3 (contract § 1.4, § 7.6)
+   * ---------------------------------------------------------------------- */
+
+  /*
+   * The stage's one intervention control and the stamp beside it, built here on
+   * `dispatcherEditor.ts`'s precedent because the canonical markup has no block for them, and
+   * inserted **above the stage and under the coach ribbon** — the ribbon is this surface's
+   * header, and § 7.6 puts the most recent intervention's stamp under the header. Sibling-insert
+   * via `parentElement?.insertBefore`, the idiom every other mount uses and the one the DOM test
+   * recorders answer; the words live in `live/interventions.ts`, pure and honesty-swept, and this
+   * block only decides which element they go in.
+   *
+   * Pressing the button appends `{ atS: playhead, change: park-cars-lobby }` to the state's log
+   * and re-runs the day — the whole § 1.4 mechanism: re-simulate from t = 0, prefix bit-identical
+   * by construction (`sim/interventions.test.ts`), playback resumed at the same playhead by the
+   * `seekTo` in the run's own callback. The seek happens *after* `applyShift` has adopted the new
+   * recording, so it lands on the recording it describes rather than on the one being replaced.
+   *
+   * **`applyShift` still clears `report` and `tomorrow`, deliberately.** An intervention is not a
+   * new day — but the sheet and the beat are accounts of a *recording*, and the recording they
+   * described has just been replaced; a sheet left standing would caption a run that is no longer
+   * on screen, which is § D223's stale-sheet defect. The day itself is untouched: `week` does not
+   * move, and the re-run day files again through the ordinary `closeShift` gate when its playhead
+   * runs out.
+   */
+  const interventionStamp = el(document, 'span', {
+    className: 'helpful',
+    attrs: { role: 'status' },
+    style: { color: 'var(--dim)', 'font-size': '11.5px' },
+  });
+  const interventionButton = el(document, 'button', {
+    className: 'chip',
+    text: PARK_CARS_LOBBY_LABEL,
+    attrs: {
+      type: 'button',
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        'everything before this moment is unchanged, and playback resumes here',
+    },
+  });
+  const interventionStrip = el(document, 'div', {
+    style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
+    children: [interventionButton, interventionStamp],
+  });
+  {
+    // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
+    const stageWrap = ui.stage.canvas.parentElement;
+    stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
+  }
+
+  interventionButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    const atS = playback.simTimeS;
+    state = {
+      ...state,
+      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
+    };
+    renderAll();
+    runShift(() => {
+      // After adopt: the new Playback exists by the time a run lands, and seeking does not
+      // start or stop playback — a reader who was paused stays paused at the stamped instant.
+      playback?.seekTo(atS);
+    });
+  });
+
+  /** The strip's two live facts: whether the control can act now, and the latest stamp. */
+  function drawIntervention(view: ViewAt): void {
+    const hasRun = view.recording !== undefined;
+    // Disabled rather than hidden while no run is on screen: a control that cannot act now says
+    // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
+    interventionButton.disabled = !hasRun;
+    setText(
+      interventionStamp,
+      interventionStampOf(view.state.interventions, view.simTimeS, runStartOfDayS),
+    );
+  }
+
+  /* ---------------------------------------------------------------------- *
    * The mount context — the only thing a panel may do to the world
    * ---------------------------------------------------------------------- */
   const context: MountContext = {
@@ -2661,6 +2740,7 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawTransportChrome(view);
     drawParity();
     drawLegend(view);
+    drawIntervention(view);
     drawStage();
   }
 
@@ -2725,6 +2805,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // Left out, the row would state the counts of whichever frame last changed the state — a
     // figure that is stale in exactly the way a scrubbing reader cannot see.
     drawLegend(view);
+    // The stamp is a reading at `t` too: a reader who scrubs back past their own intervention
+    // must watch it disappear, because at that instant on the stage it has not happened yet.
+    drawIntervention(view);
     drawStage();
   }
 

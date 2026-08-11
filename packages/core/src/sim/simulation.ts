@@ -127,6 +127,7 @@ import {
   type DispatchDecision,
   type DispatchPolicy,
   type GroupObservationContext,
+  type ResolvedIdleStage,
 } from '../dispatch/index.js';
 import { SimKernel, type ScheduledEvent, type SimTime } from '../kernel/index.js';
 import {
@@ -183,6 +184,7 @@ import {
   carArrivedEvent,
   carDoorEvent,
   dispatchTickEvent,
+  interventionEvent,
   queueSampleEvent,
   serviceChangeEvent,
   transferArrivalEvent,
@@ -203,6 +205,7 @@ import {
   SIM_DEFAULTS,
   SimulationError,
   type ConservationAudit,
+  type RunInterventionConfig,
   type SimulationConfig,
   type StageActivity,
   type SimulationResult,
@@ -485,6 +488,16 @@ export class Simulation {
    */
   readonly #entranceFloorIndices: ReadonlySet<number>;
   readonly #deadlineS: SimTime;
+  /**
+   * The run's intervention log, in authored order — `SimulationConfig.interventions`, or `[]`.
+   *
+   * Read in two places and only two: {@link #scheduleInterventions}, which puts one kernel event
+   * on the queue per entry so an already-idle fleet acts at `atS` rather than at the next
+   * arrival, and {@link #idleOverrideAt}, which every `#park` decision asks for the settings in
+   * force *now*. Empty, both are no-ops that allocate nothing and take no branch a previous run
+   * did not — the whole of the absent-equals-empty identity the config field promises.
+   */
+  readonly #interventions: readonly RunInterventionConfig[];
 
   readonly #policies = new Map<string, DispatchPolicy>();
   /**
@@ -654,6 +667,7 @@ export class Simulation {
     this.#kernel = new SimKernel({ maxEventsPerRun: this.#options.maxEvents });
     this.#trafficModel = config.trafficModel;
     this.#resolved = config.building;
+    this.#interventions = Object.freeze([...(config.interventions ?? [])]);
 
     /* ---- the trace, before anything moves (common random numbers) ---- */
     this.#trace = generateTrace(traceConfigFor(config, this.#streams));
@@ -1152,6 +1166,7 @@ export class Simulation {
     this.#scheduleTrace();
     this.#scheduleQueueSamples();
     this.#scheduleServiceEvents();
+    this.#scheduleInterventions();
 
     let endReason: RunEndReason = 'drained';
     try {
@@ -1381,6 +1396,92 @@ export class Simulation {
       this.#recorder.releaseAssignment(passenger, at);
       this.#promisesRevoked += 1;
     }
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Interventions — Everyday Mode's run record, contract § 1.4
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Put the run's intervention log on the queue — {@link #scheduleServiceEvents}' twin, entry for
+   * entry, and deliberately so.
+   *
+   * **In array order, and not sorted**, for that method's stated reason: the kernel's total order
+   * is `(time, sequence)` and the sequence is scheduling order, so two interventions at one
+   * instant take effect in the order the player made them (invariant 4). Sorting here would be a
+   * second ordering authority.
+   *
+   * Entries past the drain deadline are refused rather than queued, and refused **loudly**: an
+   * event on the queue keeps the run alive to its time, so an intervention stamped after the last
+   * possible departure would extend the run to do nothing — and an intervention that never fires
+   * is a change of mind that did not happen, which is exactly what `warnings` is for.
+   */
+  #scheduleInterventions(): void {
+    for (const [index, entry] of this.#interventions.entries()) {
+      if (entry.atS > this.#deadlineS) {
+        this.#deadlineTruncations += 1;
+        this.#warnings.push(
+          `interventions[${index}] would apply "${entry.change.kind}" at ${entry.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and no car's parking changes because of it.`,
+        );
+        continue;
+      }
+      this.#kernel.schedule(
+        entry.atS,
+        interventionEvent({ index }, (payload, context) => {
+          this.#onIntervention(payload.index, context.time);
+        }),
+      );
+    }
+  }
+
+  /**
+   * An intervention taking effect: walk the fleet's idle cars through stage 7, under the
+   * override that is in force as of this instant.
+   *
+   * The override itself needs no application step — {@link #idleOverrideAt} is consulted by every
+   * later {@link #park} — so the whole job of this handler is the fleet that is *already parked*:
+   * an idle car takes a stage 7 decision only when something asks it to, and without this walk a
+   * building standing quiet at `atS` would honour *park the cars in the lobby* only when the next
+   * arrival happened to free a car. Guarded per car by {@link #isIdle}, exactly as
+   * {@link #stepCar} guards its own call, because `#park` may move a car and a car with its doors
+   * open is not the group's to move.
+   */
+  #onIntervention(index: number, at: SimTime): void {
+    const entry = this.#interventions[index];
+    /* c8 ignore next 5 -- the index came from the same array a moment ago. */
+    if (entry === undefined) {
+      throw new SimulationError(
+        `Intervention ${index} is not in this run's log; the schedule and the config disagree.`,
+      );
+    }
+    for (const car of this.#building.cars) {
+      if (this.#isIdle(car)) this.#park(car, at);
+    }
+  }
+
+  /**
+   * The stage 7 settings in force at `at`, or `undefined` when the profile's own stand.
+   *
+   * A pure function of `(interventions, at)` — the log is scanned, never mutated, and no state
+   * records "the intervention has happened", so a decision at `at` gives the same answer whether
+   * it runs before or after the {@link #onIntervention} walk at the same instant. The *latest*
+   * entry at or before `at` wins, which with one change kind is indistinguishable from "any", and
+   * with a second kind (dispatcher switching) is the semantics a log of changes has to have.
+   *
+   * `undefined` — not a copy of `idle` — when no entry is in force, so the ordinary run passes no
+   * override and `repositionDecisionFor` hands its helpers the identical frozen config it always
+   * did. For `park-cars-lobby` the override is the profile's own idle stage with the strategy
+   * replaced: the deadband and the energy exchange rate stay authored, because the player said
+   * *where*, not *at what price*.
+   */
+  #idleOverrideAt(at: SimTime, idle: ResolvedIdleStage): ResolvedIdleStage | undefined {
+    let inForce: RunInterventionConfig | undefined;
+    for (const entry of this.#interventions) {
+      if (entry.atS <= at) inForce = entry;
+    }
+    if (inForce === undefined) return undefined;
+    // One arm today. A second kind extends this switch, not the mechanism around it.
+    return { ...idle, parkingStrategy: 'lobby' };
   }
 
   /* ---------------------------------------------------------------- *
@@ -3144,7 +3245,19 @@ export class Simulation {
     });
 
     const me = car.snapshot(at);
-    const decision = policy.reposition(me, at, repositionContextFor(me, resolved));
+    /*
+     * The intervention seam. `#idleOverrideAt` answers from the run's log and this instant alone,
+     * and with no entry in force it answers `undefined` — in which case the context below is the
+     * very object `repositionContextFor` built, not a spread copy of it, so a run with no
+     * interventions parks on exactly the objects it always did.
+     */
+    const override = this.#idleOverrideAt(at, policy.config.idle);
+    const base = repositionContextFor(me, resolved);
+    const decision = policy.reposition(
+      me,
+      at,
+      override === undefined ? base : { ...base, idleOverride: override },
+    );
     if (!decision.move || decision.targetFloorId === undefined) return;
     this.#depart(car, decision.targetFloorId, at);
   }

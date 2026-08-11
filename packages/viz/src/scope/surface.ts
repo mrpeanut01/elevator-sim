@@ -201,6 +201,13 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
     'Cars the reader took out of service by clicking a badge. Re-runs the day; the CLI has no flag ' +
       'that holds a car, so a run carrying one is not reproducible from its selection.',
   ),
+  'viewer.interventions': control(
+    'within-day',
+    'The run record’s intervention log — Everyday Mode’s contract § 1.4, run = { seed, config, ' +
+      'interventions[] }. Pressing the stage control appends { atS, park-cars-lobby } and re-runs ' +
+      'the day from t = 0 with the prefix bit-identical; within-day because it is the product’s ' +
+      'purest change-of-mind, and no selection, CLI line or submission carries a log yet.',
+  ),
 
   /* ------------------------------------------------------- viewer: the day boundary */
   'viewer.week': control(

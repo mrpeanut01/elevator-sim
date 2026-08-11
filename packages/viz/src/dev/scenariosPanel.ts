@@ -302,6 +302,9 @@ export function mountScenarios(list: HTMLElement, context: MountContext): Panel 
        */
       playMode: 'shift-week',
       outOfServiceCarIds: [],
+      // A scenario opens a fresh day, and an intervention log belongs to the day being left —
+      // outOfServiceCarIds' ground; see ViewerState.interventions for the clearing ledger.
+      interventions: [],
       recording: undefined,
       report: undefined,
       tomorrow: undefined,

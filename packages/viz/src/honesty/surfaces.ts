@@ -73,6 +73,7 @@ import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type Floo
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
+import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
 import { phaseAt, timelineOf } from '../live/timeline.js';
 import { verifyReplay } from '../record/document.js';
 import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type Canvas2DLike, type SceneSelection } from '../render/canvas.js';
@@ -997,6 +998,8 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/honesty.ts#honestyAt',
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
+    'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#interventionStampOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -1009,6 +1012,29 @@ const LIVE_RAIL: SurfaceAdapter = {
     for (const segment of timelineOf(recording)) {
       seeds.push({ field: `timeline(${segment.id}).label`, text: segment.label, role: 'label' });
       seeds.push({ field: `timeline(${segment.id}).title`, text: segment.title, role: 'observation' });
+    }
+
+    /*
+     * The stage's intervention control — Everyday Mode slice 3. The label is static; the stamp is
+     * driven at every sample against a log stamped mid-run, so both of its states enter the
+     * corpus: the sentence (`09:14 · parked the cars in the lobby`) at playheads at or after the
+     * stamp, and the deliberate `''` before it — `interventionStampOf` answers for the playhead,
+     * not for the log, which is what keeps the temporal property met by construction rather than
+     * by a guard in the caller.
+     */
+    seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    const interventionLog = [
+      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } as const },
+    ];
+    for (const at of sampleTimes(recording)) {
+      const stamp = interventionStampOf(interventionLog, at);
+      if (stamp === '') continue;
+      seeds.push({
+        field: `interventionStamp(@${at.toFixed(0)}s)`,
+        text: stamp,
+        role: 'observation',
+        playhead: atPlayhead(recording, at),
+      });
     }
 
     for (const at of sampleTimes(recording)) {

@@ -373,6 +373,50 @@ export const TIMEOUT_POLICIES = ['throw', 'report'] as const;
 
 export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
 
+/* -------------------------------------------------------------------------- *
+ * Interventions — the player's mid-run change of mind, as data
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One thing a mid-run intervention may change. A discriminated union with **one arm today**,
+ * built as a union so the second arm — switching which dispatcher is driving — is a new member
+ * beside this one rather than a redesign of the field that carries it.
+ *
+ * `park-cars-lobby` asks stage 7 to treat every idle car as though the profile had authored
+ * `idle.parkingStrategy: 'lobby'` from the moment the intervention takes effect. It changes no
+ * weight, no constraint and no stage-1–6 setting: the group controller keeps scoring calls
+ * exactly as configured, and only *where a car with nothing to do waits* moves. That is why it
+ * can travel through `RepositionContext` rather than through a second policy — see
+ * `dispatch/lifecycle.ts#repositionDecisionFor`.
+ */
+export type InterventionChange = {
+  readonly kind: 'park-cars-lobby';
+};
+
+/**
+ * One intervention: at simulated second {@link atS}, apply {@link change} for the rest of the run.
+ *
+ * **Data, not a hook** — the same argument `config/types.ts#ServiceEventConfig` makes, and it is
+ * load-bearing here for a second reason that mechanism never had: the Everyday Mode contract
+ * (docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md § 1.4) defines a run as the record
+ * `{ seed, config, interventions[] }`, re-simulated whole from t = 0 whenever the log grows.
+ * The viewer posts a `SimulationConfig` to a worker by structured clone
+ * (`packages/viz/src/dev/shiftRunner.ts`), and a function does not survive that crossing — a
+ * `createInterventionPolicy` hook would be silently absent from every shipped run and every
+ * replay, which is invariant 5 failing quietly. Plain data crosses byte for byte.
+ *
+ * `atS` is **simulated** seconds from the start of the run, from the kernel and never a wall
+ * clock (invariant 3). Two interventions at the same `atS` take effect in authored order,
+ * because the kernel's total order is `(time, sequence)` and the runner schedules them in array
+ * order (invariant 4).
+ */
+export interface RunInterventionConfig {
+  /** Simulated seconds from the start of the run. */
+  readonly atS: number;
+  /** What changes at that instant, for the rest of the run. */
+  readonly change: InterventionChange;
+}
+
 /**
  * Everything one replication needs.
  *
@@ -569,6 +613,27 @@ export interface SimulationConfig {
    * `RunSummary.saturation`, not a defect — the detector exists for exactly this.
    */
   readonly lobbyCrowding?: DoorCrowdingConfig | undefined;
+  /**
+   * The player's mid-run interventions, in time order — Everyday Mode's run record
+   * (contract § 1.4, `run = { seed, config, interventions[] }`).
+   *
+   * **Absent and `[]` are the same run, byte for byte.** A run carrying no interventions must be
+   * identical to one built before this field existed — the `#weights` identity pattern from
+   * `dispatch/policy.ts`, held here structurally: with an empty log the runner schedules nothing,
+   * builds no override, and every `RepositionContext` is the object it always was.
+   * `sim/interventions.test.ts` compares fingerprints rather than trusting this sentence.
+   *
+   * **The prefix is bit-identical by construction.** An intervention at `atS` schedules one kernel
+   * event at `atS` and changes what stage 7 is told from that instant on; nothing that fires
+   * before `atS` can observe it, so every leg boarded earlier is the leg it was, and the picture
+   * a player re-simulates under does not jump. Only the future changes.
+   *
+   * An entry past the run's drain deadline is refused loudly — warned and not scheduled — exactly
+   * as a `serviceEvents` entry is, and for the same reason: an event on the queue keeps the run
+   * alive to its time, and an intervention that fires after the last passenger left would extend
+   * the run to do nothing.
+   */
+  readonly interventions?: readonly RunInterventionConfig[] | undefined;
   /** `throw` (default) or `report`. See {@link SimulationError}. */
   readonly onTimeout?: TimeoutPolicy | undefined;
 }

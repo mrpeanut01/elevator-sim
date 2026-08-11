@@ -1387,6 +1387,9 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
         parkedWeeks: moved.parked,
         ...(contract === undefined ? {} : { buildingId: contract.buildingId }),
         outOfServiceCarIds: [],
+        // The intervention log belongs to the day being left, on outOfServiceCarIds' ground —
+        // see ViewerState.interventions for the clearing ledger.
+        interventions: [],
         recording: undefined,
         report: undefined,
         tomorrow: undefined,
@@ -1419,6 +1422,10 @@ export function mountReport(elements: ReportElements, context: MountContext): Pa
       report: undefined,
       tomorrow: undefined,
       withheld: [],
+      // Yesterday's change of mind is part of yesterday's record, and tomorrow opens with none —
+      // an intervention stamped 09:14 replayed onto a different day would be a stamp about a run
+      // that never carried it. See ViewerState.interventions for the clearing ledger.
+      interventions: [],
     });
     context.openTab('run');
     context.runShift();

@@ -154,6 +154,10 @@ export function enterFreePlay(
      * looking perfectly ordinary.
      */
     outOfServiceCarIds: [],
+    // The intervention log is the same case again: not one of the six axes, and a mid-run change
+    // of mind stamped against a campaign day. A free-play run that replayed it would not be the
+    // run the menu described, and runIdentityIssues would refuse to post it on arrival.
+    interventions: [],
     levers: DEFAULT_LEVERS,
     /*
      * **The same argument as the two fields above, two fields over — and they were missed.**
