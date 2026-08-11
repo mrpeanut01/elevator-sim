@@ -82,6 +82,13 @@ async function clockText(page: Page): Promise<string> {
   return (await page.locator('#clock').first().textContent()) ?? '';
 }
 
+/** The `×N` chip currently pressed, or `''` when none is — the speed the transport is at. */
+async function latchedSpeed(page: Page): Promise<string> {
+  return (
+    (await page.locator('#speed-chips button[aria-pressed="true"]').first().textContent()) ?? ''
+  );
+}
+
 describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14.1', () => {
   it('inverts the shell, and puts it all back exactly', async () => {
     const page = await pageWithARun();
@@ -100,6 +107,16 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
     await page.waitForTimeout(300);
     const clockBefore = await clockText(page);
     const headlineBefore = await page.locator('#building-name').first().textContent();
+
+    /*
+     * Latch the top chip, which is what `docs/20` defect 10 is about: ×900 was still driving the
+     * transport when somebody else's day went on the stage, and a shipped reference run was over
+     * about a second and a half later. ×900 rather than any other rung because it is the one that
+     * makes the defect a *lost* run rather than a fast one.
+     */
+    await page.locator('#speed-chips button', { hasText: '×900' }).first().click();
+    await page.waitForTimeout(200);
+    expect(await latchedSpeed(page), 'the ×900 chip did not latch').toBe('×900');
 
     /* --- into the picker, and into somebody else's day ---------------------- */
 
@@ -121,6 +138,59 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
     await page.locator('.watch-chrome').first().waitFor({ timeout: 60_000 });
 
     expect(await chromeIsUp(page), 'the spectator chrome did not come up').toBe(true);
+
+    /* --- `docs/20` defect 12 — the strip and the header share the top of the page ------------ */
+
+    /*
+     * Measured rather than described. The strip is inserted above the header, and `.shell` is a
+     * three-row grid: as a fourth child it took the leading `auto` and pushed the header onto the
+     * `1fr`, inside a `height: 100vh` box with `overflow: hidden`. The player-visible result was the
+     * wordmark, Menu and clock clipped under a floating bar.
+     *
+     * Two claims, and neither is about how it looks: the two boxes do not overlap, and the
+     * wordmark's own box is inside the header's. A pixel of tolerance, because a sub-pixel layout
+     * rounding is not a defect and this assertion should not fail on one.
+     */
+    const boxes = await page.evaluate(() => {
+      const rect = (selector: string): { top: number; bottom: number; left: number; right: number; width: number } | null => {
+        const node = document.querySelector(selector);
+        if (node === null) return null;
+        const box = node.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, width: box.width };
+      };
+      return {
+        chrome: rect('.watch-chrome'),
+        header: rect('header.topbar'),
+        brand: rect('.brand-name'),
+        shellChildren: document.querySelector('.shell')?.childElementCount ?? 0,
+      };
+    });
+    expect(boxes.chrome, 'no spectator strip in the page').not.toBeNull();
+    expect(boxes.header, 'no header in the page').not.toBeNull();
+    expect(boxes.brand, 'no wordmark in the page').not.toBeNull();
+    expect(
+      (boxes.chrome?.bottom ?? 0) - 1,
+      'the spectator strip overlaps the app header — `docs/20` defect 12',
+    ).toBeLessThanOrEqual(boxes.header?.top ?? 0);
+    expect(boxes.brand?.width ?? 0, 'the wordmark has no width while watching').toBeGreaterThan(0);
+    expect(
+      (boxes.brand?.right ?? 0) - 1,
+      'the wordmark is clipped by the header while watching',
+    ).toBeLessThanOrEqual(boxes.header?.right ?? 0);
+    /*
+     * And the grid still has the three children its `grid-template-rows` was written for. This is
+     * the *cause* rather than the symptom, and it is asserted beside the symptom deliberately: a
+     * future fix that moved the strip somewhere else would keep the boxes apart and quietly put the
+     * row count back to four.
+     */
+    expect(boxes.shellChildren, 'the shell grid grew a row while watching').toBe(3);
+
+    /* --- `docs/20` defect 10 — the speed chip does not carry into a stranger's day ----------- */
+
+    expect(
+      await latchedSpeed(page),
+      'the latched ×900 chip carried into the watch — a stranger’s day is over before it is seen',
+    ).toBe('×60');
 
     /* --- § 14.1's table, cell by cell --------------------------------------- */
 
@@ -179,6 +249,12 @@ describe.skipIf(!HAS_BROWSER)('watching somebody else’s run — GAMEPLAY § 14
     // still be showing its name.
     expect(await clockText(page), 'the playhead did not survive the watch').toBe(clockBefore);
     expect(await page.locator('#building-name').first().textContent()).toBe(headlineBefore);
+    /*
+     * And the chip they latched, which is the other half of `docs/20` defect 10. § 14.1 promises
+     * *"exactly where you were"*, and a reset with no restore is the same surprise pointed the
+     * other way: the player comes back to their own run at a speed they never chose.
+     */
+    expect(await latchedSpeed(page), 'the player’s own speed chip did not come back').toBe('×900');
 
     await page.close();
   }, 300_000);

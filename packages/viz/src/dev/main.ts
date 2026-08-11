@@ -976,9 +976,34 @@ function boot(ui: Elements, resources: BrowserResources): void {
     },
   });
   {
-    // Above the header, so the inverted strip and the inverted header read as one block.
+    /*
+     * Above the header, so the inverted strip and the inverted header read as one block — and
+     * **inside a band of their own**, which is `docs/20` defect 12 and a layout bug rather than a
+     * styling preference.
+     *
+     * `.shell` is `grid-template-rows: auto 1fr auto` over exactly three children: the header, the
+     * body, the footer. Inserting the strip as a fourth child *before* the header shifts all three
+     * down a track — the strip takes the leading `auto`, **the header takes the `1fr`**, the body
+     * takes the trailing `auto` and the footer lands in an implicit row — inside a `height: 100vh`
+     * box with `overflow: hidden`. What a player sees is the strip and the header contending for
+     * the top of the page with the wordmark, Menu and clock clipped, which is what the audit
+     * photographed (`61-watching.png`).
+     *
+     * So the two go into one band that occupies the header's own track, and the grid is back to
+     * three children whether or not anybody is watching. The band is inserted with
+     * `parentElement?.insertBefore` — this package's one insertion idiom — before the header is
+     * moved into it. No rule in `index.html` selects the header as a child of `.shell` (there is no
+     * `.shell > *` rule at all), so nothing about the header's own styling moves with it, and
+     * `ui.header.right.closest('header')` — how every other reader finds the header — does not care
+     * about depth. `min-width: 0` is the ordinary grid-item guard: without it the band's minimum
+     * content size would stop `.topbar`'s own ellipsis from ever engaging.
+     */
     const headerEl = ui.header.right.closest('header');
-    headerEl?.parentElement?.insertBefore(watchPanel.chrome, headerEl);
+    if (headerEl !== null) {
+      const band = el(document, 'div', { className: 'watch-band', style: { 'min-width': '0' } });
+      headerEl.parentElement?.insertBefore(band, headerEl);
+      band.append(watchPanel.chrome, headerEl);
+    }
   }
 
   /**
@@ -2646,6 +2671,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * is the same class of surprise as the speed chip latching across a mode (`docs/19` defect 12).
      */
     readonly wasPlaying: boolean;
+    /**
+     * The speed chip the player had latched — `docs/20` defect 10, and the same defect `docs/19`
+     * defect 12 found one mode door over.
+     *
+     * Entering a watch is a **mode entry**: the run on the stage is a different day, of a different
+     * length, that the player did not start. The chip they latched belongs to the thing they left,
+     * and at ×900 a shipped reference run is over about a second and a half after `Watch it` — the
+     * audit measured 06:22 of a record ending ~06:26. So {@link enterWatch} calls
+     * {@link resetTransportSpeed} exactly as every other mode door does.
+     *
+     * It is saved here for the *other* half of § 14.1, which the mode doors have no equivalent of:
+     * *"stopping the watch returns you exactly where you were."* A reset with no restore would put
+     * the player back on their own run at a speed they never chose — the same surprise, aimed the
+     * other way — so the chip goes back with the playhead and the pause state.
+     */
+    readonly baseSpeed: number;
   }
 
   /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
@@ -4284,8 +4325,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
         filedRunId,
         playheadS: playback?.simTimeS,
         wasPlaying: playback?.state === 'playing',
+        baseSpeed,
       },
     };
+    /*
+     * A mode is being entered, so the latched chip stays behind — `docs/20` defect 10, and
+     * {@link resetTransportSpeed} owns the boundary. Read {@link WatchedBefore.baseSpeed} for why
+     * the value is saved rather than only dropped: § 14.1 promises the player their own run back
+     * exactly as they left it, and the speed is part of *exactly*.
+     *
+     * **Before `adopt`**, which is not stylistic: `adopt` builds the `Playback` with
+     * `playbackRateFor(baseSpeed, …)`, so a reset afterwards would construct the transport at the
+     * latched speed and correct it a frame later — a stranger's day would still start at ×900.
+     */
+    resetTransportSpeed();
     /*
      * The rival's line goes down for the run it raced. Leaving it standing beside somebody else's
      * day would be two different crowds on one scale, which `applyShift` already refuses for the
@@ -4336,6 +4389,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ghostPick = before.ghostPick;
     runStartOfDayS = before.startOfDayS;
     lastRaceKey = '';
+    /*
+     * The chip the player latched before they left — see {@link WatchedBefore.baseSpeed}. Assigned
+     * **before `adopt`** for `enterWatch`'s reason in reverse: `adopt` reads `baseSpeed` when it
+     * builds the `Playback`, so the player's own run comes back at the player's own speed rather
+     * than at the spectator default and a correction.
+     */
+    baseSpeed = before.baseSpeed;
     if (state.recording === undefined) {
       /*
        * A player who had no run of their own gets the stage they had — nothing on it. `adopt`
