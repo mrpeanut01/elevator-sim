@@ -466,6 +466,18 @@ export interface MenuViewInput {
   /** Whether a finished run is on screen at all. */
   readonly hasRun: boolean;
   /**
+   * Whether the player has any relationship with the shift behind the overlay — they have left
+   * this menu in this sitting, or the session restored a previous sitting's play. `undefined`
+   * means **nobody has said** ({@link firstVisit}'s convention), and is treated as `true` so a
+   * caller that carries no shell keeps the ordinary Resume wording.
+   *
+   * Exists for one row: on a genuinely first load the run behind the menu is boot's own (issue
+   * #97 requires Resume *enabled* over it), and *"Back to the shift on screen"* claimed a shift
+   * the player had never seen — `docs/19`'s Resume copy nit. The shell computes the fact
+   * (`dev/main.ts#runState`); {@link resumeRow} words it.
+   */
+  readonly everLeftTheMenu?: boolean | undefined;
+  /**
    * Why the run on screen may not be ranked — `scope/runIdentity.ts`'s reasons, joined.
    *
    * Supplied rather than computed, because deciding it needs a `ViewerState` and the loaded
@@ -684,7 +696,14 @@ function bodyOf(input: MenuViewInput, screen: MenuScreen): Body {
     case 'main':
       return {
         ...empty,
-        rows: mainRows(input.hasServer, input.hasRun, input.viewMode ?? 'advanced'),
+        rows: mainRows(
+          input.hasServer,
+          input.hasRun,
+          input.viewMode ?? 'advanced',
+          // `=== false` — *nobody has said* keeps the ordinary wording, exactly as `firstVisit`'s
+          // `=== true` keeps the ordinary silence. See {@link MenuViewInput.everLeftTheMenu}.
+          input.everLeftTheMenu === false,
+        ),
         // `=== true`, so *nobody has said* is silence rather than a welcome. See
         // {@link MenuViewInput.firstVisit}.
         notices: input.firstVisit === true ? [FIRST_VISIT_NOTE] : empty.notices,
@@ -758,11 +777,25 @@ const NEEDS_A_SERVER = ' · needs a server, and this one has none';
  * would open the product on a greyed control; last is where a reader looks for the way out, which
  * is the half of the old sentence that was always right.
  */
-function resumeRow(hasRun: boolean): MenuAffordance {
+function resumeRow(hasRun: boolean, neverLeft: boolean): MenuAffordance {
+  /*
+   * Two details for the enabled row, and the split is `docs/19`'s Resume copy nit. On a genuinely
+   * first load — nothing restored, this menu never dismissed — the shift behind the overlay is
+   * boot's own demo run, which issue #97 requires the row to stay **enabled** over (pressing it is
+   * fine; the stage shows a building at rest and the filing gate refuses to bank that run). What
+   * was wrong is only the claim: *"Back to the shift on screen"* names a shift the player has
+   * never seen, as though something of theirs were waiting. So the first-sitting wording says what
+   * is actually behind the menu and points at the row that starts a real one; the ordinary wording
+   * returns the moment they have been out there or a session restored (`everLeftTheMenu`).
+   */
+  const detail = neverLeft
+    ? 'Close this menu and look around — the page ran a demo day so the stage is not empty; ' +
+      'nothing is filed from it. Start here, above, opens your first real shift.'
+    : 'Back to the shift on screen — nothing here is changed by leaving';
   return {
     id: 'main.resume',
     label: 'Resume',
-    detail: 'Back to the shift on screen — nothing here is changed by leaving',
+    detail,
     kind: 'commit',
     // Closing an overlay moves no leg. `presentation` is the honest scope and it is what lets this
     // row appear under every play mode, which a way out has to.
@@ -886,6 +919,7 @@ function mainRows(
   hasServer: boolean | undefined,
   hasRun: boolean,
   viewMode: 'basic' | 'advanced',
+  neverLeft: boolean,
 ): readonly MenuAffordance[] {
   // `undefined` says nothing. See `MenuViewInput.hasServer`: asserting *needs a server* on a build
   // that has one would be a worse claim than the silence it replaces, and this module cannot tell.
@@ -939,7 +973,7 @@ function mainRows(
     // and it is now true (§ D241): an address, a link in the inbox, and nothing to choose or forget.
     social('main.account', 'Account', 'An emailed link, no password — sign in to post a score', 'account'),
     to('main.settings', 'Settings', 'Presentation only — nothing here changes a run', 'settings'),
-    resumeRow(hasRun),
+    resumeRow(hasRun, neverLeft),
   ]);
 }
 
@@ -1379,6 +1413,16 @@ function settingsRows(settings: Settings, viewMode: 'basic' | 'advanced'): reado
     {
       id: 'settings.playback-speed',
       label: 'Playback speed',
+      /*
+       * The relationship to the stage's own ×-chips, in the row's own copy — `docs/19`'s copy nit
+       * (*two speed controls with no stated relationship*). The wording is `dev/main.ts`'s
+       * `applyPlaybackSpeed` docstring made player-sized: the chip is a property of the run being
+       * watched, this is the player's preference, and the effective rate is their product — which
+       * is also why changing a chip does not move this select and vice versa.
+       */
+      detail:
+        'Your own multiplier on top of the ×1–×900 chips under the stage: the chips pick a run’s ' +
+        'pace, this scales all of them and survives changing chips',
       kind: 'select',
       scope: 'presentation',
       enabled: true,

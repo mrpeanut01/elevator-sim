@@ -160,6 +160,33 @@ export function plainLeverHelp(view: PlainLeverView): string {
 }
 
 /**
+ * The acknowledgement a surface draws after a lever moves — `docs/19` defect 5.
+ *
+ * At laptop width the thirteen terms are below the fold, so moving a lever changed nothing the eye
+ * could see: the mapping this module guarantees (*same number, two drawers*) was stated in prose
+ * and shown nowhere. This line echoes the moved control **from the current view**, never from a
+ * remembered press, so it cannot describe a value the state has since left: a slider names the
+ * position it now holds and the field that holds it; a toggle names the state and the group
+ * control it wrote. The editor draws it beside the levers together with `costFunctionLine`'s own
+ * output — the formula is composed there and only there, this sentence deliberately does not
+ * restate it.
+ *
+ * Composed here rather than in the mount for {@link plainLeverSub}'s stated reason: two callers
+ * exist — the editor and the honesty sweep's adapter — and a string composed twice is two screens
+ * waiting to disagree.
+ */
+export function plainLeverEchoOf(view: PlainLeverView): string {
+  if (view.kind === 'toggle') {
+    return `${view.label} is now ${view.value === true ? 'on' : 'off'} — that wrote ${view.writes}.`;
+  }
+  const position = typeof view.value === 'number' ? view.value : 0;
+  return (
+    `${view.label} is now ${String(position)} — that wrote ${view.writes}, ` +
+    'the same number the term slider below holds.'
+  );
+}
+
+/**
  * Write one lever into the model it is a view of. Returns the new spec and group levers; only
  * the owned field differs from what went in.
  *

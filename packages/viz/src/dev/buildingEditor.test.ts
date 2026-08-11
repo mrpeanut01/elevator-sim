@@ -26,6 +26,7 @@ import {
   floorIdOf,
   orphanFloors,
   personsOf,
+  specFromBuilding,
   validateSpec,
   withZoneGroup,
   type BuildingSpec,
@@ -36,10 +37,12 @@ import { STATE_GLYPHS, STATE_WORDS } from '../access/zoning.js';
 import { RESOURCES, baseState, legsOf } from '../scope/probes.test-helper.js';
 import { SANDBOX_CONTRACT_ID } from '../shift/week.js';
 
-import type { MountContext } from './mountTypes.js';
+import type { MountContext, ViewAt } from './mountTypes.js';
+import { buildingConfigOf, type ViewerState } from './state.js';
 import { mountRecorder } from './mountRecorder.test-helper.js';
 import {
   SHAFT_LEFT_PX,
+  buildingEditorSeedOf,
   elevationStageWidthPx,
   CAPACITY_TICK_PCT,
   OCCUPANCY_MAX_PCT,
@@ -1124,6 +1127,63 @@ describe('the save confirms, names, and can be run — issue #54', () => {
     expect(JSON.parse(control)).not.toHaveLength(0);
     expect(JSON.parse(moved)).not.toHaveLength(0);
     expect(moved).not.toBe(control);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Seeding from the stage — docs/19 defect 11
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The rule behind *Open building editor →* and the report's *Add a car* card: seed the staged
+ * building when — and only when — doing so clobbers nothing. Each refusing arm is asserted, since
+ * the no-clobber rule is the half the audit conceded was sound and the half a regression would
+ * silently drop.
+ */
+describe('buildingEditorSeedOf — docs/19 defect 11', () => {
+  const viewOf = (over: Partial<ViewerState>): ViewAt => ({
+    state: { ...baseState(), ...over },
+    resources: RESOURCES,
+    recording: undefined,
+    simTimeS: 0,
+    building: undefined,
+    playing: false,
+  });
+
+  it('seeds the staged building over a clean draft of another one', () => {
+    // The audit's screen: Midtown on stage, the editor still holding Garden Apartments.
+    const at = viewOf({ buildingId: 'midtown-office' });
+    const seed = buildingEditorSeedOf(at);
+    expect(seed?.editingBuildingId).toBe('midtown-office');
+    expect(seed?.buildingSpec?.name).toBe('Midtown Office');
+    // And the seeded spec is exactly what picking Midtown in the editor's own list produces.
+    const config = buildingConfigOf(RESOURCES, [], 'midtown-office');
+    expect(config).toBeDefined();
+    if (config !== undefined) {
+      expect(seed?.buildingSpec).toStrictEqual(specFromBuilding(config, 'midtown-office'));
+    }
+  });
+
+  it('leaves a dirty draft alone — the no-clobber rule stands unweakened', () => {
+    const at = viewOf({ buildingId: 'midtown-office' });
+    const clean = buildingEditorSeedOf(at);
+    expect(clean).toBeDefined();
+    const dirty = viewOf({
+      buildingId: 'midtown-office',
+      buildingSpec: { ...at.state.buildingSpec, floors: at.state.buildingSpec.floors + 1 },
+    });
+    expect(buildingEditorSeedOf(dirty)).toBeUndefined();
+  });
+
+  it('does nothing when the editor is already on the staged building', () => {
+    const at = viewOf({ buildingId: 'garden-apartments', editingBuildingId: 'garden-apartments' });
+    expect(buildingEditorSeedOf(at)).toBeUndefined();
+  });
+
+  it('does nothing for a staged id this catalogue does not hold', () => {
+    // A recording loaded from a file can stage a building the catalogue lacks; seeding BLANK_SPEC
+    // under that name would look like the staged building while being an empty tower.
+    expect(buildingEditorSeedOf(viewOf({ buildingId: 'no-such-building' }))).toBeUndefined();
   });
 });
 

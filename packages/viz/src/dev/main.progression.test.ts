@@ -489,3 +489,75 @@ describe('issue #136 — a loaded recording banks nothing', () => {
     expect(await bodyOf('loadRecordingFile')).toContain('runStartOfDayS = undefined');
   });
 });
+
+/* -------------------------------------------------------------------------- *
+ * docs/19 defects 6 and 12 — the drawer yields to navigation, the chip to a mode
+ * -------------------------------------------------------------------------- */
+
+describe('docs/19 defect 12 — the transport speed resets on mode entry and only there', () => {
+  it('resets in every dispatchMenu arm that enters a mode and runs', async () => {
+    /*
+     * The set is derived from the arms rather than listed: an arm that both latches
+     * `entered-a-mode` and calls `runShift()` is a mode door with a first day to protect, and
+     * every one of them must put the chip down first. `open-campaign` and `open-fixit` latch the
+     * flag and run nothing, so they keep the player's chip — a navigation is not a new mode's
+     * first day.
+     */
+    const code = await mainCode();
+    const dispatch = code.slice(code.indexOf('function dispatchMenu('));
+    const arms = [...dispatch.matchAll(/closeMenu\('entered-a-mode'\);\n(?<tail>(?:.*\n){0,4})/gu)];
+    expect(arms.length).toBeGreaterThanOrEqual(4);
+    for (const arm of arms) {
+      const tail = arm.groups?.['tail'] ?? '';
+      if (!tail.includes('runShift()')) continue;
+      expect(
+        tail,
+        'a mode door runs its first day on the previous mode’s chip — docs/19 defect 12 is back',
+      ).toContain('resetTransportSpeed()');
+    }
+    // Non-vacuity: at least the free-play Start, beat-score, Keep going and the commissioning
+    // commit are mode doors that run.
+    const resetting = arms.filter((arm) =>
+      (arm.groups?.['tail'] ?? '').includes('resetTransportSpeed()'),
+    );
+    expect(resetting.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('resets on the scenario cards’ door, through MountContext.enterMode', async () => {
+    const block = await contextBlock();
+    const enterMode = block.slice(block.indexOf('enterMode()'));
+    expect(enterMode, 'the context’s enterMode no longer resets the chip').toContain(
+      'resetTransportSpeed()',
+    );
+  });
+
+  it('does not reset on the ordinary run path — a mid-week re-run keeps the player’s chip', async () => {
+    /*
+     * The boundary's other half, which is the deliberate deviation from the handoff's per-day
+     * rule (`resetTransportSpeed`'s docstring carries the argument). `runShift` is the seam every
+     * panel's re-run comes through; a reset there would fight the player on the surface they are
+     * iterating on.
+     */
+    const block = await contextBlock();
+    const runShiftArm = block.slice(block.indexOf('runShift(onRan)'), block.indexOf('enterMode()'));
+    expect(runShiftArm).not.toContain('resetTransportSpeed');
+    expect(await bodyOf('closeMenu')).not.toContain('resetTransportSpeed');
+  });
+});
+
+describe('docs/19 defect 6 — a navigation dismisses the drawer', () => {
+  it('closes an open drawer inside openTab, and only in drawer mode', async () => {
+    /*
+     * The four `Open … editor →` links live in the drawer, so pressing one opened the editor
+     * behind the overlay that launched it. The write sits in `openTab` because every navigation
+     * comes through it; the `isDrawer` guard is what keeps column mode's remembered choice
+     * untouched (`drawerStateFor`'s own docstring).
+     */
+    const code = await mainCode();
+    const start = code.indexOf('openTab(tab) {');
+    expect(start).toBeGreaterThan(-1);
+    const arm = code.slice(start, code.indexOf('\n    },', start));
+    expect(arm).toContain('drawerStateFor(window.innerWidth, state.drawerOpen).isDrawer');
+    expect(arm).toContain('drawerOpen: false');
+  });
+});

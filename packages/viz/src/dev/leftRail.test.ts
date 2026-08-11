@@ -188,6 +188,8 @@ describe('statRowsOf — the four rows the design draws', () => {
 
   it('carries the denominator into the tooltip — R13’s `n` for the share', () => {
     expect(servedTitleFor(60, 137)).toContain('Over 137 served legs.');
+    // And in the singular when the sample really is one — docs/19 defect 8's `over 1 legs`.
+    expect(servedTitleFor(60, 1)).toContain('Over 1 served leg.');
   });
 
   /* --- the empty denominator --- */
@@ -416,6 +418,12 @@ describe('runFiguresOf and the sparkline', () => {
       'best day so far',
       'banked this scenario',
     ]);
+  });
+
+  it('counts one clean day in the singular — docs/19’s copy nit', () => {
+    // `1 clean days running` shipped; the label follows the value's number.
+    expect(runFiguresOf(week({ streak: 1 }))[0]?.label).toBe('clean day running');
+    expect(runFiguresOf(week({ streak: 2 }))[0]?.label).toBe('clean days running');
   });
 
   it('banks against the contract’s own needClean', () => {

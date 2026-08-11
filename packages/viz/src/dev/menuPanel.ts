@@ -76,8 +76,17 @@ export interface MenuPanelHost {
   dispatch(intent: MenuIntent): void;
   account(): AccountState;
   leaderboard(): LeaderboardView;
-  /** What only the shell knows: whether a run is on screen, and whether it may be ranked. */
-  runState(): { readonly hasRun: boolean; readonly rankingRefusal: string | undefined };
+  /**
+   * What only the shell knows: whether a run is on screen, whether it may be ranked, and whether
+   * the player has ever been out to it — `everLeftTheMenu` is `docs/19`'s Resume copy nit, and
+   * optional with `firstVisit`'s convention: an absent answer is *nobody has said*, which the
+   * screen words as the ordinary Resume rather than guessing at a first sitting.
+   */
+  runState(): {
+    readonly hasRun: boolean;
+    readonly rankingRefusal: string | undefined;
+    readonly everLeftTheMenu?: boolean | undefined;
+  };
   /** The reader's disclosure level, for the one settings row Basic cannot honour — `docs/16` S7. */
   viewMode(): 'basic' | 'advanced';
   /**
@@ -361,6 +370,8 @@ export function renderMenu(root: HTMLElement, host: MenuPanelHost): void {
     postingRefusal: postingRefusal(account),
     hasRun: run.hasRun,
     rankingRefusal: run.rankingRefusal,
+    // `firstVisit`'s convention one field over: absent is *nobody has said*, never a guess.
+    ...(run.everLeftTheMenu === undefined ? {} : { everLeftTheMenu: run.everLeftTheMenu }),
     boards: board.boards,
     /*
      * The open board, handed to the decision half — GitHub issue #93.
@@ -753,9 +764,20 @@ function affordance(draw: Draw, host: MenuPanelHost, row: MenuAffordance): HTMLE
    * that never matches `document.activeElement` and a trap that never fires.
    */
   if (row.kind === 'select') {
-    return selectRow(draw, row.label, row.value ?? '', row.options ?? [], row.id, (id) => {
-      host.dispatch(withValue(id));
-    });
+    return selectRow(
+      draw,
+      row.label,
+      row.value ?? '',
+      row.options ?? [],
+      row.id,
+      (id) => {
+        host.dispatch(withValue(id));
+      },
+      // The screen decides the words; this only draws them — `textRow`'s own rule, extended to
+      // selects for the one row that carries a relationship sentence (docs/19's playback-speed
+      // nit). A row that carries none draws none.
+      row.detail,
+    );
   }
   if (row.kind === 'toggle') {
     return toggleRow(draw, row.label, row.value === 'on', row.id, (value) => {
@@ -1391,6 +1413,7 @@ function selectRow(
   options: readonly { readonly id: string; readonly name: string; readonly detail?: string | undefined }[],
   key: string,
   onChange: (id: string) => void,
+  hint?: string | undefined,
 ): HTMLElement {
   const row = draw.retain('label', `row.${key}`, { className: 'menu-select' });
   const text = draw.retain('span', `label.${key}`);
@@ -1419,7 +1442,13 @@ function selectRow(
   on(select, 'change', () => {
     onChange(select.value);
   });
-  reconcile(row, text, select);
+  // `textRow`'s hint span, same class and same absence rule: no sentence, no node.
+  const help =
+    hint === undefined || hint === ''
+      ? undefined
+      : draw.retain('span', `hint.${key}`, { className: 'menu-hint' });
+  if (help !== undefined) setText(help, hint ?? '');
+  reconcile(row, text, select, help);
   return row;
 }
 

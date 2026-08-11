@@ -259,6 +259,14 @@ import {
  */
 const SPEEDS = [1, 10, 60, 240, 900] as const;
 
+/**
+ * The chip a fresh mode opens on — ×60, the ladder's middle rung, a 1 800 s shift in thirty
+ * seconds of watching. One name for a value two sites hold (`baseSpeed`'s initialiser and
+ * {@link resetTransportSpeed}), so the speed a cold boot gets and the speed a mode entry restores
+ * cannot drift apart.
+ */
+const DEFAULT_BASE_SPEED = 60;
+
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
 /** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
@@ -847,8 +855,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * Held separately from `playback.speed` because `settings.playbackSpeed` multiplies it — see
    * {@link applyPlaybackSpeed}. Without the split, a reader on ×2 would find their chip selection
    * jump to whichever chip happened to equal `60 × 2`, and the two controls would fight.
+   *
+   * Opens on {@link DEFAULT_BASE_SPEED} and returns to it on every **mode entry** — see
+   * {@link resetTransportSpeed} for the boundary and its argument (`docs/19` defect 12).
    */
-  let baseSpeed = 60;
+  let baseSpeed = DEFAULT_BASE_SPEED;
 
   /* ---------------------------------------------------------------------- *
    * The menu — § D214 § 2, and the non-test caller of `menu/`
@@ -1629,6 +1640,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // A mode is being entered, so the chip latched in the last one does not travel — docs/19
+        // defect 12, and {@link resetTransportSpeed} owns the boundary.
+        resetTransportSpeed();
         runShift();
         /*
          * After `runShift` and drawn on its own, for the building select's reason: `runShift` spends
@@ -1679,6 +1693,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = enterEndless(state);
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
         return;
 
@@ -1749,6 +1765,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
         state = entered;
         menuState = navigate(menuState, 'main');
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
         return;
       }
@@ -1838,6 +1856,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
          */
         state = { ...state, tab: 'run' };
         closeMenu('entered-a-mode');
+        // Mode entry — the latched chip stays behind (docs/19 defect 12, resetTransportSpeed).
+        resetTransportSpeed();
         runShift();
         return;
 
@@ -2256,6 +2276,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
       return {
         hasRun: state.recording !== undefined,
         rankingRefusal: issues.length === 0 ? undefined : issues.map((issue) => issue.message).join('; '),
+        /*
+         * Whether the shift behind the overlay is one the player has any relationship with —
+         * `docs/19`'s Resume copy nit. On a **genuinely first** load the recording on screen is
+         * boot's own (issue #97 requires Resume enabled over it), yet *"Back to the shift on
+         * screen"* claims a shift the player has never seen. Two facts only this file holds
+         * decide it: the menu has been dismissed this sitting ({@link menuHasBeenDismissed} —
+         * they have been out there), or the session restored (`!loadedWithNothingRestored` — a
+         * previous sitting's shifts are theirs). `menu/screens.ts#resumeRow` words the row; this
+         * carries the facts, which is the split every panel keeps.
+         */
+        everLeftTheMenu: menuHasBeenDismissed || !loadedWithNothingRestored,
       };
     },
   };
@@ -2622,10 +2653,32 @@ function boot(ui: Elements, resources: BrowserResources): void {
       playerStartedARun();
       runShift(onRan);
     },
+    enterMode() {
+      /*
+       * A panel announcing a **mode entry** — today the scenario cards, the one mode door that
+       * does not pass through `dispatchMenu`'s arms. The shell-owned transport state resets here
+       * and nowhere on the ordinary run path; {@link resetTransportSpeed} owns the boundary and
+       * the argument (`docs/19` defect 12).
+       */
+      resetTransportSpeed();
+    },
     openTab(tab) {
       const revealed = new Set(state.revealedTabs);
       revealed.add(tab);
       state = { ...state, tab, revealedTabs: revealed };
+      /*
+       * **A navigation dismisses the drawer** — `docs/19` defect 6. Below the breakpoint the
+       * right rail is an overlay covering the editor column, so *Open dispatcher editor →* opened
+       * the editor **behind** the drawer that launched it, with "EDITING — …" truncated under the
+       * panel the player had to know to close. Leaving for a surface is the reader saying *show me
+       * that surface*, so the overlay yields — every navigation comes through here, which is what
+       * makes this one write cover the four `Open … editor` links, the report's lever cards and
+       * the tab strip alike. Column mode is untouched: there the rail occludes nothing and
+       * `drawerOpen` is the remembered choice `drawerStateFor`'s docstring protects.
+       */
+      if (drawerStateFor(window.innerWidth, state.drawerOpen).isDrawer && state.drawerOpen) {
+        state = { ...state, drawerOpen: false };
+      }
       /*
        * **A navigation files a day only when the day has been played out** — § D232, closing the
        * half § D223 named and could not reach from its own lane.
@@ -3994,6 +4047,35 @@ function boot(ui: Elements, resources: BrowserResources): void {
 
   function applyPlaybackSpeed(): void {
     playback?.setSpeed(playbackRateFor(baseSpeed, menuState.settings.playbackSpeed));
+  }
+
+  /**
+   * Return the transport chip to {@link DEFAULT_BASE_SPEED} — called on **mode entry**, and the
+   * boundary is the decision (`docs/19` defect 12).
+   *
+   * The Everyday handoff's §7.3 rule is *"Speed never carries across days: each run opens at the
+   * player's default speed, so a day can never vanish in three seconds because the last one ended
+   * at 30×"*. The defect it names is real and was reproduced here: ×900 latched from a previous
+   * mode ended Free Play's first day before a frame of it was watched. The boundary shipped is
+   * **narrower than the handoff's**, deliberately:
+   *
+   * - **A mode being entered resets** — Free play's Start, *Keep going*, a leaderboard row's
+   *   *beat this*, a commissioning week opening, a scenario card taken
+   *   ({@link MountContext.enterMode}). The player is starting a new thing to watch, and the chip
+   *   they latched belongs to the thing they left.
+   * - **A mid-week re-run keeps the player's chip.** Re-running Tuesday five seconds after
+   *   choosing ×240 is the same sitting, the same mode and the same intent; snapping the chip
+   *   back on every run would fight the player on exactly the surface they are iterating on.
+   *   The handoff's own §4.6 chips survive this deviation because the *settings* multiplier —
+   *   the player's declared preference — is not touched here at all.
+   *
+   * `applyPlaybackSpeed` is called so a playback already adopted follows immediately, and the
+   * chrome is redrawn so the lit chip agrees — the same pair the chip's own `onPick` performs.
+   */
+  function resetTransportSpeed(): void {
+    baseSpeed = DEFAULT_BASE_SPEED;
+    applyPlaybackSpeed();
+    drawTransportChrome(viewAt());
   }
 
   function adopt(recording: VizRecording): void {

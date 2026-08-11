@@ -1103,6 +1103,19 @@ function listOf(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${String(parts[parts.length - 1])}`;
 }
 
+/**
+ * `1 leg`, `5 legs` — one denominator, correctly numbered — `docs/19` defect 8's *"over 1 legs"*.
+ *
+ * A count of one is a state a real run reaches (Garden Apartments quotes a valid AWT over five
+ * legs at one seed; a thinner window reaches one), and R13 makes the count part of what the mean
+ * means, so its grammar is not cosmetic: *"over 1 legs"* reads as a typo in the one clause a
+ * reader is being asked to trust. `noun` is the singular form; module-private because every
+ * caller is a note in this file.
+ */
+function legCount(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 /* -------------------------------------------------------------------------- *
  * The figure grid
  * -------------------------------------------------------------------------- */
@@ -1127,7 +1140,7 @@ function figuresFor(
       label: 'AWAY INSIDE A MINUTE',
       value: `${String(observations.minutePct)}%`,
       // R13: the share never travels without the count it was taken over.
-      note: `an observation, never suppressed — over ${String(observations.servedLegs)} served legs`,
+      note: `an observation, never suppressed — over ${legCount(observations.servedLegs, 'served leg')}`,
       tone: observations.minutePct >= 75 ? 'good' : observations.minutePct >= 50 ? 'caution' : 'bad',
       axisOnly: false,
     },
@@ -1207,7 +1220,7 @@ export function averageWaitFigure(summary: VizSummary): ReportFigure {
     label: 'AVERAGE WAIT',
     value: `${summary.meanWaitS.toFixed(1)} s`,
     // R13 and § 7.4: a mean is not a figure without its window and its `n`.
-    note: `over ${String(summary.waitCount)} legs in the ${summary.reportWindow.id} window`,
+    note: `over ${legCount(summary.waitCount, 'leg')} in the ${summary.reportWindow.id} window`,
     // The same denominator, structured, so it survives being carried off this grid. See above.
     count: summary.waitCount,
     tone: 'plain',
@@ -1351,7 +1364,7 @@ function energyFigures(summary: VizSummary): readonly ReportFigure[] {
         measured && energy.workPerServedLegKJ !== null
           ? `${energy.workPerServedLegKJ.toFixed(1)} kJ`
           : NOT_RECORDED,
-      note: `over ${String(energy.deliveredLegCount)} delivered legs — a day that spends less by carrying fewer people has saved nothing`,
+      note: `over ${legCount(energy.deliveredLegCount, 'delivered leg')} — a day that spends less by carrying fewer people has saved nothing`,
       tone: 'unranked',
       axisOnly: true,
     },

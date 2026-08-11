@@ -649,6 +649,37 @@ describe('the root offers a way out that is not a mode being entered', () => {
     expect(refusal, 'the refusal points both ways at once').not.toContain(above ? 'below' : 'above');
   });
 
+  it('does not claim “back to the shift on screen” of a shift the player never saw — docs/19', () => {
+    /*
+     * On a genuinely first load the run behind the menu is boot's own demo, which issue #97
+     * requires the row to stay **enabled** over — so the fix is the wording, not the state. The
+     * first-sitting fact is `everLeftTheMenu === false`; absent means *nobody has said* and keeps
+     * the ordinary sentence, exactly as `firstVisit`'s convention has it.
+     */
+    const detailAt = (everLeftTheMenu: boolean | undefined): string =>
+      screenOf({
+        ...ARM,
+        hasRun: true,
+        ...(everLeftTheMenu === undefined ? {} : { everLeftTheMenu }),
+        state: stateAt('main'),
+      }).rows.find((row) => row.id === 'main.resume')?.detail ?? '';
+
+    const firstSitting = detailAt(false);
+    expect(firstSitting).not.toContain('Back to the shift on screen');
+    // The honest account: what is behind the menu, that nothing files from it, and where to start.
+    expect(firstSitting).toContain('demo day');
+    expect(firstSitting).toContain('nothing is filed from it');
+    expect(firstSitting).toContain('Start here');
+    // And it stays enabled — issue #97's own requirement, unchanged by the rewording.
+    const row = screenOf({ ...ARM, hasRun: true, everLeftTheMenu: false, state: stateAt('main') })
+      .rows.find((entry) => entry.id === 'main.resume');
+    expect(row?.enabled).toBe(true);
+
+    for (const ordinary of [detailAt(true), detailAt(undefined)]) {
+      expect(ordinary).toContain('Back to the shift on screen');
+    }
+  });
+
   it('is the only row on the root that leaves without choosing anything', () => {
     /*
      * The non-vacuity guard. Every other root row is a `navigate`, and the three commits that close
@@ -667,6 +698,27 @@ describe('the root offers a way out that is not a mode being entered', () => {
      */
     const before = stateAt('settings');
     expect(applyIntent(before, { kind: 'close' }, CATALOGUE)).toBe(before);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Two speed controls, one stated relationship — docs/19's copy nit
+ * -------------------------------------------------------------------------- */
+
+describe('the playback-speed row states its relationship to the stage chips', () => {
+  it('says it multiplies the chips, in the row’s own copy', () => {
+    /*
+     * The audit met a Settings 0.5×–8× select and a stage ×1–×900 chip row with no sentence
+     * connecting them. The mechanism is `dev/main.ts#applyPlaybackSpeed` — the effective rate is
+     * chip × setting — and the row's `detail` now says so where the choice is made.
+     */
+    const row = rowsOn('settings').find((entry) => entry.id === 'settings.playback-speed');
+    expect(row, 'the settings screen lost its playback-speed row').toBeDefined();
+    const detail = row?.detail ?? '';
+    expect(detail).toContain('multiplier');
+    expect(detail).toContain('chips');
+    // Both directions of the independence, so neither control reads as overriding the other.
+    expect(detail).toContain('survives changing chips');
   });
 });
 
