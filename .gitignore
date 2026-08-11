@@ -46,6 +46,7 @@ pnpm-debug.log*
 
 # Multi-agent worktrees
 .worktrees/
+.claude/worktrees/
 
 # Finder / file-sync duplicates. A sync client on at least one dev machine creates
 # "name 2.ts" copies of every file during a large checkout.
