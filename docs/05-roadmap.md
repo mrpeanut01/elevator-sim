@@ -1697,7 +1697,7 @@ is worse at serving people*. Measured front membership, one row per cell:
 | `garden-down-peak` | 51 | collective, **nearest-car**, eta, energy-aware, fairness-first, capacity-aware, auction, auction-multi-round, zoned-uppeak, `destination-eta` |
 | `secure-up-peak` | 119 | **nearest-car**, energy-aware |
 | `mixed-use-up-peak` | 50 | energy-aware |
-| `vertical-city-up-peak` | 50 | collective, **nearest-car**, eta, energy-aware, fairness-first, `destination-eta` |
+| `vertical-city-up-peak` | 50 | collective, **nearest-car**, eta, energy-aware, fairness-first |
 
 `nearest-car` is the arm this document elsewhere calls too weak a baseline to separate anything, and
 it was the viewer's default until [§ D134](../DECISIONS.md). It reaches the front by being **best on energy and worst on wait**: a
@@ -1760,6 +1760,28 @@ score — one would rank the worst dispatcher first. **Energy is an axis, never 
 > > mechanism now — `matrix.ts`'s `PINNED_FRONTS` and `matrixFront.test.ts`, which re-derive every
 > > cell's front, identity classes and verdict census from the run the suite **already pays for**, and
 > > scan this document for the row ([§ D184](../DECISIONS.md)). Cost: ~0.3 s.
+
+> **And it moved a fourth time, for [§ D332](../DECISIONS.md) — but this time the mechanism was
+> caught before the row was, because `matrixFront.test.ts` now exists.** Stage 6 of the dispatch
+> lifecycle compared a call's floor against `CarSnapshot.floorId` literally, and for a double-deck
+> car that is the *lower* deck's stop position — so a car standing at a paired landing refused the
+> call at the floor its upper deck had open. `vertical-city` is the only shipped building declaring
+> `servesFloorPairs`, so it is again the only cell that moves.
+>
+> `destination-eta` **leaves** this cell's front, which takes it from six arms to **five**:
+> `collective`, `nearest-car`, `eta`, `energy-aware`, `fairness-first`. The verdict census goes
+> **9/1/34 → 8/4/32** (BETTER / INDISTINGUISHABLE / WORSE). The note above claiming the front is
+> *"the **six** arms in the table … including `destination-eta`"* is now false about this tree, in
+> the same way its own predecessor was — and it is left standing for the same reason.
+>
+> **`nearest-car` is still on the front at exactly six of eight**, the same six, so § D106 and
+> `docs/10` § 5.5's refusal of an aggregated eco score are untouched. That is now the *third*
+> consecutive time this cell has moved while the count under it held, which is the § D149 shape this
+> section keeps re-teaching: the count is not evidence that the table beneath it is current.
+>
+> The difference from the last three is that nothing had to notice. `PINNED_FRONTS` failed on the
+> nine disagreements and the failure message named this document, so the row and the register moved
+> in the same commit rather than a wave apart.
 
 **2. `destination-eta` used to be bit-identical to `eta` at all eight cells, and is now identical at
 one.** It authored `dispatch.callType: mobile-credential` and a weight vector identical to `eta`'s,

@@ -23108,3 +23108,142 @@ A per-test static check. A global name-level call graph produced **1 881 false p
 *runs a simulation* from *reads a recording module scope already ran*, which is what most of
 `shift/report.test.ts` does. The narrow file-local version finds 82 cases across 23 files and is
 blind to a helper reached through a value, so it would **look** total and not be. Do not ship one.
+
+## D332 — a car standing at an upper-deck floor can answer the call there
+
+`dispatch/lifecycle.ts`'s stage 6 asked whether a car was at a call's landing by comparing
+`CarSnapshot.floorId` against `call.floorId` **literally**. For a double-deck car those are not the
+same coordinate: `floorId` is a *stop position*, the floor the **lower** deck opens onto, and the
+upper deck is at the paired floor at the same instant. A hall call raised at an upper-deck landing
+was therefore refused — `not-at-floor` — by the one car standing at it with its door open.
+
+The runner one line earlier is deck-aware (`Simulation#serveHere` gates on `Car.stopFloorFor`), so
+the defect was a deck-aware caller handing a raw call to a stage that was not. Grepping the whole
+dispatch layer for a deck-aware helper returned zero hits.
+
+**Closed by `lifecycle.ts#stopFloorFor`, which delegates to `stopFloorIdOf`** — the model's own
+accessor, the same function `Car.stopFloorFor` uses over the same shaft, so the dispatcher and the
+runner cannot come to disagree about where a car is standing.
+
+### Why the blast radius is a structural claim rather than a measured one
+
+`stopFloorIdOf` returns its argument when `shaft.isDoubleDeck` is false. On a single-deck shaft the
+new comparison is therefore *the expression it replaced*, not merely equal to it on the runs that
+were checked. That is why the seven single-deck buildings are bit-identical, and it is a stronger
+statement than a passing test: there is no run on which they could differ.
+
+Measured on `vertical-city`/`rise-and-fall`/seed 20 270 000 before the fix: 45–126 stage-6
+`not-at-floor` refusals per run under all 13 dispatchers, **100 %** of them at an upper-deck floor,
+with `carFloor → callFloor` exactly the four pairs the building declares. After: zero, and the calls
+are answered rather than re-refused on direction — `direction-mismatch` fires zero times, every
+shipped profile leaving `allowOppositeDirectionPickup` at its default.
+
+### What it moved, and the one claim that got weaker
+
+`vertical-city` is the only shipped building declaring `servesFloorPairs`, so it is the only one that
+moves. `sim/doubleDeckSeam.test.ts`'s shuttle-move census goes `nearest-car` **256 → 261**, `eta`
+**271 → 265**, `collective` **296 → 287**, against a control arm unchanged at 262, 299, 309 — and the
+control being unchanged is the check, not a detail, because `withoutFloorPairs` is a shaft the fix
+is identity on.
+
+`saved === 3` still holds. **It is now the weaker half of what that line knows**, and the test says
+so: `nearest-car`'s margin collapses from 6 moves to **1** — one stop in 262, on one seed, with no
+interval — while the two look-ahead dispatchers' margins widen (28 → 34, 13 → 22). Answering at a
+deck that is already open is worth most to a dispatcher choosing between stops anyway; `nearest-car`
+does not look ahead and spends the new eligibility on extra journeys. The pin is kept for drift
+detection and the *claim* it supports is narrowed to the two look-ahead arms, because promoting
+three-of-three to a rule off a one-move margin would be the confident nonsense `CLAUDE.md` names as
+this project's likeliest failure.
+
+### The identity digests were regenerated locally, and that was checked rather than assumed
+
+§ D196/§ D201 record that some pins here are environment-dependent, which is why CI runs a two-OS
+matrix, and regenerating such a pin on one machine is not sound. These are not among them: CI's
+**linux** leg, CI's **macOS** leg and the local run each reported the same six replacement digests
+for `traffic/dayStartIdentity.test.ts` and `traffic/transportIdentity.test.ts`, character for
+character. Three independent machines agreeing is what makes the local regeneration defensible, and
+the docstrings say so at the tables rather than here.
+
+## D333 — the landing panel stops promising one car an unbounded queue
+
+`Simulation#tellThePanel` promised **every** unpromised waiter at a request to `carIds[0]` with no
+capacity bound at all, and `#candidateCars` then restricted every later decision for that call to
+the already-promised cars. The two together meant a rider who walked up to a busy landing two hours
+later **inherited other people's pin**: measured on `vertical-city`, p50 **81 riders** promised to
+one car that holds 13–20, while p50 4 of its 7 siblings sat idle and completely empty — and in
+39–77 % of bumps one of those idle cars was standing at that very landing.
+
+Three changes, the first two useless apart:
+
+1. **Candidacy reopens to the whole bank** the moment one waiter is unpromised. The restriction used
+   to fire as soon as *one* waiter held a promise; it now asks whether **every** waiter the bank
+   could carry is already promised.
+2. **A car holding an outstanding promise keeps the call** even when the group picks another
+   (`#withPromiseHolders`). Without this the promised car loses its hall call and stops coming —
+   permanently, under `reassignmentPolicy: 'never'`, which is every shipped profile.
+3. **A promise is only made while the car's outstanding promises are below its per-deck design
+   load**, crossing by one person — clause for clause the rule `#boardFrom` applies at the doorway,
+   and per deck for the same reason: a deck is a room with its own doorway.
+
+### § D29 is not weakened, and the distinction is the whole argument
+
+D29 protects the passenger the panel has **already answered**: they keep the car they were told,
+because re-offering them is the panel changing its mind, and a destination arm that changes its mind
+quietly recovers the deferral advantage it surrendered. It says nothing about the rider the panel has
+told **nothing**. No promise is moved, `assign` is still write-once, `brokenPromises` still counts
+every bump, and `wrongCarBoardings` is still 0.
+
+The ledger (`#promisedMassKg`) is charged in `#tellThePanel` and discharged at the three instants a
+promise stops being outstanding — boarding, revocation, abandonment — which are the same three places
+`ConservationAudit`'s promise identity is kept balanced. `releasePromise` has exactly two call sites
+and both are paired with a discharge; the third discharge is the boarding. Verified by assertion
+rather than by reading: an instrumented run over the saturated `vertical-city` fixture never charged
+a deck above its ceiling.
+
+### What it moved
+
+`vertical-city`/`office-day`: timed-out with 4 597 stranded → **completed with 0**, delivering the
+same 19 293 as `collective` and ending at the same instant. Longest wait 23 404.5 s → **916.7 s**.
+Bumps per assigned leg 49.4 → **0.46**. All four timing-out seeds now complete; `midtown-office` with
+2 of 6 cars recalled goes 185 stranded → 0.
+
+**The `collective` headline row is the one to read, and it is not the good-news row it looks like.**
+On `transportIdentity`'s `vertical-city|collective` cell the mean improves (30.2 → 27.2 s) and the
+worst wait falls by 64 % (408.6 → 148.6 s) while the **p95 gets 21 % worse** (80.4 → 97.1 s). That
+combination is a redistribution rather than an improvement: riders who used to be pinned behind a
+full car are now served, and a rider finally served with a two-minute wait enters a percentile they
+were previously absent from. Quoting the mean and the longest wait without the p95 beside them would
+turn that row into a claim it does not support — § D106's rule about energy, applied to a wait
+distribution.
+
+### Two surfaces went quiet because the product got better, and that is a defect in the sampler
+
+`frame/pinnedQueue.ts` describes a landing pinned to one full car. Its test drove
+`panel.endedAt - 1`, which worked only because the run **did not finish** — it timed out with
+thousands still standing, so the last instant was also the worst. With the promise bounded the run
+drains, and a probe at the end now finds nothing.
+
+The surface is not dead: swept at 400 instants over the same recording the condition still holds in
+**194 of 401 frames**, peaking at floor `G` with 73 riders standing for a car seating 26. What died
+was the assumption that the worst moment is the last one. Both the test and
+`honesty/surfaces.ts`'s adapter now **sweep for the instant the condition holds** instead of
+sampling fixed fractions — and the honesty corpus's own false-negative hunt is what caught it, by
+reporting `describePinnedQueues` among the silent adapters. A conditional surface sampled at
+unconditional instants measures the sampler rather than the sentence.
+
+`fixit/cases.test.ts`'s `sleeping-sky-lobby` is the same shape one level up: its diagnosed repair
+(`parkingStrategy: zone-center`) stopped clearing the § 9 bar, falling to 55.6 % against a required
+80 %. The diagnosis is unchanged and still correct — idle cars parked at the bottom of their run,
+while the shuttles' calls come from the top — so the repair was moved to `predicted-demand`, which
+parks idle cars where demand is forecast and is a closer match to the copy the case already ships
+(*"a shuttle at each lobby instead of eight at the street"*) than `zone-center` ever was. The bar was
+not lowered.
+
+### What was deliberately not done
+
+`benchmark/published.ts` was **not** regenerated from `regeneratePins.js`. The tool re-runs every
+study at its default options, and `runPrepositioningStudy({})` at defaults disagrees with the pinned
+run while `prepositioning.test.ts` passes — so a wholesale paste would have rewritten healthy pins
+from a differently-parameterised run. That is the tool's own warning (*"a re-run that disagrees with
+the file is a question, not an answer"*) arriving in practice. Only pins whose own test reports them
+as moved are touched, and the test is the authority for the value.

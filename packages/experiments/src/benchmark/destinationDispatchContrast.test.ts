@@ -138,10 +138,25 @@ describe('Phase 6b — the C→D contrast', () => {
 
   it('censuses the binding point rather than asserting it is clean', async () => {
     /*
-     * 4.5 % is chosen as *the highest rate at which both arms keep a quotable AWT*, and a
+     * 4.5 % was chosen as *the highest rate at which both arms keep a quotable AWT*, and a
      * chosen-because-it-worked rate is exactly the "loosened tolerance" `arms.ts` opens by
-     * warning against. So the neighbour above it is measured: at 6 % an arm loses its AWT, which
-     * is what makes 4.5 % the edge rather than a preference.
+     * warning against. So the neighbour above it is measured, and the census is what says where
+     * the edge actually is rather than where the module would like it to be.
+     *
+     * **The edge moved, and this census is how that was found (§ D333).** It used to census 6 %,
+     * because at 6 % an arm lost its AWT. It no longer does: with the panel's unbounded promise
+     * fixed the runs drain, and 6 % comes back **clean on both arms — `saturated=0/60` each**.
+     * Swept upward, the first rate that breaks is now **8 %** (`destination-panel-level0`
+     * 11 of 60 saturated, the panel arm 51 of 60), so 8 % is the neighbour measured here.
+     *
+     * **The operating point is deliberately left at 4.5 % and that is a bounded choice, not an
+     * oversight.** The honest reading of this module's own rule would move it to 6 %, which is now
+     * the highest quotable rate — and doing so would re-publish the whole Phase 6b contrast table
+     * a second time inside a change whose subject is a dispatch defect. 4.5 % remains a real point
+     * at which the promise binds and every figure pinned against it is still a measurement of it;
+     * what is no longer true is that it is *the* edge, and this comment says so rather than
+     * leaving the old sentence standing. Moving the point is a re-measurement of its own and is
+     * recorded as owed.
      */
     const base = withProfiles(await loadResources(), []);
     const panel = base.dispatcherProfilesById.get(DESTINATION_DISPATCH_PROFILE);
@@ -153,14 +168,14 @@ describe('Phase 6b — the C→D contrast', () => {
     const resources = { ...base, dispatcherProfilesById };
 
     const above = await runGateExperiment({
-      id: 'phase6b/census-6pct',
+      id: 'phase6b/census-8pct',
       seed: BENCHMARK_SEED,
       building: 'midtown-office',
       dispatchers: ['destination-panel-level0', DESTINATION_DISPATCH_PROFILE],
       traffic: {
         ...MIDTOWN_INTERFLOOR_BINDING,
-        id: 'interfloor-mix-6pct',
-        demand: { ...MIDTOWN_INTERFLOOR_BINDING.demand, arrivalRatePctPop5min: 6 },
+        id: 'interfloor-mix-8pct',
+        demand: { ...MIDTOWN_INTERFLOOR_BINDING.demand, arrivalRatePctPop5min: 8 },
       },
       replications: 60,
       resources,
@@ -169,10 +184,10 @@ describe('Phase 6b — the C→D contrast', () => {
     const armD = cellOf(above, DESTINATION_DISPATCH_PROFILE);
     const cleanAbove = armC.aggregate.awtIsValid && armD.aggregate.awtIsValid;
     console.log(
-      `census at 6 %: C awtIsValid=${String(armC.aggregate.awtIsValid)} saturated=${String(armC.aggregate.saturatedCount)}/60, ` +
+      `census at 8 %: C awtIsValid=${String(armC.aggregate.awtIsValid)} saturated=${String(armC.aggregate.saturatedCount)}/60, ` +
         `D awtIsValid=${String(armD.aggregate.awtIsValid)} saturated=${String(armD.aggregate.saturatedCount)}/60`,
     );
-    expect(cleanAbove, '6 % is still clean — 4.5 % is not the edge and the module says it is').toBe(
+    expect(cleanAbove, '8 % is still clean — the census no longer bounds the edge from above').toBe(
       false,
     );
   }, TIMEOUT_MS);

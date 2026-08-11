@@ -169,7 +169,9 @@ const PINNED: readonly Pinned[] = [
     figureTexts: [
       '9 of 86 journeys',
       '70 s',
-      '23.9 s over 86 boarded journeys',
+      // 23.9 s before § D332. The deck fix moves `vertical-city`'s as-built run — the complaint
+      // count, the worst wait and the healthy figure are all unmoved, so the case reads as it did.
+      '23.1 s over 86 boarded journeys',
       '100.0 % of 520 journeys',
     ],
   },

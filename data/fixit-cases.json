@@ -47,7 +47,7 @@
           "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street. The 9 waits over a minute are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
-              "idle": { "parkingStrategy": "zone-center", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
+              "idle": { "parkingStrategy": "predicted-demand", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
             }
           }
         },
@@ -70,7 +70,7 @@
           "role": "cheap-fix",
           "name": "Trim the door dwell at every stop",
           "costUnits": 2,
-          "effect": "A second or two off every stop moves the 23.9 s mean wait a little. The empty three-hundred-metre climb that makes the long waits is not a door.",
+          "effect": "A second or two off every stop moves the 23.1 s mean wait a little. The empty three-hundred-metre climb that makes the long waits is not a door.",
           "patch": {
             "building": {
               "cars": [

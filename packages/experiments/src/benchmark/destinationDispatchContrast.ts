@@ -70,10 +70,18 @@
  *
  * ## What this module refuses to do
  *
- * **It does not raise the rate until the effect is significant and stop there.** 4.5 % is the
- * highest rate at which *both* arms still return a valid AWT on all 150 replications, censused in
+ * **It does not raise the rate until the effect is significant and stop there.** 4.5 % *was* the
+ * highest rate at which both arms still return a valid AWT on all 150 replications, censused in
  * `destinationDispatchContrast.test.ts`; above it the point would be a saturated arm with its
- * statistics suppressed, which is a capacity finding and not a contrast. The two rates are
+ * statistics suppressed, which is a capacity finding and not a contrast.
+ *
+ * **That ceiling moved when § D333 bounded the panel's promise, and the sentence above is kept in
+ * the past tense rather than deleted.** The runs now drain, so 6 % comes back clean on both arms
+ * (`saturated=0/60` each) and the first rate that breaks is **8 %**. 4.5 % is therefore still a
+ * point at which the promise binds — every figure published against it is a measurement of it —
+ * but it is **no longer the edge**, and this module no longer claims to sit at one. Moving the
+ * operating point to 6 % is the faithful re-measurement and is owed; it was not done inside a
+ * dispatch fix, because it would re-publish this whole table a second time in one change. The two rates are
  * reported together, and the honest summary is that the sign of the C→D effect depends on whether
  * the constraint binds.
  *
@@ -164,9 +172,11 @@ export const CONTRAST_METRIC_LABELS: Readonly<Record<string, string>> = Object.f
  * Midtown Office interfloor-mix at 4.5 % of population per 5 minutes.
  *
  * The same pattern as {@link MIDTOWN_INTERFLOOR_MIX} at three times the rate — the *only* thing
- * changed, so the two rows are a rate sweep and not two different experiments. 4.5 % because it is
- * the highest rate at which both arms return a valid AWT on every one of 150 replications; the
- * census is in the test rather than in this comment.
+ * changed, so the two rows are a rate sweep and not two different experiments. 4.5 % because it
+ * **was** the highest rate at which both arms return a valid AWT on every one of 150 replications;
+ * the census is in the test rather than in this comment, and since § D333 that census reports the
+ * ceiling has risen to 6 % with 8 % the first rate that breaks. The rate here is unchanged and the
+ * claim attached to it is narrowed accordingly — it is a binding point, not the binding point.
  */
 export const MIDTOWN_INTERFLOOR_BINDING: TrafficArmSpec = Object.freeze({
   ...MIDTOWN_INTERFLOOR_MIX,
