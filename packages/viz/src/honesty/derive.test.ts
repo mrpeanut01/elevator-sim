@@ -329,6 +329,44 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
+        'Everyday slice 8’s watch seam, whose player-facing words are driven by the `WATCH` ' +
+        'adapter and whose remaining derived “prose” is not prose. Four shapes, none of them a ' +
+        'sentence anybody reads. (1) The scanner reads hyphenated **identifiers** as words, ' +
+        'exactly as it does for `PlayMode`’s members above: `viewer.calendar`, `free-play`, ' +
+        '`no-such-tower`, `filed-day`, `does-not-reproduce`, `park-cars-lobby`. (2) Two are id ' +
+        '**templates** — `filedDayRuns`’ `day:${contractId}:${day}` selection key and the record ' +
+        'shape number — which no surface prints. (3) `WATCH_RECORD_CARRIES` and ' +
+        '`PERIOD_BOOKS_THE_EVENT` are refusals a **developer** reads: the first is a coverage ' +
+        'table asserted against `WatchRecord`’s own fields, the second is a `ScopeIssue` message ' +
+        'that stops a record being written and therefore never reaches a picker row — a day it ' +
+        'fires on is filed with `record: null` and the row says `DAY_HAS_NO_RECORD`, which the ' +
+        'adapter does drive. (4) The two mounts and the loader are DOM- or fetch-bound and are ' +
+        'excluded on `dev/fixitPanel.ts`’s own established ground: every string they print comes ' +
+        'from `watch/view.ts`, `watch/library.ts` or `watch/reproduce.ts`, all driven. ' +
+        '`firstPersonWordsIn` authors the word list § 14.1 forbids, which is the opposite of ' +
+        'player-facing text — it is the checker for it, and `watch/reference.ts` calls it at load ' +
+        'time so an authored fixture cannot ship first-person copy.',
+      ids: [
+        'dev/data.ts#loadReferenceRuns',
+        'dev/watchPanel.ts#mountWatchPanel',
+        'dev/watchPanel.ts#WATCHING_HEADER_CLASS',
+        'watch/library.ts#checkedRun',
+        'watch/library.ts#filedDayRuns',
+        'watch/record.ts#PERIOD_BOOKS_THE_EVENT',
+        'watch/record.ts#stateFromWatchRecord',
+        'watch/record.ts#WATCH_RECORD_CARRIES',
+        'watch/record.ts#watchRecordIssues',
+        'watch/record.ts#watchRecordOf',
+        'watch/record.ts#watchRunConfigOf',
+        'watch/reference.ts#FIXTURE_MARKER',
+        'watch/reference.ts#parseReferenceRuns',
+        'watch/reproduce.ts#reproductionDrift',
+        'watch/types.ts#WATCH_RECORD_VERSION',
+        'watch/view.ts#firstPersonWordsIn',
+      ],
+    },
+    {
+      reason:
         'TP-13’s provenance emitter. Its `ok` line is CLI flags — machine text the CLI parses, ' +
         'pinned flag-for-flag and leg-for-leg by `main.test.ts` — but its refusal reasons are ' +
         'authored sentences that reach `#status` through `copyProvenance`, so this exclusion is ' +

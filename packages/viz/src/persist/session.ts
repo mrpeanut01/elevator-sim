@@ -501,7 +501,10 @@ function readEnvelope(store: SessionStore): EnvelopeRead {
   return {
     ok: true,
     version,
-    session: withParkedWeeks(withWindowStart(record['session'], version), version),
+    session: withDayRecords(
+      withParkedWeeks(withWindowStart(record['session'], version), version),
+      version,
+    ),
     library: version >= 2 ? record['library'] : EMPTY_LIBRARY,
   };
 }
@@ -549,6 +552,52 @@ function withParkedWeeks(session: unknown, version: number): unknown {
   if (version >= 4) return session;
   if (!isPlainRecord(session) || 'parkedWeeks' in session) return session;
   return { ...session, parkedWeeks: [] };
+}
+
+/**
+ * A version 1–5 `session`, given the one key version 6 added — Everyday Mode slice 8.
+ *
+ * {@link withParkedWeeks}' argument, and the strongest form of it this module has needed.
+ * `DayOutcome.record` is *the run a filed day was*, and `null` is *this day cannot be re-asked*. A
+ * build with no record concept stored no seed, no building and no dispatcher against any day it
+ * filed, so there is nothing to re-ask **with** — every day in those bytes really is unwatchable,
+ * and `null` is what the player had rather than a stand-in for something nobody wrote down.
+ *
+ * ## Why this one reaches two levels down, where the others reach one
+ *
+ * The key is inside `week.history[]` and inside every `parkedWeeks[].history[]`, so the completion
+ * has to walk them. It walks **only** those two paths and completes **only** the missing key: a
+ * history entry that already carries `record` is returned untouched, so a version-6 session cannot
+ * acquire anything here and the version guard above is not the only thing keeping it out.
+ *
+ * Returns whatever it cannot complete, untouched, for {@link withWindowStart}'s stated reason —
+ * every such shape is one `snapshotIssue` is about to refuse **by name**, and completing a
+ * malformed object first replaces a precise complaint with a vaguer one. A `history` that is not an
+ * array and an entry that is not an object are both left exactly as found.
+ */
+function withDayRecords(session: unknown, version: number): unknown {
+  if (version >= 6) return session;
+  if (!isPlainRecord(session)) return session;
+  const week = withHistoryRecords(session['week']);
+  const parked = session['parkedWeeks'];
+  return {
+    ...session,
+    week,
+    ...(Array.isArray(parked) ? { parkedWeeks: parked.map(withHistoryRecords) } : {}),
+  };
+}
+
+/** One week, with `record: null` on every history entry that has no such key. */
+function withHistoryRecords(week: unknown): unknown {
+  if (!isPlainRecord(week)) return week;
+  const history = week['history'];
+  if (!Array.isArray(history)) return week;
+  return {
+    ...week,
+    history: history.map((outcome) =>
+      isPlainRecord(outcome) && !('record' in outcome) ? { ...outcome, record: null } : outcome,
+    ),
+  };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

@@ -47,6 +47,7 @@ const VIEWER_FETCHES = [
   '/campaign.json',
   '/scenario-goals.json',
   '/fixit-cases.json',
+  '/reference-runs.json',
 ] as const;
 
 beforeAll(async () => {

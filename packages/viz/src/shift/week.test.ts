@@ -71,6 +71,7 @@ function day(
   minutePct = kind === 'met' ? 90 : 40,
 ): DayOutcome {
   return outcomeOf({
+    record: null,
     day: week.day,
     dayIdx: week.dayIdx,
     eventId: 'ordinary',
@@ -121,6 +122,7 @@ describe('unjudged is not passed', () => {
     // `every` over an empty array is `true`, which would make a shift with nothing to prove
     // indistinguishable from one that proved everything.
     const outcome = outcomeOf({
+      record: null,
       day: 1,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -454,6 +456,7 @@ describe('purity', () => {
 describe('re-closing the same day replays it rather than adding to it', () => {
   const cleanDay = (day: number): DayOutcome =>
     outcomeOf({
+      record: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',
@@ -464,6 +467,7 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     });
   const missedDay = (day: number): DayOutcome =>
     outcomeOf({
+      record: null,
       day,
       dayIdx: 0,
       eventId: 'ordinary',

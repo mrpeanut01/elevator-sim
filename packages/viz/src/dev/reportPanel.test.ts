@@ -140,6 +140,7 @@ function reportOf(
   const week = closeDay(
     opened,
     outcomeOf({
+      record: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
@@ -217,6 +218,7 @@ function closesOf(recordings: readonly VizRecording[], day = 4): readonly Shaped
     week = closeDay(
       week,
       outcomeOf({
+        record: null,
         day,
         dayIdx: week.dayIdx,
         eventId: 'ordinary',

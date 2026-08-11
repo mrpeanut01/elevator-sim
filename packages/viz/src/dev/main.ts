@@ -174,8 +174,15 @@ import { mountBatchPanel } from './batchPanel.js';
 import { mountSuitePanel } from './suitePanel.js';
 import { mountCampaignPanel, type CampaignPanelHandle } from './campaignPanel.js';
 import { createLoader } from './bootstrap.js';
-import { loadBrowserResources, loadCampaign, loadFixitCases, type BrowserResources } from './data.js';
+import {
+  loadBrowserResources,
+  loadCampaign,
+  loadFixitCases,
+  loadReferenceRuns,
+  type BrowserResources,
+} from './data.js';
 import { mountFixitPanel } from './fixitPanel.js';
+import { WATCHING_HEADER_CLASS, mountWatchPanel } from './watchPanel.js';
 import { chip, el, fill, fillSelect, keyedFill, setHidden, setText } from './dom.js';
 import {
   ELEMENT_IDS,
@@ -232,6 +239,10 @@ import {
   type ViewerState,
 } from './state.js';
 import { ghostPlanOf } from './ghostRun.js';
+import { watchRecordOf } from '../watch/record.js';
+import type { WatchableRun } from '../watch/types.js';
+import type { WatchingView } from '../watch/view.js';
+import { watchingStateOf } from '../watch/session.js';
 import {
   createShiftRunner,
   shiftRunCostOf,
@@ -931,6 +942,75 @@ function boot(ui: Elements, resources: BrowserResources): void {
     resources,
     loadCases: () => loadFixitCases(resources),
   });
+
+  /**
+   * Watching somebody else's run — GAMEPLAY § 14.1, Everyday Mode slice 8.
+   *
+   * Mounted like the Fix-a-building overlay and for the same reasons, with one addition: the
+   * spectator **chrome** is not an overlay. § 14.1's differentiation is structural, so the strip is
+   * inserted into the page above the header — `parentElement?.insertBefore`, this package's one
+   * insertion idiom — and the header itself is inverted by a class while a run is being watched.
+   *
+   * `simulate` is `recordRun` on the main thread rather than through `shiftRunner`. That is the
+   * same trade `dev/fixitPanel.ts` states: a run costs ~0.2–1.5 s on the shipped buildings, the
+   * whole output is one replay, and a worker round-trip for it is complexity this slice does not
+   * need. Named as a limitation rather than discovered.
+   */
+  const watchPanel = mountWatchPanel({
+    document,
+    resources,
+    stateNow: () => state,
+    loadReferenceRuns: () =>
+      loadReferenceRuns((id: string) => buildingNameOf(resources, state.savedBuildings, id)),
+    simulate: (config) => recordRun(config).recording,
+    buildingNameOf: (id) => buildingNameOf(resources, state.savedBuildings, id),
+    dispatcherNameOf: (id) => profileById(resources, state.savedDispatchers, id).name,
+    onWatch: (run, view, recording) => {
+      enterWatch(run, view, recording);
+    },
+    onPlayThisCrowd: (run) => {
+      playThisCrowd(run);
+    },
+    onStopWatching: () => {
+      stopWatching();
+    },
+  });
+  {
+    // Above the header, so the inverted strip and the inverted header read as one block.
+    const headerEl = ui.header.right.closest('header');
+    headerEl?.parentElement?.insertBefore(watchPanel.chrome, headerEl);
+  }
+
+  /**
+   * The canvas pill — § 14.1's *"a pill, top left"*.
+   *
+   * Absolutely positioned over `.stage-wrap`, which is given `position: relative` at mount time. A
+   * relative block container lays out exactly as a static one, so nothing on the page moves; what
+   * it buys is that the pill sits **on** the stage rather than above it, which is where § 14.1 puts
+   * it and the only place a spectator's eye is guaranteed to be.
+   */
+  const watchPill = el(document, 'div', {
+    className: 'watch-pill',
+    style: {
+      display: 'none',
+      position: 'absolute',
+      top: '10px',
+      left: '10px',
+      'z-index': '5',
+      background: '#23201C',
+      color: '#FBF7EF',
+      padding: '4px 10px',
+      'border-radius': '999px',
+      font: '11px/1.2 system-ui, sans-serif',
+      'letter-spacing': '0.06em',
+      'pointer-events': 'none',
+    },
+  });
+  {
+    const stageWrap = ui.stage.canvas.parentElement;
+    stageWrap?.style.setProperty('position', 'relative');
+    stageWrap?.insertBefore(watchPill, ui.stage.canvas);
+  }
 
   const apiOrigin =
     document.querySelector('meta[name="elevator-sim-api"]')?.getAttribute('content')?.trim() ?? '';
@@ -1709,6 +1789,20 @@ function boot(ui: Elements, resources: BrowserResources): void {
         fixitPanel.open();
         return;
 
+      case 'open-watch':
+        /*
+         * `open-fixit`'s arm exactly, and for its reasons: the overlay opens over whatever is
+         * running, nothing behind it is torn down, and the menu closes because two overlays
+         * stacked would each claim Escape.
+         *
+         * Opening the picker enters **nothing** — a row's `Watch it` does, through
+         * `enterWatch`. That split is why the menu row's scope is `presentation`: a list of runs
+         * changes no run.
+         */
+        closeMenu('entered-a-mode');
+        watchPanel.open();
+        return;
+
       case 'reopen':
         menuRoot.hidden = false;
         menuState = navigate(menuState, 'main');
@@ -2159,6 +2253,38 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * refusal that exists only in a disabled button is a refusal one keyboard route away from not
      * existing.
      */
+    /*
+     * **The run on screen has to be the run this shell simulated** — Everyday Mode slice 8, and the
+     * same object-identity gate `closeShift` already uses.
+     *
+     * Found while wiring the spectator state, and it is **not only** about watching. `submitScore`
+     * posts `claimedMetricsOf(recording.summary)` — the metrics of whatever is on screen — under
+     * `state.buildingId`, `state.dispatcherId` and `state.seed`, which are the **player's own**
+     * selection. Those two describe the same run for a run this shell simulated and describe
+     * different runs for any other:
+     *
+     * - while **watching**, `state.recording` is somebody else's day and the selection is the
+     *   spectator's;
+     * - for a recording **loaded from a file** (issue #136), they have never agreed, and that hole
+     *   predates this slice.
+     *
+     * Either way the server replays the submitted seed, does not reproduce, and answers
+     * `422 metrics-do-not-reproduce` — *"this product's one accusation, aimed at a player who did
+     * nothing wrong"*, which is `scope/runIdentity.ts`'s own sentence about exactly this shape.
+     * `runIdentityIssues` below cannot see it: it inspects the **state**, and the state is
+     * perfectly reproducible. What is wrong is the *recording beside it*.
+     *
+     * So the gate is `bankingRefusalFor`, reused rather than restated — one answer to *is the run on
+     * screen this shell's own?*, now asked by both the thing that banks a day and the thing that
+     * posts one.
+     */
+    const notOurs = bankingRefusalFor(recording, simulatedRecording);
+    if (notOurs !== null) {
+      accountState = withNotice(accountState, `This run cannot be posted: ${notOurs}.`);
+      drawMenu();
+      return;
+    }
+
     const identity = runIdentityIssues(state, resources, 'ranked');
     if (identity.length > 0) {
       accountState = withNotice(
@@ -2470,6 +2596,73 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let lastShiftPlan: ShiftRunConfig | undefined;
   /** What the strip geometry was last drawn for — see {@link drawRaceStrip}'s keying. */
   let lastRaceKey = '';
+
+  /* ---------------------------------------------------------------------- *
+   * Watching somebody else's run — GAMEPLAY § 14.1, ENGINE_CONTRACT § 1.5
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * Everything the shell has to put back when `⤺ Stop watching` is pressed.
+   *
+   * § 14.1: *"stopping the watch returns you exactly where you were."* That is a promise about
+   * **state**, not about a redraw, and the only way to keep it is to hold the state rather than to
+   * recompute it — a rebuild would put the player back on *a* run rather than on *their* run, at
+   * whatever playhead the rebuild happened to produce.
+   *
+   * The playhead is in here for exactly that reason and is the field a reader is most likely to
+   * think unnecessary. It is the one a spectator visibly loses: `adopt` builds a fresh `Playback`
+   * at the start of the recording, so without this a player who paused their own day at 09:41 to
+   * look at somebody else's would come back to 06:00 on a run they had already watched two-thirds
+   * of. `main.test.ts` asserts the round trip on all four — recording, report, week and playhead.
+   */
+  interface WatchedBefore {
+    readonly state: ViewerState;
+    /*
+     * {@link simulatedRecording} is deliberately **not** in here, and its absence is the design.
+     *
+     * The obvious snapshot saves it, clears it and puts it back — and that would make this the
+     * second writer of a field `main.progression.test.ts` requires to have exactly one, which it
+     * caught on the first run of this code. The guard is right and the shape was wrong: a watch
+     * never touches the field at all. While watching, `state.recording` is the watched run and
+     * `simulatedRecording` is still the player's own, so `bankingRefusalFor`'s identity comparison
+     * fails and refuses; on stop, `state.recording` becomes the player's own run again — the same
+     * object — and the comparison succeeds without anything having been restored.
+     *
+     * So the spectator lock is *the field not moving*, which is a stronger guarantee than a
+     * save-and-restore: there is no window in which a bug could put it back early.
+     */
+    readonly ghostRecording: VizRecording | undefined;
+    readonly ghostRefusal: string | undefined;
+    readonly ghostPick: GhostPick;
+    readonly startOfDayS: number | undefined;
+    readonly filedRunId: string | undefined;
+    readonly playheadS: number | undefined;
+    /**
+     * Whether the player's own run was **playing** when they left it.
+     *
+     * The playhead alone is not *"exactly where you were"*, and the browser tier is what said so: a
+     * player who had paused at 08:30 came back to 08:31 and climbing, because `adopt` autoplays.
+     * One second of drift is not a rounding artefact — it is a run that resumed on its own, which
+     * is the same class of surprise as the speed chip latching across a mode (`docs/19` defect 12).
+     */
+    readonly wasPlaying: boolean;
+  }
+
+  /** The run being watched and what to put back, or `undefined` when nobody is being watched. */
+  let watching:
+    | { readonly run: WatchableRun; readonly view: WatchingView; readonly before: WatchedBefore }
+    | undefined;
+
+  /**
+   * Whether the shell is in the spectator state — the one question every disabling reads.
+   *
+   * A function over one field rather than a second boolean, because two facts that must agree is
+   * how a control comes to be enabled during a watch: `docs/16` S1's rule, and the reason
+   * `ViewerState.playMode` is a field rather than an inference one module over.
+   */
+  function isWatching(): boolean {
+    return watching !== undefined;
+  }
 
   const clock = systemClock();
 
@@ -3023,7 +3216,77 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawLegend(view);
     drawRaceStrip(view);
     drawIntervention(view);
+    drawWatching();
     drawStage();
+  }
+
+  /**
+   * Everything § 14.1's differentiation table asks the **shell** for — drawn from one value, and
+   * cleared by the same function.
+   *
+   * ## Why one function rather than a clause in each of the six draws
+   *
+   * Because the table is a single claim — *this is not your run* — and six independently-guarded
+   * clauses is six chances for one of them to stay behind. § 14.1's own sentence is that a
+   * spectator who cannot tell whose day they are looking at makes the whole board untrustworthy;
+   * the failure mode that produces is a header that reverted while the pill did not, which is worse
+   * than either treatment alone.
+   *
+   * So: one read of {@link watching}, every surface written on both arms, and `main.test.ts`
+   * asserts the whole set appears and disappears together.
+   *
+   * ## The three disablings, and why two of them are not new flags
+   *
+   * `interventionButton` and the ghost `select` are disabled here — contract § 1.5: *"Interventions
+   * are replayed, not offered. The intervention API is disabled in this context; playback controls
+   * (pause, the five speeds) are not interventions."* The transport is therefore **left alone**,
+   * which is the half of that sentence a disabling sweep would have got wrong.
+   *
+   * The third — *a watched run cannot be closed, banked or posted* — has no line here at all,
+   * deliberately. `enterWatch` never writes {@link simulatedRecording}, so `bankingRefusalFor`
+   * refuses the run by object identity and `closeShift` returns before it writes anything. A flag
+   * checked here would be a second answer to a question the product already answers, and the second
+   * answer is the one that goes stale.
+   */
+  function drawWatching(): void {
+    const view = watching?.view;
+    const headerEl = ui.header.right.closest('header');
+    headerEl?.classList.toggle(WATCHING_HEADER_CLASS, view !== undefined);
+    if (headerEl !== null && headerEl !== undefined) {
+      // The inverted treatment — § 14.1's *"the single strongest signal"*. Inline rather than in
+      // `index.html`'s stylesheet for `waitLiveRegion`'s stated reason: the sheet is not this
+      // lane's to edit, and the class above is what a future sheet would hook.
+      headerEl.style.setProperty('background', view === undefined ? '' : '#23201C');
+      headerEl.style.setProperty('color', view === undefined ? '' : '#FBF7EF');
+    }
+    watchPanel.showChrome(view, watching?.run);
+    watchPill.style.display = view === undefined ? 'none' : 'block';
+    setText(watchPill, view?.pill ?? '');
+    /*
+     * § 14.1's rail subline, `WATCHING · <NAME>`, and § 14.1's *"no timeline"*. The timeline is
+     * **hidden rather than disabled**: the table says *no timeline*, and a greyed-out scrubber is
+     * still a timeline telling a spectator that the four-step day is theirs to close.
+     */
+    /*
+     * **Both the attribute and the inline display**, and the pair is a finding rather than belt and
+     * braces. `index.html` gives `#timeline` a `display` of its own, which is more specific than the
+     * user-agent's `[hidden] { display: none }` — so the attribute alone left the scrubber on
+     * screen, and the browser tier caught it on its first run. The attribute stays because it is
+     * what an assistive technology reads; the inline rule is what actually removes it.
+     */
+    ui.transport.timeline.hidden = view !== undefined;
+    ui.transport.timeline.style.setProperty('display', view === undefined ? '' : 'none');
+    /*
+     * § 14.1's rail subline replaces the phase pill, which is the element that carries
+     * `MID-DAY · 08:41` — the table's own example. **Written after `drawHeader`** in both render
+     * paths rather than branched inside it, so the header keeps one derivation of the phase and
+     * this keeps one derivation of the spectator treatment; `drawHeader` re-writes the pill on
+     * every live frame and this re-writes it back, which is why it is in `renderLive` too.
+     */
+    if (view !== undefined) setText(ui.header.phaseLabel, view.railSubline);
+    // Contract § 1.5 — the intervention API is disabled, the playback controls are not.
+    if (view !== undefined) interventionButton.disabled = true;
+    ui.race.ghost.disabled = view !== undefined;
   }
 
   /**
@@ -3279,6 +3542,9 @@ function boot(ui: Elements, resources: BrowserResources): void {
     // The stamp is a reading at `t` too: a reader who scrubs back past their own intervention
     // must watch it disappear, because at that instant on the stage it has not happened yet.
     drawIntervention(view);
+    // The spectator treatment, re-applied because `drawHeader` above has just overwritten the
+    // phase pill with the run's own phase. See `drawWatching` for why it is one function.
+    drawWatching();
     drawStage();
   }
 
@@ -3982,6 +4248,160 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (!menuRoot.hidden) drawMenu();
   }
 
+  /**
+   * Enter the spectator state — § 14.1, and the whole of what `Watch it` means.
+   *
+   * ## What is deliberately **not** written
+   *
+   * {@link simulatedRecording}. The watched run goes onto `state.recording` so the stage, the
+   * transport and every panel draw it, and it is never the run this shell simulated — so
+   * `shift/banking.ts#bankingRefusalFor`'s object-identity gate refuses it **by construction**,
+   * exactly as slice 4d's ghost is refused. That is § 14.1's *"a watched run cannot be closed,
+   * scored or posted"* enforced through the refusal the product already had, rather than through a
+   * fourth flag `closeShift` would have to remember to consult.
+   *
+   * `state.week`, `state.report` and `state.tomorrow` are not touched either. The day belongs to
+   * somebody else and is already closed; `dayClosed` has no business moving, and the sheet the
+   * player left open is theirs and is still theirs when they come back.
+   */
+  function enterWatch(run: WatchableRun, view: WatchingView, recording: VizRecording): void {
+    if (watching !== undefined) return;
+    watching = {
+      run,
+      view,
+      before: {
+        state,
+        ghostRecording,
+        ghostRefusal,
+        ghostPick,
+        startOfDayS: runStartOfDayS,
+        filedRunId,
+        playheadS: playback?.simTimeS,
+        wasPlaying: playback?.state === 'playing',
+      },
+    };
+    /*
+     * The rival's line goes down for the run it raced. Leaving it standing beside somebody else's
+     * day would be two different crowds on one scale, which `applyShift` already refuses for the
+     * same reason when a new primary lands.
+     */
+    ghostRecording = undefined;
+    ghostRefusal = undefined;
+    lastRaceKey = '';
+    /*
+     * The watched run's own start-of-day hour is not known here — the record carries the
+     * configuration, and `runStartOfDayS` is produced by the runner. `undefined` is the honest
+     * answer and is what the header already draws for a template that declares no hour: an
+     * omission means *this has no hour*, never *midnight*.
+     */
+    runStartOfDayS = undefined;
+    /*
+     * Through `watch/session.ts` rather than spelled out here — § 14.1's *"`dayClosed` is
+     * untouched, and so is your own day's state"* is a checkable claim, and a claim living in a
+     * click handler is a claim nothing checks. `session.test.ts` asserts the untouched half by
+     * object identity.
+     */
+    state = watchingStateOf(state, recording);
+    adopt(recording);
+    renderAll();
+  }
+
+  /**
+   * Leave it, putting back exactly what was there — § 14.1's `⤺ Stop watching`.
+   *
+   * Every field of {@link WatchedBefore} is restored, including the playhead, and the recording is
+   * re-adopted rather than re-simulated: it is the **same object** `applyShift` put on the state,
+   * so the player's own run comes back as the run this shell simulated and `bankingRefusalFor`
+   * stops refusing it — without {@link simulatedRecording} ever having been written. See
+   * {@link WatchedBefore} for why that is the lock rather than a convenience.
+   *
+   * `seekTo` after `adopt`, and only when there was a playhead to put back. `adopt` builds the
+   * `Playback`, so seeking before it would seek a transport that has been replaced; seeking a
+   * `Playback` does not start or stop it, so a player who was paused comes back paused.
+   */
+  function stopWatching(): void {
+    const session = watching;
+    if (session === undefined) return;
+    const before = session.before;
+    watching = undefined;
+    state = before.state;
+    ghostRecording = before.ghostRecording;
+    ghostRefusal = before.ghostRefusal;
+    ghostPick = before.ghostPick;
+    runStartOfDayS = before.startOfDayS;
+    lastRaceKey = '';
+    if (state.recording === undefined) {
+      /*
+       * A player who had no run of their own gets the stage they had — nothing on it. `adopt`
+       * cannot express that (it takes a recording), so the transport is left as the watch left it
+       * and the state says there is no run, which is what every panel already reads.
+       */
+      playback = undefined;
+      disableTransport(ui, true);
+    } else {
+      adopt(state.recording);
+      if (before.playheadS !== undefined) playback?.seekTo(before.playheadS);
+      /*
+       * And paused if they were paused. `adopt` autoplays whenever the overlay has been dismissed,
+       * so without this a spectator's return silently starts a run the player had stopped — see
+       * {@link WatchedBefore.wasPlaying}. Seeking neither starts nor stops playback, so the order
+       * of these two lines is free; `pause` is written after for the reader.
+       */
+      if (!before.wasPlaying) playback?.pause();
+    }
+    /*
+     * **After `adopt`, which arms the filing gate.** `adopt` sets `filedRunId = undefined`, so a
+     * restore that did not put the old value back would let a day the player had already filed
+     * file a second time — the same double-bank `WeekState.attempt` exists to make impossible,
+     * arriving through the spectator's back door.
+     */
+    filedRunId = before.filedRunId;
+    renderAll();
+  }
+
+  /**
+   * § 14.1's primary — *"drops the spectator state and opens the brief for the same day, which is
+   * the whole reason watching exists."*
+   *
+   * ## What it does, and the half it deliberately does not do
+   *
+   * It leaves the spectator state and puts the watched run's **selection** on the player's own
+   * state — building, dispatcher, pattern, the two Free Play axes, the length and the window — then
+   * runs it. So the player gets the same crowd to play, from their own state, through `runShift`,
+   * which is the one function that turns a state into a run.
+   *
+   * It does **not** carry the record's intervention log or its week day. The log is the other
+   * player's changes of mind and copying them would hand the spectator a run they did not make;
+   * the day number belongs to the watched week and would grow the spectator's building by somebody
+   * else's schedule. Both are omissions with reasons rather than oversights, which is why they are
+   * written here — `docs/16` S1.
+   */
+  function playThisCrowd(run: WatchableRun): void {
+    const record = run.record;
+    stopWatching();
+    if (record === undefined || record === null) return;
+    state = {
+      ...state,
+      buildingId: record.buildingId,
+      dispatcherId: record.dispatcherId,
+      pattern: record.pattern,
+      shiftLengthS: record.shiftLengthS,
+      windowStartS: record.windowStartS,
+      seed: BigInt(record.seed),
+      freePlay:
+        record.demandTemplateId === null
+          ? state.freePlay
+          : {
+              demandTemplateId: record.demandTemplateId,
+              arrivalRatePctPop5min: record.arrivalRatePctPop5min,
+            },
+      // The spectator's own log goes, because the run they are about to play is a different day.
+      interventions: [],
+    };
+    renderAll();
+    runShift();
+  }
+
   function adoptEditedBuilding(config: BuildingConfig): void {
     const id = config.id;
     const saved = [
@@ -4259,6 +4679,22 @@ function boot(ui: Elements, resources: BrowserResources): void {
       minutePct: observations.minutePct,
       carried: observations.carried,
       arrived: observations.arrived,
+      /*
+       * The run this day was, so it can be watched — Everyday Mode slice 8, § 14.1 / § 1.5.
+       *
+       * `undefined` when `watchRecordIssues` has something to say, stored as `null`, and the two
+       * spellings are one decision rather than sloppiness: `watchRecordOf` answers `undefined` in
+       * the language of *"there is no such value"*, and `DayOutcome.record` spells absence the way
+       * a JSON round trip can carry it — `Observations.peakQueueFloorId`'s own note, one struct
+       * over.
+       *
+       * Written from **`state`**, which is the run this shell simulated: `bankingRefusalFor` has
+       * already refused every other case forty lines up, so by here the recording on screen *is*
+       * `simulatedRecording` and `state` is the question that produced it. Reading the menu's
+       * selection instead would be § D318's defect — a record describing whatever a select was
+       * left on after the run.
+       */
+      record: watchRecordOf(state, resources) ?? null,
     });
     /*
      * **The week is written only by a mode that owns one** — § D231, issue #64.

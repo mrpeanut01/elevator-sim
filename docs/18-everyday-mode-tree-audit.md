@@ -402,6 +402,81 @@ clause is satisfied by this file). One entry per landed slice beyond 0–2:
   block reusing the verdict expression (§6.5 — the report is another lane's surface), and any
   persistence of the pick. Honesty-corpus string counts are deliberately not re-measured here:
   a figure measured per branch is stale on merge (CLAUDE.md's rule).
+- **Slice 8, the client half — LANDED.** §14.1's *watching somebody else's run*, on the only seam
+  this build actually has. **There is no server**, so §1.5's *"which is why the pill can honestly
+  say verified by the server"* has nothing behind it and the pill does not say it: it reads
+  `REPLAY · <name> · VERIFIED BY RE-SIMULATION`, and `watch/types.ts` argues the substitution —
+  re-simulating a record the player's own machine wrote refuses **staleness** and says nothing about
+  **forgery**, so the stronger sentence would be a true-sounding claim about a check that did not
+  happen.
+  **The persisted shape could reconstruct nothing, and that is the finding rather than the cost.**
+  `DayOutcome` carried the outcome — arrived, carried, `minutePct`, the readings — and not one fact
+  about the *question*: no seed, no building, no dispatcher, no log. **Zero of eight**, where
+  `shift/banking.ts` counts *one of eight* against a `VizRecording` and concludes the facts are not
+  there to rebuild. So the shape is extended, minimally and versioned:
+  `DayOutcome.record: WatchRecord | null` (**session schema 6**), written by `closeShift` through
+  `watchRecordOf` and by nothing else — the derivation needs `BrowserResources` and the scope table,
+  and a `shift/` module reaching for either would be a second answer to `dev/state.ts`'s question
+  about what a run is. Versions 1–5 are read backwards on the strongest form of
+  `persist/types.ts`' own test: a build with no record concept stored no seed, so every day it filed
+  really is unwatchable and `null` is the **measured** state (`session.ts#withDayRecords`).
+  `DayOutcomeInput.record` is **required**, so a caller that forgets it is a compile error rather
+  than a day silently filed unwatchable — it caught fourteen call sites on its first run.
+  The recordability gate is `scope/runIdentity.ts` **called, never restated**: `watchRecordIssues`
+  is `runIdentityIssues('ranked')` minus `WATCH_RECORD_CARRIES`, a three-row table asserted against
+  `WatchRecord`'s own fields both ways, holding exactly the three things a submission cannot say and
+  a local record can — the intervention log (contract §1.4), the held cars, and the week's day pair
+  (growth and `eventFor`). **One arm is added and it is load-bearing**: a calendar period that books
+  the day's event, because `calendarAsks` has no vocabulary for `eventId` and the catch lived in the
+  `week` arm the subtraction removes. Driven firing inside the window and silent outside it.
+  Sources are the two that exist: the player's filed days, and **two shipped reference runs**
+  (`data/reference-runs.json`) whose FIXTURE marker the parser requires verbatim and whose
+  `source: 'reference'` is written by the parser rather than read from the file — so a fixture
+  cannot declare itself a player (§20.11). Their four figures are pinned **twice**: `reference.test.ts`
+  re-simulates each record, and the product's own reproduction gate performs the same check before
+  offering the row, so a fixture that goes stale in a shipped build loses its affordance rather than
+  lying. The eighth fixed-name fetch, added to both ends of the cache contract.
+  **A watched run cannot be closed, banked or posted through the refusal the product already had**:
+  `enterWatch` never writes `simulatedRecording`, so `bankingRefusalFor`'s object-identity gate
+  refuses it by construction — slice 4d's ghost lock, reused. The first draft saved and restored the
+  field and `main.progression.test.ts`'s single-writer guard caught it on its first run; *the field
+  not moving* is the stronger lock, because there is no window in which a bug could put it back
+  early. Interventions and the ghost picker are disabled (contract §1.5); the transport is
+  deliberately **not**, which is the half of that sentence a disabling sweep gets wrong.
+  **Posting was the hole, and it was not only a watching one.** *A watched run cannot be closed,
+  banked or posted* is enforced through the refusal the product already had for the first two —
+  but `submitScore` had no such gate: it posts `claimedMetricsOf(recording.summary)`, the metrics of
+  **whatever is on screen**, under `state.buildingId`/`dispatcherId`/`seed`, which are the
+  **player's own** selection. `runIdentityIssues` cannot see it — it inspects the *state*, and a
+  spectator's state is perfectly reproducible; what is wrong is the recording beside it. The server
+  would replay the submitted seed, fail to reproduce, and answer `422 metrics-do-not-reproduce`,
+  which is `scope/runIdentity.ts`'s own named outcome: *this product's one accusation, aimed at a
+  player who did nothing wrong*. Closed with `bankingRefusalFor`, reused rather than restated, so
+  one answer to *is the run on screen this shell's own?* is now asked by both the thing that banks a
+  day and the thing that posts one — **and it closes the same hole for a recording loaded from a
+  file, which predates this slice** (issue #136 gated banking and not posting).
+  §14.1's two stated defect conditions are both driven: `view.test.ts` walks every string the view
+  draws — a corpus that is a *function of the view*, with a third case settling that it covers the
+  view — and requires none to say `you`/`your`; the action bar is a closed list of two.
+  `watch/reference.ts` applies the same rule to **authored** fixture copy at load time, where
+  `fixit/parse.ts` refuses R10 words, because a rule enforced over everything except the words a
+  human types is enforced in the one place a human can break it.
+  **The browser tier is where this slice earned its keep, and it found three defects rather than
+  confirming a working feature** (`dev/watch.browser.test.ts`, the whole route end to end):
+  `#timeline`'s own `display` beat `[hidden]{display:none}`, so the scrubber stayed on screen; the
+  chrome rebuilt at 60 Hz through `replaceChildren` and detached its own buttons between `mousedown`
+  and `mouseup` — **issue #106 exactly**, sixty failed clicks — now keyed on the whole view; and
+  stopping the watch **resumed a run the player had paused**, because `adopt` autoplays, so 08:30
+  came back as 08:31. `wasPlaying` is in the snapshot, and the round trip now pins the recording,
+  the report, the week and the playhead.
+  **Not built, named rather than implied:** another player's posted run — §14.1's actual subject,
+  which needs a board first, and both are absent together; the board rank (`#2 on today's board`),
+  omitted rather than stubbed because `#—` where a position goes is `docs/10` R3's
+  blank-where-a-number-should-be, with the row's source line in its place; the eyebrow's *vs the
+  world's middle* half, dropped on slice 4d's own precedent; and the worker-thread gate — a row is
+  checked **when it is pressed** rather than on open, because checking every row would run one
+  simulation per filed day to draw a list. Honesty-corpus string counts are deliberately not
+  re-measured here: a figure measured per branch is stale on merge (CLAUDE.md's rule).
 - **Slice 3, first pass — LANDED.** `SimulationConfig.interventions` carries the log as data
   (`packages/core/src/sim/types.ts`); the override travels through
   `RepositionContext.idleOverride` into stage 7; a tenth kernel event walks the idle fleet at

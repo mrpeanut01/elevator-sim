@@ -47,6 +47,7 @@ function observations(overrides: Partial<GoalObservations> = {}): GoalObservatio
 /** A closed day, through the real `outcomeOf`, so the history entries are the shipped shape. */
 function closedDay(day: number, forDay: GoalObservations): DayOutcome {
   return outcomeOf({
+    record: null,
     day,
     dayIdx: (day - 1) % 7,
     eventId: 'ordinary',

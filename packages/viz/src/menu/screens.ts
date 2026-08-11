@@ -153,6 +153,15 @@ export type MenuIntent =
    * this module decides nothing about it, exactly as `open-campaign` decides nothing about tabs.
    */
   | { readonly kind: 'open-fixit' }
+  /**
+   * Open the watch picker — Everyday Mode slice 8, GAMEPLAY § 14.1.
+   *
+   * {@link 'open-fixit'}'s exact footing, and for its reason: this module decides nothing about
+   * what watching *is*, and `dev/main.ts`'s arm is what opening the surface means. The scope is
+   * `presentation` because opening a picker changes no run — **entering** the spectator state does,
+   * and that is a press on the picker rather than on the menu.
+   */
+  | { readonly kind: 'open-watch' }
   | { readonly kind: 'open-board'; readonly configHash: string }
   /**
    * Take a board row's own configuration and run it — GitHub issue #93 § 1.
@@ -330,6 +339,7 @@ export function withChosenValue(intent: MenuIntent, value: string): MenuIntent {
     case 'open-campaign':
     case 'start-endless':
     case 'open-fixit':
+    case 'open-watch':
     case 'open-board':
     case 'beat-score':
     case 'account-form':
@@ -1556,6 +1566,26 @@ function campaignRows(calendarPeriodId: string): readonly MenuAffordance[] {
       intent: { kind: 'open-fixit' },
     },
     {
+      /*
+       * GAMEPLAY § 14.1. Beside Fix a building for the same reason it sits here rather than on the
+       * root: it is a surface a player reaches from the scenario board's neighbourhood, not a
+       * seventh peer of Free play, and § D299's add-a-door-take-nothing-away test pins the root's
+       * six rows. The arm is `dev/main.ts`'s: close the menu, open the picker. No week is touched
+       * by opening it, which is why the scope is `presentation`.
+       *
+       * The detail line states the substitution rather than hiding it — there is no server here, so
+       * what the product can promise is a local re-simulation, and a row promising more would be a
+       * claim about a check that does not happen.
+       */
+      id: 'campaign.watch',
+      label: 'Watch a run',
+      detail: 'A day filed on this device, or a shipped reference run, re-simulated here from its own record and replayed',
+      kind: 'commit',
+      scope: 'presentation',
+      enabled: true,
+      intent: { kind: 'open-watch' },
+    },
+    {
       id: 'campaign.endless',
       label: 'Keep going',
       detail: 'The same week with no assignment: it grows, nothing is banked, nothing clears',
@@ -2347,6 +2377,7 @@ export function applyIntent(
     case 'open-campaign':
     case 'start-endless':
     case 'open-fixit':
+    case 'open-watch':
     case 'open-board':
     case 'account-form':
     case 'account-submit':

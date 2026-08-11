@@ -148,6 +148,7 @@ function reportOf(
   const week = closeDay(
     opened,
     outcomeOf({
+      record: null,
       day,
       dayIdx: opened.dayIdx,
       eventId: 'ordinary',
