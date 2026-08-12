@@ -47,7 +47,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * registered project is wholly gated by asking which project's every file imports that module, and
  * turns an unexpectedly gated tier in CI into a red run.
  */
-import { CHROMIUM, HAS_BROWSER } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -136,6 +136,8 @@ async function load(): Promise<Loaded> {
     undefined,
     { timeout: 30_000 },
   );
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
   await page.waitForTimeout(1_500);
 
   /*

@@ -229,7 +229,24 @@ function stripMemberNames(text: string): string {
 
 /** Files whose job is to touch the outside world. */
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
-const isDev = (id: string): boolean => id.startsWith('dev/');
+
+/**
+ * The Everyday shell's two DOM-owning files — the second shell, exempted by name.
+ *
+ * `everyday/` is an entry point in the same sense `dev/` is: `boot.ts` is what `index.html` loads,
+ * and `shell.ts` builds the rail, the screen region and the action bar. What is *not* exempt is the
+ * rest of the directory — `types.ts`, `modes.ts` and `rail.ts` are pure decisions about what the
+ * shell shows, kept free of the document precisely so they can be tested in this node tier, and the
+ * rules below are what hold them there.
+ *
+ * So the exemption is **two file names rather than a `startsWith('everyday/')`**. A prefix would
+ * have exempted a directory that is mostly pure, and the day one of those three reached for a
+ * `document` this suite would have said nothing.
+ */
+const EVERYDAY_SHELL_FILES = new Set(['everyday/boot.ts', 'everyday/shell.ts']);
+
+/** A shell entry point: `dev/` wholesale, and the Everyday shell's two DOM-owning files. */
+const isDev = (id: string): boolean => id.startsWith('dev/') || EVERYDAY_SHELL_FILES.has(id);
 
 describe('CLAUDE.md invariant 6 — core never depends on viz', () => {
   it('has no reference to viz anywhere in core or experiments sources', async () => {

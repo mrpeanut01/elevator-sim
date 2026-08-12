@@ -55,7 +55,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -85,6 +85,8 @@ beforeAll(async () => {
   browser = await chromium.launch({ executablePath: CHROMIUM });
   page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   await page.goto(origin, { waitUntil: 'load' });
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
   /*
    * The campaign's own `data/campaign.json` is fetched after boot and the Lab panel mounts on that
    * promise, so waiting for the stage picker to have options is waiting for the mount rather than
@@ -109,6 +111,8 @@ beforeAll(async () => {
    * second half of the comment above was also already stale — *Open the doors* has been *Pick a
    * scenario* since issue #97.
    */
+  // The Engineer menu is dismissed at boot now, so this walk has to reopen it first.
+  await reopenEngineerMenu(page);
   await pressMenuRow(page, 'main.campaign');
   await pressMenuRow(page, 'campaign.open');
   await page.waitForFunction(

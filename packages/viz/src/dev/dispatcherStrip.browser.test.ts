@@ -52,7 +52,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -225,6 +225,10 @@ describe.skipIf(!HAS_BROWSER)('the dispatcher editor reports the run it started'
       undefined,
       { timeout: 30_000 },
     );
+    // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+    await enterEngineerStage(page);
+    // The Engineer menu is dismissed at boot now, so this walk has to reopen it first.
+    await reopenEngineerMenu(page);
     // By affordance id — `pressMenuRow`'s docstring, and GitHub issue #142.
     await pressMenuRow(page, 'main.free-play');
     await page.locator('.menu-overlay .menu-text input').first().waitFor({ timeout: 10_000 });

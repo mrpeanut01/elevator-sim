@@ -32,6 +32,20 @@ called by nothing outside their own module.
 > **The existing ordinals do not move.** *The ninth*, *the eleventh* and the rest name specific
 > instances elsewhere in these documents, and renumbering them would break every reference for the
 > sake of a running total. The total is the sentence above; the ordinals are names.
+>
+> **And one more, 2026-08-12, which is not in the count because it is a level up from it and is a
+> different question** ([§ D335](../DECISIONS.md)). Everyday Mode's **shell** — GAMEPLAY § 3's
+> 212 px rail, pinned action bar and four-mode menu — was never built, because BUILD_PLAN § 0's
+> *"What already exists"* table mapped *menus* and *shell chrome* onto `viz/src/menu/` and
+> `viz/src/dev/`, and both of those rows point at the **Engineer** shell. No slice owned the
+> requirement, so every Everyday feature that shipped landed inside the developer tool, and the page
+> a player loaded was that tool.
+>
+> The rule below asks *"name the non-test caller"* of a behaviour. This is the same question asked
+> of a **requirement**: *name the code that satisfies it* — and *"the plan says it already exists"*
+> is not an answer, for exactly the reason a barrel re-export is not a caller. If you are working
+> from a plan that says something is done, open the thing it names and check that it is the thing
+> the specification is describing.
 
 **The fifth was Phase 7's `tuning/report`, and it is the instructive one** — because it happened
 *after* both guards below were installed, in a module those guards do not audit. Every function in

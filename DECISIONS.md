@@ -23308,3 +23308,121 @@ caption and note) rather than the three it used to.
 That is the second time in this wave a test's *stated* claim was stronger than what it checked; the
 first was `fuzz/deep.test.ts` restating P5 as a subtraction (§ D333). Both were found by a property
 search rather than by the suite, which is the argument for keeping the search.
+
+## D335 — the page opens on Everyday Mode, because the build plan's "already exists" row named a different thing
+
+`docs/design/design_handoff_casual_mode/BUILD_PLAN.md` § 0 has a table headed *"What already
+exists"*, and two of its rows map the menus and the shell chrome onto `packages/viz/src/menu/` and
+`packages/viz/src/dev/`. Both rows point at the **Engineer** shell: an eight-screen developer menu
+and a tabbed developer surface. `GAMEPLAY_AND_NAVIGATION.md` specifies something else — a 212 px
+rail, a pinned action bar, one screen at a time, and a menu whose four entries are the four modes
+(§ 3, § 4).
+
+Because the plan recorded that requirement as already met, **no slice ever owned it**. Every
+Everyday feature that shipped — levers, interventions, the ghost, the four-goal day, Fix-a-building,
+the bench — landed *inside the Engineer shell*, and the product a player met on load was still the
+developer tool. Nothing was mis-built; the requirement was simply invisible, and it is not in
+`docs/18`'s register of honest absences either, which names the server halves, the gauntlet, two rule
+actions and fifteen Fix-a-building cases — and not the shell.
+
+That is this repository's signature defect one level up from code. The standing requirement asks
+*"name the non-test caller"* of a behaviour. This is the same question asked of a **requirement**:
+name the code that satisfies it — and *"the row in the plan says it already exists"* is not an
+answer, for the same reason a barrel re-export is not a caller.
+
+### What was built, and what deliberately was not
+
+`packages/viz/src/everyday/` — the shell and the front door, and **not** § 4's sixteen screens:
+
+| module | what it decides | driven by |
+|---|---|---|
+| `types.ts` | the sixteen screen keys, the run context, the shell's state | — |
+| `modes.ts` | the four tiles, and which of them open | `modes.test.ts`, `EVERYDAY_MENU` |
+| `rail.ts` | § 3.2's groups, rows and live subline | `rail.test.ts`, `EVERYDAY_MENU` |
+| `shell.ts` | the DOM: rail, screen region, pinned bar, the hand-off | `shell.browser.test.ts` |
+| `boot.ts` | the page's entry point | `shell.browser.test.ts` |
+
+`index.html` now loads `everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the
+Engineer surface still builds and starts exactly as before — and mounts the shell over it. **The old
+shell is untouched and the change is one line of HTML to revert.**
+
+Three of the four tiles do not open, and each says why in a sentence a player reads rather than as a
+greyed rectangle. Two of those refusals are about the *screen* and not about the thing: the campaign
+engine and the three Fix-a-building cases both run, and § 8's and § 10's Everyday screens do not
+exist. `modes.test.ts` checks both directions against disk, because a refusal that understates the
+product is § D227's defect with its polarity reversed.
+
+`EVERYDAY_SHELL_ABSENCES` is the register `docs/18` was missing, kept next to the code — and it is
+**drawn on the menu** under *what this build does not do yet*. It was not, in the first draft, and
+`deadCode.test.ts` caught it within the hour: a register of what a build cannot do is worth exactly
+the number of people who read it, and a constant no renderer touches is read by nobody.
+
+### Today's tower opens the stage, and the stage is the Engineer surface
+
+§ 6.1's front door and § 6.2's brief are not built, so the tile skips them rather than routing a
+player through two empty screens. The stage it reaches is the Engineer surface with the rail beside
+it — named in the absences register rather than presented as § 7.
+
+The hand-off **covers and uncovers** rather than showing and hiding. `div.shell` holds canvases that
+size themselves from their laid-out box, and a `display:none` ancestor gives them a zero box; a
+simulator view measured while hidden draws nothing when revealed. So the Engineer root stays laid out
+for its whole life, the shell sits on top of it, and on the stage the shell shrinks to the rail strip
+and insets the surface beside it.
+
+### Four defects found by driving it, three of them invisible to every other tier
+
+1. **`dev/main.ts#shellBehindMenu` handed `coverShell` every child of `body`**, so opening the
+   Engineer menu behind this shell wrote `inert` onto the Everyday root — the front door, ignoring
+   every click, painting identically. Fixed by excluding the Everyday root there rather than by the
+   shell defending itself, on `coverShell`'s own ground that the shell names what it is.
+2. **The reverse, on the same attribute.** Closing that menu *clears* `inert` on `div.shell`, handing
+   the Engineer surface its whole tab order back underneath an opaque overlay. So `inert` has two
+   writers, and the rule between them is now stated: the outer cover wins while it is up.
+3. **`el.inert = true` on an already-inert element is not a no-op.** The property reflects an
+   attribute, the assignment calls `setAttribute`, and `setAttribute` records a mutation *even when
+   the value is identical* — so the re-assert in (2) was its own trigger. Measured, that starved the
+   renderer completely: `page.evaluate` never returned and the page never reached `load`, with no
+   error anywhere. Guarded by reading before writing. **The first draft's docstring asserted the
+   opposite as the reason the pair could not loop**, which is the more useful half of this entry: a
+   comment claiming a mechanism, written from memory, was wrong in exactly the way this repository
+   keeps recording.
+4. **`hidden` does nothing on an element carrying inline `display`.** The attribute works through the
+   user-agent rule `[hidden] { display: none }`, and an inline declaration outranks any stylesheet —
+   so the screen region kept painting under the rail with the stage beside it.
+
+(1) and (4) were visible in a screenshot. (2) and (3) were not visible anywhere: one is an attribute
+that changes no pixel, and the other looks exactly like a slow page. Both were found by the browser
+tier, and (3) only after the tier was compared against its own baseline — the existing suite passed
+in 22 s against the same tree, which is what pinned the wedge to this work rather than to the
+harness.
+
+### What the front-door change cost the browser tier, and why it was not paid with a back door
+
+Fifteen cases in six files went red the moment the page stopped opening on the Engineer surface. They
+are not wrong: every one of them drives that surface, which still ships and is still what Today's
+tower hands off to.
+
+They now reach it **the way a player does** — `enterEngineerStage`, which presses the *Today's tower*
+tile, and `reopenEngineerMenu`, which presses the `#open-menu` control the stage carries. No helper
+dismantles the shell, reaches into `mountEverydayShell`, or loads a second HTML entry point. That
+distinction is the whole value of the tier: a helper that took the cover off would let these cases
+keep passing against a surface no player can open, which is this repository's signature defect with a
+test suite standing behind it.
+
+One case needed more than a route change. `menuExit`'s blocks-play trap walks *reload → Resume → Run
+this shift*, and `everyday/boot.ts` now makes that Resume press itself. The case walks *reload →
+Today's tower → Run this shift* instead and proves the same thing: no `entered-a-mode` exit occurs
+anywhere in it, the tile press latches nothing, and the only thing that can file the day is
+`playerStartedARun` on the `#run` press.
+
+### The Engineer swap is present, disabled, and says so
+
+§ 3.2's footer row is drawn and refuses with *"not built yet — Everyday Mode is the only play style
+in this build"*. It is a separate play style from the developer surface behind the stage, and
+building it is not this decision's scope.
+
+### What is not claimed
+
+The menu, the rail and the refusals are built and driven. § 4's sixteen screens are not, and the
+Everyday stage is not — `EVERYDAY_SHELL_ABSENCES` is the list, on screen. No phase verdict moves:
+Phase 9's row is about the honesty property and mode parity, and neither is touched.

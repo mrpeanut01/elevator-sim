@@ -49,6 +49,10 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
+import { EVERYDAY_MODES } from '../everyday/modes.js';
+import { railModel, sublineFor } from '../everyday/rail.js';
+import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
+import { EVERYDAY_SCREENS, type RunContext } from '../everyday/types.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -6922,6 +6926,113 @@ function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
   };
 }
 
+/**
+ * **Everyday Mode's front door** — the menu's four tiles, the rail, and the register of absences.
+ *
+ * ## Why this is in the corpus at all, and why it is the pure half only
+ *
+ * It is the first screen a player meets, and almost everything on it is a **claim about what this
+ * build can do**: four tiles that say what each mode is and how long it takes, three of which say
+ * why they do not open, a rail whose rows carry the same kind of refusal, and a list headed *what
+ * this build does not do yet*. Those are exactly the sentences that go stale — the roadmap's
+ * standing requirement is about a control that says it writes nothing while writing something, and
+ * `docs/05`'s § D227 is about the mirror image. A front door full of refusals nothing sweeps is that
+ * defect with a bigger audience.
+ *
+ * `everyday/shell.ts#mountEverydayShell` is **not** driven here and is excluded in
+ * `derive.test.ts` on the DOM mounts' shared ground: it needs a document. The split is deliberate
+ * and is the reason `modes.ts` and `rail.ts` are pure — the mount draws what they decide, so driving
+ * them is driving the words. What the mount authors of its own is the two headings and the menu
+ * lede, which reach only the static sweep, and that is a limitation rather than coverage.
+ *
+ * ## Why the rail is driven over every screen and every context
+ *
+ * `sublineFor` is a total function over the sixteen screen keys and three run contexts, and its
+ * whole job is to tell a player **where they are**. A subline that says `MID-DAY` on the rush or
+ * `READING THE REPORT` at the front door is a false statement about the player's own position, and
+ * the only way to know none of them does that is to ask for all of them.
+ */
+const EVERYDAY_MENU: SurfaceAdapter = {
+  id: 'everyday/modes.ts#EVERYDAY_MODES',
+  covers: [
+    'everyday/modes.ts#EVERYDAY_MODES',
+    'everyday/rail.ts#sublineFor',
+    'everyday/rail.ts#railGroups',
+    'everyday/rail.ts#railModel',
+    'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    for (const mode of EVERYDAY_MODES) {
+      seeds.push({ field: `mode.${mode.screen}.title`, text: mode.title, role: 'label' });
+      seeds.push({ field: `mode.${mode.screen}.blurb`, text: mode.blurb, role: 'prose' });
+      /*
+       * § 5's session shape — *"~3 min · no losing"*. `role: 'prose'` rather than `estimate`: it is
+       * a statement about how long a *player* spends, authored once and true of the mode, not a
+       * figure any run produced. R13 asking it for an `n` would be asking the wrong question.
+       */
+      seeds.push({ field: `mode.${mode.screen}.shape`, text: mode.shape, role: 'prose' });
+      if (mode.unavailable !== undefined) {
+        // The refusal's own words, on the role the rules exempt from R3 — the whole point of a
+        // refusal is that it may name what it is refusing.
+        seeds.push({
+          field: `mode.${mode.screen}.unavailable`,
+          text: mode.unavailable,
+          role: 'reason',
+        });
+      }
+    }
+
+    /* Every screen × every context, for the reason in the docstring. */
+    for (const screen of EVERYDAY_SCREENS) {
+      for (const ctx of ['daily', 'campaign', 'rush'] as const satisfies readonly RunContext[]) {
+        seeds.push({
+          field: `rail.subline.${screen}.${ctx}`,
+          text: sublineFor({ screen, ctx, history: [] }),
+          role: 'label',
+        });
+      }
+    }
+
+    /*
+     * Both shapes of rail: outside a campaign, and inside one where the CAMPAIGN group appears.
+     * Driving only the first would leave two rows — *All buildings*, *Contract & works* — swept by
+     * nothing, and they are rows that open screens which do not exist.
+     */
+    for (const inCampaign of [false, true]) {
+      const model = railModel({ screen: 'menu', ctx: 'campaign', history: [] }, inCampaign);
+      const where = inCampaign ? 'in-campaign' : 'no-campaign';
+      seeds.push({ field: `rail.${where}.brand`, text: model.brand, role: 'label' });
+      seeds.push({ field: `rail.${where}.mode`, text: model.mode, role: 'label' });
+      for (const group of model.groups) {
+        seeds.push({ field: `rail.${where}.${group.title}`, text: group.title, role: 'label' });
+        for (const item of group.items) {
+          seeds.push({
+            field: `rail.${where}.${group.title}.${item.screen}`,
+            text: item.label,
+            role: 'label',
+          });
+          if (item.unavailable !== undefined) {
+            seeds.push({
+              field: `rail.${where}.${group.title}.${item.screen}.unavailable`,
+              text: item.unavailable,
+              role: 'reason',
+            });
+          }
+        }
+      }
+    }
+
+    for (const [index, absence] of EVERYDAY_SHELL_ABSENCES.entries()) {
+      seeds.push({ field: `absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -6962,6 +7073,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // matching a shape, so an adapter inserted earlier would move every fault onto a different
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
+  EVERYDAY_MENU,
   REPORT_CARD,
   // Appended, same reason again: the suite re-seeds the bench's sentences under its own surface
   // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the

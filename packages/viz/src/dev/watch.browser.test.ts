@@ -32,7 +32,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -75,8 +75,17 @@ async function pageWithARun(): Promise<Page> {
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
-  // Leave the menu the way a player does, so boot's own recording is on screen and the transport
-  // is live. `changed-their-mind` deliberately does not latch the filing gate (issue #117).
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
+  /*
+   * Reopen the Engineer menu and leave it the way a player does, so boot's own recording is on
+   * screen and the transport is live. `changed-their-mind` deliberately does not latch the filing
+   * gate (issue #117) — and the reopen is what keeps that assertion about *this* press: since the
+   * page began opening on Everyday Mode, `everyday/boot.ts` has already made one Resume press of
+   * its own, and a walk that skipped straight to the stage would be asserting about that one.
+   */
+  // The Engineer menu is dismissed at boot now, so this walk has to reopen it first.
+  await reopenEngineerMenu(page);
   await pressMenuRow(page, 'main.resume');
   await page.waitForTimeout(1_200);
   return page;

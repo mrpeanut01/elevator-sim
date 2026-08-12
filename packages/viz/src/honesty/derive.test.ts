@@ -97,6 +97,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/reportPanel.ts#mountReport',
         'dev/scenariosPanel.ts#mountScenarios',
         'dev/rightRail.ts#mountRightRail',
+        /*
+         * The Everyday shell's mount, on the mounts' shared ground: it builds the rail, the screen
+         * region and the pinned bar, so it cannot run without a document. The split it sits on is
+         * deliberate rather than incidental — `everyday/modes.ts` and `everyday/rail.ts` hold every
+         * word the mount draws about what a mode is and where the player is, and the
+         * `EVERYDAY_MENU` adapter drives both over every screen and both shapes of rail. What is
+         * left here is what the mount authors of its own: two headings, the menu lede and the stub
+         * screen's one sentence, which reach the static sweep below. Weaker than driving them, and
+         * stated as a limitation rather than presented as coverage.
+         */
+        'everyday/shell.ts#mountEverydayShell',
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
@@ -152,6 +163,25 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'persist/session.ts#saveSession',
         'persist/types.ts#SESSION_KEY',
         'persist/validate.ts#snapshotIssue',
+      ],
+    },
+    {
+      reason:
+        'The Everyday shell\'s boot seam: two CSS selectors and the console lines that fire when ' +
+        'one of them finds nothing. No player reads any of it. `ENGINEER_ROOT_SELECTOR` and the ' +
+        'two `ENGINEER_*` selectors are `document.querySelector` arguments — derived only because ' +
+        'the two-adjacent-words scanner reads `[data-menu-control="main.resume"]` as prose — and ' +
+        '`dismissEngineerMenu` and `closeEngineerMenuWhenReady` return a boolean and `void` ' +
+        'respectively. `bootEveryday`\'s own strings are the two `console.error` diagnostics, on ' +
+        'the same footing as the save diagnostics above: they name a selector that has gone stale, ' +
+        'for whoever is holding the source. The day one of them is drawn on a screen it stops ' +
+        'being excludable, exactly as `loadSession`\'s did.',
+      ids: [
+        'everyday/boot.ts#ENGINEER_MENU_SELECTOR',
+        'everyday/boot.ts#ENGINEER_RESUME_SELECTOR',
+        'everyday/boot.ts#bootEveryday',
+        'everyday/boot.ts#closeEngineerMenuWhenReady',
+        'everyday/boot.ts#dismissEngineerMenu',
       ],
     },
     {

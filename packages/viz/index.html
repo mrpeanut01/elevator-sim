@@ -2774,6 +2774,11 @@
       </form>
     </dialog>
 
-    <script type="module" src="/src/dev/main.ts"></script>
+    <!--
+      The app boots into Everyday Mode's main menu (GAMEPLAY § 3.5). `everyday/boot.ts`
+      imports `dev/main.ts` for its side effect, so the Engineer surface below still builds
+      and starts exactly as before; the shell then covers it until a mode hands off.
+    -->
+    <script type="module" src="/src/everyday/boot.ts"></script>
   </body>
 </html>

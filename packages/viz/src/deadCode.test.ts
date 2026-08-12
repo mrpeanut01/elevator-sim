@@ -100,6 +100,7 @@ const AUDITED_MODULES = [
   'viz/src/controls',
   'viz/src/dev',
   'viz/src/editor',
+  'viz/src/everyday',
   'viz/src/fixit',
   'viz/src/frame',
   'viz/src/honesty',

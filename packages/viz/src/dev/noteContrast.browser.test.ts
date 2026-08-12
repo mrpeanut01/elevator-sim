@@ -64,7 +64,7 @@ import { chromium, type Browser } from 'playwright-core';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { CHROMIUM, HAS_BROWSER } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
 
 /*
  * **The gate comes from the shared module, and this file is the reason that module now exists in
@@ -178,6 +178,8 @@ async function measureAt(scheme: 'dark' | 'light'): Promise<readonly Measured[]>
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
   await page.waitForTimeout(500);
 
   const rows = await page.evaluate((): Measured[] => {

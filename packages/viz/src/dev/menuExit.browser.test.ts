@@ -43,7 +43,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, pressMenuRow } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -82,6 +82,16 @@ async function coldLoad(): Promise<Page> {
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
+  /*
+   * And then the Engineer menu is put back up, because *the menu is covering the page* is the
+   * premise all three cases below start from — one dismisses it with Escape, two walk it to a mode
+   * door. `everyday/boot.ts` has already pressed Resume once by now, which is the same
+   * `changed-their-mind` exit the first case then performs; that press latches nothing, so the
+   * refusal being asserted is still about the player's own way out and not about boot's.
+   */
+  await reopenEngineerMenu(page);
   return page;
 }
 
@@ -272,18 +282,21 @@ describe.skipIf(!HAS_BROWSER)('leaving the menu without entering a mode', () => 
     await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
       timeout: 30_000,
     });
-    // Resume is disabled until boot's own run lands (issue #97), so waiting for the row to enable
-    // is the same adoption latch the transport waits are — and Escape is not used here on purpose:
-    // Resume is the row the audit's player pressed.
-    await page.waitForFunction(
-      () => {
-        const row = document.querySelector('.menu-overlay [data-menu-control="main.resume"]');
-        return row instanceof HTMLButtonElement && !row.disabled;
-      },
-      undefined,
-      { timeout: 30_000 },
-    );
-    await pressMenuRow(page, 'main.resume');
+    /*
+     * **The Resume press is still here; it is just not this test's to make any more.**
+     *
+     * The audit's player reloads and leaves the menu by Resume — a `changed-their-mind` exit, which
+     * deliberately latches nothing. Since the page began opening on Everyday Mode, `everyday/boot.ts`
+     * makes exactly that press itself as soon as the row is drawable, and the returning player's
+     * sequence is *reload → Today's tower → Run this shift*. So this walks that, and the case is
+     * unchanged in what it proves: no `entered-a-mode` exit happens anywhere in it, the tile press
+     * latches nothing either, and the only thing that can file the day below is
+     * `playerStartedARun` on the `#run` press.
+     *
+     * The adoption latch the old Resume wait doubled as has not been dropped — `waitForAdoption`
+     * below is it, and it was always the load-bearing half.
+     */
+    await enterEngineerStage(page);
     // Back to the run surface first: `syncUrl` keeps the address describing the state, so after
     // the setup half filed its sheet the reloaded URL opens on the **report** tab — where `#run`
     // and the transport are not on screen. The audit's player was on the run surface; this is

@@ -84,15 +84,26 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **374 491** | **606** | **36** | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **474 400** | **4 710** | **37** | **0** | **green**, and the register is now empty |
+  | always-on | 49 | **379 538** | **606** | **37** | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **480 580** | **4 710** | **38** | **0** | **green**, and the register is now empty |
 
-  **Re-measured 2026-08-11 on merged `main`, both tiers, in one sitting — and the previous row was
-  stale before this wave touched it** ([§ D334](DECISIONS.md)). It published `335 950 / 30` and
-  `426 662 / 31`; the tree measures `374 491 / 36` and `474 400 / 37`. Wave 18's own lane could not
-  have published the right number and did not: the surfaces column had been wrong by six for longer
-  than the string counts had been wrong at all. **This is the fourth time this file has recorded the
-  same lesson**, which is why the sentence below it is the rule and not an observation.
+  **Re-measured 2026-08-12 on the integrated tree, both tiers, in one sitting** — the row above is
+  that measurement. It moved for one reason and the reason is a *new surface* rather than drift:
+  [§ D335](DECISIONS.md) put Everyday Mode's front door into the corpus, so each tier gains **one**
+  surface and about **five thousand** strings, and the cases, the simulations and the failing-case
+  columns are all unmoved. That is what a wave which adds a screen and sweeps it is supposed to look
+  like.
+
+  The `EVERYDAY_MENU` adapter drives the four mode tiles, the rail over **every** screen key in all
+  three run contexts, both shapes of the rail, and the shell's register of absences. It does not
+  drive `mountEverydayShell`, which needs a document and is excluded on the DOM mounts' shared
+  ground — the pure/DOM split in `everyday/` exists so that the words are drivable without one.
+
+  The row this replaced published `374 491 / 36` and `474 400 / 37`, measured on merged `main` the
+  day before ([§ D334](DECISIONS.md)); the one *that* replaced published `335 950 / 30` and
+  `426 662 / 31`, and its surfaces column had been wrong by six for longer than its string counts had
+  been wrong at all. **This is the fourth time this file has recorded the same lesson**, which is why
+  the sentence below it is the rule and not an observation.
 
   **The deep tier's failing-case column is `0` for the first time, and the register is empty.** Both
   entries in it named one collision — the M7 caveat's *"6 of 20 consecutive seeds"* against a refused
@@ -164,11 +175,12 @@ verdict:
   quoted as *reported violation lines on a named property*, which is a thing a reader can grep the
   run's output for — and the only violation count that needs no such care is **zero**.
 
-  The surface column is corrected as well as re-measured — it published `30` for both tiers, and the
-  deep tier reaches **31**, because `campaign/judge.ts#judgeStage` is silent in the always-on tier by
-  construction (`STANDARD_SPACE` sets `stageProbability: 0`, a stage being 50 replications) and loud
-  in the deep one. `honesty.test.ts` asserts that silence in one tier and that noise in the other, so
-  *30* was never the deep tier's number.
+  **The deep tier's surface count is one above the always-on tier's, in every row above and for one
+  reason**: `campaign/judge.ts#judgeStage` is silent in the always-on tier by construction
+  (`STANDARD_SPACE` sets `stageProbability: 0`, a stage being 50 replications) and loud in the deep
+  one. `honesty.test.ts` asserts that silence in one tier and that noise in the other, which is why
+  the gap is a property rather than a coincidence — and it is how a row that once published the same
+  number for both tiers was known to be wrong before it was re-measured.
 
   **Both string counts went up, and both for the same reason**: issue #127 put the Day report's
   **run-to-run delta block** into the corpus, which had never been in it — `honesty/surfaces.ts`
@@ -268,6 +280,22 @@ eight cells**, because it is best on energy and worst on wait. A dispatcher that
 So the energy proxy may be shown **beside** AWT and WT95 and never aggregated into a grade, and
 `EnergyStatistics.workPerServedLegKJ` goes beside the raw figure: a configuration that spends less
 by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
+
+**The page opens on Everyday Mode, and that changed on 2026-08-12.** `packages/viz/index.html` loads
+`everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the Engineer surface still
+builds and starts exactly as before — and mounts a 212 px rail, a pinned action bar and a four-tile
+menu over it ([§ D335](DECISIONS.md)). **The Engineer surface is what *Today's tower* hands off to**,
+so it is still the stage, and the change is one line of HTML to revert.
+
+Three consequences worth knowing before you touch either shell. **`inert` has two writers** —
+`menuPanel.ts#coverShell` and `everyday/shell.ts` — and the rule between them is that the outer cover
+wins while it is up; writing it unguarded hangs the renderer, because `el.inert = true` on an
+already-inert element still calls `setAttribute` and still records a mutation. **The browser tier
+reaches the Engineer surface through the player's own path** (`enterEngineerStage`,
+`reopenEngineerMenu`) rather than by taking the cover off, which is the difference between a tier that
+tests the product and one that tests a surface nobody can open. And **three of the four mode tiles
+refuse**, two of them about a *screen* rather than about the thing behind it — the campaign and
+Fix-a-building engines both run, and their Everyday screens do not.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
 *Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted

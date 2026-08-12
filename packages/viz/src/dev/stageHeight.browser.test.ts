@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MIN_FOOTER_PX, MIN_HEADER_PX } from '../render/layout.js';
 
-import { CHROMIUM, HAS_BROWSER } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, enterEngineerStage } from './browserTier.test-helper.js';
 
 /**
  * The smallest floor pitch worth calling legible, in canvas pixels — the same **12 px** that
@@ -101,6 +101,8 @@ async function loadAt(width: number, height: number): Promise<Page> {
     undefined,
     { timeout: 30_000 },
   );
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
   await page.keyboard.press('Escape');
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,

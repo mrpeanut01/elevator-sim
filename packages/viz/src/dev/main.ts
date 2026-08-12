@@ -41,6 +41,7 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
@@ -2518,10 +2519,26 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * first `drawMenu`, and a list taken at mount would be a snapshot of a page that is still being
    * assembled.
    */
+  /**
+   * What sits behind this menu, for `menuPanel.ts#coverShell` to take out of the page.
+   *
+   * **The Everyday shell is excluded, and that exclusion is a fix.** `everyday/shell.ts` mounts its
+   * own root as a sibling of `div.shell` and covers this whole surface; without the third clause
+   * below, opening this menu behind it wrote `inert` onto the Everyday root, and the front door the
+   * application boots on became unclickable — silently, because `inert` reports no error and paints
+   * no differently.
+   *
+   * It is excluded rather than the Everyday shell defending itself, for the reason `coverShell`'s
+   * own docstring gives: *the shell's own elements are not that file's to disable*, and this
+   * function is the shell naming what it is. The Everyday root is not part of it.
+   */
   function shellBehindMenu(): readonly HTMLElement[] {
     return [...document.body.children].filter(
       (child): child is HTMLElement =>
-        child instanceof HTMLElement && child !== menuRoot && child !== waitLiveRegion,
+        child instanceof HTMLElement &&
+        child !== menuRoot &&
+        child !== waitLiveRegion &&
+        !child.classList.contains(EVERYDAY_ROOT_CLASS),
     );
   }
 

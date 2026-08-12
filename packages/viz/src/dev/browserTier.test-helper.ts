@@ -132,6 +132,62 @@ export const MENU_CONTROL_ATTR = 'data-menu-control';
  * unique within a screen, so the only way this matches twice is a defect worth a separate issue —
  * and Playwright's strict mode would turn that into a failure at an unrelated call site.
  */
+/**
+ * Get to the Engineer surface the way a player does — through Everyday Mode's front door.
+ *
+ * ## Why every browser test now needs this
+ *
+ * `packages/viz/index.html` loads `everyday/boot.ts`, so a cold page is Everyday Mode's main menu
+ * with the Engineer surface **covered and `inert` beneath it** and that shell's own menu already
+ * dismissed. Every test in this tier drives the Engineer surface, and none of them could reach it:
+ * fifteen cases went red the moment the front door changed, all of them by clicking something that
+ * was there, was visible, and was not in the page.
+ *
+ * ## Why it is a player's path rather than a back door
+ *
+ * This is the press a player makes — the *Today's tower* tile — and nothing else. It does not tear
+ * the shell down, reach into `mountEverydayShell`, or load a second HTML entry point. That matters
+ * for what the tier is worth: a helper that dismantled the front door would let these tests keep
+ * passing against a surface no player can open, which is this repository's signature defect with a
+ * test suite standing behind it.
+ *
+ * The Engineer **menu** is reachable from here too, by the `#open-menu` control the stage carries —
+ * `menu.browser.test.ts` and `menuExit.browser.test.ts` take that second step themselves, because
+ * for them the reopening is part of what is under test.
+ *
+ * @param page a page that has finished `goto`.
+ */
+export async function enterEngineerStage(page: Page): Promise<void> {
+  /*
+   * Wait for the hand-off to be *possible* before pressing. `everyday/boot.ts` presses the Engineer
+   * menu's Resume row when that menu finishes rendering, which happens well after `load` — pressing
+   * the tile first would hand off to a stage with that menu still over it, and the case would fail
+   * somewhere that has nothing to do with what it is testing.
+   */
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.locator('.everyday-mode[data-screen="stage"]').click();
+  // The shell's screen region is `display: none` on the stage — the honest latch for *uncovered*.
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
+/** Reopen the Engineer menu from the stage — the control that surface carries for it. */
+export async function reopenEngineerMenu(page: Page): Promise<void> {
+  await page.locator('#open-menu').first().click();
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === false,
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
 export async function pressMenuRow(page: Page, id: string): Promise<void> {
   await page
     .locator(`.menu-overlay [${MENU_CONTROL_ATTR}="${id}"]`)

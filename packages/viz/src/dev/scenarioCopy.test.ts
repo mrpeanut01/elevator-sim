@@ -190,10 +190,13 @@ describe('the page hands a player no repository path', () => {
 
   it('negative control: the sweep reads the markup, and lets the module entry point through', async () => {
     // A regex set that matched nothing would pass in silence. And the one path that *must* stay is
-    // `<script type="module" src="/src/dev/main.ts">`, which is not prose — the sweep's patterns
-    // are written so it survives, and that is asserted rather than left to luck.
+    // the page's module entry point, which is not prose — the sweep's patterns are written so it
+    // survives, and that is asserted rather than left to luck. It is `/src/everyday/boot.ts` since
+    // the Everyday shell became what the page loads; the assertion follows the entry point rather
+    // than naming `dev/main.ts` for ever, because what it is checking is *a script src survives the
+    // sweep*, not which module the product happens to boot.
     const markup = await playerFacingMarkup();
-    expect(markup).toContain('/src/dev/main.ts');
+    expect(markup).toContain('/src/everyday/boot.ts');
     expect(markup.length).toBeGreaterThan(1000);
     const planted = `${markup} <p>see data/buildings/ for more</p>`;
     expect(FORBIDDEN.some((pattern) => pattern.test(planted))).toBe(true);

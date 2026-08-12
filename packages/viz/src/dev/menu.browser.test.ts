@@ -35,7 +35,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `browserTier.test-helper.ts`, and GitHub issue #142 for why it is one. */
-import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, pressMenuRow } from './browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, MENU_CONTROL_ATTR, enterEngineerStage, pressMenuRow, reopenEngineerMenu } from './browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -78,6 +78,10 @@ async function openFreePlay(): Promise<Page> {
   await page.waitForFunction(() => document.querySelector('canvas')?.width !== undefined, undefined, {
     timeout: 30_000,
   });
+  // The page opens on Everyday Mode now; this is the player's way to the Engineer surface.
+  await enterEngineerStage(page);
+  // The Engineer menu is dismissed at boot now, so this walk has to reopen it first.
+  await reopenEngineerMenu(page);
   await pressMenuRow(page, 'main.free-play');
   await page.locator('.menu-overlay .menu-text input').first().waitFor({ timeout: 10_000 });
   return page;
