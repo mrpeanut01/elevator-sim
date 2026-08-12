@@ -10,8 +10,13 @@ the shape of all three, and **Phase 9's ✅ is the one that must not be read alo
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against
   the criterion [`DECISIONS.md` § D27](../DECISIONS.md) **raised**, and that criterion has now been
-  measured on the building it names ([§ D100](../DECISIONS.md)). The gate is **met by the Level-0
-  arm and not met by the Level-1 panel at any measured point** — both halves are the result. 6c
+  measured on the building it names ([§ D100](../DECISIONS.md)). The gate **was met by the Level-0
+  arm and not by the Level-1 panel at any measured point, and the second half stopped being true on
+  2026-08-11** ([§ D333](../DECISIONS.md)): the panel's unbounded landing promise was a defect only
+  the Level-1 arm could suffer, and bounding it turns the heavy point over — ΔTTD
+  `−1.598 [−2.575, −0.621]` against `eta` and `−1.642 [−2.620, −0.663]` against `collective` at
+  up-peak 4 %, n = 200, both **BETTER** and resolvable at that cell. **The gate is now met by both
+  arms**, with the cost still reported beside it (AWT and WT95 WORSE against `eta`). 6c
   (learned control) is **no longer deferred: it is implemented, measured, and NOT ACCEPTED** —
   ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an interval
   containing zero, unchanged at 24 and 64 search candidates ([§ D139](../DECISIONS.md) is the
@@ -177,7 +182,7 @@ is not being read honestly.
 | 5 — Smart dispatch | ✅ Twelve cost terms, auction, predictor, benchmark suite |
 | 7 — Automated tuning | ✅ **ACCEPTED** — search space, three searches, held-out validation, a CLI `tune` that calls them, **and its one undelivered bullet — the fuzzy traffic-pattern detector with hysteresis driving per-pattern weight sets — now ships and drives a run**; measured BETTER on TTD and reported **below the resolution limit** |
 | CLI | ✅ `list`, `run`, `compare`, `tune`, `fuzz`, `watch` |
-| **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, not met by the Level-1 panel**; **6c implemented, measured and NOT ACCEPTED — three times: one cell ([§ D145](../DECISIONS.md)), eight cells ([§ D156](../DECISIONS.md)), and the mix-varying `lunch-two-way` point under [§ D162](../DECISIONS.md)'s conditions**; double-deck **simulated and benchmarked**, to a **dispatcher-dependent** verdict |
+| **6 — Destination dispatch & learned control** | ⚠️ 6a and 6b accepted against the raised criterion, measured on the building it names: **met by Level 0, and since [§ D333](../DECISIONS.md) by the Level-1 panel too at the heavy point** — the panel had been measured with an unbounded landing promise only it could suffer; **6c implemented, measured and NOT ACCEPTED — three times: one cell ([§ D145](../DECISIONS.md)), eight cells ([§ D156](../DECISIONS.md)), and the mix-varying `lunch-two-way` point under [§ D162](../DECISIONS.md)'s conditions**; double-deck **simulated and benchmarked**, to a **dispatcher-dependent** verdict |
 | **8 — Testing campaign** | ✅ Blocking clause **discharged** — 0 outstanding property violations, deep tier green at 2 000 cases — and all eight tracks landed, the last being the full experiment matrix (8 cells × 12 profiles, Pareto over AWT / energy / WT95) with Phase 7's acceptance interval at n = 150 |
 | **9 — Experience layer** | ✅ **ACCEPTED WITH NAMED GAPS** — all nine units built; clause 1 (the honesty property under **search**) green at 60 cases / 271 985 strings / 0 violations after finding two, clause 2 (mode parity) **derived** from the code, clause 3 re-derived in the always-on tier, clause 5 discharged **by driving a browser**. **Clause 4 — name the non-test caller — was satisfied in prose and mechanised by nothing at acceptance; mechanised in wave 12 ([§ D192](../DECISIONS.md))**. Unbuilt and named: U6, U7's rider models, Basic's curated three-dimension subset |
 
@@ -771,10 +776,15 @@ the building clause without arguing it. [§ D99](../DECISIONS.md) owned that as 
 
 With the costs published beside them, because omitting them fails the phase: **Level 0** ΔAWT
 `+0.876 [+0.703, +1.050]` **WORSE**, ΔWT95 `+0.273 [−0.026, +0.571]` INDISTINGUISHABLE; **Level 1**
-ΔAWT `+3.190 [+2.463, +3.916]` and ΔWT95 `+9.083 [+5.683, +12.484]`, both **WORSE**.
+ΔAWT `+2.119 [+1.737, +2.501]` and ΔWT95 `+3.244 [+0.715, +5.773]`, both **WORSE**.
 
-**Stated plainly: the criterion is met by the Level-0 arm and not by the Level-1 panel at any
-measured point** — and not at 1 % or 2 % either. The 2 % gate needs **n ≈ 5161 against a ceiling of
+**Stated plainly: the criterion is met by the Level-0 arm, and since [§ D333](../DECISIONS.md) by
+the Level-1 panel as well — at the heavy point only.** The sentence here read *"not by the Level-1
+panel at any measured point"*, which was true of a tree in which `#tellThePanel` promised every
+waiter at a landing to one car without bound. Bounded, the 4 % gate is `−1.598 [−2.575, −0.621]`
+against `eta` and `−1.642 [−2.620, −0.663]` against `collective`, both BETTER. The ΔAWT and ΔWT95
+figures above are re-measured with it: `+2.119 [+1.737, +2.501]` and `+3.244 [+0.715, +5.773]`,
+still both **WORSE**, so the § D27 sign split is unchanged. It is still not met at 1 % or 2 %. The 2 % gate needs **n ≈ 5161 against a ceiling of
 395**, i.e. *permanently unresolvable*, not under-budgeted; **3 % is excluded by its ceiling, not by
 its answer** (its effect is larger than 2 %'s), which `saturationCensus.test.ts` asserts because the
 two are indistinguishable in a results table.

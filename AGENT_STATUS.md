@@ -95,8 +95,12 @@
 >
 > Phase 6's criterion named the Mixed-Use High-Rise; § D27 dropped the building clause; § D99 owned
 > that as a weakening and § D100 measured it there. **Met by the Level-0 arm** (ΔTTD −21.239 /
-> −2.072 / −2.116 against the three baselines, all BETTER, at up-peak 4 %, n = 200); **not met by
-> the Level-1 panel at any measured point.**
+> −2.072 / −2.116 against the three baselines, all BETTER, at up-peak 4 %, n = 200); **and, since
+> § D333, met by the Level-1 panel too at that same point** — ΔTTD `−1.598 [−2.575, −0.621]` against
+> `eta` and `−1.642 [−2.620, −0.663]` against `collective`. This board recorded *"not met by the
+> Level-1 panel at any measured point"*, which was true of a tree whose landing panel promised one
+> car an unbounded queue; that is a defect only the Level-1 arm can suffer, and it was being measured
+> along with the arm.
 >
 > ### The two figures this board recorded as *unverified* — now measured, and one was wrong
 >

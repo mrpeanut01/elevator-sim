@@ -4142,6 +4142,14 @@ against `eta` and `collective` at every rate, and at 4 % it is 9.083 s WORSE on 
 write-once promise binding under load, the same mechanism `destinationDispatchContrast.ts`
 measures on Midtown at 4.5 %. Level 1 buys in-car time and pays for it at the landing.
 
+> **⚠️ The second half of that verdict is SUPERSEDED by [§ D333](#d333--the-landing-panel-stops-promising-one-car-an-unbounded-queue) (2026-08-11), and the figures in the two tables above are superseded with it.** It is left standing because the correction is only legible beside it, and because *how* it went stale is the point.
+>
+> The write-once promise was not what bound Level 1 here. `Simulation#tellThePanel` promised **every** unpromised waiter at a landing to `carIds[0]` with no capacity bound at all, and `#candidateCars` then restricted the call to already-promised cars — so a rider arriving later inherited a pin nobody had told them about. That is a defect only the Level-1 arm can suffer, because only Level 1 promises anybody a car, and this decision measured the arm together with it.
+>
+> Bounded to the car's per-deck design load, the heavy point turns over: ΔTTD `−1.598 [−2.575, −0.621]` against `eta` and `−1.642 [−2.620, −0.663]` against `collective` at up-peak 4 %, n = 200, both **BETTER**, with `requiredReplications = 1` against that cell's measured ceiling of 206. The cost is unchanged in sign and re-measured in magnitude — ΔAWT `+2.119 [+1.737, +2.501]` and ΔWT95 `+3.244 [+0.715, +5.773]`, both still WORSE — so § D27's sign split survives the correction.
+>
+> **The 1 % and 2 % points below are unaffected and still INDISTINGUISHABLE**, which is what an over-subscription defect predicts and a general improvement would not: an unbounded promise cannot bite until a car fills. That shape is why the turnover is read as a defect removed rather than as the panel having been better all along.
+
 **It is not met at 1 % or 2 % either, and the required `n` says why rather than the verdict.** At
 2 % the Level-0 gate against `eta` is `−0.109 [−0.616, +0.399]` INDISTINGUISHABLE, needing
 **n ≈ 5161 against a measured ceiling of 395** — *permanently* unresolvable at that operating

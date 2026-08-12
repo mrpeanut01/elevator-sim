@@ -212,7 +212,7 @@ Concretely, four bodies of work remain:
 | Phase 4 — Visualization | ✅ **COMPLETE** — viewer, editor, live metrics overlay, playback from a stored seed, 87-scenario UX ledger *(88 after `T29`; see `packages/viz/UX.md` § 7.0)* |
 | Phase 6a / 6b — destination disclosure and dispatch | ✅ **ACCEPTED** against the criterion D27 raised |
 | Phase 6c — learned control | ⬜ **deferred out of the phase** with reasons (D28) — not dropped, and it needs its own acceptance question first |
-| Phase 6 — the criterion measured on the building it names | ✅ **closed by measurement** (D99 → D100): met by the Level-0 arm, **not** met by the Level-1 panel at any measured point |
+| Phase 6 — the criterion measured on the building it names | ✅ **closed by measurement** (D99 → D100): met by the Level-0 arm, and **since § D333 by the Level-1 panel as well** at up-peak 4 % — the panel's half was measured with an unbounded landing promise only it could suffer |
 | Phase 8 — Testing campaign | ⚠️ *at close:* seven of eight tracks landed and found four defects, **all four fixed**. `fuzz-1000384` is **closed**; the full experiment matrix at a real budget is not started, so the criterion is not yet met. **Superseded — the matrix landed in `f895a16` and Phase 8 is accepted (§ D108)** |
 
 **The one thing between here and § 7's definition of done, at close:** run the full experiment matrix
