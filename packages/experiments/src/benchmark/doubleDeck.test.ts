@@ -447,7 +447,7 @@ describe('the double-deck verdict', () => {
         // **`carStarts` came back BETTER, and this is that finding rather than a widened
         // tolerance.** The sequence is worth keeping because each step was predicted by the one
         // before: it was WORSE in every cell; then INDISTINGUISHABLE under `eta` at 1 %
-        // (`+0.634 [-0.045, +1.313]`) once the extra lobby-level leg stopped being a start the
+        // (the interval still spanned zero) once the extra lobby-level leg stopped being a start the
         // control never made; and since § D332 it is **BETTER** there —
         // `−1.523 [−2.258, −0.788]`, an interval entirely below zero.
         //

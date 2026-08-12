@@ -184,13 +184,22 @@
  * the same seed and the same pre-registered budgets. **The verdict moved, and it moved in the
  * direction the earlier entry said it would:**
  *
- * | | before the escalator | after |
- * |---|---|---|
- * | excess legs, 1 % / 1.5 % | +10.80 % / +11.56 % | **+1.32 % / +1.70 %** |
- * | `eta` @ 1 %, ΔTTD | **+1.950 [+0.975, +2.925] WORSE** | **−2.729 [−3.550, −1.907] BETTER** |
- * | `collective` @ 1 %, ΔTTD | −1.408 [−2.400, −0.416] BETTER | **−6.262 [−7.210, −5.315] BETTER** |
- * | the 1.5 % point | quotable; `collective` BETTER, `eta` unresolvable | **UNQUOTABLE — both double-deck cells lose their AWT inside the pre-registered n = 200** |
- * | gate | `DISPATCHER-DEPENDENT` | **`BETTER-EVERYWHERE`** |
+ * | | before the escalator | after | after the deck fix (§ D332) |
+ * |---|---|---|---|
+ * | excess legs, 1 % / 1.5 % | +10.80 % / +11.56 % | +1.32 % / +1.70 % | **+1.32 % / +1.70 %** |
+ * | `eta` @ 1 %, ΔTTD | **+1.950 [+0.975, +2.925] WORSE** | −2.729 [−3.550, −1.907] BETTER | **−1.493 [−2.304, −0.683] BETTER** |
+ * | `collective` @ 1 %, ΔTTD | −1.408 [−2.400, −0.416] BETTER | −6.262 [−7.210, −5.315] BETTER | **−4.710 [−5.548, −3.873] BETTER** |
+ * | `eta` @ 1 %, ΔcarStarts | — | +0.634 [−0.045, +1.313] INDIST. | **−1.523 [−2.258, −0.788] BETTER** |
+ * | the 1.5 % point | quotable; `collective` BETTER, `eta` unresolvable | UNQUOTABLE, ceiling 90 | **UNQUOTABLE, ceiling 52 — both DD cells now fail at the same replication** |
+ * | gate | `DISPATCHER-DEPENDENT` | `BETTER-EVERYWHERE` | **`BETTER-EVERYWHERE`** |
+ *
+ * **The third column is § D332's and it moves both ΔTTD magnitudes *towards zero* while leaving
+ * every verdict alone.** Stage 6 refused a call at a car's own upper deck, which cost the
+ * double-deck arm trips it should never have made; removing that removes part of the advantage the
+ * previous column credited to the decks, because some of that advantage was the control arm being
+ * compared against a needlessly handicapped treatment. The gate is unchanged, and the one row that
+ * changes *sign* is `carStarts` under `eta` — recorded in the test rather than here, because it is
+ * an axis and § D106 forbids reading it as a score.
  *
  * **Read that with two cautions, because it is the flattering direction.**
  *

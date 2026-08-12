@@ -760,6 +760,37 @@ export const UNPINNED_INTERVALS: readonly UnpinnedInterval[] = Object.freeze([
       'above. The verdict did not change here; the magnitude did, by a factor of four.',
   }),
   Object.freeze({
+    text: '−2.729 [−3.550, −1.907]',
+    file: 'benchmark/doubleDeck.ts',
+    count: 1,
+    reason:
+      'Kind 3, superseded. ΔTTD for the `eta` pair at up-peak 1 % on the tree before § D332, when ' +
+      'stage 6 still refused a call at a double-deck car’s own upper deck. The same cell now ' +
+      'measures −1.493 [−2.304, −0.683], which IS pinned. Quoted in section 5’s third column ' +
+      'because publishing only the after would hide that part of the decks’ credited advantage was ' +
+      'the treatment arm being handicapped rather than the decks helping.',
+  }),
+  Object.freeze({
+    text: '−6.262 [−7.210, −5.315]',
+    file: 'benchmark/doubleDeck.ts',
+    count: 1,
+    reason:
+      'Kind 3, superseded. ΔTTD for the `collective` pair at up-peak 1 % on the same pre-§ D332 ' +
+      'tree, quoted beside its successor −4.710 [−5.548, −3.873] for the same reason as the entry ' +
+      'above. The verdict did not change here either; the magnitude fell by about a quarter.',
+  }),
+  Object.freeze({
+    text: '+0.634 [−0.045, +1.313]',
+    file: 'benchmark/doubleDeck.ts',
+    count: 1,
+    reason:
+      'Kind 3, superseded. ΔcarStarts for the `eta` pair at up-peak 1 % before § D332, when the ' +
+      'interval still spanned zero. It now measures −1.523 [−2.258, −0.788] and is pinned. Quoted ' +
+      'in section 5 because a start count crossing from INDISTINGUISHABLE to BETTER is the finding ' +
+      'the assertion in doubleDeck.test.ts says must not pass silently, and it is only legible as a ' +
+      'crossing with the value it crossed from beside it.',
+  }),
+  Object.freeze({
     text: '−6.86 [−8.19, −5.53]',
     file: 'benchmark/report.ts',
     count: 1,
@@ -1932,16 +1963,16 @@ export const PINNED_ESTIMATES: Readonly<
     "secure-up-peak-2pct/learned/cost/energyPerServedLegKJ": { n: 126, mean: -4.115737123301034, standardError: 1.5089054590924842, lower: -7.1020482962321285, upper: -1.129425950369939 },
     "secure-up-peak-2pct/learned/cost/wt95S": { n: 126, mean: -0.07265215714862193, standardError: 0.04045426302294784, lower: -0.15271616442630898, upper: 0.007411850129065117 },
     "secure-up-peak-2pct/learned/gate/ttdMeanS": { n: 126, mean: -0.21441487477441387, standardError: 0.06571061669157235, lower: -0.3444643405138095, upper: -0.08436540903501827 },
-    "vertical-city-up-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: 0.11275041387366398, standardError: 0.042003566979564005, lower: 0.029921205086394204, upper: 0.19557962266093376 },
-    "vertical-city-up-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 434.3841011402187, standardError: 140.5132045938455, lower: 157.2981677875939, upper: 711.4700344928435 },
-    "vertical-city-up-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 5.948827113650339, standardError: 1.803225535568218, lower: 2.392944718024646, upper: 9.504709509276031 },
-    "vertical-city-up-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: 0.049429137122255946, standardError: 0.07815598947443053, lower: -0.10469107779432163, upper: 0.2035493520388335 },
-    "vertical-city-up-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.040286406922495244, standardError: 0.09221159025343797, lower: -0.22212365577862714, upper: 0.14155084193363665 },
-    "vertical-city-up-peak-1pct/learned/cost/awtS": { n: 200, mean: 0.04283756256258224, standardError: 0.019073255684410748, lower: 0.0052259311955207485, upper: 0.08044919392964373 },
-    "vertical-city-up-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 88.33213772201054, standardError: 56.89005051222852, lower: -23.852569688393586, upper: 200.5168451324147 },
-    "vertical-city-up-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 1.4941670113191967, standardError: 0.8279227495211193, lower: -0.13846067273391305, upper: 3.1267946953723067 },
-    "vertical-city-up-peak-1pct/learned/cost/wt95S": { n: 200, mean: 0.04918866111823037, standardError: 0.047370039177888595, lower: -0.04422299764007089, upper: 0.14260031987653163 },
-    "vertical-city-up-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: 0.02642891794765916, standardError: 0.03624667923624022, lower: -0.045047958379640346, upper: 0.09790579427495866 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/awtS": { n: 200, mean: 0.24940584604284247, standardError: 0.0517091417085181, lower: 0.14743766565308686, upper: 0.3513740264325981 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyKJ": { n: 200, mean: 906.525968277962, standardError: 212.73355147416342, lower: 487.02464926655966, upper: 1326.0272872893643 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/energyPerServedLegKJ": { n: 200, mean: 12.96961225922361, standardError: 2.5733306089863643, lower: 7.895116124309495, upper: 18.044108394137723 },
+    "vertical-city-up-peak-1pct/fuzzy/cost/wt95S": { n: 200, mean: 0.22554156104069364, standardError: 0.094406551246328, lower: 0.03937594449025483, upper: 0.41170717759113246 },
+    "vertical-city-up-peak-1pct/fuzzy/gate/ttdMeanS": { n: 200, mean: -0.05480989579536868, standardError: 0.18864995622525418, lower: -0.426819411546573, upper: 0.3171996199558357 },
+    "vertical-city-up-peak-1pct/learned/cost/awtS": { n: 200, mean: 0.0036764293144893666, standardError: 0.006394256059148895, lower: -0.00893276576697098, upper: 0.016285624395949713 },
+    "vertical-city-up-peak-1pct/learned/cost/energyKJ": { n: 200, mean: 97.35257081588279, standardError: 41.67853071391758, lower: 15.164319419773634, upper: 179.54082221199195 },
+    "vertical-city-up-peak-1pct/learned/cost/energyPerServedLegKJ": { n: 200, mean: 1.0674372467319266, standardError: 0.5057824906806931, lower: 0.07005615426616207, upper: 2.064818339197691 },
+    "vertical-city-up-peak-1pct/learned/cost/wt95S": { n: 200, mean: -0.016422814414905992, standardError: 0.024432710505815747, lower: -0.06460305779065889, upper: 0.03175742896084691 },
+    "vertical-city-up-peak-1pct/learned/gate/ttdMeanS": { n: 200, mean: -0.1282033282916374, standardError: 0.05274017292007451, lower: -0.23220465742634955, upper: -0.02420199915692524 },
   }),
   "lunch-two-way-selection": Object.freeze({
     "midtown-lunch-two-way-1.5pct-flat/fuzzy/cost/awtS": { n: 200, mean: 0.29473512218223963, standardError: 0.06707864992311303, lower: 0.1624589394867818, upper: 0.42701130487769745 },

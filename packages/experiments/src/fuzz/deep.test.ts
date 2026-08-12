@@ -316,7 +316,7 @@ describe('deep campaign counterexample fuzz-1000384 (a recalled car stranding it
     localConfig = await loadConfig(DATA_DIR);
   }, 60_000);
 
-  it('reproduces, and the fleet now works to its deadline instead of idling for 1 694 s', () => {
+  it('reproduces, and now delivers all 480 instead of idling for 1 694 s — while still refusing a mean', () => {
     const options = generateOptionsFrom(localConfig, DEEP_SPACE, CORPUS_DISPATCHER_PROFILE_IDS, CORPUS_TRAFFIC_PROFILE_IDS);
     const fuzzCase = caseFromSeed(1_000_384, options);
     const outcome = evaluateCase(fuzzCase, { config: localConfig });
@@ -333,30 +333,70 @@ describe('deep campaign counterexample fuzz-1000384 (a recalled car stranding it
     expect(result.conservation.balanced).toBe(true);
     expect(result.conservation.wrongCarBoardings).toBe(0);
 
-    /* **The mechanism, pinned.** 45 promises were taken back from cars leaving group control. If
-       this goes to 0 the fix has been removed; if it goes non-zero on a run *without* a service
-       schedule, `#revokePromisesTo` has acquired a second trigger — which is the thing D29 exists
-       to stop, and `sim/serviceMode.test.ts` asserts the control. */
-    expect(result.conservation.promisesRevoked).toBe(45);
+    /* **The mechanism, pinned.** Promises taken back from cars leaving group control. If this goes
+       to 0 the fix has been removed; if it goes non-zero on a run *without* a service schedule,
+       `#revokePromisesTo` has acquired a second trigger — which is the thing D29 exists to stop,
+       and `sim/serviceMode.test.ts` asserts the control.
+
+       **45 -> 20 for § D333, and the direction is the fix rather than a regression.** The panel
+       used to promise every waiter at a landing to one car without bound, so a recalled car was
+       carrying promises it could never have kept and all of them had to be revoked. Bounded to its
+       per-deck design load, the same car is holding fewer than half as many when the schedule takes
+       it out of group control — so there is less to take back, because less was over-committed in
+       the first place. The count is still non-zero, which is what keeps this assertion a test of
+       the revocation path rather than of the bound. */
+    expect(result.conservation.promisesRevoked).toBe(20);
 
     /* **What P5 measures, restated on the run itself.** The property fires when the fleet did no
        passenger work for `deadlockIdleBoundS` before the deadline. The last boarding or alighting
-       anywhere used to be t = 1734.7 against a deadline of 3429 — 1 694 s of nothing. It is now
-       within a few seconds of the deadline, so the run is *busy* right up to it. */
+       anywhere used to be t = 1734.7 against a deadline of 3429 — 1 694 s of nothing.
+
+       **This used to assert `deadlineS - lastActivityAt < deadlockIdleBoundS`, and § D333 showed
+       that was never P5 restated — only a proxy that happened to agree.** With the panel's promise
+       bounded the fleet clears its backlog and goes quiet at t = 2821.6, which is **607 s** before
+       the deadline and therefore *past* the 600 s bound. The proxy now says "deadlock" about a run
+       P5 correctly passes.
+
+       P5 does not fire because it is not a question about the fleet being idle; it is a question
+       about somebody *waiting* while the fleet is idle. It takes each undelivered journey's
+       `stallBeganAt = max(lastActivityAt, waitingSince)`, so a journey that arrived after the fleet
+       went quiet has a short stall by construction. That is the real condition and it is what is
+       asserted below: every outstanding journey on this run arrived after the stall window opens,
+       so the quiet tail is a fleet that has **finished**, not one that is stuck.
+
+       The distinction is the whole point of the property — `properties.ts` labours it for the
+       all-out-of-service fleet that passed all six while delivering none — and the proxy was blind
+       to it in the opposite direction. */
     const lastActivityAt = Math.max(
       result.record.startedAt,
       ...result.record.passengers.flatMap((leg) => [leg.boardedAt ?? 0, leg.alightedAt ?? 0]),
     );
     expect(result.deadlineS).toBe(3429);
-    expect(lastActivityAt).toBeCloseTo(3423.14, 1);
-    expect(result.deadlineS - lastActivityAt).toBeLessThan(PROPERTY_BOUNDS.deadlockIdleBoundS);
+    expect(lastActivityAt).toBeCloseTo(2821.56, 1);
 
-    /* It is still a `timed-out` run, and that is the honest answer rather than a residual defect:
-       3.8 %pop/5 min on this building with a car withdrawn is past handling capacity, the queue
-       genuinely diverges, and the run refuses to publish a mean for it. P5 exempts a *busy*
-       saturated fleet by construction and P6 exempts a run that flags itself, both for the right
-       reason. */
-    expect(result.status).toBe('timed-out');
+    // The quiet tail is real, and longer than the bound — which is why the check below has to be
+    // P5's actual predicate rather than this subtraction.
+    expect(result.deadlineS - lastActivityAt).toBeGreaterThan(PROPERTY_BOUNDS.deadlockIdleBoundS);
+
+    // P5's own condition, and the reason it is silent: there is nobody left to be waiting. P5
+    // iterates `result.undelivered`, so an empty list is not a narrow escape from the bound — it is
+    // the loop not executing at all. The quiet tail belongs to a fleet that ran out of work.
+    expect(result.undelivered).toEqual([]);
+
+    /* **It is no longer a `timed-out` run, and that is § D333 rather than a weakened assertion.**
+       This asserted `timed-out`, reasoning that 3.8 %pop/5 min on this building with a car
+       withdrawn is past handling capacity. The load is unchanged; what changed is that the panel no
+       longer promises one car a queue it cannot hold, so all **480 of 480** journeys are delivered
+       and the run completes.
+
+       **The saturation verdict and the AWT suppression are still asserted, and they still hold** —
+       which is the half worth keeping. The queue did diverge on the way, and a run that drained
+       just in time is precisely the case `CLAUDE.md` says the trend and censoring tests cannot see
+       between: *"neither sees a queue that grew enormously and drained just in time."* Delivering
+       everybody is not the same as being unsaturated, and this run is now the standing example —
+       `completed`, nobody undelivered, and still refusing to publish a mean. */
+    expect(result.status).toBe('completed');
+    expect(result.conservation.generated).toBe(480);
     expect(result.summary.saturation.verdict).toBe('diverging-queue');
     expect(result.summary.awtIsValid).toBe(false);
 
