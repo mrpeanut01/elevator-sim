@@ -664,6 +664,16 @@ export const ANSWER_REASONS = [
   'assigned',
   /** Bypassing on load, but no other car could serve the floor, so it stops anyway. */
   'sole-eligible-override',
+  /**
+   * The car is not standing at this call's landing — it is elsewhere, or still moving.
+   *
+   * **"At the landing" is a question about the car's stop position, not about its floor id.** A
+   * double-deck car standing at the lower floor of a declared pair has its upper deck at the
+   * paired floor *at the same instant*, so a call there is a call it is standing at and this
+   * verdict does not apply to it. The reason string's meaning is unchanged; what changed is that
+   * it stopped being returned for a car that was in fact there (`lifecycle.ts#stopFloorFor`).
+   * Identity, and therefore unchanged in every particular, on a single-deck car.
+   */
   'not-at-floor',
   'not-assigned',
   'bypassing-load',

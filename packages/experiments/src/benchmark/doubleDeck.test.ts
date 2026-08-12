@@ -421,6 +421,19 @@ describe('the double-deck verdict', () => {
     console.log(`[double-deck] GATE ${result.verdict.gate} — ${result.verdict.byCell.join(', ')}`);
   }, TIMEOUT_MS);
 
+  /**
+   * The measured `carStarts` verdict per dispatcher at the one quotable point, § D332.
+   *
+   * `eta` crosses to BETTER and `collective` does not, which is the same split the shuttle-move
+   * census in `sim/doubleDeckSeam.test.ts` reports: answering at a deck that is already open is
+   * worth most to the arm that was choosing between stops anyway. Any unlisted dispatcher is held
+   * to WORSE, which is where every arm started.
+   */
+  const CAR_STARTS_VERDICT: Readonly<Record<string, string>> = Object.freeze({
+    eta: 'BETTER',
+    collective: 'WORSE',
+  });
+
   it('costs energy in every quotable cell, and does not pay for it by serving fewer people', async () => {
     const result = await study();
     expect(result.verdict.costsEnergyEverywhere).toBe(true);
@@ -431,15 +444,37 @@ describe('the double-deck verdict', () => {
         // and the per-served-leg figure beside the raw one.
         expect(point.cell(dispatcher, 'energyKJ').verdict).toBe('WORSE');
         expect(point.cell(dispatcher, 'carDistanceM').verdict).toBe('WORSE');
-        // `carStarts` used to be WORSE in every cell too and is now INDISTINGUISHABLE under `eta`
-        // at 1 % (+0.634 [-0.045, +1.313]), because the extra lobby-level leg the treatment arm
-        // used to make was a *start* the control never made and it is gone. The axis has not
-        // changed sign — energy and distance are still WORSE everywhere — so this is bounded
-        // rather than dropped: a start count that came back BETTER would be a different finding
-        // and must not pass silently.
-        expect(['WORSE', 'INDISTINGUISHABLE']).toContain(
-          point.cell(dispatcher, 'carStarts').verdict,
-        );
+        // **`carStarts` came back BETTER, and this is that finding rather than a widened
+        // tolerance.** The sequence is worth keeping because each step was predicted by the one
+        // before: it was WORSE in every cell; then INDISTINGUISHABLE under `eta` at 1 %
+        // (the interval still spanned zero) once the extra lobby-level leg stopped being a start the
+        // control never made; and since § D332 it is **BETTER** there —
+        // `−1.523 [−2.258, −0.788]`, an interval entirely below zero.
+        //
+        // The mechanism is the fix itself. Stage 6 used to refuse a call at a car's *upper* deck
+        // because it compared the call's floor against the lower deck's stop position, so a paired
+        // car had to start again for a floor it was already standing at. It no longer does, and the
+        // starts it saves are exactly those. `collective` moves the same way without crossing
+        // (`+4.980 → +2.915`, still WORSE), which is the same split the shuttle-move census shows:
+        // the saving goes to the arm that looks ahead.
+        //
+        // **This is not permission for the energy axis to change sign.** § D106's rule is that a
+        // configuration which spends less by serving fewer people has saved nothing, and the two
+        // clauses that enforce it are untouched and immediately below: `energyKJ` and
+        // `carDistanceM` are still asserted WORSE in every quotable cell, and `unservedFraction` is
+        // asserted to be exactly 0 on **both** arms. A start count falling while those hold is a
+        // real reduction in work; the same fall with either of them moving would be this study
+        // measuring its own denominator, and would still fail here.
+        //
+        // Pinned per dispatcher rather than widened to a set that admits everything. A list of all
+        // three verdicts would assert nothing about a metric whose sign is the finding, and this
+        // file pins verdicts elsewhere for the same reason.
+        const starts = point.cell(dispatcher, 'carStarts');
+        expect(
+          starts.verdict,
+          `${point.id}/${dispatcher} carStarts: ` +
+            `${starts.estimate.mean.toFixed(3)} [${starts.estimate.lower.toFixed(3)}, ${starts.estimate.upper.toFixed(3)}]`,
+        ).toBe(CAR_STARTS_VERDICT[dispatcher] ?? 'WORSE');
         // "A configuration that spends less by serving fewer people has not saved anything" — the
         // converse also has to be checked: this one spends more and serves exactly as many.
         const unserved = point.cell(dispatcher, 'unservedFraction');

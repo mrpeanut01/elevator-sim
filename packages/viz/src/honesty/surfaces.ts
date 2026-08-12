@@ -44,7 +44,7 @@ import { restrictedFloorIds } from '../access/zoning.js';
 import { credentialLensFor, describeCredentialLens, LENS_LEGEND, LENS_OPERATIONAL_NOTE, STATE_WORDS } from '../access/zoning.js';
 import { checkAccessCompatibility, credentialCapabilityOf } from '../access/dispatcherCredentials.js';
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
-import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
+import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
@@ -1416,6 +1416,24 @@ const RIDER_QUEUE: SurfaceAdapter = {
  * naming a car that is not the one, or surviving a change to how promises work — is the failure
  * this whole apparatus exists to catch, and it is the shape `patternSwitching` and the traffic
  * editor's mean-group-size refusal both had.
+ *
+ * ## Why this one may not use {@link sampleTimes} alone (§ D333)
+ *
+ * **It went silent, and the reason it went silent is that the product got better.** This adapter
+ * sampled the five fixed fractions every other surface uses, which is right for a surface that
+ * always has something to say and wrong for a *conditional* one. Once § D333 bounded the panel's
+ * promises the runs drained, the condition stopped holding at 0/25/50/75/100 %, and the adapter
+ * emitted **no strings at all** — so `honesty.test.ts`'s own false-negative hunt reported it among
+ * the silent, which is the check working exactly as intended.
+ *
+ * A conditional surface has to be sampled where its condition holds, or the corpus is measuring
+ * the sampler rather than the sentence. So the fixed fractions are kept — they are the comparable
+ * ones across adapters — and the run's **most pinned** instant is swept for and added to them. The
+ * condition still holds in roughly half of a saturated run's frames (194 of 401 on `suppressedConfig`
+ * at the time of writing), so this is not a hunt for a needle; it is a refusal to assume the needle
+ * sits on a fifth.
+ *
+ * Silent on a run that never pins, which is correct and is what the conventional arm is.
  */
 const PINNED_QUEUES: SurfaceAdapter = {
   id: 'frame/pinnedQueue.ts#describePinnedQueues',
@@ -1424,17 +1442,39 @@ const PINNED_QUEUES: SurfaceAdapter = {
     'frame/pinnedQueue.ts#pinnedQueuesAt',
   ],
   render(context) {
+    const { recording } = context;
+    const pinnedAt = (at: number): readonly PinnedQueue[] =>
+      pinnedQueuesAt(context.bundleAt(at).queues, recording.shafts, recording.passengerModel);
+
+    // The worst instant, found by sweep. Coarse on purpose: the condition holds across a wide
+    // stretch of a saturated run, so a fine sweep would buy nothing but corpus build time.
+    let peakAt: number | undefined;
+    let worstSeen = 0;
+    const steps = 40;
+    for (let i = 0; i <= steps; i += 1) {
+      const at = recording.startedAt + ((recording.endedAt - recording.startedAt) * i) / steps;
+      const head = pinnedAt(at)[0];
+      if (head !== undefined && head.waiting > worstSeen) {
+        worstSeen = head.waiting;
+        peakAt = at;
+      }
+    }
+
+    // Deduped and ordered, so the corpus is stable across runs of the same recording.
+    const times = [...sampleTimes(recording)];
+    if (peakAt !== undefined && !times.includes(peakAt)) times.push(peakAt);
+    times.sort((a, b) => a - b);
+
     const seeds: TextSeed[] = [];
-    for (const at of sampleTimes(context.recording)) {
-      const { queues } = context.bundleAt(at);
-      const pinned = pinnedQueuesAt(queues, context.recording.shafts, context.recording.passengerModel);
+    for (const at of times) {
+      const pinned = pinnedAt(at);
       if (pinned.length === 0) continue;
       for (const short of [false, true]) {
         seeds.push({
           field: `describePinnedQueues(@${at.toFixed(0)}s, short=${String(short)})`,
           text: describePinnedQueues(pinned, { short }),
           role: 'observation',
-          playhead: atPlayhead(context.recording, at),
+          playhead: atPlayhead(recording, at),
         });
       }
     }

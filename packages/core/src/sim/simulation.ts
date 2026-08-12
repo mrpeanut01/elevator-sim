@@ -64,13 +64,21 @@
  *   Midtown at the interfloor-mix operating point);
  * - `#applyDecision` **tells the panel** — every unpromised passenger of that request is assigned
  *   the car the group just chose, write-once, and the promise reaches the recorder in the same
- *   statement pair;
+ *   statement pair — **while that car still has room to promise**. `#tellThePanel` will not put
+ *   more mass on a car's deck than its design load, for the same reason `#boardFrom` will not put
+ *   more mass in it: the panel used to promise every waiter to `carIds[0]` unbounded, and on
+ *   Vertical City that was 81 riders at the median promised to a car holding 13 to 20;
  * - `#boardFrom` refuses anyone whose promise names another car, or whose walk
  *   (`sim.assignedWalkS`) is not finished;
  * - a car that fills up leaves promised passengers behind rather than handing them on. Their
  *   promise **stands** (DECISIONS.md § D29) and `#candidateCars` gives the call straight back to
- *   the same car. `ConservationAudit.brokenPromises` counts how often that happens, and it is a
- *   *result* — the price of committing at the panel — not a failure;
+ *   the same car — *while everybody still standing there is one of them*.
+ *   `ConservationAudit.brokenPromises` counts how often that happens, and it is a *result* — the
+ *   price of committing at the panel — not a failure;
+ * - a rider who arrives at that landing **later and has been told nothing** does not inherit the
+ *   pin: the call is scored over the whole bank again, `#applyDecision` keeps the promised car on
+ *   it so nobody's promise becomes a car that is no longer coming, and no existing promise moves.
+ *   D29 protects the passenger the panel has answered; it says nothing about the one it has not;
  * - a car that leaves **group control** is the one exception: a promise it holds is revoked
  *   (`#revokePromisesTo`), because D29's argument is about a car that will empty and come back and
  *   an `independent` car will not. Counted separately in `ConservationAudit.promisesRevoked`;
@@ -536,6 +544,20 @@ export class Simulation {
   readonly #refusals = new Map<string, Map<string, RefusalTally>>();
 
   /**
+   * Banks observed holding a landing queue with **not one car able to answer a hall call**.
+   *
+   * The run that most obviously needs a diagnostic used to produce none: `garden-apartments` with
+   * both cars withdrawn and `midtown-office` with all four reported `timed-out`, 0 of 26 and 0 of
+   * 719 delivered, and `result.warnings` **empty**. The viewer draws one row per warning, so a
+   * player got a red word and no cause. Keyed by bank id; the value is the window it was first and
+   * last seen in and the largest queue it was seen holding.
+   */
+  readonly #banksWithoutService = new Map<
+    string,
+    { from: SimTime; until: SimTime; peakWaiting: number }
+  >();
+
+  /**
    * Statements that a number this run reports describes something other than what was asked
    * for, kept apart from the advisories and reported **first**.
    *
@@ -560,6 +582,29 @@ export class Simulation {
   #brokenPromises = 0;
   /** Promises voided because the car they named left group control. See `#revokePromisesTo`. */
   #promisesRevoked = 0;
+  /**
+   * Mass promised to each car's deck and not yet aboard it, keyed by {@link #promiseKey}.
+   *
+   * **The panel's own load cell.** `#boardFrom` will not put a thirteenth person into a car that
+   * holds twelve; without this the panel would still *promise* the thirteenth, and the hundredth,
+   * because the promise is made at the landing where nothing weighs anything. Maintained rather
+   * than derived: the honest derivation is a scan of every landing queue in the bank per decision,
+   * and a run makes tens of thousands of decisions.
+   *
+   * Every entry is added in {@link #tellThePanel} and removed at the one instant the promise stops
+   * being outstanding — boarding ({@link #boardFrom}), revocation ({@link #revokePromisesTo}) or
+   * the rider walking out ({@link #abandon}) — which are the same three places
+   * `ConservationAudit`'s promise identity is kept balanced. Empty on every conventional run.
+   */
+  readonly #promisedMassKg = new Map<string, number>();
+  /**
+   * How often the panel had a passenger to promise and no named car with room left for them.
+   *
+   * Read by {@link #dispatchBank} as a *retry* signal and by nothing else: a landing holding a
+   * waiter nobody has been able to promise is a landing that must be asked about again, and the
+   * ordinary `carIds.length === 0` retry does not fire for it because the call *was* assigned.
+   */
+  #promisesDeferred = 0;
   #capacityCrossings = 0;
   #capacityMigrations = 0;
   #capacityHeld = 0;
@@ -1316,11 +1361,22 @@ export class Simulation {
    * because a call whose promised car was full at its last re-offer is active and held by nobody:
    * it would not appear in the released list and its waiters would be stranded exactly as before.
    *
-   * **What this does not model**, stated because the books still balance either way: a car put
-   * into `fire-recall` or `out-of-service` with passengers aboard keeps them aboard. `setMode`
-   * clears its car calls, so it has no reason to move and they end the run as
-   * `undelivered: 'riding'` — named, counted, never lost. A real Phase I recall discharges at the
-   * recall level; modelling that is a behaviour, not a config field, and is out of scope here.
+   * **What happens to the passengers already aboard, corrected — the sentence here used to say
+   * the opposite of what the code does.** It read: *"`setMode` clears its car calls, so it has no
+   * reason to move and they end the run as `undelivered: 'riding'`"*. Measured across 336
+   * configurations — 8 buildings × 3 dispatchers × 14 withdrawal instants — **874 rider-legs were
+   * aboard at the instant of withdrawal and every one of them was delivered**; `undelivered:
+   * 'riding'` was 0 in every cell. Clearing `#carCalls` cannot strand them, because
+   * `Car.committedStops()` derives its stops from `#passengers` as well, and the passengers
+   * regenerate the very stops that were cleared. A withdrawn car finishes the trip it is on and
+   * then stops collecting: it takes no hall call, is not parked, and is not given a new
+   * destination. That is what the run does; the mechanism is `committedStops()`, not the car-call
+   * list.
+   *
+   * **What is genuinely not modelled** is the recall itself: a car in `fire-recall` neither
+   * travels to a designated level nor parks with its doors open, so the mode is a withdrawal
+   * wearing a fire brigade's name. A real Phase I recall is a behaviour rather than a config
+   * field, and building it is out of scope here.
    */
   #onServiceChange(index: number, at: SimTime): void {
     const event = this.#resolved.serviceEvents?.[index];
@@ -1399,7 +1455,12 @@ export class Simulation {
    */
   #revokePromisesTo(active: ActiveCall, car: Car, at: SimTime): void {
     for (const passenger of this.#promisedTo(active, car)) {
+      const massKg = passenger.massKg;
       passenger.releasePromise(at);
+      // The withdrawn car's books are settled with it: a promise nobody holds any more is not a
+      // claim on its doorway, and leaving it charged would shrink what the car may be promised
+      // if a later schedule entry puts it back in service.
+      this.#dischargePromise(car.id, active.floorId, massKg);
       this.#recorder.releaseAssignment(passenger, at);
       this.#promisesRevoked += 1;
     }
@@ -1735,6 +1796,9 @@ export class Simulation {
     // reserving itself for somebody who had already left.
     if (passenger.assignedCarId !== undefined) this.#promisesAbandoned += 1;
     this.#recorder.recordAbandonment(passenger, at);
+    // Off the car's books as well as off the landing: a rider who has gone home is not a claim on
+    // anybody's doorway, and the seat they were holding is free to be promised again.
+    this.#dischargePromise(passenger.assignedCarId, passenger.originFloorId, passenger.massKg);
     passenger.releasePromise(at);
 
     for (const active of this.#callsAtFloor(passenger.originFloorId)) {
@@ -1954,6 +2018,11 @@ export class Simulation {
         passes += 1;
 
         let retry = false;
+        // A landing holding somebody the panel could not promise — every named car was already
+        // promised its design load — has to be asked about again, and no other signal in this
+        // loop says so: the call *was* assigned, so the `carIds.length === 0` retry below never
+        // fires for it. Compared rather than reset, because `#dispatchBank` is re-entered.
+        const deferredBefore = this.#promisesDeferred;
         // One set of snapshots serves every call in the pass, and is dropped the moment an
         // assignment actually moves — a call priced against a car that has since taken on
         // another stop is priced against a car that no longer exists.
@@ -1976,6 +2045,7 @@ export class Simulation {
             this.#completeCall(active, at);
             continue;
           }
+          this.#noteUnservedBank(bank, waiting.count, at);
           snapshots ??= this.#snapshots(bank, at);
           group ??= this.#groupContext(bank.id, snapshots, at);
           const decision = policy.dispatch(
@@ -2000,6 +2070,8 @@ export class Simulation {
           }
         }
 
+        if (this.#promisesDeferred !== deferredBefore) retry = true;
+
         for (const car of bank.cars) {
           // Before the step, not after: a car that can still be cut short is a car whose
           // arrival time is about to change, and `#stepCar` only ever acts on a standing one.
@@ -2020,7 +2092,22 @@ export class Simulation {
   }
 
   /**
-   * Move the call onto the cars the decision names, and off the ones it does not.
+   * Move the call onto the cars the decision names, and off the ones it does not — **plus the
+   * cars that already owe somebody at this landing a trip**.
+   *
+   * The second clause is the other half of {@link #candidateCars}' correction and is useless
+   * without it. Once a decision may name a car other than the promised one — which it may, as soon
+   * as somebody at the landing has been promised nothing — the promised car would lose its hall
+   * call and stop coming, and the people it answered would wait for a car with no reason to
+   * travel. Under `reassignmentPolicy: 'never'`, every shipped profile, that is permanent.
+   *
+   * So a car holding an outstanding promise to a waiter of this call keeps the call. It is not a
+   * second allocation: it is the first one, still owed, expressed the only way a car is ever told
+   * to go somewhere. {@link #tellThePanel} is deliberately told about `decision.carIds` and not
+   * about this union, so a retained, already-full car collects no *new* promises.
+   *
+   * Conventionally — no panel — nobody is promised anything, {@link #withPromiseHolders} returns
+   * its argument, and this is the assignment loop it has always been.
    *
    * @returns `true` if any car's commitments actually changed.
    */
@@ -2029,7 +2116,10 @@ export class Simulation {
     decision: Pick<DispatchDecision, 'carIds'>,
     at: SimTime,
   ): boolean {
-    const next = decision.carIds;
+    const chosen = decision.carIds;
+    // A decision that names nobody discharges the allocation outright, exactly as it always has:
+    // there is no car to keep the promised alongside, and the call is retried or reported.
+    const next = chosen.length === 0 ? chosen : this.#withPromiseHolders(active, chosen);
     let changed = false;
     for (const carId of active.carIds) {
       if (next.includes(carId)) continue;
@@ -2045,8 +2135,30 @@ export class Simulation {
     // **The landing panel answers**, at the instant the group decides and not one event later.
     // Unconditional on `changed`, because a decision that names the car it already named is still
     // the answer somebody who arrived since is waiting for.
-    if (next.length > 0) this.#tellThePanel(active, next, at);
+    if (chosen.length > 0) this.#tellThePanel(active, chosen, at);
     return changed;
+  }
+
+  /**
+   * The decision's cars, plus every other car of this bank that still owes a waiter of this call
+   * the trip the panel promised them.
+   *
+   * The withdrawn car is excluded on purpose and not by accident: `#onServiceChange` has already
+   * revoked its promises (§ T22-D1), so it holds none to retain, and re-committing a car that has
+   * left group control is the defect that decision closed.
+   */
+  #withPromiseHolders(active: ActiveCall, chosen: readonly string[]): readonly string[] {
+    if (!this.#panelAssigns) return chosen;
+    const floor = this.#building.requireFloor(active.floorId);
+    const owed: string[] = [];
+    for (const passenger of this.#waitingForCall(floor, active)) {
+      const carId = passenger.assignedCarId;
+      if (carId === undefined || chosen.includes(carId) || owed.includes(carId)) continue;
+      const car = this.#carsById.get(carId);
+      if (car === undefined || car.bankId !== active.bankId || !car.acceptsHallCalls) continue;
+      owed.push(carId);
+    }
+    return owed.length === 0 ? chosen : Object.freeze([...chosen, ...owed]);
   }
 
   /**
@@ -2066,6 +2178,38 @@ export class Simulation {
    * Under `split-demand` a request may be given several cars, and the queue is dealt across them
    * in arrival order. Under `single-car` — every shipped profile — that is `carIds[0]` for
    * everybody, evaluated identically.
+   *
+   * ## And **no more of them than the car can carry**
+   *
+   * This used to promise *every* unpromised waiter to `carIds[0]` with no bound at all, and the
+   * bound's absence was a defect rather than a simplification. Measured on Vertical City at the
+   * moment of a bump: **81 riders promised to one car at the median** — against a car that holds
+   * 13 to 20 — with four of its seven siblings idle and completely empty, and one of them standing
+   * at that very landing in 39–77 % of bumps. On the `office-day` template the panel delivered
+   * 14 725 journeys and left **4 597** standing, where `collective` on the identical trace
+   * delivered 19 293 and left none — with a longest served wait of 23 404.5 s against 721.7 s.
+   *
+   * So the panel promises while the car's outstanding promises are **below its design load**, and
+   * stops the moment they cross it — clause for clause the rule {@link #boardFrom} applies at the
+   * doorway, crossing by one person for the same reason (the sensor trips *after* somebody steps
+   * in), and per **deck** for the same reason again: a deck is a room with its own doorway.
+   *
+   * **The ceiling is the outstanding promises alone and not the car's present load**, deliberately.
+   * A promise is a claim on the car's doorway *at the pickup landing*, and what the car happens to
+   * be carrying at the instant the panel speaks is not a fact about that moment — a shuttle full of
+   * down-riders at floor 76 is empty by the time it reaches G. Pricing the load it will arrive with
+   * is stage 2 and 3's job (`loadFactorOnArrival`), and this is not a second, worse copy of it: it
+   * is the bound that stops the panel writing a cheque for a car that holds thirteen.
+   *
+   * Riders it cannot promise are left **unpromised**, which is a state a landing can already be in
+   * (a call every car refused reaches nobody either), and the pass that could not place them sets
+   * {@link #promisesDeferred} so the bank is asked again on the ordinary retry timer.
+   *
+   * **This is not a weakening of § D29 and does not touch a promise that exists.** D29 is about a
+   * passenger the panel has already answered: they keep their car, they are skipped here as they
+   * always were, and `brokenPromises` still counts every time a full car leaves them. What this
+   * refuses is a *new* promise to a car that is already over-subscribed — a rider who has been told
+   * nothing, and whom D29 says nothing about.
    */
   #tellThePanel(active: ActiveCall, carIds: readonly string[], at: SimTime): void {
     if (!this.#panelAssigns) return;
@@ -2077,14 +2221,85 @@ export class Simulation {
     for (const passenger of this.#waitingForCall(floor, active)) {
       if (passenger.isAssigned) continue;
       if (!this.#bankCanCarry(bank, passenger)) continue;
-      const carId = carIds[index % carIds.length];
-      /* c8 ignore next -- `carIds` is non-empty at the one call site. */
-      if (carId === undefined) continue;
+      const car = this.#carWithPromiseRoom(carIds, index, active.floorId);
+      if (car === undefined) {
+        // Nobody the group named has room to promise. Left standing, unpromised, and the bank is
+        // asked again — rather than promised a car that cannot come for them.
+        this.#promisesDeferred += 1;
+        continue;
+      }
       index += 1;
-      passenger.assign(carId, at);
-      this.#recorder.recordAssignment(passenger, at, { carId, bankId: bank.id });
+      passenger.assign(car.id, at);
+      this.#chargePromise(car, active.floorId, passenger.massKg);
+      this.#recorder.recordAssignment(passenger, at, { carId: car.id, bankId: bank.id });
       this.#legsAssigned += 1;
     }
+  }
+
+  /**
+   * The first of the named cars, starting at `index`, whose deck at this floor may still be
+   * promised to. `undefined` when none of them may.
+   *
+   * The ring walk preserves `split-demand`'s deal exactly — with every car in room it returns
+   * `carIds[index % carIds.length]`, which is the expression this replaced — and under
+   * `single-car`, every shipped profile, it is one car and one test.
+   */
+  #carWithPromiseRoom(
+    carIds: readonly string[],
+    index: number,
+    floorId: string,
+  ): Car | undefined {
+    for (let offset = 0; offset < carIds.length; offset += 1) {
+      const carId = carIds[(index + offset) % carIds.length];
+      /* c8 ignore next -- `carIds` is non-empty at every call site. */
+      if (carId === undefined) continue;
+      const car = this.#carsById.get(carId);
+      if (car === undefined) continue;
+      const promised = this.#promisedMassKg.get(this.#promiseKey(car, floorId)) ?? 0;
+      if (promised < this.#promiseCeilingKg(car)) return car;
+    }
+    return undefined;
+  }
+
+  /**
+   * Which load cell a promise made at this floor will eventually be weighed by.
+   *
+   * One key per car conventionally; one per **deck** for a double-deck car, because
+   * {@link #boardFrom} stops on `deckMassKg >= deckDesignLoadKg` and a whole-car ceiling would let
+   * one deck be promised twice what it holds. The floor is the passenger's own origin, so the key
+   * a promise is charged to is the key it is discharged from.
+   */
+  #promiseKey(car: Car, floorId: string): string {
+    if (car.deckDesignLoadKg === undefined) return car.id;
+    return `${car.id}#${String(deckSlot(car.deckFor(floorId)))}`;
+  }
+
+  /** The design load {@link #promiseKey}'s cell is measured against — per deck where there is one. */
+  #promiseCeilingKg(car: Car): number {
+    return car.deckDesignLoadKg ?? car.loadSensor.designLoadKg;
+  }
+
+  /** Put a promise on the car's books. */
+  #chargePromise(car: Car, floorId: string, massKg: number): void {
+    const key = this.#promiseKey(car, floorId);
+    this.#promisedMassKg.set(key, (this.#promisedMassKg.get(key) ?? 0) + massKg);
+  }
+
+  /**
+   * Take a promise off them again — boarded, revoked, or the rider walked out.
+   *
+   * Silent when the car is gone or nothing was charged, because the three callers are each already
+   * guarded on the passenger holding a promise and a fourth guard here would only hide a drift.
+   */
+  #dischargePromise(carId: string | undefined, floorId: string, massKg: number): void {
+    if (carId === undefined) return;
+    const car = this.#carsById.get(carId);
+    /* c8 ignore next -- a promise names a car of this run's own building. */
+    if (car === undefined) return;
+    const key = this.#promiseKey(car, floorId);
+    const remaining = (this.#promisedMassKg.get(key) ?? 0) - massKg;
+    if (remaining > 0) this.#promisedMassKg.set(key, remaining);
+    else this.#promisedMassKg.delete(key);
   }
 
   /** Whether every car refused this call for a reason that cannot change with time. */
@@ -2234,8 +2449,10 @@ export class Simulation {
     }
     // **A broken promise, counted** (DECISIONS.md § D29). Everybody still standing here whom
     // *this* car had been promised to is somebody a full car left behind. Their `assignedCarId`
-    // stands — `#candidateCars` will hand this call straight back to the same car, and they wait
-    // for it — so the count is the price of committing at the panel rather than a fault.
+    // stands and they wait for it — `#candidateCars` hands this call back to the promised cars
+    // while everybody left here is one of them, and `#applyDecision` keeps a promised car on the
+    // call even when the group names another for the unpromised — so the count is the price of
+    // committing at the panel rather than a fault.
     if (this.#panelAssigns) {
       const floor = this.#building.requireFloor(active.floorId);
       for (const passenger of this.#waitingForCall(floor, active)) {
@@ -2432,6 +2649,31 @@ export class Simulation {
       }
     }
     return { stopped: false, dirty };
+  }
+
+  /**
+   * Remember that this bank was asked to collect a landing while it had **no car in group
+   * control at all**, so the run can say so instead of reporting a bare `timed-out`.
+   *
+   * Asked at the one place that already knows both halves — a live call with somebody eligible
+   * standing at it, and the bank whose cars are about to be priced. A bank with cars but none of
+   * them accepting hall calls and a bank with no cars are the same fact to a waiting rider, so
+   * they are the same predicate here: `Car.acceptsHallCalls` is false for `out-of-service`,
+   * `independent` and `fire-recall` alike, and `some` over an empty fleet is false, so a bank with
+   * no cars at all falls through the guard and is recorded like any other.
+   *
+   * Silent on every shipped building — none declares `serviceEvents` or a car `mode` — so no run
+   * this repository has published acquires a warning.
+   */
+  #noteUnservedBank(bank: Bank<Car>, waiting: number, at: SimTime): void {
+    if (bank.cars.some((car) => car.acceptsHallCalls)) return;
+    const seen = this.#banksWithoutService.get(bank.id);
+    if (seen === undefined) {
+      this.#banksWithoutService.set(bank.id, { from: at, until: at, peakWaiting: waiting });
+      return;
+    }
+    seen.until = at;
+    seen.peakWaiting = Math.max(seen.peakWaiting, waiting);
   }
 
   /** Remember that a car declined a call, so a call nobody will answer can be named at the end. */
@@ -2955,6 +3197,10 @@ export class Simulation {
       if (passenger === undefined) break;
 
       if (car.isDoubleDeck) this.#doubleDeckBoardings[deckSlot(deck)] += 1;
+      // The promise is discharged the instant it is kept, so the doorway it was a claim on is
+      // free to be promised to somebody else. Before `car.board`, which is the statement that
+      // makes `hasBoarded` true and the promise no longer outstanding.
+      this.#dischargePromise(passenger.assignedCarId, floor.id, passenger.massKg);
       car.board(passenger, at);
       // Counted, not assumed. `#promiseAllows` is the only path into this loop and it refuses
       // the wrong car, so this can only be non-zero if a *second* path into a car appears — which
@@ -3825,6 +4071,28 @@ export class Simulation {
    *
    * Returns the full snapshot list conventionally, and whenever nobody at the landing has been
    * promised anything yet — which is every call at the moment it opens.
+   *
+   * ## **"Remaining passengers" means all of them, and it used to mean any of them**
+   *
+   * The restriction used to fire as soon as *one* waiter held a promise, which pinned the whole
+   * landing — for the rest of the run, because a call is only extinguished when its landing empties
+   * and `reassignmentPolicy: 'never'` will not revisit an allocation in between. A rider who walked
+   * up to a busy panel two hours later **inherited other people's pin**: measured on Vertical City,
+   * 81 riders at the median promised to one car holding 13 to 20 while four of its seven siblings
+   * stood idle and empty.
+   *
+   * That is not what § D29 says and it is not what T16-D3 was enforcing. D29's argument is about
+   * the passenger the panel has **already answered** — they keep the car they were told, because
+   * re-offering them is the panel changing its mind, and a destination arm that changes its mind
+   * quietly recovers the deferral advantage it is supposed to have surrendered. It says nothing
+   * about somebody the panel has not spoken to yet. Their call is a fresh allocation problem and
+   * belongs to the whole bank.
+   *
+   * So the restriction now asks whether **every** waiter this bank could carry is already promised.
+   * If one is not, the group scores the landing over its whole fleet; {@link #applyDecision} keeps
+   * the promised car on the call regardless of what the group picks, so nobody's promise becomes a
+   * car that is no longer coming, and {@link #tellThePanel} skips the promised as it always has.
+   * Every existing promise is preserved and `brokenPromises` still counts every bump.
    */
   #candidateCars(
     active: ActiveCall,
@@ -3832,10 +4100,20 @@ export class Simulation {
   ): readonly CarSnapshot[] {
     if (!this.#panelAssigns) return snapshots;
     const floor = this.#building.requireFloor(active.floorId);
+    const bank = this.#building.bankById(active.bankId);
+    /* c8 ignore next -- every active call belongs to a bank of this building. */
+    if (bank === undefined) return snapshots;
     const promised = new Set<string>();
     for (const passenger of this.#waitingForCall(floor, active)) {
       const carId = passenger.assignedCarId;
-      if (carId !== undefined) promised.add(carId);
+      // Somebody this bank could carry and has told nothing. The landing is not settled, and the
+      // decision that settles it is the whole group's — the same predicate `#tellThePanel` uses to
+      // decide whom it may answer, asked here about whether anybody is still owed an answer.
+      if (carId === undefined) {
+        if (this.#bankCanCarry(bank, passenger)) return snapshots;
+        continue;
+      }
+      promised.add(carId);
     }
     if (promised.size === 0) return snapshots;
     const restricted = snapshots.filter((snapshot) => promised.has(snapshot.carId));
@@ -3993,7 +4271,7 @@ export class Simulation {
     }
     if (status === 'timed-out' && this.#options.onTimeout === 'throw') {
       throw new SimulationError(
-        `Run "${this.#runId}" did not deliver everybody: ${undelivered.length} of ${audit.generated} journeys were still in the system when the run stopped at t=${endedAt}s. ${this.#timeoutDiagnosis()} This is a failed run, not a slow one — pass onTimeout: 'report' to inspect it.`,
+        `Run "${this.#runId}" did not deliver everybody: ${undelivered.length} of ${audit.generated} journeys were still in the system when the run stopped at t=${endedAt}s. ${this.#timeoutDiagnosis(endedAt)} This is a failed run, not a slow one — pass onTimeout: 'report' to inspect it.`,
         result,
       );
     }
@@ -4047,12 +4325,34 @@ export class Simulation {
    * that simply ran out of scheduled work while people were still standing at landings is a
    * different failure with a different remedy, and telling its owner to raise `drainGraceS`
    * would send them to look at a knob that had nothing to do with it.
+   *
+   * **It did exactly that, and the counter is the reason.** The test used to be
+   * `#deadlineTruncations > 0 || now >= deadline`, and `#deadlineTruncations` counts *dispatch
+   * retry ticks* as well as work: a bank with no in-service car spins one retry per
+   * `dispatchRetryS`, the last of which falls past the deadline, so a run with **nobody to carry
+   * anybody** reported *"the drain deadline cut 1 pieces of work: raise sim.drainGraceS"* — for a
+   * run whose last recorded event was 3 600 s before that deadline. Measured refutation, on
+   * `garden-apartments` and `midtown-office` with every car withdrawn: re-running at
+   * `drainGraceS: 36000` leaves the result bit-identical, delivered still 0.
+   *
+   * So the question is asked of the clock the run publishes: did this run **reach** its deadline?
+   * `endedAt` is `max(lastEventAt, demand horizon)` and the deadline is the horizon plus the
+   * grace, so `endedAt >= deadlineS` is true exactly of a run the deadline stopped and false of one
+   * that ran out of work first. The truncation counter is still reported — it is a fact — but it
+   * no longer *decides*, and the quiet case says out loud that a non-zero count of it is not
+   * evidence for the knob.
+   *
+   * @param endedAt the instant the run reports having stopped, from {@link #finish}.
    */
-  #timeoutDiagnosis(): string {
-    if (this.#deadlineTruncations > 0 || this.#kernel.now() >= this.#deadlineS) {
-      return `The drain deadline (t=${this.#deadlineS}s = end of demand + sim.drainGraceS) cut ${this.#deadlineTruncations} pieces of work: raise sim.drainGraceS or lower demand.`;
+  #timeoutDiagnosis(endedAt: SimTime): string {
+    if (endedAt >= this.#deadlineS) {
+      return `The drain deadline (t=${this.#deadlineS}s = end of demand + sim.drainGraceS) stopped this run at t=${endedAt}s and cut ${this.#deadlineTruncations} pieces of work: raise sim.drainGraceS or lower demand.`;
     }
-    return `The event queue emptied at t=${this.#kernel.now()}s without the drain deadline (t=${this.#deadlineS}s) ever biting, so nothing was truncated — the run simply stopped scheduling work while people were still waiting. Check result.warnings for the calls involved; raising sim.drainGraceS cannot help.`;
+    const cut =
+      this.#deadlineTruncations === 0
+        ? 'nothing was truncated'
+        : `the ${this.#deadlineTruncations} truncation(s) counted are dispatch retries that fell past it, not work that would have carried anybody`;
+    return `The event queue emptied at t=${endedAt}s, ${this.#deadlineS - endedAt}s short of the drain deadline (t=${this.#deadlineS}s) and without it ever biting, so ${cut} — the run simply stopped scheduling work while people were still waiting. Check result.warnings for the calls and the banks involved; raising sim.drainGraceS cannot help, and re-running with a larger one returns the same figures.`;
   }
 
   /**
@@ -4076,6 +4376,30 @@ export class Simulation {
    * that happened to pass and load it is not a problem, and saying so would be a lie.
    */
   #diagnoseStuckCalls(): void {
+    /*
+     * **A bank with nobody to send, said first, because it explains everything below it.**
+     *
+     * Every other line in this method describes a call that some car refused. A bank whose whole
+     * fleet is out of group control refuses nothing — no car is priced, no verdict is recorded,
+     * `#unservable` and `#refusals` stay empty — so the run used to reach the end with a status of
+     * `timed-out`, nobody delivered, and **not one warning**. That is the shape a player is most
+     * likely to produce on purpose (withdraw the cars and watch) and the one the product said
+     * least about.
+     *
+     * Reported whether or not service came back, with the window, because a bank that was dead for
+     * twenty minutes explains a run's waits even after a car returns. `Car.acceptsHallCalls` is the
+     * predicate, so `out-of-service`, `independent` and `fire-recall` all count — none of the three
+     * collects a landing queue.
+     */
+    for (const [bankId, seen] of this.#banksWithoutService) {
+      const bank = this.#building.bankById(bankId);
+      const fleet = bank === undefined ? 0 : bank.cars.length;
+      const back = bank?.cars.some((car) => car.acceptsHallCalls) ?? false;
+      this.#warnings.push(
+        `bank "${bankId}" was asked to collect a landing while not one of its ${fleet} car(s) was in group control — every one was out of service, on independent operation or recalled — first at t=${seen.from.toFixed(1)}s, last at t=${seen.until.toFixed(1)}s, with up to ${seen.peakWaiting} rider(s) eligible and waiting at a single call. No car was priced and no call was refused, so nothing else in this run names the cause. ${back ? 'Service returned to the bank before the run ended.' : 'No car in this bank was back in group control when the run ended, so every landing it serves stayed uncollected.'} This is a fleet that cannot answer, not a dispatcher setting: no weight, no reassignment policy and no drain grace reaches it.`,
+      );
+    }
+
     // The bare kiosk's refusals, said out loud once. A landing that was collected around them
     // reports nothing else at all — the call completed — so without this line the only trace of
     // a turned-away passenger is a row in `undelivered` that looks like ordinary overflow.

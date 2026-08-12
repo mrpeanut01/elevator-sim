@@ -83,6 +83,22 @@ const DISPATCHER_IDS = ['nearest-car', 'eta', 'collective'] as const;
  * building declaring `accessZones` can do; both tables were regenerated together in one run of one
  * tree, so the one-key claim is still a measurement. The six unzoned cells below are byte-for-byte
  * what they were before the gap existed, which is what this lane's byte-identity claim is.
+ *
+ * **And again for § D332 — three cells, and the twelve that did not move are the control.** The
+ * deck fix lets a double-deck car answer a call at the floor its upper deck already has open, so
+ * only a building declaring `floorPairs` can change; `vertical-city` is the one that does. The
+ * other twelve entries below were regenerated in the same run of the same tree and came back
+ * byte-for-byte identical, which is the check that the fix is inert where it should be — and it is
+ * inert *structurally*, because `stopFloorIdOf` returns its argument on a shaft that is not
+ * double-deck.
+ *
+ * **These three digests were regenerated locally, and that is defensible here because they were
+ * measured to be platform-stable rather than assumed to be.** § D196/D201 record that some pins in
+ * this repository are environment-dependent, which is why CI runs a two-OS matrix. These are not
+ * among them: the failing run on CI's **linux** and **macOS** legs and the local macOS run each
+ * reported the same six replacement digests, character for character, so three independent machines
+ * agree on the new values. A pin regenerated on one machine is only sound when that has been
+ * checked, and this is the check.
  */
 const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'garden-apartments|nearest-car':
@@ -101,9 +117,9 @@ const SUPERSEDED_STRUCTURAL: Readonly<Record<string, string>> = {
   'secure-tower|nearest-car': '3b99ad0366448c26f08047eff7bfb29706e089e52009131bd26eb705a71a750c',
   'secure-tower|eta': 'a0294d5060875bf3b4143ebf4ebddb1682bdb7f193d36954d7f18e8976736b5b',
   'secure-tower|collective': '13bce7a771756549df8c2432798fbd064014ed0dfd44b2dfb572fba5d72f1e36',
-  'vertical-city|nearest-car': '3b323308fafc96cf4e40909ad7460e9b440c439b2292ff659dfcc4c40d3f9b3d',
-  'vertical-city|eta': 'efc3de9879571eb5d62bc893fba2a772494d6c4020b300780fa5c2a8cb2809aa',
-  'vertical-city|collective': 'fb50e75156ea5fadabc5cb337ff65ff9583795ee843009af72b752c96bd8cf39',
+  'vertical-city|nearest-car': '40c925c5e7af9bb70cfafc5c1349b89cb49bca9814bbb96ad437e0d41d0bbf11',
+  'vertical-city|eta': 'dc8d212732994a2b45b870440045309b850827809bf7f061bc89f3cc28c97a02',
+  'vertical-city|collective': '7f9b3a5adeeeb7ceb82d866bbe93c2e73346fc9401548f3dd4d4b19b261fef01',
 };
 
 /**

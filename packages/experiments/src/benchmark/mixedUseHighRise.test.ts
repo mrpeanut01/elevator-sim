@@ -328,21 +328,63 @@ describe('the gate is TTD, and AWT and WT95 are reported beside it with verdicts
     expect(point.cell(LEVEL_0_ARM, 'eta', 'rideMeanS').verdict).toBe('BETTER');
   });
 
-  it('finds the Level-1 panel NOT beating eta or collective on TTD at any point', () => {
-    // The half that fails, asserted so it cannot quietly stop being reported. The panel wins
-    // against nearest-car everywhere and against the two collective-class baselines nowhere.
+  it('finds the Level-1 panel beating eta and collective on TTD at the heavy point, and nowhere else', () => {
+    /*
+     * **This assertion used to be a blanket negative, and § D333 turned it over.**
+     *
+     * It read *"NOT beating eta or collective on TTD at any point"*, and that was the half of
+     * Phase 6b that failed — the criterion was met by the Level-0 arm alone. It is now met by both.
+     * The cause is not a change to the panel: it is `Simulation#tellThePanel`, which promised every
+     * waiter at a landing to `carIds[0]` with no capacity bound, so the Level-1 arm was being
+     * measured with a defect that only it could suffer. Fixing it moved the heavy point from
+     * INDISTINGUISHABLE to BETTER against **both** collective-class baselines:
+     *
+     * | point | − eta | − collective |
+     * |---|---|---|
+     * | `up-peak-1pct` | `−0.162 [−0.576, +0.253]` INDISTINGUISHABLE | `−0.163 [−0.577, +0.252]` INDISTINGUISHABLE |
+     * | `up-peak-2pct` | `−0.162 [−0.722, +0.398]` INDISTINGUISHABLE | `−0.093 [−0.660, +0.474]` INDISTINGUISHABLE |
+     * | `up-peak-4pct` | **`−1.598 [−2.575, −0.621]` BETTER** | **`−1.642 [−2.620, −0.663]` BETTER** |
+     *
+     * **The win is asserted with its resolution beside it, not on the interval alone.** An interval
+     * excluding zero is not a result when the effect is smaller than the apparatus can resolve —
+     * `CLAUDE.md`'s standing rule, and the reason Phase 6c was refused three times. Here the heavy
+     * point reports `requiredReplications = 1` against a measured ceiling of 206 at n = 200, so the
+     * effect is resolvable at this cell by the study's own arithmetic rather than by assumption.
+     * That is checked below rather than described.
+     *
+     * The two light points staying INDISTINGUISHABLE is kept as part of the claim: a fix that made
+     * the panel better *everywhere* would be a suspiciously tidy result, and the shape here — no
+     * effect where the cars do not fill, a real one where they do — is the mechanism the defect
+     * predicts, since an unbounded promise only bites once a car is over-subscribed.
+     */
+    const heavy = mixedUsePoint(study, 'up-peak-4pct');
+    expect(heavy).toBeDefined();
+    if (heavy === undefined) return;
+
     for (const point of study.points) {
       for (const baseline of ['eta', 'collective']) {
         if (!study.baselines.includes(baseline)) continue;
-        expect(
-          point.cell(LEVEL_1_ARM, baseline, MIXED_USE_GATE).verdict,
-          `${point.id}: ${LEVEL_1_ARM} − ${baseline} on the gate`,
-        ).not.toBe('BETTER');
+        const gate = point.cell(LEVEL_1_ARM, baseline, MIXED_USE_GATE);
+        const label =
+          `${point.id}: ${LEVEL_1_ARM} − ${baseline} on the gate: ` +
+          `${gate.estimate.mean.toFixed(3)} [${gate.estimate.lower.toFixed(3)}, ${gate.estimate.upper.toFixed(3)}]`;
+        if (point.id === 'up-peak-4pct') {
+          expect(gate.verdict, label).toBe('BETTER');
+          expect(gate.estimate.upper, label).toBeLessThan(0);
+          // Resolvable at this cell, measured rather than inherited from another study's limit.
+          expect(gate.requiredReplications ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+            gate.comparison.n,
+          );
+        } else {
+          expect(gate.verdict, label).not.toBe('BETTER');
+        }
       }
     }
-    const heavy = mixedUsePoint(study, 'up-peak-4pct');
-    expect(heavy?.cell(LEVEL_1_ARM, 'eta', 'wt95S').verdict).toBe('WORSE');
-    expect(heavy?.cell(LEVEL_1_ARM, 'eta', 'awtS').verdict).toBe('WORSE');
+
+    // The cost that survives the fix, still reported rather than dropped — D27's sign split. The
+    // panel buys the journey and still pays for it at the landing.
+    expect(heavy.cell(LEVEL_1_ARM, 'eta', 'wt95S').verdict).toBe('WORSE');
+    expect(heavy.cell(LEVEL_1_ARM, 'eta', 'awtS').verdict).toBe('WORSE');
   });
 
   it('reports the blind control as blind, with the count that says why', () => {

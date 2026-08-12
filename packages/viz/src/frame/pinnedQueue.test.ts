@@ -32,6 +32,25 @@ import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from './pinned
 
 let panel: VizRecording;
 let conventional: VizRecording;
+/**
+ * The instant this run is most pinned, found by sweeping it rather than assumed to be the end.
+ *
+ * **This used to be `panel.endedAt - 1`, and § D333 is why it cannot be.** That worked because the
+ * panel run did not finish: it timed out with thousands of riders still standing, so the last
+ * instant was also the worst one. With the unbounded promise fixed the run *drains* — the landings
+ * are empty when it ends, and a probe at `endedAt - 1` now finds nothing pinned and would report
+ * this surface dead.
+ *
+ * It is not dead. Swept at 400 instants across the same recording, the condition holds in **194**
+ * of 401 frames, peaking at floor `G` with 73 riders standing for `shuttle-S5`, which seats 26. So
+ * the surface still fires on real traffic, which is the claim this file exists to make; what
+ * changed is that the moment it fires is no longer the moment the run stops.
+ *
+ * Derived rather than pinned to a constant `t`, deliberately. A hard-coded instant would be a
+ * second thing to re-measure every time dispatch moves, and it is exactly what made this file fail
+ * for a fix that improved the product.
+ */
+let pinnedMoment: number;
 
 beforeAll(async () => {
   const config: LoadedConfig = await loadConfig(DATA_DIR);
@@ -43,6 +62,20 @@ beforeAll(async () => {
   ).recording;
   conventional = recordRun(suppressedConfig(config, { onTimeout: 'report' })).recording;
   expect(panel.buildingId).toBe(SUPPRESSED_BUILDING_ID);
+
+  // The sweep. Worst-first ordering is `pinnedQueuesAt`'s own guarantee, so the largest overhang
+  // in the run is the head of whichever frame has the largest head.
+  let worstSeen = 0;
+  pinnedMoment = panel.endedAt - 1;
+  const steps = 400;
+  for (let i = 0; i <= steps; i += 1) {
+    const t = panel.startedAt + ((panel.endedAt - panel.startedAt) * i) / steps;
+    const head = pinnedAt(panel, t)[0];
+    if (head !== undefined && head.waiting > worstSeen) {
+      worstSeen = head.waiting;
+      pinnedMoment = t;
+    }
+  }
 }, 600_000);
 
 const pinnedAt = (recording: VizRecording, t: number): readonly PinnedQueue[] =>
@@ -53,8 +86,7 @@ describe('a landing promised to one full car', () => {
     // The report: "numerous people in the lobby and cars on the lobby floor, but they were not
     // serving riders, they were just sitting there." Measured on this recording, one promised car
     // holds more riders than it can carry — which is that picture, stated.
-    const late = panel.endedAt - 1;
-    const pinned = pinnedAt(panel, late);
+    const pinned = pinnedAt(panel, pinnedMoment);
     expect(pinned.length).toBeGreaterThan(0);
     const worst = pinned[0];
     expect(worst).toBeDefined();
@@ -79,7 +111,7 @@ describe('a landing promised to one full car', () => {
   });
 
   it('counts trips by the car’s own capacity, not by a number chosen here', () => {
-    const pinned = pinnedAt(panel, panel.endedAt - 1);
+    const pinned = pinnedAt(panel, pinnedMoment);
     for (const entry of pinned) {
       const shaft = panel.shafts.find((candidate) => candidate.carId === entry.carId);
       // The capacity is read off the building, so a re-authored car changes the trigger with it.
@@ -89,7 +121,7 @@ describe('a landing promised to one full car', () => {
   });
 
   it('orders worst first, and totally, so a banner does not reshuffle between frames', () => {
-    const pinned = pinnedAt(panel, panel.endedAt - 1);
+    const pinned = pinnedAt(panel, pinnedMoment);
     for (let i = 1; i < pinned.length; i += 1) {
       const previous = pinned[i - 1];
       const current = pinned[i];
@@ -98,13 +130,13 @@ describe('a landing promised to one full car', () => {
     }
     // Deterministic: the same instant twice is the same array, which is what the playhead scrubbing
     // backwards requires of everything in `frame/`.
-    expect(pinnedAt(panel, panel.endedAt - 1)).toEqual(pinned);
+    expect(pinnedAt(panel, pinnedMoment)).toEqual(pinned);
   });
 });
 
 describe('the sentence', () => {
   it('says the cause, not just that something is wrong', () => {
-    const pinned = pinnedAt(panel, panel.endedAt - 1);
+    const pinned = pinnedAt(panel, pinnedMoment);
     const long = describePinnedQueues(pinned);
     // R3: a suppressed thing is replaced by *why*, never by a blank — and never by a bare alarm.
     // The named car and the capacity are the whole content; without them this is "queue pinned".
@@ -120,7 +152,7 @@ describe('the sentence', () => {
     // § D29 chose the write-once promise deliberately, and a non-zero count is a result rather
     // than a failure. Copy that called it a fault would be this repository asserting a verdict its
     // own decision record contradicts.
-    const long = describePinnedQueues(pinnedAt(panel, panel.endedAt - 1)).toLowerCase();
+    const long = describePinnedQueues(pinnedAt(panel, pinnedMoment)).toLowerCase();
     for (const word of ['fail', 'broken', 'error', 'bug', 'stuck', 'fault']) {
       expect(long, word).not.toContain(word);
     }
@@ -129,7 +161,7 @@ describe('the sentence', () => {
   });
 
   it('has a short form that keeps the cause and drops the arithmetic', () => {
-    const pinned = pinnedAt(panel, panel.endedAt - 1);
+    const pinned = pinnedAt(panel, pinnedMoment);
     const short = describePinnedQueues(pinned, { short: true });
     expect(short).toContain('one named car');
     expect(short.length).toBeLessThan(describePinnedQueues(pinned).length);

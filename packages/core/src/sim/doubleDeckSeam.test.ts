@@ -224,11 +224,30 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
      * three shipped dispatchers still save shuttle moves when the decks are paired — 256 against
      * 262, 271 against 299, 296 against 309 — so the `saved === 3` claim below is still a
      * measurement of this run and not an inheritance from the last one.
+     *
+     * **Re-measured a third time for § D332, and this one moved the paired arm in both
+     * directions.** Stage 6 compared a call's floor against `CarSnapshot.floorId` literally, so a
+     * double-deck car standing at the *lower* floor of a pair refused a call at the upper floor its
+     * other deck had open. With that closed, the paired arm answers landings it used to drive past:
+     * `nearest-car` **256 → 261**, `eta` **271 → 265**, `collective` **296 → 287**.
+     *
+     * **The control arm is unchanged in all three — 262, 299, 309 — and that is the check that
+     * makes the rest readable.** `withoutFloorPairs` declares no pairs, `stopFloorIdOf` is identity
+     * on a shaft that is not double-deck, and so the single arm is bit-identical by construction
+     * rather than by luck. Every move that changed is a move on the paired side.
+     *
+     * The `saved === 3` claim below still holds and is still a measurement, but **`nearest-car`'s
+     * margin collapses from 6 moves to 1** while the two look-ahead dispatchers' margins widen
+     * (28 → 34, 13 → 22). That split is the finding: answering a call at the deck that is already
+     * open is worth most to a dispatcher that was choosing between stops anyway, and `nearest-car`
+     * — which does not look ahead — spends the new eligibility on extra journeys instead. It is
+     * recorded rather than acted on; a one-move margin is not a claim about anything, and the
+     * `saved === 3` line below now says so.
      */
     const CENSUS: Readonly<Record<string, readonly [number, number]>> = {
-      'nearest-car': [256, 262],
-      eta: [271, 299],
-      collective: [296, 309],
+      'nearest-car': [261, 262],
+      eta: [265, 299],
+      collective: [287, 309],
     };
 
     let saved = 0;
@@ -257,6 +276,15 @@ describe('a stop at a floor pair serves both floors, and a run can see it', () =
     // It is still pinned rather than promoted to a rule. Three of three is a stronger result than
     // two of three, and it is exactly the kind of result that would be worth nothing if the count
     // were allowed to drift.
+    //
+    // **Still three of three after § D332's deck fix, and the count is now the weaker half of what
+    // this line knows.** `nearest-car` saves by **one move** — 261 against 262 — which is a margin
+    // no reader should treat as a result: it is one stop out of 262 on a single seed, with no
+    // interval around it, and it would flip on a run this test does not do. The other two widened
+    // (34 and 22). So the pin is kept for drift detection, and the *claim* it supports is now "the
+    // two look-ahead dispatchers save moves when the decks are paired", with `nearest-car`
+    // recorded as too close to call. Promoting three-of-three to a rule here would be exactly the
+    // confident nonsense CLAUDE.md names as this project's likeliest failure.
     expect(saved).toBe(3);
   }, 300_000);
 

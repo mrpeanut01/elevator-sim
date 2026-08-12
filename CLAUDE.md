@@ -15,8 +15,18 @@ verdict:
 
 - **Phase 6** — 6a (destination *disclosure*) and 6b (destination *dispatch*) are accepted against a
   **raised** criterion, now measured on the building that criterion names ([§ D100](DECISIONS.md)).
-  The gate is **met by the Level-0 arm and not by the Level-1 panel at any measured point** — say
-  both. 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
+  The gate **was met by the Level-0 arm and not by the Level-1 panel at any measured point**, and
+  **that second half stopped being true on 2026-08-11** ([§ D333](DECISIONS.md)). It was never a
+  fact about the panel: `Simulation#tellThePanel` promised every waiter at a landing to `carIds[0]`
+  with no capacity bound, so the Level-1 arm was the only arm that could suffer the defect and it
+  was measured with it. Bounded, the heavy point turns over — at `up-peak-4pct`, n = 200, ΔTTD
+  `−1.598 [−2.575, −0.621]` against `eta` and `−1.642 [−2.620, −0.663]` against `collective`, both
+  **BETTER**, with `requiredReplications = 1` against that cell's measured ceiling of 206, so the
+  effect is resolvable there rather than merely excluding zero. **The gate is now met by both
+  arms** — and say the shape, not just the verdict: the two light points stay INDISTINGUISHABLE,
+  which is what an over-subscription defect predicts, since an unbounded promise cannot bite until
+  a car fills. The cost is unchanged and still reported beside it (AWT and WT95 **WORSE** against
+  `eta` at that point). 6c (learned control) is **no longer deferred — it is implemented, measured, and NOT
   ACCEPTED**: ΔTTD `−0.213 [−0.440, +0.014]` against `collective` at n = 200 on a disjoint seed, an
   interval containing zero, unchanged at 24 and 64 search candidates ([§ D139](DECISIONS.md) is the
   criterion, dated before the code; [§ D145](DECISIONS.md) is the verdict). **That refusal is now

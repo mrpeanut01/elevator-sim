@@ -117,14 +117,14 @@
  * | | vs `nearest-car` | vs `eta` | vs `collective` |
  * |---|---|---|---|
  * | **Level 0** (`+ride1`) | `−21.239 [−22.793, −19.685]` **BETTER** | `−2.072 [−2.868, −1.277]` **BETTER** | `−2.116 [−2.908, −1.325]` **BETTER** |
- * | Level 1 (`panel`) | `−18.633 [−20.702, −16.563]` **BETTER** | `+0.534 [−0.855, +1.923]` INDIST. | `+0.490 [−0.902, +1.882]` INDIST. |
+ * | Level 1 (`panel`) | `−20.764 [−22.520, −19.009]` **BETTER** | `−1.598 [−2.575, −0.621]` **BETTER** | `−1.642 [−2.620, −0.663]` **BETTER** |
  *
  * **AWT and WT95 beside it, with verdicts, because § D27 says a cost hidden is a cost claimed:**
  *
  * | | ΔAWT vs `eta` | ΔWT95 vs `eta` | Δride vs `eta` |
  * |---|---|---|---|
  * | **Level 0** | `+0.876 [+0.703, +1.050]` **WORSE** | `+0.273 [−0.026, +0.571]` INDIST. | `−2.452 [−3.068, −1.835]` BETTER |
- * | Level 1 | `+3.190 [+2.463, +3.916]` **WORSE** | `+9.083 [+5.683, +12.484]` **WORSE** | `−3.126 [−3.785, −2.466]` BETTER |
+ * | Level 1 | `+2.119 [+1.737, +2.501]` **WORSE** | `+3.244 [+0.715, +5.773]` **WORSE** | `−3.393 [−4.051, −2.735]` BETTER |
  *
  * Four readings, and none of them is the headline alone.
  *
@@ -133,11 +133,29 @@
  * verdicts — one WORSE and one INDISTINGUISHABLE. § D27 is explicit that a WORSE AWT does not fail
  * the phase and omitting it does.
  *
- * **It is not met by the Level-1 panel, at any measured point.** Against `eta` and `collective` the
- * panel's TTD interval contains zero at every rate, and at 4 % it is `+9.083 [+5.683, +12.484]` s
- * WORSE on WT95 — the write-once promise (§ D29) binding under load, the same mechanism
- * `destinationDispatchContrast.ts` measures on Midtown. Level 1 buys in-car time and pays for it at
- * the landing, and on this building at this load it pays more than it buys.
+ * **It is met by the Level-1 panel too, at the heavy point — and until § D333 it was not.** This
+ * paragraph used to read *"it is not met by the Level-1 panel, at any measured point"*, and that
+ * was never a fact about the panel. `Simulation#tellThePanel` promised every waiter at a landing to
+ * `carIds[0]` with **no capacity bound**, so a rider arriving at a busy panel inherited a pin they
+ * were never told about — a defect only the Level-1 arm can suffer, because only Level 1 promises
+ * anybody a car. The arm was measured with it for the whole of Phase 6b.
+ *
+ * Bounded, the heavy point turns over: `−1.598 [−2.575, −0.621]` against `eta` and
+ * `−1.642 [−2.620, −0.663]` against `collective`, both **BETTER**, with `requiredReplications = 1`
+ * against this cell's measured ceiling of 206 — so the effect is resolvable here rather than merely
+ * an interval that excludes zero, which is the distinction Phase 6c was refused three times for
+ * failing.
+ *
+ * **The cost is unchanged and still the point of § D27.** Level 1 still buys in-car time
+ * (`−3.393 [−4.051, −2.735]`) and still pays for it at the landing — AWT `+2.119 [+1.737, +2.501]`
+ * WORSE and WT95 `+3.244 [+0.715, +5.773]` WORSE. What changed is that it now buys more than it
+ * pays on the gate; both halves are published because a gate quoted without its costs is the
+ * claim § D27 exists to forbid.
+ *
+ * **And the shape is as load-bearing as the verdict.** The two lighter points stay
+ * INDISTINGUISHABLE, which is what an over-subscription defect predicts and a general improvement
+ * would not: an unbounded promise cannot bite until a car fills. A fix that had made the panel
+ * better everywhere would be the suspiciously tidy result, and is not what was measured.
  *
  * **It is not met at the lighter points, and the required-`n` says why rather than the verdict.**
  * At 2 % the Level-0 gate against `eta` is `−0.109 [−0.616, +0.399]` — INDISTINGUISHABLE, needing

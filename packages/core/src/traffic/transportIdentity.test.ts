@@ -178,11 +178,22 @@ const BASELINE_STRUCTURAL: Readonly<Record<string, string>> = {
  * the same delta proof — see {@link BASELINE_STRUCTURAL}. `vertical-city` runs `rise-and-fall`,
  * which now declares 08:30; its escalator routing is untouched and its `transportHops` count below
  * is unchanged.
+ *
+ * **Re-pinned again for § D332's deck fix, and the escalator claim is re-read rather than
+ * inherited.** A double-deck car may now answer a call at the floor its upper deck already has
+ * open, which moves this building's run and therefore its digest. What it does *not* move is the
+ * thing this table exists to watch: `transportHops` below is unchanged in all three arms, so the
+ * riders taking the escalator are the same riders, and the digest moved because the lifts around
+ * them behaved differently. A transport pin that moved *with* its hop count would be a different
+ * and much more interesting failure, and this is the assertion that tells the two apart.
+ *
+ * Regenerated locally on the same measured-platform-stable grounds as {@link BASELINE_STRUCTURAL} —
+ * CI's linux leg, CI's macOS leg and the local run reported these three character for character.
  */
 const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
-  'vertical-city|nearest-car': 'd826af3bd806d84e72b4bf3c934e47c35e3211460a7a8a67218567e8110d0fc8',
-  'vertical-city|eta': 'a6c3d0704c13cdc2e91fc4d3f29b13b333d2ae05088cb2d6f3d7c854f3eb4edf',
-  'vertical-city|collective': '7603c8b397ccd88b141748625640d847985f0134b2c1c2ae604448b7dd498756',
+  'vertical-city|nearest-car': 'c27d5005cd0753365ec12f2a7ce73a6903f34d04343db7594287bf0b95b8b151',
+  'vertical-city|eta': '11935af9e94650a804295699dc304e06eaf620f2195ef0d5fd6c2c3830b13fc2',
+  'vertical-city|collective': '522ee3ff6efb10bfc5a79a707ad263bf18cd363ec4dfbd95ad4e30455bed4c89',
 };
 
 /**
@@ -220,6 +231,39 @@ const MOVED_STRUCTURAL: Readonly<Record<string, string>> = {
  * and WT95 are the acceptance statistics, `workPerLegKJ` is the § D106 companion the energy figure
  * may not be read without, and `longestWaitS` is the § D108 abandonment-horizon ground. A change
  * that moves the run without moving any of these has still moved the structural digest.
+ *
+ * ## The three `vertical-city` rows, re-measured for § D332 and § D333
+ *
+ * All eight figures moved in all three arms, because both fixes land on this building: the deck
+ * fix (§ D332) lets a paired car answer at the deck it already has open, and the panel-pin fix
+ * (§ D333) stops one car being promised a queue it cannot hold. The twelve rows above are
+ * unchanged, which is the control.
+ *
+ * **What moved, stated as arithmetic on one seed and not as a result:**
+ *
+ * | arm | waitMean | waitP95 | longestWait | workKJ |
+ * |---|---|---|---|---|
+ * | `nearest-car` | 130.3 → 97.1 | 471.7 → 337.3 | 633.3 → 507.5 | 50 275 → 56 214 |
+ * | `eta` | 24.2 → 23.2 | 79.4 → 67.0 | 120.9 → 137.6 | 70 223 → 64 522 |
+ * | `collective` | 30.2 → 27.2 | **80.4 → 97.1** | **408.6 → 148.6** | 81 058 → 71 945 |
+ *
+ * **`collective` is the row to read, and it is not the good-news row it looks like.** Its mean
+ * improves, its worst wait falls by 64 %, and its **p95 gets 21 % worse** at the same time. That
+ * combination is what a redistribution looks like rather than an improvement: the panel fix serves
+ * riders who used to be pinned behind a full car, and a rider who is finally served with a
+ * two-minute wait enters the percentile they were previously absent from. Reporting the mean and
+ * the longest wait without the p95 beside them would turn this row into a claim it does not
+ * support — which is the § D106 rule about energy, applied to a wait distribution.
+ *
+ * **`nearest-car` moves the other way on energy** — waits down across the board, `workKJ` **up
+ * 12 %** — and that is § D106's own case: it answers more calls at paired landings, so it drives
+ * more and carries more, and `workPerLegKJ` rises with it (59.3 → 63.2) rather than falling, so
+ * the extra energy is not being bought by serving extra people per trip.
+ *
+ * **None of the above is an interval.** These are single-seed structural pins with a relative
+ * tolerance, kept so that drift is noticed; they are not paired-t comparisons and nothing here may
+ * be quoted as one dispatcher beating another. The statistical claims live in `benchmark/`, where
+ * they are measured at 50–200 replications under common random numbers.
  */
 const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   'garden-apartments|nearest-car': { waitMeanS: 22.516504973257074, waitP95S: 44.3475961534573, rideMeanS: 28.671768707483043, ttdMeanS: 51.18827368074012, workKJ: 159.47144369607724, workPerLegKJ: 22.781634813725322, handlingPct: 6.666666666666667, longestWaitS: 48.503080914483576 },
@@ -234,9 +278,9 @@ const BASELINE_HEADLINE: Readonly<Record<string, Readonly<Record<string, number>
   'secure-tower|nearest-car': { waitMeanS: 117.50578060891134, waitP95S: 236.49202767237338, rideMeanS: 99.05396066082899, ttdMeanS: 224.9833335727993, workKJ: 3692.412283657347, workPerLegKJ: 27.351202101165534, handlingPct: 6.754032258064516, longestWaitS: 261.24994780096097 },
   'secure-tower|eta': { waitMeanS: 33.18829302490414, waitP95S: 86.37592396911488, rideMeanS: 100.83803786988547, ttdMeanS: 139.19270979268728, workKJ: 6256.948630612125, workPerLegKJ: 46.347767634163894, handlingPct: 10.483870967741936, longestWaitS: 91.88634249324991 },
   'secure-tower|collective': { waitMeanS: 28.077489232750207, waitP95S: 103.06062675292485, rideMeanS: 95.86154920637641, ttdMeanS: 127.06784142193546, workKJ: 6714.034768258036, workPerLegKJ: 49.73359087598545, handlingPct: 11.088709677419354, longestWaitS: 166.82792671858385 },
-  'vertical-city|nearest-car': { waitMeanS: 130.27227643894926, waitP95S: 471.71911859523584, rideMeanS: 88.91265803083918, ttdMeanS: 363.86439856015835, workKJ: 50275.4997554894, workPerLegKJ: 59.287145938077124, handlingPct: 11.561285041948025, longestWaitS: 633.3074402713851 },
-  'vertical-city|eta': { waitMeanS: 24.230893718009746, waitP95S: 79.35783649899052, rideMeanS: 83.20450610244768, ttdMeanS: 183.33988863148602, workKJ: 70222.50025428712, workPerLegKJ: 80.90149798881005, handlingPct: 12.70718232044199, longestWaitS: 120.89955123787024 },
-  'vertical-city|collective': { waitMeanS: 30.197768922726834, waitP95S: 80.35426825330633, rideMeanS: 78.80324849119535, ttdMeanS: 181.76770543213865, workKJ: 81058.35428299439, workPerLegKJ: 91.38484135625072, handlingPct: 12.216083486801718, longestWaitS: 408.60979568160394 },
+  'vertical-city|nearest-car': { waitMeanS: 97.13014568650004, waitP95S: 337.25608353894995, rideMeanS: 82.74957073652443, ttdMeanS: 308.15939581212535, workKJ: 56214.400543239244, workPerLegKJ: 63.233296449088016, handlingPct: 12.461632903621854, longestWaitS: 507.52118017113503 },
+  'vertical-city|eta': { waitMeanS: 23.152778551459914, waitP95S: 66.97290344311216, rideMeanS: 81.27008148592162, ttdMeanS: 181.66679441775838, workKJ: 64522.176112578585, workPerLegKJ: 74.24876422621242, handlingPct: 12.482095355023532, longestWaitS: 137.6494509933474 },
+  'vertical-city|collective': { waitMeanS: 27.225913682314914, waitP95S: 97.11772561190551, rideMeanS: 78.78784705110202, ttdMeanS: 183.5741238700387, workKJ: 71945.19279067186, workPerLegKJ: 80.47560714840253, handlingPct: 12.318395743810107, longestWaitS: 148.6349797575955 },
 };
 
 /** The eight reported figures, and where each lives in a summary. */
