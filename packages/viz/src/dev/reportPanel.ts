@@ -1053,10 +1053,36 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
    */
   const was = new Map(previous.figures.map((cell) => [cell.id, cell]));
   const figures: DeltaRowView[] = [];
+  /**
+   * Figures this sheet withholds, which are named in the note instead of paired — § D334.
+   *
+   * **Why a row cannot be drawn here, when `withheld → 58.3 s` is drawn one branch up.** The two
+   * directions are not symmetric. `withheld → 58.3 s` ends on a number *this* sheet published and
+   * stands behind. The other way round ends on a refusal and leads with a number this sheet has
+   * just declined to quote — and the earlier run is the **same candidate arm at another seed**
+   * (`honesty/surfaces.ts` builds the swap sheet from `comparisonRecording`), so its mean sits
+   * right on top of the one being withheld. On `honesty-9100011` both round to **30.5 s**: the
+   * sheet printed `AVERAGE WAIT was 30.5 s → withheld` two lines under a cell reading `withheld`,
+   * and the number beside the word was, to any reader, the number the word was hiding.
+   *
+   * That is R3's textual half exactly — *a reader cannot tell a quoted figure from this run's
+   * figure* — and it is the same shape `shift/report.ts` fixed by spelling an illustrative 25 as
+   * **twenty-five**. A real measurement cannot be spelled away, so the pairing is refused instead.
+   *
+   * **Named rather than dropped.** `docs/16` S1 refuses a silent absence: the note says which
+   * figure was not paired and why, so a reader who counts the rows against the grid above finds an
+   * answer rather than a gap. The earlier run's mean is not lost either — it is on the earlier
+   * sheet, in its own box, with its own count beside it.
+   */
+  const withheldHere: string[] = [];
   for (const cell of current.figures) {
     const wasCell = was.get(cell.id);
     // A figure the earlier sheet did not carry is not a change; it is a sheet of a different shape.
     if (wasCell === undefined || wasCell.value === cell.value) continue;
+    if (cell.tone === 'withheld') {
+      withheldHere.push(cell.label);
+      continue;
+    }
     figures.push({
       label: cell.label,
       before: wasCell.value,
@@ -1074,12 +1100,27 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
   }
 
   const moved = selection.length > 0 || figures.length > 0;
+  /**
+   * The unpaired figures, stated in the note — see {@link withheldHere}.
+   *
+   * Appended to whichever note the block was going to carry rather than replacing it: the block is
+   * still a pairing, and *nothing moved* is still true of the figures that could be paired. A
+   * sentence that replaced the note would turn one withheld cell into a refusal of the whole block,
+   * which is what {@link ReportDeltaView.refused} is for and this is not.
+   */
+  const withheldNote =
+    withheldHere.length === 0
+      ? ''
+      : ` ${withheldHere.join(' and ')} ${withheldHere.length === 1 ? 'is' : 'are'} not paired: this ` +
+        `run withholds ${withheldHere.length === 1 ? 'it' : 'them'}, and the earlier run's figure ` +
+        `printed beside a withheld cell would read as the number being withheld.`;
   return {
     caption: 'What moved since the run before this one',
     selection,
     figures,
     refused: null,
-    note: moved
+    note:
+      (moved
       ? /*
          * The refusal, in the same visual unit as the rows it qualifies. It states what the block
          * **is** — two sheets, side by side — and what would be needed to turn it into a result,
@@ -1092,7 +1133,7 @@ function reportDeltaOf(previous: ShapedDayReport, current: ShapedDayReport): Rep
         'same passengers and an interval that excludes zero, which is what Compare is for.'
       : 'Nothing moved. A run is identified by its building, its dispatcher and its seed, so this ' +
         'is the same day simulated again and it reproduces exactly — the sheet is not stale, ' +
-        'there was nothing new to say.',
+        'there was nothing new to say.') + withheldNote,
   };
 }
 

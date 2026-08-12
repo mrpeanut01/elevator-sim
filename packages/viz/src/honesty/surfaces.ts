@@ -3728,9 +3728,17 @@ function reportPairingsOf(bundle: ShiftBundle): readonly ReportPairing[] {
  * where this row's role came from, and it is read as a digit test over that string rather than as
  * `!== null`: a count field holding a sentence with no number in it is not a count on screen.
  *
- * A side whose sheet refused its mean has no count, draws none and reports none, so a pairing where
- * the current cell is `withheld` still comes back `countShown: false` — and R13 stays silent there
- * because that row's role is `suppressed`, which is R3's business rather than R13's.
+ * A side whose sheet refused its mean has no count, draws none and reports none, so a pairing whose
+ * **earlier** cell is `withheld` comes back `countShown` read off the later side, which published
+ * one — and R13 stays silent on the refused half because that side's role is `suppressed`, which is
+ * R3's business rather than R13's.
+ *
+ * **The other arrangement no longer reaches this function — § D334.** A pairing whose *current*
+ * cell is `withheld` used to draw `30.5 s → withheld`, and on a same-arm pair the earlier run's
+ * mean rounds onto the withheld one often rather than rarely: `honesty-9100011` printed the run's
+ * own refused `meanWaitS` beside the word hiding it. `reportDeltaOf` now declines that pairing and
+ * names the figure in the note, so the only rows this adapter sees are ones ending on a value the
+ * current sheet stands behind.
  *
  * ## The counts are seeded as their own strings, which is the grid's arrangement and not a dodge
  *

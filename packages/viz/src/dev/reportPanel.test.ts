@@ -1167,17 +1167,62 @@ describe('what moved since the run before this one — issue #38', () => {
     };
     const delta = deltaOf(reportOf(clean), reportOf(refusedTwin));
     expect(delta.refused).toBeNull();
-    const wait = delta.figures.find((row) => row.label === 'AVERAGE WAIT');
-    expect(wait?.after).toBe(WITHHELD);
-    expect(wait?.after).not.toMatch(/\d/);
+
+    /*
+     * **The row is not drawn at all — § D334, and this test's own claim is what changed it.**
+     *
+     * The paragraph above says *"no digit of the mean it refuses appears anywhere in the block"*,
+     * and until § D334 that held **by luck of this fixture**: `clean` and `refusedTwin` are far
+     * enough apart that the earlier run's printed mean shares no rounding with the refused one. In
+     * the wild they are not far apart. `honesty/surfaces.ts` builds the swap sheet from the case's
+     * `comparisonRecording` — the *same candidate arm at another seed* — so on `honesty-9100011`
+     * both rounded to `30.5 s`, and the block printed `AVERAGE WAIT was 30.5 s → withheld` two
+     * lines under a cell reading `withheld`. The deep honesty tier caught it; this suite did not,
+     * because this fixture cannot produce it.
+     *
+     * So the claim is now enforced by construction rather than asserted over a fixture: a figure
+     * **this** sheet withholds is not paired, and the note says which and why.
+     */
+    expect(delta.figures.map((row) => row.label)).not.toContain('AVERAGE WAIT');
+    expect(delta.note).toContain('AVERAGE WAIT');
+    expect(delta.note).toContain('not paired');
+
+    // The claim itself, over every string the block draws — now true of any fixture, not this one.
     const text = [...delta.selection, ...delta.figures]
-      .flatMap((row) => [row.label, row.before, row.after])
+      .flatMap((row) => [row.label, row.before, row.after, row.beforeCount ?? '', row.afterCount ?? ''])
+      .concat(delta.caption, delta.note)
       .join('\n');
     for (const places of [0, 1, 2]) {
       expect(text).not.toContain(refusedTwin.summary.meanWaitS.toFixed(places));
     }
-    // And the other direction: the earlier sheet's publishable mean is quoted exactly as it printed.
-    expect(wait?.before).toBe(`${clean.summary.meanWaitS.toFixed(1)} s`);
+    // And the earlier run's mean is not lost — it is on the earlier sheet, in its own box.
+    expect(reportOf(clean).figures.find((cell) => cell.label === 'AVERAGE WAIT')?.value).toBe(
+      `${clean.summary.meanWaitS.toFixed(1)} s`,
+    );
+  });
+
+  it('still pairs the other direction, where the run stands behind the number it ends on', () => {
+    /*
+     * The asymmetry § D334 turns on, asserted so the fix cannot be over-applied. `withheld → 58.3 s`
+     * ends on a figure **this** sheet published; only the reverse leads with a number this sheet has
+     * declined to quote. Refusing both would delete the shape `DeltaRowView`'s docstring is about.
+     */
+    const refusedTwin: VizRecording = {
+      ...clean,
+      summary: {
+        ...clean.summary,
+        awtIsValid: false,
+        awtInvalidReason: 'the queue was still growing when the window closed',
+      },
+    };
+    const wait = deltaOf(reportOf(refusedTwin), reportOf(swapped)).figures.find(
+      (row) => row.label === 'AVERAGE WAIT',
+    );
+    expect(wait?.before).toBe(WITHHELD);
+    expect(wait?.after).toBe(`${swapped.summary.meanWaitS.toFixed(1)} s`);
+    // A refusal has no sample; the side that published a mean keeps its count.
+    expect(wait?.beforeCount).toBeNull();
+    expect(wait?.afterCount).toContain(String(swapped.summary.waitCount));
   });
 
   /**
@@ -1267,21 +1312,30 @@ describe('what moved since the run before this one — issue #38', () => {
      * refusal — R3's *suppression replaces the number* applied to the denominator. The refusal keeps
      * exactly the words it had before this change and gains nothing.
      */
-    const refusedTwin: VizRecording = {
-      ...swapped,
+    /*
+     * **Asked in the direction that still draws a row — § D334.** This used to pair
+     * `clean → refusedTwin`, which no longer draws one: a figure the *current* sheet withholds is
+     * named in the note instead. The rule being tested is unchanged and is about the count, so it
+     * is asked where a row exists — the earlier sheet refusing, the later one publishing.
+     */
+    const refusedEarlier: VizRecording = {
+      ...clean,
       summary: {
-        ...swapped.summary,
+        ...clean.summary,
         awtIsValid: false,
         awtInvalidReason: 'the queue was still growing when the window closed',
       },
     };
-    const wait = deltaOf(reportOf(clean), reportOf(refusedTwin)).figures.find(
+    const wait = deltaOf(reportOf(refusedEarlier), reportOf(swapped)).figures.find(
       (row) => row.label === 'AVERAGE WAIT',
     );
-    expect(wait?.after).toBe(WITHHELD);
-    expect(wait?.afterCount).toBeNull();
+    expect(wait?.before).toBe(WITHHELD);
+    expect(wait?.beforeCount).toBeNull();
     // The other side published a mean, so it keeps its count: one refusal does not silence both.
-    expect(wait?.beforeCount).toContain(String(clean.summary.waitCount));
+    expect(wait?.afterCount).toContain(String(swapped.summary.waitCount));
+
+    // And the withheld side carries no denominator anywhere in its box.
+    expect(wait?.before).not.toMatch(/\d/);
   });
 
   it('names what was run, so a change cannot be pinned on the wrong cause', () => {

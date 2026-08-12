@@ -557,26 +557,29 @@ const OUTSTANDING: readonly {
    * count, would be an allow-rule with a hiding place in it. What would close it is the caveat citing
    * its measurement without a bare integer — a copy change on a sentence § D160 owns — and that is
    * somebody's decision rather than a harness edit.
+   *
+   * ### **Both entries are DELETED as of § D334, and the caveat was not the thing that changed**
+   *
+   * The ghost check fired: the deep search stopped finding this collision on either surface. It is
+   * deleted here on the commit that made it stop reproducing, because an entry that no longer
+   * reproduces is as much a defect as a finding that is not recorded — and the register would
+   * otherwise be decoration.
+   *
+   * **Why it stopped, measured rather than inferred.** The case is `vertical-city` / `nearest-car`
+   * at seed `900344702126007`, and § D332's deck fix moved that building's runs. Re-measured on the
+   * fixed tree, that run reports `awtIsValid: **true**` and `meanWaitS: **19.186**` — where the
+   * finding needed a *refused* mean of 19.65 rounding to 20. Two independent things changed and
+   * either alone closes it: the run no longer suppresses its mean at all, so `suppressed-mean`
+   * cannot fire on it by construction; and the mean it does publish rounds to **19**, not 20.
+   *
+   * **So this is luck moving, not a defect being fixed, and the difference matters.** The caveat in
+   * `render/mood.ts` is unchanged and still cites its measurement with a bare integer. The copy
+   * change described above is still the thing that would close the *class*; what closed this
+   * *instance* is that a dispatch fix moved the one run whose refused mean happened to round onto
+   * the caveat's seed count. A future run that suppresses a mean rounding to 20 will collide again,
+   * and it will arrive unregistered — which is the correct state for a finding nothing currently
+   * reproduces.
    */
-  Object.freeze({
-    property: 'suppressed-mean',
-    surfaceId: 'render/mood.ts#buildingMood',
-    tier: 'deep' as const,
-    contains: 'quotable average on 6 of 2',
-    finding: 'the M7 caveat’s seed count collides with a refused mean that rounds to 20',
-  }),
-  Object.freeze({
-    property: 'suppressed-mean',
-    surfaceId: 'render/describeFrame.ts#describeFrame',
-    tier: 'deep' as const,
-    /*
-     * The seed, because the caveat sentence this is the same collision as falls outside the 200
-     * characters a violation quotes on this surface — `describeFrame` opens with the building, the
-     * dispatcher, the seed and the clock. It pins the finding to one run, which is what it is about.
-     */
-    contains: 'seed 900344702126007',
-    finding: 'the same collision, quoted through the canvas text alternative',
-  }),
 ]);
 
 interface FoundViolation {

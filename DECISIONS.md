@@ -23255,3 +23255,56 @@ run while `prepositioning.test.ts` passes — so a wholesale paste would have re
 from a differently-parameterised run. That is the tool's own warning (*"a re-run that disagrees with
 the file is a question, not an answer"*) arriving in practice. Only pins whose own test reports them
 as moved are touched, and the test is the authority for the value.
+
+## D334 — a withheld figure is not paired, because the earlier run's mean sits on top of it
+
+`dev/reportPanel.ts#reportDeltaOf` pairs two sheets figure by figure and copies each side's value
+verbatim, so a refused cell "survives the pairing intact": `withheld → 58.3 s`. The reverse
+direction — `30.5 s → withheld` — was drawn by the same rule and is **not** the same claim.
+
+**Found by the deep honesty tier, on a run that had just stopped being broken.** § D332's deck fix
+changed `vertical-city`'s runs, and on `honesty-9100011` the Day report drew
+
+```
+AVERAGE WAIT was 30.5 s → withheld
+```
+
+two lines under a figure grid whose `AVERAGE WAIT` cell read `withheld`. R3 reported it against the
+run's own refused `meanWaitS`, which is **30.5**.
+
+### Why that is not a coincidence, and why the checker is right
+
+The earlier sheet in that pairing is built from `HonestyContext.comparisonRecording` — *the second
+replication, on the case's candidate arm*. Same building, same dispatcher, same demand, different
+seed. Its mean is therefore drawn from the same distribution as the one being withheld, and the two
+round to the same displayed figure often rather than rarely. The pairing does not merely permit the
+collision; on a same-arm pair it **manufactures** it.
+
+So a reader met the number the word beside it was hiding, in the voice the sheet reports real
+figures in. That is R3's textual half exactly — *a reader cannot tell a quoted figure from this
+run's figure* — and it is the shape `shift/report.ts` already fixed once by spelling an illustrative
+`25` as **twenty-five**. A measurement cannot be spelled away, so the pairing is refused instead.
+
+### What changed
+
+A figure whose **current** cell is `tone: 'withheld'` is not paired. It is named in the block's note
+with the reason, because `docs/16` S1 refuses a silent absence and a reader counting rows against
+the grid above is owed an answer rather than a gap. The earlier run's mean is not lost: it is on the
+earlier sheet, in its own box, with its own count beside it.
+
+**The other direction still draws**, and a test now pins that it must. `withheld → 58.3 s` ends on a
+figure this sheet published and stands behind; only the reverse leads with a number this sheet has
+declined to quote. Refusing both would delete the shape `DeltaRowView`'s docstring exists to
+describe.
+
+### The suite that should have caught it, and why it did not
+
+`reportPanel.test.ts` already claimed the property — *"no digit of the mean it refuses appears
+anywhere in the block"* — and asserted it over a fixture where `clean` and `swapped` are far enough
+apart that no rounding is shared. The claim was true of the fixture and false of the product. It is
+now enforced by construction, and the assertion sweeps every string the block draws (values, counts,
+caption and note) rather than the three it used to.
+
+That is the second time in this wave a test's *stated* claim was stronger than what it checked; the
+first was `fuzz/deep.test.ts` restating P5 as a subtraction (§ D333). Both were found by a property
+search rather than by the suite, which is the argument for keeping the search.

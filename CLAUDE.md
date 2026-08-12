@@ -84,8 +84,24 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **335 950** | **606** | 30 | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **426 662** | **4 710** | **31** | **1** | **green** — the one finding is registered |
+  | always-on | 49 | **374 491** | **606** | **36** | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **474 400** | **4 710** | **37** | **0** | **green**, and the register is now empty |
+
+  **Re-measured 2026-08-11 on merged `main`, both tiers, in one sitting — and the previous row was
+  stale before this wave touched it** ([§ D334](DECISIONS.md)). It published `335 950 / 30` and
+  `426 662 / 31`; the tree measures `374 491 / 36` and `474 400 / 37`. Wave 18's own lane could not
+  have published the right number and did not: the surfaces column had been wrong by six for longer
+  than the string counts had been wrong at all. **This is the fourth time this file has recorded the
+  same lesson**, which is why the sentence below it is the rule and not an observation.
+
+  **The deep tier's failing-case column is `0` for the first time, and the register is empty.** Both
+  entries in it named one collision — the M7 caveat's *"6 of 20 consecutive seeds"* against a refused
+  mean of 19.65 — and § D332's deck fix moved that run: re-measured, `honesty-9100031` reports
+  `awtIsValid: true` and a mean of **19.186**, so it neither suppresses nor rounds to 20. The entries
+  were deleted on the commit that made them stop reproducing. **That is luck moving rather than a
+  defect being fixed**, and `honesty.test.ts` says so where the entries used to be: the caveat still
+  cites its measurement with a bare integer, so the class is open and the next run to collide will
+  arrive unregistered, which is correct.
 
   Measured 2026-08-09 on the integrated tree, both tiers, in one sitting — and that is the point of
   the sentence rather than a detail of it. **Three lanes in this wave each measured the corpus on a
@@ -104,16 +120,29 @@ verdict:
   corpus, plus `buildingPlateOf`'s Casual arm being swept for the first time — it had been shipping
   unreachable since issue #71 because `keyedPlate` hashed a key that a mode toggle did not change.
 
-  **The verdict column says *green* rather than *0 violations*, and the difference is deliberate.**
-  Both tiers pass, which means every violation the search finds is in `honesty.test.ts`'s
-  `OUTSTANDING` register with a ghost check holding it. **One finding is open**, and it is the
-  cue-rule coincidence rather than a product defect:
+  **The verdict column says *green* rather than *0 violations*, and the difference used to be
+  deliberate.** It meant: both tiers pass, and every violation the search finds is in
+  `honesty.test.ts`'s `OUTSTANDING` register with a ghost check holding it. **As of § D334 the two
+  now coincide — the register is empty and the search finds nothing**, which is the first time that
+  has been true of the deep tier. The distinction is kept in this row rather than deleted, because it
+  is what the column will mean again the next time a finding is recorded rather than fixed.
 
-  - **`suppressed-mean`** — `honesty-9100031`, deep tier only, 10 violations in one case: the caveat
-    says *"a quotable average on 6 of 20 consecutive seeds"* and that run's refused `meanWaitS` also
-    rounds to 20. It was published as *outstanding* in this file and the roadmap **while being held
-    by no register at all**, so the deep tier was genuinely red on `integration/issue-wave-15` before
-    this wave entered it. Now registered in both directions.
+  - **`suppressed-mean` on `honesty-9100031` is closed, and not by anybody fixing it.** It was the
+    cue-rule coincidence — the caveat says *"a quotable average on 6 of 20 consecutive seeds"* and
+    that run's refused `meanWaitS` rounded to 20. § D332's deck fix moved the run out from under the
+    collision: it now reports `awtIsValid: true` and a mean of 19.186, so it neither suppresses nor
+    rounds to 20. The two register entries were deleted on the commit that made them stop
+    reproducing. **The caveat is unchanged**, so the class is still open and the next run that
+    collides will arrive unregistered.
+
+  - **`suppressed-mean` on `dev/reportPanel.ts#reportViewOf` was found and fixed in the same
+    sitting** ([§ D334](DECISIONS.md)). The Day report's delta block drew
+    `AVERAGE WAIT was 30.5 s → withheld` two lines under a cell reading `withheld`, and the earlier
+    sheet in that pairing is **the same candidate arm at another seed**, so its mean sits on top of
+    the one being withheld rather than near it. A figure the current sheet withholds is no longer
+    paired; it is named in the note with the reason. This one was a product defect rather than a
+    coincidence, and it was introduced by § D332 — the deep tier was green before that merge and red
+    after, which is how it was caught.
 
   **`estimate-without-n` was the second, and it is closed in the product** (issue **#137**). The Day
   report's delta row published `AVERAGE WAIT was 17.8 s → 23.4 s` — a mean with **no count in its
@@ -173,12 +202,15 @@ verdict:
   and had to be repaired first is a different claim from one that acquired it and reported. It is
   fixed now, one wave later, in the view both surfaces draw from.
 
-  The deep tier's **remaining** failure — its only one — is `honesty-9100031` / `suppressed-mean`, a
-  **cue-rule coincidence rather than a product defect**: the caveat says *"a quotable average on 6 of
-  20 consecutive seeds"* and that run's refused `meanWaitS` (19.65) also rounds to 20. It has been
-  published as outstanding since the temporal axis landed **and was in no register**, so the deep
-  tier was simply red on this base; it is entered in `honesty.test.ts`'s `OUTSTANDING` now, where the
-  ghost check holds it accountable in both directions. It is also the reason issue #137's count was
+  The deep tier's **then-remaining** failure — its only one at that point — was `honesty-9100031` /
+  `suppressed-mean`, a **cue-rule coincidence rather than a product defect**: the caveat says *"a
+  quotable average on 6 of 20 consecutive seeds"* and that run's refused `meanWaitS` (19.65) also
+  rounded to 20. It had been published as outstanding since the temporal axis landed **and was in no
+  register**, so the deep tier was simply red on that base; it was entered in `honesty.test.ts`'s
+  `OUTSTANDING`, where the ghost check held it accountable in both directions — **and that ghost
+  check is what closed it**. § D332 moved the run (`awtIsValid: true`, mean 19.186), the entry
+  stopped reproducing, the check said so, and both entries were deleted. It is also the reason
+  issue #137's count was
   seeded as its own string rather than spliced into the row: the row's label *is* R3's cue, and a
   denominator set beside the word `AVERAGE` on a run whose mean is refused is that same collision,
   manufactured on purpose.
