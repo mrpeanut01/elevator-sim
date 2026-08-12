@@ -146,10 +146,16 @@
  * deviation of the paired ΔTTD on the binding pair and `h = |d| / 1.5`, from a pilot at
  * {@link PILOT_SEED}, which is disjoint from the study seed.
  *
- * | point | ceiling (pre-escalator) | ceiling (current) | n | basis |
- * |---|---|---|---|---|
- * | up-peak 1 % | 951 | **284** | **153** | variance-derived on the binding pair (`collective`); still under the ceiling |
- * | up-peak 1.5 % | 386 | **90** | **200** | ceiling-bound, and now ceiling-**excluded**: the budget sits above the ceiling and the point returns UNQUOTABLE |
+ * | point | ceiling (pre-escalator) | ceiling (pre-deck-fix) | ceiling (current) | n | basis |
+ * |---|---|---|---|---|---|
+ * | up-peak 1 % | 951 | 284 | **284** | **153** | variance-derived on the binding pair (`collective`); still under the ceiling |
+ * | up-peak 1.5 % | 386 | 90 | **52** | **200** | ceiling-bound, and ceiling-**excluded**: the budget sits above the ceiling and the point returns UNQUOTABLE |
+ *
+ * **The current column is § D332's**, re-censused after the deck fix: the 1 % ceiling is unmoved at
+ * 284 and the 1.5 % one falls 90 -> 52, with both double-deck cells now failing at the *same*
+ * replication (DD/eta@52, DD/collective@52) and both single-deck cells unmoved at 905. A change
+ * confined to deck geometry landing on both DD cells and neither SD cell is what the census should
+ * show, and it is why the column is reported rather than folded into the one before it.
  *
  * **Both ceilings were re-censused when `vertical-city` declared its ground-lobby escalator, and
  * both fell.** Per cell over 1000 replications at the study seed: at 1 % the first invalid
@@ -528,7 +534,18 @@ export const DOUBLE_DECK_POINTS: readonly DoubleDeckPoint[] = Object.freeze([
     // point is UNQUOTABLE by construction rather than by luck of the seed — the same category
     // `nearest-car` is in, and reported the same way. The budget is deliberately NOT lowered:
     // choosing one after seeing the answer is the thing `PILOT_SEED` exists to prevent.
-    ceiling: 90,
+    //
+    // **Re-censused again for § D332, and it fell further: 90 -> 52.** Both double-deck cells now
+    // lose their AWT at the *same* replication — DD/eta@52 and DD/collective@52, where they used to
+    // part at 90 and 104 — while both single-deck cells are unmoved at 905. The conclusion is
+    // unchanged and strengthened rather than reversed: 200 is further above 52 than it was above
+    // 90, so the point stays UNQUOTABLE by construction, and the budget is still not lowered.
+    //
+    // That the two arms now fail together is the interesting half. The deck fix removes a refusal
+    // that only ever applied to a paired car, so it lands on both double-deck cells identically and
+    // on neither single-deck cell at all — which is what a change confined to the deck geometry
+    // should look like in a census, and is the same shape as the twelve unmoved identity digests.
+    ceiling: 52,
     budgetBasis:
       'Ceiling-bound rather than variance-derived: the pilot’s requirement for the binding pair ' +
       '(eta, s = 6.439 s against a 0.770 s effect, h = |d| / 1.5) is 606 against a measured ' +
