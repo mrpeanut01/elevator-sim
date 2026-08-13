@@ -142,7 +142,7 @@ export interface SettingsScreenView {
  */
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
-  'Default speed — the day this build plays is the Engineer stage, whose speed chips belong to the run being watched; there is no Everyday day speed to set',
+  'Default speed — § 7’s stage has its own five speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built',
   'Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing for the switch to switch',
   'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',

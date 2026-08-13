@@ -465,9 +465,19 @@ export const RUSH_BESTS: readonly RushBestView[] = Object.freeze([
  *
  * `name` is the standing dispatcher's display name, or the id when this build does not know it —
  * `buildingById`'s honest-lookup rule, one screen up.
+ *
+ * **The sentence used to end *"on the front door, which is not built either"*, and both halves were
+ * wrong** — § D227's stale refusal, on a shipped player string. The front door is a registered
+ * screen (`screens.ts`, and `UNBUILT_REASONS` is empty), and the picker was never on it: `doorView`
+ * draws *DRIVING TODAY* as a fact and says *"Change it on the brief, which is the next screen."*
+ * So the line now points where the control actually is.
+ *
+ * Its test asserted `/not built/`, which is how the drift survived: a case that pins the shape of a
+ * refusal rather than its subject passes for exactly as long as the sentence is wrong. It now names
+ * the screen the copy names.
  */
 export function rushDrivingLine(name: string): string {
-  return `${name} would drive it. Picking another is on the front door, which is not built either.`;
+  return `${name} would drive it. Picking another is on the brief, which today's tower opens.`;
 }
 
 /* -------------------------------------------------------------------------- *

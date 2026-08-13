@@ -225,6 +225,13 @@ describe('what the screen refuses, and where the refusal sits', () => {
   it('states who would drive rather than offering a select that writes another mode’s run', () => {
     const line = rushDrivingLine('Collective control');
     expect(line).toContain('Collective control');
-    expect(line).toMatch(/not built/);
+    /*
+     * The screen the copy points at, not the shape of a refusal. The first version of this case
+     * asserted `/not built/`, and the sentence it pinned named the front door as unbuilt long after
+     * the door had landed — a test that holds a refusal's *form* keeps passing while its *subject*
+     * goes stale, which is § D227 with a green tick over it.
+     */
+    expect(line).toContain('brief');
+    expect(line).not.toMatch(/not built/);
   });
 });

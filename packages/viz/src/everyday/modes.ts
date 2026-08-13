@@ -41,8 +41,9 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
  * - **Campaign** — `packages/viz/src/campaign/` (judging, fail states, brief, stage runs) and
  *   `commissioning/` (budget, choices, refusals) both exist and are exercised by the Engineer
  *   shell's campaign panel. § 8's three Everyday screens are what the tile waits on.
- * - **Fix a building** — `packages/viz/src/fixit/` exists with three authored cases validated by
- *   real paired runs (`docs/18`; the remaining fifteen are named there as content work). § 10's
+ * - **Fix a building** — `packages/viz/src/fixit/` ships all **eighteen** § 10.5 cases, each one
+ *   validated against a real paired run and its quoted figures pinned by `fixit/cases.test.ts`
+ *   (`docs/18` still names fifteen as outstanding content work, and that sentence is stale). § 10's
  *   Everyday screen is what the tile waits on.
  * - **Endless rush** — § 9.1's setup screen is built and the tile opens onto it; what is still
  *   missing is behind it rather than in front, and the refusal moved with it. There is no climbing

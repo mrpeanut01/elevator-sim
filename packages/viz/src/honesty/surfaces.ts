@@ -6995,12 +6995,17 @@ const WATCH: SurfaceAdapter = {
  * | Your week | **exists** — `dev/leftRail.ts`'s week card: the three run figures, the seven-day sparkline, and `shift/weekLabel.ts#coachWeekLines`' ribbon |
  * | the report | **exists** — `dev/reportPanel.ts#emptyReportView`, the sheet's own account of why it is empty |
  * | the board | **exists, without a server** — `menu/screens.ts`'s leaderboard body over `menu/client.ts`'s types |
- * | the ladder | **does not exist** — a standing dispatcher rating is unbuilt; slice 4d omitted the ghost's *best* arm for the same reason (*"needs a rating that does not exist"*), and a sweep of a ladder would be a sweep of a screen nobody can open |
+ * | the ladder | **exists** — `gauntlet/ladder.ts` over `gauntlet/rating.ts`'s mean of the forty, drawn by `everyday/boardScreen.ts`. It needs no server, because a rating is measured on this device |
  * | the percentile line | **does not exist** — nothing in this tree computes *"better than 64 % of today's players"*: there is no world distribution, and `menu/client.ts` has no endpoint that would carry one |
  *
- * The two absences are named here rather than stubbed, on § 20.11's own rule about reference runs
- * and slice 4d's about the world band: a surface invented in order to be swept is a surface with no
- * reader, and the sweep would then certify it.
+ * **The ladder row said *does not exist* until the gauntlet landed, and this is the correction.**
+ * It is worth leaving visible: a matrix whose whole job is to say which cells are absent is exactly
+ * the thing that goes stale when one of them is filled, and `docs/18` had already struck the same
+ * claim through two files over while this row still made it.
+ *
+ * The one remaining absence is named here rather than stubbed, on § 20.11's own rule about reference
+ * runs and slice 4d's about the world band: a surface invented in order to be swept is a surface
+ * with no reader, and the sweep would then certify it.
  *
  * ## What is marked withheld, and what deliberately is not
  *
