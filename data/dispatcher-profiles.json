@@ -186,6 +186,60 @@
       "dispatch": { "callType": "mobile-credential", "passengerAssignment": "panel" }
     }
   ],
+  "playStyles": [
+    {
+      "$comment": "The six named entry points GAMEPLAY §11.2 and ENGINE_CONTRACT §6.2 put at the top of the dispatcher workshop. They are HERE rather than in the renderer for the reason PlayerTermWords is: a table in a screen mapping profile ids to Casual prose goes stale the day a profile is renamed, and a style is a weight vector with a name, which invariant 7 says is data. Two things about the shape. FIRST, a style is not one-to-one with a profile — steady-hand and lobby-anchor start from the same vector and differ only in where the idle cars wait — which is why parking and zone are fields here rather than a consequence of profileId. SECOND, §6.2's own table gives each style a base vector over five plain axes (dist/load/patience/lobby/spread) that this tree's cost function does not have: parking is stage 7 and spreading is an assignment mode, not weights. So each style names the SHIPPED profile whose vector already makes its trade, and the handoff's precedence rule applies — the code wins anything about the existing tree. The trade sentences are re-authored rather than transcribed for one reason worth stating: two of §6.2's are claims of quality ('the biggest single win on a busy morning'), and §11.1's own rule for this copy is 'one plain sentence about the trade, not a claim of quality'. R2 is the same rule one level up — no authored sentence is a paired-t interval.",
+      "id": "steady-hand",
+      "name": "Steady hand",
+      "trade": "Nothing clever and nothing stupid: the nearest car already going your way, and no second thoughts.",
+      "profileId": "collective",
+      "parking": false,
+      "zone": false
+    },
+    {
+      "$comment": "Same vector as steady-hand; the difference is entirely where an idle car waits, which is the lobby lever of §6.1 and idle.parkingStrategy in the run.",
+      "id": "lobby-anchor",
+      "name": "Lobby anchor",
+      "trade": "An idle car waits downstairs, so the morning queue is answered with the doors already there — and every other floor waits a little longer.",
+      "profileId": "collective",
+      "parking": true,
+      "zone": false
+    },
+    {
+      "id": "chase-the-longest-wait",
+      "name": "Chase the longest wait",
+      "trade": "Nobody waits long and everybody waits a little longer: the oldest call outranks the nearest one.",
+      "profileId": "fairness-first",
+      "parking": false,
+      "zone": false
+    },
+    {
+      "$comment": "§6.2's 'Fill them up' trades a longer first wait for fewer trips. energy-aware is the shipped profile whose whole design is that trade — stopCount and distanceTravelled weighted against waitTime — so it is named rather than a twelfth profile authored to satisfy a card.",
+      "id": "fill-them-up",
+      "name": "Fill them up",
+      "trade": "Fewer trips and less motor time, paid for with a longer first wait while a car fills.",
+      "profileId": "energy-aware",
+      "parking": false,
+      "zone": false
+    },
+    {
+      "id": "spread-out",
+      "name": "Spread out",
+      "trade": "Each car keeps to a slice of the tower. Good when the calls are scattered, worst when everybody wants one floor.",
+      "profileId": "zoned-uppeak",
+      "parking": false,
+      "zone": true
+    },
+    {
+      "$comment": "Destination disclosure, the Level-0 arm — the rider's floor is known before boarding. NOT destination-panel, which names a car at the landing and is a passenger-model change (DECISIONS.md § D27); that stays behind its own named profile rather than under a friendly card.",
+      "id": "ask-where-they-are-going",
+      "name": "Ask where they are going",
+      "trade": "Riders say their floor before boarding, so the car is grouped around the answer — a longer moment in the lobby, fewer stops after it.",
+      "profileId": "destination-eta",
+      "parking": false,
+      "zone": false
+    }
+  ],
   "patternSwitching": {
     "$comment": "Per-pattern weight sets. The optimum for up-peak is not the optimum for down-peak (CLAUDE.md § Tuning discipline), and hysteresis prevents detector oscillation. This block was authored in Phase 2, schema-validated, typed on the core barrel and cross-checked for dangling names, and READ BY NOTHING until dispatch/selector.ts; editing it changed no decision, which is the configured-validated-dead defect one level up from code into data. Three things changed when it was made live, and each is a correction rather than a preference. FIRST, timeOfDay is gone from inputs. core/ has no wall clock (invariant 3) and the kernel's time is seconds since the start of the run; every shipped operating point is a 900-3600 s window from zero, so a timeOfDay derived from it is a constant near zero wearing a feature's name — a declared detector input nothing can supply is the same defect this block was. If a scenario ever carries a start-of-day, the input comes back. SECOND, idle selects energy-aware and no longer energy-saver, which was never an authored profile: config/parse.ts warned unknown-weight-set-profile and said pattern switching would 'fall back until it exists', which was harmless while nothing read the block and is not now — a selector silently missing one of its five regimes is a dispatcher that cannot express a regime its own configuration declares. The name is REPOINTED rather than the profile invented: energy-aware is the shipped profile whose entire design is the idle regime's objective (parkingStrategy stay, weights on stopCount and distanceTravelled, a longer adaptive dwell), and authoring a twelfth profile to satisfy a string would change every arm count in benchmark/arms.ts and every 'N of N' in the matrix without a measurement earning it. resolveWeightSets now THROWS on a dangling name; loader.test.ts drives the warning from a fixture instead of from a defect in shipped data. THIRD, membership is authored, because a detector whose pattern-to-signature mapping lived in code would put five pattern names in code and break invariant 7. Every ramp below is [zeroAt, oneAt] in the input's own units — passengers per second PER CAR — and a pattern's membership is the weakest of its clauses (fuzzy AND). The breakpoints are calibrated, not guessed: measured through the shipped engine at seed 20260728 over eight shipped operating points, the median rates are midtown up-peak lobby 0.0167 / inter 0 / down 0; midtown down-peak 0 / 0 / 0.0117; midtown interfloor-mix 0.0108 / 0.0025 / 0.0075; garden residential 0.0017 / 0 / 0.0017; garden down-peak 0 / 0 / 0.0050; secure up-peak 0.0111 / 0 / 0; mixed-use up-peak 0.0242 / 0 / 0; vertical-city up-peak 0.0088 / 0.0042 / 0. The rise points sit at the low end of that spread and the fall points below it, so each shipped cell reads the pattern its own name says. Rates are per car so one map is not silently a fact about one building's fleet size.",
     "patternDetector": {

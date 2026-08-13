@@ -26,9 +26,12 @@
  * levers; the stage needs the run actions) and nothing speculative. Named absences, for the lane
  * that needs one to add with its consumer:
  *
- * - **no dispatcher or building setter** — the door screen's *pick who drives* writes through
- *   `dev/state.ts#withDispatcher`/`withBuilding`, and the lane that builds that screen adds the
- *   action beside its control;
+ * - **no building setter** — the door screen's *pick where you are* writes through
+ *   `dev/state.ts#withBuilding`, and the lane that builds that screen adds the action beside its
+ *   control. There **is** a dispatcher setter now ({@link EverydayHost.startFromDispatcher}), added
+ *   with the workshop screen that presses it; the sentence is corrected rather than left standing,
+ *   because a stated absence that has stopped being true is § D227's defect with the polarity
+ *   reversed — a refusal telling a reader not to look for something that is there;
  * - **no campaign works booking, no contract acceptance** — the campaign lane's, with its screens;
  * - **no transport control** (pause, speed, seek) and no `playing` flag — the § 7 Everyday stage's,
  *   when it exists; the handed-off Engineer stage owns its own transport today;
@@ -46,14 +49,27 @@
 import type {
   BuildingConfig,
   DispatcherProfile,
+  DispatcherProfiles,
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
+import {
+  specFromProfile,
+  type DispatcherSpec,
+  type GroupLevers,
+} from '../authoring/dispatcherSpec.js';
+import { templateHasClock, type RuleRow } from '../authoring/ruleSpec.js';
+import {
+  selectorContextFrom,
+  type SelectorContext,
+  type SelectorSpec,
+} from '../authoring/selectorSpec.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
   allDispatchers,
   buildingConfigOf,
+  shiftDemandTemplateId,
   type SavedDispatcher,
   type ViewerState,
 } from '../dev/state.js';
@@ -135,6 +151,90 @@ export interface EverydayHost {
    * about what a lever holds (they are two renderings of one vector).
    */
   plainLevers(): readonly PlainLeverView[];
+
+  /* ------------------------------------------- the workshop's document */
+
+  /**
+   * The whole of `data/dispatcher-profiles.json`, not its `profiles` array.
+   *
+   * The workshop needs three file-level blocks the profile list does not carry: the **cost-term
+   * library** (thirteen rows with their `measures` sentences), the **play styles**
+   * (`core`'s `PlayStyle` — §11.2's six cards, in `data/` for invariant 7's reason), and
+   * `patternSwitching`, which the switching block's arm map is validated against. `dev/data.ts`
+   * carries the whole file for the same reason and `honesty/surfaces.ts#HonestyContext` names it
+   * the same way.
+   */
+  dispatcherProfilesFile(): DispatcherProfiles;
+
+  /**
+   * The dispatcher being edited — the Engineer editor's own working copy, the identical object.
+   *
+   * Not a second document. `mode/plainLevers.ts`'s standing rule is that the tinker drawer and the
+   * thirteen-term drawer are two renderings of one vector; this extends it to a third surface, so
+   * a weight moved in the workshop is moved in the Engineer editor and in the next run.
+   */
+  workingSpec(): DispatcherSpec;
+
+  /** The group levers applied over whichever dispatcher drives — see `GroupLevers`' docstring. */
+  groupLevers(): GroupLevers;
+
+  /** The profile the working copy was read from, or `undefined` when it no longer exists. */
+  editingSource(): DispatcherProfile | undefined;
+
+  /** The authored rule rows — `authoring/ruleSpec.ts`'s shape, which is the profile's own. */
+  ruleRows(): readonly RuleRow[];
+
+  /** The traffic-pattern switching spec — `authoring/selectorSpec.ts`'s flat, total document. */
+  selectorSpec(): SelectorSpec;
+
+  /**
+   * What the selector spec is validated against: the profile library, the file-level arm map and
+   * the run length. Derived from the same resources the run is built from, so a refusal the
+   * workshop draws is a refusal the run would make.
+   */
+  selectorContext(): SelectorContext;
+
+  /**
+   * Whether the crowd the next run will use has a start-of-day.
+   *
+   * The one fact `authoring/ruleSpec.ts#RuleContext` carries, and it is not cosmetic: `core`
+   * evaluates a clockless time clause as never-matching, so without this the three time
+   * conditions would be §D227's exact defect — a control that writes nothing and does not say so.
+   * Derived through `dev/state.ts#shiftDemandTemplateId`, the same route `dev/ruleEditor.ts` takes.
+   */
+  crowdHasClock(): boolean;
+
+  /* --------------------------------------- the workshop's own actions */
+
+  /** Replace the working spec wholesale — the term sliders, the flags and the name field. */
+  setWorkingSpec(spec: DispatcherSpec): void;
+
+  /** Replace the group levers wholesale — the parking and express toggles, and the dwell chips. */
+  setGroupLevers(levers: GroupLevers): void;
+
+  /** Replace the rule rows. Takes effect on the next run: rules are config, never mid-run. */
+  setRuleRows(rows: readonly RuleRow[]): void;
+
+  /** Replace the switching spec. Also next-run, and for the same reason. */
+  setSelectorSpec(spec: SelectorSpec): void;
+
+  /**
+   * Load a shipped or saved dispatcher into the working copy, with the two group settings a §11.2
+   * play style carries — the *press a style card* action.
+   *
+   * It writes the working copy **and** `dispatcherId`, because §11.2 says selecting a style
+   * *"resets the working copy to that style"* and a copy that was not also what drives would put a
+   * second answer to *which dispatcher is running* on the screen. Unlike
+   * `dev/state.ts#withDispatcher` it does not keep a dirty copy: a style card is an explicit
+   * request to start again, which is precisely what that guard exists to protect against doing by
+   * accident.
+   *
+   * An id this build does not know writes nothing — the honest lookup rule, as {@link buildingById}.
+   */
+  startFromDispatcher(
+    dispatcherId: string,
+    settings?: { readonly parking: boolean; readonly zone: boolean },
+  ): void;
 
   /**
    * The run on the stage, as GAMEPLAY § 18's state model asks for it.
@@ -294,6 +394,58 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);
+    },
+    dispatcherProfilesFile: () => b.resources.dispatcherProfiles,
+    workingSpec: () => b.state().dispatcherSpec,
+    groupLevers: () => b.state().levers,
+    editingSource: () => {
+      const state = b.state();
+      return allDispatchers(b.resources, state.savedDispatchers).find(
+        (profile) => profile.id === state.editingDispatcherId,
+      );
+    },
+    ruleRows: () => b.state().ruleRows,
+    selectorSpec: () => b.state().selectorSpec,
+    selectorContext: () =>
+      selectorContextFrom(b.resources.dispatcherProfiles, b.state().shiftLengthS),
+    crowdHasClock: () => {
+      const state = b.state();
+      const building = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
+      return templateHasClock(
+        b.resources.trafficProfiles,
+        shiftDemandTemplateId(b.resources, state, building),
+      );
+    },
+    setWorkingSpec: (spec) => {
+      b.applyPatch({ dispatcherSpec: spec });
+    },
+    setGroupLevers: (levers) => {
+      b.applyPatch({ levers });
+    },
+    setRuleRows: (rows) => {
+      b.applyPatch({ ruleRows: rows });
+    },
+    setSelectorSpec: (spec) => {
+      b.applyPatch({ selectorSpec: spec });
+    },
+    startFromDispatcher: (dispatcherId, settings) => {
+      const state = b.state();
+      const wanted = allDispatchers(b.resources, state.savedDispatchers).find(
+        (profile) => profile.id === dispatcherId,
+      );
+      // Honest lookup — see the interface docstring. An unknown id writes nothing rather than
+      // loading the first shipped profile under the name the player pressed.
+      if (wanted === undefined) return;
+      const spec = specFromProfile(wanted, wanted.name);
+      b.applyPatch({
+        dispatcherId,
+        editingDispatcherId: dispatcherId,
+        dispatcherSpec:
+          settings === undefined
+            ? spec
+            : { ...spec, flags: { ...spec.flags, zone: settings.zone } },
+        ...(settings === undefined ? {} : { levers: { ...state.levers, parking: settings.parking } }),
+      });
     },
     runState: () => {
       const hasRun = b.state().recording !== undefined;

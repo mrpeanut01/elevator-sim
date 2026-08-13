@@ -252,6 +252,7 @@ export type {
   ProfileNormalizationConfig,
   ProfileRulesConfig,
   PatternSwitchingConfig,
+  PlayStyle,
   ReassignmentPolicy,
   RealWorldAnchor,
   RuleActionId,

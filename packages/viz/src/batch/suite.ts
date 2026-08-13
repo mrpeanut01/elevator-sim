@@ -6,9 +6,9 @@
  *
  * §20.8 as vendored is inverted for this tree: there is exactly one bench (`dev/batchPanel.ts`),
  * it *is* the pairwise one, and the thing that does not exist is the multi-cell sweep. So this
- * module is only the sweep's shape — a field of **two** dispatcher arms, a set of ticked cells,
- * one `BatchRequest` per cell — and everything it says about a result is `batchReport`'s, read,
- * never recomputed. Two refusals define it:
+ * module is only the sweep's shape — a field of **at least two** dispatcher arms, a set of ticked
+ * cells, one `BatchRequest` per cell — and everything it says about a result is `batchReport`'s,
+ * read, never recomputed. Two refusals define it:
  *
  * - **It does not reimplement the bench.** Requests run through `runBatch` (the shipped worker
  *   path), reports come from `batchReport`, and the six-verdict vocabulary (`report.ts` —
@@ -58,11 +58,28 @@ export class SuiteError extends Error {
 }
 
 /**
- * Exactly two arms, as a tuple rather than an array — the field-of-two condition held by the
- * type. The dispatcher stays on the arm and everything else on the request, which is
- * `batch/types.ts`'s misalignment-unexpressible split, inherited rather than restated.
+ * **At least two arms**, as a tuple rather than a plain array — the floor held by the type. The
+ * dispatcher stays on the arm and everything else on the request, which is `batch/types.ts`'s
+ * misalignment-unexpressible split, inherited rather than restated.
+ *
+ * ## Why the ceiling moved out of the type and the floor did not
+ *
+ * This was `readonly [BatchArmRequest, BatchArmRequest]` — exactly two — and that was right while
+ * the only caller was the Engineer suite panel's two selects. GAMEPLAY §12.1 gives the Everyday
+ * bench a field of *"two at least, four at most"*, and the two halves of that sentence are not the
+ * same kind of rule. **Two at least** is arithmetic: a comparison of one arm is not a comparison,
+ * and no report can be drawn from it, so the type says so. **Four at most** is a screen's own
+ * limit on how many columns a matrix can be read across — §12.1 puts its enforcement on the
+ * toggles, and `everyday/benchModel.ts#benchFieldRefusal` is where it lives.
+ *
+ * **What did not move is the verdict gate**, which is the property this tuple was often mistaken
+ * for. A pairwise verdict is drawn only when `report.comparisons.length === 1`
+ * ({@link suiteCellViewOf}), and `batchReport` compares every arm after the first *with* the
+ * first — so three arms produce two comparisons and the refusal below is drawn instead. Widening
+ * the field cannot produce a verdict block over three arms; it produces a cell that says why
+ * there is none.
  */
-export type SuiteField = readonly [BatchArmRequest, BatchArmRequest];
+export type SuiteField = readonly [BatchArmRequest, BatchArmRequest, ...(readonly BatchArmRequest[])];
 
 /** What to sweep: which cells, at what budget, with which two dispatchers. */
 export interface SuiteRequest {
@@ -95,7 +112,7 @@ export interface SuiteCellPlan {
  * and without an injectable lookup those refusals would be sentences no test had ever seen fire.
  *
  * @throws SuiteError on a plan that cannot run: no cells ticked, a duplicate tick, a field that
- *   is not two arms at run time (the type already forbids it at compile time; a deserialised
+ *   is under two arms at run time (the type already forbids it at compile time; a deserialised
  *   state can still get here), or a cell whose traffic spec carries something `BatchRequest`
  *   cannot — refused by name rather than silently dropped, because a suite that ran a cell
  *   *minus* its demand template would report on a population the matrix never measured.
@@ -112,9 +129,9 @@ export function suitePlanOf(
   if (new Set(request.cellIds).size !== request.cellIds.length) {
     throw new SuiteError('a cell is ticked twice; a suite runs each ticked cell once.');
   }
-  if (request.field.length !== 2) {
+  if (request.field.length < 2) {
     throw new SuiteError(
-      `a suite compares a field of exactly two dispatchers; this one carries ${String(request.field.length)}.`,
+      `a suite compares a field of at least two dispatchers; this one carries ${String(request.field.length)}.`,
     );
   }
   return request.cellIds.map((cellId) => {

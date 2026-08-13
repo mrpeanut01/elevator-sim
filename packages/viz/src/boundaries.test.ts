@@ -253,6 +253,10 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/fixitScreen.ts',
   /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
   'everyday/settingsScreen.ts',
+  /* The workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
+  'everyday/workshopScreen.ts',
+  /* The bench's DOM half — its words stay pure in benchModel.ts, and it owns a batch Worker. */
+  'everyday/benchScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
 ]);

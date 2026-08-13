@@ -992,10 +992,51 @@ export const dispatcherProfilesSchema = z
         weightSetsByPattern: z.record(identifier, identifier),
       })
       .optional(),
+    /*
+     * The named play styles a Casual surface offers over the library — GAMEPLAY §11.2, and
+     * `config/types.ts#PlayStyle` for why they are data and why they are file-level rather than a
+     * `player` block on each profile (a style is not one-to-one with a vector, and a new object
+     * section on the profile would enter the tuning search space carrying prose).
+     *
+     * `trade` is capped at the dispatcher blurbs' 160 characters for `trafficProfileSchema`'s
+     * stated reason: an uncapped authored string on a driven surface is § D186's defect with a
+     * different key name.
+     */
+    playStyles: z
+      .array(
+        z.strictObject({
+          $comment: comment,
+          id: identifier,
+          name: z.string().min(1, 'a play style is what a player reads; it may not be empty'),
+          trade: z
+            .string()
+            .min(1, 'a style with nothing to say about its trade still has to say it on purpose')
+            .max(
+              160,
+              'a trade sentence over 160 characters is maintainer prose on a player surface; see DECISIONS.md § D186',
+            ),
+          profileId: identifier,
+          parking: z.boolean(),
+          zone: z.boolean(),
+        }),
+      )
+      .optional(),
   })
   .superRefine((file, ctx) => {
     checkUniqueIds(file.terms, 'terms', ctx);
     checkUniqueIds(file.profiles, 'profiles', ctx);
+    if (file.playStyles !== undefined) {
+      checkUniqueIds(file.playStyles, 'playStyles', ctx);
+      const profileIds = new Set(file.profiles.map((profile) => profile.id));
+      file.playStyles.forEach((style, index) => {
+        if (profileIds.has(style.profileId)) return;
+        ctx.addIssue({
+          code: 'custom',
+          path: ['playStyles', index, 'profileId'],
+          message: `play style "${style.id}" starts from dispatcher "${style.profileId}", which this file does not declare. A style whose vector does not exist is a card that cannot be pressed.`,
+        });
+      });
+    }
     const termIds = new Set(file.terms.map((term) => term.id));
     const known = [...termIds].join(', ');
     file.profiles.forEach((profile, index) => {
