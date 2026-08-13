@@ -41,6 +41,7 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from '../everyday/host.js';
 import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
 import {
@@ -851,6 +852,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * has not, has not.
    */
   let filedThisSitting = false;
+
+  /**
+   * Who the Everyday data host notifies when the state changes — the listener half of
+   * `everyday/host.ts`'s `subscribe`. Filled through the bindings' `onChange`, drained at the end
+   * of {@link renderAll}, which is the one choke point every state write already passes through —
+   * so a subscriber hears about exactly the changes a panel would redraw for, and never about a
+   * playhead frame ({@link renderLive} deliberately does not notify; the host's `playheadS` is a
+   * pull).
+   *
+   * A `const` array, but declared up here with the `let`s all the same: `renderAll` runs in
+   * boot's own sequence below, and a `const` after that sequence is the TDZ throw the guard in
+   * `main.test.ts` exists for — that guard's regex watches `let` only, so this comment is the
+   * fence for the `const` case.
+   */
+  const everydayHostListeners: (() => void)[] = [];
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -3188,6 +3204,57 @@ function boot(ui: Elements, resources: BrowserResources): void {
   syncUrl();
   requestAnimationFrame(tick);
 
+  /*
+   * The Everyday data host — `everyday/host.ts`'s bindings, implemented against this closure and
+   * published for the shell `everyday/boot.ts` mounted while this boot was still fetching data.
+   *
+   * Every binding is a thin read of a closure fact or a press of a seam that already exists;
+   * every derivation over them lives in `createEverydayHost`, where it is testable without a
+   * document. Two are worth naming here because they are the § 3.4 latch's own grounds:
+   *
+   * - `runIsOwn` is `bankingRefusalFor`'s identity comparison, read rather than re-argued — a
+   *   watched or file-loaded run is somebody else's, and § 3.4 exempts it (*there is nothing of
+   *   yours to lose*);
+   * - `playerHasChosen` is § D232's flag, so boot's own demo run never arms the confirm strip —
+   *   a warning about a run nobody started would be theatre (issue #39's class).
+   *
+   * `startRun` goes through `context.runShift`, which is one of `playerStartedARun`'s two latch
+   * sites — a run the host starts is a run a player pressed for, on a screen this shell cannot
+   * see, and it must file exactly as the Run button's does.
+   *
+   * Published after the boot sequence above, so a host method can never observe a half-booted
+   * closure. Everything the Engineer surface does is unchanged when nothing consumes this: the
+   * bindings write nothing at publish time, and the listener list drains empty.
+   */
+  const everydayHostBindings: EverydayHostBindings = {
+    resources,
+    state: () => state,
+    playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
+    dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,
+    runIsOwn: () => state.recording !== undefined && state.recording === simulatedRecording,
+    playerHasChosen: () => playerHasChosen,
+    startRun: () => {
+      context.runShift();
+    },
+    closeDay: () => {
+      closeShift();
+    },
+    openRunTab: () => {
+      context.openTab('run');
+    },
+    applyPatch: (patch) => {
+      context.update(patch);
+    },
+    onChange: (listener) => {
+      everydayHostListeners.push(listener);
+      return () => {
+        const at = everydayHostListeners.indexOf(listener);
+        if (at >= 0) everydayHostListeners.splice(at, 1);
+      };
+    },
+  };
+  EVERYDAY_HOST.publish(createEverydayHost(everydayHostBindings));
+
   /* ====================================================================== *
    * Rendering
    * ====================================================================== */
@@ -3297,6 +3364,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawIntervention(view);
     drawWatching();
     drawStage();
+    /*
+     * The Everyday host's subscribers, last — after every panel above, so a screen that reads the
+     * host inside its listener reads the same state the page has just been drawn from. Over a
+     * snapshot, so a listener that unsubscribes (or subscribes a sibling) mid-notification does
+     * not skip or double-call a neighbour.
+     */
+    for (const listener of [...everydayHostListeners]) listener();
   }
 
   /**

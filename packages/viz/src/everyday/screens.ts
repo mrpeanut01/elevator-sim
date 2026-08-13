@@ -31,6 +31,7 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import type { EverydayHost } from './host.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_SCREENS } from './types.js';
 
@@ -38,6 +39,12 @@ import { EVERYDAY_SCREENS } from './types.js';
 export interface EverydayScreenContext {
   /** The flow this screen is serving — GAMEPLAY § 18's `ctx`. */
   readonly ctx: RunContext;
+  /**
+   * The data host — the only way a screen reaches the simulation machinery. Its docstring in
+   * `host.ts` is the contract: what it reads, what it does, and what is deliberately absent.
+   * No screen may import `dev/main` directly.
+   */
+  readonly host: EverydayHost;
   /** Navigate. The same navigation a rail row performs; there is no other way to move. */
   go(screen: EverydayScreen): void;
   /**

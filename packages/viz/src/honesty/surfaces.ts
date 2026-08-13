@@ -50,6 +50,7 @@ import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
 import { ACTION_BAR_ROWS, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
+import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
@@ -6976,6 +6977,7 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/screens.ts#unbuiltReasonFor',
     'everyday/screens.ts#SCREEN_NAMES',
     'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
+    'everyday/host.ts#HOST_PENDING_REASON',
   ],
   render(context) {
     void context;
@@ -7134,6 +7136,14 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     for (const [index, absence] of EVERYDAY_SHELL_ABSENCES.entries()) {
       seeds.push({ field: `absence.${String(index)}`, text: absence, role: 'reason' });
     }
+
+    /*
+     * The shell's one boot-order sentence: a registered screen entered before `dev/main.ts` has
+     * published the data host. A refusal about a screen, so the role the rules give a refusal —
+     * and swept at its source in `host.ts`, where it is pure, exactly like the registry's
+     * per-screen sentences above.
+     */
+    seeds.push({ field: 'host.pending', text: HOST_PENDING_REASON, role: 'reason' });
 
     return singleRun(this.id, seeds);
   },

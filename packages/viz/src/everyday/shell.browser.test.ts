@@ -56,6 +56,74 @@ afterAll(async () => {
 });
 
 /**
+ * The data host, as the **page** sees it once {@link stashHost} has put it somewhere nameable.
+ *
+ * A type-only shape, so nothing of this declaration survives into the browser — the casts below
+ * are erased before Playwright ever serialises a callback.
+ */
+type PageHostWindow = Window &
+  typeof globalThis & {
+    __everydayHost?: {
+      current(): {
+        runState(): {
+          hasRun: boolean;
+          dayClosed: boolean;
+          playheadS: number;
+          open: boolean;
+        };
+        startRun(): void;
+        closeDay(): void;
+        lastReport(): unknown;
+      } | undefined;
+    };
+  };
+
+/**
+ * Reach the shipped host module from inside the page, once, and give it a name the later
+ * callbacks can read synchronously.
+ *
+ * **The import is a string, and that is a transform fact rather than a style choice.** vitest
+ * compiles this file before Playwright serialises anything, and its SSR transform rewrites a
+ * dynamic `import(…)` into `__vite_ssr_dynamic_import__(…)` — a binding that exists in this
+ * module's scope and not in the page. Written as a callback, the evaluate threw
+ * `ReferenceError: __vite_ssr_dynamic_import__ is not defined` in the browser, which is a
+ * failure about the harness wearing the costume of a failure about the product. A string is not
+ * transformed, so the dev server hands back **the very module instance `everyday/boot.ts`
+ * imported** — the same slot `dev/main.ts` published into, not a second copy.
+ *
+ * The stash is the **test's** handle and the product neither writes nor reads it: driving the
+ * host must not require the product to publish itself on a global, which would be a shipped
+ * surface that exists for a test.
+ */
+async function stashHost(page: Page): Promise<void> {
+  await page.evaluate(
+    "import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+  );
+  // `dev/main.ts` publishes at the end of its own boot, which is after the menu this page has
+  // already waited out — so this is ordering insurance rather than a race, and it fails here,
+  // named, rather than as an undefined read three lines down.
+  await page.waitForFunction(
+    () => (window as PageHostWindow).__everydayHost?.current() !== undefined,
+    undefined,
+    { timeout: 30_000 },
+  );
+}
+
+/** The host's own answer about the run on the stage, read live. */
+async function runStateOf(page: Page): Promise<{
+  hasRun: boolean;
+  dayClosed: boolean;
+  playheadS: number;
+  open: boolean;
+}> {
+  const state = await page.evaluate(() =>
+    (window as PageHostWindow).__everydayHost?.current()?.runState(),
+  );
+  if (state === undefined) throw new Error('the data host answered no run state');
+  return state;
+}
+
+/**
  * A cold load, waited out to the point where the Engineer menu has been dismissed.
  *
  * The wait is the interesting part. `dev/main.ts` boots asynchronously, so the Engineer menu arrives
@@ -308,6 +376,116 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       await page.close();
     }
   });
+
+  it('warns before a mid-run leave, stays, and leaves freely once the day is closed — § 3.4 through the host', async () => {
+    /*
+     * The data host's runtime half, driven end to end: `dev/main.ts` publishes the host,
+     * `everyday/boot.ts` hands its slot to the shell, and the shell's § 3.4 latch follows
+     * `runState().open`. The host itself is reachable from the page because the dev server serves
+     * the same module graph the app runs — `import('/src/everyday/host.ts')` answers the exact
+     * module instance `boot.ts` imported, so `startRun`/`closeDay` here are the same presses a
+     * screen lane's code will make.
+     *
+     * The sequencing is the claim: before the player starts anything, leaving the stage warns
+     * nothing (boot's demo run is not theirs to lose — § D232); a run they started arms the
+     * confirm strip with § 3.4's exact words; *Stay* puts it down and moves nothing; and once the
+     * day is closed, leaving is free again, because a report is already after the fact.
+     */
+    const page = await coldLoad();
+    try {
+      await page.locator('.everyday-mode[data-screen="stage"]').click();
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+        undefined,
+        { timeout: 15_000 },
+      );
+
+      await stashHost(page);
+
+      /*
+       * **Before the player has asked for anything, nothing is open** — § D232's ground, driven.
+       * A full shift has already run under the menu (boot's own), it is on the stage, and it is
+       * this shell's own run; what it is not is a run the player started, so leaving it must not
+       * warn. This is the assertion that would fail if the latch were `hasRun && !dayClosed`.
+       */
+      expect((await runStateOf(page)).open, 'boot’s own run armed the confirm strip').toBe(false);
+
+      // Start a run through the host — the same latching press as **Run this shift**.
+      await page.evaluate(() => {
+        (window as PageHostWindow).__everydayHost?.current()?.startRun();
+      });
+
+      /*
+       * Wait for that run to land, through the page's own statement about it: the coach's Run
+       * control **is** the cancel control while a run is in flight. Waiting for the round trip
+       * rather than only for the latch is what keeps the closing half below deterministic — a
+       * `closeDay` pressed while the worker was still simulating would file the recording on
+       * screen and then have `applyShift` clear the sheet out from under the assertion.
+       */
+      await page.waitForFunction(
+        () => document.querySelector('#run')?.textContent === 'Cancel this run',
+        undefined,
+        { timeout: 30_000 },
+      );
+      await page.waitForFunction(
+        () => document.querySelector('#run')?.textContent === 'Run this shift',
+        undefined,
+        { timeout: 120_000 },
+      );
+
+      // The latch follows the host: a run the player asked for is open on the stage.
+      const started = await runStateOf(page);
+      expect(started.hasRun).toBe(true);
+      expect(started.dayClosed).toBe(false);
+      expect(started.open, 'the host did not report the player’s own run as open').toBe(true);
+
+      // Leaving mid-run meets § 3.4's strip — over the stage, where there is no bar to replace.
+      await page.locator('.everyday-rail-menu').click();
+      const strip = await page.evaluate(() => ({
+        shown: document.querySelector<HTMLElement>('.everyday-stage-confirm')?.style.display,
+        question: document.querySelector('.everyday-bar-question')?.textContent ?? '',
+        consequence: document.querySelector('.everyday-bar-consequence')?.textContent ?? '',
+        stillOnStage:
+          document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+      }));
+      expect(strip.shown).toBe('flex');
+      expect(strip.question).toBe('Leave the day unfinished?');
+      expect(strip.consequence).toBe(
+        "Today's run will not be scored, and the board keeps whatever you posted before.",
+      );
+      expect(strip.stillOnStage).toBe(true);
+
+      // Stay: the strip goes down and the stage is exactly as it was.
+      await page.locator('.everyday-bar-confirm-stay').click();
+      const stayed = await page.evaluate(() => ({
+        shown: document.querySelector<HTMLElement>('.everyday-stage-confirm')?.style.display,
+        stillOnStage:
+          document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+      }));
+      expect(stayed).toEqual({ shown: 'none', stillOnStage: true });
+
+      // Close the day — § 3.3's stage primary, as the host carries it — and the latch disarms.
+      await page.evaluate(() => {
+        (window as PageHostWindow).__everydayHost?.current()?.closeDay();
+      });
+      const closed = await runStateOf(page);
+      expect(closed.dayClosed, 'closeDay filed nothing').toBe(true);
+      expect(closed.open, 'the day is filed and the strip is still armed').toBe(false);
+      const filed = await page.evaluate(
+        () => (window as PageHostWindow).__everydayHost?.current()?.lastReport() !== undefined,
+      );
+      expect(filed, 'closeDay filed no sheet').toBe(true);
+
+      // A report is already after the fact: the same leave now goes straight to the menu.
+      await page.locator('.everyday-rail-menu').click();
+      const back = await page.evaluate(
+        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display,
+      );
+      expect(back).toBe('grid');
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
 
   it('comes back to the menu, and covers the stage again on the way', async () => {
     const page = await coldLoad();
