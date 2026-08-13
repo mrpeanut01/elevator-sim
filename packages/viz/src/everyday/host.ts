@@ -49,6 +49,7 @@ import type {
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
+import { specIsDirty } from '../authoring/dispatcherSpec.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
@@ -128,6 +129,23 @@ export interface EverydayHost {
 
   /** The dispatchers the reader saved, id and profile. Read-only. */
   savedDispatchers(): readonly SavedDispatcher[];
+
+  /**
+   * The dispatcher the workshop has open, and whether it has changes that are not saved.
+   *
+   * Added with its consumer — the § 20.10 gauntlet gate, which *"must require a saved dispatcher"*
+   * and whose button *"says why"* when it refuses. The dirty question is asked exactly where
+   * `dev/dispatcherEditor.ts#runThisStateOf` asks it and collapsed the same way: a working copy
+   * that differs from its source and a source that no longer exists are one answer, because a run
+   * can be pointed at neither. Two answers to *what does saved mean* is the disagreement a
+   * standing public rating cannot survive — `scope/runIdentity.ts` makes the same argument about
+   * the leaderboard, and it points the same way here.
+   */
+  editedDispatcher(): {
+    readonly id: string;
+    readonly name: string;
+    readonly dirty: boolean;
+  };
 
   /**
    * The four plain levers over the current working spec and group levers —
@@ -291,6 +309,17 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     trafficProfileById: (id) =>
       b.resources.trafficProfiles.profiles.find((profile) => profile.id === id),
     savedDispatchers: () => b.state().savedDispatchers,
+    editedDispatcher: () => {
+      const state = b.state();
+      const source = allDispatchers(b.resources, state.savedDispatchers).find(
+        (profile) => profile.id === state.editingDispatcherId,
+      );
+      return {
+        id: state.editingDispatcherId,
+        name: state.dispatcherSpec.name,
+        dirty: specIsDirty(state.dispatcherSpec, source),
+      };
+    },
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);

@@ -47,7 +47,7 @@ import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '.
 import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
-import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
+import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
 import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
 import {
@@ -106,6 +106,27 @@ import {
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
+import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE } from '../everyday/boardScreen.js';
+import {
+  caseNameOf,
+  caseNamesOf,
+  ladderRowsOf,
+  sendGateOf,
+  whatAreTheFortyOf,
+  LADDER_EMPTY,
+  LADDER_WORLD_ABSENCE,
+  REFERENCE_RUN_LABEL,
+  type LadderEntry,
+} from '../gauntlet/ladder.js';
+import { proofCasesOf, type ProofCase, type ProofCaseSet } from '../gauntlet/proofCases.js';
+import {
+  proofCaseCountOf,
+  ratingFigureOf,
+  RATING_BASIS,
+  RATING_CAVEAT,
+  type RatingSummary,
+} from '../gauntlet/rating.js';
+import { runGauntlet, GAUNTLET_CANCELLED, type GauntletWorker } from '../gauntlet/run.js';
 import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type FloorQueue, type LandingAssignment } from '../frame/overlay.js';
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
@@ -7461,6 +7482,297 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * The gauntlet and the ladder — GAMEPLAY § 14, § 20.10, contract § 12.3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The forty proof cases, the rating they produce, and the ladder that shows it.**
+ *
+ * ## Why this belongs in a corpus about honesty more than most surfaces do
+ *
+ * A ladder rating is the only **standing public claim** this product makes about a dispatcher —
+ * every other figure is a fact about one run, said once and gone. R2 is the rule it lives closest
+ * to (*"a score is a property of a run, never of a dispatcher"*), and a rating is deliberately a
+ * property of a dispatcher, made admissible only by the two sentences drawn beside it: what it is a
+ * mean of ({@link RATING_BASIS}) and what a gap between two rows is not ({@link RATING_CAVEAT}).
+ * Those two are exactly the sentences whose absence R13 and R2 exist to catch, so the rating figure
+ * is seeded as an `estimate` carrying its own `n` — the `proof cases` column beside it — and the
+ * search may ask R13's question of it directly.
+ *
+ * The refusals matter for the same reason one level down: § 20.10's gate (*"a dirty dispatcher
+ * cannot be sent, and the button says why"*), a cancelled gauntlet's *"nothing is rated"*, the
+ * unrated and *edited since* row states, the empty table, and § 12.2's labelled absence where the
+ * daily board's server would be. Each is a claim about what this build will not do, which is the
+ * class § D227 records going stale.
+ *
+ * ## The proof set is synthetic here, and the shipped one is validated at the door
+ *
+ * `FIXIT`'s precedent exactly: the authored halves are synthetic (two towers over the context's own
+ * buildings, two crowd shapes with placeholder labels) and the shipped `data/proof-cases.json` is
+ * refused at load by `parseProofCases`, whose refusals `gauntlet/proofCases.test.ts` drives. What
+ * this adapter drives is the machinery that wraps the document — and the placeholders are
+ * deliberate a second time: `gauntlet/proofCases.test.ts` asserts that no module under
+ * `packages/viz/src` contains a shipped tower name or crowd label, and this file is inside that
+ * scope.
+ *
+ * ## The gauntlet runs against a worker double, which is the only way it speaks at all
+ *
+ * `runGauntlet`'s player-facing strings are its progress line and its two stop reasons, and all
+ * three exist only while forty simulations are in flight. The double answers each `postMessage`
+ * synchronously from the context's own finished batch, so the progress line, the finished rating,
+ * the failed-case refusal and the cancellation are every one of them rendered from a real
+ * `BatchResult` rather than from a fixture.
+ */
+const GAUNTLET: SurfaceAdapter = {
+  id: 'gauntlet/ladder.ts#ladderRowsOf',
+  covers: [
+    'gauntlet/ladder.ts#ladderRowsOf',
+    'gauntlet/ladder.ts#sendGateOf',
+    'gauntlet/ladder.ts#whatAreTheFortyOf',
+    'gauntlet/ladder.ts#caseNameOf',
+    'gauntlet/ladder.ts#caseNamesOf',
+    'gauntlet/ladder.ts#REFERENCE_RUN_LABEL',
+    'gauntlet/ladder.ts#LADDER_EMPTY',
+    'gauntlet/ladder.ts#LADDER_WORLD_ABSENCE',
+    'gauntlet/rating.ts#RATING_BASIS',
+    'gauntlet/rating.ts#RATING_CAVEAT',
+    'gauntlet/rating.ts#ratingFigureOf',
+    'gauntlet/rating.ts#proofCaseCountOf',
+    // Driven through `runGauntlet`, which folds every case through them before it finishes.
+    'gauntlet/rating.ts#ratedCaseOf',
+    'gauntlet/rating.ts#proofCaseScoreOf',
+    'gauntlet/proofCases.ts#proofCasesOf',
+    'gauntlet/proofCases.ts#proofCaseRequestOf',
+    'gauntlet/run.ts#runGauntlet',
+    'gauntlet/run.ts#GAUNTLET_CANCELLED',
+    // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
+    'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
+    'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const towers = context.buildings.slice(0, 2);
+    /*
+     * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell.
+     * A shipped crowd label here would be the second copy of the fixture list that
+     * `gauntlet/proofCases.ts` exists to prevent, in the file that checks for it.
+     */
+    const set: ProofCaseSet = {
+      version: 1,
+      towers: towers.map((building, index) => ({
+        id: building.id,
+        arrivalRatePctPop5min: 1 + index,
+        why: '⟨why this building is in the set⟩',
+      })),
+      crowds: [
+        {
+          id: 'shape-a',
+          label: '⟨first crowd shape⟩',
+          tests: '⟨what the first shape tests⟩',
+          durationS: 900,
+          demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+        },
+        {
+          id: 'shape-b',
+          label: '⟨second crowd shape⟩',
+          tests: '⟨what the second shape tests⟩',
+          durationS: 900,
+          demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
+        },
+      ],
+    };
+    const nameOf = (towerId: string): string =>
+      towers.find((building) => building.id === towerId)?.name ?? towerId;
+
+    /* § 14.2's disclosure — every building, every shape, and the closing arithmetic. */
+    const forty = whatAreTheFortyOf(set, (towerId) => {
+      const building = towers.find((candidate) => candidate.id === towerId);
+      const lifts = building?.banks.reduce((count, bank) => count + bank.cars.length, 0) ?? 0;
+      return {
+        name: nameOf(towerId),
+        spec: `${String(building?.floors.length ?? 0)} floors · ${String(lifts)} lifts`,
+      };
+    });
+    seeds.push({ field: 'forty.heading', text: forty.heading, role: 'label' });
+    for (const [index, tower] of forty.towers.entries()) {
+      seeds.push({ field: `forty.tower.${String(index)}.name`, text: tower.name, role: 'label' });
+      seeds.push({ field: `forty.tower.${String(index)}.spec`, text: tower.spec, role: 'label' });
+      seeds.push({ field: `forty.tower.${String(index)}.why`, text: tower.why, role: 'prose' });
+    }
+    for (const [index, crowd] of forty.crowds.entries()) {
+      seeds.push({ field: `forty.crowd.${String(index)}.label`, text: crowd.label, role: 'label' });
+      seeds.push({ field: `forty.crowd.${String(index)}.tests`, text: crowd.tests, role: 'prose' });
+    }
+    seeds.push({ field: 'forty.arithmetic', text: forty.arithmetic, role: 'prose' });
+    seeds.push({ field: 'forty.basis', text: forty.basis, role: 'prose' });
+    /* The caveat is a refusal to name a winner, which is R2's own exemption. */
+    seeds.push({ field: 'forty.caveat', text: forty.caveat, role: 'reason' });
+
+    /* § 20.10's gate, all three states — nothing open, an unsaved edit, and a saved dispatcher. */
+    for (const [key, candidate] of [
+      ['none', undefined],
+      ['dirty', { dispatcherId: 'candidate', dispatcherName: '⟨dispatcher⟩', dirty: true }],
+      ['saved', { dispatcherId: 'candidate', dispatcherName: '⟨dispatcher⟩', dirty: false }],
+    ] as const) {
+      const gate = sendGateOf(candidate);
+      seeds.push({ field: `send.${key}.label`, text: gate.label, role: 'label' });
+      if (gate.refusal !== null) {
+        seeds.push({ field: `send.${key}.refusal`, text: gate.refusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * The forty themselves, three ways: finished, failed at the first case, and cancelled. The
+     * double answers synchronously from the context's own batch, so every figure below came out of
+     * a real run rather than out of this file.
+     */
+    const workerOf = (message: BatchWorkerMessage): (() => GauntletWorker) => {
+      return () => {
+        let handler: ((event: { data: unknown }) => void) | undefined;
+        return {
+          postMessage: () => {
+            handler?.({ data: message });
+          },
+          terminate: () => {},
+          addEventListener: (type: string, listener: unknown) => {
+            if (type === 'message') handler = listener as (event: { data: unknown }) => void;
+          },
+        } as GauntletWorker;
+      };
+    };
+
+    let finished: RatingSummary | undefined;
+    const progressLines: string[] = [];
+    runGauntlet({
+      set,
+      dispatcherProfileId: context.batch.arms[0]?.dispatcherProfileId ?? 'collective',
+      replications: 1,
+      towerNameOf: nameOf,
+      createWorker: workerOf({ kind: 'done', result: context.batch }),
+      onProgress: (progress) => progressLines.push(progress.line),
+      onFinished: (summary) => {
+        finished = summary;
+      },
+      onStopped: () => {},
+    });
+    for (const [index, line] of progressLines.entries()) {
+      seeds.push({ field: `run.progress.${String(index)}`, text: line, role: 'label' });
+    }
+
+    for (const [key, message] of [
+      ['failed', { kind: 'failed', message: '⟨what the worker said⟩' } as const],
+    ] as const) {
+      runGauntlet({
+        set,
+        dispatcherProfileId: 'collective',
+        replications: 1,
+        towerNameOf: nameOf,
+        createWorker: workerOf(message),
+        onProgress: () => {},
+        onFinished: () => {},
+        onStopped: (reason) => {
+          seeds.push({ field: `run.${key}`, text: reason, role: 'reason' });
+        },
+      });
+    }
+    seeds.push({ field: 'run.cancelled', text: GAUNTLET_CANCELLED, role: 'reason' });
+
+    /*
+     * The table. Three rows: a reference run with a complete rating, the same dispatcher after an
+     * edit (`edited since`), and one that has never run (`unrated`). Every state § 14 names.
+     */
+    const names = caseNamesOf(set, nameOf);
+    const entries: LadderEntry[] = [];
+    if (finished !== undefined) {
+      entries.push({
+        dispatcherId: 'reference',
+        dispatcherName: '⟨reference dispatcher⟩',
+        isReference: true,
+        fingerprint: 'as-rated',
+        summary: finished,
+      });
+      entries.push({
+        dispatcherId: 'edited',
+        dispatcherName: '⟨edited dispatcher⟩',
+        isReference: false,
+        fingerprint: 'as-rated',
+        summary: finished,
+      });
+      entries.push({
+        dispatcherId: 'never-run',
+        dispatcherName: '⟨unrated dispatcher⟩',
+        isReference: false,
+        fingerprint: 'as-rated',
+        summary: { ...finished, rating: null, casesRated: 0, complete: false, weakest: null },
+      });
+    }
+    const rows = ladderRowsOf(entries, {
+      fingerprintOf: (id) => (id === 'edited' ? 'moved-since' : 'as-rated'),
+      caseNameOf: (caseId) => names.get(caseId) ?? caseId,
+    });
+    for (const row of rows) {
+      const at = `ladder.${row.dispatcherId}`;
+      seeds.push({ field: `${at}.name`, text: row.name, role: 'label' });
+      /*
+       * R13's question, asked of the one figure in this product that is a standing claim: the
+       * rating is a mean, and the count it is a mean over is the column beside it. `declaredCount`
+       * is the summary's own `casesRated` and `countShown` says the cell is in the same row.
+       */
+      seeds.push({
+        field: `${at}.rating`,
+        text: row.rating,
+        role: 'estimate',
+        declaredCount: entries.find((entry) => entry.dispatcherId === row.dispatcherId)?.summary
+          .casesRated,
+        countShown: true,
+      });
+      seeds.push({ field: `${at}.proofCases`, text: row.proofCases, role: 'observation' });
+      seeds.push({ field: `${at}.weakest`, text: row.weakestAt, role: 'label' });
+      if (row.referenceLabel !== null) {
+        seeds.push({ field: `${at}.reference`, text: row.referenceLabel, role: 'label' });
+      }
+      if (row.staleness !== null) {
+        seeds.push({ field: `${at}.staleness`, text: row.staleness, role: 'reason' });
+      }
+      if (row.incompleteNote !== null) {
+        seeds.push({ field: `${at}.incomplete`, text: row.incompleteNote, role: 'reason' });
+      }
+    }
+
+    /* The two formatters on a rating nothing produced — § 13's `—`, never a zero. */
+    const nothing: RatingSummary = {
+      rating: null,
+      casesRated: 0,
+      casesRun: 0,
+      casesTotal: proofCasesOf(set).length,
+      complete: false,
+      weakest: null,
+      cases: [],
+    };
+    seeds.push({ field: 'rating.none.figure', text: ratingFigureOf(nothing), role: 'suppressed' });
+    seeds.push({ field: 'rating.none.cases', text: proofCaseCountOf(nothing), role: 'observation' });
+    seeds.push({
+      field: 'case.name',
+      text: caseNameOf(proofCasesOf(set)[0] as ProofCase, nameOf(towers[0]?.id ?? '')),
+      role: 'label',
+    });
+
+    /* The screen's chrome, its two absences, and the standing sentences beside the table. */
+    for (const [key, text] of Object.entries(BOARD_SCREEN_COPY)) {
+      seeds.push({ field: `board.copy.${key}`, text, role: 'label' });
+    }
+    seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
+    seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
+    seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
+    seeds.push({ field: 'ladder.reference.label', text: REFERENCE_RUN_LABEL, role: 'label' });
+    seeds.push({ field: 'rating.basis', text: RATING_BASIS, role: 'prose' });
+    seeds.push({ field: 'rating.caveat', text: RATING_CAVEAT, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -7521,6 +7833,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.
   WITHHELD_MATRIX,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: the ladder re-seeds a
+  // rating and a case count, which are figure-shaped, so placing it earlier would move
+  // batch-shaped faults onto this surface.
+  GAUNTLET,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

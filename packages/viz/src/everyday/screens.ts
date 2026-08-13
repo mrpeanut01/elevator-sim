@@ -31,6 +31,7 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import { BOARD_SCREEN } from './boardScreen.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
 import { SETTINGS_SCREEN } from './settingsScreen.js';
@@ -81,7 +82,7 @@ export interface EverydayScreenModule {
  * sentence from {@link UNBUILT_REASONS}.**
  */
 const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModule>>> =
-  Object.freeze({ fixit: FIXIT_SCREEN, settings: SETTINGS_SCREEN });
+  Object.freeze({ board: BOARD_SCREEN, fixit: FIXIT_SCREEN, settings: SETTINGS_SCREEN });
 
 /** The two screens the shell itself provides — see the module docstring. */
 const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'stage']);
@@ -144,7 +145,6 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
   designer: 'the designer screen is not built',
   tuner: 'the tuner screen is not built — it is reached from the brief and the report, and neither of those is built either',
   week: 'the week screen is not built',
-  board: 'needs a server to post and rank runs, and this build has none',
 });
 
 /**

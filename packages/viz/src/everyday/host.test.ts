@@ -212,6 +212,37 @@ describe('the resource lookups are honest — undefined, never a substitution', 
   });
 });
 
+describe('editedDispatcher — the § 20.10 gauntlet gate’s one question', () => {
+  it('is clean on a freshly opened profile, so a saved dispatcher may be sent', () => {
+    const edited = createEverydayHost(harnessOf(base()).bindings).editedDispatcher();
+    expect(edited.id).toBe(base().editingDispatcherId);
+    expect(edited.dirty).toBe(false);
+    expect(edited.name).not.toBe('');
+  });
+
+  it('is dirty the moment the working copy differs from what the library holds', () => {
+    const state = base();
+    const h = harnessOf({
+      ...state,
+      dispatcherSpec: {
+        ...state.dispatcherSpec,
+        weights: { ...state.dispatcherSpec.weights, waitTime: 3 },
+      },
+    });
+    expect(createEverydayHost(h.bindings).editedDispatcher().dirty).toBe(true);
+  });
+
+  it('is dirty when the profile it was opened from is gone — a run can be pointed at neither', () => {
+    /*
+     * `dev/dispatcherEditor.ts#runThisStateOf` collapses the two into one `saveFirst` for this
+     * reason, and the gate asks the question in the same place so the two controls cannot disagree
+     * about what *saved* means.
+     */
+    const h = harnessOf({ ...base(), editingDispatcherId: 'no-such-dispatcher' });
+    expect(createEverydayHost(h.bindings).editedDispatcher().dirty).toBe(true);
+  });
+});
+
 describe('the plain-lever seam — the same vector the Engineer editor holds', () => {
   it('reads the four levers off the working spec and group levers', () => {
     const views = createEverydayHost(harnessOf(base()).bindings).plainLevers();

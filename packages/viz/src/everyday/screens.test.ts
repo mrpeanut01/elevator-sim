@@ -28,11 +28,13 @@ describe('what this build has actually built', () => {
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
-     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`) and
-     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`); the order is
+     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`),
+     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`) and `board` the third (§ 14,
+     * `everyday/boardScreen.ts` — the ladder half needs no server, so the screen opens and the
+     * daily board's tab carries § 12.2's labelled unavailable state instead); the order is
      * `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
      */
-    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'settings']);
+    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'board', 'settings']);
   });
 
   it('derives BUILT from the registry, in both directions', () => {
