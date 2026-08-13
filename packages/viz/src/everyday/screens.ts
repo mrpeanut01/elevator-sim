@@ -31,6 +31,7 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import { SETTINGS_SCREEN } from './settingsScreen.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_SCREENS } from './types.js';
 
@@ -69,10 +70,10 @@ export interface EverydayScreenModule {
 
 /**
  * The registry. **Screen lanes: add your import above and your row here, and delete your key's
- * sentence from {@link UNBUILT_REASONS}.** Empty today — the frame landed before any screen.
+ * sentence from {@link UNBUILT_REASONS}.**
  */
 const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModule>>> =
-  Object.freeze({});
+  Object.freeze({ settings: SETTINGS_SCREEN });
 
 /** The two screens the shell itself provides — see the module docstring. */
 const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'stage']);
@@ -137,7 +138,6 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
   tuner: 'the tuner screen is not built — it is reached from the brief and the report, and neither of those is built either',
   week: 'the week screen is not built',
   board: 'needs a server to post and rank runs, and this build has none',
-  settings: 'the settings screen is not built yet',
 });
 
 /**

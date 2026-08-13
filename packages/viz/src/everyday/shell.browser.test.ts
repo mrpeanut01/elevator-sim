@@ -211,7 +211,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('draws § 3.2’s footer: the PLAYING AS card without an invented profile, and Settings refusing', async () => {
+  it('draws § 3.2’s footer: the PLAYING AS card without an invented profile, and Settings opening', async () => {
     const page = await coldLoad();
     try {
       const footer = await page.evaluate(() => ({
@@ -227,11 +227,17 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       expect(footer.identity).toContain('PLAYING AS');
       expect(footer.identity).toContain('you');
       expect(footer.identity).toContain('no days saved');
-      // The bordered Settings row is a destination that refuses in words while its screen is
-      // unbuilt — drawn, not a tooltip.
-      expect(footer.settings?.disabled).toBe(true);
+      /*
+       * The bordered Settings row is a destination, and it **opens** — the § 15.1 screen landed
+       * and left `UNBUILT_REASONS` on the same commit, which is the registry's whole contract.
+       * This case previously pinned the other side of it (disabled, captioned *not built*); the
+       * assertion moved rather than being deleted, because the pair *refuses ⇔ unbuilt* is what
+       * is under test either way, and § D227 is the direction that matters now: a row still
+       * captioning a refusal over a working screen would fail here.
+       */
+      expect(footer.settings?.disabled).toBe(false);
       expect(footer.settings?.label).toContain('Settings');
-      expect(footer.settings?.label).toContain('not built');
+      expect(footer.settings?.label).not.toContain('not built');
     } finally {
       await page.close();
     }

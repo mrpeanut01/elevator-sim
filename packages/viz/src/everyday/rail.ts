@@ -25,7 +25,9 @@
  * calls that wrong, so its absence is deliberate and is asserted.
  */
 
+import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
+import { ENGINEER_SWAP_REFUSAL } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /** One rail row. */
@@ -55,8 +57,10 @@ export interface RailFooter {
     /** The card's eyebrow, always `PLAYING AS`. */
     readonly heading: string;
     readonly name: string;
-    /** The avatar circle's letter — first letter of the name, uppercased. */
+    /** The avatar circle's letter — `profile.ts`'s one derivation, never a second one here. */
     readonly initial: string;
+    /** The disc behind the letter — § 15.1's curated colour, sun until the player picks. */
+    readonly avatarColor: string;
     /** The streak line under the name — or, with no profile, an honest absence. */
     readonly streak: string;
   };
@@ -75,14 +79,25 @@ export interface RailModel {
   readonly footer: RailFooter;
 }
 
-/** What the shell knows beyond the state — all optional, all absent in this build. */
+/** What the shell knows beyond the state — all optional. */
 export interface RailOptions {
   /** Whether a campaign is under way — gates the `CAMPAIGN` group together with `ctx`. */
   readonly inCampaign?: boolean;
   /** The open building's name, for the campaign group's middle row (§ 3.2: the row *is* the name). */
   readonly openBuilding?: string | undefined;
-  /** The player's identity, once something stores one. */
-  readonly profile?: { readonly name: string; readonly streak: string } | undefined;
+  /**
+   * The player's identity — `everyday/profileStore.ts`'s stored name and avatar colour, once the
+   * settings screen has written one. `streak` stays optional because the profile store holds no
+   * career: with none given the card keeps its honest absence line rather than inventing a run of
+   * days (§ 20.11).
+   */
+  readonly profile?:
+    | {
+        readonly name: string;
+        readonly streak?: string | undefined;
+        readonly avatarColor?: string | undefined;
+      }
+    | undefined;
 }
 
 /**
@@ -196,18 +211,21 @@ export function railGroups(
 /**
  * § 3.2's footer.
  *
- * With no profile store in this build, the card does not invent one: the name falls back to the
- * prototype's own `you`, and the streak line says plainly that nothing is saved — an authored
- * fixture presented as a player is exactly what the handoff's § 20.11 forbids.
+ * The identity is `everyday/profileStore.ts`'s, handed in through {@link RailOptions.profile};
+ * with nothing stored the card does not invent one — the name falls back to
+ * `DEFAULT_EVERYDAY_PROFILE`'s `you` on sun, and the streak line says plainly that nothing is
+ * saved. An authored fixture presented as a player is exactly what the handoff's § 20.11 forbids,
+ * which is also why the streak never comes from the profile: the store holds no days to count.
  */
 export function railFooter(state: EverydayState, options: RailOptions = {}): RailFooter {
-  const name = options.profile?.name ?? 'you';
+  const name = options.profile?.name ?? DEFAULT_EVERYDAY_PROFILE.name;
   const streak = options.profile?.streak ?? 'no days saved yet — this build keeps no career';
   return {
     identity: {
       heading: 'PLAYING AS',
       name,
-      initial: (name[0] ?? 'y').toUpperCase(),
+      initial: avatarInitialOf(name),
+      avatarColor: options.profile?.avatarColor ?? DEFAULT_EVERYDAY_PROFILE.avatarColor,
       streak,
     },
     settings: {
@@ -216,7 +234,7 @@ export function railFooter(state: EverydayState, options: RailOptions = {}): Rai
     },
     engineerSwap: {
       label: 'Switch to Engineer',
-      unavailable: 'not built yet — Everyday Mode is the only play style in this build',
+      unavailable: ENGINEER_SWAP_REFUSAL,
     },
   };
 }

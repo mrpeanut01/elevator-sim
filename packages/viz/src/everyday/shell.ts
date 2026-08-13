@@ -44,6 +44,7 @@
 import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
+import { everydayProfileStore } from './profileStore.js';
 import { railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
@@ -149,6 +150,13 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
 
   /** The registered screen currently mounted in the region, so navigation can unmount it. */
   let mounted: EverydayScreenHandle | undefined;
+
+  /*
+   * § 20.15: the rail card and the settings screen read the name and avatar colour from one
+   * place. This is that place's one page-wide instance; the subscription below is what makes a
+   * name typed on the settings screen move the `PLAYING AS` card without a reload.
+   */
+  const profileStore = everydayProfileStore();
 
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
@@ -393,7 +401,13 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
 
   function drawRail(): void {
     rail.replaceChildren();
-    const model: RailModel = railModel(state);
+    const stored = profileStore.current();
+    const model: RailModel = railModel(
+      state,
+      stored === undefined
+        ? {}
+        : { profile: { name: stored.name, avatarColor: stored.avatarColor } },
+    );
 
     /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
@@ -505,12 +519,13 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
     card.style.cssText = `border-radius:${String(R.well)}px;background:${RAIL_SURFACE.card};padding:11px 12px`;
     const cardTop = el(doc, 'div');
     cardTop.style.cssText = 'display:flex;align-items:center;gap:8px';
-    const avatar = el(doc, 'span', undefined, model.footer.identity.initial);
+    const avatar = el(doc, 'span', 'everyday-identity-avatar', model.footer.identity.initial);
     avatar.style.cssText = [
       'width:24px',
       'height:24px',
       'border-radius:50%',
-      `background:${C.sun}`,
+      /* § 15.1's curated colour, from the same store the settings screen writes (§ 20.15). */
+      `background:${model.footer.identity.avatarColor}`,
       `color:${C.ink}`,
       'display:flex',
       'align-items:center',
@@ -736,6 +751,14 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
         const picked = EVERYDAY_MODES.find((mode) => mode.pick === (state.modePick ?? 'today'));
         if (picked !== undefined && isPlayable(picked)) go(picked.screen);
       });
+    } else if (state.screen === 'settings') {
+      /*
+       * § 3.3's settings row: the primary is `Back to the modes`, which is the same exit the left
+       * button performs — wired here rather than in the screen module because the bar is the
+       * shell's (§ 3.1), and a filled primary that did nothing would be the exact control this
+       * frame refuses to draw.
+       */
+      primaryBtn.addEventListener('click', requestLeave);
     }
     bar.append(primaryBtn);
   }
@@ -912,6 +935,14 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
 
   draw();
 
+  /*
+   * § 20.15's check, made true by wiring rather than by luck: a profile write from any surface —
+   * today that is the settings screen's name field and swatches — redraws the rail, so the
+   * `PLAYING AS` card shows the new name and colour without a reload. Only the rail: the screen
+   * region belongs to whatever is mounted in it, and the writer redraws its own words.
+   */
+  const stopProfileWatch = profileStore.subscribe(drawRail);
+
   return {
     root,
     go,
@@ -920,6 +951,7 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
       runOpen = open;
     },
     destroy: () => {
+      stopProfileWatch();
       unmountCurrent();
       setCoveredInert(false);
       root.remove();

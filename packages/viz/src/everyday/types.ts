@@ -146,6 +146,24 @@ export interface EverydayState {
 export const EVERYDAY_ROOT: EverydayScreen = 'menu';
 
 /**
+ * Why the way out of Everyday Mode does not open — one sentence, two readers: `rail.ts`'s § 3.2
+ * footer swap and `settingsView.ts`'s § 15.1 *This device* register, which offers the same row.
+ * Two surfaces refusing one thing in two wordings is the defect `screens.ts`'s refusal table
+ * exists to prevent, one level down.
+ *
+ * **Here rather than beside either reader, and that placement is a fix rather than a preference.**
+ * It began in `rail.ts`; `settingsView.ts` imported it, and the settings screen is reached through
+ * `screens.ts`'s registry, which imports the screen module — so the import graph closed into
+ * `rail → screens → settingsScreen → settingsView → rail` and the constant read `undefined` at
+ * module-init time on whichever file the cycle entered second. The register drew
+ * *"Switch to Engineer — undefined"* and only the test that compared the two sites caught it.
+ * This module imports nothing, so a constant declared here cannot be caught in a cycle — the same
+ * argument {@link EVERYDAY_ROOT_CLASS} is here for, and § 18's own note about declaration order.
+ */
+export const ENGINEER_SWAP_REFUSAL =
+  'not built yet — Everyday Mode is the only play style in this build';
+
+/**
  * The class on the Everyday shell's own root element.
  *
  * It is a shared constant rather than a literal in one file because **two shells write `inert` on

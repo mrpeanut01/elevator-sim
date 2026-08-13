@@ -41,6 +41,10 @@
 
 import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
 
+import {
+  provideEngineerSettings,
+  type EngineerSettingsBridge,
+} from '../everyday/engineerBridge.js';
 import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
 import {
@@ -2398,6 +2402,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
      */
     if (result.ok) void loadBoards();
   }
+
+  /*
+   * The Everyday settings screen's Motion row, wired to **this** menu's switch rather than to a
+   * second value — `everyday/engineerBridge.ts` has the whole argument. The write goes through
+   * `dispatchMenu` as the same `set-setting` intent `menu/screens.ts`'s `settings.reduce-motion`
+   * toggle dispatches, so the application (`playback?.pause()`), the redraw and `saveSessionNow()`
+   * all happen exactly as they would from the Engineer menu, and the two surfaces cannot disagree.
+   */
+  const engineerSettingsBridge: EngineerSettingsBridge = {
+    reduceMotion: () => menuState.settings.reduceMotion,
+    setReduceMotion: (value) => {
+      dispatchMenu({ kind: 'set-setting', field: 'reduceMotion', value: value ? 'on' : 'off' });
+    },
+  };
+  provideEngineerSettings(engineerSettingsBridge);
 
   const menuHost: MenuPanelHost = {
     doc: document,
