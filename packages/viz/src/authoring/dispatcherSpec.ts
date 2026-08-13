@@ -444,11 +444,17 @@ export function specIsDirty(spec: DispatcherSpec, source: DispatcherProfile | un
    * a control the reader had put back is the stale-confirmation defect the mount's
    * `forgetConfirmation` exists for, arriving from the other direction.
    */
-  const space = familySpace();
-  const point = candidateFromProfile(space, source);
-  for (const [id, value] of Object.entries(spec.families)) {
-    const held = point.get(id) ?? space.byId.get(id)?.default;
-    if (String(held) !== String(value)) return true;
+  const moved = Object.entries(spec.families);
+  // Guarded rather than folded into the loop: `candidateFromProfile` walks every declared
+  // dimension, this function runs on every render of the panel, and the record is empty on every
+  // profile nobody has opened a family block on.
+  if (moved.length > 0) {
+    const space = familySpace();
+    const point = candidateFromProfile(space, source);
+    for (const [id, value] of moved) {
+      const held = point.get(id) ?? space.byId.get(id)?.default;
+      if (String(held) !== String(value)) return true;
+    }
   }
   const terms = new Set([...Object.keys(original.weights), ...Object.keys(spec.weights)]);
   for (const term of terms) {
