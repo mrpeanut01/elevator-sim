@@ -262,6 +262,21 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/stageScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
+  /*
+   * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
+   * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
+   * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of
+   * which are driven in this node tier.
+   *
+   * `briefScreen.ts` is here for a second reason worth naming: it is the only Everyday file that
+   * draws to a canvas, so it reads `devicePixelRatio` and a `resize` listener off the document's
+   * own view — ENGINE_CONTRACT § 14's rules, which cannot be followed without touching them.
+   */
+  'everyday/screenDom.ts',
+  'everyday/doorScreen.ts',
+  'everyday/briefScreen.ts',
+  'everyday/reportScreen.ts',
+  'everyday/weekScreen.ts',
 ]);
 
 /** A shell entry point: `dev/` wholesale, and the Everyday shell's DOM-owning files. */

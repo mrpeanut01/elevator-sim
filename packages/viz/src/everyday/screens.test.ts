@@ -23,22 +23,40 @@ import {
 import { EVERYDAY_SCREENS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is the shell’s own menu and every registered module — today the menu plus stage, fixit and settings', () => {
+  it('is the shell’s own menu and every registered module — the whole daily loop, plus fixit, the board and settings', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
-     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`),
-     * `settings` the second (§ 15.1), `stage` the third (§ 7, `everyday/stageScreen.ts`) and
-     * `board` the fourth (§ 14, `everyday/boardScreen.ts` — the ladder half needs no server, so the
-     * screen opens and the daily board's tab carries § 12.2's labelled unavailable state instead);
-     * the order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
+     *
+     * `fixit` was the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`) and
+     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`). Two lanes then landed six more
+     * between them: § 7's stage (`everyday/stageScreen.ts`) and § 14's board
+     * (`everyday/boardScreen.ts` — the ladder half needs no server, so the screen opens and the
+     * daily board's tab carries § 12.2's labelled unavailable state instead), and § 6's daily loop
+     * — the front door, the brief, the report and Your week — which is what turns *Today's tower*
+     * from a hand-off into a loop.
+     *
+     * The order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory
+     * and not a record of what registered when. It is why this list can be recomputed from
+     * `types.ts` and the registry after a merge rather than reconstructed from two branches'
+     * registration orders.
      *
      * **`stage` moved sides without moving in this list**, which is the case worth reading twice:
      * it was shell-owned (the § D335 hand-off), it is now registered, and a list that only says
      * *built* cannot tell the difference. The case below is what does.
      */
-    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'board', 'settings']);
+    expect(EVERYDAY_SCREENS_BUILT).toEqual([
+      'menu',
+      'door',
+      'brief',
+      'stage',
+      'report',
+      'fixit',
+      'week',
+      'board',
+      'settings',
+    ]);
   });
 
   it('derives BUILT from the registry, in both directions', () => {
@@ -79,6 +97,7 @@ describe('the refusal sentences and the registry move together', () => {
     // The throwing arm is deliberate: a caller asking for a refusal over a working screen is the
     // § D227 defect about to happen, and a returned fallback sentence would let it.
     expect(() => unbuiltReasonFor('menu')).toThrow(/built/);
+    expect(() => unbuiltReasonFor('door')).toThrow(/built/);
     expect(unbuiltReasonFor('rush')).toMatch(/not built yet/);
   });
 });

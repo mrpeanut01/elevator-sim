@@ -28,7 +28,7 @@
  *
  * What it no longer has is a **door**: the § 3.2 footer's *Switch to Engineer* row is that door and
  * it is not built, so nothing in this build opens the Engineer surface. That is the one thing this
- * change took away and it is the second entry of {@link EVERYDAY_SHELL_ABSENCES} rather than a
+ * change took away and it is an entry of {@link EVERYDAY_SHELL_ABSENCES} rather than a
  * discovery waiting to happen. It also makes `types.ts#ENGINEER_SWAP_REFUSAL` — *"Everyday Mode is
  * the only play style in this build"* — true, which it was not while the stage handed off.
  *
@@ -68,9 +68,32 @@ import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
  * cannot go stale the way a prose row in a plan did.
  */
 export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
-  '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
+  /*
+   * **Four rows left this register on the merge that brought § 6's daily loop in beside § 7's
+   * stage, and every one of them left because its screen landed rather than because anybody
+   * tidied.** Written down because a register whose deletions are invisible is a register a reader
+   * cannot audit, and because two of the four were deleted by the *other* lane's work:
+   *
+   * - *"§ 6.1 front door and § 6.2 brief — Today's tower opens the day directly"* — both are
+   *   registered screens now and the tile routes through them (`modes.ts` says so in the tile's
+   *   own comment);
+   * - *"§ 7's Everyday stage — the stage shown is the Engineer surface with Casual copy"* —
+   *   `everyday/stageScreen.ts` is § 7's stage, mounted in the screen region like any other;
+   * - *"§ 3.3's action bar is not drawn over the handed-off stage"*, with its consequence that
+   *   *Close the day* had no home — the hand-off retired with the stage becoming a screen, so the
+   *   bar is drawn under it and `actionBar.ts` gives that row the primary the note promises
+   *   (`stageScreenModel.test.ts` pins the label);
+   * - *"§ 14 boards and § 12.2 ladder — both need a server"* — true of the daily board and never
+   *   true of the ladder, which is measured on this device. It is replaced below by the half that
+   *   is still an absence.
+   *
+   * A register that kept naming any of them would be § D227's stale refusal — the defect this
+   * register exists to prevent — reproduced by the register itself.
+   */
+  '§ 6.1’s replay — a past day can be read from the front door’s week strip, not re-opened: a week moves forward and nothing here stands it back up',
+  '§ 6.2’s ghost — no run in this build races a second dispatcher over the same crowd, so *Race against* states what it would be instead of offering it',
   'the Engineer surface still boots and runs behind this shell, and nothing here opens it — the rail’s Switch to Engineer row is that door and it is not built; one line of packages/viz/index.html reverts the whole product to it',
-  '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
+  '§ 14’s daily board — a ranking of other people’s runs needs a server to post and verify them, and this build has none: the board screen opens on § 12.2’s labelled unavailable state for that tab, the ladder beside it is live because a rating is measured on this device, and Your week states what a board would be keyed on rather than drawing an empty one',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
 
@@ -1017,6 +1040,28 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           },
         };
         mounted = module.mount(screenRegion, context);
+        /*
+         * **Draw the bar again, now that there is a mount to answer its primary.**
+         *
+         * `drawBar()` above runs before this line, so on the *first* draw of a registered screen it
+         * resolved the § 3.3 row while `mounted` was still `undefined` — and its
+         * `route === 'screen' && mounted?.primary !== undefined` branch is what wires the press. The
+         * result was a filled, enabled primary that did nothing until something else caused a
+         * redraw: the exact silently-does-nothing control the handoff's definition of done forbids,
+         * on the loudest button on the screen.
+         *
+         * It shipped unnoticed because the only registered screen with a `primary` was
+         * `fixitScreen.ts`, which calls `refreshBar` from its own load handler a beat later and so
+         * always had one by the time anybody pressed. A screen whose row is static — the front door,
+         * the brief, the report, Your week — has nothing to trigger that beat, and the browser tier
+         * found all four dead on the first press.
+         *
+         * Here rather than in each screen's `mount`, and that is the fix rather than a convenience:
+         * a screen cannot call `refreshBar` early enough, because `mounted` is assigned by *this*
+         * statement. The bar is the shell's element (§ 3.1) and its wiring is the shell's to get
+         * right once.
+         */
+        drawBar();
         return;
       }
     }

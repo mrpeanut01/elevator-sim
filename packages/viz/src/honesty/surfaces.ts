@@ -65,11 +65,14 @@ import {
   fixitRepairStateLine,
   fixitSpendSummary,
 } from '../everyday/fixitScreenModel.js';
+import { briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
+import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { AVATAR_SWATCHES } from '../everyday/profile.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
+import { everydayReportViewOf } from '../everyday/reportView.js';
 import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
 import {
@@ -85,7 +88,10 @@ import {
   STAGE_NO_GHOST,
   STAGE_RECOMPUTING,
 } from '../everyday/stageScreenModel.js';
+import { todayOf } from '../everyday/today.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS } from '../everyday/types.js';
+import { weekScreenViewOf } from '../everyday/weekView.js';
+import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -8076,6 +8082,287 @@ const GAUNTLET: SurfaceAdapter = {
   },
 };
 
+/**
+ * **Everyday Mode's daily loop** — GAMEPLAY § 6 and § 14, the words half of four screens.
+ *
+ * ## Why this loop belongs in a corpus about honesty more than any other Everyday surface
+ *
+ * Because almost everything on it is a **withheld** state, and § 12.2 says the withheld states
+ * must be enumerated *from the state model* rather than from hand-written fixtures. Four screens
+ * draw two independent absences that combine:
+ *
+ * - **the day is not closed** — § 16 rule 1's `—`, on today's chip at the front door, on today's
+ *   card in Your week, and on the percentile line. It is a fact about the reader's own run;
+ * - **the world is unreachable** — § 16 rule 15's labelled band, which in this build is the
+ *   *normal* state, because there is no server. It is a fact about other players.
+ *
+ * A screen that printed `0%` for the first would tell a reader nobody got away inside a minute; a
+ * screen that printed `0 players` for the second would tell them nobody played. Both are R3's
+ * blank-versus-failure rule, and both are exactly the kind of sentence a search finds and a
+ * reviewer does not. Every case below is driven with the day open **and** closed for that reason.
+ *
+ * ## And two refusals that are claims about controls
+ *
+ * § 6.1's replay and § 6.2's ghost are both refused in this build, and both refusals are sentences
+ * a player reads about a control they can see. That is § D227's shape — a refusal is pinned by a
+ * run, never by another sentence — and a refusal nothing sweeps is the sentence that goes stale
+ * the day somebody wires the seam it refuses about.
+ *
+ * ## What is driven, and what is not
+ *
+ * Every pure producer of the four screens, over both arms of the day-closed axis and over a week
+ * with history and one without. The four **mounts** are excluded in `derive.test.ts` on the DOM
+ * mounts' shared ground — they draw into the shell's scroll region, so they cannot run without a
+ * document — which is the same pure/DOM split `EVERYDAY_MENU` and `EVERYDAY_SETTINGS` describe.
+ * What those mounts author of their own is geometry and class names.
+ *
+ * The report screen's own view is driven here; the **sheet** inside it is `reportViewOf`'s, which
+ * `DAY_REPORT_VIEW` already drives in both registers. This adapter seeds what `reportView.ts` adds
+ * on top: the Everyday empty state, the levers' no-surface sentence, the closing block's title,
+ * the tomorrow button's note, and the stale-sheet warning — five claims about what this screen is
+ * showing, none of which exist on the Engineer panel.
+ */
+const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
+  id: 'everyday/today.ts#todayOf',
+  covers: [
+    'everyday/today.ts#todayOf',
+    'everyday/doorView.ts#doorScreenViewOf',
+    'everyday/doorView.ts#DOOR_STEPS',
+    'everyday/doorView.ts#SAME_FOR_EVERYONE',
+    'everyday/briefView.ts#briefScreenViewOf',
+    'everyday/briefView.ts#GHOST_REFUSAL',
+    'everyday/briefView.ts#lockedForScore',
+    'everyday/weekView.ts#weekScreenViewOf',
+    'everyday/reportView.ts#everydayReportViewOf',
+    'everyday/world.ts#percentileLine',
+    'everyday/world.ts#WORLD_FIGURES_LABEL',
+    'everyday/world.ts#WORLD_FIGURES_REASON',
+    'everyday/world.ts#WORLD_FIGURES_ABSENT',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+
+    for (const entry of bundle.days) {
+      /*
+       * The day record first — one object, four screens (§ 16 rule 14). Seeded once per day rather
+       * than once per screen, because the whole claim of that rule is that the brief and the door
+       * are quoting the *same* sentences.
+       */
+      const today = todayOf({
+        week: entry.week,
+        // No period, on `shiftBundleOf`'s own stated ground: what a period changes is which event
+        // the card picks, and every event's words are already in the corpus.
+        calendar: null,
+        building: context.building,
+        buildingId: context.building.id,
+        dispatcherName: entry.report.metaLines[0],
+        goals: entry.readings,
+        seed: 424_242n,
+      });
+      const at = `day${String(entry.day)}`;
+      seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
+      seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
+      seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      for (const fact of today.facts) {
+        seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
+      }
+      if (today.load !== undefined) {
+        seeds.push({ field: `${at}.today.load.word`, text: today.load.word, role: 'label' });
+        seeds.push({ field: `${at}.today.load.note`, text: today.load.note, role: 'observation' });
+      }
+      if (today.outOfService !== undefined) {
+        seeds.push({
+          field: `${at}.today.outage`,
+          text: today.outOfService.sentence,
+          role: 'observation',
+        });
+      }
+      for (const ask of today.asks) {
+        seeds.push({ field: `${at}.today.asks`, text: ask, role: 'label' });
+      }
+
+      /*
+       * **Both arms of the day-closed axis, on every screen that has one** — § 12.2's matrix, as
+       * far as this build reaches it. `closed: false` is the state a reader is in for the whole of
+       * the day they are playing, and it is the arm that draws every `—`.
+       */
+      for (const closed of [false, true]) {
+        const arm = `${at}.${closed ? 'closed' : 'open'}`;
+
+        /* ---- the front door, at today and at a past day (the replay refusal) ---- */
+        for (const offset of [0, DAY_OFFSET_MIN]) {
+          const door = doorScreenViewOf({
+            week: entry.week,
+            today,
+            dayOffset: offset,
+            dayClosed: closed,
+          });
+          const where = `${arm}.door${String(offset)}`;
+          seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
+          seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
+          seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
+          for (const chip of door.chips) {
+            seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
+            seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
+          }
+          seeds.push({ field: `${where}.world.label`, text: door.world.label, role: 'label' });
+          seeds.push({ field: `${where}.world.reason`, text: door.world.reason, role: 'reason' });
+          for (const absent of door.world.absent) {
+            seeds.push({ field: `${where}.world.absent`, text: absent, role: 'reason' });
+          }
+          for (const step of door.steps) {
+            seeds.push({ field: `${where}.step.${step.n}.head`, text: step.head, role: 'label' });
+            seeds.push({ field: `${where}.step.${step.n}.body`, text: step.body, role: 'prose' });
+          }
+          seeds.push({ field: `${where}.driver`, text: door.driver.note, role: 'prose' });
+          seeds.push({ field: `${where}.same`, text: door.sameForEveryone, role: 'prose' });
+          seeds.push({ field: `${where}.primary.label`, text: door.primary.label, role: 'label' });
+          /* The § 6.1 replay refusal on the past-day arm; the § 3.3 note on today's. */
+          seeds.push({
+            field: `${where}.primary.note`,
+            text: door.primary.note,
+            role: door.primary.inert ? 'reason' : 'prose',
+          });
+        }
+
+        /* ---- Your week: today's card, the tally, the percentile, the board's absence ---- */
+        const week = weekScreenViewOf({
+          week: entry.week,
+          towerToday: context.buildingName,
+          dayClosed: closed,
+          // A sheet stands exactly when the day is closed here, which is the shipped pairing; the
+          // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
+          sheetStanding: closed,
+        });
+        seeds.push({ field: `${arm}.week.streak`, text: week.streakLine, role: 'observation' });
+        for (const card of week.cards) {
+          seeds.push({ field: `${arm}.week.card.score`, text: card.score, role: 'observation' });
+          seeds.push({ field: `${arm}.week.card.note`, text: card.note, role: 'label' });
+        }
+        seeds.push({ field: `${arm}.week.tally`, text: week.tally.line, role: 'observation' });
+        seeds.push({ field: `${arm}.week.readNote`, text: week.readNote, role: 'prose' });
+        seeds.push({
+          field: `${arm}.week.percentile`,
+          text: week.percentile.line,
+          role: 'reason',
+        });
+        seeds.push({ field: `${arm}.week.split`, text: week.splitCaption, role: 'prose' });
+        seeds.push({ field: `${arm}.week.board.refusal`, text: week.board.refusal, role: 'reason' });
+        for (const rule of week.board.rules) {
+          seeds.push({ field: `${arm}.week.board.rule`, text: rule.title, role: 'label' });
+          seeds.push({ field: `${arm}.week.board.body`, text: rule.body, role: 'prose' });
+        }
+      }
+
+      /* ---- the brief: the wrinkle, what today asks, and the two refusals ---- */
+      /*
+       * The dispatcher list the brief offers, carrying the Engineer's own Casual sentence per
+       * profile — `dispatcherCardOf(profile, peers, 'basic').sub`, which is the same expression
+       * `briefScreen.ts` hands the view and which `DISPATCHER_CARDS` already drives on its own
+       * surface. The peers are `context.profiles`, which is the list the rail shows.
+       */
+      const options = context.profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        description: dispatcherCardOf(profile, context.profiles, 'basic').sub,
+      }));
+      const brief = briefScreenViewOf({
+        today,
+        dispatchers: options,
+        savedIds: [],
+        selectedId: options[0]?.id ?? '',
+      });
+      seeds.push({ field: `${at}.brief.title`, text: brief.title, role: 'label' });
+      seeds.push({ field: `${at}.brief.wrinkle.title`, text: brief.wrinkle.title, role: 'label' });
+      seeds.push({ field: `${at}.brief.wrinkle.body`, text: brief.wrinkle.body, role: 'observation' });
+      seeds.push({ field: `${at}.brief.wrinkle.shared`, text: brief.wrinkle.shared, role: 'prose' });
+      seeds.push({ field: `${at}.brief.asks.note`, text: brief.asks.note, role: 'prose' });
+      seeds.push({ field: `${at}.brief.count`, text: brief.drivers.count, role: 'observation' });
+      seeds.push({ field: `${at}.brief.bar`, text: brief.barNote, role: 'label' });
+      for (const [name, card] of [
+        ['ghost', brief.ghost],
+        ['locked', brief.locked],
+      ] as const) {
+        seeds.push({ field: `${at}.brief.${name}.what`, text: card.what, role: 'prose' });
+        seeds.push({ field: `${at}.brief.${name}.why`, text: card.why, role: 'reason' });
+        seeds.push({ field: `${at}.brief.${name}.caveat`, text: card.caveat, role: 'prose' });
+      }
+
+      /*
+       * ---- the report screen's own additions ----
+       *
+       * Three states: nothing filed, a filed sheet, and a filed sheet with a newer unfiled run on
+       * the stage. The third is the one worth insisting on — it is the sentence that stops a reader
+       * taking this sheet for an account of the run they can currently see.
+       */
+      for (const [label, input] of [
+        ['empty', { report: undefined, previous: undefined, overnight: undefined, newerRunOnStage: false }],
+        ['filed', { report: entry.report, previous: undefined, overnight: undefined, newerRunOnStage: false }],
+        ['paired', { report: entry.report, previous: entry.swapped, overnight: undefined, newerRunOnStage: false }],
+        ['stale', { report: entry.report, previous: undefined, overnight: undefined, newerRunOnStage: true }],
+      ] as const) {
+        const view = everydayReportViewOf(input);
+        const where = `${at}.report.${label}`;
+        if (view.emptyLede !== undefined) {
+          seeds.push({ field: `${where}.empty`, text: view.emptyLede, role: 'prose' });
+        }
+        seeds.push({ field: `${where}.figuresHeading`, text: view.headings.figures, role: 'label' });
+        seeds.push({ field: `${where}.overnightHeading`, text: view.headings.overnight, role: 'label' });
+        seeds.push({ field: `${where}.honesty.title`, text: view.honesty.title, role: 'label' });
+        /*
+         * `role: 'reason'`, which is what `DAY_REPORT` and `DAY_REPORT_VIEW` classify the same
+         * string as — and the classification is load-bearing rather than cosmetic. The small
+         * print's whole job is to **refuse** a comparative reading of one day, and it does that in
+         * R2's own words (*"it cannot tell you that X is better than anything — that needs 50 or
+         * more paired runs …"*), which names an ordering and names a dispatcher. Seeded `prose`
+         * it fired `single-run-comparative` on eighteen strings across three cases on this
+         * adapter's first run — the property's own documented third narrowing, met from the wrong
+         * side. A refusal is the one string entitled to name the ordering it is refusing.
+         */
+        seeds.push({ field: `${where}.honesty.body`, text: view.honesty.body, role: 'reason' });
+        if (view.honesty.pointer !== undefined) {
+          seeds.push({ field: `${where}.pointer`, text: view.honesty.pointer.why, role: 'prose' });
+        }
+        for (const lever of view.levers) {
+          if (lever.noSurfaceNote === undefined) continue;
+          seeds.push({ field: `${where}.lever.refusal`, text: lever.noSurfaceNote, role: 'reason' });
+        }
+        if (view.tomorrow !== undefined) {
+          seeds.push({ field: `${where}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
+          seeds.push({ field: `${where}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
+        }
+        if (view.staleNote !== undefined) {
+          seeds.push({ field: `${where}.stale`, text: view.staleNote, role: 'reason' });
+        }
+      }
+    }
+
+    /*
+     * The two constants no rendered view reaches on its own: `DOOR_STEPS`' and `SAME_FOR_EVERYONE`
+     * are seeded through the door view above, and `percentileLine`'s two arms through Your week.
+     * `GHOST_REFUSAL` and `lockedForScore` likewise. What is left is the world band's own three,
+     * asserted here as well so the exclusion list never has to claim they are unchecked.
+     */
+    seeds.push({ field: 'world.label', text: WORLD_FIGURES_LABEL, role: 'label' });
+    seeds.push({ field: 'world.reason', text: WORLD_FIGURES_REASON, role: 'reason' });
+    for (const absent of WORLD_FIGURES_ABSENT) {
+      seeds.push({ field: 'world.absent', text: absent, role: 'reason' });
+    }
+    for (const closed of [false, true]) {
+      seeds.push({ field: `world.percentile.${String(closed)}`, text: percentileLine(closed), role: 'reason' });
+    }
+    for (const step of DOOR_STEPS) {
+      seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
+    }
+    seeds.push({ field: 'door.same', text: SAME_FOR_EVERYONE, role: 'prose' });
+    seeds.push({ field: 'brief.ghost.why', text: GHOST_REFUSAL.why, role: 'reason' });
+    seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -8148,6 +8435,17 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // rating and a case count, which are figure-shaped, so placing it earlier would move
   // batch-shaped faults onto this surface.
   GAUNTLET,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the part worth reading. The daily-loop lane had it between
+   * `EVERYDAY_SETTINGS` and `REPORT_CARD`, which was the end of the array on that branch and is
+   * the middle of it here. Left where it merged, it would sit ahead of eleven surfaces it shares
+   * wordings with — the report card's figures, the week's withheld cells, § 7's stage header —
+   * and every fault of those shapes would have moved onto this surface without a line of either
+   * branch changing. That is exactly the silent re-mapping the rule exists to stop, so the rule is
+   * applied to the merged array rather than to each branch's.
+   */
+  EVERYDAY_DAILY_LOOP,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

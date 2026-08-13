@@ -26,9 +26,12 @@
  * levers; the stage needs the run actions) and nothing speculative. Named absences, for the lane
  * that needs one to add with its consumer:
  *
- * - **no dispatcher or building setter** — the door screen's *pick who drives* writes through
- *   `dev/state.ts#withDispatcher`/`withBuilding`, and the lane that builds that screen adds the
- *   action beside its control;
+ * - **no building setter** — `dev/state.ts#withBuilding` parks a week as it goes (issue #107), so
+ *   the screen that offers it is the campaign's building desk rather than the daily door: § 6's
+ *   whole premise is *one building, one crowd, one seed, everybody*, and a control that changed
+ *   the tower on the front door would be changing the day out from under the score. The daily
+ *   loop's own *"you can change all of them and the run stops counting"* routes to the tuner,
+ *   which is unbuilt and refuses in `screens.ts`'s words;
  * - **no campaign works booking, no contract acceptance** — the campaign lane's, with its screens;
  * - **no transport control** (pause, speed, seek) and no `playing` flag — **and this absence is now
  *   a decision rather than a gap.** The § 7 Everyday stage exists (`everyday/stageScreen.ts`) and it
@@ -57,6 +60,7 @@
 import type {
   BuildingConfig,
   DispatcherProfile,
+  ResolvedBuilding,
   RunInterventionConfig,
   TrafficProfile,
 } from '@elevator-sim/core/browser';
@@ -68,6 +72,8 @@ import {
   allBuildingIds,
   allDispatchers,
   buildingConfigOf,
+  resolvedBuildingOf,
+  withDispatcher,
   type SavedDispatcher,
   type ViewerState,
 } from '../dev/state.js';
@@ -78,10 +84,12 @@ import {
   type PlainLeverId,
   type PlainLeverView,
 } from '../mode/plainLevers.js';
+import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById } from '../shift/contracts.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { ShapedDayReport } from '../shift/report.js';
+import type { TomorrowBriefing } from '../shift/tomorrow.js';
 import type {
   DayOutcome,
   GoalObservations,
@@ -105,6 +113,18 @@ export interface EverydayHost {
   contract(): ScenarioContract | undefined;
 
   /**
+   * The calendar period the week is under, or `null` — `ViewerState.calendar`.
+   *
+   * On the host rather than left to a screen, because *which event is today under?* has exactly one
+   * composition (`shift/calendar.ts#scheduledEventFor`) and that composition needs the period.
+   * Issue #135 is what happens without it: `eventFor` is the ordinary schedule, a period may
+   * overrule it, and four surfaces that asked the schedule described a day the run was not
+   * running. `eventSeam.test.ts` derives every caller from disk, so a screen that reached for the
+   * schedule directly would be red rather than merely wrong.
+   */
+  calendarPeriod(): CalendarPeriod | null;
+
+  /**
    * Today's goals, read at the current playhead — the same derivation the Engineer rail draws
    * (`readGoals` over the live fold). Before any run every reading is `pending`, because zero
    * arrivals sits under the wake-up gate; that is the gate doing its work, not a stand-in.
@@ -119,6 +139,45 @@ export interface EverydayHost {
 
   /** What the standing config points at — the ids the next run will be built from. */
   selection(): { readonly buildingId: string; readonly dispatcherId: string };
+
+  /**
+   * The crowd the next run will meet, as the number two players compare — `ViewerState.seed`.
+   *
+   * § 6 prints it on the door and on the brief *"so two players can confirm they had the same
+   * morning"*, which is the whole of why a seed is on a player-facing surface at all. It is also
+   * CLAUDE.md invariant 5 read from the other end: every persisted run carries its seed, so the
+   * seed is the one identifier that makes a day re-askable.
+   */
+  seed(): bigint;
+
+  /**
+   * The building the next run will be built from, resolved — floors expanded, cars resolved,
+   * population summed.
+   *
+   * Beside {@link buildingById} rather than instead of it, because the two answer different
+   * questions. `buildingById` is the authored document for *an id*, which is what a picker needs;
+   * this is *the standing selection*, resolved, which is what a screen quoting facts needs — and
+   * the facts differ: `resolveBuilding` expands `floorRanges` and treats the **floor sum** as
+   * authoritative over a declared `totalPopulation`, which is the figure the kernel counts
+   * arrivals against (`shift/tomorrow.ts` says so about the same number). A screen that read the
+   * declared total would print a population the run does not have.
+   *
+   * `undefined` when the standing id names no document this build knows — {@link buildingById}'s
+   * honest-lookup rule, and the same one, since a substituted answer is a false statement about
+   * the thing asked after.
+   */
+  resolvedBuilding(): ResolvedBuilding | undefined;
+
+  /**
+   * What changed overnight, as the between-day beat holds it — `ViewerState.tomorrow`.
+   *
+   * `undefined` before any day has closed, and on a mode that does not advance the week. Read
+   * rather than composed: `shift/tomorrow.ts` measures every figure in it and `dev/main.ts` writes
+   * it at close, so a screen that rebuilt the beat would be the second computation of a judgement
+   * § D237 spent an issue removing. § 6.5's report order names it — *what changed overnight … the
+   * calendar already knows all of it; say it here* — and this is where the report reads it from.
+   */
+  tomorrowBriefing(): TomorrowBriefing | undefined;
 
   /** Every building id on offer — shipped plus saved. Read-only. */
   buildingIds(): readonly string[];
@@ -260,6 +319,25 @@ export interface EverydayHost {
   intervene(atS: number, change: RunInterventionConfig['change']): void;
 
   /**
+   * Put a dispatcher in charge of the next run — § 6.2's *who drives today*.
+   *
+   * `dev/state.ts#withDispatcher`'s exact composition, patched in, so the Everyday brief and the
+   * Engineer rail cannot disagree about what picking a dispatcher does: the pristine guard that
+   * keeps an edited working spec, the `editingDispatcherId` that stops the editor describing a
+   * dispatcher nobody is running, and the no-op on re-picking the standing one are all that
+   * function's and none of them is restated here.
+   *
+   * Takes effect on the **next** run, exactly as {@link setPlainLever} does — the simulator runs a
+   * whole day in milliseconds and plays the recording back, so there is no mid-day change
+   * (`docs/16` § 1) and the control that changes the driver is a control that changes tomorrow's
+   * question rather than today's answer.
+   *
+   * An id no profile carries writes nothing: `withDispatcher` leaves the spec alone, so the run is
+   * built from a dispatcher that exists rather than from a name that does not.
+   */
+  setDispatcher(dispatcherId: string): void;
+
+  /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
    * editor's `pullPlainLever` takes, so the two drawers stay two renderings of one vector. Takes
    * effect on the next run, exactly as the editor's levers do.
@@ -357,6 +435,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
   return {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
+    calendarPeriod: () => b.state().calendar,
     goalsToday: () => {
       const state = b.state();
       const observations =
@@ -371,6 +450,9 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const state = b.state();
       return { buildingId: state.buildingId, dispatcherId: state.dispatcherId };
     },
+    seed: () => b.state().seed,
+    resolvedBuilding: () => resolvedBuildingOf(b.resources, b.state()),
+    tomorrowBriefing: () => b.state().tomorrow,
     buildingIds: () => allBuildingIds(b.resources, b.state().savedBuildings),
     buildingById: (id) => buildingConfigOf(b.resources, b.state().savedBuildings, id),
     dispatchers: () => allDispatchers(b.resources, b.state().savedDispatchers),
@@ -427,6 +509,20 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.applyPatch(openTomorrowPatch(state.week));
       b.openRunTab();
       b.startRun();
+    },
+    setDispatcher: (dispatcherId) => {
+      const state = b.state();
+      const next = withDispatcher(state, b.resources, dispatcherId);
+      /*
+       * The three fields `withDispatcher` writes, patched rather than the whole state replaced —
+       * `applyPatch` is `MountContext.update`, which merges, and handing it a full `ViewerState`
+       * would make this host the writer of every field a concurrent press had just changed.
+       */
+      b.applyPatch({
+        dispatcherId: next.dispatcherId,
+        dispatcherSpec: next.dispatcherSpec,
+        editingDispatcherId: next.editingDispatcherId,
+      });
     },
     setPlainLever: (id, value) => {
       const state = b.state();
