@@ -2299,11 +2299,34 @@ export function upPeakAnalysisOf(spec: BuildingSpec, specs: ElevatorSpecs): Spec
       banks: [],
     };
   }
-  const named = resolved.banks.length > 1;
-  return {
-    refusal: '',
-    banks: resolved.banks.map((bank) => bankAnalysisOf(resolved, bank, specs, named)),
-  };
+  return { refusal: '', banks: upPeakBanksOf(resolved, specs) };
+}
+
+/**
+ * The same per-bank sizing, for a building that is **already resolved** — `docs/21` § 3.7 (1).
+ *
+ * ## Why this half is exported
+ *
+ * {@link upPeakAnalysisOf} above starts from a `BuildingSpec` — the editor's working copy — and
+ * spends `buildingFromSpec` → `parseBuilding` → `resolveBuilding` getting to a `ResolvedBuilding`.
+ * The right rail already **has** one: it is drawing the building the run was made on. Sending it
+ * back through the loader to get its own figures would be a round trip in the other sense, and the
+ * plate is drawn on every state change.
+ *
+ * So the analysis is one function with two doors, and both go through `analyzeUpPeak`. What matters
+ * is what is *not* duplicated by the second door: the `tp` rule for building types the reference
+ * table has no row for ({@link bankTransferSecondsOf}), the per-code warning sentences, and the
+ * refusal that quotes the closed form's own message. A third copy of any of those is the
+ * published-figure-goes-stale defect with a plate to draw it on.
+ *
+ * Non-test callers: {@link upPeakAnalysisOf} here, and `dev/rightRail.ts#closedFormRowsOf`.
+ */
+export function upPeakBanksOf(
+  building: ResolvedBuilding,
+  specs: ElevatorSpecs,
+): readonly SpecBankAnalysis[] {
+  const named = building.banks.length > 1;
+  return building.banks.map((bank) => bankAnalysisOf(building, bank, specs, named));
 }
 
 /**

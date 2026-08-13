@@ -13,11 +13,17 @@
  *
  * ## Why the canvas is driven rather than skipped
  *
- * `drawScene`, `drawOverlay` and `drawPreview` are the surfaces a player actually looks at, and
- * they take a `Canvas2DLike` — a **structural** interface with `fillText` on it and no DOM
- * anywhere. So they are driven with a context that records every `fillText`, and every string the
- * bitmap would have carried is checked exactly like a string a function returned. A search over
- * the experience layer that exempted the canvas would exempt the screen.
+ * `drawScene` and `drawPreview` are surfaces a player actually looks at, and they take a
+ * `Canvas2DLike` — a **structural** interface with `fillText` on it and no DOM anywhere. So they
+ * are driven with a context that records every `fillText`, and every string the bitmap would have
+ * carried is checked exactly like a string a function returned. A search over the experience layer
+ * that exempted the canvas would exempt the screen.
+ *
+ * `drawOverlay` was the third and is gone: `docs/21` § 3.4 made the live metrics panel a view and a
+ * DOM card, so its strings arrive through {@link LIVE_METRICS} under **named fields** rather than as
+ * `fillText[15]` of a captured array. That is the one thing the capture cannot give — per-string
+ * provenance — and the migration is why it is now worth saying that the capture is a fallback for
+ * what is genuinely a picture rather than the way this corpus prefers to read words.
  *
  * ## Coverage is asserted, never assumed
  *
@@ -153,7 +159,7 @@ import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type C
 import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
-import { drawOverlay } from '../render/overlay.js';
+import { overlayViewOf } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
@@ -927,7 +933,6 @@ const CANVAS: SurfaceAdapter = {
     'render/canvas.ts#describeSelection',
     'render/canvas.ts#landingOptionLabel',
     'render/canvas.ts#fitLabel',
-    'render/overlay.ts#drawOverlay',
     /*
      * The header banner's Casual refusal — GitHub issue #100. Declared in `mode/disclosure.ts`
      * beside the per-ground table it reads, and **driven from here**, because `drawHeader` is its
@@ -937,16 +942,6 @@ const CANVAS: SurfaceAdapter = {
      */
     'mode/disclosure.ts#suppressionBannerFor',
     'mode/disclosure.ts#NO_AVERAGE_LEAD',
-    /*
-     * The panel's refusal, in both registers — `docs/20` defect 3. `drawOverlay` is their only
-     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
-     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
-     * PENDING` is the engineer's arm of the same gate, drawn by the same function.
-     */
-    'mode/disclosure.ts#casualRefusalFor',
-    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
-    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
-    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
     /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
@@ -960,6 +955,14 @@ const CANVAS: SurfaceAdapter = {
      */
     'render/riderFigures.ts#drawRiderLane',
     'render/riderFigures.ts#drawAlarmRule',
+    /*
+     * `loadColour` is the same reading, one file over, and it arrived in this list the day the four
+     * load bands were named: its arms read `'at-design-load'` now rather than a bare `theme.X`, and
+     * a hyphen is a word break to the two-adjacent-words scanner. It returns a **colour**, and it is
+     * listed rather than excluded because `drawScene` really does call it on every car of every
+     * frame this adapter draws — a coverage claim, on the precedent two lines up.
+     */
+    'render/overlay.ts#loadColour',
   ],
   render(context) {
     const { recording } = context;
@@ -970,7 +973,6 @@ const CANVAS: SurfaceAdapter = {
       floors: recording.floors,
       shafts: recording.shafts,
       gutterRightPx: 168,
-      overlayWidthPx: 240,
     });
     for (const at of sampleTimes(recording)) {
       const bundle = context.bundleAt(at);
@@ -1006,7 +1008,6 @@ const CANVAS: SurfaceAdapter = {
           // See `dispatcherNameOf` — the subtitle a player reads is the profile's name.
           dispatcherName: dispatcherNameOf(context),
           layout,
-          overlay: bundle.metrics,
           ...(selection === undefined ? {} : { selection }),
           unservedFloorIds: unservedFloors(recording),
           unansweredCallFloorIds: bundle.unanswered,
@@ -1023,76 +1024,6 @@ const CANVAS: SurfaceAdapter = {
             playhead: atPlayhead(recording, at),
           });
         }
-      }
-      /*
-       * **Both registers, on every case** — GitHub issue #100, and `honesty/types.ts#HONESTY_MODES`
-       * said this day would come: *"the value of generating the axis is the day a mode-aware
-       * renderer lands: it is driven on both modes from that day, rather than from the day somebody
-       * remembers to check it."* `render/overlay.ts` is that renderer, and § D194's measured null —
-       * the second mode value producing zero new strings — stops being null here.
-       *
-       * Rendered both ways rather than branching on `context.case.mode`, which is the disclosure
-       * adapter's own precedent: a mode that only half the cases draw is a mode half the corpus
-       * never sees, and the panel's Casual words include the one string on it that may never be
-       * wrong — the refusal.
-       *
-       * `drawScene` above draws the panel too, and this loop draws it again at every sampled
-       * playhead. That is deliberate duplication rather than waste: `drawOverlay` is a shipped entry
-       * point in its own right — `render/canvas.ts` is not its only caller — and seeding it under its
-       * own `field` is what makes a violation report name the panel instead of the scene it happened
-       * to be composited into. Identical strings cost the search nothing; a misattributed one costs
-       * a reader the fix.
-       */
-      for (const mode of VIEW_MODES) {
-        const overlayCtx = textCapturingContext();
-        drawOverlay(overlayCtx, {
-          recording,
-          frame: bundle.frame,
-          metrics: bundle.metrics,
-          layout,
-          theme: DEFAULT_THEME,
-          mode,
-        });
-        for (const [index, text] of overlayCtx.texts.entries()) {
-          seeds.push({
-            field: `drawOverlay(${mode}@${at.toFixed(0)}s).fillText[${String(index)}]`,
-            text,
-            role: 'prose',
-            playhead: atPlayhead(recording, at),
-          });
-        }
-      }
-      /*
-       * **The RIGHT NOW panel's refusal, with the window it folds** — `docs/20` defect 3.
-       *
-       * The loop above captures every string the panel draws and can declare a basis for **none** of
-       * them: a text-capturing context returns an array, and per-string provenance is precisely what
-       * it throws away. So the refusal is seeded again, from the shipped function that words it, with
-       * the basis that function returns.
-       *
-       * That is not a duplicate reading of the same thing. The loop asks *what did the panel draw*;
-       * this asks *what did the panel claim about which window*, which is the question R6's
-       * structural half is. Until it was asked, `NO AVERAGE — A RESULT` and *"That is a result, not
-       * a gap"* were `role: 'prose'` strings with no numeral and no declaration — invisible to both
-       * halves of the property that exists to catch exactly them.
-       *
-       * Seeded only where the panel actually draws it (`metrics.suppressed`), because a refusal the
-       * surface does not show is a string the corpus should not contain.
-       */
-      if (bundle.metrics.suppressed) {
-        const refusal = casualRefusalFor(bundle.metrics.suppressionBasis === 'whole-run');
-        seeds.push({
-          field: `drawOverlay(@${at.toFixed(0)}s).refusal.head`,
-          text: refusal.heads[0] ?? '',
-          role: 'reason',
-          playhead: atPlayhead(recording, at, refusal.basis),
-        });
-        seeds.push({
-          field: `drawOverlay(@${at.toFixed(0)}s).refusal.reason`,
-          text: refusal.reason,
-          role: 'reason',
-          playhead: atPlayhead(recording, at, refusal.basis),
-        });
       }
       if (selection !== undefined) {
         seeds.push({
@@ -4375,6 +4306,11 @@ const RIGHT_RAIL: SurfaceAdapter = {
   id: 'dev/rightRail.ts#buildingPlateOf',
   covers: [
     'dev/rightRail.ts#buildingPlateOf',
+    /* The specification block on that plate — `docs/21` § 3.7 (1). Reached only through
+       `buildingPlateOf`, which is what drives it above. */
+    'dev/rightRail.ts#closedFormRowsOf',
+    /* The per-bank analysis both the plate and the building editor's live readout draw from. */
+    'authoring/buildingSpec.ts#upPeakBanksOf',
     'dev/rightRail.ts#dispatcherPlateOf',
     'dev/rightRail.ts#dispatcherBlurbOf',
     /*
@@ -4465,7 +4401,14 @@ const RIGHT_RAIL: SurfaceAdapter = {
       ['with-run', context.recording, 'basic'],
       ['no-run', undefined, 'basic'],
     ] as const) {
-      for (const row of buildingPlateOf(context.building, recording, mode)) {
+      /*
+       * `specs` is handed over so the **closed-form rows are swept** — `docs/21` § 3.7 (1). They are
+       * the one block on this plate that is not a reading of a run, and the labelling that keeps
+       * them honest (*a specification, not a measurement*, the assumption citation, the divergence
+       * sentences) is exactly the kind of claim this corpus exists to hold. Omitting `specs` here
+       * would have shipped a new figure block with no register at all.
+       */
+      for (const row of buildingPlateOf(context.building, recording, mode, specs)) {
         seeds.push({
           field: `buildingPlateOf(${mode}, ${label}).${row.k}`,
           text: `${row.k}: ${row.v}`,
@@ -7656,6 +7599,171 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
   },
 };
 
+/**
+ * **LIVE METRICS, as a card** — `docs/21` § 3.4, and the adapter that moved rather than appeared.
+ *
+ * ## What this drives, and what used to drive it
+ *
+ * The panel's strings were swept through `CANVAS`, by capturing `drawOverlay`'s `fillText` calls
+ * into an array. That worked and it cost the corpus something it could not get back: a captured
+ * array has no per-string provenance, so a violation could be reported against *the fifteenth
+ * `fillText` of the panel at 340 s* and nothing more. Every string is a **named field** of
+ * `overlayViewOf`'s view now — `estimate.head`, `banks[2].mean`, `cars[0].load` — so a finding
+ * names the row rather than an index into a draw order.
+ *
+ * The `role` split is what the array could not carry either: an observation is a `label`, a
+ * refusal is a `reason`, and R6's structural half can only read a basis off a seed that has one.
+ * Both refusal strings carry `metrics.suppressionBasis`, which is the producer's own reading of its
+ * clock (`docs/20` defect 3) rather than a comparison made here.
+ *
+ * ## Both registers, at every sampled playhead
+ *
+ * Unchanged from the loop this replaces, and for `honesty/types.ts#HONESTY_MODES`' stated reason:
+ * *the value of generating the axis is the day a mode-aware renderer lands*. The panel's Casual
+ * words include the one string on this surface that may never be wrong — the refusal — so a mode
+ * only half the cases draw is half a screen the search never sees.
+ *
+ * ## What is **not** driven here, and why that is honest
+ *
+ * `dev/main.ts#drawLiveMetrics` — the card's DOM half — is excluded on the DOM mounts' shared
+ * ground in `derive.test.ts`. It needs a document, and the pure/DOM split exists precisely so that
+ * every word is drivable without one: the mount decides which node a string goes in and authors
+ * none of them.
+ *
+ * Appended at the end of {@link SURFACE_ADAPTERS}, per the fault-ordering rule stated at
+ * `SHIFT_REPORT`: `faults.ts` corrupts the **first** string matching a shape, and this surface
+ * re-renders phrases the canvas adapter also draws.
+ */
+const LIVE_METRICS: SurfaceAdapter = {
+  id: 'render/overlay.ts#overlayViewOf',
+  covers: [
+    'render/overlay.ts#overlayViewOf',
+    'render/overlay.ts#ENGINEER_WORDS',
+    'render/overlay.ts#CASUAL_WORDS',
+    /*
+     * The panel's refusal, in both registers — `docs/20` defect 3. `overlayViewOf` is their only
+     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
+     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
+     * PENDING` is the engineer's arm of the same gate, worded by the same function.
+     */
+    'mode/disclosure.ts#casualRefusalFor',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
+    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
+    /* The four load bands, as names. The card draws one per car row; `loadColour` is the stage's
+       projection of the same judgement and is covered by `CANVAS`. */
+    'render/overlay.ts#loadTone',
+  ],
+  render(context) {
+    const { recording } = context;
+    const seeds: TextSeed[] = [];
+    for (const at of sampleTimes(recording)) {
+      const bundle = context.bundleAt(at);
+      for (const mode of VIEW_MODES) {
+        const view = overlayViewOf(bundle.metrics, bundle.frame, mode);
+        const where = `${mode}@${at.toFixed(0)}s`;
+        seeds.push({
+          field: `overlayViewOf(${where}).title`,
+          text: view.title,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        seeds.push({
+          field: `overlayViewOf(${where}).window`,
+          text: view.window,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const [index, row] of view.observations.entries()) {
+          const at_ = `overlayViewOf(${where}).observations[${String(index)}]`;
+          seeds.push({
+            field: `${at_}.label`,
+            text: row.label,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+          /*
+           * The value goes in as its own seed rather than joined to the label, and that is R13's
+           * shape rather than tidiness: a figure the search can see is a figure it can ask *what
+           * is this a count of* about. `waiting now 70` as one string is one prose blob.
+           */
+          seeds.push({
+            field: `${at_}.value`,
+            text: `${row.label} ${row.value}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        const estimate = view.estimate;
+        seeds.push({
+          field: `overlayViewOf(${where}).estimate.label`,
+          text: estimate.label,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        if (estimate.kind === 'refused') {
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.head`,
+            text: estimate.head,
+            role: 'reason',
+            playhead: atPlayhead(recording, at, estimate.basis),
+          });
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.reason`,
+            text: estimate.reason,
+            role: 'reason',
+            playhead: atPlayhead(recording, at, estimate.basis),
+          });
+        } else {
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.value`,
+            text: `${estimate.label} ${estimate.value}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        seeds.push({
+          field: `overlayViewOf(${where}).bankHeading`,
+          text: view.bankHeading,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        if (view.banksEmpty !== undefined) {
+          seeds.push({
+            field: `overlayViewOf(${where}).banksEmpty`,
+            text: view.banksEmpty,
+            role: 'reason',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        for (const [index, bank] of view.banks.entries()) {
+          seeds.push({
+            field: `overlayViewOf(${where}).banks[${String(index)}]`,
+            text: `${bank.bankId} ${bank.boarded} ${bank.mean}`,
+            role: bank.refused ? 'reason' : 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        seeds.push({
+          field: `overlayViewOf(${where}).carHeading`,
+          text: view.carHeading,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const [index, car] of view.cars.entries()) {
+          seeds.push({
+            field: `overlayViewOf(${where}).cars[${String(index)}]`,
+            text: `${car.label} ${car.load}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -7720,6 +7828,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.
   WITHHELD_MATRIX,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: `docs/21` § 3.4's live
+  // metrics card re-renders phrases `CANVAS` also draws — the refusal head and reason above all —
+  // so placing it earlier would move every panel-shaped fault onto this surface.
+  LIVE_METRICS,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

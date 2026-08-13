@@ -27,13 +27,13 @@ import type { LockedOutLanding } from '../access/lockedOut.js';
 import { describeLockedOut } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt } from '../frame/pinnedQueue.js';
 import { STATE_GLYPHS } from '../access/zoning.js';
-import type { FloorQueue, LandingAssignment, OverlayMetrics, WaitBand } from '../frame/overlay.js';
+import type { FloorQueue, LandingAssignment, WaitBand } from '../frame/overlay.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import type { DoorPhase, Frame, VizRecording } from '../contract/types.js';
 import { observationsAt } from '../live/observations.js';
 import { NO_AVERAGE_LEAD, suppressionBannerFor } from '../mode/disclosure.js';
 import type { Layout, ShaftColumn } from './layout.js';
-import { LOAD_ALARM, drawOverlay, loadColour } from './overlay.js';
+import { LOAD_ALARM, loadColour } from './overlay.js';
 import { windowClause } from './runSummary.js';
 import type { BuildingMood } from './mood.js';
 import type { ViewMode } from '../mode/types.js';
@@ -391,14 +391,6 @@ export interface SceneInput {
   readonly frame: Frame;
   readonly layout: Layout;
   readonly theme?: Theme;
-  /**
-   * The live metrics panel's data. Omitted, no panel is drawn.
-   *
-   * Passed in rather than computed here because `drawScene` must stay a pure function of its
-   * inputs — the property `canvas.test.ts` asserts and the one that turns "the frame sequences
-   * match" into "the pictures match".
-   */
-  readonly overlay?: OverlayMetrics | undefined;
   /** The landing the reader has selected, and the car the record says answers it — `RV-T3`. */
   readonly selection?: SceneSelection | undefined;
   /**
@@ -419,8 +411,8 @@ export interface SceneInput {
    * call among the facts Basic mode may never hide. A fact with one optional surface is a fact
    * that is usually not shown, so it is drawn on the landing itself and named in the banner.
    *
-   * Derived by the caller from `landingAssignmentsAt`, for the reason `SceneInput.overlay` is:
-   * `drawScene` stays a pure function of its inputs, and the renderer never reaches for a
+   * Derived by the caller from `landingAssignmentsAt`, for the reason {@link SceneInput.queues}
+   * gives: `drawScene` stays a pure function of its inputs, and the renderer never reaches for a
    * recording-wide scan of its own.
    */
   readonly unansweredCallFloorIds?: readonly string[] | undefined;
@@ -440,7 +432,7 @@ export interface SceneInput {
    * shaft reaches the same way as a floor no credential opens would do exactly that in the one
    * place a reader actually looks.
    *
-   * Derived by the caller from `access/lockedOut.ts`, for the reason {@link SceneInput.overlay}
+   * Derived by the caller from `access/lockedOut.ts`, for the reason {@link SceneInput.queues}
    * and {@link SceneInput.unansweredCallFloorIds} are: which floors are access-controlled is a
    * fact about the *building*, and `drawScene` stays a pure function of what it is handed.
    */
@@ -453,9 +445,11 @@ export interface SceneInput {
    * of them, then with a `+N`, then as a log-scaled bar (§ 6.2). The counts are not replaced,
    * because they are the only thing on the row that says which way people want to go.
    *
-   * Passed in rather than computed here for the reason {@link SceneInput.overlay} is: `drawScene`
-   * stays a pure function of its inputs, so `canvas.test.ts` can assert what was drawn without
-   * running a simulation.
+   * Passed in rather than computed here because `drawScene` must stay a **pure function of its
+   * inputs** — the property `canvas.test.ts` asserts, the one that turns *the frame sequences
+   * match* into *the pictures match*, and the reason four other fields on this interface cite this
+   * one. (It was `SceneInput.overlay` that carried this paragraph until `docs/21` § 3.4 moved the
+   * live metrics panel out of the bitmap; the argument is the field's, not that field's.)
    */
   readonly queues?: readonly FloorQueue[] | undefined;
   /**
@@ -478,7 +472,7 @@ export interface SceneInput {
    * A player who reads `yours-1` on the stage and `Lobby holder` on the sheet has two runs as far
    * as they can tell.
    *
-   * Passed in rather than looked up, for {@link SceneInput.overlay}'s reason and for one more:
+   * Passed in rather than looked up, for {@link SceneInput.queues}' reason and for one more:
    * the id-to-name map is `data/dispatcher-profiles.json` plus whatever the reader has saved, which
    * is `dev/state.ts`'s to know and not a renderer's. This is `shift/report.ts#dayReportOf`'s own
    * idiom (`input.dispatcherName ?? recording.dispatcherProfileId`), spelled the same way here so
@@ -490,7 +484,7 @@ export interface SceneInput {
   /**
    * The reader's disclosure level, for the strings on this canvas that have two registers.
    *
-   * ## It reached `render/overlay.ts` and nothing else, and that claim has been retired
+   * ## It reached the live metrics panel and nothing else, and that claim has been retired
    *
    * This field's docstring used to say the header band was deliberately left out: *"wording the
    * banner from here would be a second place that decides how this run's refusal is said"*. The
@@ -508,9 +502,11 @@ export interface SceneInput {
    *
    * ## What it reaches, and what it deliberately still does not
    *
-   * `drawOverlay`, and — since issue #100 — {@link drawHeader}'s three suppression-bearing strings:
-   * the banner's refusal, the counters line's running mean, and the word in front of the waiting
-   * count. Everything else on this canvas is a picture, a status verbatim from `recording.status`
+   * {@link drawHeader}'s three suppression-bearing strings — the banner's refusal, the counters
+   * line's running mean, and the word in front of the waiting count. It reached `drawOverlay` as
+   * well until `docs/21` § 3.4 moved that panel off this bitmap; the register still travels with
+   * it, through `dev/main.ts` to `render/overlay.ts#overlayViewOf`, which is the same one lookup at
+   * the top of one function. Everything else on this canvas is a picture, a status verbatim from `recording.status`
    * (§ D294), or a mood line whose sentence `render/mood.ts` already words per mode from the one
    * place that holds the mood's vocabulary.
    *
@@ -519,8 +515,8 @@ export interface SceneInput {
    * rider who transfers boards twice — so drawing the count as *people* would be a false figure
    * rather than a friendlier one.
    *
-   * Defaults to `advanced` for {@link OverlayInput.mode}'s reason: a caller describing a run rather
-   * than serving a reader gets the engineer's words.
+   * Defaults to `advanced` for `render/overlay.ts#overlayViewOf`'s reason: a caller describing a run
+   * rather than serving a reader gets the engineer's words.
    */
   readonly mode?: ViewMode | undefined;
   /**
@@ -596,7 +592,7 @@ export interface StageAlarm {
  * that cannot be recovered from the inputs without re-deriving the layout: where the badges
  * landed, and which landing raised the alarm. Both are *reports of what was drawn*, so the chip
  * above the stage and the rule across the floor can never disagree about which floor is in
- * trouble — which is the same argument `SceneInput.overlay` makes in the other direction.
+ * trouble — which is the same argument {@link SceneInput.queues} makes in the other direction.
  */
 export interface SceneHits {
   readonly carBadges: readonly CarBadgeHit[];
@@ -675,17 +671,6 @@ export function drawScene(ctx: Canvas2DLike, input: SceneInput): SceneHits {
   drawSelection(ctx, input, theme);
   drawNotices(ctx, input, theme);
   drawFooter(ctx, recording, frame, layout, theme);
-  if (input.overlay !== undefined) {
-    drawOverlay(ctx, {
-      recording,
-      frame,
-      layout,
-      theme,
-      metrics: input.overlay,
-      /* Issue #100 — the one field on this canvas that has two registers. See `SceneInput.mode`. */
-      mode: input.mode,
-    });
-  }
   ctx.restore();
   return { carBadges, alarm };
 }
@@ -851,7 +836,8 @@ export function undeliveredAt(recording: VizRecording, frame: Frame): Undelivere
 function drawHeader(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   const { recording, frame, layout } = input;
   /* Issue #100. One lookup at the top, so no line below chooses a register of its own — the idiom
-     `render/overlay.ts#drawOverlay` established for the panel this header sits above. */
+     `render/overlay.ts#overlayViewOf` established for the panel that used to sit on this bitmap and
+     is a DOM card under it now (`docs/21` § 3.4). */
   const casual = (input.mode ?? 'advanced') === 'basic';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1678,8 +1664,8 @@ function drawNotices(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void {
   /*
    * The whole canvas, not the plot — § D236.
    *
-   * This row sits above `layout.plot.y`, and `layout.overlay` starts *at* `plot.y`, so nothing is
-   * drawn to the right of here on this line. Budgeting it by the plot meant the sentence that
+   * This row sits above `layout.plot.y`, and nothing else is drawn to the right of here on this
+   * line. Budgeting it by the plot meant the sentence that
    * explains a squeezed picture inherited the squeeze: at a 360 px canvas the plot was one pixel
    * wide and `fitLabel` returned `…` — the app showed one lift of six and the only thing saying
    * so was three dots. The gutters are not exempt from being written across when the alternative
@@ -1909,10 +1895,12 @@ function drawLandings(ctx: Canvas2DLike, input: SceneInput, theme: Theme): void 
   // (M5: 175 on Midtown Office, 379 on Vertical City) and either pin makes the other unreadable.
   const scaleTotal = (input.queues ?? []).reduce((max, queue) => Math.max(max, queue.total), 0);
   const x = layout.plot.x + layout.plot.width + 10;
-  // Everything right of the landings, up to the metrics panel if there is one. This is the *"row
-  // width"* § 6.2 degrades against, and it is a property of the viewport rather than of the
-  // building — which is why the same building degrades differently on a narrow window.
-  const rightEdge = (layout.overlay?.x ?? layout.width) - 12;
+  // Everything right of the landings, to the canvas's own edge. This is the *"row width"* § 6.2
+  // degrades against, and it is a property of the viewport rather than of the building — which is
+  // why the same building degrades differently on a narrow window. It used to stop at the metrics
+  // panel; `docs/21` § 3.4 took that panel out of the bitmap, so the room is the landings' now —
+  // § D316's own beneficiary, collected.
+  const rightEdge = layout.width - 12;
   ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';

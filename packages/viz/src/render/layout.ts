@@ -208,8 +208,6 @@ export interface Layout {
    * {@link yForHeight}'s single-floor case.
    */
   readonly pitchPx: number;
-  /** The metrics panel's rectangle, when one was asked for. Never overlaps {@link plot}. */
-  readonly overlay: Rect | undefined;
   /**
    * The strip inside the plot where waiting people are drawn — `docs/12` § 1.3 M3.
    *
@@ -251,14 +249,6 @@ export interface LayoutOptions {
   readonly headerPx?: number;
   readonly footerPx?: number;
   readonly paddingPx?: number;
-  /**
-   * Width reserved for the live metrics panel, to the right of the landing counts.
-   *
-   * Reserved rather than overlaid: a translucent panel drawn *over* the shafts hides the cars at
-   * exactly the moment somebody is reading the metric that made them look. `0` (the default)
-   * gives {@link Layout.overlay} `undefined` and the plot the whole width.
-   */
-  readonly overlayWidthPx?: number;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -390,7 +380,8 @@ const TIGHT_SHAFT_GAP_PX = 4;
  * ## The failure this closes
  *
  * `dev/main.ts` asks for `gutterRightPx: 280` — the rider-queue gutter — on **every** canvas
- * width, and adds a 250 px metrics panel above 900. At a 360 px canvas (the floor `drawStage`
+ * width, and asked for a 250 px metrics panel above 900 as well until `docs/21` § 3.4 moved that
+ * panel to the DOM. At a 360 px canvas (the floor `drawStage`
  * clamps to, which is what a 375 px phone gets) that is `360 − 24 − 72 − 280 = −16`, and
  * `Math.max(1, …)` below turned it into a **one-pixel plot**. `capacity` is `max(1, …)` as well,
  * so the stage drew **exactly one shaft** of every building on every phone — one of Garden
@@ -419,69 +410,52 @@ const MIN_GUTTER_LEFT_PX = 40;
 /** Narrowest right gutter that still holds a landing's `▲12` at the same face. */
 const MIN_GUTTER_RIGHT_PX = 44;
 
-/**
- * Narrowest live-metrics panel that holds its own longest mandatory line — GitHub issue #115 § 6.
+/*
+ * `MIN_OVERLAY_WIDTH_PX` used to live here — 210 px, GitHub issue #115 § 6, the narrowest panel
+ * that held its own longest mandatory line. It is gone with the panel: `docs/21` § 3.4 moved the
+ * live metrics out of the bitmap and into a DOM card, so the question *is this room wide enough
+ * for its own words* is now the browser's rather than this file's arithmetic, and it is asked as a
+ * measured `scrollWidth <= clientWidth` over all eight shipped buildings in both registers
+ * (`dev/liveMetrics.browser.test.ts`) instead of against an assumed character advance.
  *
- * `render/overlay.ts` draws its rows with a left inset and no width budget, so every line it
- * writes is as wide as its own text. The longest of the fixed ones is
- * `boarded (window) NNN legs` — 25 characters at the 12 px monospace face, 180 px — plus the
- * panel's own 10 px inset on each side. **210 px, therefore, and not a number anybody picked.**
- * `render/overlayRender.test.ts` asserts the two agree by drawing the panel at exactly this width
- * and measuring every string that lands in it, which is the same way {@link MIN_RIDER_LANE_PX}
- * is kept in step with `render/riderFigures.ts`.
+ * That is the trade § D316's carrier was allowed to move on: the replacement check is **stronger**
+ * than the one it replaces — it measures the real face at the real width rather than 7.2 px per
+ * character — and it is the check issue #115 § 6 said no DOM tier could make.
  */
-const MIN_OVERLAY_WIDTH_PX = 210;
 
 /**
- * Shrink the two gutters and the overlay until the plot has {@link MIN_PLOT_SHARE} of the canvas.
+ * Shrink the two gutters until the plot has {@link MIN_PLOT_SHARE} of the canvas.
  *
  * In request order of what yields first, which is the order of how much each *degrades* rather
  * than how much it is asking for. The right gutter goes first: its landing rows aggregate, and
  * `render/canvas.ts#drawQueueRow` already draws a shortened bar rather than dropping a count, so
- * a narrower one says the same thing in less room. Then the overlay, then the left gutter. Each
- * stops at its own floor rather than at zero, because a gutter that cannot hold a floor id is not
- * a smaller gutter, it is a missing label.
+ * a narrower one says the same thing in less room. Then the left gutter. Each stops at its own
+ * floor rather than at zero, because a gutter that cannot hold a floor id is not a smaller gutter,
+ * it is a missing label.
  *
- * ## The overlay used to go first, and it went to *any* width
+ * ## There was a third claimant, and it went first
  *
- * That is issue #115 § 6, and it is one line of arithmetic. At the viewer's own 910 × 547 canvas
- * — the one a 1600 × 1000 viewport produces — the requested 250 px panel was cut to **135.3 px**,
- * against content up to 230 px wide. Measured, every one of these clipped at the panel's right
- * edge: `boarded (window) 75 legs` (173 px), `main  75 legs  suppressed` (180 px),
- * `… (full reason below the canvas)` (211 px), and `waiting now      70` (137 px). It is drawn
- * into the canvas, so no DOM overflow check could ever have seen it.
- *
- * **A panel narrower than its content is not a smaller panel; it is an illegible one.** So the
- * overlay now has a floor like everything else here, and below that floor it goes to zero rather
- * than to something in between — `RX-05` already drops it below 900 px of canvas, and no panel is
- * a better answer than a clipped one. Reordering is what keeps that from firing at 910: the plot
- * still gets exactly {@link MIN_PLOT_SHARE}, so **no shaft moves and `hiddenShaftCount` is
- * unchanged at every width** — only the split between the right gutter and the panel does.
+ * The live metrics panel was laid out here, and issue #115 § 6 is what that cost: at the viewer's
+ * own 910 × 547 canvas the requested 250 px panel was cut to **135.3 px** against content up to
+ * 230 px wide, and four strings overhung its border where no DOM check could see them. § D316 gave
+ * it a floor; `docs/21` § 3.4 took it off the bitmap altogether. **The room it was holding is the
+ * plot's now**, which is what § D316 named as the beneficiary — the crowd lane and the landing
+ * rows get the width back at every viewport, and `hiddenShaftCount` can only fall.
  */
-function requestedOverlayPx(asked: number | undefined): number {
-  const width = Math.max(0, asked ?? 0);
-  return width >= MIN_OVERLAY_WIDTH_PX ? width : 0;
-}
-
 function fitGutters(
   inner: number,
-  requested: { readonly left: number; readonly right: number; readonly overlay: number },
-): { readonly left: number; readonly right: number; readonly overlay: number } {
+  requested: { readonly left: number; readonly right: number },
+): { readonly left: number; readonly right: number } {
   const want = Math.max(0, inner * MIN_PLOT_SHARE);
-  let { left, right, overlay } = requested;
-  const shortfall = (): number => want - (inner - left - right - overlay);
-  if (shortfall() <= 0) return { left, right, overlay };
+  let { left, right } = requested;
+  const shortfall = (): number => want - (inner - left - right);
+  if (shortfall() <= 0) return { left, right };
 
   right = Math.max(MIN_GUTTER_RIGHT_PX, right - shortfall());
-  if (shortfall() <= 0) return { left, right, overlay };
-
-  // All-or-nothing under its floor. `Math.max(0, …)` alone is what produced the 135 px panel.
-  const squeezed = overlay - shortfall();
-  overlay = squeezed >= MIN_OVERLAY_WIDTH_PX ? squeezed : 0;
-  if (shortfall() <= 0) return { left, right, overlay };
+  if (shortfall() <= 0) return { left, right };
 
   left = Math.max(MIN_GUTTER_LEFT_PX, left - shortfall());
-  return { left, right, overlay };
+  return { left, right };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -534,24 +508,18 @@ export function buildLayout(options: LayoutOptions): Layout {
 
   // Clamped for the same reason, one axis over — see {@link MIN_PLOT_SHARE}. Inert wherever the
   // caller's request already leaves the plot its share, which is every desktop width.
-  const { left: gutterLeft, right: gutterRight, overlay: overlayWidth } = fitGutters(
+  const { left: gutterLeft, right: gutterRight } = fitGutters(
     Math.max(0, options.width - 2 * padding),
     {
       left: options.gutterLeftPx ?? DEFAULTS.gutterLeftPx,
       right: options.gutterRightPx ?? DEFAULTS.gutterRightPx,
-      // Clamped on the way in as well as on the way down, so {@link Layout.overlay} carries one
-      // invariant rather than one-and-a-caveat: it is `undefined`, or it is at least
-      // {@link MIN_OVERLAY_WIDTH_PX}. A caller asking for a panel too narrow to hold its own rows
-      // is asking for the clipping the floor exists to prevent — the argument
-      // {@link LayoutOptions.headerPx} already makes one axis over.
-      overlay: requestedOverlayPx(options.overlayWidthPx),
     },
   );
 
   const plot: Rect = {
     x: padding + gutterLeft,
     y: padding + header,
-    width: Math.max(1, options.width - 2 * padding - gutterLeft - gutterRight - overlayWidth),
+    width: Math.max(1, options.width - 2 * padding - gutterLeft - gutterRight),
     height: Math.max(1, options.height - 2 * padding - header - footer),
   };
 
@@ -582,16 +550,6 @@ export function buildLayout(options: LayoutOptions): Layout {
     progressY,
     progressHeightPx: PROGRESS_HEIGHT_PX,
   };
-
-  const overlay: Rect | undefined =
-    overlayWidth === 0
-      ? undefined
-      : {
-          x: options.width - padding - overlayWidth,
-          y: plot.y,
-          width: overlayWidth,
-          height: plot.height,
-        };
 
   const heights = options.floors.map((floor) => floor.heightM);
   const lowest = heights.length > 0 ? Math.min(...heights) : 0;
@@ -801,7 +759,6 @@ export function buildLayout(options: LayoutOptions): Layout {
     hiddenShaftCount: total - count,
     carHeightPx,
     pitchPx,
-    overlay,
     riderLane,
     yForHeight,
     heightForY,

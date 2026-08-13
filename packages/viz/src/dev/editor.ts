@@ -88,8 +88,6 @@ import { describePreview, drawPreview } from '../render/preview.js';
 import type { Canvas2DLike, Theme } from '../render/canvas.js';
 import type { BrowserResources } from './data.js';
 
-const OVERLAY_NONE = 0;
-
 /**
  * Right gutter wide enough for `114.6 m  not permitted` — the lens's per-floor word.
  *
@@ -681,7 +679,6 @@ export function mountEditor(options: EditorOptions): EditorHandle {
       height: cssHeight,
       floors: geometry.floors,
       shafts: geometry.shafts,
-      overlayWidthPx: OVERLAY_NONE,
       // The lens costs two things the default geometry does not have room for, and both were
       // found by driving it on Secure Tower: the right gutter has to fit `114.6 m  not permitted`
       // rather than `114.6 m`, and the four legend lines at the bottom sat over the lobby. Asked
