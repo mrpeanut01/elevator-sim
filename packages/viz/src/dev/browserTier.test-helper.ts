@@ -133,9 +133,9 @@ export const MENU_CONTROL_ATTR = 'data-menu-control';
  * and Playwright's strict mode would turn that into a failure at an unrelated call site.
  */
 /**
- * Get to the Engineer surface the way a player does — through Everyday Mode's front door.
+ * Get to the Engineer surface the way a player does — through Everyday Mode's § 3.2 swap row.
  *
- * ## Why every browser test now needs this
+ * ## Why every browser test needs this
  *
  * `packages/viz/index.html` loads `everyday/boot.ts`, so a cold page is Everyday Mode's main menu
  * with the Engineer surface **covered and `inert` beneath it** and that shell's own menu already
@@ -143,15 +143,33 @@ export const MENU_CONTROL_ATTR = 'data-menu-control';
  * fifteen cases went red the moment the front door changed, all of them by clicking something that
  * was there, was visible, and was not in the page.
  *
+ * ## The press this makes moved once, and the way it failed is worth keeping
+ *
+ * It used to be the *Today's tower* tile, because § D335 shipped the stage as a **hand-off**: that
+ * tile uncovered `div.shell` and inset it beside a shrunken rail, and the latch below read
+ * `.everyday-main` going `display: none`. § 7's stage is now a registered screen, so the tile mounts
+ * a canvas inside the shell and uncovers nothing — and this helper waited fifteen seconds for a
+ * style that will never be written, in **25 cases across 12 files**. Every one of them failed inside
+ * this function, on a page where the product was working.
+ *
+ * That is the failure mode a shared helper is *for*: one path moved, one file changed. It is also
+ * the reason the wait below is written against **two** facts rather than one — the Engineer root
+ * being back in the page, and this shell having stepped out of the paint. A latch on either alone
+ * would have passed against the hand-off too.
+ *
  * ## Why it is a player's path rather than a back door
  *
- * This is the press a player makes — the *Today's tower* tile — and nothing else. It does not tear
- * the shell down, reach into `mountEverydayShell`, or load a second HTML entry point. That matters
- * for what the tier is worth: a helper that dismantled the front door would let these tests keep
- * passing against a surface no player can open, which is this repository's signature defect with a
- * test suite standing behind it.
+ * This is the press a player makes — the rail's *Switch to Engineer* row — and nothing else. It does
+ * not tear the shell down, reach into `mountEverydayShell`, or load a second HTML entry point. That
+ * matters for what the tier is worth: a helper that dismantled the front door would let these tests
+ * keep passing against a surface no player can open, which is this repository's signature defect
+ * with a test suite standing behind it.
  *
- * The Engineer **menu** is reachable from here too, by the `#open-menu` control the stage carries —
+ * It is also the *cheaper* press, which is a side effect worth naming: the tile mounts § 7's stage
+ * and asks the host for a run, so every case in this tier used to start a simulation it had no
+ * interest in. The swap row starts nothing.
+ *
+ * The Engineer **menu** is reachable from here too, by the `#open-menu` control the header carries —
  * `menu.browser.test.ts` and `menuExit.browser.test.ts` take that second step themselves, because
  * for them the reopening is part of what is under test.
  *
@@ -159,9 +177,9 @@ export const MENU_CONTROL_ATTR = 'data-menu-control';
  */
 export async function enterEngineerStage(page: Page): Promise<void> {
   /*
-   * Wait for the hand-off to be *possible* before pressing. `everyday/boot.ts` presses the Engineer
-   * menu's Resume row when that menu finishes rendering, which happens well after `load` — pressing
-   * the tile first would hand off to a stage with that menu still over it, and the case would fail
+   * Wait for the swap to be *possible* before pressing. `everyday/boot.ts` presses the Engineer
+   * menu's Resume row when that menu finishes rendering, which happens well after `load` — swapping
+   * first would land on an Engineer surface with its own menu still over it, and the case would fail
    * somewhere that has nothing to do with what it is testing.
    */
   await page.waitForFunction(
@@ -169,10 +187,29 @@ export async function enterEngineerStage(page: Page): Promise<void> {
     undefined,
     { timeout: 30_000 },
   );
-  await page.locator('.everyday-mode[data-screen="stage"]').click();
-  // The shell's screen region is `display: none` on the stage — the honest latch for *uncovered*.
+  await page.locator('.everyday-engineer-swap').click();
   await page.waitForFunction(
-    () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+    () =>
+      document.querySelector<HTMLElement>('.shell')?.inert === false &&
+      document.querySelector<HTMLElement>('.everyday')?.style.visibility === 'hidden',
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
+/**
+ * And back — the Engineer header's own return, `#back-to-everyday`.
+ *
+ * The same argument as above, mirrored: it is the control a player presses, so a case that drives it
+ * is driving the product. The wait is the exact inverse of the swap's, which is what makes *"the
+ * cover went back on"* a checked fact rather than a screenshot.
+ */
+export async function returnToEverydayMode(page: Page): Promise<void> {
+  await page.locator('#back-to-everyday').click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector<HTMLElement>('.shell')?.inert === true &&
+      document.querySelector<HTMLElement>('.everyday')?.style.visibility === '',
     undefined,
     { timeout: 15_000 },
   );

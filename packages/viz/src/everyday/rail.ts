@@ -27,7 +27,7 @@
 
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
-import { ENGINEER_SWAP_REFUSAL } from './types.js';
+import { ENGINEER_SWAP_NOTE } from './types.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /** One rail row. */
@@ -65,8 +65,21 @@ export interface RailFooter {
     readonly streak: string;
   };
   readonly settings: RailItem & { readonly hint: string };
-  /** A product-level route, stubbed — present so the way out of Everyday Mode is never hidden. */
-  readonly engineerSwap: { readonly label: string; readonly unavailable?: string | undefined };
+  /**
+   * § 3.2's last row: the product-level route into the Engineer surface.
+   *
+   * **Not a screen, and it carries no `screen` field for that reason.** `EverydayScreen` has no key
+   * for it and must not gain one — the swap hands the *page* to the other shell and leaves this one
+   * mounted behind it, which is a mode switch rather than a navigation, and a route arm nothing can
+   * return is the dead seam `screens.ts` deleted `'handoff'` to avoid.
+   *
+   * **And it carries no `unavailable`, which is the shape of the change rather than an omission.**
+   * It held one for every wave in which the door was not built. The door is built, so a refusal here
+   * would be § D227's stale-refusal defect — the half that tells a reader not to press a control
+   * that works. What is in its place is a {@link RailFooter.engineerSwap.note}: not a reason it does
+   * not open, but the two facts a player cannot see from the label.
+   */
+  readonly engineerSwap: { readonly label: string; readonly note: string };
 }
 
 /** Everything the rail draws, in order. */
@@ -234,7 +247,7 @@ export function railFooter(state: EverydayState, options: RailOptions = {}): Rai
     },
     engineerSwap: {
       label: 'Switch to Engineer',
-      unavailable: ENGINEER_SWAP_REFUSAL,
+      note: ENGINEER_SWAP_NOTE,
     },
   };
 }

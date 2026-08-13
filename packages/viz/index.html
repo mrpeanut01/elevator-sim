@@ -1724,6 +1724,21 @@
                or Campaign the menu was gone for the session: no button, no key,
                and no `screen` among the seven fields `applyDeepLink` reads. -->
           <button id="open-menu" class="chip" type="button" title="Main menu">Menu</button>
+          <!-- The way back to Everyday Mode — GAMEPLAY § 3.2's swap, returning.
+
+               It carries **no text and no title**: both are written by
+               `dev/main.ts#wireHeaderAndFooter` from
+               `everyday/types.ts#ENGINEER_RETURN_LABEL` and `#ENGINEER_RETURN_TITLE`,
+               where the rail's own swap row reads its note from. Two shells offering
+               one door in two wordings is the defect that module exists to prevent,
+               and a copy of the words here would be the second wording.
+
+               `hidden` at rest and revealed when `everyday/swap.ts` reports a mounted
+               Everyday shell. On the page this repository ships that is always — the
+               entry point is `everyday/boot.ts` — so the attribute is not a refusal:
+               it is what a build that loads `dev/main.ts` alone should show, because
+               there is no Everyday Mode behind it to go back to. -->
+          <button id="back-to-everyday" class="chip" type="button" hidden></button>
         </div>
 
         <div class="topbar-building">

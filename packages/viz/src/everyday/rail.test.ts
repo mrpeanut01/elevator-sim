@@ -12,7 +12,13 @@ import { describe, expect, it } from 'vitest';
 
 import { railFooter, railGroups, railModel, sublineFor } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
-import { EVERYDAY_SCREENS, RUN_CONTEXTS, type EverydayScreen, type RunContext } from './types.js';
+import {
+  ENGINEER_SWAP_NOTE,
+  EVERYDAY_SCREENS,
+  RUN_CONTEXTS,
+  type EverydayScreen,
+  type RunContext,
+} from './types.js';
 
 const titlesOf = (ctx: RunContext, inCampaign: boolean): readonly string[] =>
   railGroups(ctx, inCampaign).map((group) => group.title);
@@ -193,10 +199,25 @@ describe('the footer', () => {
     expect(settings.unavailable === undefined).toBe(EVERYDAY_SCREENS_BUILT.includes('settings'));
   });
 
-  it('offers the Engineer swap and says why it does not open', () => {
+  /**
+   * The row that used to refuse. It read *"not built yet — Everyday Mode is the only play style in
+   * this build"*, and the door is built, so what is asserted here is § D227's rule in the direction
+   * that matters after a lane lands: **a control that does something may not claim it does
+   * nothing.** The type has no `unavailable` arm any more, so the shape of the model is the first
+   * guard and this is the second.
+   */
+  it('offers the Engineer swap as a live row, with a note rather than a refusal', () => {
     const swap = railFooter({ screen: 'menu', ctx: 'daily' }).engineerSwap;
     expect(swap.label).toBe('Switch to Engineer');
-    expect(swap.unavailable).toMatch(/not built yet/);
+    expect(swap.note).toBe(ENGINEER_SWAP_NOTE);
+    /*
+     * The three facts the sentence exists to carry, asserted separately from the constant so that
+     * rewording it cannot quietly drop one: nothing stops, and the choice lasts one visit.
+     */
+    expect(swap.note).toContain('nothing stops');
+    expect(swap.note).toContain('this visit only');
+    // The stale-refusal guard proper: no wording of "not built" may come back onto this row.
+    expect(swap.note).not.toMatch(/not built/);
   });
 });
 

@@ -23627,3 +23627,116 @@ demanding one.
 off the screen (`docs/21` L-7). Nothing here asks a mount for a fallback; what it asks is that the
 table and the screen agree in both directions, so that silence is loud in the suite rather than quiet
 on the page.
+## D338 — the two worlds co-exist: § 3.2's swap is a door, and the Engineer header is the way back
+
+### The state this closes
+
+§ D335 put the page's front door on Everyday Mode and made the Engineer surface the thing *Today's
+tower* handed off to. § 7's stage screen then retired that hand-off — correctly; the hand-off was
+never § 7 — and left the Engineer surface **booting, running, laid out, covered, and reachable by
+nothing**. `everyday/shell.ts`'s `EVERYDAY_SHELL_ABSENCES` said so in its second entry, which is the
+right way to ship a gap and not a way to keep one.
+
+The product owner's standing requirement is that both worlds co-exist: Casual is where everyone
+starts, Engineer brings the full detail. For one wave the product had one world and a second one
+running behind a curtain nobody could pull.
+
+### What was built
+
+**Out.** The § 3.2 footer row is live. `shell.ts#enterEngineer` releases the cover
+(`setCoveredInert(false)`) and then steps the Everyday root aside; the order is not interchangeable,
+because releasing first disconnects the `MutationObserver` that re-asserts `inert` before anything
+else moves. Both writes are one synchronous block, so no frame is painted between an uncovered
+Engineer surface and a still-painted Everyday one, and the transition ends with the `resize` § D335
+already dispatched on the way in.
+
+**Back.** A new `#back-to-everyday` control in the Engineer header, beside `Menu` — the other
+*leave this surface* button, which is where an Engineer reader will look. It reaches the shell
+through `everyday/swap.ts`, a provided port on `everyday/engineerBridge.ts`'s exact pattern and for
+its exact reason: `everyday/boot.ts` imports `dev/main.js`, so `dev/main.ts` importing
+`everyday/shell.js` would close the cycle that has already produced one module-init `undefined` in
+this directory.
+
+### `inert` still has two writers, and the rule is unchanged
+
+§ D335's rule reads *the outer cover wins while it is up*. The swap does not weaken it; it is the
+moment the outer cover stops being up. `menuPanel.ts#coverShell` is the only writer while Everyday
+Mode is stepped aside, which is the state the Engineer surface expects when nobody is covering it,
+and the observer is re-armed by `coverEngineer()` on the return. Every write on both paths goes
+through `setInert`'s read-first guard — the one whose absence starved the renderer completely.
+
+### Cover, never hide — now in both directions, and `visibility` is why
+
+The Engineer root has always stayed laid out because a `display:none` ancestor gives a canvas a zero
+box and a view measured while hidden draws nothing when revealed. The Everyday root now gets the
+same treatment on the other side of the door, because it holds § 7's stage: a canvas sized from
+`getBoundingClientRect()` by a `resize` listener that is **still attached** while the player is in
+the other world. `visibility:hidden` suppresses the paint and keeps the box; `display:none` does not.
+`inert` and `aria-hidden` go with it for `coverShell`'s own stated reason.
+
+The assertion is measured rather than argued: `shell.browser.test.ts` records the stage canvas's
+width before the swap and requires the identical value after the return. Under `display:none` that
+is `0`.
+
+### Nothing is discarded, so there is no § 3.4 strip
+
+No screen is unmounted, no run stopped, no `ctx` cleared, no latch reset — the shell is covered, not
+destroyed. The browser case takes the trip **from the stage, mid-run**, and checks the day rather
+than the shell: the host still reports the player's run open, the § 3.3 primary still reads
+`Close the day`, and the rail's Main menu row still raises § 3.4. A confirm strip states a
+consequence; this transition has none to state, and a strip over nothing is friction pretending to
+be care.
+
+### The choice is not remembered, and that is § 3.5 rather than a second rule
+
+§ 3.5: the app always opens on the main menu, and it is not overridable. A remembered world is that
+override wearing `localStorage`, and it fails worse than the deleted `startScreen` prop would have:
+the screen it restores is a developer tool the player has no memory of choosing. It would also need
+a second boot path, since `boot.ts#closeEngineerMenuWhenReady` presses the Engineer menu away
+*behind the cover* and that is only correct while the cover is up.
+
+So the swap is a fact about this visit, and **the product says so** rather than leaving a player to
+discover it by reloading: `types.ts#ENGINEER_SWAP_NOTE` is drawn on the row itself — *"the same day
+on the full instrument panel — nothing stops, and this visit only: reloading opens Everyday Mode
+again"* — and the reload is asserted from the Engineer side in the browser tier.
+
+### Two refusals deleted, on the commit that made them false
+
+`types.ts#ENGINEER_SWAP_REFUSAL` (*"not built yet — Everyday Mode is the only play style in this
+build"*) is gone, with the `unavailable` arm of `RailFooter.engineerSwap` and the seventh entry of
+`settingsView.ts#SETTINGS_ABSENCES`. § D227 binds both ways, and the direction that bites after a
+lane lands is the second: a control that does something may not claim it does nothing. The
+`EVERYDAY_SHELL_ABSENCES` entry naming the missing door went the same way — a register that keeps a
+closed absence is decoration.
+
+### The browser tier was measuring nothing, and that is the finding
+
+`dev/browserTier.test-helper.ts#enterEngineerStage` pressed the *Today's tower* tile and waited for
+`.everyday-main` to go `display: none` — the hand-off's own latch. § 7's stage writes no such style,
+so measured on `integration/everyday-and-engineer` at `c4b8cf0` the tier was **red in 25 cases across
+12 files**, every one of them failing inside that helper, on a page where the product worked. It now
+presses the swap row and waits on two facts rather than one — the Engineer root back in the page and
+this shell out of the paint — because a latch on either alone would have passed against the hand-off
+too. After the change: **12 files, 58 cases, green.**
+
+That is also why the helper is a shared module: one door moved, one file changed.
+
+### What is asserted, and the one thing it is not
+
+`everyday/shell.browser.test.ts` drives the whole round trip, and every leg presses a **real
+control** and requires it to act — `#open-menu` opening the Engineer menu, the rail's Main menu row
+raising the confirm strip — rather than reading `inert` and calling it proof. That distinction is the
+point: `inert` paints identically, and § D335's second defect was exactly a surface that looked
+uncovered and swallowed every click.
+
+What is **not** claimed is that the Engineer surface is a good place for a Casual player to land. It
+is the developer tool, it says so, and the swap's job is to make crossing over a choice with a way
+back rather than a trap.
+
+### Known-red beside this work, and untouched by it
+
+`everyday/fixitScreen.browser.test.ts`'s *"runs the day from the bar's primary, holds it inert
+meanwhile"* fails on the base and after this change, deterministically, in both. It waits 15 s for a
+one-frame `Running the day` relabel that the synchronous pair of runs has already replaced. Nothing
+in this lane is on that path; it is filed rather than folded in, because a lane that quietly fixes an
+unrelated red is a lane whose own evidence is harder to read.

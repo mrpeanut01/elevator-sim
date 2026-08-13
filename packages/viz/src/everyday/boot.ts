@@ -20,16 +20,22 @@
  * be a second boot path for a module that already has one, and the second one would be the one
  * nothing tests.
  *
- * ## The Engineer surface is no longer handed off to, and this file is where that shows
+ * ## The Engineer surface is no longer handed off to — it is swapped to
  *
- * `everyday/stageScreen.ts` is GAMEPLAY § 7's stage, so `shell.ts` never uncovers `div.shell` and
+ * `everyday/stageScreen.ts` is GAMEPLAY § 7's stage, so `shell.ts` never insets `div.shell` and
  * takes neither an `engineerRoot` nor an `onEnter` hook. The import above is unchanged and so is
  * everything it starts — the Engineer application boots, lays itself out and runs exactly as before,
- * behind an opaque, inert cover. `EVERYDAY_SHELL_ABSENCES` names the door it no longer has.
+ * behind an opaque, inert cover.
+ *
+ * What reaches it is § 3.2's footer row: `shell.ts#enterEngineer` lifts the cover and steps the
+ * Everyday root aside, and `dev/main.ts`'s header control puts it back through
+ * `everyday/swap.ts`'s port. Neither direction runs through this file, and that is worth saying
+ * because this file is where the hand-off used to live: the swap is a transition between two
+ * mounted shells, not a boot, so nothing about it is entry-point business.
  *
  * {@link closeEngineerMenuWhenReady} stays, and it is now the whole fastening rather than the brace
  * to `onEnter`'s belt: the Engineer menu opens itself at boot, and a menu left open behind the cover
- * would be the first thing a reader met if that one line of `index.html` were ever reverted.
+ * is the first thing a player would meet on their first swap.
  */
 
 import '../dev/main.js';

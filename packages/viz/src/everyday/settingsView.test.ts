@@ -11,7 +11,6 @@ import { displayNameIssueOf, MAX_DISPLAY_NAME } from '../menu/account.js';
 import { AVATAR_SWATCHES } from './profile.js';
 import { railFooter } from './rail.js';
 import { SETTINGS_ABSENCES, settingsScreenViewOf } from './settingsView.js';
-import { ENGINEER_SWAP_REFUSAL } from './types.js';
 
 const BASE = { profile: undefined, reduceMotion: false } as const;
 
@@ -131,7 +130,11 @@ describe('This device — statements of fact, and the drawn register of refusals
       'Post runs to the board',
       'Sign out',
       'Clear saved progress',
-      'Switch to Engineer',
+      /*
+       * `Switch to Engineer` was the seventh and is deliberately absent — the rail's § 3.2 row
+       * opens the Engineer surface now, so a register still refusing it would be § D227's stale
+       * refusal. The case below asserts that absence rather than this list merely not mentioning it.
+       */
     ]) {
       expect(entries.some((entry) => entry.startsWith(label)), label).toBe(true);
     }
@@ -141,19 +144,32 @@ describe('This device — statements of fact, and the drawn register of refusals
     );
   });
 
-  it('refuses the Engineer swap in the rail’s words, so two surfaces refuse once', () => {
-    const swap = SETTINGS_ABSENCES.find((entry) => entry.startsWith('Switch to Engineer'));
-    expect(swap).toBe(`Switch to Engineer — ${ENGINEER_SWAP_REFUSAL}`);
+  /**
+   * The inverse of the case this replaces, and the inversion is the point.
+   *
+   * It used to read *"refuses the Engineer swap in the rail's words, so two surfaces refuse once"*
+   * and pinned `Switch to Engineer — not built yet …` in this register against the same sentence on
+   * the rail's row. The rail's row opens the Engineer surface now, so the register may not mention
+   * it at all: an entry in a list of *rows this screen does not draw* naming a control that works
+   * two centimetres to the left is § D227's stale refusal, and the whole reason this register is
+   * swept rather than left in a docstring.
+   *
+   * The rail is asserted here as well as in `rail.test.ts`, deliberately — the claim under test is
+   * about the **pair**, exactly as the deleted case's was, and a register checked only against
+   * itself is what let the last defect through.
+   */
+  it('does not name the Engineer swap at all, because the rail’s row opens it', () => {
+    expect(SETTINGS_ABSENCES.find((entry) => entry.startsWith('Switch to Engineer'))).toBeUndefined();
     /*
-     * The literal too, and it is a regression rather than a belt: the constant lived in `rail.ts`
-     * and the registry's import graph closed a cycle through it, so both sides of the comparison
-     * above read `undefined` and agreed. A sentence asserted only against itself is the shape
-     * that let that through — see `types.ts`'s note on why the constant lives where it does.
+     * The row's name anywhere, not only as a prefix — a re-worded entry would move it off the front
+     * of the string and past the check above. The bare word `Engineer` is deliberately *not* what is
+     * asserted: the Default speed entry names the Engineer stage, correctly, and banning the word
+     * would make this case fail for a sentence that is true.
      */
-    expect(swap).toContain('not built yet');
-    // And the rail's own footer says exactly it, which is the claim "two surfaces refuse once".
-    expect(railFooter({ screen: 'settings', ctx: 'daily' }).engineerSwap.unavailable).toBe(
-      ENGINEER_SWAP_REFUSAL,
-    );
+    for (const entry of SETTINGS_ABSENCES) expect(entry).not.toContain('Switch to Engineer');
+    // The other half of the pair: the row this register used to refuse about is live and noted.
+    const swap = railFooter({ screen: 'settings', ctx: 'daily' }).engineerSwap;
+    expect(swap.label).toBe('Switch to Engineer');
+    expect(swap.note).not.toMatch(/not built/);
   });
 });
