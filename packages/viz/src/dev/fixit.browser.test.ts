@@ -11,8 +11,10 @@
  * (`fixedBadgeAfter`), with the panel's assignment pinned at the source there; a browser replay of
  * it would cost four simulations to re-prove a one-line pure function.
  *
- * § D220 § 4 holds: no metric. Nothing here runs a day; the cases read pressed-state, a glyph,
- * and two computed background colours.
+ * § D220 § 4 holds: **no metric**. The first two cases read pressed-state, a glyph and two computed
+ * background colours. The third runs a day and still asserts no metric — what it watches is the run
+ * button's own state while the run is happening, which is a fact about the chrome and not about the
+ * building.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -70,6 +72,67 @@ async function fixitPage(): Promise<Page> {
   return page;
 }
 
+/** One frame the sampler actually saw painted, with the run button's state in it. */
+interface RunFrame {
+  readonly label: string;
+  readonly disabled: boolean;
+}
+
+/** Where the sampler parks its list. The test's own name; the product neither writes nor reads it. */
+type SamplingWindow = Window & typeof globalThis & { __fixitRunFrames?: RunFrame[] };
+
+/**
+ * Sample the run button once per **animation frame**, from before the press until the run is over.
+ *
+ * ## What this samples, and — measured — what it does *not* prove
+ *
+ * It samples in a `requestAnimationFrame` callback, so every entry is a frame the browser went on
+ * to render: a busy entry means the relabel reached the screen and was not merely written to the
+ * DOM. That is worth asserting, and a panel that stopped disabling its run button would fail here.
+ *
+ * **It does not discriminate the `requestAnimationFrame` wrapper in `fixitPanel.ts`, and saying so
+ * is the point.** Both this case and its first draft — a `MutationObserver`, which cannot see paint
+ * at all — were run against a deliberately broken panel with that wrapper replaced by an immediate
+ * call, and **both passed**. The reason is an observer effect: this sampler keeps a *standing* rAF
+ * loop, so when the click handler relabels there is already a frame callback queued, and it renders
+ * the busy frame the product's own wrapper was supposed to guarantee.
+ *
+ * The wrapper is still right, and the evidence for it is a probe rather than this case. Two presses
+ * in an empty page, identical but for the defer, counting frames rendered carrying the busy label:
+ *
+ * | defer | frames with the busy label |
+ * |---|---|
+ * | `setTimeout(body, 0)` | **0** |
+ * | `requestAnimationFrame(() => setTimeout(body, 0))` | **1** |
+ *
+ * So a zero timeout really does let the blocking task run before any paint, and nesting really does
+ * fix it — which is what `fixitPanel.ts`'s own comment now claims and what its previous comment
+ * claimed while the code did not provide it.
+ *
+ * Installed **before** the press for the reason the sibling screen's case records: an evaluate
+ * issued after the click queues behind the blocking task and first runs when the run is over.
+ */
+async function sampleRunFrames(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as SamplingWindow;
+    const frames: RunFrame[] = [];
+    const tick = (): void => {
+      const button = document.querySelector<HTMLButtonElement>('.fixit-run');
+      if (button !== null) {
+        frames.push({ label: button.textContent ?? '', disabled: button.disabled });
+      }
+      w.requestAnimationFrame(tick);
+    };
+    w.__fixitRunFrames = frames;
+    w.requestAnimationFrame(tick);
+  });
+}
+
+/** Every frame the sampler saw, in order. */
+async function runFrames(page: Page): Promise<readonly RunFrame[]> {
+  return page.evaluate(() => (window as SamplingWindow).__fixitRunFrames ?? []);
+}
+
 describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16', () => {
   it('repair rows are toggles that say so: aria-pressed both ways, and a visible tick', async () => {
     const page = await fixitPage();
@@ -107,5 +170,55 @@ describe.skipIf(!HAS_BROWSER)('Fix-a-building’s chrome — docs/20 defect 16',
      */
     expect(grounds.overlay).toBe(grounds.body);
     expect(grounds.overlay).not.toBe('');
+  });
+  it('holds the run button inert while the day runs, and the relabel reaches the screen first', async () => {
+    const page = await fixitPage();
+
+    /*
+     * The press relabels and disables the run button, that state reaches a rendered frame, and the
+     * button comes back — which is what stops a second press landing mid-run on a panel whose runs
+     * are deliberately not on a worker.
+     *
+     * This panel had no browser case at all until now, which is why a comment claiming a mechanism
+     * the code did not provide survived here for two waves. The mechanism is fixed; the evidence
+     * for the fix is the probe recorded on {@link sampleRunFrames} rather than this case, and that
+     * distinction is stated there rather than implied by a green tick here.
+     */
+    await sampleRunFrames(page);
+    await page.locator('.fixit-run').click();
+
+    // A real run of a real case; the 120 s ceiling is the tier's for two synchronous `recordRun`s.
+    await page.waitForSelector('.fixit-outcome', { timeout: 120_000 });
+
+    const frames = await runFrames(page);
+    const busyAt = frames.findIndex((frame) => /Running the day/.test(frame.label));
+    /*
+     * A **painted** frame carrying the busy label — the relabel reached the screen rather than only
+     * the DOM. See {@link sampleRunFrames} for the measured limit of this assertion: it does not by
+     * itself discriminate the defer, because the sampler's own frame loop supplies a frame either
+     * way. What it does catch is a panel that stops relabelling or stops disabling.
+     */
+    expect(
+      busyAt,
+      `no rendered frame carried the busy label — the relabel never painted before the runs. Frames: ${JSON.stringify(frames.slice(0, 8))}`,
+    ).toBeGreaterThanOrEqual(0);
+    expect(frames[busyAt]?.disabled, 'the button was relabelled but stayed pressable').toBe(true);
+    // And it came back: a busy frame that is the last one sampled is a button left inert.
+    expect(busyAt, 'the button was still busy when the outcome was drawn').toBeLessThan(
+      frames.length - 1,
+    );
+
+    const after = await page.evaluate(() => {
+      const button = document.querySelector<HTMLButtonElement>('.fixit-run');
+      return {
+        label: button?.textContent ?? '',
+        disabled: button?.disabled ?? true,
+        outcomeRows: document.querySelectorAll('.fixit-outcome-row').length,
+      };
+    });
+    expect(after.disabled).toBe(false);
+    expect(after.label).toBe('Run it again');
+    // § D220 § 4: that a verdict was drawn, never what it measured.
+    expect(after.outcomeRows).toBeGreaterThan(0);
   });
 });

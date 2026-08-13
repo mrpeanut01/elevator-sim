@@ -323,13 +323,19 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
 
       /*
-       * The relabel is deferred past a paint precisely so it is on screen before the synchronous
-       * pair, so this is the assertion that the defer works: a state the primary genuinely passed
-       * through, disabled and named, between the press and the outcome below.
+       * A state the primary genuinely passed through, disabled and named, between the press and the
+       * outcome below. Read off {@link recordPrimaryStates}'s recording rather than polled for —
+       * see its docstring for why a poll issued after the press cannot see a state that only exists
+       * while the main thread is busy.
        *
-       * Read off {@link recordPrimaryStates}'s recording rather than polled for — see its docstring
-       * for why a poll issued after the press cannot see a state that only exists while the main
-       * thread is busy. The two facts asserted are the two that were asserted before.
+       * **It is not the assertion that the defer works, and an earlier draft of this comment said
+       * it was.** A `MutationObserver` reports DOM *writes*, and the relabel is written in the click
+       * handler whether or not the defer puts a paint after it — so this case passes against a
+       * screen with the `requestAnimationFrame` wrapper removed, which was measured rather than
+       * reasoned about (`dev/fixit.browser.test.ts#sampleRunFrames` records the run and the probe
+       * that does discriminate the two: 0 painted frames carrying the busy label against 1). What
+       * this asserts is that the busy state exists and ends, which is the regression worth holding
+       * here; the defer's evidence lives with the probe.
        */
       const states = await primaryStates(page);
       const busyAt = states.findIndex((state) => /Running the day/.test(state.label));

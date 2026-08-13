@@ -20,16 +20,28 @@
  *
  * ## The lever handoff, and where the panel name comes from
  *
- * § 6.5's levers are *"a live handoff into the workshop"*. The workshop screen is unbuilt, and the
- * surface that actually carries out a fabric change is the Engineer panel `LEVER_SURFACES` names.
- * So a card with a surface routes to the shell's `stage` key — the hand-off `enterEngineerStage`
- * performs, which is the player's own path onto that surface — and the button's label carries the
+ * § 6.5's levers are *"a live handoff into the workshop"*, and the handoff a card performs is onto
+ * the surface that can carry its advice out. **Every card that has one is a change to the building
+ * document**: `LEVER_SURFACES` names exactly two, *add a car* and *zone the tower*, and both are the
+ * Engineer building editor's — a car is a `CarConfig`, zoning is a bank's `servesFloors`. So a card
+ * with a surface routes to the shell's `stage` key — the hand-off `enterEngineerStage` performs,
+ * which is the player's own path onto that surface — and the button's label carries the
  * **panel's own tab text, read from the tab button in the page**. Read rather than tabulated: a
  * `Record<TabName, string>` here would be a second copy of a label `index.html` owns, going stale
  * the day somebody renames a tab, and § 16 rule 11's neighbouring argument applies (a lookup table
  * in a screen mapping ids to prose is the screen being the wrong owner). With no such button in the
  * document the label falls back to naming the simulator without naming a panel, which is a
  * narrower claim rather than a wrong one.
+ *
+ * **An Everyday dispatcher workshop exists now, and it changes nothing here** — which is worth
+ * stating because the sentence this paragraph replaces gave *"the workshop screen is unbuilt"* as
+ * the reason for the routing, and that stopped being true on the merge that registered
+ * `everyday/workshopScreen.ts`. It was never the real reason. The workshop authors a **dispatcher**
+ * and the two routed cards author a **building**, so it could not carry them; and the two cards
+ * that *are* dispatcher-shaped — *weight fairness up*, *ask where they're going* — are precisely
+ * the two `LEVER_SURFACES` deliberately gives no surface at all, because a sheet pointing at a
+ * dispatch control off one replication is `docs/10` R2 and CLAUDE.md's paired-interval rule. A
+ * workshop route would be that refusal undone by the back door.
  */
 
 import type { DeltaRowView, ReportView } from '../dev/reportPanel.js';

@@ -454,32 +454,59 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
 
   function runButton(entry: FixitCase, session: CaseSession): HTMLElement {
     const button = el(doc, 'button', {
+      // Named for the same reason `.fixit-repair` is: the tier selects a control by its class and
+      // never by the prose a player reads, which is a lesson this file's sibling paid for once.
+      className: 'fixit-run',
       text: session.outcome === undefined ? 'Run the day' : 'Run it again',
       style: { ...buttonStyle(true), 'font-weight': '600', margin: '0.75rem 0' },
     });
     button.addEventListener('click', () => {
       button.disabled = true;
       button.textContent = 'Running the day…';
-      // Deferred one frame so the relabel paints before the synchronous pair of runs.
-      setTimeout(() => {
-        const plan = fixitRunPlanOf(entry, session.state, host.resources);
-        const pair = runFixitPair(plan);
-        session.asBuilt = pair.before;
-        const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
-        const outcome = classifyOutcome(entry, measurement, spendOf(entry, session.state));
-        session.outcome = outcome;
-        // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
-        // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
-        // about one case on one screen).
-        session.fixed = fixedBadgeAfter(outcome);
-        render();
-      }, 0);
+      /*
+       * Deferred **past a paint** so the relabel is on screen before the synchronous pair of runs
+       * blocks the thread.
+       *
+       * ## The comment that used to sit here described a mechanism this code did not have
+       *
+       * It read *"deferred one frame so the relabel paints before the synchronous pair of runs"*,
+       * over a bare `setTimeout(…, 0)`. A zero timeout schedules a **task**, not a frame: the
+       * browser may run it before the next paint, and the task then blocks the main thread for the
+       * length of two `recordRun` calls — 0.5–1.5 s on the shipped buildings. So the two writes
+       * above reached the DOM and were overwritten by `render()` below without ever being painted,
+       * and the disabled, relabelled button — the only thing stopping a second press mid-run —
+       * existed for nobody.
+       *
+       * It was measured rather than reasoned about, and not here: `everyday/fixitScreen.ts` carried
+       * this approach over verbatim, and its browser case waited fifteen seconds for a button
+       * reading `Running the day…` on a run that takes seconds and never saw one.
+       *
+       * `requestAnimationFrame` runs its callback **before** the paint that follows it, and a
+       * `setTimeout` inside that callback runs after — which is the first moment the relabel is
+       * guaranteed to be on screen. Nesting the two is the whole fix. `everyday/fixitScreen.ts`'s
+       * `afterPaint` holds the same argument at more length; this panel is where the mistake was.
+       */
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const plan = fixitRunPlanOf(entry, session.state, host.resources);
+          const pair = runFixitPair(plan);
+          session.asBuilt = pair.before;
+          const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
+          const outcome = classifyOutcome(entry, measurement, spendOf(entry, session.state));
+          session.outcome = outcome;
+          // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
+          // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
+          // about one case on one screen).
+          session.fixed = fixedBadgeAfter(outcome);
+          render();
+        }, 0);
+      });
     });
     return el(doc, 'div', { children: [button] });
   }
 
   function outcomeCard(outcome: FixitOutcome): HTMLElement {
-    return card([
+    const box = card([
       el(doc, 'p', {
         text: outcome.head,
         style: { margin: '0 0 0.25rem', 'font-weight': '600', color: outcome.kind === 'fixed' ? GOOD : INK },
@@ -487,6 +514,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
       el(doc, 'p', { text: outcome.body, style: { color: MUTED, margin: '0 0 0.75rem' } }),
       ...outcome.rows.map((row) =>
         el(doc, 'div', {
+          className: 'fixit-outcome-row',
           style: { 'margin-bottom': '0.4rem' },
           children: [
             el(doc, 'div', {
@@ -508,6 +536,10 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
       ),
       el(doc, 'p', { text: BASIS_LINE, style: { color: MUTED, 'font-size': '12px', margin: '0.5rem 0 0' } }),
     ]);
+    // The card the tier waits on. `card()` is shared by six blocks on this screen, so the name goes
+    // on the instance rather than into the helper.
+    box.className = 'fixit-outcome';
+    return box;
   }
 
   return { open, close, root };
