@@ -6,7 +6,7 @@
  * 1. Imports `dev/main.js` for its side effect, which builds and starts the Engineer surface inside
  *    the static `div.shell`. Nothing about that surface changes.
  * 2. Mounts {@link mountEverydayShell} over it, so the app opens on Everyday Mode's main menu
- *    (GAMEPLAY § 3.5) and the Engineer surface is uncovered only when a mode hands off to it.
+ *    (GAMEPLAY § 3.5) and the Engineer surface stays covered behind it.
  *
  * ## Why the import comes first, and why it is a bare side-effect import
  *
@@ -20,26 +20,22 @@
  * be a second boot path for a module that already has one, and the second one would be the one
  * nothing tests.
  *
- * ## What happens if the Engineer root is missing
+ * ## The Engineer surface is no longer handed off to, and this file is where that shows
  *
- * Nothing fatal, and nothing silent. {@link mountEverydayShell} accepts `engineerRoot: undefined` —
- * the menu, the rail and every refusal draw without it — so a page that shipped without `div.shell`
- * gets a working menu whose one playable tile lands on an empty stage. That is worse than a hard
- * failure and better than a blank page, so it is reported to the console rather than passed over.
+ * `everyday/stageScreen.ts` is GAMEPLAY § 7's stage, so `shell.ts` never uncovers `div.shell` and
+ * takes neither an `engineerRoot` nor an `onEnter` hook. The import above is unchanged and so is
+ * everything it starts — the Engineer application boots, lays itself out and runs exactly as before,
+ * behind an opaque, inert cover. `EVERYDAY_SHELL_ABSENCES` names the door it no longer has.
+ *
+ * {@link closeEngineerMenuWhenReady} stays, and it is now the whole fastening rather than the brace
+ * to `onEnter`'s belt: the Engineer menu opens itself at boot, and a menu left open behind the cover
+ * would be the first thing a reader met if that one line of `index.html` were ever reverted.
  */
 
 import '../dev/main.js';
 
 import { EVERYDAY_HOST } from './host.js';
 import { mountEverydayShell, type EverydayShell } from './shell.js';
-
-/**
- * The selector for the Engineer application root.
- *
- * `div.shell` is authored statically in `packages/viz/index.html` rather than created by
- * `dev/main.ts`, which is why this is a query rather than an import.
- */
-export const ENGINEER_ROOT_SELECTOR = '.shell';
 
 /**
  * The Engineer menu, and its *Resume* row — how this shell gets that menu out of the way.
@@ -53,7 +49,8 @@ export const ENGINEER_ROOT_SELECTOR = '.shell';
  * as `changed-their-mind`, so it does *not* latch `playerHasChosen`, so the demo day boot left on
  * the stage is not filed as something the player chose — which is exactly right, because they chose
  * Today's tower, not that. The first real press of *Run this shift* latches through
- * `playerStartedARun`, so nothing the player actually asks for goes unfiled.
+ * `playerStartedARun`, so nothing the player actually asks for goes unfiled — and § 7's stage asks
+ * for exactly that press on entry, gated on `runState().open`, which boot's demo run does not set.
  */
 export const ENGINEER_MENU_SELECTOR = '.menu-overlay';
 export const ENGINEER_RESUME_SELECTOR = '[data-menu-control="main.resume"]';
@@ -97,7 +94,7 @@ export function dismissEngineerMenu(doc: Document): boolean {
 /**
  * Close the Engineer menu as soon as it exists, and keep it closed.
  *
- * ## Why at boot rather than at the hand-off, which is where it started
+ * ## Why at boot, which is where it ended up
  *
  * `dev/main.ts` self-invokes an **async** `main()`, so at the moment this shell mounts, the Engineer
  * menu may be an empty `div.menu-overlay` with `hidden === false` and no rows in it yet. Dismissing
@@ -127,11 +124,13 @@ export function dismissEngineerMenu(doc: Document): boolean {
  *
  * `boundaries.test.ts` requires that nothing outside the shells schedules a timer, and any deadline
  * long enough not to fire during that boot is far longer than the moment when the answer matters.
- * That moment is the hand-off, and it is where the failure is reported: {@link bootEveryday} calls
- * {@link dismissEngineerMenu} again as the stage is entered and says so if the menu is still up. A
- * silent failure there is a player looking at a developer menu the product does not admit to having,
- * which is the failure mode this repository keeps finding — so it is named, at the instant it would
- * become visible, rather than guessed at on a clock.
+ *
+ * That moment used to be the hand-off, where {@link bootEveryday} pressed the row a second time and
+ * reported a failure to the console. There is no hand-off now, and the honest consequence is that
+ * this observer has no deadline **and** no reporting site — a menu that never gained its Resume row
+ * stays open behind an opaque cover, where nobody can see it and nothing depends on it. That is a
+ * smaller failure than the one it replaces, and it is stated rather than left to be inferred from a
+ * deleted `console.error`.
  */
 export function closeEngineerMenuWhenReady(doc: Document): void {
   if (dismissEngineerMenu(doc)) return;
@@ -154,35 +153,14 @@ export function closeEngineerMenuWhenReady(doc: Document): void {
 
 /** Mount the Everyday shell over an already-booting Engineer surface. */
 export function bootEveryday(doc: Document): EverydayShell {
-  const engineerRoot = doc.querySelector<HTMLElement>(ENGINEER_ROOT_SELECTOR) ?? undefined;
-  if (engineerRoot === undefined) {
-    console.error(
-      `Everyday shell: no ${ENGINEER_ROOT_SELECTOR} in the document. The menu will draw, but ` +
-        "Today's tower will hand off to nothing.",
-    );
-  }
   closeEngineerMenuWhenReady(doc);
   return mountEverydayShell(doc, {
-    engineerRoot,
     /*
      * The data host's slot — `dev/main.ts` publishes into it at the end of its own boot, which is
      * strictly after this mount (its `main()` is async and this file runs synchronously after the
      * side-effect import above). The shell handles both orders; see `EverydayShellHost.host`.
      */
     host: EVERYDAY_HOST,
-    /*
-     * The belt to `closeEngineerMenuWhenReady`'s brace, and the place its failure is reported: by
-     * here the menu should long since be closed, so a `false` means the Resume row never arrived and
-     * the player is about to meet the Engineer menu over their stage.
-     */
-    onEnter: (screen) => {
-      if (screen !== 'stage') return;
-      if (dismissEngineerMenu(doc)) return;
-      console.error(
-        `Everyday shell: handing off to the stage and ${ENGINEER_MENU_SELECTOR} ` +
-          `${ENGINEER_RESUME_SELECTOR} is not there to press. The Engineer menu is still over it.`,
-      );
-    },
   });
 }
 

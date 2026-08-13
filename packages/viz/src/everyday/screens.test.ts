@@ -23,14 +23,18 @@ import {
 import { EVERYDAY_SCREENS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is the shell’s two screens and every registered module — today the two plus fixit and settings', () => {
+  it('is the shell’s own menu and every registered module — today the menu plus stage, fixit and settings', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
-     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`) and
-     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`); the order is
-     * `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
+     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`),
+     * `settings` the second (§ 15.1) and `stage` the third (§ 7, `everyday/stageScreen.ts`); the
+     * order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
+     *
+     * **`stage` moved sides without moving in this list**, which is the case worth reading twice:
+     * it was shell-owned (the § D335 hand-off), it is now registered, and a list that only says
+     * *built* cannot tell the difference. The case below is what does.
      */
     expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'settings']);
   });
@@ -38,9 +42,20 @@ describe('what this build has actually built', () => {
   it('derives BUILT from the registry, in both directions', () => {
     for (const screen of EVERYDAY_SCREENS) {
       const registered = screenModuleFor(screen) !== undefined;
-      const shellOwned = screen === 'menu' || screen === 'stage';
+      const shellOwned = screen === 'menu';
       expect(isScreenBuilt(screen), screen).toBe(registered || shellOwned);
     }
+  });
+
+  it('owns exactly one screen in the shell — the menu, and no longer the stage', () => {
+    /*
+     * The hand-off's epitaph. `stage` carries a module now, so it must route like every other
+     * registered key; a `stage` that were still shell-owned *and* registered would be built twice
+     * and refused by neither half of the reasons check.
+     */
+    expect(screenModuleFor('menu')).toBeUndefined();
+    expect(screenModuleFor('stage')).toBeDefined();
+    expect(routeFor('stage')).toBe('screen');
   });
 });
 
@@ -67,15 +82,24 @@ describe('the refusal sentences and the registry move together', () => {
 });
 
 describe('the router', () => {
-  it('sends the two shell-owned keys their own way and splits the rest by registration', () => {
+  it('sends the one shell-owned key its own way and splits the rest by registration', () => {
     expect(routeFor('menu')).toBe('menu');
-    expect(routeFor('stage')).toBe('handoff');
     for (const screen of EVERYDAY_SCREENS) {
-      if (screen === 'menu' || screen === 'stage') continue;
+      if (screen === 'menu') continue;
       expect(routeFor(screen), screen).toBe(
         screenModuleFor(screen) === undefined ? 'refusal' : 'screen',
       );
     }
+  });
+
+  it('has no route arm nothing can produce', () => {
+    /*
+     * `'handoff'` was the fourth value and it had exactly one producer. It went with the route
+     * rather than being left in the union: a route a reader can switch on and nothing can return
+     * is the dead seam this repository keeps a count of, one type up.
+     */
+    const produced = new Set(EVERYDAY_SCREENS.map((screen) => routeFor(screen)));
+    expect([...produced].sort()).toEqual(['menu', 'refusal', 'screen']);
   });
 
   it('names every screen for a heading, in § 4’s words', () => {
