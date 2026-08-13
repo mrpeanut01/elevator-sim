@@ -7,31 +7,30 @@
  * It owns the frame: a 212 px rail, a scroll region showing **one screen at a time**, and a pinned
  * action bar drawn from `actionBar.ts`'s table — no screen declares its own footer (§ 3.1). It
  * draws the menu itself, because the menu is the shell's own front door (§ 3.5). Every other key
- * is routed by `screens.ts`: a registered screen module mounts into the region, `stage` hands off
- * to the existing Engineer surface, and an unregistered key draws that key's one refusal sentence
- * — the same sentence the rail's caption and the mode tiles read, so no two surfaces refuse in
- * different words.
+ * is routed by `screens.ts`: a registered screen module mounts into the region, and an unregistered
+ * key draws that key's one refusal sentence — the same sentence the rail's caption and the mode
+ * tiles read, so no two surfaces refuse in different words.
  *
- * ## The hand-off, stated plainly
+ * ## The hand-off retired, and what that cost
  *
- * `dev/main.ts` builds and drives the whole existing application inside `div.shell`. The stage is
- * that surface. Rather than re-implement a working simulator view, this shell **covers and uncovers
- * it**: off-stage the shell is a full-viewport overlay, and on `stage` it shrinks to the 212 px rail
- * strip and insets `div.shell` beside it. That is a deliberate, reversible seam — the Engineer
- * product is untouched and still reachable, which is what the § 3.2 footer's *Switch to Engineer*
- * row is for once it is built.
+ * § D335 shipped `stage` as a *hand-off*: the shell shrank to the 212 px rail strip, uncovered
+ * `div.shell` and inset the whole Engineer application beside it. It was honest, it was reversible,
+ * and it was not § 7. `everyday/stageScreen.ts` is now § 7's stage — a registered screen like any
+ * other — so `screens.ts` has no `'handoff'` route left to return and this module has no second
+ * geometry to draw.
  *
- * **It covers rather than hides, and the difference is load-bearing.** `div.shell` holds canvases
- * that size themselves from their laid-out box; a `display:none` ancestor gives them a zero box, and
- * a simulator view that was measured while hidden draws nothing when revealed. So the Engineer root
- * stays laid out for its whole life and the shell simply sits on top of it — and when the strip
- * changes the width beneath it, {@link mountEverydayShell} dispatches a `resize` so anything
- * listening re-measures.
+ * **The shell therefore covers the Engineer surface for its whole life, and it still covers rather
+ * than hides.** The difference stays load-bearing: `div.shell` holds canvases that size themselves
+ * from their laid-out box, a `display:none` ancestor gives them a zero box, and a simulator view
+ * measured while hidden draws nothing when revealed. The Engineer root stays laid out, `inert`, and
+ * exactly as it was — it boots and runs unchanged, which is what makes reverting one line of
+ * `packages/viz/index.html` a working product rather than a hope.
  *
- * It is also honest about being a seam rather than the finished § 4 product: the stage a player
- * reaches is the Engineer stage with Casual copy, not § 7's Everyday stage with its race strip
- * geometry and campaign dock. {@link EVERYDAY_SHELL_ABSENCES} is the register, and the menu, the
- * rail and the router all read from the same refusal strings rather than each inventing their own.
+ * What it no longer has is a **door**: the § 3.2 footer's *Switch to Engineer* row is that door and
+ * it is not built, so nothing in this build opens the Engineer surface. That is the one thing this
+ * change took away and it is the second entry of {@link EVERYDAY_SHELL_ABSENCES} rather than a
+ * discovery waiting to happen. It also makes `types.ts#ENGINEER_SWAP_REFUSAL` — *"Everyday Mode is
+ * the only play style in this build"* — true, which it was not while the stage handed off.
  *
  * ## Why the app opens here and cannot be told not to
  *
@@ -69,9 +68,8 @@ import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
  * cannot go stale the way a prose row in a plan did.
  */
 export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
-  "§ 7's Everyday stage — the stage shown is the Engineer surface with Casual copy",
   '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
-  '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out there, and mid-run it warns through § 3.4’s confirm strip, fed the run state by the data host',
+  'the Engineer surface still boots and runs behind this shell, and nothing here opens it — the rail’s Switch to Engineer row is that door and it is not built; one line of packages/viz/index.html reverts the whole product to it',
   '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
@@ -148,31 +146,27 @@ export interface EverydayShell {
    * **The data host is the shipped writer**: when {@link EverydayShellHost.host} is supplied the
    * shell syncs this latch from `EverydayHost.runState().open` on every host notification, so a
    * run the player started reaching the stage arms the strip and the day being filed disarms it.
-   * This method stays exposed for a screen's `setRunOpen` (the § 7 Everyday stage, when it
-   * exists) and for the tests that pin § 3.4's behaviour — but while a host is connected its
-   * next notification reasserts the host's answer, which is correct for as long as the only
-   * stage is the handed-off Engineer one the host describes.
+   * The § 7 stage screen writes the same value through its context's `setRunOpen` on every host
+   * notification, which is deliberate rather than redundant: the screen states its participation,
+   * and because both writers read one fact — `runState().open` — they cannot disagree.
    */
   setRunOpen(open: boolean): void;
   /** Remove the shell and restore the Engineer surface. Used by the Engineer swap once built. */
   destroy(): void;
 }
 
+/**
+ * What the shell is mounted over.
+ *
+ * **Two fields retired with the hand-off** and are named here rather than deleted silently, because
+ * `everyday/boot.ts` passed both and a reader of that file will look for them: `engineerRoot` was
+ * the element the shell inset beside the rail on `stage`, and `onEnter` was the hook that dismissed
+ * the Engineer menu as the player crossed into it. § 7's stage is a screen, nothing is ever inset,
+ * and the Engineer menu is closed once at boot by `boot.ts#closeEngineerMenuWhenReady` — which was
+ * always the belt to `onEnter`'s brace and is now the whole fastening. An option the shell reads
+ * nowhere is the dead seam this repository keeps a count of, so they went with their use.
+ */
 export interface EverydayShellHost {
-  /**
-   * The existing Engineer application root, shown for `stage` and hidden otherwise.
-   *
-   * Optional so the shell can be mounted in a test document that has no Engineer surface — the
-   * menu, the rail and the refusals are all drawable without one.
-   */
-  readonly engineerRoot?: HTMLElement | undefined;
-  /**
-   * Called when the player leaves the menu into a mode that hands off to the Engineer surface.
-   *
-   * The shell does not reach into `dev/main.ts`; the host decides what "start Today's tower" means
-   * so this module stays free of the other shell's internals.
-   */
-  readonly onEnter?: ((screen: EverydayScreen) => void) | undefined;
   /**
    * The data host's slot — `everyday/boot.ts` passes {@link EVERYDAY_HOST} here, and
    * `dev/main.ts` publishes into it once its boot closure exists.
@@ -199,6 +193,18 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /** § 3.4's latch — see {@link EverydayShell.setRunOpen}. */
   let runOpen = false;
 
+  /**
+   * Whether § 3.4's confirm strip is standing in the bar's place, so a screen's `refreshBar` does
+   * not wipe a question the player has not answered.
+   *
+   * A screen asks for a bar redraw whenever one of its own facts moves, and on the stage those
+   * facts move on **host notifications** — a run landing, an intervention re-simulating. Both can
+   * arrive while the strip is up, and an unguarded redraw would replace *Leave the day unfinished?*
+   * with the ordinary row under the player's cursor: the click aimed at *Leave it* would land on
+   * *Close the day*. The strip owns the bar until it is answered.
+   */
+  let confirmShowing = false;
+
   /** The data host, once `dev/main.ts` publishes it. See {@link EverydayShellHost.host}. */
   let dataHost: EverydayHost | undefined;
 
@@ -218,9 +224,10 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
   /*
-   * Two geometries, one element. Off-stage the shell is the whole viewport; on-stage it is the rail
-   * strip alone and the Engineer surface is inset beside it. Keeping both here rather than in a
-   * stylesheet means the 212 px appears exactly once, in {@link RAIL_WIDTH_PX}.
+   * One geometry: the shell is the whole viewport, rail then screen region. It was two while the
+   * stage handed off — a strip beside the inset Engineer surface — and collapsed to this when § 7's
+   * stage became a screen. Keeping it here rather than in a stylesheet means the 212 px appears
+   * exactly once, in {@link RAIL_WIDTH_PX}.
    */
   const RAIL = String(RAIL_WIDTH_PX) + 'px';
   const COMMON = [
@@ -236,7 +243,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     `z-index:${String(SHELL_Z_INDEX)}`,
   ].join(';');
   const FULL = COMMON + `;right:0;grid-template-columns:${RAIL} minmax(0,1fr)`;
-  const STRIP = COMMON + `;width:${RAIL};grid-template-columns:${RAIL}`;
   root.style.cssText = FULL;
 
   /* --- The rail (§ 3.2). Dark ink ground; scrolls independently of the screen region. --- */
@@ -281,63 +287,20 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   main.append(screenRegion, bar);
   root.append(rail, main);
 
-  /*
-   * § 3.4's confirm strip **over the handed-off stage**. On every other screen the strip replaces
-   * the § 3.3 bar (§ 3.4's own rule), but on the stage there is no bar — the shell is the rail
-   * strip and `main` is display:none, so a strip drawn into the hidden bar would be a leave press
-   * that visibly does nothing. This element is the stage's home for the same strip: fixed along
-   * the bottom of the uncovered surface, beside the rail, styled as the bar it stands in for. It
-   * is inside `root`, so the cover's `inert` sweep never touches it, and `position:fixed` keeps it
-   * out of `root`'s overflow clip (a fixed box's containing block is the viewport — `root` carries
-   * no transform).
-   *
-   * Visibility is `style.display`, not `hidden`, for the exact reason `setEngineerUncovered`
-   * documents on `main`: an inline `display:flex` outranks the user-agent's `[hidden]` rule.
-   */
-  const stageConfirm = el(doc, 'div', 'everyday-stage-confirm');
-  stageConfirm.style.cssText = [
-    'position:fixed',
-    `left:${RAIL}`,
-    'right:0',
-    'bottom:0',
-    'display:none',
-    'align-items:center',
-    `gap:${String(GAP.row + 2)}px`,
-    'padding:10px 16px',
-    `border-top:1px solid ${C.rule}`,
-    `background:${C.card}`,
-    'min-height:52px',
-    `color:${C.ink}`,
-    `font-family:${TYPE.body}`,
-  ].join(';');
-  root.append(stageConfirm);
-
   doc.body.append(root);
 
   /**
-   * Uncover the Engineer surface, or cover it again.
+   * Cover the page behind this shell, and keep the screen region laid out.
    *
-   * Never touches `hidden` or `display` — see the module docstring. Uncovering insets the surface by
-   * the rail width and dispatches one `resize`, because `.shell` is `width:100%` and the canvases
-   * inside it size from their laid-out box rather than from a media query.
+   * **Never touches `hidden` or `display` on anything behind it** — see the module docstring: the
+   * Engineer surface holds canvases that size from their laid-out box, and one measured under a
+   * `display:none` ancestor paints nothing when revealed. Covering leaves it laid out and inert.
+   *
+   * The one `resize` is dispatched because this shell's own arrival changes what is on screen and
+   * `everyday/stageScreen.ts` re-measures its canvas on that event like every other listener.
    */
-  function setEngineerUncovered(uncovered: boolean): void {
-    root.style.cssText = uncovered ? STRIP : FULL;
-    /*
-     * `hidden` **and** an explicit `display`, because on this element `hidden` alone does nothing.
-     * The attribute works through the user-agent rule `[hidden] { display: none }`, and this element
-     * carries `display:grid` in its own `style` attribute — an inline declaration outranks any
-     * stylesheet, so the region kept painting under the rail with the Engineer stage beside it. The
-     * attribute stays for the accessibility tree; the property is what removes the box.
-     */
-    main.hidden = uncovered;
-    main.style.display = uncovered ? 'none' : 'grid';
-    const engineer = options.engineerRoot;
-    if (engineer !== undefined) {
-      engineer.style.marginLeft = uncovered ? RAIL : '';
-      engineer.style.width = uncovered ? `calc(100% - ${RAIL})` : '';
-    }
-    setCoveredInert(!uncovered);
+  function coverEngineer(): void {
+    setCoveredInert(true);
     doc.defaultView?.dispatchEvent(new Event('resize'));
   }
 
@@ -444,14 +407,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function go(screen: EverydayScreen): void {
     state = { ...state, screen };
     draw();
-    /*
-     * **After the draw, and that ordering is a fix rather than a preference.** `draw` is what lifts
-     * {@link setCoveredInert} off the page, and an `inert` subtree swallows clicks — including
-     * scripted ones. Called before it, a host that hands off by pressing a control on the covered
-     * surface (which is exactly what `everyday/boot.ts` does to dismiss the Engineer menu) presses
-     * nothing at all, silently, and the player lands on a stage with that menu still over it.
-     */
-    if (screen !== EVERYDAY_ROOT) options.onEnter?.(screen);
   }
 
   /**
@@ -744,6 +699,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * primary over a screen that does not exist is a control that silently does nothing.
    */
   function drawBar(): void {
+    confirmShowing = false;
     bar.replaceChildren();
     /*
      * A registered screen refines the resolved row through its module's `bar()` — the § 3.3 cells
@@ -880,11 +836,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   /**
    * § 3.4's confirm strip — replaces the whole bar until the player decides.
    *
-   * *Leave it* leaves for real; *Stay* puts things back and nothing else changes. Two homes, one
-   * strip: on every screen with a bar it replaces the bar (§ 3.4's rule), and on the handed-off
-   * stage — where the bar is not drawn, which {@link EVERYDAY_SHELL_ABSENCES} names — it draws
-   * into {@link stageConfirm} along the bottom of the uncovered surface. The children and their
-   * class names are identical on both arms, so a test and a reader meet one strip.
+   * *Leave it* leaves for real; *Stay* puts things back and nothing else changes.
+   *
+   * **One home again.** It had two while the stage handed off, because the handed-off stage drew no
+   * § 3.3 bar and a strip painted into a hidden bar is a leave press that visibly does nothing. § 7's
+   * stage is a screen with the shell's own bar under it, so § 3.4's own rule — the strip replaces
+   * the bar — holds everywhere, and the second element and its `display` toggle went with the route
+   * that needed them.
    */
   function drawConfirm(
     question: string,
@@ -892,9 +850,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     leaveLabel: string,
     stayLabel: string,
   ): void {
-    const onStage = routeFor(state.screen) === 'handoff';
-    const target = onStage ? stageConfirm : bar;
-    target.replaceChildren();
+    bar.replaceChildren();
     const q = el(doc, 'span', 'everyday-bar-question', question);
     q.style.cssText = 'font-weight:600;font-size:13px';
     const why = el(doc, 'span', 'everyday-bar-consequence', consequence);
@@ -908,15 +864,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const stay = el(doc, 'button', 'everyday-bar-confirm-stay', stayLabel);
     stay.type = 'button';
     stay.style.cssText = PRIMARY;
-    stay.addEventListener('click', onStage ? hideStageConfirm : drawBar);
-    target.append(q, why, spacer, leaveIt, stay);
-    if (onStage) stageConfirm.style.display = 'flex';
-  }
-
-  /** *Stay* on the stage: the strip goes down, the stage is exactly as it was. */
-  function hideStageConfirm(): void {
-    stageConfirm.style.display = 'none';
-    stageConfirm.replaceChildren();
+    stay.addEventListener('click', drawBar);
+    bar.append(q, why, spacer, leaveIt, stay);
+    confirmShowing = true;
   }
 
   function drawMenu(): void {
@@ -1033,13 +983,9 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
 
   function draw(): void {
     unmountCurrent();
-    // A navigation cancels a pending stage confirm: the question was about the screen being left.
-    hideStageConfirm();
     drawRail();
     const route = routeFor(state.screen);
-    const onStage = route === 'handoff';
-    setEngineerUncovered(onStage);
-    if (onStage) return;
+    coverEngineer();
     drawBar();
     if (route === 'menu') {
       drawMenu();
@@ -1061,7 +1007,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           setRunOpen: (open) => {
             runOpen = open;
           },
-          refreshBar: drawBar,
+          /*
+           * Guarded rather than `drawBar` directly — see {@link confirmShowing}. A screen may ask
+           * for a redraw at any moment, and one of those moments is while § 3.4's question is
+           * standing where the row would be.
+           */
+          refreshBar: () => {
+            if (!confirmShowing) drawBar();
+          },
         };
         mounted = module.mount(screenRegion, context);
         return;
@@ -1132,11 +1085,6 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       dataHost = undefined;
       setCoveredInert(false);
       root.remove();
-      const engineer = options.engineerRoot;
-      if (engineer !== undefined) {
-        engineer.style.marginLeft = '';
-        engineer.style.width = '';
-      }
       doc.defaultView?.dispatchEvent(new Event('resize'));
     },
   };

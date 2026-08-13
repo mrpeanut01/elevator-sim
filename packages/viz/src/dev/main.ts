@@ -39,7 +39,11 @@
  * to reach, so it cannot be tested and it drifts.
  */
 
-import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
+import {
+  SimulationError,
+  type BuildingConfig,
+  type RunInterventionConfig,
+} from '@elevator-sim/core/browser';
 
 import {
   provideEngineerSettings,
@@ -2911,13 +2915,23 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
   }
 
-  interventionButton.addEventListener('click', () => {
-    if (state.recording === undefined || playback === undefined) return;
-    const atS = playback.simTimeS;
-    state = {
-      ...state,
-      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
-    };
+  /**
+   * § 1.4's *record growing*, in one place — the button below and the Everyday stage's control both
+   * land here.
+   *
+   * **`atS` is the caller's playhead rather than this shell's**, and that is what makes one
+   * implementation serviceable for two stages. The Engineer button passes its own transport's
+   * position; `everyday/stageScreen.ts` runs its own `Playback` over the same recording and passes
+   * *its* position, which is the instant the player was actually looking at. Reading `playback`
+   * here instead would stamp an Everyday intervention wherever this surface happened to be paused —
+   * a change filed at a moment nobody saw.
+   *
+   * A second copy of this in the host bindings would be two different runs from one press, which is
+   * the shape `docs/20` defect 17 already had to unpick once.
+   */
+  function interveneAt(atS: number, change: RunInterventionConfig['change']): void {
+    if (state.recording === undefined) return;
+    state = { ...state, interventions: [...state.interventions, { atS, change }] };
     renderAll();
     runShift(() => {
       // After adopt: the new Playback exists by the time a run lands, and seeking does not
@@ -2927,6 +2941,11 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // runCause}. Said here, at the site that appended to the log two statements up, because
       // intent exists nowhere else: the re-simulated recording is indistinguishable from a retry's.
     }, 'intervention');
+  }
+
+  interventionButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    interveneAt(playback.simTimeS, { kind: 'park-cars-lobby' });
   });
 
   /** The strip's two live facts: whether the control can act now, and the latest stamp. */
@@ -3282,8 +3301,12 @@ function boot(ui: Elements, resources: BrowserResources): void {
     dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,
     runIsOwn: () => state.recording !== undefined && state.recording === simulatedRecording,
     playerHasChosen: () => playerHasChosen,
+    dayStartS: () => runStartOfDayS,
     startRun: () => {
       context.runShift();
+    },
+    intervene: (atS, change) => {
+      interveneAt(atS, change);
     },
     closeDay: () => {
       closeShift();
