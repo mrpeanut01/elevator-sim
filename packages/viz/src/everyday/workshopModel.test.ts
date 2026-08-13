@@ -215,6 +215,26 @@ describe('the play styles are data, and the shelf is complete', () => {
     expect(lit(parked)).toEqual(['lobby-anchor']);
   });
 
+  /**
+   * The guarantee `schema.ts` deliberately does not make, made here instead.
+   *
+   * A style naming a profile the file does not declare is a card that cannot be pressed, and it
+   * would be a real defect in `data/`. It is checked here rather than in the schema for the
+   * reason that `superRefine`'s comment gives in full: rebuilding the dispatcher document around
+   * a **subset** of its profiles is idiomatic in this tree (a saved dispatcher, a worked example
+   * from `docs/06`), and a cross-file refinement refused every one of those with a message about
+   * the shipped library. `patternSwitching.weightSetsByPattern` is the same relationship and is
+   * unchecked in the schema for the same reason.
+   */
+  it('resolves every shipped style to a shipped profile', () => {
+    for (const style of FILE.playStyles ?? []) {
+      expect(
+        styleSelectionOf(FILE, style.id),
+        `play style "${style.id}" starts from "${style.profileId}", which this file does not declare`,
+      ).toBeDefined();
+    }
+  });
+
   it('resolves a card to a shipped profile and its two group settings', () => {
     const picked = styleSelectionOf(FILE, 'lobby-anchor');
     expect(picked?.profile.id).toBe('collective');

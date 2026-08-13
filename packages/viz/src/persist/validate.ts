@@ -900,18 +900,11 @@ function classIssue(entry: MachineClass, specs: ElevatorSpecs): string | undefin
  * check worth having rather than a shape assertion: `dispatcherProfilesSchema`'s `superRefine`
  * cross-checks every weight against the declared cost-term library, so a profile the player tuned
  * against a term this build has since removed is caught here and nowhere else.
- *
- * **`playStyles` is dropped, and that is not a convenience.** The same `superRefine` requires every
- * style to name a profile the document declares, and a document whose profile list is one saved
- * dispatcher declares none of the six — so carrying them would refuse every saved dispatcher in
- * the shelf with a message about `steady-hand`, which is a sentence about the shipped library and
- * not about the thing being checked. A one-profile document has no play styles, so it says so.
  */
 function dispatcherIssue(entry: SavedDispatcher, context: LibraryContext): string | undefined {
   try {
-    const { playStyles: _styles, ...file } = context.dispatcherProfiles;
     parseDispatcherProfiles(
-      { ...file, profiles: [entry.profile] },
+      { ...context.dispatcherProfiles, profiles: [entry.profile] },
       `your dispatcher “${entry.id}”`,
     );
     return undefined;

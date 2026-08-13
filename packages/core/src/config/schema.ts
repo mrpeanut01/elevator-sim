@@ -1025,18 +1025,26 @@ export const dispatcherProfilesSchema = z
   .superRefine((file, ctx) => {
     checkUniqueIds(file.terms, 'terms', ctx);
     checkUniqueIds(file.profiles, 'profiles', ctx);
-    if (file.playStyles !== undefined) {
-      checkUniqueIds(file.playStyles, 'playStyles', ctx);
-      const profileIds = new Set(file.profiles.map((profile) => profile.id));
-      file.playStyles.forEach((style, index) => {
-        if (profileIds.has(style.profileId)) return;
-        ctx.addIssue({
-          code: 'custom',
-          path: ['playStyles', index, 'profileId'],
-          message: `play style "${style.id}" starts from dispatcher "${style.profileId}", which this file does not declare. A style whose vector does not exist is a card that cannot be pressed.`,
-        });
-      });
-    }
+    /*
+     * Ids only. **Whether a style's `profileId` names a declared profile is deliberately not
+     * checked here**, and the precedent is `patternSwitching.weightSetsByPattern` twelve lines
+     * up, which is exactly the same relationship and is also unchecked: `config/parse.ts` warns
+     * `unknown-weight-set-profile` and `resolveWeightSets` throws at the point of use.
+     *
+     * It was checked here first, and three call sites showed why it cannot be. Rebuilding this
+     * document around a **subset** of its profiles is idiomatic in this tree —
+     * `persist/validate.ts` checks one saved dispatcher against the shipped term library,
+     * `tuning/space/docExamples.test.ts` loads every worked example in `docs/06` the same way —
+     * and under a cross-file refinement each of those refused with a message about `steady-hand`,
+     * which is a sentence about the shipped library and not about the thing being validated. A
+     * check that fires on documents nobody is making a claim about is a check that will be worked
+     * around.
+     *
+     * The guarantee is kept where it is a fact about `data/`: `everyday/workshopModel.test.ts`
+     * asserts every shipped style resolves to a shipped profile, and `styleSelectionOf` answers
+     * `undefined` for one that does not — an absence rather than a substitution.
+     */
+    if (file.playStyles !== undefined) checkUniqueIds(file.playStyles, 'playStyles', ctx);
     const termIds = new Set(file.terms.map((term) => term.id));
     const known = [...termIds].join(', ');
     file.profiles.forEach((profile, index) => {
