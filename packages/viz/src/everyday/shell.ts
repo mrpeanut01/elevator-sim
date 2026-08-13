@@ -73,7 +73,8 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
   '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
   '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out there, and mid-run it warns through § 3.4’s confirm strip, fed the run state by the data host',
   '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
-  '§ 9 Endless rush — no held time, no setup screen',
+  '§ 3.3’s Tune the tower is registered and routable, and no shipped control opens it: § 3.2 forbids a rail row (*a thing you do to a day, not a place you live*) and names its two doors as the brief’s *Take it to the sandbox* and the report’s third lever, neither of which is built',
+  '§ 9 Endless rush — the setup screen draws, and the climbing stream behind it does not exist, so its primary refuses; § 9.2’s held-time stage and § 9.3’s own result screen are unbuilt',
 ]);
 
 /**

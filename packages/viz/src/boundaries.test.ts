@@ -253,6 +253,12 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/fixitScreen.ts',
   /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
   'everyday/settingsScreen.ts',
+  /* The rush setup screen's DOM half — its ramp arithmetic and words stay in rushScreenModel.ts. */
+  'everyday/rushScreen.ts',
+  /* The drawing board's DOM half — its figures, steps and warnings stay in designerModel.ts. */
+  'everyday/designerScreen.ts',
+  /* The tuner's DOM half — its seven controls and their seams stay in tunerModel.ts. */
+  'everyday/tunerScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
 ]);

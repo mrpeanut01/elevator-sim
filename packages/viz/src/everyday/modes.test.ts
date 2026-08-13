@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
+import { rushBarModel, RUSH_PRIMARY_REFUSAL } from './rushScreenModel.js';
 import { isScreenBuilt } from './screens.js';
 import { EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
@@ -62,15 +64,18 @@ describe('a tile either reaches the simulation or says it does not', () => {
     }
   });
 
-  it('leaves exactly two modes playable — Today’s tower, and Fix a building since its screen landed', () => {
+  it('leaves three modes playable — the campaign is the one still waiting on its screens', () => {
     /*
      * Stated as a fact about this build rather than as a design intent. When another mode's
      * Everyday screens land, this case fails — which is the point: the menu's refusals and the tree
      * move together or the failure is visible here rather than on a player's screen. Fix a
-     * building's tile opened on the commit that registered `everyday/fixitScreen.ts`.
+     * building's tile opened on the commit that registered `everyday/fixitScreen.ts`; the rush's
+     * opened on the commit that registered `everyday/rushScreen.ts`, and *playable* there means
+     * § 9.1's setup screen opens — its § 3.3 primary is inert, which is a fact about the control
+     * and is asserted in `rushScreenModel.test.ts` rather than smuggled into this list.
      */
     const playable = EVERYDAY_MODES.filter(isPlayable).map((mode) => mode.title);
-    expect(playable).toEqual(["Today's tower", 'Fix a building']);
+    expect(playable).toEqual(["Today's tower", 'Endless rush', 'Fix a building']);
   });
 
   it('derives every tile’s availability from the screen registry, both ways', () => {
@@ -105,15 +110,23 @@ describe('a tile either reaches the simulation or says it does not', () => {
 });
 
 describe('the availability flags describe this tree, not a remembered one', () => {
-  it('says Endless rush is unbuilt, and there is still no rush module', () => {
-    const rush = EVERYDAY_MODES.find((mode) => mode.screen === 'rush');
-    expect(rush?.unavailable).toBeDefined();
+  it('opens Endless rush onto its setup screen, and keeps the refusal about the missing engine', () => {
     /*
-     * The refusal, checked against disk. If somebody builds `everyday/rush/` and leaves this tile
-     * saying *not built yet*, that is § D227's defect — a control telling a player not to touch
-     * something that now works — and this is the case that catches it.
+     * The direction this case used to run in was *the tile refuses, and there is still no rush
+     * module*. § 9.1's setup screen landed, so the tile opens — and the half that was true stays
+     * true and is asserted here rather than deleted: there is still no rush engine on disk, which
+     * is why `rushScreenModel.ts` marks the § 3.3 primary inert and publishes a register of what
+     * is missing. A tile that opened onto a screen with a live *Start the rush* over nothing would
+     * be the silently-does-nothing control this file exists to catch.
      */
-    expect(existsSync(`${SRC}rush`), 'a rush module exists but the tile still refuses').toBe(false);
+    const rush = EVERYDAY_MODES.find((mode) => mode.screen === 'rush');
+    expect(rush?.unavailable).toBeUndefined();
+    expect(existsSync(`${SRC}everyday/rushScreen.ts`)).toBe(true);
+    expect(existsSync(`${SRC}rush`), 'a rush engine exists but the primary still refuses').toBe(
+      false,
+    );
+    expect(RUSH_PRIMARY_REFUSAL).toMatch(/not built/);
+    expect(rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' })).primary.inert).toBe(true);
   });
 
   it('does not claim the campaign is missing — only its Everyday screens are', () => {

@@ -212,8 +212,17 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
           .filter((tile) => tile instanceof HTMLButtonElement && tile.disabled)
           .map((tile) => tile.textContent ?? ''),
       );
-      // Two, since the fixit screen landed: the campaign and the rush still refuse.
-      expect(refusals).toHaveLength(2);
+      /*
+       * One, since § 9.1's rush setup screen landed beside the fixit screen: the campaign is the
+       * only tile left refusing, and it refuses about its **screens** rather than about its engine
+       * — `campaign/` and `commissioning/` both run.
+       *
+       * The rush tile now opens onto a screen whose § 3.3 primary is inert, which is the same
+       * honesty one level in: a refusal about a missing engine belongs on the control that cannot
+       * act once the screen in front of it is real. `standaloneScreens.browser.test.ts` is where
+       * that disabled primary is asserted, so this case is not quietly covering two claims.
+       */
+      expect(refusals).toHaveLength(1);
       // Not a greyed tile with nothing on it — the handoff's definition of done requires the words.
       for (const refusal of refusals) expect(refusal).toMatch(/not built yet/);
     } finally {
