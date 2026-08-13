@@ -101,8 +101,15 @@ const AA_BODY = 4.5;
  *
  * **Two lanes each counted their own addition and each wrote 18; the integrated page holds
  * both.** The number below is measured on the merged tree rather than reasoned from either.
+ *
+ * **Twenty since `docs/21` § 3.6's family controls landed** — `dispatcherEditor.ts`'s
+ * `FAMILY_SCOPE_NOTE`, the `.advice` above the thirty-seven generated controls, which says they
+ * write the same draft the weights do. It is drawn only while `scope/surface.ts` still declares
+ * that commitment (L-7's failure direction is silence), so this pin is a fact about a page whose
+ * scope table declares it — which every shipped tree does, and the two lines above say why a pin
+ * rather than a floor. Measured on this branch; the integrated figure is the integration lane's.
  */
-const NOTES_ON_THE_PAGE = 19;
+const NOTES_ON_THE_PAGE = 20;
 
 /** One paragraph as the browser resolved it. */
 interface Measured {

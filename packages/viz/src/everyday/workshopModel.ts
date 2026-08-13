@@ -106,11 +106,9 @@ import {
   leverRowsOf,
   shortTermNameOf,
   termRowsOf,
-  unauthorableBlocksOf,
   type FlagRow,
   type LeverRow,
   type TermRow,
-  type UnauthorableBlock,
 } from '../dev/dispatcherEditor.js';
 import { plainLeversOf, type PlainLeverView } from '../mode/plainLevers.js';
 
@@ -523,16 +521,32 @@ export function constraintCardsOf(profile: DispatcherProfile | undefined): reado
 }
 
 /**
+ * The blocks a profile can carry that this workshop draws no control for.
+ *
+ * Its own union rather than `dispatcherEditor.ts#UnauthorableBlock`, because the two screens ask
+ * different questions and the shared name hid that — see {@link carriedBlocksOf}. A member leaves
+ * here on the commit that draws its family, never before.
+ */
+export type WorkshopCarriedBlock =
+  | 'auction'
+  | 'zoning'
+  | 'panel'
+  | 'reassignment'
+  | 'timing'
+  | 'constraints'
+  | 'selection';
+
+/**
  * The Casual sentence for each block a profile can carry that this workshop has no control for.
  *
- * A table keyed by a **closed union declared in this package**, not by an engine id — so it is not
- * the §6.3 shape: `UnauthorableBlock` gaining a member is a compile error here, where a profile
- * gaining a section is not. The sentences exist because the alternative is worse in both
+ * A table keyed by a **closed union declared in this module**, not by an engine id — so it is not
+ * the §6.3 shape: {@link WorkshopCarriedBlock} gaining a member is a compile error here, where a
+ * profile gaining a section is not. The sentences exist because the alternative is worse in both
  * directions: printing the union's own members would put `auction` and `panel` on a Casual surface
  * (rule 11), and printing nothing would be §D227's silent partial editor, which
- * `unauthorableBlocksOf` exists to refuse.
+ * {@link carriedBlocksOf} exists to refuse.
  */
-const CARRIED_BLOCK_WORDS: Readonly<Record<UnauthorableBlock, string>> = Object.freeze({
+const CARRIED_BLOCK_WORDS: Readonly<Record<WorkshopCarriedBlock, string>> = Object.freeze({
   auction: 'the cars bid against each other for the call, over more than one round',
   zoning: 'a crowd size above which the tower is split between the cars',
   panel: 'the landing panel tells each rider which car to stand at',
@@ -544,25 +558,51 @@ const CARRIED_BLOCK_WORDS: Readonly<Record<UnauthorableBlock, string>> = Object.
 
 /** One carried-but-not-drawn block, in words. */
 export interface CarriedBlock {
-  readonly block: UnauthorableBlock;
+  readonly block: WorkshopCarriedBlock;
   readonly words: string;
 }
 
 /**
- * What this dispatcher carries that the workshop cannot draw — `unauthorableBlocksOf`'s list, said
- * in Casual words.
+ * What this dispatcher carries that **this workshop** cannot draw, said in Casual words.
  *
- * The list is derived from the profile rather than from its `role`, which is `dispatcherEditor.ts`'s
- * own decision and its own reason (three shipped profiles declare no role while carrying exactly
- * these blocks). Empty for most of the shelf; non-empty is the honest half of *full capability* —
- * the workshop says what it is not showing rather than letting a reader believe the screen is the
- * document.
+ * ## Why the list is derived here rather than borrowed
+ *
+ * It used to call `dispatcherEditor.ts#unauthorableBlocksOf`, and that was right while the two
+ * screens could draw the same seven blocks: neither authored them, so one list answered both.
+ * `dev/familyControls.ts` then made six of the seven authorable **in the Engineer editor**, and that
+ * function narrowed to `selection` alone — correctly, for its own screen.
+ *
+ * The workshop imports none of those controls. So the borrowed list stopped meaning *what this
+ * screen is not showing* and started meaning *what the other screen is not showing*, and the two
+ * had quietly become different questions. Left alone, a Casual player editing `auction-multi-round`
+ * — which declares an auction and no selection — would have been told nothing at all, on the one
+ * disclosure whose entire job is to say what the screen is leaving out. § D227, arriving through a
+ * merge rather than through an edit, on a surface neither lane changed.
+ *
+ * The derivation below is the one that function carried before it narrowed, and it stays here until
+ * the workshop draws these families itself — at which point a block leaves this list on the commit
+ * that draws it, which is the same rule the register it came from applies one screen over.
+ *
+ * Derived from the profile rather than from its `role`, because `role` is free-form and three of the
+ * thirteen shipped profiles declare none while carrying exactly these blocks. Empty for most of the
+ * shelf; non-empty is the honest half of *full capability* — the workshop says what it is not
+ * showing rather than letting a reader believe the screen is the document.
  */
 export function carriedBlocksOf(profile: DispatcherProfile | undefined): readonly CarriedBlock[] {
+  if (profile === undefined) return Object.freeze([]);
+  const dispatch = profile.dispatch;
+  const found: WorkshopCarriedBlock[] = [];
+  if (profile.auction !== undefined) found.push('auction');
+  if (dispatch?.splitThresholdPassengers !== undefined) found.push('zoning');
+  if (dispatch?.passengerAssignment !== undefined) found.push('panel');
+  if (dispatch?.reassignmentPolicy !== undefined) found.push('reassignment');
+  if (dispatch?.assignmentTiming !== undefined) found.push('timing');
+  if (profile.hardConstraints !== undefined || profile.eligibility !== undefined) {
+    found.push('constraints');
+  }
+  if (profile.selection !== undefined) found.push('selection');
   return Object.freeze(
-    unauthorableBlocksOf(profile).map((block) =>
-      Object.freeze({ block, words: CARRIED_BLOCK_WORDS[block] }),
-    ),
+    found.map((block) => Object.freeze({ block, words: CARRIED_BLOCK_WORDS[block] })),
   );
 }
 

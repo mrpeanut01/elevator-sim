@@ -124,10 +124,14 @@ const PUBLIC_API_ONLY: Readonly<Record<string, string>> = Object.freeze({
 'traffic/passengersPer5Min': 'converts a rate; the handling-capacity unit CIBSE reports in',
 'traffic/inReportWindow': 'reads a template and an instant',
 
-// -- Documented constants. `CLOSED_FORM_*` are the Barney/CIBSE assumptions and the comparison rule
-// the oracle is judged by; `AWT_INVALID_GROUNDS` is the suppression-ground list § D108 fixed at
-// four and docs/14 § 3.1 widened to five.
-'analytical/CLOSED_FORM_ASSUMPTIONS': 'the oracle contract, quoted by docs and asserted by tests',
+// -- Documented constants. `CLOSED_FORM_COMPARISON_RULE` is the rule the oracle is judged by;
+// `AWT_INVALID_GROUNDS` is the suppression-ground list § D108 fixed at four and docs/14 § 3.1
+// widened to five.
+//
+// `CLOSED_FORM_ASSUMPTIONS` **left this list** when `dev/rightRail.ts` began citing it on the
+// building plate's closed-form row (`docs/21` § 3.7 (1), § D337): the row states its own basis by
+// counting the declared simplifications and naming the first, so the constant has a shipped reader
+// and an allowlist entry for it would be the decoration this file's own message warns about.
 'analytical/CLOSED_FORM_COMPARISON_RULE': 'the oracle contract, quoted by docs and asserted by tests',
 'metrics/AWT_INVALID_GROUNDS': 'the suppression grounds; consumed as a set by guards',
 

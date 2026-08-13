@@ -306,6 +306,15 @@ import {
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
 import {
+  FAMILY_ELSEWHERE,
+  FAMILY_EYEBROW,
+  FAMILY_NOTE,
+  FLAG_OWNED,
+  SELECTION_REFUSAL,
+  familyControlsViewOf,
+  familyPartitionOf,
+} from '../dev/familyControls.js';
+import {
   RULES_EXCLUSIVITY_NOTE,
   defaultRuleRow,
   fallbackLineOf,
@@ -3519,6 +3528,7 @@ const AUTHORING: SurfaceAdapter = {
         spec: {
           name: 'My dispatcher',
           weights: { rideTime: 50, waitTime: 100 },
+          families: {},
           flags: { pool: false, zone: false, bypass: true },
         },
       },
@@ -7841,6 +7851,139 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       }
     }
 
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The dispatcher editor's family controls — `docs/21` § 3.6, `dev/familyControls.ts`.
+ *
+ * What is new here and not already in `CONTROLS` is the **frame** around the generated controls:
+ * the block titles, the per-block *Read by …* line naming the non-test caller, the status count,
+ * the sentence about the two dimensions that live on a flag instead, and the override notes that
+ * say a control below is outranked by a switch above. The controls themselves are `CONTROLS`'s and
+ * are not re-seeded here; what is seeded is what this panel adds.
+ *
+ * Driven over four states rather than one, because three of the strings only exist in some of them:
+ * a profile with no zoning draws no zoning override, a profile with a dwell chip pressed draws
+ * three, and the gate reason on `dispatch.passengerAssignment` only appears while the destination
+ * flag is off. The refusal is seeded as a constant because it is drawn by the register's own node
+ * (`unauthorableBlocksOf` → `UNAUTHORABLE_COPY`) rather than by the block's view — one string, one
+ * author, two readers.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`.
+ */
+const FAMILY_CONTROLS: SurfaceAdapter = {
+  id: 'dev/familyControls.ts#familyControlsViewOf',
+  covers: [
+    'dev/familyControls.ts#familyControlsViewOf',
+    'dev/familyControls.ts#familyOverridesOf',
+    'dev/familyControls.ts#familyPartitionOf',
+    'dev/familyControls.ts#FAMILY_TITLES',
+    'dev/familyControls.ts#FAMILY_CALLERS',
+    'dev/familyControls.ts#FAMILY_DIMENSIONS',
+    'dev/familyControls.ts#FAMILY_EYEBROW',
+    'dev/familyControls.ts#FAMILY_NOTE',
+    'dev/familyControls.ts#FAMILY_ELSEWHERE',
+    'dev/familyControls.ts#FLAG_OWNED',
+    'dev/familyControls.ts#SELECTION_REFUSAL',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const space = context.space;
+
+    /*
+     * The refusal, and the two sentences that are true of the panel however it is configured. Each
+     * is seeded once — a constant repeated per profile would put thirteen copies of one sentence in
+     * front of R13's frequency clause and say nothing new about any of them.
+     */
+    seeds.push({ field: 'SELECTION_REFUSAL', text: SELECTION_REFUSAL, role: 'reason' });
+    seeds.push({ field: 'FAMILY_NOTE', text: FAMILY_NOTE, role: 'prose' });
+    seeds.push({ field: 'FAMILY_ELSEWHERE', text: FAMILY_ELSEWHERE, role: 'reason' });
+    seeds.push({ field: 'FAMILY_EYEBROW', text: FAMILY_EYEBROW, role: 'label' });
+    for (const id of FLAG_OWNED) {
+      seeds.push({ field: `FLAG_OWNED.${id}`, text: id, role: 'label', provenance: 'schema' });
+    }
+    /*
+     * The partition, as words. `unaccounted` is what the block would have to say if a schema row
+     * landed in no family — it is empty on every shipped tree and is seeded anyway, because the
+     * sentence a surface prints when something is missing is exactly the one nobody drives.
+     */
+    const partition = familyPartitionOf(space);
+    seeds.push({
+      field: 'familyPartitionOf.unaccounted',
+      text:
+        partition.unaccounted.length === 0
+          ? ''
+          : `${String(partition.unaccounted.length)} declared dimensions are drawn by no control: ${partition.unaccounted.join(', ')}`,
+      role: 'reason',
+    });
+
+    const states: readonly {
+      readonly label: string;
+      readonly profileId: string;
+      readonly levers: typeof DEFAULT_LEVERS;
+      readonly zone: boolean;
+    }[] = [
+      { label: 'as-authored', profileId: '', levers: DEFAULT_LEVERS, zone: false },
+      { label: 'zoned', profileId: '', levers: DEFAULT_LEVERS, zone: true },
+      {
+        label: 'dwell-pressed',
+        profileId: '',
+        levers: { ...DEFAULT_LEVERS, dwell: DWELL_CHOICES[0] },
+        zone: false,
+      },
+      {
+        label: 'parked',
+        profileId: '',
+        levers: { ...DEFAULT_LEVERS, parking: true },
+        zone: false,
+      },
+    ];
+
+    for (const profile of context.profiles) {
+      const base = profile as unknown as Parameters<typeof specFromProfile>[0];
+      const read = specFromProfile(base, base.name);
+      for (const state of states) {
+        const spec: DispatcherSpec = {
+          ...read,
+          families: {},
+          flags: { ...read.flags, zone: state.zone || read.flags.zone },
+        };
+        const draft = profileFromSpec(spec, { id: 'honesty', base, levers: state.levers });
+        const view = familyControlsViewOf({
+          space,
+          spec,
+          levers: state.levers,
+          draft,
+          base,
+        });
+        const at = `${base.id}.${state.label}`;
+        seeds.push({ field: `${at}.status`, text: view.status, role: 'observation' });
+        for (const block of view.blocks) {
+          seeds.push({ field: `${at}.${block.family}.title`, text: block.title, role: 'label' });
+          /*
+           * The caller line is the panel's own claim about the code — *this block is read by X* —
+           * so it is an observation rather than a label. If it ever names something that is not a
+           * caller, that is a false statement on a player-facing surface and it belongs in front of
+           * the same properties every other claim here does.
+           */
+          seeds.push({
+            field: `${at}.${block.family}.caller`,
+            text: block.caller,
+            role: 'observation',
+          });
+          for (const row of block.rows) {
+            if (row.overriddenBy === undefined) continue;
+            seeds.push({
+              field: `${at}.${block.family}.${row.control.id}.overriddenBy`,
+              text: row.overriddenBy,
+              role: 'reason',
+            });
+          }
+        }
+      }
+    }
 
     return singleRun(this.id, seeds);
   },
@@ -9326,6 +9469,21 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    */
   EVERYDAY_WORKSHOP,
   EVERYDAY_BENCH,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT: `docs/21` § 3.6's family
+   * controls.
+   *
+   * Its branch's note read *"re-renders nothing another adapter draws, but the rule is about
+   * position, and the position for a new adapter is the end"* — and the second clause is why the
+   * first one not surviving the merge costs nothing. That branch did not carry § 11's workshop,
+   * which now seeds the dispatcher library's term rows and cost line two entries above; whether
+   * this panel's block frame shares a wording with any of them is **unmeasured here**, and the
+   * end of the array is the position that does not require it to be measured.
+   *
+   * The claim is therefore withdrawn rather than restated. What is left is the rule, which was
+   * always the load-bearing half.
+   */
+  FAMILY_CONTROLS,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
