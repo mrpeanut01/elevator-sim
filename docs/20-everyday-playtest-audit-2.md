@@ -102,7 +102,7 @@ Canvas subtitle and `#frame-description` both name the dispatcher **`yours-1`** 
 
 **13. POLISH — The dispatcher editor's left column is a large empty white void** once you scroll to the rules section — half the panel width, nothing in it. `46-rule-added.png`.
 
-**14. POLISH — Progress is written on a delay.** Pressing *Open the doors on Tuesday* and reloading ~1 s later restored **Day 1**; the same action with a 6 s pause restored Day 2 correctly. A player who closes the tab after taking tomorrow loses the day.
+**14. POLISH — ~~Progress is written on a delay.~~** Pressing *Open the doors on Tuesday* and reloading ~1 s later restored **Day 1**; the same action with a 6 s pause restored Day 2 correctly. A player who closes the tab after taking tomorrow loses the day. **Closed.** There was no timer to remove — the delay was the distance from the press to the next incidental save, which is `closeShift` at the end of the day the press had just started. `MountContext.update` now writes the session synchronously on any patch that moves the week (`persist/session.ts#patchMovesTheWeek`, the second predicate at issue #113 § 2's choke point), and `persist.test.ts` pins the predicate against the exact patch the next-day press sends plus the wiring line that asks it.
 
 **15. POLISH — The bench suite has no scannable summary.** Two cells at n = 10 produce 17.8 k characters of prose; per-cell verdicts are only findable by reading. Identical arms print *"interval [0.00, 0.00], crossing zero"* on all nine measures and the copy still says *"not the same as the two settings being identical"* — true, but it reads as evasion when every delta is exactly zero.
 

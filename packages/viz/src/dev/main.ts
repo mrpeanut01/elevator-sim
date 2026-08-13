@@ -214,6 +214,7 @@ import {
   clearSession,
   loadLibrary,
   loadSession,
+  patchMovesTheWeek,
   patchTouchesLibrary,
   saveSession,
 } from '../persist/session.js';
@@ -2904,8 +2905,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * *the library moved* is a fact rather than a convention each editor has to remember. See
        * {@link patchTouchesLibrary} for why no debounce is needed: the hot patches — a slider drag
        * writing `dispatcherSpec` — do not touch a shelf, and the ones that do are button presses.
+       *
+       * **And the week is written the moment it moves** — `docs/20` defect 14, the same defect
+       * about the campaign's progress instead of its library. *Open the doors on tomorrow*
+       * advanced the week here and the advanced day did not reach `localStorage` until the end of
+       * the day the press started, so a tab closed a second after the press lost it. Same fix,
+       * same choke point, second predicate — {@link patchMovesTheWeek} holds the census of the
+       * three sites that patch a week and why none of them is hot, and § D231's `weeksForSession`
+       * still decides *what* gets written on every save this triggers.
        */
-      if (patchTouchesLibrary(patch)) saveSessionNow();
+      if (patchTouchesLibrary(patch) || patchMovesTheWeek(patch)) saveSessionNow();
       renderAll();
     },
     runShift(onRan) {
