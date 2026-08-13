@@ -30,6 +30,7 @@
 
 import '../dev/main.js';
 
+import { EVERYDAY_HOST } from './host.js';
 import { mountEverydayShell, type EverydayShell } from './shell.js';
 
 /**
@@ -163,6 +164,12 @@ export function bootEveryday(doc: Document): EverydayShell {
   closeEngineerMenuWhenReady(doc);
   return mountEverydayShell(doc, {
     engineerRoot,
+    /*
+     * The data host's slot — `dev/main.ts` publishes into it at the end of its own boot, which is
+     * strictly after this mount (its `main()` is async and this file runs synchronously after the
+     * side-effect import above). The shell handles both orders; see `EverydayShellHost.host`.
+     */
+    host: EVERYDAY_HOST,
     /*
      * The belt to `closeEngineerMenuWhenReady`'s brace, and the place its failure is reported: by
      * here the menu should long since be closed, so a `false` means the Resume row never arrived and
