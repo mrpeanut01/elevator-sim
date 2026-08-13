@@ -237,7 +237,7 @@ export interface DispatcherCard {
  *
  * #100 says the cards *"show raw weighted-cost notation such as `cost = 1.00 times wait`"*. Driven
  * over all thirteen shipped profiles, **no card on this rail has ever printed that**: the string it
- * describes is `authoring/dispatcherSpec.ts#weightSummaryOf`'s `cost = 1.00·wait + 0.30·starvation`,
+ * describes is `authoring/dispatcherSpec.ts#costFunctionLine`'s `cost = 1.00·wait + 0.30·starvation`,
  * which belongs to the dispatcher **editor**. Recorded as not reproduced rather than fixed here.
  *
  * #110's quotation is exact, and it is this file's:
@@ -341,16 +341,24 @@ export function dispatcherCardOf(
  * property {@link dispatcherBlurbOf} was rewritten to have: a reader's own profile weighting all
  * thirteen terms is the worst case and it is a known one.
  *
- * ## What is *not* derived, and is therefore not said
+ * ## What this card still does not say, and why that is now a gap rather than a refusal
  *
- * There is no plain-language name for `noDirectionReversal`. `core` declares one —
- * `dispatch/parameters.ts`'s `constraints.noDirectionReversal` carries a 350-character description
- * under CLAUDE.md invariant 8 — and it is engineer prose written for an optimizer's schema, not a
- * card. Translating it here would be a taxonomy maintained in a renderer, which
- * {@link dispatcherFamilyOf} refuses two functions up for exactly this reason. So the card says what
- * a hard constraint **is** — a filter no weight can buy past — and names the id verbatim, which is
- * true of every id including one this build has never heard of. A player-facing name per constraint
- * belongs beside the constraint, in `core`'s parameter schema, and is not invented here.
+ * This card names `noDirectionReversal` verbatim, under a sentence saying what a hard constraint
+ * **is** — a filter no weight can buy past — which is true of every id including one this build has
+ * never heard of. That used to be a *refusal*: the only prose `core` carried per constraint was
+ * `dispatch/parameters.ts`'s 350-character optimizer-schema description, written under CLAUDE.md
+ * invariant 8 for a search rather than for a person, and translating it in a renderer would be the
+ * taxonomy {@link dispatcherFamilyOf} refuses two functions up for exactly this reason.
+ *
+ * **The refusal's ground is gone.** `core` now declares player-facing words beside the constraint —
+ * `dispatch/types.ts#HARD_CONSTRAINT_WORDS`, surfaced on the schema row as
+ * `DISPATCH_PARAMETERS['constraints.noDirectionReversal'].player` — which is the fix
+ * [#147](https://github.com/mrpeanut01/elevator-sim/issues/147) asked for, in the place it named.
+ * `everyday/workshopModel.ts#constraintCardsOf` reads them, with the honest fallback for a
+ * constraint this build cannot name. This rail card does not read them **yet**, so #147 stays open
+ * on the surface it names, and this paragraph is a gap with an owner rather than a sentence telling
+ * the next reader not to try. Per § D227, a refusal is pinned by a run and never by another
+ * sentence; when the ground under one moves, the sentence moves with it.
  */
 export function dispatcherBehaviourOf(
   profile: DispatcherProfile,
