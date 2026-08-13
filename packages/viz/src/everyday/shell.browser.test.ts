@@ -235,23 +235,37 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('says why each mode it cannot open does not open', async () => {
+  it('leaves no mode tile refusing, and every one of the four takes a click', async () => {
     const page = await coldLoad();
     try {
-      const refusals = await page.evaluate(() =>
+      const tiles = await page.evaluate(() =>
         [...document.querySelectorAll('.everyday-mode')]
-          .filter((tile) => tile instanceof HTMLButtonElement && tile.disabled)
-          .map((tile) => tile.textContent ?? ''),
+          .filter((tile): tile is HTMLButtonElement => tile instanceof HTMLButtonElement)
+          .map((tile) => ({
+            screen: tile.getAttribute('data-screen') ?? '',
+            disabled: tile.disabled,
+            text: tile.textContent ?? '',
+          })),
       );
       /*
-       * One, since GAMEPLAY § 8's three campaign screens landed: only the rush still refuses, and
-       * it is the one tile with nothing behind the screen either — no held-time clock and no rush
-       * module. A tile that stayed refused over a mode whose screens exist is § D227's defect, so
-       * this count moves on the commit that opens a mode and on no other.
+       * **Zero, since § 9.1's rush setup screen landed beside § 8's three.** The count was one on
+       * each incoming branch and for a different reason on each — the campaign on one, the rush on
+       * the other — which is why it is stated as a fact about *this* tree and re-derived rather than
+       * merged: neither branch's number was right here.
+       *
+       * A count of zero would be a weak case on its own, so the claim is the pair rather than the
+       * count: four tiles, none disabled, and none carrying a refusal it can no longer mean. A tile
+       * that stayed refused over a mode whose screens exist is § D227's defect and fails the second
+       * assertion; a tile that vanished rather than opening fails the first.
+       *
+       * The rush's own missing engine has not gone anywhere — its § 3.3 primary is drawn inert with
+       * the refusal on it, which is that honesty one level in, and
+       * `standaloneScreens.browser.test.ts` is where that disabled primary is asserted. This case
+       * deliberately does not cover it.
        */
-      expect(refusals).toHaveLength(1);
-      // Not a greyed tile with nothing on it — the handoff's definition of done requires the words.
-      for (const refusal of refusals) expect(refusal).toMatch(/not built yet/);
+      expect(tiles.map((tile) => tile.screen)).toEqual(['door', 'towers', 'rush', 'fixit']);
+      expect(tiles.filter((tile) => tile.disabled)).toEqual([]);
+      for (const tile of tiles) expect(tile.text, tile.screen).not.toMatch(/not built/);
     } finally {
       await page.close();
     }
@@ -359,36 +373,45 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('captions every refusing rail row with the registry’s own sentence — drawn, not a tooltip', async () => {
+  it('leaves no rail row captioned with a refusal, because every screen behind the rail is built', async () => {
     const page = await coldLoad();
     try {
       /*
-       * No player control reaches an unbuilt screen today — every row and tile that would is
-       * disabled — so what a player actually meets is the caption on the disabled row, and the
-       * claim under test is the § D227 guarantee: the rail refuses in the registry's sentence,
-       * as words on the row, never as a `title` attribute nobody hovers.
+       * **This case has run out of refusing rows, and that is the result rather than a gap in it.**
+       *
+       * It used to pin both directions of § D227's pair on the page: `Design a building` disabled
+       * and captioned *the designer screen is not built*, beside the workshop and the bench opening
+       * because their screens had landed. § 13's drawing board is registered on this merge, so the
+       * refusing half has no row left to be asserted on — and repointing it at another label is not
+       * available either, since `UNBUILT_REASONS` is now empty and no rail row refuses at all.
+       *
+       * So the browser tier asserts the half a page can still show — every row opens, and none
+       * carries a caption it can no longer mean — and the half that needs an unbuilt screen moves to
+       * where it can be exercised without one: `rail.test.ts` derives both directions from the
+       * registry and fails on the first row whose refusal and registration disagree. That is a
+       * weaker page claim honestly stated, not a claim quietly dropped.
        */
+      const rows = await page.evaluate(() =>
+        [...document.querySelectorAll('nav.everyday-rail button')]
+          .filter((row): row is HTMLButtonElement => row instanceof HTMLButtonElement)
+          .map((row) => ({ disabled: row.disabled, text: row.textContent ?? '' })),
+      );
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.filter((row) => row.disabled)).toEqual([]);
+      for (const row of rows) expect(row.text, row.text).not.toContain('not built');
+
+      // And the rows the previous version of this case named, still by name: what moved is which
+      // side of the pair they are on, and `Design a building` is the one that moved on this merge.
       const rowFor = async (label: string) =>
         page.evaluate((wanted) => {
-          const rows = [...document.querySelectorAll('.everyday-rail button')];
-          const found = rows.find((r) => (r.textContent ?? '').includes(wanted));
+          const found = [...document.querySelectorAll('nav.everyday-rail button')].find((r) =>
+            (r.textContent ?? '').includes(wanted),
+          );
           return found instanceof HTMLButtonElement
             ? { disabled: found.disabled, text: found.textContent ?? '' }
             : null;
         }, label);
-
-      const designer = await rowFor('Design a building');
-      expect(designer?.disabled).toBe(true);
-      expect(designer?.text).toContain('the designer screen is not built');
-
-      /*
-       * And the other direction, which is the half § D227 is about and the half that moved: the
-       * workshop and the bench landed and left `UNBUILT_REASONS` on the same commit, so their
-       * rows open and carry no refusal. The subject of this case is the pair *refuses ⇔ unbuilt*,
-       * so it is asserted both ways rather than repointed at whichever screen is unbuilt today —
-       * the same move the Settings case above made when § 15.1 landed.
-       */
-      for (const label of ['Dispatcher workshop', 'Test bench']) {
+      for (const label of ['Design a building', 'Dispatcher workshop', 'Test bench']) {
         const row = await rowFor(label);
         expect(row?.disabled, label).toBe(false);
         expect(row?.text, label).not.toContain('not built');

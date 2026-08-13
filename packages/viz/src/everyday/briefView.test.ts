@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { briefScreenViewOf, GHOST_REFUSAL, lockedForScore, RECOMMENDED_CARDS } from './briefView.js';
-import { UNBUILT_REASONS } from './screens.js';
+import { isScreenBuilt } from './screens.js';
 import type { TodayRecord } from './today.js';
 
 const TODAY: TodayRecord = {
@@ -110,17 +110,40 @@ describe('the two cards this build states rather than offers', () => {
     expect(GHOST_REFUSAL.caveat).toBe('One day each is a race, not proof. The test bench settles it properly.');
   });
 
-  it('refuses the sandbox in `screens.ts`’ own words, so the two surfaces refuse once', () => {
+  it('opens the sandbox rather than refusing it, because § 3.3’s tuner is built', () => {
+    /*
+     * **This case used to assert the opposite**, and the way it did is the finding rather than the
+     * copy. It read `expect(card.why).toContain(UNBUILT_REASONS.tuner)` beside a card built with
+     * `` `…${UNBUILT_REASONS.tuner ?? 'the tuner screen is not built'}` `` — so on the merge that
+     * registered `everyday/tunerScreen.ts` the key vanished, the card's `??` fallback took over,
+     * and this assertion would have compared a string against `undefined`. Neither half would have
+     * said the true thing: the card refuses a screen a player can open (§ D227), and the test can
+     * only notice by accident.
+     *
+     * So the pair is asserted against the **registry**, both ways, which is the thing that actually
+     * decides it: built ⇒ a door and no refusal; unbuilt ⇒ the registry's own sentence and no door.
+     */
     const card = lockedForScore();
-    expect(card.why).toContain(UNBUILT_REASONS.tuner);
+    expect(isScreenBuilt('tuner')).toBe(true);
+    expect(card.door).toEqual({ label: 'Take it to the sandbox', screen: 'tuner' });
+    expect(card.why).toContain('Take it to the sandbox');
+    expect(card.why).not.toMatch(/not built/);
   });
 
-  it('resolves the tuner refusal at call time, so an import cycle cannot make it `undefined`', () => {
-    // `screens.ts` imports this screen's module, which imports this file — a module-level read
-    // resolves to `undefined` on whichever file the cycle is entered second. `types.ts`'s
-    // `ENGINEER_SWAP_REFUSAL` docstring is that defect's own history, one directory over.
+  it('carries no refusal sentence it could not have produced — the `??` fallback is gone', () => {
+    /*
+     * `screens.ts` imports this screen's module, which imports this file — a module-level read
+     * resolves to `undefined` on whichever file the cycle is entered second. `types.ts`'s
+     * `ENGINEER_SWAP_REFUSAL` docstring is that defect's own history, one directory over, and it is
+     * why `lockedForScore` is a function. The consequence is now stronger than *not `undefined`*:
+     * the refusing arm calls `unbuiltReasonFor`, which **throws** on a built key, so a card that
+     * refused today could not have been constructed at all.
+     */
     expect(lockedForScore().why).not.toContain('undefined');
     expect(viewOf().locked.why).not.toContain('undefined');
+    expect(viewOf().locked.door?.screen).toBe('tuner');
+    // The ghost is the other shape and stays it: a refusal with nowhere to send anybody.
+    expect(GHOST_REFUSAL.door).toBeUndefined();
   });
 });
 

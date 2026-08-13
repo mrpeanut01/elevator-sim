@@ -244,7 +244,34 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/workshopScreen.ts#WORKSHOP_SCREEN',
         'everyday/benchScreen.ts#BENCH_SCREEN',
+        /*
+         * The three standalone Everyday screens (GAMEPLAY § 9.1, § 13 and § 3.3 over § 18), on the
+         * mounts' shared ground and on the same split every other screen in this group sits on.
+         * Each draws into the shell's scroll region, so none can run without a document; each has a
+         * pure half — `everyday/rushScreenModel.ts`, `everyday/designerModel.ts`,
+         * `everyday/tunerModel.ts` — and the `EVERYDAY_STANDALONE_SCREENS` adapter drives all
+         * three, over both arms of everything with two: a sized design and a refused one, a class
+         * the drawing fits and one it is past, a tuner with nothing moved and one with something.
+         * What is left here is what the mounts author of their own: the designer's saved-and-run
+         * confirmation, which quotes the allocated id, and its catch, which quotes the loader's own
+         * refusal rather than paraphrasing it. Both reach the static sweep below, which is weaker
+         * than driving them and is stated as a limitation.
+         */
+        'everyday/rushScreen.ts#RUSH_SCREEN',
+        'everyday/designerScreen.ts#DESIGNER_SCREEN',
+        'everyday/tunerScreen.ts#TUNER_SCREEN',
       ],
+    },
+    {
+      reason:
+        'The Everyday data façade. Its methods hand back plain data the screens word; the only ' +
+        'literals it authors are the two fallback names a save allocates when the reader typed ' +
+        'nothing — `My pattern`, beside `dev/trafficEditor.ts`’s identical one — and those are ' +
+        'identifiers in a list, not claims about a run. Every sentence a player reads about a ' +
+        'building or a pattern is authored by the screen that draws it, and those screens’ pure ' +
+        'halves are driven. `HOST_PENDING_REASON` is the one sentence this module does put on a ' +
+        'screen, and it is driven by `EVERYDAY_MENU` rather than excluded here.',
+      ids: ['everyday/host.ts#createEverydayHost'],
     },
     {
       reason:

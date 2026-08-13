@@ -348,7 +348,16 @@ function mountBrief(
     return column;
   }
 
-  /** A § 6.2 card this build states rather than offers — what it would be, why it is not, the caveat. */
+  /**
+   * A § 6.2 card this build states rather than draws as a live control — what it would be, why it
+   * is not here (or what taking it costs), the caveat, and the door when it has one.
+   *
+   * The button is drawn from `BriefRefusalCard.door` and from nothing else, so *which* screen this
+   * card opens, and whether it opens one at all, is `briefView.ts#lockedForScore`'s decision taken
+   * against the screen registry. A `context.go('tuner')` written here would be this file holding a
+   * second opinion about whether that screen exists — which is the shape the fuse that card's
+   * docstring describes was made of.
+   */
   function refusalCard(card: BriefRefusalCard, className: string): HTMLElement {
     const root_ = el(doc, 'div', className);
     root_.style.cssText = `${WELL};display:grid;gap:6px`;
@@ -361,6 +370,26 @@ function mountBrief(
     const caveat = el(doc, 'p', undefined, card.caveat);
     caveat.style.cssText = `${QUIET};margin:0`;
     root_.append(heading, what, why, caveat);
+    const { door } = card;
+    if (door !== undefined) {
+      const button = el(doc, 'button', `${className}-go`, door.label);
+      button.type = 'button';
+      button.style.cssText = [
+        'cursor:pointer',
+        'justify-self:start',
+        'margin-top:2px',
+        `border:1px solid ${C.ink}`,
+        `border-radius:${String(R.pill)}px`,
+        `background:${C.card}`,
+        `color:${C.ink}`,
+        'padding:6px 13px',
+        'font-size:12.5px',
+      ].join(';');
+      button.addEventListener('click', () => {
+        context.go(door.screen);
+      });
+      root_.append(button);
+    }
     return root_;
   }
 

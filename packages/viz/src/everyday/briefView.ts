@@ -29,10 +29,13 @@
  *   defect exactly (§ D219), which is the one CLAUDE.md tells a lane building a surface to read
  *   first. So the card states what a ghost would be, says it is not built, and keeps § 6.2's
  *   caveat, which is true of a race whenever there is one.
- * - **Locked for score** — shipped as a statement, with its button refusing. The three fixed
+ * - **Locked for score** — shipped as a statement, **and its button now opens**. The three fixed
  *   things are real (the tower, the machines and the crowd are the day's), and *Take it to the
- *   sandbox* points at `tuner`, which `screens.ts` refuses in its own words. The refusal is read
- *   from there rather than re-worded, so the two surfaces refuse once.
+ *   sandbox* points at `tuner`, which § 3.2 names as one of that screen's two doors — the other
+ *   being the report's third lever, which this build does not draw. § 3.2 forbids a rail row for it
+ *   (*a thing you do to a day, not a place you live*), so this card is the shipped way in.
+ *   It refused for as long as the tuner was unbuilt, and how it refused is the thing to read:
+ *   {@link lockedForScore}'s docstring has the fuse that arrangement left behind.
  *
  * ## What today asks, which § 6.2 does not list and this screen draws anyway
  *
@@ -43,8 +46,9 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
-import { UNBUILT_REASONS } from './screens.js';
+import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
 import type { TodayRecord } from './today.js';
+import type { EverydayScreen } from './types.js';
 
 /** One dispatcher on offer — § 6.2's style card and the dropdown's option are one list. */
 export interface BriefDispatcherOption {
@@ -59,15 +63,31 @@ export interface BriefDispatcherOption {
   readonly mine: boolean;
 }
 
-/** A card § 6.2 asks for that this build does not offer, with the reason it does not. */
+/**
+ * A card § 6.2 states rather than draws as a live control — what it would be, and either why it is
+ * not here or where it is carried out.
+ *
+ * Two of them, and they are no longer the same shape. {@link GHOST_REFUSAL} refuses: nothing in
+ * this tree runs two dispatchers over one crowd, so the card has no {@link door} and `why` says why.
+ * {@link lockedForScore} is a **statement with a door**: the three fixed things are real, and the
+ * screen that unfixes them exists, so the card carries the route to it. The type covers both
+ * because § 6.2 draws them identically and the difference is whether there is somewhere to go.
+ */
 export interface BriefRefusalCard {
   readonly heading: string;
   /** What the card would have been, so a reader learns what is missing rather than that it is. */
   readonly what: string;
-  /** Why it is not here. One clause, checkable. */
+  /** Why it is not here, or — when {@link door} is set — what taking it costs. One clause. */
   readonly why: string;
   /** The caveat § 6.2 attaches, kept because it is true whenever the thing exists. */
   readonly caveat: string;
+  /**
+   * The screen this card opens, or `undefined` for one that opens nothing.
+   *
+   * Set only where {@link isScreenBuilt} says the target is built — see {@link lockedForScore} for
+   * why that question is asked rather than assumed.
+   */
+  readonly door: { readonly label: string; readonly screen: EverydayScreen } | undefined;
 }
 
 /** The whole screen, as data. */
@@ -142,27 +162,48 @@ export const GHOST_REFUSAL: BriefRefusalCard = Object.freeze({
     'test bench runs two dispatchers against matched crowds fifty times, which is the question a ' +
     'race only gestures at.',
   caveat: 'One day each is a race, not proof. The test bench settles it properly.',
+  door: undefined,
 });
 
 /**
- * § 6.2's *Locked for score*. The statement is true; the button is not offered, in `screens.ts`'s
- * own words for the screen it would have opened.
+ * § 6.2's *Locked for score* — the statement, and the door § 3.2 names.
  *
- * **A function rather than a frozen constant, and that is a fix rather than a style.** The import
- * graph closes — `screens.ts` imports this screen's module, which imports this file, which imports
- * `screens.ts` — so a module-level read of `UNBUILT_REASONS` resolves at init time on whichever
- * file the cycle is entered second, and the card would draw *"Take it to the sandbox: undefined"*.
- * That is `types.ts#ENGINEER_SWAP_REFUSAL`'s own history, one directory over and already paid for
- * once. Read at call time, the table is initialised and the two surfaces refuse in one wording.
+ * ## It refused until § 3.3's tuner landed, and the way it refused was a fuse
+ *
+ * The card used to read `` `Take it to the sandbox: ${UNBUILT_REASONS.tuner ?? '…'}` ``, which was
+ * correct copy over an unbuilt screen and a **delay fuse** underneath it: `UNBUILT_REASONS` is keyed
+ * exactly over the unbuilt keys, so the day `tuner` was registered the key vanished, the `??`
+ * fallback took over silently, and this card went on refusing a screen a player can open — § D227's
+ * stale refusal, arriving through a merge rather than through an edit. `screens.ts`'s own docstring
+ * names the shape and forbids it; this call site is what it was written about.
+ *
+ * So the question is asked of the registry rather than of the table: {@link isScreenBuilt} first,
+ * and {@link unbuiltReasonFor} **only** in the arm where that is `false` — where it throws on a
+ * built key, loudly, at the one instant a fallback would have gone quiet. The refusing arm is kept
+ * rather than deleted because it is what draws the day the tuner is unregistered.
+ *
+ * ## And it stays a function rather than a frozen constant
+ *
+ * The import graph closes — `screens.ts` imports this screen's module, which imports this file,
+ * which imports `screens.ts` — so a module-level read resolves at init time on whichever file the
+ * cycle is entered second, and the card would draw *"Take it to the sandbox: undefined"* or, worse
+ * now, offer no door on a build that has one. That is `types.ts#ENGINEER_SWAP_REFUSAL`'s own
+ * history, one directory over and already paid for once. Read at call time, the registry is
+ * initialised and the two surfaces agree.
  */
 export function lockedForScore(): BriefRefusalCard {
+  const built = isScreenBuilt('tuner');
   return {
     heading: 'LOCKED FOR SCORE',
     what:
       'The tower, the machines and the crowd are the same for everyone today. You can change all ' +
       'of them — the run just stops counting.',
-    why: `Take it to the sandbox: ${UNBUILT_REASONS.tuner ?? 'the tuner screen is not built'}.`,
+    why: built
+      ? 'Take it to the sandbox: the day still runs with whatever you change, and it stops ' +
+        'counting on today’s board.'
+      : `Take it to the sandbox: ${unbuiltReasonFor('tuner')}.`,
     caveat: 'Everything you can change from here changes the dispatcher, and nothing else.',
+    door: built ? { label: 'Take it to the sandbox', screen: 'tuner' } : undefined,
   };
 }
 

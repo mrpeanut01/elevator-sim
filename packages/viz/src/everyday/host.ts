@@ -26,12 +26,18 @@
  * levers; the stage needs the run actions) and nothing speculative. Named absences, for the lane
  * that needs one to add with its consumer:
  *
- * - **no standalone building setter** — `dev/state.ts#withBuilding` parks a week as it goes
- *   (issue #107), so the screen that offers it is the campaign's building desk rather than the
- *   daily door: § 6's whole premise is *one building, one crowd, one seed, everybody*, and a
- *   control that changed the tower on the front door would be changing the day out from under the
- *   score. The daily loop's own *"you can change all of them and the run stops counting"* routes to
- *   the tuner, which is unbuilt and refuses in `screens.ts`'s words.
+ * - ~~no standalone building setter~~ — **built, and the absence is corrected here rather than left
+ *   standing.** `dev/state.ts#withBuilding` parks a week as it goes (issue #107), which is why there
+ *   was none for two waves: § 6's whole premise is *one building, one crowd, one seed, everybody*,
+ *   and a control that changed the tower on the front door would be changing the day out from under
+ *   the score. {@link EverydayHost.applyBuildingSpec} is that setter and it arrived **with its two
+ *   consumers** — GAMEPLAY § 13's *Run a day in it* and § 3.3's tuner primary — rather than ahead of
+ *   them, which is the rule these absences exist to keep. It honours the parking argument rather
+ *   than routing around it: `stateRunningSaved` goes through `withBuilding`, and the sandbox
+ *   contract is what says a drawn tower belongs to no scenario. The daily loop's own *"you can
+ *   change all of them and the run stops counting"* routes to the tuner — **and the tuner is built**,
+ *   so the clause that called it unbuilt and quoted `screens.ts`'s refusal went with the screen that
+ *   landed, on the same commit, which is § D227's rule applied to a docstring.
  *   {@link EverydayHost.runCampaignDay} is **not** the exception it looks like: it writes a tower's
  *   building id *and* its dispatcher id *and* presses run, as one indivisible campaign press, so no
  *   screen can use it to move the standing selection without running the day that selection belongs
@@ -58,7 +64,12 @@
  *   and names the absence (`everyday/stageScreenModel.ts#STAGE_NO_GHOST`); a ghost method with no
  *   rival behind it would be worse than none;
  * - **no watch entry** — § 14's spectator flow has no Everyday surface yet;
- * - **no saved-pattern or saved-building shelves** — no listed screen reads them.
+ * - **no saved-pattern or saved-building *shelf* to browse** — and the narrowing is the point.
+ *   {@link EverydayHost.applyBuildingSpec} and {@link EverydayHost.applyPatternSpec} both *write* to
+ *   those shelves and hand back the id they took, because § 13's designer and § 3.3's tuner press
+ *   them. What no listed screen reads is the **list**, so no method answers one. The bullet used to
+ *   say the shelves were untouched, and a stated absence that has stopped being true is § D227's
+ *   defect with its polarity reversed.
  *
  * ## Change notification
  *
@@ -72,17 +83,21 @@ import type {
   BuildingConfig,
   DispatcherProfile,
   DispatcherProfiles,
+  ElevatorSpecs,
   ResolvedBuilding,
   RunInterventionConfig,
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
+import { specFromBuilding, type BuildingSpec } from '../authoring/buildingSpec.js';
 import {
   specFromProfile,
   specIsDirty,
   type DispatcherSpec,
+  type DwellChoice,
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
+import { specFromTrafficProfile, type PatternSpec } from '../authoring/patternSpec.js';
 import { templateHasClock, type RuleRow } from '../authoring/ruleSpec.js';
 import {
   selectorContextFrom,
@@ -97,13 +112,16 @@ import {
   type CampaignCareer,
 } from '../campaign/career.js';
 import type { VizRecording } from '../contract/types.js';
+import { savedBuildingFrom, stateRunningSaved } from '../dev/buildingEditor.js';
 import type { BrowserResources } from '../dev/data.js';
+import { nextSavedId } from '../dev/dispatcherEditor.js';
 import {
   allBuildingIds,
   allDispatchers,
   buildingConfigOf,
   resolvedBuildingOf,
   shiftDemandTemplateId,
+  specsWithSaved,
   withDispatcher,
   type SavedDispatcher,
   type ViewerState,
@@ -270,6 +288,44 @@ export interface EverydayHost {
     readonly name: string;
     readonly dirty: boolean;
   };
+
+  /**
+   * The reference machine table the next run resolves against — `data/elevator-specs.json` widened
+   * by every class the reader saved, which is exactly what `shiftRunConfigOf` hands `parseBuilding`.
+   *
+   * On the host rather than imported by the screen, for GAMEPLAY § 13's designer: its machine-class
+   * panel offers the classes a run can actually be built from, and its specification block feeds
+   * `authoring/buildingSpec.ts#upPeakAnalysisOf`, which takes these specs as its second argument.
+   * A screen that read the shipped file directly would offer a class list the run does not have.
+   */
+  elevatorSpecs(): ElevatorSpecs;
+
+  /**
+   * The building the next run will be built from, as the authoring model's editable spec — the
+   * same `specFromBuilding` reading the Engineer building editor opens with, so the two drawing
+   * boards cannot disagree about what the standing tower is.
+   *
+   * `undefined` when the standing id names no building this build knows, on {@link buildingById}'s
+   * honest-lookup rule.
+   */
+  buildingSpec(): BuildingSpec | undefined;
+
+  /**
+   * The demand the next run is under, as the pattern editor's spec.
+   *
+   * Read through the **selection**, never through the editor's working copy: `state.patternSpec` is
+   * what the Engineer traffic panel has under its sliders and reaches no run until it is saved, so
+   * a screen that read it would draw numbers the simulation is not using. What this answers is the
+   * spec behind `state.pattern` — the saved pattern it names, the shipped profile it names, or the
+   * building's own profile when the selection is `'building'`.
+   */
+  patternSpec(): PatternSpec;
+
+  /**
+   * The door-dwell chip the group levers hold, or `undefined` for *the dispatcher's own* —
+   * `GroupLevers.dwell`'s fourth state, which is not a fourth chip and must not be defaulted.
+   */
+  doorDwell(): DwellChoice | undefined;
 
   /**
    * The four plain levers over the current working spec and group levers —
@@ -506,6 +562,42 @@ export interface EverydayHost {
   runCampaignDay(towerId: string): void;
 
   /**
+   * Save a drawn building **and stand the next run on it**, answering the id it took.
+   *
+   * The exact two presses the Engineer building editor's *Save* and *Run it* make, in one call:
+   * `savedBuildingFrom` allocates a fresh id and runs the document through the real loader (so a
+   * spec the parser refuses throws here rather than at run time), and `stateRunningSaved` selects
+   * it through `withBuilding` — which is the load-bearing half. A bare `buildingId` write would
+   * leave the week's `contractId` in place and bank a drawn tower against a real assignment; the
+   * sandbox contract is what says a drawn building belongs to no scenario.
+   *
+   * It does **not** run. GAMEPLAY § 13's *Run a day in it* and § 3.3's tuner primary are
+   * *apply, then run*, and the two are separate because the designer's *Save as a new building*
+   * is the same apply with no run after it. Composition beats a second method that differs by a
+   * boolean.
+   */
+  applyBuildingSpec(spec: BuildingSpec): string;
+
+  /**
+   * Save a demand pattern and point the next run at it, answering the id it took.
+   *
+   * `savedPatterns` **and** `pattern`, in one patch, for `dev/trafficEditor.ts`'s stated reason:
+   * *"a pattern the run cannot be pointed at is the dead seam this repository keeps finding"*.
+   * `patternSpec` is written alongside so the Engineer traffic panel opens on what is running
+   * rather than on whatever it was last left at.
+   */
+  applyPatternSpec(spec: PatternSpec): string;
+
+  /**
+   * Write the door-dwell chip — `GroupLevers.dwell`, the seam that reaches the run as every car's
+   * `dwellCarCallS`/`dwellHallCallS` through `shiftRunConfigOf`'s `withDoorTiming`.
+   *
+   * `undefined` restores *the dispatcher's own*, which is a real fourth value rather than a
+   * missing one: writing a chip nobody pressed silently replaces an authored `dwellPolicy`.
+   */
+  setDoorDwell(choice: DwellChoice | undefined): void;
+
+  /**
    * Hear about state changes, so a screen re-renders. Returns the unsubscribe. See the module
    * docstring for the cadence (state changes, never per frame).
    */
@@ -663,6 +755,23 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         dirty: specIsDirty(state.dispatcherSpec, source),
       };
     },
+    elevatorSpecs: () => specsWithSaved(b.resources, b.state().savedClasses),
+    buildingSpec: () => {
+      const state = b.state();
+      const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
+      return config === undefined ? undefined : specFromBuilding(config, state.buildingId);
+    },
+    patternSpec: () => {
+      const state = b.state();
+      if (state.pattern !== 'building') {
+        const saved = state.savedPatterns.find((entry) => entry.id === state.pattern);
+        if (saved !== undefined) return saved.spec;
+        return specFromTrafficProfile(b.resources.trafficProfiles, state.pattern);
+      }
+      const config = buildingConfigOf(b.resources, state.savedBuildings, state.buildingId);
+      return specFromTrafficProfile(b.resources.trafficProfiles, config?.trafficProfile);
+    },
+    doorDwell: () => b.state().levers.dwell,
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);
@@ -785,6 +894,47 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       b.openRunTab();
       b.startRun();
     },
+    applyBuildingSpec: (spec) => {
+      const state = b.state();
+      const saved = savedBuildingFrom(spec, state, b.resources);
+      const next = stateRunningSaved(state, b.resources, saved);
+      /*
+       * The whole derived state as the patch, rather than a hand-picked field list.
+       * `stateRunningSaved` goes through `withBuilding`, which touches the week, the parked weeks
+       * and both editor working copies under their own pristine guards — a list here would be a
+       * second opinion about which of those matter, and would go stale the next time that function
+       * learns to carry one more thing. It is a patch over the same `state` this call read, so
+       * nothing else can have moved underneath it.
+       */
+      b.applyPatch({ ...next });
+      return saved.id;
+    },
+    applyPatternSpec: (spec) => {
+      const state = b.state();
+      const id = nextSavedId('pat', [
+        ...state.savedPatterns.map((entry) => entry.id),
+        ...b.resources.trafficProfiles.profiles.map((profile) => profile.id),
+      ]);
+      const named: PatternSpec = {
+        ...spec,
+        name: spec.name.trim() === '' ? 'My pattern' : spec.name.trim(),
+      };
+      b.applyPatch({
+        savedPatterns: [...state.savedPatterns, { id, spec: named }],
+        pattern: id,
+        patternSpec: named,
+      });
+      return id;
+    },
+    setDoorDwell: (choice) => {
+      b.applyPatch({ levers: { ...b.state().levers, dwell: choice } });
+    },
+    /*
+     * The campaign arm of this is the merge's, not either branch's: the career lives beside
+     * `b.state()` rather than in it, so a listener has to be on both or a campaign screen never
+     * redraws. The lane that added the three writers above carried the plain `b.onChange` form,
+     * which was correct on its own branch and would have unsubscribed every campaign screen here.
+     */
     subscribe: (listener) => {
       const stopState = b.onChange(listener);
       campaignListeners.add(listener);

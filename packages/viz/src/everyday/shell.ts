@@ -121,7 +121,35 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * stops being read.
    */
   '§ 14’s daily board — a ranking of other people’s runs needs a server to post and verify them, and this build has none: the board screen opens on § 12.2’s labelled unavailable state for that tab, the ladder beside it is live because a rating is measured on this device, and Your week states what a board would be keyed on rather than drawing an empty one',
-  '§ 9 Endless rush — no held time, no setup screen',
+  /*
+   * **A sixth row left on the merge that registered § 9.1's rush setup, § 13's drawing board and
+   * § 3.3's tuner — and it left because this merge closed it, which is the one case this register
+   * has not recorded before.**
+   *
+   * It read: *"§ 3.3's Tune the tower is registered and routable, and no shipped control opens it:
+   * § 3.2 forbids a rail row (*a thing you do to a day, not a place you live*) and names its two
+   * doors as the brief's *Take it to the sandbox* and the report's third lever, neither of which is
+   * built"*. That was true on the lane that wrote it and false the moment it met a tree carrying
+   * § 6.2's brief: the first of those two doors exists here, and `briefView.ts#lockedForScore` now
+   * carries the route through it. § 3.2's rail-row prohibition is unchanged and still asserted
+   * (`rail.test.ts`), so the screen is reached the way the guide says and by no other way.
+   *
+   * **What is left of it is the second door, and it is a row below rather than a deletion.** The
+   * report draws four § 6.5 lever cards and every one of them routes to the Engineer panel that
+   * carries out a fabric change; none is the sandbox lever. One door out of two is not the absence
+   * this row named, so the row is rewritten to the half that is still true rather than kept for the
+   * half that is not.
+   *
+   * **And the § 9 row below was rewritten on the same merge, in the other direction.** It read
+   * *"§ 9 Endless rush — no held time, no setup screen"*; the setup screen landed, so half of that
+   * sentence became false while the other half stayed exactly as true as it was. A row that has
+   * become half wrong is the most dangerous shape in a register — it reads as verified and is not —
+   * so it is narrowed to what remains missing, and where the refusal moved to (the screen's own
+   * § 3.3 primary, `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`) is named rather than left for a reader
+   * to discover.
+   */
+  '§ 6.5’s third lever does not open the tuner — the report’s four lever cards each route to the Engineer panel that carries the advice out, which is what `dev/reportPanel.ts#LEVER_SURFACES` names, and § 3.2 gives the tuner two doors of which only the brief’s *Take it to the sandbox* is drawn here',
+  '§ 9 Endless rush — the setup screen draws, and the climbing stream behind it does not exist, so its primary refuses; § 9.2’s held-time stage and § 9.3’s own result screen are unbuilt',
 ]);
 
 /**

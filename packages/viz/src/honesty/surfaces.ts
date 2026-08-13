@@ -99,7 +99,41 @@ import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from 
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { AVATAR_SWATCHES } from '../everyday/profile.js';
+import {
+  DESIGNER_ABSENCES,
+  DESIGNER_COPY,
+  classOfSpec,
+  designerCapacityLine,
+  designerFigures,
+  designerPlateRows,
+  designerReading,
+  designerWarnings,
+} from '../everyday/designerModel.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
+import {
+  RUSH_ABSENCES,
+  RUSH_BESTS,
+  RUSH_PRIMARY_REFUSAL,
+  RUSH_SCREEN_COPY,
+  rushBandViews,
+  rushDrivingLine,
+  rushFactViews,
+  rushGeneratedRangeLine,
+  rushHoldLineFigure,
+  rushOpeningLine,
+} from '../everyday/rushScreenModel.js';
+import {
+  TUNER_COPY,
+  TUNE_CARDS,
+  movedKeys,
+  patternWithTune,
+  tuneCapacityReadout,
+  tuneDwellChips,
+  tuneReadout,
+  tuneSandboxStrip,
+  tuneSpeedReadout,
+  tuneStateFrom,
+} from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
 import { settingsScreenViewOf } from '../everyday/settingsView.js';
@@ -7211,8 +7245,23 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/actionBar.ts#actionBarFor',
     'everyday/actionBar.ts#confirmStripFor',
     'everyday/actionBar.ts#TIMELINE_STEPS',
-    'everyday/screens.ts#UNBUILT_REASONS',
-    'everyday/screens.ts#unbuiltReasonFor',
+    /*
+     * **`screens.ts#UNBUILT_REASONS` and `#unbuiltReasonFor` left this list on the merge that
+     * registered the last three screens, and they left because they stopped being text producers.**
+     *
+     * The table is keyed exactly over the unbuilt keys and every § 4 key is now built, so it holds
+     * no sentence, and `derive.test.ts`'s scan finds no prose in either declaration —
+     * `unbuiltReasonFor`'s only literal is the message it throws, which the derivation excludes on
+     * purpose. A `covers` entry for a declaration that produces nothing is a coverage claim for
+     * nothing, which is the case that failed here first and is the reason these two are deleted
+     * rather than left as decoration.
+     *
+     * **They come back with the first sentence.** `render` below still loops the registry and seeds
+     * `screen.<key>.unbuilt` for every key that carries a reason, so the day a screen is
+     * unregistered the table bears prose again, the derivation finds it, and `derive.test.ts` fails
+     * it as an *unclassified* producer until this entry is restored. The mechanism runs in both
+     * directions on its own; nobody has to remember.
+     */
     'everyday/screens.ts#SCREEN_NAMES',
     'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
     'everyday/host.ts#HOST_PENDING_REASON',
@@ -7381,6 +7430,233 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * per-screen sentences above.
      */
     seeds.push({ field: 'host.pending', text: HOST_PENDING_REASON, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **The three standalone Everyday screens' pure halves** — GAMEPLAY § 9.1's rush setup, § 13's
+ * drawing board and § 3.3's tuner over § 18's seven controls.
+ *
+ * ## Why these three belong in a corpus about honesty
+ *
+ * Between them they are almost nothing but claims about controls and about arithmetic:
+ *
+ * - the rush setup's five bands are **figures read off ENGINE_CONTRACT § 3.2's arrival expression**,
+ *   printed beside the guide's own words for them, and its facts are two withheld values and one
+ *   computed one — the exact shape R3 and R13 exist for;
+ * - the designer's four figures, three § 10 warnings and rating plate are predictions the closed
+ *   form made about a drawing, every one of which has a refusing arm that must print `—` rather than
+ *   a stale number;
+ * - the tuner's rows each name the field they write, and its sandbox strip is a claim about whether
+ *   a run will be posted.
+ *
+ * Every one of those is a sentence that goes stale the day its seam moves, which is what this corpus
+ * is for.
+ *
+ * ## What is driven, and what is not
+ *
+ * Both arms of everything that has two: the designer's figures over a spec the closed form sizes and
+ * over one it refuses, its warnings over a design inside its class and one past it, the tuner's strip
+ * and stamp with nothing moved and with something moved, its § 3.3 note over both variants, and the
+ * rush's bar refinement.
+ *
+ * The three **mounts** are excluded in `derive.test.ts` on the DOM mounts' shared ground — they need
+ * a document — which is the same pure/DOM split `EVERYDAY_MENU` and `EVERYDAY_SETTINGS` describe.
+ * What those mounts author of their own is geometry and class names, not sentences.
+ */
+const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
+  id: 'everyday/designerModel.ts#designerFigures',
+  covers: [
+    'everyday/rushScreenModel.ts#RUSH_SCREEN_COPY',
+    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
+    'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
+    'everyday/rushScreenModel.ts#RUSH_BANDS',
+    'everyday/rushScreenModel.ts#RUSH_BESTS',
+    'everyday/rushScreenModel.ts#rushBandViews',
+    'everyday/rushScreenModel.ts#rushFactViews',
+    'everyday/rushScreenModel.ts#rushDrivingLine',
+    'everyday/rushScreenModel.ts#rushHoldLineFigure',
+    'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
+    'everyday/rushScreenModel.ts#rushOpeningLine',
+    'everyday/designerModel.ts#DESIGNER_COPY',
+    'everyday/designerModel.ts#DESIGNER_ABSENCES',
+    'everyday/designerModel.ts#designerFigures',
+    'everyday/designerModel.ts#designerWarnings',
+    'everyday/designerModel.ts#designerPlateRows',
+    'everyday/designerModel.ts#designerCapacityLine',
+    /*
+     * `designerReading` is deliberately **not** claimed. It authors no prose: it reads
+     * `SpecBankAnalysis.reading`, which is `authoring/buildingSpec.ts`'s own arm of § 10's
+     * stops-versus-travel branch and is already driven by the AUTHORING adapter. The sentence is
+     * rendered below all the same, on this adapter's states, so it is swept here and claimed there.
+     */
+    'everyday/tunerModel.ts#TUNER_COPY',
+    'everyday/tunerModel.ts#TUNE_CARDS',
+    'everyday/tunerModel.ts#tuneSandboxStrip',
+    'everyday/tunerModel.ts#tuneDwellChips',
+    'everyday/tunerModel.ts#tuneReadout',
+    'everyday/tunerModel.ts#tuneSpeedReadout',
+    'everyday/tunerModel.ts#tuneCapacityReadout',
+    'everyday/tunerModel.ts#patternWithTune',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    /* ---------------------------------------------------------- § 9.1 rush */
+    for (const [key, text] of Object.entries(RUSH_SCREEN_COPY)) {
+      seeds.push({
+        field: `rush.copy.${key}`,
+        text,
+        role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
+      });
+    }
+    for (const [index, absence] of RUSH_ABSENCES.entries()) {
+      seeds.push({ field: `rush.absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+    seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
+    seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
+    seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
+    seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });
+    seeds.push({
+      field: 'rush.driving',
+      text: rushDrivingLine('Collective control'),
+      role: 'prose',
+    });
+    for (const band of rushBandViews()) {
+      seeds.push({ field: `rush.band.${band.waves}.waves`, text: band.waves, role: 'label' });
+      seeds.push({ field: `rush.band.${band.waves}.rate`, text: band.rate, role: 'label' });
+      seeds.push({ field: `rush.band.${band.waves}.note`, text: band.note, role: 'prose' });
+      /*
+       * The two figures the band prints. `observation` rather than `estimate`: they are the value
+       * of a stated expression at a stated wave, not a mean of anything — there is no sample behind
+       * a ramp, which is why R13 must not ask one of them for an `n`.
+       */
+      seeds.push({ field: `rush.band.${band.waves}.perMinute`, text: band.perMinute, role: 'observation' });
+      seeds.push({ field: `rush.band.${band.waves}.against`, text: band.against, role: 'observation' });
+    }
+    for (const fact of rushFactViews()) {
+      seeds.push({
+        field: `rush.fact.${fact.label}`,
+        text: fact.value,
+        role: fact.withheld ? 'label' : 'observation',
+      });
+      seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+    }
+    for (const best of RUSH_BESTS) {
+      seeds.push({ field: `rush.best.${best.name}.name`, text: best.name, role: 'label' });
+      seeds.push({ field: `rush.best.${best.name}.who`, text: best.who, role: 'label' });
+      seeds.push({ field: `rush.best.${best.name}.wave`, text: best.wave, role: 'label' });
+    }
+
+    /* ------------------------------------------------------- § 13 designer */
+    for (const [key, text] of Object.entries(DESIGNER_COPY)) {
+      seeds.push({
+        field: `designer.copy.${key}`,
+        text,
+        role: key === 'specNote' || key === 'lede' || key === 'notScored' ? 'prose' : 'label',
+      });
+    }
+    for (const [index, absence] of DESIGNER_ABSENCES.entries()) {
+      seeds.push({ field: `designer.absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+
+    const specs = context.elevatorSpecs;
+    const classes = classesFromSpecs(specs);
+    const sized = specFromBuilding(context.building.config, context.building.id);
+    /*
+     * The refusing arm, built by the one edit that produces it: a design whose only shaft is taken
+     * out of the lobby serves nothing the closed form can board anybody at, so `analyzeUpPeak`
+     * throws and every figure must come back `—` with the reason beside it rather than as a number.
+     */
+    const refused: typeof sized = { ...sized, cars: 1, noLobby: { 0: true }, bandByCar: { 0: [sized.floors, sized.floors] } };
+    /* A design past its class's ceiling, for § 10's first warning — both numbers, named. */
+    const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
+
+    for (const [arm, drawn] of [
+      ['sized', sized],
+      ['refused', refused],
+      ['over-class', overClass],
+    ] as const) {
+      const analysis = upPeakAnalysisOf(drawn, specs);
+      for (const figure of designerFigures(drawn, analysis)) {
+        seeds.push({
+          field: `designer.${arm}.figure.${figure.label}`,
+          text: figure.value,
+          role: figure.withheld ? 'label' : 'observation',
+        });
+        seeds.push({
+          field: `designer.${arm}.figure.${figure.label}.note`,
+          text: figure.note,
+          role: figure.withheld ? 'reason' : 'observation',
+        });
+      }
+      for (const [index, warning] of designerWarnings(drawn, classOfSpec(classes, drawn), analysis).entries()) {
+        seeds.push({
+          field: `designer.${arm}.warning.${String(index)}`,
+          text: warning.text,
+          role: 'prose',
+        });
+      }
+      for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn))) {
+        seeds.push({ field: `designer.${arm}.plate.${row.key}`, text: row.value, role: 'observation' });
+      }
+      seeds.push({
+        field: `designer.${arm}.capacity`,
+        text: designerCapacityLine(drawn),
+        role: 'observation',
+      });
+      const reading = designerReading(analysis);
+      if (reading !== '') {
+        seeds.push({ field: `designer.${arm}.reading`, text: reading, role: 'prose' });
+      }
+    }
+
+    /* ---------------------------------------------------------- § 18 tuner */
+    for (const [key, text] of Object.entries(TUNER_COPY)) {
+      seeds.push({
+        field: `tuner.copy.${key}`,
+        text,
+        role: key === 'lede' || key.endsWith('Body') || key === 'stepsHint' ? 'prose' : 'label',
+      });
+    }
+    const standingTune = tuneStateFrom(sized, DEFAULT_PATTERN, undefined);
+    const movedTune = { ...standingTune, cars: standingTune.cars + 1, rate: standingTune.rate + 2 };
+    for (const [arm, tune] of [
+      ['standing', standingTune],
+      ['moved', movedTune],
+    ] as const) {
+      const moved = movedKeys(standingTune, tune);
+      const strip = tuneSandboxStrip(moved);
+      seeds.push({ field: `tuner.${arm}.strip.state`, text: strip.state, role: 'label' });
+      seeds.push({ field: `tuner.${arm}.strip.note`, text: strip.note, role: 'prose' });
+      seeds.push({
+        field: `tuner.${arm}.pattern.name`,
+        text: patternWithTune(DEFAULT_PATTERN, tune).name,
+        role: 'label',
+      });
+      seeds.push({ field: `tuner.${arm}.speed`, text: tuneSpeedReadout(tune), role: 'observation' });
+      seeds.push({ field: `tuner.${arm}.cap`, text: tuneCapacityReadout(tune), role: 'observation' });
+      for (const card of TUNE_CARDS) {
+        for (const row of card.rows) {
+          seeds.push({ field: `tuner.${arm}.${row.key}.label`, text: row.label, role: 'label' });
+          seeds.push({ field: `tuner.${arm}.${row.key}.hint`, text: row.hint, role: 'prose' });
+          seeds.push({
+            field: `tuner.${arm}.${row.key}.readout`,
+            text: tuneReadout(row, tune),
+            role: 'observation',
+          });
+        }
+        seeds.push({ field: `tuner.${arm}.card.${card.name}`, text: card.effect, role: 'prose' });
+        seeds.push({ field: `tuner.${arm}.card.${card.name}.sub`, text: card.sub, role: 'label' });
+      }
+    }
+    for (const chip of tuneDwellChips(undefined)) {
+      seeds.push({ field: `tuner.dwell.${chip.label}`, text: chip.label, role: 'label' });
+      seeds.push({ field: `tuner.dwell.${chip.label}.seconds`, text: chip.seconds, role: 'label' });
+    }
 
     return singleRun(this.id, seeds);
   },
@@ -9484,6 +9760,23 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * always the load-bearing half.
    */
   FAMILY_CONTROLS,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the third time this array has recorded that sentence.
+   *
+   * Its branch's note read *"the three standalone Everyday screens re-seed figure shapes the
+   * designer and the report already draw"*, and on that branch the position it named was the end of
+   * a nineteen-entry array. Here it is thirty-seven entries in, and the surfaces it would have sat
+   * ahead of are the ones it collides with hardest: § 7's stage header, the report card, the week's
+   * withheld cells, § 11's workshop and § 12's bench all draw figure-shaped and band-shaped
+   * wordings, and this adapter re-seeds a design's four figures, a rush's five bands and a tuner's
+   * readouts. Left where it merged it would have taken figure-shaped faults off five surfaces at
+   * once.
+   *
+   * The rule is applied to the merged array rather than to either branch's, and a clean auto-merge
+   * is not evidence that it was: this position was chosen, not inherited.
+   */
+  EVERYDAY_STANDALONE_SCREENS,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

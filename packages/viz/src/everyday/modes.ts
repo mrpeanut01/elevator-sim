@@ -44,8 +44,12 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
  * - **Fix a building** — `packages/viz/src/fixit/` exists with three authored cases validated by
  *   real paired runs (`docs/18`; the remaining fifteen are named there as content work). § 10's
  *   Everyday screen is what the tile waits on.
- * - **Endless rush** — nothing behind the screen either: no held-time clock and no rush module.
- *   § 9 describes it in full and none of it is built.
+ * - **Endless rush** — § 9.1's setup screen is built and the tile opens onto it; what is still
+ *   missing is behind it rather than in front, and the refusal moved with it. There is no climbing
+ *   arrival stream, no held-time clock and no § 9.3 result, so the screen's § 3.3 primary is drawn
+ *   inert with `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL` on it. That is the rule this module states
+ *   below, applied in the other direction for once: where the *screen* exists and the thing behind
+ *   it does not, the refusal belongs on the control that cannot act.
  */
 export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
   Object.freeze({
@@ -102,13 +106,15 @@ export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
     blurb: 'One climbing day until the building stops draining.',
     shape: '~5 min · the run always ends; the question is when',
     /*
-     * Named rather than hidden. § 9 specifies held time instead of a clock, a setup screen, and a
-     * result that is a rush report rather than a day report — none of which exists. Saying "not
-     * built yet" is the honest form; a tile that opened a blank screen would be the fourth
-     * silently-does-nothing control this repository has had to hunt down.
+     * § 9.1's setup screen is registered, so this resolves to `undefined` and the tile opens. The
+     * sentence is kept current rather than left as it was: it is what a reader would be told if the
+     * screen were ever unregistered, and a refusal that describes a build two waves old is § D227's
+     * defect with a longer fuse. What the rush still lacks is named on the screen itself
+     * (`rushScreenModel.ts#RUSH_ABSENCES`) and on its primary, which is where a refusal about a
+     * missing engine belongs once the screen in front of it is real.
      */
     unavailable: unlessBuilt(
-      'not built yet — the rush needs held time and a setup screen, and neither exists',
+      'not built yet — the rush setup screen draws, but nothing behind it generates the climb',
       'rush',
     ),
   }),
