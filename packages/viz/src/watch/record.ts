@@ -52,7 +52,12 @@
  * bearing rather than decorative.
  */
 
-import { RULE_ACTIONS, RULE_CONDITIONS, type SimulationConfig } from '@elevator-sim/core/browser';
+import {
+  INTERVENTION_KINDS,
+  RULE_ACTIONS,
+  RULE_CONDITIONS,
+  type SimulationConfig,
+} from '@elevator-sim/core/browser';
 
 // `dispatcherSpec.ts` and `selectorSpec.ts` both export a `specFromProfile`, over different
 // shapes. They are aliased at every site that needs both — `selectorSpec.ts`'s own naming hazard.
@@ -232,6 +237,21 @@ export function recordUnreadableReason(
     !resources.trafficProfiles.profiles.some((p) => p.id === record.pattern)
   ) {
     return `this build does not ship the arrival pattern “${record.pattern}”`;
+  }
+  /*
+   * The intervention vocabulary, on the ids' footing — and on the promise `persist/validate.ts`
+   * and `watch/reference.ts` both make in as many words: the log is *"passed through as data;
+   * `core` owns what an `InterventionChange` may be and refuses what it does not recognise"*.
+   * `core` keeps that promise with a throw at scheduling time; a stored record deserves the same
+   * refusal as a **row** rather than a mid-replay exception, so the kind is checked here against
+   * the vocabulary `core` exports — one source, two refusal surfaces, never a second copy of the
+   * union's cases. A record written by a newer build with a fourth kind is a run this build
+   * cannot re-ask, which is the identical sentence shape the building id gets.
+   */
+  for (const entry of record.interventions) {
+    if (!(INTERVENTION_KINDS as readonly string[]).includes(entry.change.kind)) {
+      return `this build does not ship the intervention kind “${String(entry.change.kind)}”`;
+    }
   }
   /*
    * The rule vocabulary, on exactly the footing the three ids above sit on — `docs/20` defect 1. A

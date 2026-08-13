@@ -9,13 +9,30 @@
  * shape changes.
  */
 
+import type { DispatcherProfile } from '@elevator-sim/core/browser';
 import { describe, expect, it } from 'vitest';
 
-import { interventionLogOf, interventionStampOf, PARK_CARS_LOBBY_LABEL } from './interventions.js';
+import {
+  interventionLogOf,
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  switchDispatcherLabelOf,
+} from './interventions.js';
 
 // 09:14 under the shared 06:00 day start: 3 h 14 min into the run.
 const AT_0914 = 3 * 3600 + 14 * 60;
 const PARK = { kind: 'park-cars-lobby' } as const;
+
+// The minimal profile the switch arm carries: id, display name, a vector. The stamp must speak
+// the name and never the id — the id here is deliberately engine-flavoured so a leak would show.
+const STEADY: DispatcherProfile = { id: 'steady-hand-v2', name: 'Steady hand', weights: {} };
+const SWITCH = { kind: 'switch-dispatcher', profile: STEADY } as const;
+const ANSWER = {
+  kind: 'answer-incident',
+  option: 'call the fitter out now',
+  serviceEvents: [],
+} as const;
 
 describe('interventionStampOf', () => {
   it('stamps the design’s own sentence, in the shell’s own clock', () => {
@@ -52,8 +69,30 @@ describe('interventionStampOf', () => {
   });
 
   it('labels the control with a verb, and the stamp with its past tense', () => {
-    // One arm today; a second change kind must extend both sentences together.
     expect(PARK_CARS_LOBBY_LABEL).toBe('Park the cars in the lobby');
+    // The switch control speaks the *name* — a button naming `steady-hand-v2` would be an engine
+    // identifier in the Casual register (§ 16 rule 11), which is why the label is parametric.
+    expect(switchDispatcherLabelOf('Steady hand')).toBe('Hand the rest of the day to Steady hand');
+  });
+
+  it('stamps a dispatcher switch with the profile’s display name, never its id', () => {
+    const stamp = interventionStampOf([{ atS: AT_0914, change: SWITCH }], AT_0914);
+    expect(stamp).toBe('09:14 · handed the rest of the day to Steady hand');
+    expect(stamp).not.toContain('steady-hand-v2');
+  });
+
+  it('stamps an incident answer with the chosen option’s own words — § 20.16’s clock', () => {
+    // `atS` is `runIncidentClock`: the simulated second the answer was given, in the shell's own
+    // clock, beside the option's authored words. No engine vocabulary enters the sentence.
+    expect(interventionStampOf([{ atS: AT_0914, change: ANSWER }], AT_0914)).toBe(
+      '09:14 · answered the incident — call the fitter out now',
+    );
+  });
+
+  it('holds the recomputing beat as one sentence, ready for the stage', () => {
+    // Contract § 1.4: above ~400 ms, a beat rather than a freeze. The words live here so the
+    // sweep drives them; dev/main.ts only decides when the threshold has genuinely passed.
+    expect(RECOMPUTING_BEAT).toBe('recomputing the day…');
   });
 });
 
@@ -76,6 +115,22 @@ describe('interventionLogOf', () => {
     // Line one is byte-identical to the stage's stamp at that instant — shared verbs, shared
     // clock, so the sheet and the stage cannot disagree about what a press was called.
     expect(lines[1]).toBe(interventionStampOf([{ atS: AT_0914, change: PARK }], AT_0914));
+  });
+
+  it('prints all three kinds on one sheet — the incident answer’s clock among them (§ 20.16)', () => {
+    // A day with a park, a handover and an answered incident lists three stamped lines, one per
+    // entry, in time order; the answer's line *is* `runIncidentClock` appearing on the report.
+    expect(
+      interventionLogOf([
+        { atS: AT_0914, change: ANSWER },
+        { atS: 600, change: PARK },
+        { atS: 7200, change: SWITCH },
+      ]),
+    ).toEqual([
+      '06:10 · parked the cars in the lobby',
+      '08:00 · handed the rest of the day to Steady hand',
+      '09:14 · answered the incident — call the fitter out now',
+    ]);
   });
 
   it('prints nothing for an empty log — no placeholder line', () => {

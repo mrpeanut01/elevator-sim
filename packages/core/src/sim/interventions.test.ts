@@ -23,6 +23,13 @@
  * pre-positioning measurements were taken on. `collective` because it is the shipped default
  * (§ D134) and authors no `idle` section at all: the override replaces `stay`, which is the
  * exact state the player's button exists for.
+ *
+ * The same four properties are asserted per change kind — `park-cars-lobby`, then
+ * `switch-dispatcher` (§ 20.12's check verbatim: switching at the stamped instant leaves every
+ * figure before it identical and changes the ones after), then `answer-incident` (whose effects
+ * ride the service schedule, and whose one extra refusal — an effect before its own answer — is
+ * the § 1.4 prefix defended against the record itself). An unknown kind is refused with a throw,
+ * which is the promise `packages/viz`'s stored-record readers quote.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -142,5 +149,164 @@ describe('an intervention past the deadline is refused loudly', () => {
     expect(truncated.warnings.some((line) => line.includes('drain deadline'))).toBe(true);
     // The refusal is the whole effect: the run itself is the baseline run, leg for leg.
     expect(JSON.stringify(legsOf(truncated))).toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * switch-dispatcher — the second arm (gameplay § 7.6, § 20.12)
+ * -------------------------------------------------------------------------- */
+
+describe('switch-dispatcher changes the future and only the future', () => {
+  // The same measured instant the park tests stand on: on this building and seed, five legs
+  // board before 600 s and twenty-four after, so both halves assert over something.
+  const AT_S = 600;
+  const SEED = 20260726;
+
+  /**
+   * The moved-control arm (§ D177, § 20.12's own check): switching at `atS` leaves every leg
+   * boarded before it byte-identical and changes the legs after it. `collective` hands the rest
+   * of the day to `nearest-car` — the weakest shipped dispatcher, chosen *because* its vector is
+   * the furthest from collective's, so a suffix that failed to move would mean the seam is inert
+   * rather than that the two agree.
+   */
+  it('keeps every leg boarded before atS byte-identical, and moves the run after it', () => {
+    const nearestCar = config.dispatcherProfilesById.get('nearest-car');
+    if (nearestCar === undefined) throw new Error('no profile "nearest-car"');
+    const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+    const switched = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        interventions: [{ atS: AT_S, change: { kind: 'switch-dispatcher', profile: nearestCar } }],
+      }),
+    );
+
+    // The trace is the trace: a change of driver is a change of mind, never a change of crowd.
+    expect(switched.record.passengers.length).toBe(baseline.record.passengers.length);
+
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(
+        legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S),
+      );
+    expect(
+      legsOf(baseline).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S).length,
+    ).toBeGreaterThan(0);
+    expect(prefix(switched)).toBe(prefix(baseline));
+
+    // Assignment obeys the new vector from atS on: the whole projection must differ.
+    expect(JSON.stringify(legsOf(switched))).not.toBe(JSON.stringify(legsOf(baseline)));
+    // The record still names the profile the run *started* under; the log is the handover's account.
+    expect(switched.record.dispatcherProfileId).toBe('collective');
+  }, 60_000);
+
+  it('replays the same record to the same fingerprint (invariant 5)', () => {
+    const record = (): SimulationConfig => {
+      const nearestCar = config.dispatcherProfilesById.get('nearest-car');
+      if (nearestCar === undefined) throw new Error('no profile "nearest-car"');
+      return run('garden-apartments', 'collective', SEED, {
+        interventions: [{ atS: AT_S, change: { kind: 'switch-dispatcher', profile: nearestCar } }],
+      });
+    };
+    expect(fingerprint(runSimulation(record()))).toBe(fingerprint(runSimulation(record())));
+  }, 60_000);
+});
+
+/* -------------------------------------------------------------------------- *
+ * answer-incident — the third arm (gameplay § 7.5, § 20.16), on the same log
+ * -------------------------------------------------------------------------- */
+
+describe('answer-incident changes the future and only the future', () => {
+  const AT_S = 600;
+  const SEED = 20260726;
+  /**
+   * An answer at 600 s whose effect takes car B out at 700 s and returns it at 1200 s — the
+   * two-event window `shift/incidents.ts` has always spelled, riding the intervention log and
+   * scheduling through the ordinary `serviceChange` path. On a two-car building, half the fleet
+   * leaving is a suffix that cannot fail to move.
+   */
+  const ANSWER: RunInterventionConfig = {
+    atS: AT_S,
+    change: {
+      kind: 'answer-incident',
+      option: 'take car B out for the fitter, back within the hour',
+      serviceEvents: [
+        { atS: 700, bankId: 'main', carId: 'B', mode: 'out-of-service' },
+        { atS: 1200, bankId: 'main', carId: 'B', mode: 'in-service' },
+      ],
+    },
+  };
+
+  it('keeps every leg boarded before atS byte-identical, and moves the run after it', () => {
+    const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+    const answered = runSimulation(
+      run('garden-apartments', 'collective', SEED, { interventions: [ANSWER] }),
+    );
+
+    expect(answered.record.passengers.length).toBe(baseline.record.passengers.length);
+
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(
+        legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S),
+      );
+    expect(
+      legsOf(baseline).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S).length,
+    ).toBeGreaterThan(0);
+    expect(prefix(answered)).toBe(prefix(baseline));
+    expect(JSON.stringify(legsOf(answered))).not.toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  it('replays the same record to the same fingerprint (invariant 5)', () => {
+    const record = (): SimulationConfig =>
+      run('garden-apartments', 'collective', SEED, { interventions: [ANSWER] });
+    expect(fingerprint(runSimulation(record()))).toBe(fingerprint(runSimulation(record())));
+  }, 60_000);
+
+  it('an answer with no service effects is the run it was — the stamp is the point', () => {
+    // The reassurance option: on the record for the report's clock, changing nothing physical.
+    expect(
+      fingerprint(
+        runSimulation(
+          run('garden-apartments', 'collective', 20260810, {
+            interventions: [
+              { atS: AT_S, change: { kind: 'answer-incident', option: 'wait it out', serviceEvents: [] } },
+            ],
+          }),
+        ),
+      ),
+    ).toBe(fingerprint(runSimulation(run('garden-apartments', 'collective', 20260810))));
+  }, 60_000);
+
+  it('refuses an effect scheduled before its own answer — the past is not reschedulable', () => {
+    const baseline = runSimulation(run('garden-apartments', 'collective', SEED));
+    const rewriting = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        interventions: [
+          {
+            atS: AT_S,
+            change: {
+              kind: 'answer-incident',
+              option: 'a defective entry',
+              // Before the answer itself: honouring it would change legs the player already
+              // watched, which is contract § 1.4's bit-identical prefix broken by the record.
+              serviceEvents: [{ atS: 100, bankId: 'main', carId: 'B', mode: 'out-of-service' }],
+            },
+          },
+        ],
+      }),
+    );
+    expect(rewriting.warnings.some((line) => line.includes('before the answer itself'))).toBe(true);
+    // The refusal is the whole effect: leg for leg, this is the baseline run.
+    expect(JSON.stringify(legsOf(rewriting))).toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+});
+
+describe('an unknown change kind is refused before any event fires', () => {
+  it('throws naming the kind and the declared vocabulary — never applies a guess', () => {
+    const change = { kind: 'reverse-gravity' } as unknown as RunInterventionConfig['change'];
+    expect(() =>
+      runSimulation(
+        run('garden-apartments', 'collective', 20260726, {
+          interventions: [{ atS: 600, change }],
+        }),
+      ),
+    ).toThrow(/reverse-gravity.*park-cars-lobby, switch-dispatcher, answer-incident/su);
   }, 60_000);
 });

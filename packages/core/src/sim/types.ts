@@ -41,6 +41,7 @@ import type {
   ElevatorSpecs,
   ResolvedBank,
   ResolvedBuilding,
+  ResolvedServiceEvent,
   TrafficProfiles,
 } from '../config/types.js';
 import type { AuctionPolicyOptions } from '../dispatch/policies/types.js';
@@ -378,9 +379,22 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  * -------------------------------------------------------------------------- */
 
 /**
- * One thing a mid-run intervention may change. A discriminated union with **one arm today**,
- * built as a union so the second arm — switching which dispatcher is driving — is a new member
- * beside this one rather than a redesign of the field that carries it.
+ * The change kinds a mid-run intervention may carry — the declared vocabulary, in the manner of
+ * `PARKING_STRATEGIES` and `SELECTOR_INPUTS`, and for their reason: the log is **data** that
+ * crosses a worker boundary and a `localStorage` round trip, so a record can carry a kind this
+ * build has never heard of, and a kind that is silently dropped — or, worse, silently treated as
+ * one of the known ones — is a replay that is *approximate*, which contract § 1.5 forbids by
+ * name. `Simulation` refuses an unknown kind loudly at scheduling time, and
+ * `packages/viz`'s `watch/record.ts#recordUnreadableReason` refuses to re-ask a stored record
+ * that names one, on the same footing it refuses an unknown rule condition.
+ */
+export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident'] as const;
+
+export type InterventionKind = (typeof INTERVENTION_KINDS)[number];
+
+/**
+ * One thing a mid-run intervention may change. A discriminated union — three arms today, and a
+ * fourth is a new member beside these rather than a redesign of the field that carries it.
  *
  * `park-cars-lobby` asks stage 7 to treat every idle car as though the profile had authored
  * `idle.parkingStrategy: 'lobby'` from the moment the intervention takes effect. It changes no
@@ -388,10 +402,60 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  * exactly as configured, and only *where a car with nothing to do waits* moves. That is why it
  * can travel through `RepositionContext` rather than through a second policy — see
  * `dispatch/lifecycle.ts#repositionDecisionFor`.
+ *
+ * `switch-dispatcher` hands the rest of the run to another dispatcher's **weight vector** — the
+ * gameplay guide's § 7.6 policy change, and § 20.12's second wire. The arm carries the whole
+ * `DispatcherProfile` inline, plain data, for the exact reason `SimulationConfig.dispatcherProfile`
+ * does: the viewer's driving profile is routinely a *derived* object — a saved spec, a style with
+ * levers applied — that no id resolves, and the record must replay without this device's shelf
+ * (`packages/viz/src/dev/ghostRun.ts` swaps the same field the same way). What switches is the
+ * vector alone, resolved through the same `resolveWeights` the run's own profile went through, and
+ * adopted by every bank's policy at the scheduled instant, so every assignment decision from `atS`
+ * on obeys the new weights and no decision before it can observe them. Stage settings do **not**
+ * switch — not `dispatch.callType`, not `passengerAssignment`, not eligibility, not the idle stage,
+ * not the auction's aggregation — on `dispatch/selector.ts`'s own argument (*Why only the weights
+ * switch*): two of those decide the passenger model, and a record that changed model at t = 600 s
+ * would publish metrics not comparable with themselves. A switched profile that authors a different
+ * passenger model is disclaimed by name rather than half-honoured. The record's
+ * `dispatcherProfileId` stays the profile the run *started* under; the log is the account of the
+ * handover, which is what the report's intervention lines print. An explicit switch also pins the
+ * vector: the profile's own weight-set selector and rule arms stop choosing from `atS` on, because
+ * the player's hand outranks the detector — the gameplay guide's `mode: one`, entered mid-run.
+ *
+ * `answer-incident` is the campaign incident's answer (gameplay § 7.5, § 20.16), unified onto this
+ * log because the dock's own copy says it is *"mechanically one instance of § 7.6"*. `atS` **is**
+ * `runIncidentClock` — the simulated second the answer was given — and the report prints it with
+ * every other intervention stamp, which is § 20.16's requirement met by unification rather than by
+ * a second clock. The chosen option's *effect* is carried in the one plain-data vocabulary the
+ * engine already has for a car leaving and returning mid-run — `ResolvedServiceEvent`, the shape
+ * `packages/viz/src/shift/incidents.ts` has authored since it became `serviceEvents`' first
+ * non-test caller — and it schedules through the **same event kind** (`serviceChange`), never a
+ * sibling; `Simulation.#scheduleServiceEvents` says why. Every effect must fall at or after `atS`:
+ * an answer that rescheduled the past would break § 1.4's bit-identical prefix, so such an entry is
+ * refused loudly. `option` is the option's own player-facing words, carried so the stamp and the
+ * report can say *what* was answered from the record alone — a spectator replaying the day gets the
+ * same sentence — and it is authored copy, never an engine identifier.
  */
-export type InterventionChange = {
-  readonly kind: 'park-cars-lobby';
-};
+export type InterventionChange =
+  | {
+      readonly kind: 'park-cars-lobby';
+    }
+  | {
+      readonly kind: 'switch-dispatcher';
+      /** The profile now driving, whole and plain — the shape the config path already serializes. */
+      readonly profile: DispatcherProfile;
+    }
+  | {
+      readonly kind: 'answer-incident';
+      /** The chosen option's player-facing words, for the stamp and the report. Never an id. */
+      readonly option: string;
+      /**
+       * The option's effect: service-mode changes, every car located, each at or after the
+       * answer's own `atS`. Empty is legal — an answer whose effect is reassurance alone still
+       * belongs on the record, because the stamp is the point.
+       */
+      readonly serviceEvents: readonly ResolvedServiceEvent[];
+    };
 
 /**
  * One intervention: at simulated second {@link atS}, apply {@link change} for the rest of the run.

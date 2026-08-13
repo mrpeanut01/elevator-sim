@@ -20,25 +20,54 @@
  * means.
  */
 
-import type { RunInterventionConfig } from '@elevator-sim/core/browser';
+import type { InterventionChange, RunInterventionConfig } from '@elevator-sim/core/browser';
 
 import { clockAt } from './timeline.js';
 
 /**
- * The control's label, imperative because it is a button and not a caption. One entry per
- * `InterventionChange` arm; a second arm (dispatcher switching) adds its own beside this one.
+ * The control's label, imperative because it is a button and not a caption. One label per
+ * intervention control; {@link switchDispatcherLabelOf} is the second, beside this one.
  */
 export const PARK_CARS_LOBBY_LABEL = 'Park the cars in the lobby';
 
 /**
- * What the stage says a change *did*, past tense, keyed by the change kind. Not exported: the
- * sentence a player reads is the stamp, and two exports for one sentence would be two places for
- * it to drift apart.
+ * The dispatcher-switch control's label — parametric over the *name*, never the id, because the
+ * button says what pressing it does and a player is handing the day to *somebody*, not to a key
+ * in a data file (gameplay § 16 rule 11: no engine identifiers in the Casual register).
  */
-const STAMP_VERBS: Readonly<Record<RunInterventionConfig['change']['kind'], string>> =
-  Object.freeze({
-    'park-cars-lobby': 'parked the cars in the lobby',
-  });
+export function switchDispatcherLabelOf(name: string): string {
+  return `Hand the rest of the day to ${name}`;
+}
+
+/**
+ * The stage's `recomputing` beat — contract § 1.4's own requirement, verbatim in intent: a
+ * re-simulation above ~400 ms shows this rather than freezing. One sentence, here with the other
+ * intervention words so the honesty sweep drives it, and shown by `dev/main.ts` only once the
+ * round trip has actually outlived the threshold — a 181 ms building must not flash it.
+ */
+export const RECOMPUTING_BEAT = 'recomputing the day…';
+
+/**
+ * What the stage says a change *did*, past tense, per change kind. Not exported: the sentence a
+ * player reads is the stamp, and two exports for one sentence would be two places for it to
+ * drift apart. A `switch` with no default, so a fourth `InterventionChange` arm is a compile
+ * error here rather than a stamp that renders `undefined` — the exhaustiveness the old
+ * `Record<kind, string>` bought, kept across the two arms whose words are parametric:
+ * `switch-dispatcher` names the profile's display name (never its id), and `answer-incident`
+ * quotes the chosen option's own authored words, so a spectator replaying the record reads the
+ * same sentence the player did (§ 20.16 — `atS` is `runIncidentClock`, and the clock beside this
+ * verb is how it appears on the report).
+ */
+function stampVerbOf(change: InterventionChange): string {
+  switch (change.kind) {
+    case 'park-cars-lobby':
+      return 'parked the cars in the lobby';
+    case 'switch-dispatcher':
+      return `handed the rest of the day to ${change.profile.name}`;
+    case 'answer-incident':
+      return `answered the incident — ${change.option}`;
+  }
+}
 
 /**
  * The most recent intervention **as of the playhead**, stamped — `09:14 · parked the cars in the
@@ -65,7 +94,7 @@ export function interventionStampOf(
     if (entry.atS <= simTimeS) latest = entry;
   }
   if (latest === undefined) return '';
-  return `${clockAt(latest.atS, dayStartS)} · ${STAMP_VERBS[latest.change.kind]}`;
+  return `${clockAt(latest.atS, dayStartS)} · ${stampVerbOf(latest.change)}`;
 }
 
 /**
@@ -82,7 +111,7 @@ export function interventionStampOf(
  * consult one.
  *
  * Each line is the stage's own stamp, verbatim (`09:14 · parked the cars in the lobby`): shared
- * {@link STAMP_VERBS}, shared {@link clockAt}, so the sheet and the stage can never disagree about
+ * {@link stampVerbOf}, shared {@link clockAt}, so the sheet and the stage can never disagree about
  * what a press was called or when it landed. The sort is a defensive copy in time order — the log
  * is authored in press order, which is time order for a control that appends at the playhead, but
  * the sheet's claim is *in time order* and it holds that claim itself rather than inheriting it.
@@ -90,6 +119,14 @@ export function interventionStampOf(
  * `[]` for an empty log, never a placeholder line: a day the player did not touch reads exactly as
  * it always did, and *"no interventions"* would be a caption over nothing (`docs/10` R3's blank,
  * inverted — {@link interventionStampOf}'s own rule, kept).
+ *
+ * ## `runIncidentClock` is one of these lines — § 20.16, discharged by unification
+ *
+ * A campaign incident's answer is an `answer-incident` entry on the same log, stamped with the
+ * simulated second it was given, so *"`runIncidentClock` must … appear on the report"* is met by
+ * this function doing for that entry exactly what it does for every other: one line, the answer's
+ * own clock, the chosen option's own words. There is no second clock and no second renderer to
+ * drift from this one.
  */
 export function interventionLogOf(
   interventions: readonly RunInterventionConfig[],
@@ -97,5 +134,5 @@ export function interventionLogOf(
 ): readonly string[] {
   return [...interventions]
     .sort((a, b) => a.atS - b.atS)
-    .map((entry) => `${clockAt(entry.atS, dayStartS)} · ${STAMP_VERBS[entry.change.kind]}`);
+    .map((entry) => `${clockAt(entry.atS, dayStartS)} · ${stampVerbOf(entry.change)}`);
 }

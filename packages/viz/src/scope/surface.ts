@@ -212,9 +212,10 @@ export const SCOPE_OF: Readonly<Record<SurfaceKey, ScopeEntry>> = Object.freeze(
   'viewer.interventions': control(
     'within-day',
     'The run record’s intervention log — Everyday Mode’s contract § 1.4, run = { seed, config, ' +
-      'interventions[] }. Pressing the stage control appends { atS, park-cars-lobby } and re-runs ' +
-      'the day from t = 0 with the prefix bit-identical; within-day because it is the product’s ' +
-      'purest change-of-mind, and no selection, CLI line or submission carries a log yet.',
+      'interventions[] }. Pressing a stage intervention control appends { atS, change } — parking ' +
+      'the cars, handing the day to another dispatcher, or answering a campaign incident — and ' +
+      're-runs the day from t = 0 with the prefix bit-identical; within-day because it is the ' +
+      'product’s purest change-of-mind, and no selection, CLI line or submission carries a log yet.',
   ),
 
   /* ------------------------------------------------------- viewer: the day boundary */

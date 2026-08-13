@@ -39,7 +39,11 @@
  * to reach, so it cannot be tested and it drifts.
  */
 
-import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
+import {
+  SimulationError,
+  type BuildingConfig,
+  type InterventionChange,
+} from '@elevator-sim/core/browser';
 
 import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
@@ -113,7 +117,12 @@ import {
 import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   GHOST_OPTIONS,
@@ -240,7 +249,7 @@ import {
   type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
-import { ghostPlanOf } from './ghostRun.js';
+import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
 import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
@@ -2847,9 +2856,28 @@ function boot(ui: Elements, resources: BrowserResources): void {
         'everything before this moment is unchanged, and playback resumes here',
     },
   });
+  /*
+   * The second intervention — § 20.12's own ordering (*start with park the cars in the lobby,
+   * then dispatcher switching*). The target is the plain baseline through `plainBaselineOf`, the
+   * § D134 resolution the ghost already uses, so the driver this hands the day to and the rival
+   * the race strip draws cannot be two different dispatchers. The label speaks the profile's
+   * *name*; the core arm carries the profile whole, exactly as `ghostRun.ts` swaps the field.
+   */
+  const switchTarget = plainBaselineOf(resources);
+  const switchButton = el(document, 'button', {
+    className: 'chip',
+    text: switchTarget === undefined ? '' : switchDispatcherLabelOf(switchTarget.name),
+    attrs: {
+      type: 'button',
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        'every decision after this moment is scored with the new dispatcher’s weights',
+    },
+  });
+  setHidden(switchButton, switchTarget === undefined);
   const interventionStrip = el(document, 'div', {
     style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
-    children: [interventionButton, interventionStamp],
+    children: [interventionButton, switchButton, interventionStamp],
   });
   {
     // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
@@ -2857,27 +2885,77 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
   }
 
-  interventionButton.addEventListener('click', () => {
+  /*
+   * The `recomputing` beat — contract § 1.4: re-simulate synchronously below ~400 ms; above it,
+   * a beat rather than a freeze. The re-run is a worker round trip, so the stage never freezes;
+   * what the beat buys is the stamp slot saying *why* the day is about to change under the
+   * playhead. Armed on press, shown only once 400 ms of wall clock have genuinely passed —
+   * a 181 ms building must not flash it — and cleared by the run landing, whose `renderAll`
+   * redraws the ordinary stamp. Wall clock, deliberately: this measures the player's wait,
+   * which is the one duration the kernel's clock cannot see.
+   */
+  let interventionRecomputeTimer: number | undefined;
+  let interventionRecomputing = false;
+  const settleRecompute = (): void => {
+    if (interventionRecomputeTimer !== undefined) window.clearTimeout(interventionRecomputeTimer);
+    interventionRecomputeTimer = undefined;
+    interventionRecomputing = false;
+  };
+
+  /** Append one entry at the playhead and re-run the day — the whole § 1.4 mechanism, shared. */
+  const appendIntervention = (change: InterventionChange): void => {
     if (state.recording === undefined || playback === undefined) return;
     const atS = playback.simTimeS;
     state = {
       ...state,
-      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
+      interventions: [...state.interventions, { atS, change }],
     };
     renderAll();
+    settleRecompute();
+    interventionRecomputeTimer = window.setTimeout(() => {
+      interventionRecomputing = true;
+      setText(interventionStamp, RECOMPUTING_BEAT);
+    }, 400);
     runShift(() => {
       // After adopt: the new Playback exists by the time a run lands, and seeking does not
       // start or stop playback — a reader who was paused stays paused at the stamped instant.
+      settleRecompute();
       playback?.seekTo(atS);
     });
+  };
+
+  interventionButton.addEventListener('click', () => {
+    appendIntervention({ kind: 'park-cars-lobby' });
+  });
+  switchButton.addEventListener('click', () => {
+    if (switchTarget === undefined) return;
+    appendIntervention({ kind: 'switch-dispatcher', profile: switchTarget });
   });
 
-  /** The strip's two live facts: whether the control can act now, and the latest stamp. */
+  /** Whether the log's latest handover already names this profile — the press would be a no-op. */
+  const alreadyDriving = (viewState: ViewerState): boolean => {
+    let latest: string | undefined;
+    for (const entry of viewState.interventions) {
+      if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
+    }
+    return latest === undefined
+      ? viewState.dispatcherId === switchTarget?.id
+      : latest === switchTarget?.id;
+  };
+
+  /** The strip's live facts: whether each control can act now, and the latest stamp. */
   function drawIntervention(view: ViewAt): void {
     const hasRun = view.recording !== undefined;
     // Disabled rather than hidden while no run is on screen: a control that cannot act now says
     // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
     interventionButton.disabled = !hasRun;
+    // Also disabled when the named driver is already driving — a handover to the incumbent is a
+    // control that moves nothing, which § D177 ranks below no control at all.
+    switchButton.disabled = !hasRun || alreadyDriving(view.state);
+    if (interventionRecomputing) {
+      setText(interventionStamp, RECOMPUTING_BEAT);
+      return;
+    }
     setText(
       interventionStamp,
       interventionStampOf(view.state.interventions, view.simTimeS, runStartOfDayS),

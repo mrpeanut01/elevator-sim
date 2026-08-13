@@ -89,6 +89,7 @@ export {
 export type { PatienceConfig, PatienceDistribution } from './patience.js';
 
 export {
+  INTERVENTION_KINDS,
   SIMULATION_STATUSES,
   SIM_DEFAULTS,
   SIM_PARAMETERS,
@@ -100,6 +101,7 @@ export {
 export type {
   ConservationAudit,
   InterventionChange,
+  InterventionKind,
   RunInterventionConfig,
   SimParameterSpec,
   SimParameterType,

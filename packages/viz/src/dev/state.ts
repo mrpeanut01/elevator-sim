@@ -401,7 +401,9 @@ export interface ViewerState {
   readonly outOfServiceCarIds: readonly string[];
   /**
    * The player's mid-run interventions, in press order — Everyday Mode's run record (contract
-   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until the stage control is pressed.
+   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until a stage intervention control
+   * is pressed — parking the fleet or handing the day to another dispatcher; a campaign
+   * incident's answer joins the same log on the day its dock lands.
    *
    * ## What survives, and what clears it — the decision, stated
    *
