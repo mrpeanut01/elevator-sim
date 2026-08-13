@@ -79,12 +79,40 @@ export interface WatchPanel {
   readonly chrome: HTMLElement;
 }
 
-const PANEL_BG = '#141a21';
-const CARD_BG = '#1c242e';
-const INK = '#23201C';
-const PAPER = '#FBF7EF';
-const MUTED = '#93a1b0';
-const TERRACOTTA = '#c96f4a';
+/* -------------------------------------------------------------------------- *
+ * Tokens
+ *
+ * Every colour this file writes is a CSS custom property **by name rather than by value** —
+ * `dev/leftRail.ts`'s rule, and § D251's. These six were hex literals, and this panel writes them
+ * into inline styles, which no `:root[data-theme]` block reaches: six dark-overlay colours that no
+ * theme could repaint, inside a product whose page is now paper (`docs/21` § 2.2 (3) names them).
+ *
+ * {@link CHROME_BG} and {@link CHROME_INK} are the **inverted** pair — § 14.1's *"the single
+ * strongest signal"*, a spectator strip drawn the other way up from the page. They are named for
+ * that role rather than for a colour, which is why they are not `INK`/`PAPER` any more: on paper
+ * the strip is light-on-dark and in the dark mode it is dark-on-light, and a constant called
+ * `PAPER` holding `var(--bg)` would be a name that is false in one of the two modes. Inverting
+ * through the two *ground* tokens keeps the contrast the page's own — `--text` on `--bg` is the
+ * body pairing, read upside down.
+ * -------------------------------------------------------------------------- */
+
+const PANEL_BG = 'var(--bg)';
+const CARD_BG = 'var(--card)';
+/** The spectator strip's ground — the page's ink, so the strip reads as inverted in both modes. */
+const CHROME_BG = 'var(--text)';
+/** Everything written on that ground: the page's own ground colour, inverted with the strip. */
+const CHROME_INK = 'var(--bg)';
+const MUTED = 'var(--dim)';
+/**
+ * The spectator accent — the reference-run marks and the primary action.
+ *
+ * `--accent` rather than `--bad`: this is *the thing you are looking at*, which is what the shell
+ * spends its accent on everywhere else (the primary Run control, the selected chip). The literal
+ * it replaces was a terracotta, and guide § 19 does spend terracotta on *"your line, live
+ * figures"* — but on this shell terracotta resolves to `--band-3`, and a spectator button in the
+ * abandoned band's red would be a colour-coded alarm about a run that is fine.
+ */
+const ACCENT = 'var(--accent)';
 
 /** The class the inverted header carries — `main.test.ts` asserts it appears exactly while watching. */
 export const WATCHING_HEADER_CLASS = 'watching-header';
@@ -121,7 +149,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
       display: 'none',
       'z-index': '40',
       background: PANEL_BG,
-      color: '#e8edf2',
+      color: 'var(--text)',
       overflow: 'auto',
       font: '14px/1.45 system-ui, sans-serif',
     },
@@ -204,7 +232,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
             ? []
             : [
                 el(doc, 'p', {
-                  style: { color: TERRACOTTA },
+                  style: { color: ACCENT },
                   text: `The shipped reference runs could not be read: ${loadFailure}`,
                 }),
               ]),
@@ -249,7 +277,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
             ...(run.source === 'reference'
               ? [
                   el(doc, 'div', {
-                    style: { color: TERRACOTTA, 'font-size': '12px', 'margin-top': '2px' },
+                    style: { color: ACCENT, 'font-size': '12px', 'margin-top': '2px' },
                     text: 'reference run · not a player',
                   }),
                 ]
@@ -258,7 +286,7 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
               ? []
               : [
                   el(doc, 'div', {
-                    style: { color: TERRACOTTA, 'font-size': '13px', 'margin-top': '6px' },
+                    style: { color: ACCENT, 'font-size': '13px', 'margin-top': '6px' },
                     text: blocked.reason,
                   }),
                 ]),
@@ -341,8 +369,8 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
     className: 'watch-chrome',
     style: {
       display: 'none',
-      background: INK,
-      color: PAPER,
+      background: CHROME_BG,
+      color: CHROME_INK,
       padding: '10px 16px',
       font: '13px/1.4 system-ui, sans-serif',
     },
@@ -373,8 +401,8 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
               width: '34px',
               height: '34px',
               'border-radius': '50%',
-              background: TERRACOTTA,
-              color: PAPER,
+              background: ACCENT,
+              color: CHROME_INK,
               display: 'flex',
               'align-items': 'center',
               'justify-content': 'center',
@@ -436,9 +464,9 @@ export function mountWatchPanel(host: WatchPanelHost): WatchPanel {
             {
               padding: '6px 14px',
               cursor: 'pointer',
-              background: action.primary ? TERRACOTTA : 'transparent',
-              color: PAPER,
-              border: `1px solid ${action.primary ? TERRACOTTA : PAPER}`,
+              background: action.primary ? ACCENT : 'transparent',
+              color: CHROME_INK,
+              border: `1px solid ${action.primary ? ACCENT : CHROME_INK}`,
               'border-radius': '6px',
             },
             () => {

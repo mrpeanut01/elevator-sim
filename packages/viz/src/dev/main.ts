@@ -1076,8 +1076,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       top: '10px',
       left: '10px',
       'z-index': '5',
-      background: '#23201C',
-      color: '#FBF7EF',
+      // The spectator pill inverts with the page, as `watchPanel.ts`'s chrome does and for
+      // § 14.1's reason — the two ground tokens read upside down, never a literal.
+      background: 'var(--text)',
+      color: 'var(--bg)',
       padding: '4px 10px',
       'border-radius': '999px',
       font: '11px/1.2 system-ui, sans-serif',
@@ -3458,8 +3460,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // The inverted treatment — § 14.1's *"the single strongest signal"*. Inline rather than in
       // `index.html`'s stylesheet for `waitLiveRegion`'s stated reason: the sheet is not this
       // lane's to edit, and the class above is what a future sheet would hook.
-      headerEl.style.setProperty('background', view === undefined ? '' : '#23201C');
-      headerEl.style.setProperty('color', view === undefined ? '' : '#FBF7EF');
+      headerEl.style.setProperty('background', view === undefined ? '' : 'var(--text)');
+      headerEl.style.setProperty('color', view === undefined ? '' : 'var(--bg)');
     }
     watchPanel.showChrome(view, watching?.run);
     watchPill.style.display = view === undefined ? 'none' : 'block';
@@ -6627,7 +6629,8 @@ if (typeof document !== 'undefined') {
   void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     const pre = document.createElement('pre');
-    pre.style.cssText = 'color:#e0473a;padding:12px;white-space:pre-wrap;font:12px ui-monospace,monospace';
+    pre.style.cssText =
+      'color:var(--bad);padding:12px;white-space:pre-wrap;font:12px var(--mono)';
     pre.textContent = `The viewer did not start.\n\n${message}`;
     document.body.prepend(pre);
   });

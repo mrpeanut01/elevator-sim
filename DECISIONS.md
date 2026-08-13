@@ -23426,3 +23426,99 @@ building it is not this decision's scope.
 The menu, the rail and the refusals are built and driven. § 4's sixteen screens are not, and the
 Everyday stage is not — `EVERYDAY_SHELL_ABSENCES` is the list, on screen. No phase verdict moves:
 Phase 9's row is about the honesty property and mode parity, and neither is touched.
+
+---
+
+## D336 — the Engineer shell is paper, and the palette pin moved with the mode it pins
+
+`docs/21-engineer-reimagined-contract.md` § 2.2 (1) asks for this in terms: *"`dev/tokens.test.ts`'s
+pins move to the new `:root` in the same commit, and the move is recorded in `DECISIONS.md` (a pin is
+a pin to a decision, and the decision is changing)."* This is that record.
+
+### What changed
+
+`packages/viz/index.html` declared the docs/12 § 1.1 S6/S7 dark palette in `:root` and an authored
+light palette in `:root[data-theme='light']`. The two blocks have **swapped**: `:root` is now guide
+§ 19's paper palette — the token language Everyday Mode already reads — and the S6/S7 values live in
+`:root[data-theme='dark']`. `render/tokens.ts#LIGHT_PALETTE` is the paper palette's home, and it
+takes every § 19-sourced value **by import from `everyday/tokens.ts`**, which is the module both
+products read. There is no third copy, and `dev/tokens.test.ts` asserts that in three directions:
+the resolver against each block, `everyday/tokens.ts` against `:root`, and the guide's § 19 fenced
+block against both, read as text.
+
+**This is a re-skin, not the deletion of a mode.** Both palettes still exist, both are still pinned
+in both directions, and the dark mode is still reachable through the same `Settings → theme` control
+it has always been reachable through. What moved is which one a reader gets when they have expressed
+no preference.
+
+### Why the values are not § 19's in five places, and why that is written down rather than decided
+
+§ 2.2 (5): *"the simulator's accessibility floor outranks the prototype's greys."* § 19's palette is
+a **fill** palette for a drawn building and a set of cards; this shell hangs 9–13 px text on almost
+every colour it owns. Measured on § 19's own paper, five of its values cannot carry that text:
+
+| claim | § 19 | measured on paper | shipped | 
+|---|---|---|---|
+| eyebrow / secondary ink | `#8D8271` | 3.38:1 | `#5d564b` |
+| accent | sun `#F2A63B` | 1.83:1 | `#8d6a2f` |
+| warning band | sun | 1.83:1 | `#8a6212` |
+| cleared / good | moss `#4F8A5B` | 3.68:1 | `#43774d` |
+| alarm / abandoned | `#D4573A` | 3.60:1 | terracotta `#B8462B` |
+
+Each shipped value is the same **family** at the value the floor demands, and the last is § 19's own
+deeper sibling rather than an invention. The deviation is not a note: `dev/tokens.test.ts` asserts
+**both halves** of every row — that § 19's value still fails the floor that forced the deviation, and
+that the shipped value clears it. A guide that moves a value past the floor turns the first half red,
+and the § 19 value is re-adopted rather than the deviation outliving its reason.
+
+### The private palettes, and the one the census missed
+
+§ 2.2 (3) named five. All five are gone, and the sweep that says so — `dev/paletteLiterals.test.ts`,
+`live/palette.test.ts`'s instrument pointed at `dev/` — found a **sixth** nobody had listed:
+`reportPanel.ts` drew the met/missed goal washes as `rgb(63 178 127 / 0.07)` and
+`rgb(224 71 58 / 0.07)`, which are the **dark** band values, frozen, on a page whose bands are now
+paper's. Both are `color-mix` over `--ok`/`--bad` now.
+
+The allowlist that sweep carries is **empty**, and that is a measurement: `dev/` draws no scrim and
+no colour the palette does not name. The stale-entry direction is asserted anyway, with a planted
+entry as its negative control, because an allowlist that only grows is a list of things nobody looks
+at (§ D192).
+
+### The shaft tints — a private palette that was also mode-blind
+
+`buildingEditor.ts#SHAFT_TINTS` held six hex literals and this editor writes them into **inline
+styles**, which no `:root[data-theme]` block reaches — § D251's defect, in the elevation. Two things
+were true of it and neither was visible: the six were dark-mode values, and five of them were the
+same string as `--accent`, `--accent-soft`, `--measured`, `--transfer` and `--secure`, so a shaft
+band and a credential-restricted floor were one colour.
+
+They are `--shaft-1…8` now, declared in both blocks, backed by `Palette` fields, projected by
+`render/theme.ts#shellTokensOf`. **Eight rather than six**, because § 19's `Shaft tints` line has
+eight. Their values deviate from § 19's for the reason the table above gives, with one addition
+specific to them: this surface draws the car's **id** in the tint, so a fill's bar is not the bar
+that applies. All sixteen clear the 4.0 hue floor on all five surfaces in both modes.
+
+`everyday/tokens.ts` deliberately ships no shaft tints — *"the lane that draws shafts adds the eight
+tints beside its caller"*. This is that lane, and *beside its caller* is read as **beside the palette
+every other colour on this surface comes from**, not in a second private list.
+
+### The evidence, and what it does not claim
+
+`dev/paperShell.browser.test.ts` drives Midtown Office at seed 42 through the player's own path
+(`enterEngineerStage` — the *Today's tower* tile, never by taking the cover off) and reads the
+**resolved** page: § 19's values on the root and on `body`, no element drawing a colour the palette
+does not own, the § 1.2 carriers still present, and the elevation's band border and label resolving
+to the paper tint through the inline style. That last one is the § D251 defect read at the pixel.
+
+No metric is asserted (§ D220 § 4). **No claim is made that the paper shell looks right** — that is
+the claim `render/tokens.ts` has always refused to make about a palette, and a driven page measures
+what is drawn rather than whether it is handsome. What is claimed is that the tokens land, that
+nothing paints around them, and that the shell still says everything § 1 says it says.
+
+### What is not claimed, and what is still owed
+
+Zero behaviour change: no logic was edited, only style values and their pinning. `dev/fixitPanel.ts`
+was **not** restyled by this lane — `fix/docs20-polish-six` had already repainted it onto the
+product's tokens, and its version is carried here verbatim (with `fixit/engine.ts`, which it
+depends on) rather than re-done. `dev/dispatcherEditor.ts` needed no migration: its only
+hex-shaped strings are GitHub issue numbers in prose.

@@ -708,7 +708,8 @@ branch-local only (L-10).
 Clause skeleton per lane is doc 10 § 11's, verbatim in shape: Acceptance / Liveness evidence /
 Non-test caller / Risk.
 
-**B1 — Tokens onto the Engineer shell** *(first; everything else depends on it)*
+**B1 — Tokens onto the Engineer shell** *(first; everything else depends on it)* — **LANDED**,
+[§ D336](../DECISIONS.md).
 Scope: `packages/viz/index.html` (custom-property blocks), `packages/viz/src/render/tokens.ts`,
 `dev/tokens.test.ts`, palette migrations in `dev/leftRail.ts`, `dev/buildingEditor.ts`
 (`SHAFT_TINTS`), `dev/watchPanel.ts`, `dev/fixitPanel.ts`, `dev/scenariosPanel.ts`,
@@ -718,6 +719,26 @@ Scope: `packages/viz/index.html` (custom-property blocks), `packages/viz/src/ren
 a driven session on Midtown Office seed 42 showing the restyled shell with every § 1.2 carrier
 present. **Non-test caller:** the shell itself — every mount already ships. **Risk:** § 19 greys
 vs the contrast floor; the deviation path is § 2.2 (5) and it is written down, not improvised.
+
+*What landed, where it differs from the plan above, and what the next lane inherits:*
+
+- **The blocks swapped rather than the light one being edited.** `:root` is paper; the S6/S7 dark
+  values live in `:root[data-theme='dark']`. Both modes stay pinned in both directions.
+- **Five § 19 values ship deepened**, each because it fails a floor this shell already enforced —
+  the risk row above, realised and recorded. The deviations are pinned *as measurements*
+  (`dev/tokens.test.ts` asserts § 19's value still fails and the shipped value clears), so a guide
+  that moves re-adopts rather than a deviation outliving its reason.
+- **`SHAFT_TINTS` went further than a value swap.** It was mode-blind — six literals written into
+  inline styles — and five of the six were another token's string. It is `--shaft-1…8` now, in the
+  `Palette` and in both blocks, and **eight** because § 19's line has eight.
+- **The sweep found two things the § 2.2 (3) census did not.** `reportPanel.ts` drew the met/missed
+  goal washes as frozen *dark* band values, and two native `<select>`s (`#view-mode`, `#race-ghost`)
+  carried the user agent's `fieldtext` rather than the palette's ink — the second found only by
+  driving the page. Both closed; `dev/paletteLiterals.test.ts`'s allowlist is **empty**.
+- **`dev/fixitPanel.ts` was not restyled here.** `fix/docs20-polish-six` had already repainted it;
+  its version is carried verbatim rather than re-done.
+- **Inherited by B2–B4:** every `var(--…)` consumer restyled with no code change, which is what
+  § 2.2 (2) promised, so no lane after this one needs to touch a colour to be on paper.
 
 **B2 — Compare, suite and report surfaces** *(after B1)*
 Scope: `dev/batchPanel.ts`, `dev/suitePanel.ts`, `dev/reportPanel.ts`, `dev/campaignPanel.ts`

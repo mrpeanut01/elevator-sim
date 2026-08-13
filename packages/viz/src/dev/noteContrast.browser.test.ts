@@ -27,8 +27,8 @@
  *
  * Run against `chrome-headless-shell-mac-arm64` with `ELEVATOR_SIM_CHROMIUM` pointed at it. Every
  * `.advice` and `.rail-prose` on the page, in both themes, agreed with the node tier to two
- * decimals: `.advice` **7.21 / 8.25** on `rgb(19 25 36)` / `rgb(251 252 254)` — `--card` — and
- * `.rail-prose` **6.35 / 5.92** on `--rail`. No pairing below 4.5:1, and the page's own resolved
+ * decimals: `.advice` **7.21 / 8.73** on `rgb(19 25 36)` / `rgb(251 247 239)` — `--card` — and
+ * `.rail-prose` **6.35 / 6.33** on `--rail`. No pairing below 4.5:1, and the page's own resolved
  * font sizes are 12 px and 11.5 px.
  *
  * ## One thing this tier saw that the other could not — and it has since been fixed
@@ -37,7 +37,7 @@
  * `class="rail-prose warn"`; `.warn { color: var(--warn) }` is declared at the top of the
  * stylesheet and `.rail-prose { … color: var(--dimmer) }` far below it; they tie on specificity, so
  * source order gave the paragraph `--dimmer` and **the `warn` class changed nothing**. Both inks
- * clear AA on `--rail` — 6.35 / 5.92 against 9.27 / 4.83 — so it was never this issue's defect. It
+ * clear AA on `--rail` — 6.35 / 6.33 against 9.27 / 4.78 — so it was never this issue's defect. It
  * was recorded rather than fixed because a class named `warn` that does not warn is § D227's
  * stale-refusal shape wearing a stylesheet's hat, and it deserved its own issue rather than a
  * silent one-line reorder inside a contrast lane.
@@ -309,22 +309,22 @@ describe.skipIf(!HAS_BROWSER)('the change-scope notes are legible on the page a 
       ),
     ].sort((a, b) => a - b);
     expect(only('advice', 'dark')).toEqual([7.21]);
-    expect(only('advice', 'light')).toEqual([8.25]);
+    expect(only('advice', 'light')).toEqual([8.73]);
     /*
      * **`.rail-prose` has two inks, and issue #143 is why.** Every user of the class draws in
-     * `--dimmer` — 6.35 / 5.92 — except `#rail-access-note`, which `.rail-prose.warn` now draws in
-     * `--warn`: 9.27 dark, 4.83 light. Both figures are the #124 lane's own measurements for
+     * `--dimmer` — 6.35 / 6.33 — except `#rail-access-note`, which `.rail-prose.warn` now draws in
+     * `--warn`: 9.27 dark, 4.78 light. Both figures are the #124 lane's own measurements for
      * `--warn` on `--rail`, taken before the class was made to bite, so this case is now the
      * confirmation that the fix landed on the ink that was already known to be legible rather than
      * on a new one nobody had checked.
      *
      * Listed as a set rather than collapsed, and sorted so the assertion does not depend on the
-     * order the page happens to yield elements in. The light pair is the one to watch: 4.83 clears
+     * order the page happens to yield elements in. The light pair is the one to watch: 4.78 clears
      * AA for normal text with less room than anything else on the page, so a token change that
      * darkens the rail or lightens the amber is red here first.
      */
     expect(only('rail-prose', 'dark')).toEqual([6.35, 9.27]);
-    expect(only('rail-prose', 'light')).toEqual([4.83, 5.92]);
+    expect(only('rail-prose', 'light')).toEqual([4.78, 6.33]);
   });
 
   it('resolves `class="rail-prose warn"` to `--warn`, because a compound rule says so', () => {
