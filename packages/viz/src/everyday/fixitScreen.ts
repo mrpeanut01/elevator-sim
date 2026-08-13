@@ -68,6 +68,7 @@ import {
   classifyOutcome,
   EDITOR_PRICING,
   emptyFixitState,
+  fixedBadgeAfter,
   repairRowOf,
   budgetNoteOf,
   spendOf,
@@ -776,13 +777,10 @@ function mountFixit(
        * *"9 waits → 9 waits · 0 % of it went away"* — two verdicts about one case on one screen.
        * The badge, the § 3.3 primary and the outcome card all read this one run.
        *
-       * Written here as the predicate rather than imported because
-       * `fixit/engine.ts#fixedBadgeAfter` — which states exactly this and is the function to
-       * consume — landed on `integration/everyday-and-engineer` after this branch left it. At
-       * merge this line becomes `session.fixed = fixedBadgeAfter(session.outcome);` and the
-       * comment above goes with it, so the rule has one home rather than two.
+       * The rule itself lives in `fixit/engine.ts#fixedBadgeAfter`, which both this screen and the
+       * Engineer panel consume, so the two surfaces cannot come to disagree about what FIXED means.
        */
-      session.fixed = session.outcome.kind === 'fixed';
+      session.fixed = fixedBadgeAfter(session.outcome);
       running = false;
       if (!alive) return;
       render();
