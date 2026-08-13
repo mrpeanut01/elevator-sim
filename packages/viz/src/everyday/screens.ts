@@ -139,6 +139,18 @@ export function routeFor(screen: EverydayScreen): EverydayRoute {
  * touch a thing that works) and on an unbuilt key with no sentence (a control that silently does
  * nothing). The wording follows `modes.ts`'s rule: where the thing behind the screen exists, the
  * refusal is about the screen, never about the thing.
+ *
+ * ## Read it, and let a missing key throw — never `?? 'a sentence of your own'`
+ *
+ * A caller that reads a key from this table and supplies its own fallback has written § D227's
+ * defect with a delay fuse: the day the key's screen is registered, the key disappears from here
+ * **and the fallback silently takes over**, so the surface goes on refusing a screen that now
+ * opens, and the test above cannot see it because the table itself is correct. The whole point of
+ * this table being keyed exactly is that its absences are load-bearing.
+ *
+ * So a surface that offers a route to another screen asks {@link isScreenBuilt} first and calls
+ * {@link unbuiltReasonFor} only in the arm where that is `false` — which throws on a built key,
+ * loudly, at the one moment a fallback would have gone quiet.
  */
 export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> = Object.freeze({
   door: "the front door screen is not built — Today's tower opens the day directly",
