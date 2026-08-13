@@ -144,7 +144,8 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
           .filter((tile) => tile instanceof HTMLButtonElement && tile.disabled)
           .map((tile) => tile.textContent ?? ''),
       );
-      expect(refusals).toHaveLength(3);
+      // Two, since the fixit screen landed: the campaign and the rush still refuse.
+      expect(refusals).toHaveLength(2);
       // Not a greyed tile with nothing on it — the handoff's definition of done requires the words.
       for (const refusal of refusals) expect(refusal).toMatch(/not built yet/);
     } finally {

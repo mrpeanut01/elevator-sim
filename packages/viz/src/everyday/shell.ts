@@ -47,7 +47,7 @@ import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
-import type { EverydayScreenHandle } from './screens.js';
+import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -72,6 +72,37 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
   '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
+
+/**
+ * What the shell actually hands a screen's `mount` — the registry's contract plus the one seam
+ * only the shell can provide: **the § 3.3 bar is the shell's element**, so a screen whose state
+ * changes one of its cells (the fixit primary going `Run the day → Run it again`, the solved
+ * inversion) cannot redraw it and must ask. `refreshBar` re-resolves the row through the mounted
+ * module's `bar()` refinement and repaints, nothing else.
+ *
+ * Declared here rather than widening `screens.ts`'s {@link EverydayScreenContext}, deliberately:
+ * the registry's contract stays the minimum a screen needs, and this is the shell's own extension
+ * — every context the shell constructs satisfies it, and a screen that accepts this type is
+ * saying it can only be mounted by the shell, which is true of every screen (`screens.ts`'s
+ * registry has exactly one consumer).
+ */
+export interface EverydayScreenShellContext extends EverydayScreenContext {
+  /** Redraw the § 3.3 row for the current state, through the mounted module's `bar()`. */
+  refreshBar(): void;
+}
+
+/**
+ * What a mounted screen may hand back beyond `unmount`: the answer to the § 3.3 primary.
+ *
+ * The primary is the shell's button (§ 3.1 — no screen declares its own footer), so a registered
+ * screen receives its press through the handle rather than drawing a second primary in the
+ * region. Optional because a screen whose primary is resolved inert (`BarPrimary.inert`) or whose
+ * row's primary navigates (none shipped yet) may have nothing to answer — and the shell draws an
+ * inert primary disabled, so a missing handler is never a live button that silently does nothing.
+ */
+export interface MountedEverydayScreen extends EverydayScreenHandle {
+  primary?(): void;
+}
 
 const RAIL_WIDTH_PX = 212;
 
@@ -148,7 +179,7 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
   let runOpen = false;
 
   /** The registered screen currently mounted in the region, so navigation can unmount it. */
-  let mounted: EverydayScreenHandle | undefined;
+  let mounted: MountedEverydayScreen | undefined;
 
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
@@ -641,8 +672,15 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
    */
   function drawBar(): void {
     bar.replaceChildren();
-    const model: ActionBarModel = actionBarFor(state);
-    const refusing = routeFor(state.screen) === 'refusal';
+    /*
+     * A registered screen refines the resolved row through its module's `bar()` — the § 3.3 cells
+     * the guide leaves state-dependent are that screen's to substitute, and the shell draws
+     * whatever comes back (`screens.ts`'s contract: an edited row, never a new shape).
+     */
+    const route = routeFor(state.screen);
+    const module = route === 'screen' ? screenModuleFor(state.screen) : undefined;
+    const model: ActionBarModel = module?.bar?.(state) ?? actionBarFor(state);
+    const refusing = route === 'refusal';
 
     const leaveBtn = el(doc, 'button', 'everyday-bar-leave', model.leave.label);
     leaveBtn.type = 'button';
@@ -730,11 +768,23 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
       primaryBtn.disabled = true;
       primaryBtn.style.cssText = QUIET + ';cursor:not-allowed';
       primaryBtn.title = unbuiltReasonFor(state.screen);
+    } else if (model.primary.inert === true) {
+      /* A resolved-inert primary — a screen state in which the press genuinely cannot act, e.g.
+       * the fixit pair mid-run. Disabled rather than ignoring the click, so the button never
+       * looks pressable while doing nothing. */
+      primaryBtn.disabled = true;
+      primaryBtn.style.cssText += ';opacity:.6;cursor:default';
     } else if (state.screen === EVERYDAY_ROOT) {
       /* § 3.3's menu row: the primary plays the selected card. */
       primaryBtn.addEventListener('click', () => {
         const picked = EVERYDAY_MODES.find((mode) => mode.pick === (state.modePick ?? 'today'));
         if (picked !== undefined && isPlayable(picked)) go(picked.screen);
+      });
+    } else if (route === 'screen') {
+      /* A registered screen answers the primary through its mount handle — see
+       * {@link MountedEverydayScreen}. */
+      primaryBtn.addEventListener('click', () => {
+        mounted?.primary?.();
       });
     }
     bar.append(primaryBtn);
@@ -897,13 +947,15 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
       const module = screenModuleFor(state.screen);
       if (module !== undefined) {
         screenRegion.replaceChildren();
-        mounted = module.mount(screenRegion, {
+        const context: EverydayScreenShellContext = {
           ctx: state.ctx,
           go,
           setRunOpen: (open) => {
             runOpen = open;
           },
-        });
+          refreshBar: drawBar,
+        };
+        mounted = module.mount(screenRegion, context);
         return;
       }
     }

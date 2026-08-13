@@ -49,7 +49,16 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
-import { ACTION_BAR_ROWS, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
+import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
+import {
+  buildingLineOf,
+  FIXIT_SCREEN_COPY,
+  fixitBarModel,
+  fixitCaseRailModel,
+  fixitMachineryRows,
+  fixitRepairStateLine,
+  fixitSpendSummary,
+} from '../everyday/fixitScreenModel.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
@@ -86,6 +95,7 @@ import {
   emptyFixitState,
   repairRowOf,
   spendOf,
+  stepSpeed,
   toggleExtra,
   toggleRepair,
   type FixitMeasurement,
@@ -6211,6 +6221,21 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#toggleRepair',
   'fixit/engine.ts#toggleExtra',
   'fixit/run.ts#figureValuesOf',
+  /*
+   * The Everyday screen's pure half (GAMEPLAY § 10, `everyday/fixitScreen.ts` is the DOM half and
+   * is excluded on the mounts' shared ground). These hold every word the screen draws of its own —
+   * the rail chrome and its derived `{fixed}/{total}`, the § 3.3 substitutions the fixit row
+   * leaves state-dependent, the § 9-priced stepper lines and the running-total split — and they
+   * are driven below over states the engine's own reducers build. `buildingLineOf` is not listed
+   * because the derivation does not find it (a `·`-joined name and floor count carries no two
+   * adjacent prose words); it is rendered below anyway, inside the rail rows.
+   */
+  'everyday/fixitScreenModel.ts#FIXIT_SCREEN_COPY',
+  'everyday/fixitScreenModel.ts#fixitCaseRailModel',
+  'everyday/fixitScreenModel.ts#fixitBarModel',
+  'everyday/fixitScreenModel.ts#fixitMachineryRows',
+  'everyday/fixitScreenModel.ts#fixitSpendSummary',
+  'everyday/fixitScreenModel.ts#fixitRepairStateLine',
 ];
 
 function fixitSearchCase(context: HonestyContext): FixitCase {
@@ -6370,6 +6395,100 @@ const FIXIT: SurfaceAdapter = {
     ] as const) {
       seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
       seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ================================================================== *
+     * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
+     *
+     * Everything above is the machinery both surfaces read; everything here is what
+     * `everyday/fixitScreen.ts` draws around it, held pure in `fixitScreenModel.ts` precisely so
+     * it can be driven here (the mount itself is DOM-bound and excluded, exactly as the Engineer
+     * panel's is). The states are built by the engine's own reducers wherever a reducer can reach
+     * them, on this adapter's established habit.
+     * ================================================================== */
+
+    /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
+    for (const [where, solvedIds] of [
+      ['none-solved', new Set<string>()],
+      ['one-solved', new Set([entry.id])],
+    ] as const) {
+      const rail = fixitCaseRailModel([entry], solvedIds, entry.id, () =>
+        buildingLineOf(context.buildingName, context.recording.floors.length),
+      );
+      seeds.push({ field: `rail.${where}.heading`, text: rail.heading, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `rail.${where}.hint`, text: rail.hint, role: 'prose', provenance: 'authored' });
+      /*
+       * `{fixed}/{total} fixed` is a count of the rows beside it, so it is an observation with its
+       * own denominator on the face of it — the R13 shape, declared rather than left to the
+       * property to infer.
+       */
+      seeds.push({
+        field: `rail.${where}.count`,
+        text: rail.count,
+        role: 'observation',
+        declaredCount: rail.rows.length,
+        countShown: true,
+      });
+      for (const row of rail.rows) {
+        seeds.push({ field: `rail.${where}.tag`, text: row.tag, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `rail.${where}.tower`, text: row.towerLine, role: 'observation' });
+      }
+    }
+
+    /* ---- the § 3.3 substitutions, over all four states the screen can be in ---- */
+    const barBase = actionBarFor({ screen: 'fixit', ctx: 'daily' });
+    for (const [where, view] of [
+      ['unready', { ready: false, running: false, ran: false, solved: false }],
+      ['ready', { ready: true, running: false, ran: false, solved: false }],
+      ['ran', { ready: true, running: false, ran: true, solved: false }],
+      ['running', { ready: true, running: true, ran: false, solved: false }],
+      ['solved', { ready: true, running: false, ran: true, solved: true }],
+    ] as const) {
+      const row = fixitBarModel(barBase, view);
+      seeds.push({ field: `bar.${where}.primary`, text: row.primary.label, role: 'label', provenance: 'authored' });
+      if (row.note !== undefined) {
+        seeds.push({ field: `bar.${where}.note`, text: row.note, role: 'prose', provenance: 'authored' });
+      }
+      if (row.wayOut !== undefined && row.inverted) {
+        seeds.push({ field: `bar.${where}.wayOut`, text: row.wayOut, role: 'label', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the § 9-priced steppers, at the budget and under it ---- */
+    for (const [where, machineState, affordable] of [
+      ['affordable', empty, true],
+      ['at-budget', { ...empty, speedSteps: 1, capacitySteps: 1 }, false],
+    ] as const) {
+      for (const row of fixitMachineryRows(machineState, affordable, affordable)) {
+        seeds.push({ field: `machines.${where}.${row.key}.label`, text: row.label, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `machines.${where}.${row.key}.readout`, text: row.readout, role: 'observation' });
+        seeds.push({ field: `machines.${where}.${row.key}.priced`, text: row.priced, role: 'label' });
+      }
+    }
+
+    /* ---- the running total's two lines, on states the reducers built ---- */
+    for (const [where, state] of [
+      ['nothing', empty],
+      ['repairs', spent],
+      ['machinery', stepSpeed(entry, empty, 1)],
+    ] as const) {
+      const summary = fixitSpendSummary(entry, spendOf(entry, state));
+      seeds.push({ field: `spend.${where}.spent`, text: summary.spentLine, role: 'observation' });
+      seeds.push({ field: `spend.${where}.committed`, text: summary.committedLine, role: 'observation' });
+      seeds.push({ field: `spend.${where}.capital`, text: summary.capitalLine, role: 'observation' });
+    }
+
+    /* ---- the repair row's state word, all three arms ---- */
+    for (const [where, row] of [
+      ['selected', { selected: true, refusal: undefined }],
+      ['affordable', { selected: false, refusal: undefined }],
+      ['refused', { selected: false, refusal: repairRowOf(entry, spent, entry.repairs[3]!).refusal }],
+    ] as const) {
+      seeds.push({
+        field: `repair.state.${where}`,
+        text: fixitRepairStateLine(row),
+        role: where === 'refused' ? 'reason' : 'label',
+      });
     }
 
     return singleRun(this.id, seeds);

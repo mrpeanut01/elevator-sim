@@ -146,6 +146,19 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * static sweep below, which is a stated limitation exactly as it is for the menu.
          */
         'dev/fixitPanel.ts#mountFixitPanel',
+        /*
+         * The Everyday Fix-a-building **screen** (GAMEPLAY § 10), on the mounts' shared ground and
+         * on the same split the Everyday shell sits on: it draws into the shell's scroll region,
+         * so it cannot run without a document. Its pure half is `everyday/fixitScreenModel.ts`,
+         * whose six producers the FIXIT adapter drives — the rail chrome and its derived
+         * `{fixed}/{total}`, the § 3.3 substitutions over all five screen states, the § 9-priced
+         * stepper lines, the running-total split and the repair state word — beside the engine
+         * and run producers both this screen and the Engineer panel above read. What is left here
+         * is the one sentence the mount authors of its own: the load-failure line, which is mount
+         * status text on exactly the footing of every mount in this group, reaching only the
+         * static sweep below.
+         */
+        'everyday/fixitScreen.ts#FIXIT_SCREEN',
       ],
     },
     {
