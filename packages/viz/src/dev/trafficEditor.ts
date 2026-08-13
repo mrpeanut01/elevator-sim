@@ -315,8 +315,8 @@ export function previewSegmentsOf(
       startS: phase.startS,
       endS: phase.endS,
       span: phase.endS - phase.startS,
-      bg: palette?.bg ?? '#161e2a',
-      fg: palette?.fg ?? '#6d7b8d',
+      bg: palette?.bg ?? 'var(--phase-steady)',
+      fg: palette?.fg ?? 'var(--phase-ink)',
       title:
         `${names.long} · ${hhmm(dayStartS + phase.startS)}–${hhmm(dayStartS + phase.endS)} · ` +
         `${rate.toFixed(1)} %pop/5 min${inReportWindow ? ' · inside the reported window' : ''}`,

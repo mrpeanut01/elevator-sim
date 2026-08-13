@@ -14,7 +14,7 @@
  * `.menu-row-detail` inherited a grey styled for a card and was drawn on `.menu-start`'s accent
  * fill, so the one sentence explaining why Start would not start was present in the DOM and
  * invisible on the screen. The negative control below re-derives that pairing through this file's
- * own resolver — 1.16 and 1.66 on today's raised ink ladder, 1.03 and 1.46 on the one that shipped
+ * own resolver — 1.16 and 1.88 on today's raised ink ladder, 1.03 and 1.46 on the one that shipped
  * it — which is how the instrument is shown to be able to fail.
  *
  * These nine sentences exist *because* a control's commitment was previously unstated. A note that
@@ -42,8 +42,8 @@
  *
  * | class | ink | size | ground | dark | light | AA 4.5:1 |
  * |---|---|---|---|---|---|---|
- * | `.advice` | `--dim` | 12 px | `--card` (`.editor-panel`) | **7.21:1** | **8.25:1** | pass |
- * | `.rail-prose` | `--dimmer` | 11.5 px | `--rail` (`.rail`) | **6.35:1** | **5.92:1** | pass |
+ * | `.advice` | `--dim` | 12 px | `--card` (`.editor-panel`) | **7.21:1** | **8.73:1** | pass |
+ * | `.rail-prose` | `--dimmer` | 11.5 px | `--rail` (`.rail`) | **6.35:1** | **6.33:1** | pass |
  *
  * **The issue's concern is unfounded for both classes, and that is a result rather than an
  * absence.** Nothing was changed to make it so, and no note was moved: § D235 had already raised
@@ -54,8 +54,8 @@
  * class rather than a note is that its future users are covered too:
  *
  * - `#rail-access-note` carries `class="rail-prose warn"`. Every ink any matching rule *proposes*
- *   is held to the bar, not merely the one the cascade elects — `--dimmer` at 6.35 / 5.92 and
- *   `--warn` (an alias of `--band-1`) at 9.27 / 4.83 — so the verdict below does not depend on this
+ *   is held to the bar, not merely the one the cascade elects — `--dimmer` at 6.35 / 6.33 and
+ *   `--warn` (an alias of `--band-1`) at 9.27 / 4.78 — so the verdict below does not depend on this
  *   file's re-implementation of the cascade being right about which of the two wins. It is not:
  *   `.warn` is declared far above `.rail-prose` and they tie on specificity, so the browser gives
  *   that paragraph `--dimmer` and the `warn` class changes nothing. Confirmed in the browser tier,
@@ -63,7 +63,7 @@
  *   stale-refusal shape in a stylesheet and wants an issue of its own, not a silent reorder inside
  *   a contrast lane.
  * - The tenth paragraph the mount sweep finds is `dispatcherEditor.ts`'s own § D227 refusal, a
- *   `.helpful` with an inline `color: var(--warn)` on `--card`: 8.77 / 5.33. It is in because the
+ *   `.helpful` with an inline `color: var(--warn)` on `--card`: 8.77 / 5.12. It is in because the
  *   sweep is *every paragraph a mount inserts beside a manifest element* rather than *paragraphs in
  *   two named classes*, which is the difference between a derivation and a list.
  *
@@ -879,9 +879,9 @@ describe('the change-scope notes clear WCAG 2.2 AA where they are actually drawn
       return Number(ratio(ink[0] as string, ground[0] as string, theme).toFixed(2));
     };
     expect(at('advice', 'dark')).toBe(7.21);
-    expect(at('advice', 'light')).toBe(8.25);
+    expect(at('advice', 'light')).toBe(8.73);
     expect(at('rail-prose', 'dark')).toBe(6.35);
-    expect(at('rail-prose', 'light')).toBe(5.92);
+    expect(at('rail-prose', 'light')).toBe(6.33);
   });
 
   it('negative control: re-derives the 1.03:1 pairing `menuPanel.test.ts` records', () => {
@@ -891,7 +891,7 @@ describe('the change-scope notes clear WCAG 2.2 AA where they are actually drawn
      * `var(--accent)`, and that pairing is far under the bar in both themes. The **1.03** and
      * **1.46** `index.html` and `menuPanel.test.ts` both quote were measured against the
      * pre-§ D235 `--dim` (`#8b98a9`); on today's raised ladder the same pairing is **1.16** and
-     * **1.66**, which is what this asserts. Either way it is a failure, and the point is that this
+     * **1.88**, which is what this asserts. Either way it is a failure, and the point is that this
      * file would have said so before a player did.
      *
      * The token is read out of the stylesheet's own base rule rather than named here, so the
@@ -902,7 +902,7 @@ describe('the change-scope notes clear WCAG 2.2 AA where they are actually drawn
     expect(cardInk).toEqual(['--dim']);
     const accent = groundTokensOf(synthetic('button', 'menu-start', null)).tokens[0] as string;
     expect(Number(ratio('--dim', accent, 'dark').toFixed(2))).toBe(1.16);
-    expect(Number(ratio('--dim', accent, 'light').toFixed(2))).toBe(1.66);
+    expect(Number(ratio('--dim', accent, 'light').toFixed(2))).toBe(1.88);
     for (const theme of ['dark', 'light'] as const) {
       expect(ratio('--dim', accent, theme), `${theme}: the control passed the bar`).toBeLessThan(
         AA_BODY,
@@ -988,8 +988,8 @@ describe('what this tier cannot see is bounded rather than merely disclaimed', (
  * off the element before the fix.
  *
  * **It was never a contrast defect**, which is why the lane that found it recorded it instead of
- * fixing it: both candidate inks clear AA on `--rail` (`--dimmer` 6.35 dark / 5.92 light, `--warn`
- * 9.27 / 4.83). Nothing was unreadable. What was wrong is that the markup claimed a register the
+ * fixing it: both candidate inks clear AA on `--rail` (`--dimmer` 6.35 dark / 6.33 light, `--warn`
+ * 9.27 / 4.78). Nothing was unreadable. What was wrong is that the markup claimed a register the
  * screen did not deliver — § D227's stale-refusal shape, living in a stylesheet instead of a
  * docstring — and the editor's counterpart `#ed-access-note`, which carries `warn` **alone** and so
  * had nothing to tie with, had been rendering the same sentence in `--warn` the whole time. One

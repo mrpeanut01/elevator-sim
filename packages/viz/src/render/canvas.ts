@@ -241,6 +241,15 @@ export const DARK_PALETTE: tokens.Palette = Object.freeze({
   bandLong: tokens.BAND_LONG,
   bandAbandoned: tokens.BAND_ABANDONED,
 
+  shaftGold: tokens.SHAFT_GOLD,
+  shaftSage: tokens.SHAFT_SAGE,
+  shaftTerracotta: tokens.SHAFT_TERRACOTTA,
+  shaftBrass: tokens.SHAFT_BRASS,
+  shaftSlate: tokens.SHAFT_SLATE,
+  shaftTan: tokens.SHAFT_TAN,
+  shaftGrey: tokens.SHAFT_GREY,
+  shaftMustard: tokens.SHAFT_MUSTARD,
+
   skyDawn: tokens.SKY_DAWN,
   skyDay: tokens.SKY_DAY,
   skyDusk: tokens.SKY_DUSK,

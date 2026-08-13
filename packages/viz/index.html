@@ -6,10 +6,13 @@
     <title>Elevator Sim — shift mode</title>
     <!-- An inline icon so /favicon.ico stops 404ing on every load — the only console error every
          session carried, training a reader to ignore the console (§ D198). Two shaft rects and a
-         car, in the page's own tokens (--bg #0b0e14, --accent #4f9ee8, near --edge). -->
+         car, in guide § 19's tokens: the Casual rail's ink ground (#23201C), its raised-surface
+         edge (#4A443A, `everyday/tokens.ts#EVERYDAY_RAIL_SURFACES`), and sun (#F2A63B — "doors,
+         active nav") for the cars. Ink rather than paper, because a favicon on a pale tab strip
+         needs a ground of its own. -->
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0e14'/%3E%3Crect x='3' y='2' width='4' height='12' fill='%23223046'/%3E%3Crect x='9' y='2' width='4' height='12' fill='%23223046'/%3E%3Crect x='3.5' y='7' width='3' height='4' fill='%234f9ee8'/%3E%3Crect x='9.5' y='3' width='3' height='4' fill='%234f9ee8'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2323201C'/%3E%3Crect x='3' y='2' width='4' height='12' fill='%234A443A'/%3E%3Crect x='9' y='2' width='4' height='12' fill='%234A443A'/%3E%3Crect x='3.5' y='7' width='3' height='4' fill='%23F2A63B'/%3E%3Crect x='9.5' y='3' width='3' height='4' fill='%23F2A63B'/%3E%3C/svg%3E"
     />
     <!--
       ============================================================================
@@ -57,68 +60,81 @@
          and the values below are the same numbers. If you change one, change both
          — `src/dev/tokens.test.ts` is what notices if you do not.
 
-         Values are the handoff's, § 1.1 S6 / S7.
+         Values are the Casual guide's § 19 paper palette — the token language both
+         products share (`docs/21-engineer-reimagined-contract.md` § 2.2), sourced
+         from `src/everyday/tokens.ts` via `render/tokens.ts`'s light palette and
+         pinned here by `src/dev/tokens.test.ts`. The semantic names below are
+         RE-POINTED, never renamed: every `var` consumer restyles with no code
+         change, which is the point of the indirection. Five § 19 values fail the
+         measured contrast floors on their own paper and ship deepened instead —
+         the deviations table in `render/tokens.ts`'s light palette carries the
+         figures, and `dev/tokens.test.ts` pins each § 19 value as *failing*, so a
+         guide that moves to a passing value goes red here and is re-adopted.
+
+         The dark mode below it is docs/12 § 1.1 S6 / S7, unchanged — the restyle
+         is a re-skin, not a deletion of a mode.
          ====================================================================== */
       :root {
-        color-scheme: dark;
+        color-scheme: light;
 
-        /* Surfaces, darkest first. */
-        --bg: #0b0e14;
-        --rail: #0e131b;
-        --panel: #10151e;
-        --card: #131924;
-        --raised: #16212f;
-        --edge: #212a36;
-        /* The handoff's *second* edge, one step lighter than `--edge` and darker than
-           `--edge-strong`. It is not decoration: the handoff spends it at six specific sites — the
-           range track (`:14`), the scrollbar thumb (`:17`), the phase pill's border (`:43`), the
-           report head's rule (`:240`), the segmented control's border (`:835`) and the footer copy
-           button's border (`:954`) — and every one of them was rendering at `--edge` here, with
-           `.report-head` carrying a raw `#26303d` literal that made this file's own "declared once"
-           rule false. Declared once, used six times, literal deleted. */
-        --edge-mid: #26303d;
-        --edge-strong: #2f3a49;
-        --hairline: #1a212c;
-        /* The dotted rule under a term that carries a tooltip. The handoff uses one colour for it
-           at every one of its seven `cursor:help` sites (`:81–84` and five more), and it is not
-           `--edge-strong` — a hint's underline is lighter than a control's border on purpose. */
-        --hint-underline: #3f4b5c;
+        /* Surfaces, deepest first — § 19's own ramp: the sunk pair as the grounds,
+           paper as the panel every card draws — § 19 marks it "page, cards" — the
+           § 19 card above it, and white as the fifth surface § 19 does not name. */
+        --bg: #f2eadb;
+        --rail: #f5efe3;
+        --panel: #f7f2e8;
+        --card: #fbf7ef;
+        --raised: #ffffff;
+        --edge: #ddd1be;
+        /* The second edge, one step stronger than `--edge` and lighter than
+           `--edge-strong` — § 19's rule triplet, in reverse strength order, because
+           on paper a line is darker than the card it borders. */
+        --edge-mid: #d6c9b4;
+        /* The strongest line the shell draws is the prototype's own control border
+           — its ghost buttons and dashed outlines all carry this exact literal. */
+        --edge-strong: #c9bba4;
+        --hairline: #e2d6c1;
+        /* The dotted rule under a term that carries a tooltip: § 19's faint warm
+           grey, darker than a control's border on purpose — the same relationship
+           the dark mode draws with the signs flipped. */
+        --hint-underline: #a79b87;
 
-        /* Ink — the ladder, and the three rungs § D235 raised.
+        /* Ink — § 19's ladder, held to § D235's floors.
 
-           The artefact's values were `--dim: #8b98a9`, `--dimmer: #6d7b8d`, `--faint: #4d5a6b`,
-           and the bottom two of those do not carry text at a size a reader can read: `--faint`
-           measures 2.75:1 on `--bg`, 2.60:1 on `--panel` and 2.31:1 on `--raised`, and it is the
-           ink of sixteen rules below — the Compare/Lab/Parameters tab labels, the timeline's
-           o'clock ticks, `.decision-time`, `.legend-title`, `.eyebrow-note`, `.slider-sub`,
-           `.zmatrix th`. WCAG 2.2 AA asks 4.5:1 at those sizes; none of them is 24 px, or
-           18.66 px bold, so AA Large's 3:1 is not available to any of them either.
+           § 19's own rungs are ink `#23201C`, ink-soft `#4C463D`, then warm greys
+           `#6E665A`, `#8D8271`, `#A79B87`, `#C6B79F`. The label grey `#8D8271` —
+           § 19's eyebrow ink — measures 3.38:1 on paper, and every rung here
+           carries 9–13 px text somewhere below, so WCAG 2.2 AA asks 4.5:1 of all
+           four with no large-text carve-out. Only `#6E665A` clears it, at 4.73:1
+           on `--bg`, which leaves it exactly the bottom rung: the ladder's
+           visible-step rule needs 1.05× headroom per rung above it. So `--dimmer`
+           is an authored rung between § 19's ink-soft and warm grey, and the
+           eyebrow register reads it instead of § 19's label grey — the deviation
+           `render/tokens.ts` records and `dev/tokens.test.ts` pins by measurement.
+           `--fainter` keeps § 19's faintest grey: nothing draws it. */
+        --text: #23201c;
+        --dim: #4c463d;
+        --dimmer: #5d564b;
+        --faint: #6e665a;
+        --fainter: #c6b79f;
 
-           Each rung now clears **4.5:1 against all five surfaces above**, worst case on
-           `--raised`: 13.81 / 6.65 / 5.54 / 4.57. `--dim` moved only to keep a visible step above
-           `--dimmer`, which took `--dim`'s old value. `--fainter` did not move — nothing draws
-           it; see `render/tokens.ts#TEXT_FAINTER`.
-
-           `src/render/tokens.test-adjacent` — really `src/dev/tokens.test.ts` — pins every value
-           here to `render/tokens.ts`, and `render/theme.test.ts` holds the four to the floor. */
-        --text: #e8edf4;
-        --dim: #9aa7b8;
-        --dimmer: #8b98a9;
-        --faint: #7c899a;
-        --fainter: #3d4956;
-
-        /* Accent. */
-        --accent: #4f9ee8;
-        --accent-soft: #7fb6f0;
-        --accent-ink: #08131f;
+        /* Accent — § 19's sun family at reading value. Sun itself (`#F2A63B`) is
+           1.83:1 on paper and cannot carry a focus ring or a word; this is the
+           prototype's own dark gold, the ink it writes timestamps and eyebrows in
+           wherever they sit on paper or amber. */
+        --accent: #8d6a2f;
+        --accent-soft: #6b5124;
+        --accent-ink: #fff9ec;
 
         /* The wait-age bands. Used by every claim about how long somebody has
            stood, on every surface, so that the rail, the canvas and the report
-           cannot disagree about what amber means. § 1.1 S7. */
-        --band-0: #3fb27f;
-        --band-1: #e0b040;
-        --band-2: #e0773a;
-        --band-3: #e0473a;
+           cannot disagree about what amber means. Claim-order unchanged — green,
+           amber, orange, red — in § 19's hue families at reading value: moss one
+           step deeper, deep sun, the orange between, § 19's terracotta. */
+        --band-0: #43774d;
+        --band-1: #8a6212;
+        --band-2: #b04a14;
+        --band-3: #b8462b;
 
         /* Three stage colours the shell draws too, since § D236 gave the stage a key. A car's
            body says its load in four steps — `--band-0` under a quarter full, `--accent` carrying,
@@ -126,21 +142,40 @@
            direction arrow beside it is `--waiting-up` or `--waiting-down`, the same two the
            landing marks use. The key's swatches read these, so the key and the canvas cannot
            disagree about what amber means. `render/tokens.ts` is still the source of all six. */
-        --car-heavy: #e0a03a;
-        --waiting-up: #57c7a6;
-        --waiting-down: #c07ad8;
+        --car-heavy: #a5620a;
+        --waiting-up: #0d7069;
+        --waiting-down: #8438b0;
+
+        /* The elevation editor's eight shaft tints — § 19's last palette line, one per bank.
+           They were six literals inside `src/dev/buildingEditor.ts`, which writes them into
+           inline styles: an inline style is not reached by a `:root[data-theme]` block, so they
+           were a palette no theme could repaint (§ D251's defect, in the elevation). Five of the
+           six were also the same string as `--accent`, `--accent-soft`, `--measured`,
+           `--transfer` and `--secure`, so a shaft and a restricted floor were one colour. Both
+           close here. Values are `render/tokens.ts`'s, deepened from § 19's fill palette because
+           this surface draws the car's id *in* the tint — the § 2.2 (5) deviation path. */
+        --shaft-1: #96681a;
+        --shaft-2: #4f6f64;
+        --shaft-3: #a83e24;
+        --shaft-4: #7d5423;
+        --shaft-5: #3f5f6b;
+        --shaft-6: #a85c22;
+        --shaft-7: #5f5850;
+        --shaft-8: #6f6413;
 
         /* Aliases kept because the vocabulary below reads better with them, and
            because `ok`/`warn`/`bad` is what the disclosure layer already calls
-           these three ideas. */
+           these three ideas — § 2.2's re-pointing lands here for free: `--ok` is
+           moss-deep, `--warn` is sun-deep, `--bad` is terracotta, because the
+           bands they alias moved. */
         --ok: var(--band-0);
         --warn: var(--band-1);
         --bad: var(--band-3);
-        --over: #e0563a;
-        --transfer: #c69ad8;
-        --entrance: #6f8fd6;
-        --secure: #c9a56a;
-        --measured: #9fc48a;
+        --over: #bc3a20;
+        --transfer: #7b3f96;
+        --entrance: #2e6da4;
+        --secure: #86612a;
+        --measured: #3d7a2e;
 
         /* The transport's phase strip — one plate and one ink per demand phase, § D251.
            `src/live/timeline.ts` names these; it holds no colour of its own.
@@ -194,15 +229,21 @@
         --phase-unknown: color-mix(in srgb, var(--raised) 35%, var(--card));
         --phase-quiet: var(--card);
 
-        /* Type. Two families: prose and figures. § 1.1 S8. */
-        --sans: 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
-        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        /* Type. § 19's three families — headings, prose, figures — with this
+           file's previous stacks kept behind them as fallbacks, since no webfont
+           is shipped and the leading name only binds where the reader has it.
+           `src/dev/tokens.test.ts` pins the three leading families to
+           `src/everyday/tokens.ts`'s EVERYDAY_TYPE. */
+        --heading: 'Familjen Grotesk', 'Instrument Sans', 'Helvetica Neue', system-ui, sans-serif;
+        --sans: 'Instrument Sans', 'Helvetica Neue', Helvetica, system-ui, -apple-system, sans-serif;
+        --mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-        /* Geometry. */
-        --r-card: 12px;
-        --r-panel: 11px;
-        --r-control: 7px;
-        --r-chip: 6px;
+        /* Geometry. The radii are § 19's scale — 14 cards, 12 tiles, 8 controls —
+           pinned to EVERYDAY_RADII by `src/dev/tokens.test.ts`. */
+        --r-card: 14px;
+        --r-panel: 12px;
+        --r-control: 8px;
+        --r-chip: 8px;
         --rail-left: 296px;
         --rail-right: 364px;
 
@@ -231,15 +272,15 @@
       }
 
       /* ======================================================================
-         The light mode — the same twenty-seven tokens, resolved for a bright page.
+         The dark mode — docs/12 § 1.1 S6 / S7, value for value.
 
-         Values are `src/render/tokens.ts`'s `LIGHT_PALETTE`, projected onto these
+         This block held the *light* palette until the § 19 restyle made paper the
+         page's own `:root`; the S6/S7 values moved here in the same commit, and
+         the move is the decision `dev/tokens.test.ts` now pins — a re-skin, not a
+         deletion of a mode. Values are `render/canvas.ts`'s `DARK_PALETTE`
+         (assembled from `render/tokens.ts`'s own constants), projected onto these
          property names by `src/render/theme.ts#shellTokensOf`, and pinned to this
-         block in both directions by `src/dev/tokens.test.ts`. Authored rather than
-         quoted from the handoff: the artefact has one mode. Nothing here has been
-         seen in a browser — `docs/16` S9's evidence tiers — so the checks on it
-         are arithmetic (a contrast floor, no token equal to its dark counterpart,
-         and the same collisions the dark palette has and no others).
+         block in both directions by `src/dev/tokens.test.ts`.
 
          Type and geometry tokens are deliberately absent: they are mode-
          independent, and restating them would be a second place `--rail-left` has
@@ -247,63 +288,74 @@
          and need no restatement either.
 
          `color-scheme` is not decoration. Without it the browser draws its own
-         surfaces — scrollbars, `<select>` popups, form controls — in dark, which
+         surfaces — scrollbars, `<select>` popups, form controls — in light, which
          is the one failure of this feature no token assertion would catch.
          ====================================================================== */
-      :root[data-theme='light'] {
-        color-scheme: light;
+      :root[data-theme='dark'] {
+        color-scheme: dark;
 
-        /* Surfaces: a grey ground rising to white, so a raised plate is never a hole. */
-        --bg: #e7ebf2;
-        --rail: #eef1f6;
-        --panel: #f5f7fa;
-        --card: #fbfcfe;
-        --raised: #ffffff;
+        /* Surfaces, darkest first. */
+        --bg: #0b0e14;
+        --rail: #0e131b;
+        --panel: #10151e;
+        --card: #131924;
+        --raised: #16212f;
 
-        /* Lines: away from the surface, as in dark — darker than the card here, lighter there. */
-        --hairline: #e0e5ee;
-        --edge: #ccd4e0;
-        --edge-mid: #bac4d3;
-        --edge-strong: #9aa7b9;
-        --hint-underline: #8593a7;
+        /* Lines: away from the surface, as on paper — lighter than the card here,
+           darker than it there. The second edge sits between `--edge` and
+           `--edge-strong`; the hint underline is lighter than a control's border
+           on purpose. */
+        --hairline: #1a212c;
+        --edge: #212a36;
+        --edge-mid: #26303d;
+        --edge-strong: #2f3a49;
+        --hint-underline: #3f4b5c;
 
-        /* Ink: losing contrast from `--text` down. `--dim` is the *higher*-contrast secondary,
-           which is the order the dark palette already uses. § D235's ladder in this mode: the
-           three sub-`--text` rungs clear 4.5:1 against `--bg`, which is the *darkest* light
-           surface and therefore the worst ground for dark ink — 7.08 / 5.61 / 4.67, against the
-           6.24 / 4.22 / 2.97 they replaced. */
-        --text: #101720;
-        --dim: #424e5d;
-        --dimmer: #515d6c;
-        --faint: #5d6978;
-        --fainter: #99a3b0;
+        /* Ink — the ladder, and the three rungs § D235 raised. The artefact's
+           values were `--dim: #8b98a9`, `--dimmer: #6d7b8d`, `--faint: #4d5a6b`;
+           the bottom two failed AA at the 9–13 px they carry, and each rung here
+           clears 4.5:1 against all five surfaces above, worst case on `--raised`:
+           13.81 / 6.65 / 5.54 / 4.57. `--fainter` did not move — nothing draws
+           it; see `render/tokens.ts#TEXT_FAINTER`. */
+        --text: #e8edf4;
+        --dim: #9aa7b8;
+        --dimmer: #8b98a9;
+        --faint: #7c899a;
+        --fainter: #3d4956;
 
-        /* Accent. `--accent-soft` is the link colour, so it is darker than the accent here and
-           lighter than it in dark — in both cases away from the page. `--accent-ink` is drawn on
-           the accent fill and inverts with it rather than with the page. */
-        --accent: #1c6fc4;
-        --accent-soft: #15528f;
-        --accent-ink: #f2f8ff;
+        /* Accent. */
+        --accent: #4f9ee8;
+        --accent-soft: #7fb6f0;
+        --accent-ink: #08131f;
 
-        /* The wait-age bands. § 1.1 S7's four are a dark-mode specification — `#3fb27f` on
-           `#f5f7fa` is 2.3:1 — so the light mode keeps the four hues and the ladder order and
-           takes the value each needs to be legible ink on a pale card. */
-        --band-0: #1c7a55;
-        --band-1: #8a6212;
-        --band-2: #b04a14;
-        --band-3: #bf2a1c;
+        /* The wait-age bands — § 1.1 S7's four, verbatim. */
+        --band-0: #3fb27f;
+        --band-1: #e0b040;
+        --band-2: #e0773a;
+        --band-3: #e0473a;
 
-        /* `LIGHT_PALETTE`'s `carHeavy`, `waitingUp` and `carDown` — the same three the dark block
-           declares, from the same source. */
-        --car-heavy: #a5620a;
-        --waiting-up: #0d7069;
-        --waiting-down: #8438b0;
+        /* The stage key's three — § D236, from the same source as the paper ones. */
+        --car-heavy: #e0a03a;
+        --waiting-up: #57c7a6;
+        --waiting-down: #c07ad8;
 
-        --over: #bc3a20;
-        --transfer: #7b3f96;
-        --entrance: #37599f;
-        --secure: #86612a;
-        --measured: #3d7a2e;
+        /* The eight shaft tints in this mode — § 19's own hues taken bright rather than deep,
+           since the ground is dark. Eight distinct values: the six they replace borrowed five
+           other tokens' strings, and a shaft is its own claim. */
+        --shaft-1: #c08a3e;
+        --shaft-2: #7e8f86;
+        --shaft-3: #c3644d;
+        --shaft-4: #9b7c48;
+        --shaft-5: #72837a;
+        --shaft-6: #d09a5a;
+        --shaft-7: #857e74;
+        --shaft-8: #c9a227;
+
+        --over: #e0563a;
+        --transfer: #c69ad8;
+        --entrance: #6f8fd6;
+        --secure: #c9a56a;
+        --measured: #9fc48a;
       }
 
       * { box-sizing: border-box; }
@@ -318,6 +370,18 @@
       a { color: var(--accent-soft); }
       a:hover { color: var(--text); }
       select, button, input, textarea { font-family: inherit; }
+      /* A native control's ink is the user agent's, not the palette's.
+         `<select>` takes `color: fieldtext`, which `color-scheme` resolves to black on paper and
+         to white in dark: legible in both, and a colour no custom property owns in either. Two
+         selects on this shell carry no rule of their own — `#view-mode` in the header (issue #72's
+         mode control) and `#race-ghost` in the race strip — and they were the only elements on the
+         page drawing outside the palette, found by driving it rather than by reading it
+         (`dev/paperShell.browser.test.ts`). A base rule closes the *class* rather than the two
+         instances; `.coach select` and `.field-inline select` are more specific and still win. */
+      select {
+        color: var(--text); background: var(--rail);
+        border: 1px solid var(--edge-strong); border-radius: var(--r-control);
+      }
 
       ::-webkit-scrollbar { width: 9px; height: 9px; }
       ::-webkit-scrollbar-thumb { background: var(--edge-mid); border-radius: 9px; }
@@ -517,7 +581,7 @@
          wordmark (`:30`) and building name (`:36`) both render at the 16px UA default; this file
          does set one, so both had to be stated or they inherited 13px and the header came out 19%
          small. The two rules below are the whole of that correction. */
-      .brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+      .brand-name { font: 700 16px var(--heading); letter-spacing: -0.01em; }
       .brand-mode { font: 500 10px/1.2 var(--mono); color: var(--dimmer); letter-spacing: 0.08em; }
 
       .topbar-building {
@@ -526,7 +590,7 @@
         flex: 1 1 180px; min-width: 120px; overflow: hidden;
       }
       .topbar-building h1 {
-        font: 600 16px var(--sans); margin: 0;
+        font: 600 16px var(--heading); margin: 0;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
       }
       .topbar-right {
@@ -663,7 +727,7 @@
         border-radius: 10px; background: linear-gradient(90deg, var(--raised), var(--panel));
       }
       .coach-rule { width: 1px; align-self: stretch; background: var(--edge); flex: none; }
-      .coach-title { font-size: 13.5px; font-weight: 600; margin-top: 2px; white-space: nowrap; }
+      .coach-title { font: 600 13.5px var(--heading); margin-top: 2px; white-space: nowrap; }
       /* § D235 / issue #76: `#c6d0dc` was a dark-mode grey no token declares, and it is the line
          the app writes for a **new player** — 1.31:1 on the light page. */
       .coach-hint { font-size: 12.5px; color: var(--dim); line-height: 1.4; }
@@ -860,7 +924,7 @@
         display: flex; align-items: center; justify-content: center; font-size: 24px;
         border: 1.5px solid var(--edge);
       }
-      .mood-headline { font-weight: 600; font-size: 15px; line-height: 1.25; }
+      .mood-headline { font: 600 15px/1.25 var(--heading); }
       .mood-sub { font: 500 11px var(--mono); color: var(--dimmer); margin-top: 2px; }
       .mood-bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; margin-top: 14px; background: var(--bg); gap: 1px; }
       .mood-legend {
@@ -886,7 +950,7 @@
       .history-label { font: 500 9px var(--mono); color: var(--dimmer); }
 
       .shift-head { padding: 11px 13px; background: linear-gradient(var(--raised), var(--card)); border-bottom: 1px solid var(--edge); }
-      .shift-event { font-size: 13px; font-weight: 600; line-height: 1.3; }
+      .shift-event { font: 600 13px/1.3 var(--heading); }
       .shift-note { font-size: 11.5px; color: var(--dim); line-height: 1.45; margin-top: 3px; }
       .goal { }
       .goal-line { display: flex; gap: 7px; align-items: baseline; }
@@ -899,7 +963,7 @@
 
       .honesty { margin-top: 14px; border: 1px solid var(--edge); border-radius: var(--r-card); padding: 12px 13px; }
       .honesty-body { display: flex; gap: 8px; align-items: flex-start; }
-      .honesty-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
+      .honesty-title { font: 600 13px/1.35 var(--heading); }
       .honesty-plain { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 3px 0 0; }
       #honesty-toggle {
         margin-top: 8px; background: none; border: 1px solid var(--edge-strong); color: var(--dim);

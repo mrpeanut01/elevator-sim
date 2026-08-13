@@ -59,6 +59,7 @@ import {
   savedBuildingFrom,
   selectedTransportOf,
   selectedZoneOf,
+  SHAFT_TINTS,
   shaftTintOf,
   stateRunningSaved,
   skyChipsOf,
@@ -504,8 +505,20 @@ describe('the elevation’s shaft bands', () => {
   });
 
   it('gives every bank index a tint, wrapping rather than running out', () => {
-    expect(shaftTintOf(0)).toBe(shaftTintOf(6));
+    // Guide § 19's `Shaft tints` line has **eight**, so the wrap is at eight — it was six until
+    // `docs/21` § 2.2 (3)'s migration. Derived from the exported set rather than written as a
+    // literal, so the day a ninth tint lands this reads the wrap it actually has.
+    expect(shaftTintOf(0)).toBe(shaftTintOf(SHAFT_TINTS.length));
     expect(shaftTintOf(0)).not.toBe(shaftTintOf(1));
+    expect(SHAFT_TINTS.length).toBe(8);
+  });
+
+  it('names a token for every tint, so the elevation follows the theme — § D251', () => {
+    // The defect this closes: the six were hex literals, and this editor writes them into inline
+    // styles, which no `:root[data-theme]` block reaches. A literal here is a colour no mode can
+    // repaint, and `dev/paletteLiterals.test.ts` is the sweep that keeps it that way.
+    for (const tint of SHAFT_TINTS) expect(tint).toMatch(/^var\(--shaft-[1-8]\)$/);
+    expect(new Set(SHAFT_TINTS).size).toBe(SHAFT_TINTS.length);
   });
 });
 

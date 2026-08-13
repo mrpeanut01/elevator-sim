@@ -123,12 +123,14 @@ describe('the token names are derived from the stylesheet, not listed', () => {
     }
   });
 
-  it('is the shipped palette, value for value, on the dark side', async () => {
-    // The dark palette is not a design decision made here; it is `index.html`'s, and seventeen of
-    // its values come from `render/tokens.ts`. If this goes red, either the stylesheet moved or
-    // this module became the fourth copy of a palette § 2.2 of the handoff counted three of.
+  it('is the shipped palette, value for value, on the paper side', async () => {
+    // The paper palette is not a design decision made here; it is `index.html`'s `:root` — guide
+    // § 19's values, the page's default since the docs/21 § 2.2 restyle swapped the blocks. If
+    // this goes red, either the stylesheet moved or this module became the fourth copy of a
+    // palette § 2.2 of the handoff counted three of. The dark block is pinned the same way by
+    // `dev/tokens.test.ts`.
     const stylesheet = await stylesheetTokens();
-    for (const [token, value] of Object.entries(tokensOf('dark'))) {
+    for (const [token, value] of Object.entries(tokensOf('light'))) {
       expect(value.toLowerCase(), `${token}`).toBe(stylesheet.get(token));
     }
   });
@@ -168,8 +170,8 @@ describe('light and dark are different palettes', () => {
   });
 
   it('keeps the surface ladder monotone, in the direction that reads as elevation', () => {
-    // Ground → raised. Both palettes lighten; the light one starts at a grey and ends at white,
-    // which is the light-mode convention rather than a mirror of the dark ladder.
+    // Ground → raised. Both palettes lighten; the light one starts at § 19's sunk paper and ends
+    // at white, which is the light-mode convention rather than a mirror of the dark ladder.
     for (const name of ['dark', 'light'] as const) {
       const tokens = tokensOf(name);
       const ladder = ['--bg', '--rail', '--panel', '--card', '--raised'].map((token) =>
@@ -417,6 +419,21 @@ const CONTENT_ON_PANEL = [
   '--entrance',
   '--secure',
   '--measured',
+  // The elevation's eight shaft tints. Content rather than scenery, and the distinction decides
+  // the bar: `buildingEditor.ts` draws the car's **id** in the tint, not merely a band edge, so
+  // each has to be legible on the panel the elevation sits on. They are never the only signal —
+  // the id is the label itself and the legend row spells `{id} · {role} · {serves}` (KB-15) — so
+  // they sit on `FLOOR` with the other hue tokens rather than on the ink ladder's AA bound. All
+  // sixteen values clear `FLOOR` on all **five** surfaces in both modes; the tightest is the
+  // paper gold at 4.09 on `--bg` and the dark grey at 4.05 on `--raised`.
+  '--shaft-1',
+  '--shaft-2',
+  '--shaft-3',
+  '--shaft-4',
+  '--shaft-5',
+  '--shaft-6',
+  '--shaft-7',
+  '--shaft-8',
 ];
 
 /** Drawn *on* the accent fill, so it is measured against the accent and not against the page. */
