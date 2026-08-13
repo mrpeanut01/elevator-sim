@@ -1049,7 +1049,16 @@
          editor's two columns are both substantial — and to the two-column layout: below 768 px
          `.editor-grid` stacks (the RX-03 block near the foot of this sheet), and a sticky first
          section in a single column would ride over the panel below it. */
-      @media (min-width: 768px) {
+      /* The gate is the *grid being two columns*, which no viewport query can express: the sheet
+         is narrowest at wide windows (at 1440 both rails are visible and the sheet is ~540 px —
+         one column) and widest in drawer mode (at the audit's 1280 the sheet is ~750 px — two
+         columns). A `min-width: 768px` media guard shipped first and the tier caught it the same
+         day: sticky in a single-column stack rides the catalogue over the editor panel below it,
+         and `dispatcherStrip.browser.test.ts`'s run-verb press was intercepted by a pick card. So
+         the sheet is the container and the query is the grid's own two-column threshold —
+         `minmax(330px, 1fr)` × 2 + the 20 px gap. */
+      #panel-dispatcher .sheet { container-type: inline-size; }
+      @container (min-width: 680px) {
         #panel-dispatcher .editor-grid > div:first-child {
           align-self: start; position: sticky; top: 0;
           /* Measured before shipping: the pick list is ~800 px tall and the sheet's scrollport at
