@@ -58,7 +58,7 @@ import {
   EVERYDAY_RAIL_SURFACES as RAIL_SURFACE,
   EVERYDAY_TYPE as TYPE,
 } from './tokens.js';
-import type { EverydayMode, EverydayScreen, EverydayState } from './types.js';
+import type { EverydayMode, EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
 
 /**
@@ -488,15 +488,34 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * Drawing
    * ---------------------------------------------------------------- */
 
+  /**
+   * § 3.2's two campaign options, from the career the host holds.
+   *
+   * `inCampaign` and `openBuilding` are what gate the rail's `CAMPAIGN` group and name its middle
+   * row, and both are facts about the campaign rather than about the shell — so they are read from
+   * the host at draw time rather than latched. No host (a cold load, or a build with no campaign)
+   * answers `{}`, which is the group not being drawn: a desk row labelled from nothing would be the
+   * invented-label defect `rail.ts` refuses one layer down.
+   */
+  function campaignRailOptions(): { inCampaign?: boolean; openBuilding?: string | undefined } {
+    if (state.ctx !== 'campaign' || dataHost === undefined) return {};
+    const career = dataHost.campaign();
+    const open = career.towers.find((tower) => tower.id === career.openTowerId);
+    return {
+      inCampaign: career.towers.length > 0,
+      openBuilding: open === undefined ? undefined : dataHost.buildingById(open.buildingId)?.name,
+    };
+  }
+
   function drawRail(): void {
     rail.replaceChildren();
     const stored = profileStore.current();
-    const model: RailModel = railModel(
-      state,
-      stored === undefined
+    const model: RailModel = railModel(state, {
+      ...campaignRailOptions(),
+      ...(stored === undefined
         ? {}
-        : { profile: { name: stored.name, avatarColor: stored.avatarColor } },
-    );
+        : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
+    });
 
     /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
@@ -996,7 +1015,16 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       tile.append(why);
     } else {
       tile.addEventListener('click', () => {
-        state = { ...state, modePick: mode.pick };
+        /*
+         * § 18's `ctx` follows the mode the tile commits to, and it is set **here** rather than
+         * inferred from the screen: `stage` and `report` are one component per flow, § 3.3 splits
+         * their bar rows by `ctx`, and `rail.ts` draws the `CAMPAIGN` group only inside one. A
+         * campaign entered with `ctx: 'daily'` would put the daily timeline under § 8's screens
+         * and hide the group that navigates them.
+         */
+        const ctx: RunContext =
+          mode.pick === 'campaign' ? 'campaign' : mode.pick === 'rush' ? 'rush' : 'daily';
+        state = { ...state, modePick: mode.pick, ctx };
         go(mode.screen);
       });
     }

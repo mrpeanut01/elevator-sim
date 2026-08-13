@@ -31,6 +31,7 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import { BUILDING_SCREEN, CONTRACT_SCREEN, TOWERS_SCREEN } from './campaignScreens.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
 import { SETTINGS_SCREEN } from './settingsScreen.js';
@@ -81,7 +82,13 @@ export interface EverydayScreenModule {
  * sentence from {@link UNBUILT_REASONS}.**
  */
 const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModule>>> =
-  Object.freeze({ fixit: FIXIT_SCREEN, settings: SETTINGS_SCREEN });
+  Object.freeze({
+    towers: TOWERS_SCREEN,
+    building: BUILDING_SCREEN,
+    contract: CONTRACT_SCREEN,
+    fixit: FIXIT_SCREEN,
+    settings: SETTINGS_SCREEN,
+  });
 
 /** The two screens the shell itself provides — see the module docstring. */
 const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'stage']);
@@ -135,9 +142,6 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
   door: "the front door screen is not built — Today's tower opens the day directly",
   brief: 'the brief screen is not built — the day starts without it',
   report: 'the report screen is not built — the Engineer stage draws its own report',
-  towers: 'the campaign runs, but its Everyday screens are not built yet',
-  building: 'the campaign runs, but its Everyday screens are not built yet',
-  contract: 'the campaign runs, but its Everyday screens are not built yet',
   rush: 'not built yet — the rush needs held time and a setup screen, and neither exists',
   workshop: 'the workshop screen is not built — the levers live on the stage for now',
   bench: 'the bench screen is not built — its suite runs from the Engineer shell',

@@ -253,6 +253,8 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/fixitScreen.ts',
   /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
   'everyday/settingsScreen.ts',
+  /* GAMEPLAY § 8's three campaign screens — their words stay pure in campaignModel.ts. */
+  'everyday/campaignScreens.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
 ]);
