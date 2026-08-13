@@ -1,12 +1,16 @@
 /**
- * **The Everyday Mode shell** — GAMEPLAY § 3.1's geometry, § 3.2's rail, § 3.3's action bar.
+ * **The Everyday Mode shell** — GAMEPLAY § 3.1's geometry, § 3.2's rail, § 3.3's action bar,
+ * § 3.4's leave friction, and the router over § 4's seventeen screen keys.
  *
  * ## What it owns, and what it hands off
  *
  * It owns the frame: a 212 px rail, a scroll region showing **one screen at a time**, and a pinned
- * action bar. It draws the menu itself, because the menu is the shell's own front door (§ 3.5).
- * Every other screen it either hands off to the existing Engineer surface — which is what actually
- * runs a day today — or refuses with the reason, per `modes.ts` and `rail.ts`.
+ * action bar drawn from `actionBar.ts`'s table — no screen declares its own footer (§ 3.1). It
+ * draws the menu itself, because the menu is the shell's own front door (§ 3.5). Every other key
+ * is routed by `screens.ts`: a registered screen module mounts into the region, `stage` hands off
+ * to the existing Engineer surface, and an unregistered key draws that key's one refusal sentence
+ * — the same sentence the rail's caption and the mode tiles read, so no two surfaces refuse in
+ * different words.
  *
  * ## The hand-off, stated plainly
  *
@@ -26,8 +30,8 @@
  *
  * It is also honest about being a seam rather than the finished § 4 product: the stage a player
  * reaches is the Engineer stage with Casual copy, not § 7's Everyday stage with its race strip
- * geometry and campaign dock. {@link EVERYDAY_SHELL_ABSENCES} is the register, and the menu and
- * rail both read from the same refusal strings rather than each inventing their own.
+ * geometry and campaign dock. {@link EVERYDAY_SHELL_ABSENCES} is the register, and the menu, the
+ * rail and the router all read from the same refusal strings rather than each inventing their own.
  *
  * ## Why the app opens here and cannot be told not to
  *
@@ -37,8 +41,20 @@
  * calls {@link EverydayShell.go} after mounting, which is a navigation a player could also perform.
  */
 
+import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
+import type { ActionBarModel } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { railModel } from './rail.js';
+import type { RailModel } from './rail.js';
+import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
+import type { EverydayScreenHandle } from './screens.js';
+import {
+  EVERYDAY_COLORS as C,
+  EVERYDAY_GAPS as GAP,
+  EVERYDAY_RADII as R,
+  EVERYDAY_RAIL_SURFACES as RAIL_SURFACE,
+  EVERYDAY_TYPE as TYPE,
+} from './tokens.js';
 import type { EverydayMode, EverydayScreen, EverydayState } from './types.js';
 import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
 
@@ -52,8 +68,7 @@ import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
 export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
   "§ 7's Everyday stage — the stage shown is the Engineer surface with Casual copy",
   '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
-  '§ 3.3’s timeline segments and note field in the action bar',
-  '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out',
+  '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out there, and § 3.4’s mid-run confirm strip has no writer until an Everyday stage reports a run open',
   '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
@@ -82,12 +97,23 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** The eyebrow style § 19 specifies — mono, small, tracked, `label` grey. */
+const EYEBROW = `font:500 10px ${TYPE.mono};letter-spacing:.14em;color:${C.label};text-transform:uppercase`;
+
 /** The mounted shell. */
 export interface EverydayShell {
   readonly root: HTMLElement;
   /** Navigate. Exposed for tests and for the rail; there is no initial-screen argument (§ 3.5). */
   go(screen: EverydayScreen): void;
   state(): EverydayState;
+  /**
+   * § 3.4's mid-run latch. While `true` and the player is on the stage, the bar's left button
+   * (and the rail's Main menu row, which runs the same exit) shows the confirm strip instead of
+   * leaving. Nothing sets it in this build — the handed-off Engineer stage does not report run
+   * state, which {@link EVERYDAY_SHELL_ABSENCES} names — so it exists for the stage lane and for
+   * the tests that pin § 3.4's behaviour.
+   */
+  setRunOpen(open: boolean): void;
   /** Remove the shell and restore the Engineer surface. Used by the Engineer swap once built. */
   destroy(): void;
 }
@@ -116,7 +142,13 @@ export interface EverydayShellHost {
  * a default.
  */
 export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}): EverydayShell {
-  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', history: [] };
+  let state: EverydayState = { screen: EVERYDAY_ROOT, ctx: 'daily', modePick: 'today' };
+
+  /** § 3.4's latch — see {@link EverydayShell.setRunOpen}. */
+  let runOpen = false;
+
+  /** The registered screen currently mounted in the region, so navigation can unmount it. */
+  let mounted: EverydayScreenHandle | undefined;
 
   const root = el(doc, 'div', EVERYDAY_ROOT_CLASS);
 
@@ -133,24 +165,27 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
     'left:0',
     'display:grid',
     'overflow:hidden',
-    'background:var(--bg,#0b0d12)',
-    'color:var(--ink,#e8ecf4)',
+    `background:${C.paperDeep}`,
+    `color:${C.ink}`,
+    `font-family:${TYPE.body}`,
     `z-index:${String(SHELL_Z_INDEX)}`,
   ].join(';');
   const FULL = COMMON + `;right:0;grid-template-columns:${RAIL} minmax(0,1fr)`;
   const STRIP = COMMON + `;width:${RAIL};grid-template-columns:${RAIL}`;
   root.style.cssText = FULL;
 
-  /* --- The rail (§ 3.2). Scrolls independently of the screen region. --- */
+  /* --- The rail (§ 3.2). Dark ink ground; scrolls independently of the screen region. --- */
   const rail = el(doc, 'nav', 'everyday-rail');
   rail.setAttribute('aria-label', 'Everyday Mode');
   rail.style.cssText = [
     'overflow-y:auto',
-    'border-right:1px solid var(--edge,#222836)',
-    'padding:14px 12px',
+    `background:${C.ink}`,
+    `color:${C.paper}`,
+    'padding:18px 14px',
     'display:flex',
     'flex-direction:column',
-    'gap:14px',
+    `gap:${String(GAP.section)}px`,
+    'box-sizing:border-box',
   ].join(';');
 
   /* --- Main: the screen region above, the pinned bar below (§ 3.1). --- */
@@ -159,17 +194,22 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
     'display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;min-width:0';
 
   const screenRegion = el(doc, 'div', 'everyday-screen');
-  screenRegion.style.cssText = 'overflow-y:auto;padding:28px 32px;min-width:0';
+  screenRegion.style.cssText = [
+    'overflow-y:auto',
+    'padding:28px 32px',
+    'min-width:0',
+    `background:linear-gradient(160deg,${C.paper},${C.paperDeep} 60%,${C.paperDeeper})`,
+  ].join(';');
 
   /* § 3.3. Owned by the shell — no screen declares its own footer. */
   const bar = el(doc, 'div', 'everyday-bar');
   bar.style.cssText = [
     'display:flex',
     'align-items:center',
-    'gap:10px',
+    `gap:${String(GAP.row + 2)}px`,
     'padding:10px 16px',
-    'border-top:1px solid var(--edge,#222836)',
-    'background:var(--card,#11141c)',
+    `border-top:1px solid ${C.rule}`,
+    `background:${C.card}`,
     'min-height:52px',
   ].join(';');
 
@@ -305,9 +345,7 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
   });
 
   function go(screen: EverydayScreen): void {
-    const history =
-      screen === EVERYDAY_ROOT ? [] : [...state.history, state.screen].filter((s) => s !== screen);
-    state = { ...state, screen, history };
+    state = { ...state, screen };
     draw();
     /*
      * **After the draw, and that ordering is a fix rather than a preference.** `draw` is what lifts
@@ -319,10 +357,34 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
     if (screen !== EVERYDAY_ROOT) host.onEnter?.(screen);
   }
 
-  function back(): void {
-    const previous = state.history[state.history.length - 1] ?? EVERYDAY_ROOT;
-    state = { ...state, screen: previous, history: state.history.slice(0, -1) };
-    draw();
+  /**
+   * § 3.4, in one place: the bar's left button and the rail's Main menu row both land here.
+   *
+   * A watched run never warns — `⤺ Stop watching` returns to the board immediately and clears the
+   * spectator context. Mid-run only — the stage, with a run open — the bar becomes the confirm
+   * strip. Everywhere else it leaves immediately: a report is already after the fact, and warning
+   * about it would be theatre. Leaving clears the context.
+   */
+  function requestLeave(): void {
+    if (state.screen === EVERYDAY_ROOT) return;
+    if (state.ctx === 'watch') {
+      state = { ...state, ctx: 'daily' };
+      go('board');
+      return;
+    }
+    const strip = confirmStripFor(state.ctx);
+    if (state.screen === 'stage' && runOpen && strip !== undefined) {
+      drawConfirm(strip.question, strip.consequence, strip.leaveLabel, strip.stayLabel);
+      return;
+    }
+    doLeave();
+  }
+
+  /** Leave for real: clear the flow and land on the menu. */
+  function doLeave(): void {
+    runOpen = false;
+    state = { ...state, ctx: 'daily' };
+    go(EVERYDAY_ROOT);
   }
 
   /* ---------------------------------------------------------------- *
@@ -331,132 +393,397 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
 
   function drawRail(): void {
     rail.replaceChildren();
-    const model = railModel(state);
+    const model: RailModel = railModel(state);
 
+    /* The brand block — the little lift glyph beside the two-line name, per the prototype. */
     const brand = el(doc, 'div');
-    brand.append(
-      el(doc, 'div', undefined, model.brand),
-      el(doc, 'div', undefined, model.mode),
-    );
-    const [name, mode] = [brand.children[0] as HTMLElement, brand.children[1] as HTMLElement];
-    name.style.cssText = 'font-weight:650;font-size:15px';
-    mode.style.cssText =
-      'font-size:10px;letter-spacing:.14em;color:var(--dim,#8b93a7);margin-top:2px';
+    brand.style.cssText = 'display:flex;align-items:center;gap:10px';
+    const glyph = el(doc, 'div');
+    glyph.style.cssText = [
+      'width:24px',
+      'height:30px',
+      'border-radius:4px',
+      `background:${C.sun}`,
+      'display:flex',
+      'align-items:flex-end',
+      'justify-content:center',
+      'overflow:hidden',
+      'flex:none',
+    ].join(';');
+    const door = el(doc, 'div');
+    door.style.cssText = `width:100%;height:11px;background:${C.ink};opacity:.85`;
+    glyph.append(door);
+    const names = el(doc, 'div');
+    const name = el(doc, 'div', undefined, model.brand);
+    name.style.cssText = `font:700 16px ${TYPE.heading};letter-spacing:-.01em`;
+    const modeLine = el(doc, 'div', undefined, model.mode);
+    modeLine.style.cssText = `font:500 9.5px ${TYPE.mono};color:${C.fainter};letter-spacing:.14em;margin-top:1px`;
+    names.append(name, modeLine);
+    brand.append(glyph, names);
     rail.append(brand);
 
     /* Main menu, with § 3.2's live subline. Pressing it runs the same exit as the bar's left. */
+    const onMenu = state.screen === EVERYDAY_ROOT;
     const menuRow = el(doc, 'button', 'everyday-rail-menu');
     menuRow.type = 'button';
     menuRow.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:10px',
       'text-align:left',
-      'background:transparent',
-      'border:1px solid var(--edge,#222836)',
-      'border-radius:8px',
-      'padding:8px 10px',
-      'color:inherit',
+      `background:${onMenu ? C.sun : 'transparent'}`,
+      `border:1px solid ${onMenu ? C.sun : RAIL_SURFACE.edge}`,
+      'border-radius:11px',
+      'padding:11px 13px',
+      `color:${onMenu ? C.ink : C.fainter}`,
       'cursor:pointer',
+      'width:100%',
+      'box-sizing:border-box',
     ].join(';');
-    const menuLabel = el(doc, 'div', undefined, 'Main menu');
-    menuLabel.style.cssText = 'font-size:13px';
-    const sub = el(doc, 'div', undefined, model.subline);
-    sub.style.cssText = 'font-size:10px;letter-spacing:.1em;color:var(--dim,#8b93a7);margin-top:2px';
-    menuRow.append(menuLabel, sub);
-    menuRow.addEventListener('click', () => {
-      go(EVERYDAY_ROOT);
-    });
+    const home = el(doc, 'span', undefined, '⌂');
+    home.style.cssText = 'flex:none;font-size:12px';
+    const menuText = el(doc, 'span');
+    menuText.style.cssText = 'min-width:0';
+    const menuLabel = el(doc, 'span', undefined, 'Main menu');
+    menuLabel.style.cssText = `display:block;font:600 15px ${TYPE.heading}`;
+    const sub = el(doc, 'span', undefined, model.subline);
+    sub.style.cssText = `display:block;font:500 9.5px ${TYPE.mono};letter-spacing:.06em;color:${onMenu ? C.ink : C.label};margin-top:1px`;
+    menuText.append(menuLabel, sub);
+    menuRow.append(home, menuText);
+    menuRow.addEventListener('click', requestLeave);
     rail.append(menuRow);
 
     for (const group of model.groups) {
       const block = el(doc, 'div');
       const title = el(doc, 'div', undefined, group.title);
-      title.style.cssText =
-        'font-size:10px;letter-spacing:.12em;color:var(--dim,#8b93a7);margin:0 0 6px 2px';
+      title.style.cssText = `${EYEBROW};margin:0 0 7px 4px`;
       block.append(title);
       for (const item of group.items) {
+        const open = item.unavailable === undefined;
+        const active = open && item.screen === state.screen;
         const row = el(doc, 'button');
         row.type = 'button';
-        row.disabled = item.unavailable !== undefined;
+        row.disabled = !open;
         row.style.cssText = [
           'display:block',
           'width:100%',
           'text-align:left',
-          'background:transparent',
+          `background:${active ? C.sun : 'transparent'}`,
           'border:0',
-          'padding:5px 2px',
+          `border-radius:${String(R.control)}px`,
+          'padding:8px 10px',
           'font-size:13px',
-          'cursor:' + (item.unavailable === undefined ? 'pointer' : 'not-allowed'),
-          'color:' + (item.unavailable === undefined ? 'inherit' : 'var(--dim,#8b93a7)'),
+          'font-weight:600',
+          'cursor:' + (open ? 'pointer' : 'not-allowed'),
+          `color:${active ? C.ink : open ? C.fainter : C.warmGrey}`,
         ].join(';');
-        row.textContent = item.label;
-        if (item.unavailable !== undefined) row.title = item.unavailable;
-        else
+        const label = el(doc, 'span', undefined, item.label);
+        row.append(label);
+        if (item.unavailable !== undefined) {
+          /*
+           * The refusal is a drawn caption, not only a tooltip — the same argument the mode tiles
+           * make: a `title` attribute is not a sentence a player reads.
+           */
+          const why = el(doc, 'span', undefined, item.unavailable);
+          why.style.cssText = `display:block;font-size:10px;font-weight:400;color:${C.label};margin-top:2px`;
+          row.append(why);
+        } else {
           row.addEventListener('click', () => {
             go(item.screen);
           });
+        }
         block.append(row);
       }
       rail.append(block);
     }
 
-    /* § 3.2's footer. The Engineer swap is a product-level route and is stubbed. */
+    /* § 3.2's footer: identity card, the bordered Settings row, the stubbed Engineer swap. */
     const footer = el(doc, 'div');
-    footer.style.cssText = 'margin-top:auto;display:flex;flex-direction:column;gap:6px';
+    footer.style.cssText = 'margin-top:auto;padding-top:18px';
+
+    const card = el(doc, 'div', 'everyday-identity');
+    card.style.cssText = `border-radius:${String(R.well)}px;background:${RAIL_SURFACE.card};padding:11px 12px`;
+    const cardTop = el(doc, 'div');
+    cardTop.style.cssText = 'display:flex;align-items:center;gap:8px';
+    const avatar = el(doc, 'span', undefined, model.footer.identity.initial);
+    avatar.style.cssText = [
+      'width:24px',
+      'height:24px',
+      'border-radius:50%',
+      `background:${C.sun}`,
+      `color:${C.ink}`,
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      `font:700 12px ${TYPE.heading}`,
+      'flex:none',
+    ].join(';');
+    const idText = el(doc, 'div');
+    idText.style.cssText = 'min-width:0';
+    const idHeading = el(doc, 'div', undefined, model.footer.identity.heading);
+    idHeading.style.cssText = `font:500 9px ${TYPE.mono};letter-spacing:.12em;color:${C.label}`;
+    const idName = el(doc, 'div', undefined, model.footer.identity.name);
+    idName.style.cssText = 'font-size:13px;font-weight:600;margin-top:1px';
+    idText.append(idHeading, idName);
+    cardTop.append(avatar, idText);
+    const streak = el(doc, 'div', undefined, model.footer.identity.streak);
+    streak.style.cssText = `font:500 11px ${TYPE.mono};color:${C.fainter};margin-top:6px`;
+    card.append(cardTop, streak);
+    footer.append(card);
+
+    const settingsOpen = model.footer.settings.unavailable === undefined;
+    const settingsRow = el(doc, 'button', 'everyday-rail-settings');
+    settingsRow.type = 'button';
+    settingsRow.disabled = !settingsOpen;
+    settingsRow.style.cssText = [
+      'width:100%',
+      'box-sizing:border-box',
+      'text-align:left',
+      'margin-top:8px',
+      'cursor:' + (settingsOpen ? 'pointer' : 'not-allowed'),
+      `border:1px solid ${RAIL_SURFACE.edge}`,
+      `border-radius:${String(R.row)}px`,
+      'padding:9px 11px',
+      'font-size:13px',
+      'font-weight:600',
+      'background:transparent',
+      `color:${settingsOpen ? C.fainter : C.warmGrey}`,
+      'display:flex',
+      'align-items:center',
+      'gap:9px',
+      'flex-wrap:wrap',
+    ].join(';');
+    const gear = el(doc, 'span', undefined, '⚙');
+    gear.style.cssText = 'flex:none;font-size:13px';
+    settingsRow.append(gear, el(doc, 'span', undefined, model.footer.settings.label));
+    const hint = el(doc, 'span', undefined, model.footer.settings.hint);
+    hint.style.cssText = `margin-left:auto;font:500 9.5px ${TYPE.mono};color:${C.label}`;
+    settingsRow.append(hint);
+    if (model.footer.settings.unavailable !== undefined) {
+      const why = el(
+        doc,
+        'span',
+        undefined,
+        model.footer.settings.unavailable,
+      );
+      why.style.cssText = `flex-basis:100%;font-size:10px;font-weight:400;color:${C.label}`;
+      settingsRow.append(why);
+    } else {
+      settingsRow.addEventListener('click', () => {
+        go(model.footer.settings.screen);
+      });
+    }
+    footer.append(settingsRow);
+
     const swap = el(doc, 'button', 'everyday-engineer-swap');
     swap.type = 'button';
-    swap.textContent = 'Switch to Engineer';
-    swap.disabled = true;
-    swap.title = 'not built yet — Everyday Mode is the only play style in this build';
+    swap.textContent = model.footer.engineerSwap.label;
+    swap.disabled = model.footer.engineerSwap.unavailable !== undefined;
+    if (model.footer.engineerSwap.unavailable !== undefined) {
+      swap.title = model.footer.engineerSwap.unavailable;
+    }
     swap.style.cssText = [
+      'width:100%',
+      'box-sizing:border-box',
       'text-align:left',
+      'margin-top:9px',
       'background:transparent',
-      'border:1px solid var(--edge,#222836)',
-      'border-radius:8px',
+      `border:1px solid ${RAIL_SURFACE.edge}`,
+      `border-radius:${String(R.control)}px`,
       'padding:7px 10px',
-      'font-size:12px',
-      'color:var(--dim,#8b93a7)',
+      'font-size:11.5px',
+      'font-weight:600',
+      `color:${C.warmGrey}`,
       'cursor:not-allowed',
     ].join(';');
     footer.append(swap);
     rail.append(footer);
   }
 
+  /* --- § 3.3: the pinned bar, drawn from the table --- */
+
+  const BUTTON = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.control)}px`,
+    'padding:7px 12px',
+    `color:${C.ink}`,
+    'cursor:pointer',
+    'font-size:12.5px',
+    'font-weight:600',
+  ].join(';');
+  const PRIMARY = [
+    `background:${C.sun}`,
+    `border:1px solid ${C.sun}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:9px 15px',
+    `color:${C.ink}`,
+    'cursor:pointer',
+    'font-size:13px',
+    'font-weight:600',
+  ].join(';');
+  const QUIET = [
+    'background:transparent',
+    `border:1px solid ${C.rule}`,
+    `border-radius:${String(R.row)}px`,
+    'padding:9px 15px',
+    `color:${C.warmGrey}`,
+    'cursor:pointer',
+    'font-size:13px',
+    'font-weight:600',
+  ].join(';');
+
+  /**
+   * § 3.3's row for the current state. On an unbuilt screen the row is drawn **refusing**: the
+   * left button and any back stop work — they are navigation, and navigation is built — while the
+   * primary is disabled and the note is the screen's own refusal sentence, because a filled
+   * primary over a screen that does not exist is a control that silently does nothing.
+   */
   function drawBar(): void {
     bar.replaceChildren();
-    if (state.screen === EVERYDAY_ROOT) {
-      const hint = el(doc, 'span', undefined, 'Pick how you want to play.');
-      hint.style.cssText = 'color:var(--dim,#8b93a7);font-size:12px';
-      bar.append(hint);
-      return;
+    const model: ActionBarModel = actionBarFor(state);
+    const refusing = routeFor(state.screen) === 'refusal';
+
+    const leaveBtn = el(doc, 'button', 'everyday-bar-leave', model.leave.label);
+    leaveBtn.type = 'button';
+    leaveBtn.disabled = model.leave.inert;
+    leaveBtn.style.cssText =
+      BUTTON + (model.leave.inert ? `;color:${C.faint};cursor:default` : '');
+    if (!model.leave.inert) leaveBtn.addEventListener('click', requestLeave);
+    bar.append(leaveBtn);
+
+    if (model.back !== undefined) {
+      const backBtn = el(doc, 'button', 'everyday-bar-back', `‹ ${model.back.label}`);
+      backBtn.type = 'button';
+      backBtn.style.cssText = BUTTON;
+      const target = model.back.screen;
+      backBtn.addEventListener('click', () => {
+        go(target);
+      });
+      bar.append(backBtn);
     }
-    const leave = el(doc, 'button', undefined, 'Leave mode');
-    leave.type = 'button';
-    leave.style.cssText =
-      'background:transparent;border:1px solid var(--edge,#222836);border-radius:8px;padding:6px 12px;color:inherit;cursor:pointer;font-size:12px';
-    leave.addEventListener('click', () => {
-      go(EVERYDAY_ROOT);
-    });
-    const backBtn = el(doc, 'button', undefined, '‹ Back');
-    backBtn.type = 'button';
-    backBtn.style.cssText = leave.style.cssText;
-    backBtn.addEventListener('click', back);
-    bar.append(leave, backBtn);
+
+    if (model.timeline !== undefined) {
+      const stops = TIMELINE_STEPS[model.timeline.flow];
+      const strip = el(doc, 'div', 'everyday-bar-timeline');
+      strip.style.cssText = `display:flex;align-items:center;gap:${String(GAP.tight)}px;margin-left:6px`;
+      for (const [index, stop] of stops.entries()) {
+        const reached = index + 1 <= model.timeline.step;
+        const current = index + 1 === model.timeline.step;
+        const step = el(doc, 'button', undefined, `${String(index + 1)} ${stop.label}`);
+        step.type = 'button';
+        step.disabled = !reached || current;
+        step.style.cssText = [
+          'border:0',
+          'background:transparent',
+          `font:500 10.5px ${TYPE.mono}`,
+          'padding:2px 3px',
+          `color:${current ? C.ink : reached ? C.label : C.ruleMid}`,
+          'cursor:' + (reached && !current ? 'pointer' : 'default'),
+        ].join(';');
+        if (reached && !current) {
+          step.addEventListener('click', () => {
+            go(stop.screen);
+          });
+        }
+        strip.append(step);
+        if (index < stops.length - 1) {
+          const sep = el(doc, 'span', undefined, '›');
+          sep.style.cssText = `color:${C.ruleMid};font-size:10px`;
+          strip.append(sep);
+        }
+      }
+      bar.append(strip);
+    }
+
+    const spacer = el(doc, 'div');
+    spacer.style.cssText = 'flex:1';
+    bar.append(spacer);
+
+    const noteText = refusing ? unbuiltReasonFor(state.screen) : model.note;
+    if (noteText !== undefined) {
+      const note = el(doc, 'span', 'everyday-bar-note', noteText);
+      note.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:44ch;text-align:right`;
+      bar.append(note);
+    }
+
+    /*
+     * § 3.3's emphasis inversion: on a last-step screen the way out is the loud button and the
+     * primary goes quiet — the onward action stays available, quietly.
+     */
+    if (model.inverted && model.wayOut !== undefined) {
+      const wayOut = el(doc, 'button', 'everyday-bar-wayout', model.wayOut);
+      wayOut.type = 'button';
+      wayOut.style.cssText = PRIMARY;
+      wayOut.addEventListener('click', () => {
+        if (state.ctx === 'campaign') go('towers');
+        else if (state.ctx === 'rush') go('rush');
+        else doLeave();
+      });
+      bar.append(wayOut);
+    }
+
+    const primaryBtn = el(doc, 'button', 'everyday-bar-primary', model.primary.label);
+    primaryBtn.type = 'button';
+    primaryBtn.style.cssText = model.inverted ? QUIET : PRIMARY;
+    if (refusing) {
+      primaryBtn.disabled = true;
+      primaryBtn.style.cssText = QUIET + ';cursor:not-allowed';
+      primaryBtn.title = unbuiltReasonFor(state.screen);
+    } else if (state.screen === EVERYDAY_ROOT) {
+      /* § 3.3's menu row: the primary plays the selected card. */
+      primaryBtn.addEventListener('click', () => {
+        const picked = EVERYDAY_MODES.find((mode) => mode.pick === (state.modePick ?? 'today'));
+        if (picked !== undefined && isPlayable(picked)) go(picked.screen);
+      });
+    }
+    bar.append(primaryBtn);
+  }
+
+  /**
+   * § 3.4's confirm strip — replaces the whole bar until the player decides.
+   *
+   * *Leave it* leaves for real; *Stay* redraws the § 3.3 row and nothing else changes.
+   */
+  function drawConfirm(
+    question: string,
+    consequence: string,
+    leaveLabel: string,
+    stayLabel: string,
+  ): void {
+    bar.replaceChildren();
+    const q = el(doc, 'span', 'everyday-bar-question', question);
+    q.style.cssText = 'font-weight:600;font-size:13px';
+    const why = el(doc, 'span', 'everyday-bar-consequence', consequence);
+    why.style.cssText = `color:${C.warmGrey};font-size:12px`;
+    const spacer = el(doc, 'div');
+    spacer.style.cssText = 'flex:1';
+    const leaveIt = el(doc, 'button', 'everyday-bar-confirm-leave', leaveLabel);
+    leaveIt.type = 'button';
+    leaveIt.style.cssText = BUTTON + `;color:${C.alarm};border-color:${C.alarm}`;
+    leaveIt.addEventListener('click', doLeave);
+    const stay = el(doc, 'button', 'everyday-bar-confirm-stay', stayLabel);
+    stay.type = 'button';
+    stay.style.cssText = PRIMARY;
+    stay.addEventListener('click', drawBar);
+    bar.append(q, why, spacer, leaveIt, stay);
   }
 
   function drawMenu(): void {
     screenRegion.replaceChildren();
     const h = el(doc, 'h1', undefined, 'Elevator Sim');
-    h.style.cssText = 'margin:0 0 4px;font-size:26px';
+    h.style.cssText = `margin:0 0 4px;font:700 26px ${TYPE.heading};letter-spacing:-.02em`;
     const lede = el(
       doc,
       'p',
       undefined,
       'Pick a way to play. Every mode runs the same simulator on the same seeds — what changes is how long you are in it and what it asks of you.',
     );
-    lede.style.cssText = 'margin:0 0 22px;color:var(--dim,#8b93a7);max-width:62ch;font-size:13px';
+    lede.style.cssText = `margin:0 0 22px;color:${C.inkSoft};max-width:62ch;font-size:13px;line-height:1.5`;
     screenRegion.append(h, lede);
 
     const list = el(doc, 'div');
-    list.style.cssText = 'display:flex;flex-direction:column;gap:10px;max-width:640px';
+    list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
     for (const mode of EVERYDAY_MODES) list.append(modeTile(mode));
     screenRegion.append(list, absencesBlock());
   }
@@ -472,13 +799,11 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
    */
   function absencesBlock(): HTMLElement {
     const block = el(doc, 'section');
-    block.style.cssText = 'margin-top:26px;max-width:640px';
+    block.style.cssText = `margin-top:${String(GAP.wide)}px;max-width:640px`;
     const title = el(doc, 'h2', undefined, 'What this build does not do yet');
-    title.style.cssText =
-      'font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim,#8b93a7);margin:0 0 8px';
+    title.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 8px`;
     const list = el(doc, 'ul');
-    list.style.cssText =
-      'margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim,#8b93a7)';
+    list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:${C.warmGrey}`;
     for (const absence of EVERYDAY_SHELL_ABSENCES) list.append(el(doc, 'li', undefined, absence));
     block.append(title, list);
     return block;
@@ -495,20 +820,20 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
       'display:block',
       'width:100%',
       'padding:14px 16px',
-      'border:1px solid var(--edge,#222836)',
-      'border-radius:12px',
-      'background:var(--card,#11141c)',
-      'color:inherit',
+      `border:1px solid ${C.rule}`,
+      `border-radius:${String(R.tile)}px`,
+      `background:${C.card}`,
+      `color:${C.ink}`,
       'cursor:' + (playable ? 'pointer' : 'not-allowed'),
-      'opacity:' + (playable ? '1' : '.55'),
+      'opacity:' + (playable ? '1' : '.62'),
     ].join(';');
 
     const title = el(doc, 'div', undefined, mode.title);
-    title.style.cssText = 'font-weight:600;font-size:15px';
+    title.style.cssText = `font:600 15px ${TYPE.heading}`;
     const blurb = el(doc, 'div', undefined, mode.blurb);
-    blurb.style.cssText = 'font-size:13px;color:var(--ink,#e8ecf4);opacity:.85;margin-top:3px';
+    blurb.style.cssText = `font-size:13px;color:${C.inkSoft};margin-top:3px`;
     const shape = el(doc, 'div', undefined, mode.shape);
-    shape.style.cssText = 'font-size:11px;color:var(--dim,#8b93a7);margin-top:6px';
+    shape.style.cssText = `font:500 11px ${TYPE.mono};color:${C.label};margin-top:6px`;
     tile.append(title, blurb, shape);
 
     if (!playable) {
@@ -517,39 +842,72 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
        * reads, and the handoff requires the control to *say* it does not reach the simulation.
        */
       const why = el(doc, 'div', undefined, mode.unavailable ?? '');
-      why.style.cssText = 'font-size:11px;color:var(--warn,#d8a24a);margin-top:8px';
+      why.style.cssText = `font-size:11px;color:${C.terracotta};margin-top:8px`;
       tile.append(why);
     } else {
       tile.addEventListener('click', () => {
+        state = { ...state, modePick: mode.pick };
         go(mode.screen);
       });
     }
     return tile;
   }
 
-  /** A screen the shell routes to but has not built: say which, and how to get back. */
-  function drawStub(screen: EverydayScreen): void {
+  /**
+   * The router's refusal screen — a sentence a player reads, never a blank region.
+   *
+   * The sentence is `screens.ts`'s, the same one the rail caption and the mode tiles carry, so no
+   * two surfaces refuse the same screen in different words.
+   */
+  function drawRefusal(screen: EverydayScreen): void {
     screenRegion.replaceChildren();
-    const h = el(doc, 'h1', undefined, screen === 'door' ? "Today's tower" : screen);
-    h.style.cssText = 'margin:0 0 8px;font-size:22px;text-transform:capitalize';
-    const p = el(
+    const h = el(doc, 'h1', undefined, SCREEN_NAMES[screen]);
+    h.style.cssText = `margin:0 0 8px;font:700 22px ${TYPE.heading}`;
+    const p = el(doc, 'p', undefined, unbuiltReasonFor(screen));
+    p.style.cssText = `color:${C.inkSoft};font-size:13px;max-width:60ch;line-height:1.5`;
+    const back = el(
       doc,
       'p',
       undefined,
-      'This screen is not built yet. Everyday Mode’s shell and menu are in; the screen behind this route is not.',
+      'The rail’s Main menu takes you back to the modes.',
     );
-    p.style.cssText = 'color:var(--dim,#8b93a7);font-size:13px;max-width:60ch';
-    screenRegion.append(h, p);
+    back.style.cssText = `color:${C.warmGrey};font-size:12px;max-width:60ch`;
+    screenRegion.append(h, p, back);
+  }
+
+  /** Unmount whatever registered screen is in the region, if one is. */
+  function unmountCurrent(): void {
+    mounted?.unmount?.();
+    mounted = undefined;
   }
 
   function draw(): void {
+    unmountCurrent();
     drawRail();
-    const onStage = state.screen === 'stage';
+    const route = routeFor(state.screen);
+    const onStage = route === 'handoff';
     setEngineerUncovered(onStage);
     if (onStage) return;
     drawBar();
-    if (state.screen === EVERYDAY_ROOT) drawMenu();
-    else drawStub(state.screen);
+    if (route === 'menu') {
+      drawMenu();
+      return;
+    }
+    if (route === 'screen') {
+      const module = screenModuleFor(state.screen);
+      if (module !== undefined) {
+        screenRegion.replaceChildren();
+        mounted = module.mount(screenRegion, {
+          ctx: state.ctx,
+          go,
+          setRunOpen: (open) => {
+            runOpen = open;
+          },
+        });
+        return;
+      }
+    }
+    drawRefusal(state.screen);
   }
 
   draw();
@@ -558,7 +916,11 @@ export function mountEverydayShell(doc: Document, host: EverydayShellHost = {}):
     root,
     go,
     state: () => state,
+    setRunOpen: (open) => {
+      runOpen = open;
+    },
     destroy: () => {
+      unmountCurrent();
       setCoveredInert(false);
       root.remove();
       const engineer = host.engineerRoot;

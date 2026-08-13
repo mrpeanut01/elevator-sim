@@ -100,12 +100,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         /*
          * The Everyday shell's mount, on the mounts' shared ground: it builds the rail, the screen
          * region and the pinned bar, so it cannot run without a document. The split it sits on is
-         * deliberate rather than incidental — `everyday/modes.ts` and `everyday/rail.ts` hold every
-         * word the mount draws about what a mode is and where the player is, and the
-         * `EVERYDAY_MENU` adapter drives both over every screen and both shapes of rail. What is
-         * left here is what the mount authors of its own: two headings, the menu lede and the stub
-         * screen's one sentence, which reach the static sweep below. Weaker than driving them, and
-         * stated as a limitation rather than presented as coverage.
+         * deliberate rather than incidental — `everyday/modes.ts`, `everyday/rail.ts`,
+         * `everyday/actionBar.ts` and `everyday/screens.ts` hold every word the mount draws about
+         * what a mode is, where the player is, what each bar control does and why an unbuilt
+         * screen refuses, and the `EVERYDAY_MENU` adapter drives all four over every screen, every
+         * run context and both shapes of rail. What is left here is what the mount authors of its
+         * own: the headings, the menu lede, the refusal screen's way-back line and the glyph
+         * characters, which reach the static sweep below. Weaker than driving them, and stated as
+         * a limitation rather than presented as coverage.
          */
         'everyday/shell.ts#mountEverydayShell',
         'dev/buildingEditor.ts#mountBuildingEditor',
@@ -183,6 +185,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/boot.ts#closeEngineerMenuWhenReady',
         'everyday/boot.ts#dismissEngineerMenu',
       ],
+    },
+    {
+      reason:
+        'GAMEPLAY § 19\'s design tokens. The type stack\'s font-family values — ' +
+        '"\'Familjen Grotesk\', sans-serif" and friends — are CSS, read by no player as a ' +
+        'sentence, and are derived only because a two-word font name satisfies the ' +
+        'two-adjacent-words prose test, exactly as the scanner\'s own docstring predicts for ' +
+        'CSS tokens. The palette, radius and gap objects carry no prose at all and are not ' +
+        'derived; the day a token module grows a sentence a player reads, it stops being ' +
+        'excludable.',
+      ids: ['everyday/tokens.ts#EVERYDAY_TYPE'],
     },
     {
       reason:

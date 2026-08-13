@@ -17,7 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
-import { EVERYDAY_SCREENS } from './types.js';
+import { isScreenBuilt } from './screens.js';
+import { EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
@@ -45,6 +46,12 @@ describe('the menu offers the four modes the design names', () => {
       expect(mode.shape.trim(), mode.title).not.toBe('');
     }
   });
+
+  it('carries § 18’s four picks, one each, in the picks’ own order', () => {
+    // The § 3.3 menu primary follows the selected card by `modePick`, so a duplicated or missing
+    // pick is a card the bar cannot name.
+    expect(EVERYDAY_MODES.map((mode) => mode.pick)).toEqual([...MODE_PICKS]);
+  });
 });
 
 describe('a tile either reaches the simulation or says it does not', () => {
@@ -63,6 +70,27 @@ describe('a tile either reaches the simulation or says it does not', () => {
      */
     const playable = EVERYDAY_MODES.filter(isPlayable).map((mode) => mode.title);
     expect(playable).toEqual(["Today's tower"]);
+  });
+
+  it('derives every tile’s availability from the screen registry, both ways', () => {
+    /*
+     * The standing requirement, pointed at the tiles: a tile opens exactly when the screens its
+     * flow enters through are registered. The campaign needs all three of § 8's screens — a
+     * campaign whose desk dead-ends mid-flow is worse than a refused tile — and the other three
+     * modes need their own entry screen. A lane that registers a screen flips its tile on the
+     * same commit, and this case is what fails when the sentence and the registry disagree.
+     */
+    const gates = {
+      stage: ['stage'],
+      towers: ['towers', 'building', 'contract'],
+      rush: ['rush'],
+      fixit: ['fixit'],
+    } as const;
+    for (const mode of EVERYDAY_MODES) {
+      const needed = gates[mode.screen as keyof typeof gates];
+      expect(needed, mode.title).toBeDefined();
+      expect(isPlayable(mode), mode.title).toBe(needed.every(isScreenBuilt));
+    }
   });
 
   it('hands Today’s tower straight to the stage, because the door is not built', () => {

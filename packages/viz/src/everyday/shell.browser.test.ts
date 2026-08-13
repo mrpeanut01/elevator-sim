@@ -168,6 +168,97 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
       await page.close();
     }
   });
+
+  it('draws § 3.3’s menu row in the bar: ⌂ Modes inert, one named primary, the note', async () => {
+    const page = await coldLoad();
+    try {
+      const bar = await page.evaluate(() => ({
+        leave: (() => {
+          const button = document.querySelector<HTMLButtonElement>('.everyday-bar-leave');
+          return button === null
+            ? null
+            : { label: button.textContent ?? '', disabled: button.disabled };
+        })(),
+        primary: (() => {
+          const button = document.querySelector<HTMLButtonElement>('.everyday-bar-primary');
+          return button === null
+            ? null
+            : { label: button.textContent ?? '', disabled: button.disabled };
+        })(),
+        note: document.querySelector('.everyday-bar-note')?.textContent ?? '',
+      }));
+      // The left button is present and inert on the menu — there is no mode to abandon yet — and
+      // the primary is named for its effect, never "Next".
+      expect(bar.leave).toEqual({ label: '⌂ Modes', disabled: true });
+      expect(bar.primary).toEqual({ label: "Play today's tower", disabled: false });
+      expect(bar.note).toBe('Pick a mode above, then play it.');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('enters the stage through the bar’s primary — the player’s second way in', async () => {
+    const page = await coldLoad();
+    try {
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+        undefined,
+        { timeout: 15_000 },
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('draws § 3.2’s footer: the PLAYING AS card without an invented profile, and Settings refusing', async () => {
+    const page = await coldLoad();
+    try {
+      const footer = await page.evaluate(() => ({
+        identity: document.querySelector('.everyday-identity')?.textContent ?? '',
+        settings: (() => {
+          const button = document.querySelector<HTMLButtonElement>('.everyday-rail-settings');
+          return button === null
+            ? null
+            : { label: button.textContent ?? '', disabled: button.disabled };
+        })(),
+      }));
+      // § 20.11: no fixture presented as a player. The card names the absence instead.
+      expect(footer.identity).toContain('PLAYING AS');
+      expect(footer.identity).toContain('you');
+      expect(footer.identity).toContain('no days saved');
+      // The bordered Settings row is a destination that refuses in words while its screen is
+      // unbuilt — drawn, not a tooltip.
+      expect(footer.settings?.disabled).toBe(true);
+      expect(footer.settings?.label).toContain('Settings');
+      expect(footer.settings?.label).toContain('not built');
+    } finally {
+      await page.close();
+    }
+  });
+
+  it('captions every refusing rail row with the registry’s own sentence — drawn, not a tooltip', async () => {
+    const page = await coldLoad();
+    try {
+      /*
+       * No player control reaches an unbuilt screen today — every row and tile that would is
+       * disabled — so what a player actually meets is the caption on the disabled row, and the
+       * claim under test is the § D227 guarantee: the rail refuses in the registry's sentence,
+       * as words on the row, never as a `title` attribute nobody hovers.
+       */
+      const row = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('.everyday-rail button')];
+        const workshop = rows.find((r) => (r.textContent ?? '').includes('Dispatcher workshop'));
+        return workshop instanceof HTMLButtonElement
+          ? { disabled: workshop.disabled, text: workshop.textContent ?? '' }
+          : null;
+      });
+      expect(row?.disabled).toBe(true);
+      expect(row?.text).toContain('the workshop screen is not built');
+    } finally {
+      await page.close();
+    }
+  });
 });
 
 describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell", () => {
