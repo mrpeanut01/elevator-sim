@@ -25,6 +25,39 @@
  *
  * Timeouts are generous by the repo's convention for suites that simulate: the largest case runs
  * a 101-floor tower twice per assertion block.
+ *
+ * ## Where the fifteen catalogue cases moved from the prototype, and why
+ *
+ * GAMEPLAY § 10.5's list is authored against towers this repository does not ship and a closed-form
+ * model this surface replaced with real paired runs (§ 20.7). Every case below keeps its § 10.5
+ * lesson; what moved is recorded here because rule 6 forced it against the real engine:
+ *
+ * - **Buildings.** Only Crown Hotel and St Jude Hospital ship by name; the other thirteen cases
+ *   are re-homed on shipped towers (the § 10.5 tower is in parentheses in each case's entry
+ *   below). Chancery House hosts none: measured at every plausible rate, its six 5 m/s cars never
+ *   produce a wait over the minute the complaint measures — the prestige bank is sized for its own
+ *   16 %/5 min peak and cannot be made to fail with one configuration fault.
+ * - **Mechanisms the patch schema cannot express**, each replaced by the nearest measurable fault:
+ *   time-of-day rules (homing's "stop homing after the morning peak", rooftop's "from 17:30",
+ *   downpeak's "down-priority for the last hour") do not exist — those cases run at the hour the
+ *   complaint is about and repair with parking, a keyed service range, and a keyed car
+ *   respectively. En-route call collection (bedcall's "collects every call en route") cannot
+ *   happen under the shipped no-diversion default, so that case became a refurbishment lockout the
+ *   diagnosed fix lifts. Crowd-shaping fixes (stagger, bell, occupancy's staggered starts) are
+ *   expressed as the population present in the measured window, and each case's copy says so
+ *   in its own words ("this run watches the first cohort").
+ * - **Destination panels demoted from a fix to a purchase.** The prototype's occupancy case buys
+ *   "panels and lobby zoning" as the diagnosed fix (14 u). Measured on this engine, panels made
+ *   the lobby's long waits worse at that operating point (§ D333's AWT cost, visible here), and
+ *   14 u exceeds the parser's 0–9 u diagnosed cap — so panels appear as the plausible-and-costly
+ *   wrong buy in four cases, priced 8–13 u, with effect lines that promise a bench run rather than
+ *   an outcome.
+ * - **Budgets and prices** were re-fitted to the parser's bands (budget 10–16 u, diagnosed 0–9 u):
+ *   homing 8 → 10 u budget, goods 9 → 10, gym 9 → 10, occupancy 18 → 16 with its diagnosed
+ *   14 → 3 u (the fix changed, above), scan/collective 2 u kept, doubledeck 16 kept.
+ * - **`bed-cars-locked-out` scores `complaintGonePct` exactly 80 %** (5 → 1 long waits), the
+ *   contract's own bar met without margin; the seed is pinned and the run is deterministic, so
+ *   this is knife-edge only against future engine changes, which re-validate every case anyway.
  */
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -133,11 +166,26 @@ function diagnosedState(entry: FixitCase): FixitState {
 }
 
 describe('the shipped case file', () => {
-  it('parses against the shipped data and holds the three authored cases', () => {
+  it('parses against the shipped data and holds the eighteen authored cases', () => {
     expect(cases.cases.map((entry) => entry.id)).toEqual([
       'sleeping-sky-lobby',
       'zoning-starves-the-top',
       'three-cars-one-cars-work',
+      'doors-that-never-close',
+      'cars-that-always-go-home',
+      'car-park-nobody-serves',
+      'express-that-stops-everywhere',
+      'deliveries-on-the-passenger-group',
+      'one-start-time',
+      'every-letter-says-nine',
+      'everyone-leaves-at-once',
+      'bed-cars-locked-out',
+      'two-cars-out-wrong-month',
+      'every-deck-calls-itself-full',
+      'restaurant-above-the-ballroom',
+      'controller-sends-every-car',
+      'let-faster-than-the-lifts',
+      'gym-on-the-top-floor',
     ]);
   });
 });
@@ -198,6 +246,181 @@ const PINNED: readonly Pinned[] = [
      */
     inertRepairIds: ['fourth-lift'],
   },
+
+  /* ---- the fifteen catalogue cases, § 10.5 ---------------------------------- */
+
+  {
+    id: 'doors-that-never-close',
+    before: 28,
+    after: 3,
+    figureTexts: [
+      '28 of 195 journeys',
+      '196 s',
+      '30.4 s over 195 boarded journeys',
+      '95.6 % of 45 journeys',
+    ],
+  },
+  {
+    id: 'cars-that-always-go-home',
+    before: 6,
+    after: 0,
+    figureTexts: [
+      '6 of 70 journeys',
+      '74 s',
+      '32.2 s over 70 boarded journeys',
+      '100.0 % of 497 journeys',
+    ],
+  },
+  {
+    id: 'car-park-nobody-serves',
+    before: 21,
+    after: 3,
+    figureTexts: [
+      '21 of 45 journeys',
+      '322 s',
+      '70.0 s over 45 boarded journeys',
+      '98.0 % of 51 journeys',
+    ],
+  },
+  {
+    id: 'express-that-stops-everywhere',
+    before: 4,
+    after: 0,
+    figureTexts: [
+      '4 of 100 journeys',
+      '110 s',
+      '19.0 s over 100 boarded journeys',
+      '100.0 % of 112 journeys',
+    ],
+  },
+  {
+    id: 'deliveries-on-the-passenger-group',
+    before: 15,
+    after: 2,
+    figureTexts: [
+      '15 of 164 journeys',
+      '105 s',
+      '21.1 s over 164 boarded journeys',
+      '94.6 % of 37 journeys',
+    ],
+  },
+  {
+    id: 'one-start-time',
+    before: 21,
+    after: 0,
+    figureTexts: [
+      '21 of 84 journeys',
+      '107 s',
+      '32.8 s over 84 boarded journeys',
+      '95.0 % of 141 journeys',
+    ],
+  },
+  {
+    id: 'every-letter-says-nine',
+    before: 10,
+    after: 0,
+    figureTexts: [
+      '10 of 91 journeys',
+      '114 s',
+      '25.4 s over 91 boarded journeys',
+      '95.5 % of 264 journeys',
+    ],
+  },
+  {
+    id: 'everyone-leaves-at-once',
+    before: 12,
+    after: 0,
+    figureTexts: [
+      '12 of 59 journeys',
+      '117 s',
+      '33.0 s over 59 boarded journeys',
+      '92.7 % of 259 journeys',
+    ],
+  },
+  {
+    id: 'bed-cars-locked-out',
+    before: 11,
+    after: 1,
+    figureTexts: [
+      '11 of 36 journeys',
+      '125 s',
+      '42.0 s over 36 boarded journeys',
+      '94.7 % of 228 journeys',
+    ],
+  },
+  {
+    id: 'two-cars-out-wrong-month',
+    before: 19,
+    after: 2,
+    figureTexts: [
+      '19 of 40 journeys',
+      '139 s',
+      '52.0 s over 40 boarded journeys',
+      '100.0 % of 72 journeys',
+    ],
+  },
+  {
+    id: 'every-deck-calls-itself-full',
+    before: 8,
+    after: 0,
+    figureTexts: [
+      '8 of 257 journeys',
+      '77 s',
+      '17.3 s over 257 boarded journeys',
+      '97.0 % of 867 journeys',
+    ],
+  },
+  {
+    id: 'restaurant-above-the-ballroom',
+    before: 6,
+    after: 0,
+    figureTexts: [
+      '6 of 44 journeys',
+      '79 s',
+      '28.7 s over 44 boarded journeys',
+      '94.5 % of 217 journeys',
+    ],
+  },
+  {
+    id: 'controller-sends-every-car',
+    before: 4,
+    after: 0,
+    figureTexts: [
+      '4 of 124 journeys',
+      '92 s',
+      '23.6 s over 124 boarded journeys',
+      '100.0 % of 427 journeys',
+    ],
+  },
+  {
+    id: 'let-faster-than-the-lifts',
+    before: 32,
+    after: 1,
+    /*
+     * The healthy figure's denominator is **14 journeys**, and it is small on purpose rather than
+     * by accident: the scope is every journey touching the lobby, so "the rest" is only the
+     * floor-to-floor traffic, which is what a 61 %-overlet office tower has least of. The engine
+     * prints the denominator beside the share for exactly this reason (`figureText`'s
+     * `rest-away-pct` arm), so the player reads *92.9 % of 14* rather than a bare percentage.
+     */
+    figureTexts: [
+      '32 of 349 journeys',
+      '113 s',
+      '22.3 s over 349 boarded journeys',
+      '92.9 % of 14 journeys',
+    ],
+  },
+  {
+    id: 'gym-on-the-top-floor',
+    before: 3,
+    after: 0,
+    figureTexts: [
+      '3 of 44 journeys',
+      '80 s',
+      '30.9 s over 44 boarded journeys',
+      '94.7 % of 57 journeys',
+    ],
+  },
 ];
 
 /**
@@ -234,6 +457,41 @@ const AUTHORED_FACTS: Readonly<Record<string, Readonly<Record<string, string>>>>
   }),
   'three-cars-one-cars-work': Object.freeze({
     '4': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+
+  /*
+   * The fifteen catalogue cases declare **eight** facts between them, and seven are the same kind:
+   * the floor the letter-writer lives or works on. That is the shape rule 6 predicts — a case whose
+   * copy quotes its own run needs no third-party numbers — and the one exception is named below.
+   */
+  'cars-that-always-go-home': Object.freeze({
+    '52': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+  'express-that-stops-everywhere': Object.freeze({
+    '25': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+  'one-start-time': Object.freeze({
+    '16': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+  'two-cars-out-wrong-month': Object.freeze({
+    '21': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+  'controller-sends-every-car': Object.freeze({
+    '40': 'a floor of the case’s building — the letter-writer’s own floor',
+  }),
+  'let-faster-than-the-lifts': Object.freeze({
+    '19': 'a floor of the case’s building — the letter-writer’s own floor',
+    /*
+     * The one fact in these fifteen that is not a floor id. It is arithmetic over the case's own
+     * as-built patch against the shipped building, checkable by hand: the building document totals
+     * 992 people, the as-built floor populations total 1,601, and 1,601 / 992 is a rise of 61.4 %.
+     * It is the fault rather than a reading of it — the same footing as the zoning case's two
+     * served headcounts above.
+     */
+    '61': 'the population rise the as-built patch encodes: 1,601 people against the building document’s 992',
+  }),
+  'gym-on-the-top-floor': Object.freeze({
+    '5': 'a floor of the case’s building — the letter-writer’s own floor',
   }),
 });
 
@@ -397,6 +655,43 @@ describe.each(PINNED)('case $id', (pinned) => {
       const plan = fixitRunPlanOf(entry, state, resources);
       // Config equality is run equality: `recordRun` is deterministic in its config.
       expect(plan.asRepaired).toEqual(plan.asBuilt);
+    },
+    SUITE_TIMEOUT,
+  );
+});
+
+/**
+ * A case may be run twice — and the loaded file must be the same file afterwards.
+ *
+ * This is a regression pin for a defect the fifteen catalogue cases exposed and the three shipped
+ * ones could not: `applyBuildingPatch` assigned `patch.banks` **by reference**, so the run's
+ * document and the parsed case object became the same array, and the `addCars` loop then pushed
+ * into it. Nine of the eighteen cases patch banks in their as-built *and* offer a new shaft, so
+ * selecting that shaft grew a car on the authored data permanently: the next run of the case was
+ * refused by `parseBuilding` with `duplicate car id "F"`, and any run that survived described a
+ * building nobody wrote.
+ *
+ * A player reaches it by pressing `Run the day` twice, which is the ordinary way to use the screen.
+ * Asserted here rather than in `run.test.ts` because what makes it reachable is the **shipped
+ * data** — a fixture case with one bank would pass against the aliasing version.
+ */
+describe('running a case leaves the authored case file alone', () => {
+  it(
+    'builds the same plan twice for every case that patches banks and offers a new shaft',
+    () => {
+      for (const entry of cases.cases) {
+        const shaft = entry.repairs.find((repair) => repair.role === 'new-shaft');
+        if (shaft === undefined || entry.asBuilt.patch.building?.banks === undefined) continue;
+        const state: FixitState = { ...emptyFixitState(), selectedRepairIds: [shaft.id] };
+        const first = fixitRunPlanOf(entry, state, resources);
+        // The second call is the assertion: under the aliasing defect it throws `duplicate car id`.
+        const second = fixitRunPlanOf(entry, state, resources);
+        expect(second.asRepaired.building, `case "${entry.id}" changed under its own run`).toEqual(
+          first.asRepaired.building,
+        );
+        // And the as-built side is unmoved by the repair having been planned at all.
+        expect(fixitRunPlanOf(entry, emptyFixitState(), resources).asBuilt).toEqual(first.asBuilt);
+      }
     },
     SUITE_TIMEOUT,
   );

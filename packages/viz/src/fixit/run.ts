@@ -94,7 +94,19 @@ function applyBuildingPatch(doc: MutableBuildingDocument, patch: NonNullable<Fix
     delete doc.totalPopulation;
   }
   if (patch.banks !== undefined) {
-    doc.banks = patch.banks as MutableBank[];
+    /*
+     * **Cloned, and the clone is load-bearing.** `patch.banks` is the array `parse.ts` decoded out
+     * of `data/fixit-cases.json` and handed straight through, so assigning it here would make the
+     * run's document and the *loaded case file* the same object — and `addCars` below pushes into
+     * `bank.cars`. A case that patches banks in its as-built and offers a new shaft (nine of the
+     * eighteen do) would therefore grow a car permanently on first selection: the second run of
+     * that case is refused by `parseBuilding` with `duplicate car id`, and every run after it
+     * describes a building the author never wrote.
+     *
+     * Found by running one case at two seeds in the same process, which is what a validation sweep
+     * does and what a player does by pressing `Run the day` twice.
+     */
+    doc.banks = structuredClone(patch.banks) as MutableBank[];
   }
   for (const carPatch of patch.cars ?? []) {
     for (const car of carsOf(doc, carPatch.carIds)) {
