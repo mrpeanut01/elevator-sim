@@ -151,6 +151,7 @@ import {
   type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
+import { overlayViewOf, type OverlayView } from '../render/overlay.js';
 import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
 import {
   CARD_HEIGHT,
@@ -293,16 +294,21 @@ const DEFAULT_BASE_SPEED = 60;
 
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
-/** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
-const OVERLAY_WIDTH_PX = 250;
-const OVERLAY_MIN_VIEWPORT_PX = 900;
+/*
+ * `OVERLAY_WIDTH_PX` (250) and `OVERLAY_MIN_VIEWPORT_PX` (900) used to sit here — the room the
+ * live metrics panel was given inside the bitmap, and the canvas width below which `RS-03` took it
+ * away. Both are gone with `docs/21` § 3.4: the panel is a DOM card under the stage, so it needs no
+ * room on the canvas and it does not disappear on a narrow viewport — it **stacks**, which is what
+ * RS-03 asks of controls and is more rather than less. The room the panel was holding is the
+ * plot's now, which is the beneficiary § D316 named.
+ */
 
 /**
  * What the stage asks for around the plot, widest request first — GitHub issue #41.
  *
  * ## The defect: two numbers that were the same at every width and every building
  *
- * {@link QUEUE_GUTTER_PX} and {@link OVERLAY_WIDTH_PX} were passed to `buildLayout` unchanged
+ * {@link QUEUE_GUTTER_PX} and a 250 px metrics panel were passed to `buildLayout` unchanged
  * whatever was being drawn, so 530 px of a canvas went to scenery whether the building had two
  * shafts or thirty-five. Measured: **Vertical City draws 27 of 35 at a 1920 px viewport** —
  * `RS-05`'s *"showing 27 of 35"* notice is doing its job and saying so, and eight shafts of a
@@ -317,21 +323,24 @@ const OVERLAY_MIN_VIEWPORT_PX = 900;
  * building one and reading `Layout.hiddenShaftCount`, which is the layout's own measurement of
  * exactly this question, already carried for the `RS-05` notice.
  *
- * The rungs yield in `fitGutters`' own order and for its stated reason — *the overlay panel is a
- * whole surface and goes first, then the right gutter*. The last rung asks for **nothing**, which
- * hands the layout its own documented default rather than a floor copied from it: this file never
- * names a minimum, and `layout.ts` still clamps whatever it is handed.
+ * The rungs yield in `fitGutters`' own order and for its stated reason. The last rung asks for
+ * **nothing**, which hands the layout its own documented default rather than a floor copied from
+ * it: this file never names a minimum, and `layout.ts` still clamps whatever it is handed.
  *
  * A building that fits on rung one stays on rung one, so no picture that was right moves.
+ *
+ * **It had a first rung that also asked for the metrics panel**, and dropping it was the ladder's
+ * whole first step. `docs/21` § 3.4 moved that panel to the DOM, so the ladder is gutters only and
+ * every building starts 250 px wider than it did — a shaft that was hidden at rung one can only
+ * become visible.
  */
-const STAGE_GUTTER_LADDER: readonly { readonly gutter: number; readonly overlay: boolean }[] =
+const STAGE_GUTTER_LADDER: readonly { readonly gutter: number }[] =
   Object.freeze([
-    { gutter: QUEUE_GUTTER_PX, overlay: true },
-    { gutter: QUEUE_GUTTER_PX, overlay: false },
-    { gutter: Math.round(QUEUE_GUTTER_PX / 2), overlay: false },
+    { gutter: QUEUE_GUTTER_PX },
+    { gutter: Math.round(QUEUE_GUTTER_PX / 2) },
     // `gutter: 0` is *ask for nothing*, which `buildLayout` reads as its own `DEFAULTS.gutterRightPx`
     // — see the note above about never copying that number here.
-    { gutter: 0, overlay: false },
+    { gutter: 0 },
   ]);
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
@@ -415,24 +424,21 @@ export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitL
  * whether they fit, and asking it is what keeps this file free of a copy of `render/layout.ts`'s
  * private minimums.
  *
- * `wantsOverlay` stays the caller's, because it answers a different question — `RS-03` drops the
- * live-metrics panel below 900 px of canvas whether or not the shafts fit — and a rung that
- * re-enabled it would be this function overruling that rule.
+ * It took a `wantsOverlay` until `docs/21` § 3.4, because `RS-03` dropped the live-metrics panel
+ * below 900 px of canvas whether or not the shafts fit. The panel is DOM now and reserves nothing
+ * here, so the question is gone rather than answered.
  */
 export function stageLayoutFor(options: {
   readonly width: number;
   readonly height: number;
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly ShaftGeometry[];
-  readonly wantsOverlay: boolean;
 }): Layout {
-  const { wantsOverlay, ...rest } = options;
   let last: Layout | undefined;
   for (const rung of STAGE_GUTTER_LADDER) {
     const layout = buildLayout({
-      ...rest,
+      ...options,
       ...(rung.gutter === 0 ? {} : { gutterRightPx: rung.gutter }),
-      overlayWidthPx: rung.overlay && wantsOverlay ? OVERLAY_WIDTH_PX : 0,
     });
     if (layout.hiddenShaftCount === 0) return layout;
     last = layout;
@@ -443,7 +449,7 @@ export function stageLayoutFor(options: {
    * that refused to draw would turn *some shafts do not fit* into *no picture at all*, which is
    * § D234's own defect.
    */
-  return last ?? buildLayout({ ...rest, overlayWidthPx: 0 });
+  return last ?? buildLayout(options);
 }
 
 /* ========================================================================== *
@@ -2863,6 +2869,209 @@ function boot(ui: Elements, resources: BrowserResources): void {
   let legendCountCells: readonly HTMLElement[] = [];
 
   /* ---------------------------------------------------------------------- *
+   * LIVE METRICS, as a card — `docs/21` § 3.4
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The three lists' fills, and the cells each build hands back.
+   *
+   * ## Why this is keyed structure plus written cells, and not a `fill`
+   *
+   * `renderLive` runs at 60 Hz and every figure on this card moves. A `fill` per frame is GitHub
+   * issue #106 exactly — the detached-button defect — and two of its three consequences are live
+   * here: a reader scrolling the car list of Vertical City's thirty-five cars would lose their
+   * place sixty times a second, and a `title` could never appear because hover is cancelled before
+   * the browser's delay elapses. `dev/watchPanel.ts` records the third.
+   *
+   * So each list is keyed on its **structure** — which banks exist, which cars, which arm the
+   * estimate is in — and the moving parts are text and style writes into nodes the build handed
+   * back. That is `legendCountCells`' pattern above, and it is the only shape that survives a
+   * panel whose every value changes on every frame.
+   */
+  const fillLiveFigures = keyedFill(ui.liveMetrics.figures);
+  const fillLiveBanks = keyedFill(ui.liveMetrics.banks);
+  const fillLiveCars = keyedFill(ui.liveMetrics.cars);
+  let liveObservationCells: readonly HTMLElement[] = [];
+  let liveEstimateCell: HTMLElement | undefined;
+  let liveBankCells: readonly { readonly boarded: HTMLElement; readonly mean: HTMLElement }[] = [];
+  let liveCarCells: readonly {
+    readonly fill: HTMLElement;
+    readonly mark: HTMLElement;
+    readonly load: HTMLElement;
+  }[] = [];
+
+  /** A label-and-value row. The value cell is handed back so the playhead can write into it. */
+  function liveRow(label: string, className = 'lm-value'): {
+    readonly node: HTMLElement;
+    readonly value: HTMLElement;
+  } {
+    const value = el(document, 'span', { className });
+    return {
+      node: el(document, 'div', {
+        className: 'live-metrics-row',
+        children: [el(document, 'span', { className: 'lm-label', text: label }), value],
+      }),
+      value,
+    };
+  }
+
+  /**
+   * Draw the live metrics card from one view — the same view the honesty sweep drives.
+   *
+   * Every word comes from `render/overlay.ts#overlayViewOf`, in the reader's own register, and
+   * nothing here decides a format: the view hands over strings. What this function decides is
+   * which node a string goes in, which is the split `dev/dom.ts` documents and the only one that
+   * keeps the panel drivable without a document.
+   *
+   * **The refusal arm draws no value cell at all.** `OverlayEstimate`'s refused member carries no
+   * `value` field, so this is a property of the type rather than of the care taken here — `docs/10`
+   * R3, made structural by the migration.
+   */
+  function drawLiveMetrics(view: OverlayView): void {
+    setText(ui.liveMetrics.title, view.title);
+    setText(ui.liveMetrics.window, view.window);
+
+    const estimate = view.estimate;
+    fillLiveFigures(
+      [
+        view.observations.map((row) => row.label).join('|'),
+        estimate.kind,
+        estimate.label,
+        estimate.kind === 'refused' ? `${estimate.head}|${estimate.reason}|${estimate.basis}` : '',
+      ].join('~'),
+      () => {
+        const rows = view.observations.map((row) => liveRow(row.label));
+        liveObservationCells = rows.map((row) => row.value);
+        const nodes: Node[] = rows.map((row) => row.node);
+        if (estimate.kind === 'refused') {
+          liveEstimateCell = undefined;
+          nodes.push(
+            el(document, 'div', {
+              className: 'live-metrics-row',
+              children: [el(document, 'span', { className: 'lm-label', text: estimate.label })],
+            }),
+            el(document, 'p', {
+              className: 'live-metrics-refusal',
+              children: [
+                el(document, 'span', { className: 'lm-head', text: estimate.head }),
+                el(document, 'span', { className: 'lm-reason', text: estimate.reason }),
+              ],
+            }),
+          );
+        } else {
+          const row = liveRow(estimate.label);
+          liveEstimateCell = row.value;
+          nodes.push(row.node);
+        }
+        return nodes;
+      },
+    );
+    for (const [index, row] of view.observations.entries()) {
+      const cell = liveObservationCells[index];
+      if (cell !== undefined) setText(cell, row.value);
+    }
+    if (liveEstimateCell !== undefined && estimate.kind !== 'refused') {
+      setText(liveEstimateCell, estimate.value);
+    }
+
+    fillLiveBanks(
+      [
+        view.bankHeading,
+        view.banksEmpty ?? '',
+        view.banks.map((bank) => `${bank.bankId}${bank.refused ? '!' : ''}`).join('|'),
+      ].join('~'),
+      () => {
+        const heading = el(document, 'div', {
+          className: 'live-metrics-head-row',
+          text: view.bankHeading,
+        });
+        if (view.banksEmpty !== undefined) {
+          liveBankCells = [];
+          return [
+            heading,
+            el(document, 'div', { className: 'live-metrics-row', children: [
+              el(document, 'span', { className: 'lm-label', text: view.banksEmpty }),
+            ] }),
+          ];
+        }
+        const built = view.banks.map((bank) => {
+          const boarded = el(document, 'span', { className: 'lm-value' });
+          const mean = el(document, 'span', {
+            className: bank.refused ? 'lm-value lm-refused' : 'lm-value',
+          });
+          return {
+            node: el(document, 'div', {
+              className: 'live-metrics-row',
+              children: [
+                el(document, 'span', { className: 'lm-label', text: bank.bankId }),
+                el(document, 'span', { children: [boarded, document.createTextNode('  '), mean] }),
+              ],
+            }),
+            boarded,
+            mean,
+          };
+        });
+        liveBankCells = built.map((entry) => ({ boarded: entry.boarded, mean: entry.mean }));
+        return [heading, ...built.map((entry) => entry.node)];
+      },
+    );
+    for (const [index, bank] of view.banks.entries()) {
+      const cells = liveBankCells[index];
+      if (cells === undefined) continue;
+      setText(cells.boarded, bank.boarded);
+      setText(cells.mean, bank.mean);
+    }
+
+    fillLiveCars(
+      [
+        view.carHeading,
+        view.cars
+          .map((car) => `${car.carId}·${car.label}·${car.tone}${car.overloaded ? '!' : ''}`)
+          .join('|'),
+      ].join('~'),
+      () => {
+        const heading = el(document, 'div', {
+          className: 'live-metrics-head-row',
+          text: view.carHeading,
+        });
+        const built = view.cars.map((car) => {
+          const bar = el(document, 'span', { className: `live-metrics-fill lm-tone-${car.tone}` });
+          const mark = el(document, 'span', { className: 'live-metrics-full-mark' });
+          const load = el(document, 'span', {
+            className: car.overloaded ? 'lm-load lm-overloaded' : 'lm-load',
+          });
+          return {
+            node: el(document, 'div', {
+              className: 'live-metrics-car',
+              children: [
+                el(document, 'span', { className: 'lm-car-label', text: car.label }),
+                el(document, 'span', { className: 'live-metrics-track', children: [bar, mark] }),
+                load,
+              ],
+            }),
+            fill: bar,
+            mark,
+            load,
+          };
+        });
+        liveCarCells = built.map((entry) => ({
+          fill: entry.fill,
+          mark: entry.mark,
+          load: entry.load,
+        }));
+        return [heading, ...built.map((entry) => entry.node)];
+      },
+    );
+    for (const [index, car] of view.cars.entries()) {
+      const cells = liveCarCells[index];
+      if (cells === undefined) continue;
+      cells.fill.style.width = `${(car.fillFraction * 100).toFixed(2)}%`;
+      cells.mark.style.left = `${(car.fullMarkFraction * 100).toFixed(2)}%`;
+      setText(cells.load, car.load);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- *
    * The intervention strip — Everyday Mode slice 3 (contract § 1.4, § 7.6)
    * ---------------------------------------------------------------------- */
 
@@ -5225,12 +5434,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (recording === undefined || playback === undefined) {
       context2d.clearRect(0, 0, width, height);
       setHidden(ui.stage.alarm, true);
+      /*
+       * The card goes with the picture — `docs/21` L-5's *hidden: a slot with nothing to say*. Not
+       * an empty card with its headings still on it: a caption over nothing is R3's blank where a
+       * number should be, one container up.
+       */
+      setHidden(ui.liveMetrics.root, true);
       canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
       return;
     }
 
     const frame = playback.frame();
-    const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
     // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
     // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
     const bank = shaftsForBank(recording.shafts, bankFilter);
@@ -5244,9 +5458,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       height,
       floors: recording.floors,
       shafts: bank.shafts,
-      wantsOverlay,
     });
+    /*
+     * The live metrics, drawn as a **card under the stage** rather than into this bitmap —
+     * `docs/21` § 3.4. Computed here rather than in a mount of its own because `overlayAt` is a
+     * scan over the recording's legs and this function already needs the frame at the same instant;
+     * two scans per frame for one panel would be the cache `frame/overlay.ts` refuses to have.
+     */
     const overlay = overlayAt(recording, frame.simTimeS);
+    setHidden(ui.liveMetrics.root, false);
+    drawLiveMetrics(overlayViewOf(overlay, frame, state.mode));
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
     const lockedOut: readonly LockedOutLanding[] = lockedOutAt(recording, frame.simTimeS);
     const hits = drawScene(context2d as unknown as Canvas2DLike, {
@@ -5255,7 +5476,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
       frame,
       dispatcherName: dispatcherNameOf(recording),
       layout,
-      overlay: wantsOverlay ? overlay : undefined,
       selection: selectionFor(assignments),
       unservedFloorIds: unservedFloorsOf(recording),
       unansweredCallFloorIds: assignments

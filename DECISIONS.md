@@ -23522,3 +23522,108 @@ was **not** restyled by this lane — `fix/docs20-polish-six` had already repain
 product's tokens, and its version is carried here verbatim (with `fixit/engine.ts`, which it
 depends on) rather than re-done. `dev/dispatcherEditor.ts` needed no migration: its only
 hex-shaped strings are GitHub issue numbers in prose.
+
+## D337 — LIVE METRICS leaves the bitmap, and the plate is allowed to compute a round trip once it says so
+
+`docs/21-engineer-reimagined-contract.md` § 7 owes this file an entry for *the LIVE METRICS
+migration (§ 3.4)*. This is that record, and it carries two decisions beside it — § 3.7 (1)'s
+specification row and § 3.5's scope-note audit — because all three were the same lane and the second
+is the one a reviewer should distrust first.
+
+### 1. The panel is a DOM card, and the reason is what no tier could see
+
+`render/overlay.ts#drawOverlay` drew the live metrics into the stage's own bitmap. GitHub issue
+#115 § 6 found four of its strings overhanging the panel border at the viewer's own 910 × 547 canvas
+— `boarded (window) 75 legs` at 173 px against a 135.3 px panel — and § D316 closed that by giving
+`render/layout.ts` a `MIN_OVERLAY_WIDTH_PX` floor computed from an assumed 7.2 px character advance.
+
+**What § D316 could not close is why the defect shipped for a wave with every tier green.** A string
+inside a canvas has no `scrollWidth`. Not one automated check in this repository could see the
+panel's geometry, and the one number in that file which had been *measured* rather than assumed
+(`ADVANCE_SMALL_PX`) was the one that had been wrong by 9 %.
+
+So the panel is now a **view** (`render/overlay.ts#overlayViewOf`) and a **card**
+(`dev/main.ts#drawLiveMetrics`, `#live-metrics` in `index.html`), and the question is asked of a real
+browser: `scrollWidth <= clientWidth` on the card and every element in it, over **all eight shipped
+buildings** in **both registers**, in `dev/liveMetrics.browser.test.ts`. That check is strictly
+stronger than the arithmetic it replaces — it measures the real face at the real width, including
+the authored bank ids nobody chose — and **it found a defect on its first run**: `auto-fit` keeps a
+grid track at its `minmax` floor even when the container is narrower than the floor, so at 420 px the
+card was 223 px of content in a 178 px box. Issue #115 § 6's shape, in CSS, on the card built to make
+it visible. `minmax(min(210px, 100%), 1fr)` closes it.
+
+**Three carriers moved and none was dropped**, which is § D299 § 1's test and `docs/21` § 1.3 (a)'s:
+
+| `docs/21` § 1.2 row | old carrier | new carrier |
+|---|---|---|
+| `LIVE METRICS` in two registers | `drawOverlay` | `overlayViewOf` — `ENGINEER_WORDS`/`CASUAL_WORDS` unchanged, word for word |
+| suppressed statistics replaced by refusals in either register | `drawOverlay`'s branch | `OverlayEstimate`'s refused arm, which **has no `value` field** — R3 as a shape rather than as care taken |
+| content width contract with `render/layout.ts` (`MIN_OVERLAY_WIDTH_PX`, § D316) | the 210 px floor | the measured DOM overflow check, plus RS-03's stacking rule in CSS |
+
+What the migration **deletes** is three pieces of arithmetic only a fixed-size bitmap needed: the row
+allocator, the greedy wrap, and the *showing 3 of 12 banks* line. Each of those is a **truncation**
+disappearing, never a fact — the card lists every bank and every car. RS-03 also improves rather than
+transfers: the old panel vanished below 900 px of canvas, and the card stacks at every width.
+
+**`Layout.overlay` is gone with it**, and that is the standing requirement rather than tidiness: a
+`Rect` no shipped path reads is the dead-seam shape this repository has closed eleven times. The room
+it reserved is the plot's now, so `hiddenShaftCount` can only fall — the beneficiary § D316 named,
+collected. `dev/main.ts`'s gutter ladder loses its overlay rung with it.
+
+**The 60 Hz hazard is named and answered.** Every figure on this card moves, so a `fill` per frame is
+GitHub issue #106's detached-button defect with a scroll container attached. Each of the three lists
+is keyed on its **structure** through `keyedFill` and the moving parts are text and style writes into
+cells the build handed back — `legendCountCells`' pattern. The browser tier measures it: the car list
+is scrolled to 40 px, the transport is pressed, and the scroll is still at 40 px while the window
+caption keeps moving.
+
+### 2. The plate may compute a round trip, and the rule survives by labelling rather than by refusal
+
+`docs/21` L-3 is `dev/rightRail.ts`'s own sentence: *a plate never computes a round trip; it reads
+one off the run, or it says there is no run.* § 3.7 (1) asks for the Barney/CIBSE closed form on that
+plate, and the two are reconciled by reading what the rule was protecting against — which its next
+sentence states: *"a nominal figure printed beside measured ones is an invitation to compare them,
+which is exactly the comparison a single run cannot support."* The defect is the **unlabelled**
+adjacency, not the arithmetic.
+
+So `closedFormRowsOf` draws, per bank, an `interval (closed form)` and a `capacity (closed form)`
+under a row whose value **is** the basis — `a specification, not a measurement` — whose help cites
+`CLOSED_FORM_ASSUMPTIONS` by count and by name, and whose divergence rows carry every warning the
+analysis recorded. Three things keep L-3 true and all three are structural: the basis is on every
+key; `no run yet` still refuses the measured rows and the specification appears anyway, because a
+specification needs no run; and the measured pair is **above** the specification pair in reading
+order, sharing no cell and no tone. The rail's module docstring is corrected rather than left
+standing — § D227's rule binds a refusal as hard as a claim.
+
+**This puts CLAUDE.md's correctness oracle on screen for the first time.** *Under pure up-peak,
+simulated interval and handling capacity must match the closed form within a few percent* has been a
+test since Phase 2 and has never been visible; it is now two rows under the two the run measured, on
+every building, so a divergence a reader can see is a defect report per that rule. The figures come
+from `authoring/buildingSpec.ts#upPeakBanksOf` — the existing seam the building editor's live readout
+already uses — so the `tp` rule for building types the reference table has no row for, the per-code
+warning sentences and the quoted refusal keep exactly one author.
+
+### 3. Scope-note coverage is a property now, and it immediately found an undriven note
+
+`dev/scopeNotes.audit.test.ts` derives the keys that need a note from `scope/surface.ts` — every
+non-`presentation` control and every latent — and asserts both directions: each is a note site or a
+stated absence, each site's claimed commitment is checked against `commitmentOf`'s current answer,
+each note is read back out of the shipped mount, each sentence is counted over the whole page, and
+each mount's source is required to carry the guard rather than the sentence.
+
+It found one thing on its first run, and it is the thing the audit exists for rather than a defect:
+**`dev/ruleEditor.ts`'s `next-run` note was driven by nothing.** `scopeNotes.test.ts`'s five mounts do
+not include the rule editor and `ruleEditor.test.ts` is about the rows. The note was correct;
+nothing said so, and nothing would have said anything if it had gone. It is a note site now.
+
+The second finding is a wording one and is recorded rather than changed: the three `next-run` blocks
+use **two** sentences. The levers and the selector say *Locked for this shift: changes apply to your
+next run*; the rule editor says *Rules take effect on your next run*, because a rule **is** a mid-day
+mechanism and *locked for this shift* over it would invite the reading that the rules stop firing.
+§ D227 asks for true, not uniform, so the audit counts each phrase where it is true rather than
+demanding one.
+
+**The failure direction is unchanged and is the point**: a withdrawn commitment takes the sentence
+off the screen (`docs/21` L-7). Nothing here asks a mount for a fallback; what it asks is that the
+table and the screen agree in both directions, so that silence is loud in the suite rather than quiet
+on the page.

@@ -28,6 +28,11 @@ import {
 } from '../contract/types.js';
 import { overlayAt, type LandingAssignment } from '../frame/overlay.js';
 import {
+  CASUAL_REFUSAL_REASON,
+  CASUAL_REFUSAL_REASON_SO_FAR,
+  SUPPRESSION_REASON_PENDING,
+} from '../mode/disclosure.js';
+import {
   DEFAULT_THEME,
   describeSelection,
   landingOptionLabel,
@@ -37,7 +42,17 @@ import {
   type Canvas2DLike,
 } from './canvas.js';
 import { MIN_HEADER_PX, buildLayout } from './layout.js';
-import { LOAD_ALARM, LOAD_FULL, drawOverlay, loadColour, loadTrackMax } from './overlay.js';
+import {
+  CASUAL_WORDS,
+  ENGINEER_WORDS,
+  LOAD_ALARM,
+  LOAD_FULL,
+  loadColour,
+  loadTone,
+  loadTrackMax,
+  overlayViewOf,
+  type OverlayView,
+} from './overlay.js';
 
 /* -------------------------------------------------------------------------- *
  * A recording 2D context
@@ -211,13 +226,35 @@ function frame(overrides: Partial<Frame> = {}): Frame {
 
 const WIDE = { width: 1200, height: 700 } as const;
 
-function layoutFor(recording: VizRecording, overlayWidthPx = 250): ReturnType<typeof buildLayout> {
+function layoutFor(recording: VizRecording): ReturnType<typeof buildLayout> {
   return buildLayout({
     ...WIDE,
     floors: recording.floors,
     shafts: recording.shafts,
-    overlayWidthPx,
   });
+}
+
+/**
+ * The fixture with a refused mean — `core`'s own prose, verbatim.
+ *
+ * One helper rather than the three copies the drawn panel's suites each kept: the reason string is
+ * the thing being asserted about in half of them, and three transcriptions of one sentence is the
+ * shape this repository keeps finding stale.
+ */
+function saturatedRecording(): VizRecording {
+  return {
+    ...RECORDING,
+    summary: {
+      ...RECORDING.summary,
+      saturated: true,
+      awtIsValid: false,
+      awtInvalidReason:
+        'Queue length rose by 268.0 persons (53.59/min, 12.0x the queue’s own scatter) over the ' +
+        '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
+        'saturated, AWT is not approximately normal and its confidence interval must be ' +
+        'suppressed.',
+    },
+  };
 }
 
 function draw(
@@ -237,311 +274,175 @@ function draw(
 }
 
 /* -------------------------------------------------------------------------- *
- * The overlay panel
+ * The live metrics view — `docs/21` § 3.4
  * -------------------------------------------------------------------------- */
 
-describe('the live metrics panel draws the metrics it was given', () => {
+/**
+ * The panel is a **view** now, and these assertions moved with it rather than being rewritten.
+ *
+ * Every one of them used to read the panel's `fillText` transcript. They read `overlayViewOf`'s
+ * fields instead, and the claims are the same claims: each value is recomputed from the recording
+ * rather than pinned, the estimate is replaced by its reason on a refused run and the observations
+ * survive beside it, and both registers say every word they said.
+ *
+ * **Four assertions are gone and none of them was about a fact.** They were the row allocator's:
+ * *showing 3 of 12 banks*, *no room here*, the panel that draws nothing below 200 px, and the panel
+ * that draws nothing when the layout reserved no room. All four were a bitmap running out of
+ * pixels, and a card that lists every bank and every car has no such state. `docs/21` § 1.3's
+ * ledger check is what this answers to, and the row it names is *`LIVE METRICS` in two registers,
+ * suppressed statistics replaced by refusals in either register* — carried below, in full.
+ *
+ * What replaces the width floor is not here at all: it is `dev/liveMetrics.browser.test.ts`, which
+ * measures `scrollWidth <= clientWidth` on the real card over all eight shipped buildings in both
+ * registers. That is the check issue #115 § 6 said no DOM tier could make.
+ */
+describe('the live metrics view carries the metrics it was given', () => {
   const at = 100;
   const metrics = overlayAt(RECORDING, at);
+  const viewAt = (mode: 'basic' | 'advanced' = 'advanced'): OverlayView =>
+    overlayViewOf(metrics, frame({ simTimeS: at }), mode);
 
-  it('draws every observation, each recomputed from the recording rather than pinned', () => {
-    const ctx = draw(frame({ simTimeS: at }), RECORDING, { overlay: metrics });
-    const text = ctx.texts.join('\n');
-
-    // Recomputed here, from the legs, without going through `overlayAt`: two independent
-    // routes to the same number, so a constant in either one fails.
-    const waitingNow = LEGS.filter(
-      (leg) => leg.arrivedAt <= at && (leg.boardedAt === undefined || leg.boardedAt > at),
-    ).length;
-    const longest = Math.max(
-      ...LEGS.filter(
-        (leg) => leg.arrivedAt <= at && (leg.boardedAt === undefined || leg.boardedAt > at),
-      ).map((leg) => at - leg.arrivedAt),
+  it('carries every observation, each recomputed from the recording rather than pinned', () => {
+    const view = viewAt();
+    const values = new Map(view.observations.map((row) => [row.label, row.value]));
+    expect(values.get(ENGINEER_WORDS.waiting)).toBe(String(metrics.waitingNow));
+    expect(values.get(ENGINEER_WORDS.boarded)).toBe(`${String(metrics.boardedInWindow)} legs`);
+    expect(values.get(ENGINEER_WORDS.longest)).toBe(
+      metrics.longestCurrentWaitS === undefined
+        ? '—'
+        : `${metrics.longestCurrentWaitS.toFixed(0)} s`,
     );
-    const boarded = LEGS.filter(
-      (leg) => leg.boardedAt !== undefined && leg.boardedAt <= at && leg.boardedAt >= at - metrics.windowS,
-    ).length;
-
-    expect(text).toContain(`waiting now      ${String(waitingNow)}`);
-    expect(text).toContain(`longest wait     ${longest.toFixed(0)} s`);
-    expect(text).toContain(`boarded (window) ${String(boarded)} legs`);
+    // The window's bounds, which is what a reader checks a figure against.
+    expect(view.window).toBe(
+      `window ${metrics.windowStartS.toFixed(0)}–${metrics.simTimeS.toFixed(0)} s`,
+    );
   });
 
-  it('draws the rolling mean, and it moves when the legs move', () => {
-    const ctx = draw(frame({ simTimeS: at }), RECORDING, { overlay: metrics });
-    expect(metrics.rollingMeanWaitS).toBeDefined();
-    expect(ctx.texts.join('\n')).toContain(`${(metrics.rollingMeanWaitS ?? 0).toFixed(1)} s`);
-
-    // Shift every wait by ten seconds and the panel must say something different.
-    const shifted: VizRecording = {
-      ...RECORDING,
-      legs: LEGS.map((leg) => ({ ...leg, arrivedAt: Math.max(0, leg.arrivedAt - 10) })),
-    };
-    const shiftedMetrics = overlayAt(shifted, at);
-    const after = draw(frame({ simTimeS: at }), shifted, { overlay: shiftedMetrics });
-    expect(after.texts.join('\n')).not.toBe(ctx.texts.join('\n'));
+  it('carries the rolling mean, and it moves when the legs move', () => {
+    const view = viewAt();
+    const estimate = view.estimate;
+    if (estimate.kind !== 'figure') throw new Error('expected a figure');
+    expect(estimate.value).toBe(`${(metrics.rollingMeanWaitS ?? 0).toFixed(1)} s`);
+    // The other direction: a different window is a different mean, and the view follows it.
+    const later = overlayViewOf(overlayAt(RECORDING, 300), frame({ simTimeS: 300 }));
+    if (later.estimate.kind !== 'figure') throw new Error('expected a figure at 300 s');
+    expect(later.estimate.value).toBe(
+      `${(overlayAt(RECORDING, 300).rollingMeanWaitS ?? 0).toFixed(1)} s`,
+    );
   });
 
   it('names every bank that served somebody, with its own count and mean', () => {
-    const ctx = draw(frame({ simTimeS: at }), RECORDING, { overlay: metrics });
-    const text = ctx.texts.join('\n');
-    expect(metrics.banks.length).toBeGreaterThan(0);
-    for (const bank of metrics.banks) {
-      expect(text).toContain(
-        `${bank.bankId}  ${String(bank.boardedInWindow)} legs  ${(bank.meanWaitS ?? 0).toFixed(1)} s`,
+    const view = viewAt();
+    expect(view.banks).toHaveLength(metrics.banks.length);
+    expect(view.banks.length).toBeGreaterThan(0);
+    for (const [index, bank] of metrics.banks.entries()) {
+      const row = view.banks[index];
+      if (row === undefined) throw new Error('a bank the metrics carried is not in the view');
+      expect(row.bankId).toBe(bank.bankId);
+      expect(row.boarded).toBe(`${String(bank.boardedInWindow)} legs`);
+      expect(row.mean).toBe(
+        bank.meanWaitS === undefined
+          ? ENGINEER_WORDS.bankSuppressed
+          : `${bank.meanWaitS.toFixed(1)} s`,
       );
+      expect(row.refused).toBe(bank.meanWaitS === undefined);
     }
+  });
+
+  it('lists every bank and every car, because a card has no row budget', () => {
+    /*
+     * The claim that replaces *showing 3 of 12 banks*. The drawn panel allocated rows against the
+     * pixels it had and said what it left out; there is nothing to leave out now, and the honest
+     * assertion is that the two lists are total.
+     */
+    const many = frame({
+      simTimeS: at,
+      cars: Array.from({ length: 16 }, (_, index) =>
+        car({ carId: `c-${String(index)}`, label: `C${String(index)}`, loadFactor: index / 20 }),
+      ),
+    });
+    const view = overlayViewOf(metrics, many);
+    expect(view.cars).toHaveLength(16);
+    expect(view.cars.map((row) => row.label)).toEqual(many.cars.map((row) => row.label));
+    expect(view.banks).toHaveLength(metrics.banks.length);
+  });
+
+  it('scales the car track past 1 and marks where rated load sits — RV-14', () => {
+    /*
+     * The bar's arithmetic, which moved from `fillRect` widths to two fractions on the view. The
+     * claim is unchanged and it is `RV-14`'s: the track does not silently clip at 1, so an
+     * overloaded car draws **past** the full mark rather than at it.
+     */
+    const heavy = frame({
+      simTimeS: at,
+      cars: [car({ carId: 'a', label: 'A', loadFactor: 0.4 }), car({ carId: 'b', label: 'B', loadFactor: 1.35 })],
+    });
+    const view = overlayViewOf(metrics, heavy);
+    const trackMax = loadTrackMax(heavy.cars);
+    expect(trackMax).toBe(1.35);
+    const [light, over] = view.cars;
+    if (light === undefined || over === undefined) throw new Error('expected two car rows');
+    expect(light.fillFraction).toBeCloseTo(0.4 / trackMax, 10);
+    expect(over.fillFraction).toBeCloseTo(1, 10);
+    expect(over.fullMarkFraction).toBeCloseTo(1 / trackMax, 10);
+    // Past the mark, not at it — the property the scaled track exists for.
+    expect(over.fillFraction).toBeGreaterThan(over.fullMarkFraction);
+    // KB-15b: the glyph is in the string, so the colour is never the only signal.
+    expect(over.load).toBe('1.35 !');
+    expect(over.overloaded).toBe(true);
+    expect(light.load).toBe('0.40');
+    expect(light.overloaded).toBe(false);
   });
 
   it('replaces the estimate with its reason on a saturated run, and keeps the observations', () => {
-    const saturated: VizRecording = {
-      ...RECORDING,
-      summary: {
-        ...RECORDING.summary,
-        saturated: true,
-        awtIsValid: false,
-        awtInvalidReason: 'queue length rose by 41 persons over the reporting window',
-      },
-    };
-    /*
-     * Driven at `endedAt`, where `core`'s own sentence is what the panel prints — `docs/20`
-     * defect 3. `awtInvalidReason` is a whole-run verdict in past tense, and the panel used to draw
-     * it at every playhead; the test below drives the other register at the same instant this one
-     * used to. Nothing about the engineer's *withholding* moved: `SUPPRESSED` and the absent mean
-     * are asserted here at the end and there mid-run.
-     */
+    const saturated = saturatedRecording();
     const end = saturated.endedAt;
-    const ctx = draw(frame({ simTimeS: end }), saturated, { overlay: overlayAt(saturated, end) });
-    const text = ctx.texts.join('\n');
-
-    expect(text).toContain('SUPPRESSED');
-    expect(text).toContain('queue length rose by 41 persons');
-    // The observations survive — a reader must still see the queue that is diverging.
-    expect(text).toContain('waiting now');
-    expect(text).toContain('boarded (window)');
-    // And no mean appears anywhere in the panel.
-    const clean = draw(frame({ simTimeS: at }), RECORDING, { overlay: metrics });
-    const cleanMean = (metrics.rollingMeanWaitS ?? 0).toFixed(1);
-    expect(clean.texts.join('\n')).toContain(`${cleanMean} s`);
-    expect(text).not.toContain(`${cleanMean} s`);
-    expect(text).toContain('suppressed');
+    const view = overlayViewOf(overlayAt(saturated, end), frame({ simTimeS: end }));
+    const estimate = view.estimate;
+    if (estimate.kind !== 'refused') throw new Error('a saturated run kept its mean');
+    expect(estimate.head).toBe('SUPPRESSED');
+    expect(estimate.reason).toBe(saturated.summary.awtInvalidReason);
+    expect(estimate.basis).toBe('whole-run');
+    /* The refused arm has no `value` field at all — R3 as a shape rather than as care taken. */
+    expect(Object.hasOwn(estimate, 'value')).toBe(false);
+    /* And the observations stay: they are how a reader *sees* the queue diverging. */
+    expect(view.observations.map((row) => row.label)).toEqual([
+      ENGINEER_WORDS.waiting,
+      ENGINEER_WORDS.longest,
+      ENGINEER_WORDS.boarded,
+    ]);
+    expect(view.observations.every((row) => row.value !== '')).toBe(true);
   });
 
-  /**
-   * The engineer's arm of `docs/20` defect 3: the same panel, mid-run.
-   *
-   * `SUPPRESSED` is a statement about the statistic and is drawn at every playhead — § D299 § 1
-   * forbids paying for Casual's legibility out of Engineer, and this asserts nothing was. What is
-   * gated is `core`'s reason, which is a fold over the finished day; in its place goes a sentence
-   * true at any instant that says where the other one has gone.
-   */
   it('does not date the engineer’s reason to a day that has not finished', () => {
-    const saturated: VizRecording = {
-      ...RECORDING,
-      summary: {
-        ...RECORDING.summary,
-        saturated: true,
-        awtIsValid: false,
-        awtInvalidReason: 'queue length rose by 41 persons over the reporting window',
-      },
-    };
-    const text = draw(frame({ simTimeS: at }), saturated, { overlay: overlayAt(saturated, at) })
-      .texts.join('\n');
-
-    // Withheld exactly as hard, and still in the engineer's word.
-    expect(text).toContain('SUPPRESSED');
-    // The whole-run verdict is not published under a clock that has not reached it.
-    expect(text).not.toContain('queue length rose by 41 persons');
-    // Wrapped across lines by the panel, so the assertion reads the unwrapped sentence.
-    const unwrapped = text.replace(/\s+/g, ' ');
-    expect(unwrapped).toContain('a fold over the whole day');
-    expect(unwrapped).toContain('when the playhead reaches the end');
-    // The observations are live and stay, exactly as they do at the end.
-    expect(text).toContain('waiting now');
+    /*
+     * `docs/20` defect 3. `awtInvalidReason` is a whole-run verdict in past tense, and it was
+     * printed at every playhead. Short of `endedAt` the engineer's arm carries the pending
+     * sentence instead, and the basis says which window it is about.
+     */
+    const saturated = saturatedRecording();
+    const early = Math.round(saturated.startedAt + (saturated.endedAt - saturated.startedAt) * 0.14);
+    const view = overlayViewOf(overlayAt(saturated, early), frame({ simTimeS: early }));
+    if (view.estimate.kind !== 'refused') throw new Error('the early playhead kept its mean');
+    expect(view.estimate.basis).toBe('now');
+    expect(view.estimate.reason).toBe(SUPPRESSION_REASON_PENDING);
+    expect(view.estimate.reason).not.toBe(saturated.summary.awtInvalidReason);
   });
 
-  it('never draws below the panel it was given, and says what it left out', () => {
-    // Found by running the viewer on `vertical-city` (seven banks, 35 cars): the bank list ran
-    // past the bottom edge and the CAR LOAD section — the one carrying the overload alarm — was
-    // drawn off-screen entirely.
-    const manyBanks: VizRecording = {
-      ...RECORDING,
-      legs: Array.from({ length: 40 }, (_, index) => ({
-        passengerId: `q${String(index)}`,
-        originFloorId: 'G',
-        destinationFloorId: '3',
-        direction: 'up' as const,
-        arrivedAt: 10 + index,
-        boardedAt: 20 + index,
-        carId: `bank-${String(index % 12)}-A`,
-        bankId: `bank-${String(index % 12)}`,
-      })),
-    };
-    // A short viewport as well as a long list, so both sections are genuinely over budget. The
-    // height is written as *what it leaves the panel* — 224 px — rather than as a total, because
-    // the total is not the quantity this test cares about and it moved when the header band grew
-    // a row (`render/layout.ts`'s `MIN_HEADER_PX`). Stated this way it cannot move again.
-    const layout = buildLayout({
-      width: 1200,
-      height: 224 + 24 + MIN_HEADER_PX + 28,
-      floors: manyBanks.floors,
-      shafts: manyBanks.shafts,
-      overlayWidthPx: 250,
-    });
-    const panel = layout.overlay;
-    if (panel === undefined) throw new Error('expected a panel');
-    const ctx = new RecordingContext();
-    drawScene(ctx, {
-      recording: manyBanks,
-      frame: frame({
-        cars: Array.from({ length: 35 }, (_, index) =>
-          car({ carId: `c${String(index)}`, label: `c${String(index)}` }),
-        ),
-      }),
-      layout,
-      theme: DEFAULT_THEME,
-      overlay: overlayAt(manyBanks, at),
-    });
-
-    const inPanel = ctx.calls.filter(
-      (call) => call.op === 'fillText' && Number(call.args[1]) >= panel.x,
-    );
-    expect(inPanel.length).toBeGreaterThan(5);
-    for (const call of inPanel) {
-      expect(Number(call.args[2])).toBeLessThanOrEqual(panel.y + panel.height);
-    }
-    const text = ctx.texts.join('\n');
-    // Both sections account for what they hold: either "showing N of M" with N ≥ 1, or the
-    // collapsed "M — no room at this size" line. Never "showing 0 of M", which is two lines that
-    // say nothing and read as a bug — that is what an earlier version of this rule produced on
-    // Mixed-Use High-Rise, and it hid the overload alarm entirely.
-    expect(text).toMatch(/(showing [1-9]\d* of 12 banks|12 banks — no room here)/);
-    expect(text).toMatch(/(showing [1-9]\d* of 35 cars|35 cars — no room here)/);
-    expect(text).not.toMatch(/showing 0 of/);
+  it('draws a dash where the window holds no sample, and never an empty box', () => {
+    const empty = { ...overlayAt(RECORDING, at), rollingMeanWaitS: undefined, suppressed: false };
+    const view = overlayViewOf(empty, frame({ simTimeS: at }));
+    if (view.estimate.kind !== 'no-sample') throw new Error('an empty window claimed a figure');
+    expect(view.estimate.value).toBe('—');
   });
 
-  it('always leaves room for the car-load rows, however many banks there are', () => {
-    // The measured regression: three banks plus a four-line suppression reason left the car
-    // section with no rows at all on a 400 px canvas.
-    const legs = Array.from({ length: 30 }, (_, index) => ({
-      passengerId: `q${String(index)}`,
-      originFloorId: 'G',
-      destinationFloorId: '3',
-      direction: 'up' as const,
-      arrivedAt: 10 + index,
-      boardedAt: 20 + index,
-      carId: `bank-${String(index % 3)}-A`,
-      bankId: `bank-${String(index % 3)}`,
-    }));
-    const saturated: VizRecording = {
-      ...RECORDING,
-      legs,
-      summary: {
-        ...RECORDING.summary,
-        saturated: true,
-        awtIsValid: false,
-        awtInvalidReason:
-          'Queue length rose by 95.9 persons (19.18/min, 13.2x the queue own scatter) over the ' +
-          '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
-          'saturated, AWT is not approximately normal and its confidence interval must be ' +
-          'suppressed.',
-      },
-    };
-    const layout = buildLayout({
-      width: 1200,
-      height: 420,
-      floors: saturated.floors,
-      shafts: saturated.shafts,
-      overlayWidthPx: 250,
-    });
-    const ctx = new RecordingContext();
-    drawScene(ctx, {
-      recording: saturated,
-      frame: frame({
-        cars: Array.from({ length: 16 }, (_, index) =>
-          car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.1 * index }),
-        ),
-      }),
-      layout,
-      theme: DEFAULT_THEME,
-      overlay: overlayAt(saturated, at),
-    });
-    const text = ctx.texts.join('\n');
-    expect(text).toContain('CAR LOAD');
-    expect(text).not.toMatch(/showing 0 of \d+ cars/);
-    // At least the reserved rows were drawn, each carrying its own load factor.
-    expect(ctx.texts.filter((t) => /^\d\.\d\d$/.test(t)).length).toBeGreaterThanOrEqual(4);
-  });
-
-  it('counts the banks it left out when some but not all of them fit', () => {
-    // The mutation harness found this line untested: the 12-bank case above takes the *collapsed*
-    // path, so "showing N of M banks" itself had no cover. A tall panel with thirty banks is the
-    // shape that exercises it.
-    const many: VizRecording = {
-      ...RECORDING,
-      legs: Array.from({ length: 60 }, (_, index) => ({
-        passengerId: `r${String(index)}`,
-        originFloorId: 'G',
-        destinationFloorId: '3',
-        direction: 'up' as const,
-        arrivedAt: 10 + index,
-        boardedAt: 20 + index,
-        carId: `bank-${String(index % 30)}-A`,
-        bankId: `bank-${String(index % 30).padStart(2, '0')}`,
-      })),
-    };
-    const ctx = new RecordingContext();
-    drawScene(ctx, {
-      recording: many,
-      frame: frame(),
-      layout: layoutFor(many, 250),
-      theme: DEFAULT_THEME,
-      overlay: overlayAt(many, at),
-    });
-    const text = ctx.texts.join('\n');
-    const shown = ctx.texts.filter((t) => t.startsWith('bank-')).length;
-    expect(shown).toBeGreaterThan(0);
-    expect(shown).toBeLessThan(30);
-    expect(text).toContain(`showing ${String(shown)} of 30 banks`);
-  });
-
-  it('draws nothing at all when the panel is too short for its mandatory content', () => {
-    // Below `MIN_PANEL_HEIGHT_PX` the title, the window, the three observations and the estimate
-    // block do not fit, and squeezing them draws over the bottom edge. Same answer as RS-03 gives
-    // a narrow viewport: no panel, and the header counters carry the headline numbers.
-    const layout = buildLayout({
-      width: 1200,
-      height: 240,
-      floors: RECORDING.floors,
-      shafts: RECORDING.shafts,
-      overlayWidthPx: 250,
-    });
-    expect(layout.overlay).toBeDefined();
-    const ctx = new RecordingContext();
-    drawScene(ctx, {
-      recording: RECORDING,
-      frame: frame(),
-      layout,
-      theme: DEFAULT_THEME,
-      overlay: metrics,
-    });
-    expect(ctx.texts.join('\n')).not.toContain('LIVE METRICS');
-  });
-
-  it('draws no panel at all when the layout reserved no room — RS-03', () => {
-    const ctx = new RecordingContext();
-    drawScene(ctx, {
-      recording: RECORDING,
-      frame: frame(),
-      layout: layoutFor(RECORDING, 0),
-      theme: DEFAULT_THEME,
-      overlay: metrics,
-    });
-    expect(ctx.texts.join('\n')).not.toContain('LIVE METRICS');
-  });
-
-  it('draws no panel when no metrics were given', () => {
-    expect(draw(frame()).texts.join('\n')).not.toContain('LIVE METRICS');
+  it('says nothing was served rather than drawing an empty list', () => {
+    const nobody = { ...overlayAt(RECORDING, at), banks: [] };
+    const view = overlayViewOf(nobody, frame({ simTimeS: at }));
+    expect(view.banks).toHaveLength(0);
+    expect(view.banksEmpty).toBe(ENGINEER_WORDS.nothingYet);
+    // And the note is absent — not `''` — whenever there is a list to draw.
+    expect(viewAt().banksEmpty).toBeUndefined();
   });
 });
 
@@ -560,24 +461,47 @@ describe('car load — RV-14', () => {
     expect(loadTrackMax([car({ loadFactor: 0.2 })])).toBe(LOAD_ALARM);
   });
 
-  it('draws each car’s load factor as a number, recomputed from the frame', () => {
+  it('carries each car’s load factor as a number, recomputed from the frame', () => {
+    /*
+     * Read off the view rather than off a `fillText` transcript — `docs/21` § 3.4. The claim is the
+     * one it always was: the figure is the frame's, at the frame's precision, per car.
+     */
     const f = frame();
-    const ctx = draw(f, RECORDING, { overlay: metrics });
-    const text = ctx.texts.join('\n');
-    for (const each of f.cars) {
-      expect(text).toContain(each.loadFactor.toFixed(2));
+    const view = overlayViewOf(metrics, f);
+    expect(view.cars).toHaveLength(f.cars.length);
+    for (const [index, each] of f.cars.entries()) {
+      expect(view.cars[index]?.load).toContain(each.loadFactor.toFixed(2));
     }
   });
 
   it('labels an overloaded car with a glyph, not only a colour — KB-15b', () => {
-    const overloaded = frame({ cars: [car({ loadFactor: LOAD_ALARM })] });
-    const ctx = draw(overloaded, RECORDING, { overlay: metrics });
-    expect(ctx.texts).toContain('!');
-    expect(ctx.texts.join('\n')).toContain(`${LOAD_ALARM.toFixed(2)} !`);
+    const overloaded = overlayViewOf(metrics, frame({ cars: [car({ loadFactor: LOAD_ALARM })] }));
+    expect(overloaded.cars[0]?.load).toBe(`${LOAD_ALARM.toFixed(2)} !`);
+    expect(overloaded.cars[0]?.overloaded).toBe(true);
+    expect(overloaded.cars[0]?.tone).toBe('overloaded');
 
-    const full = frame({ cars: [car({ loadFactor: LOAD_FULL })] });
-    const quiet = draw(full, RECORDING, { overlay: metrics });
-    expect(quiet.texts).not.toContain('!');
+    const full = overlayViewOf(metrics, frame({ cars: [car({ loadFactor: LOAD_FULL })] }));
+    expect(full.cars[0]?.load).not.toContain('!');
+    expect(full.cars[0]?.overloaded).toBe(false);
+    // The design-load band is a *distinct* fact from the alarm — `UX.md` RV-14, `D18`.
+    expect(full.cars[0]?.tone).toBe('at-design-load');
+  });
+
+  it('is one judgement with two renderers — the tone names the band the colour paints', () => {
+    /*
+     * The stage takes a `Theme` colour and the card takes a class; `loadTone` is the single set of
+     * boundaries both read, so a car cannot be amber on the picture and green on the panel. Asserted
+     * over the four bands rather than over one, because the pairing is what is being claimed.
+     */
+    for (const [factor, tone, colour] of [
+      [0.2, 'room', DEFAULT_THEME.carLight],
+      [0.6, 'carrying', DEFAULT_THEME.car],
+      [LOAD_FULL, 'at-design-load', DEFAULT_THEME.carHeavy],
+      [LOAD_ALARM, 'overloaded', DEFAULT_THEME.carOverload],
+    ] as const) {
+      expect(loadTone(factor)).toBe(tone);
+      expect(loadColour(factor, DEFAULT_THEME)).toBe(colour);
+    }
   });
 
   it('uses four bands, with the alarm and the fill rule at different thresholds — D18', () => {
@@ -816,7 +740,7 @@ describe('floor rows', () => {
       label: `car-number-${String(index)}`,
     }));
     const wide: VizRecording = { ...RECORDING, shafts: many };
-    const layout = layoutFor(wide, 250);
+    const layout = layoutFor(wide);
     const ctx = new RecordingContext();
     drawScene(ctx, {
       recording: wide,
@@ -1016,426 +940,143 @@ describe('the run status banner — RV-16', () => {
 });
 
 /* -------------------------------------------------------------------------- *
- * The layout's new geometry
- * -------------------------------------------------------------------------- */
-
-describe('the overlay never overlaps the plot', () => {
-  it('reserves its width from the plot rather than drawing on top of it', () => {
-    const withPanel = layoutFor(RECORDING, 250);
-    const withoutPanel = layoutFor(RECORDING, 0);
-    expect(withoutPanel.overlay).toBeUndefined();
-    expect(withPanel.overlay).toBeDefined();
-    expect(withPanel.plot.width).toBe(withoutPanel.plot.width - 250);
-    const panel = withPanel.overlay;
-    if (panel === undefined) throw new Error('expected a panel');
-    expect(panel.x).toBeGreaterThanOrEqual(withPanel.plot.x + withPanel.plot.width);
-    expect(panel.x + panel.width).toBeLessThanOrEqual(withPanel.width);
-  });
-});
-
-/* -------------------------------------------------------------------------- *
- * The panel's width — GitHub issue #115 § 6
+ * The two registers — issue #100
  * -------------------------------------------------------------------------- */
 
 /**
- * A context that keeps the face each string was drawn at, which the shared one above does not.
+ * **Every word of both registers reaches the view**, and the refusal is as hard in either.
  *
- * The panel mixes a 12 px and an 11 px monospace face, and a bound computed at the wider one is
- * 9 % too generous for every small line — which is exactly the error `render/overlay.ts#wrap`
- * shipped with. Measuring each string at its own face is the only way this file can claim a string
- * fits without repeating the mistake it is here to catch.
+ * The measurement that produced issue #100: `drawOverlay` took no mode, so `LIVE METRICS`,
+ * `rolling mean wait`, `waiting now` and `BY BANK` were byte-identical in Basic and Advanced. The
+ * fix was a table of two registers; this is the assertion that neither half of it can rot, and it
+ * is written over the tables themselves rather than over a list somebody remembered to update — a
+ * tenth word added to either register with no view field to carry it is red here.
  */
-class FacedContext implements Canvas2DLike {
-  readonly drawn: { readonly text: string; readonly x: number; readonly advancePx: number }[] = [];
-  fillStyle = '';
-  strokeStyle = '';
-  lineWidth = 1;
-  font = '';
-  textAlign: Canvas2DLike['textAlign'] = 'start';
-  textBaseline: Canvas2DLike['textBaseline'] = 'alphabetic';
-  globalAlpha = 1;
-  save(): void {}
-  restore(): void {}
-  clearRect(): void {}
-  fillRect(): void {}
-  strokeRect(): void {}
-  beginPath(): void {}
-  closePath(): void {}
-  moveTo(): void {}
-  lineTo(): void {}
-  quadraticCurveTo(): void {}
-  arc(): void {}
-  fill(): void {}
-  stroke(): void {}
-  fillText(text: string, x: number): void {
-    // `ui-monospace` advances at 0.6 em, which is where `canvas.ts`'s 7.2 at 12 px comes from.
-    this.drawn.push({ text, x, advancePx: (Number.parseFloat(this.font) || 12) * 0.6 });
-  }
-}
-
-describe('the live metrics panel is never narrower than its own content — issue #115 § 6', () => {
-  /**
-   * The narrowest panel the layout will hand over, **found rather than transcribed**.
-   *
-   * `render/layout.ts` owns the floor; this file owns the claim that the floor is wide enough. A
-   * literal here would be a second copy of the number and the two would drift the first time the
-   * panel grew a row. The canvas is wide enough that nothing is squeezed, so what comes back is
-   * the request unchanged or nothing at all.
-   */
-  function narrowestPanelPx(): number {
-    for (let asked = 1; asked <= 600; asked += 1) {
-      const layout = buildLayout({
-        width: 2400,
-        height: 900,
-        floors: RECORDING.floors,
-        shafts: RECORDING.shafts,
-        overlayWidthPx: asked,
-      });
-      if (layout.overlay !== undefined) return layout.overlay.width;
-    }
-    throw new Error('the layout refused every panel width up to 600 px');
-  }
-
-  it('drops the panel rather than handing over a strip too narrow to read', () => {
-    const floor = narrowestPanelPx();
-    expect(floor).toBeGreaterThan(120);
-    const justUnder = buildLayout({
-      width: 2400,
-      height: 900,
-      floors: RECORDING.floors,
-      shafts: RECORDING.shafts,
-      overlayWidthPx: floor - 1,
-    });
-    expect(justUnder.overlay).toBeUndefined();
-  });
-
-  it('is what a 910 px canvas gets, which is where the clipping was measured', () => {
-    /*
-     * The failure, in one number. A 1600 × 1000 viewport gives the stage a 910 × 547 canvas, and
-     * `dev/main.ts` asks for a 250 px panel there. `fitGutters` used to shrink the **overlay**
-     * first and to any value at all, so the panel arrived **135.3 px** wide with content up to
-     * 230 px — `boarded (window) 75 legs`, `main  75 legs  suppressed` and
-     * `… (full reason below the canvas)` all clipped at its right edge, on a surface drawn into
-     * the canvas where no DOM overflow check could see them.
-     */
-    const layout = buildLayout({
-      width: 910,
-      height: 547,
-      floors: RECORDING.floors,
-      shafts: RECORDING.shafts,
-      gutterRightPx: 280,
-      overlayWidthPx: 250,
-    });
-    expect(layout.overlay?.width).toBe(250);
-    // And the plot still gets exactly the share it got before, so no shaft moved for this.
-    expect(layout.plot.width).toBeCloseTo((910 - 24) * 0.45, 6);
-  });
-
-  it('draws nothing past its own right edge, at the narrowest width it can be', () => {
-    const floor = narrowestPanelPx();
-    /*
-     * The two longest strings the panel can be asked to draw, together: a saturated run (so the
-     * suppression reason is wrapped and the "full reason below" pointer appears) on a building
-     * whose bank ids are as long as any shipped one — `mixed-use-high-rise` authors
-     * `office-low-rise`, fifteen characters.
-     */
-    const legs: readonly VizLeg[] = Array.from({ length: 30 }, (_ignored, index) => ({
-      passengerId: `p${String(index)}`,
-      originFloorId: 'G',
-      destinationFloorId: '3',
-      direction: 'up' as const,
-      arrivedAt: 10 + index,
-      boardedAt: 20 + index,
-      carId: 'office-low-rise-A',
-      bankId: 'office-low-rise-express',
-    }));
-    const saturated: VizRecording = {
-      ...RECORDING,
-      legs,
-      summary: {
-        ...RECORDING.summary,
-        saturated: true,
-        awtIsValid: false,
-        awtInvalidReason:
-          'Queue length rose by 125.7 persons (25.15/min, 21.1x the queue own scatter) over the ' +
-          '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
-          'saturated, AWT is not approximately normal and its confidence interval must be ' +
-          'suppressed.',
-      },
-    };
-    const layout = buildLayout({
-      width: 2400,
-      height: 900,
-      floors: saturated.floors,
-      shafts: saturated.shafts,
-      overlayWidthPx: floor,
-    });
-    const panel = layout.overlay;
-    if (panel === undefined) throw new Error('expected a panel');
-
-    const ctx = new FacedContext();
-    // `drawOverlay` rather than `drawScene`: the header's own right-aligned counters are drawn
-    // past `panel.x` by design and are not this panel's rows, so going through the scene would
-    // measure the wrong strings against the wrong edge.
-    /*
-     * Driven at `endedAt`, where the panel prints `core`'s own reason — `docs/20` defect 3 gates
-     * that sentence behind the playhead, and this test needs the **long** one: its subject is the
-     * clipping rule, and the pointer it asserts on only exists when a reason overruns the budget.
-     * The mid-run reason is one sentence by design and would make the assertion vacuous.
-     */
-    drawOverlay(ctx, {
-      recording: saturated,
-      frame: frame({
-        simTimeS: saturated.endedAt,
-        cars: Array.from({ length: 4 }, (_ignored, index) =>
-          car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.25 * index }),
-        ),
-      }),
-      metrics: overlayAt(saturated, saturated.endedAt),
-      layout,
-      theme: DEFAULT_THEME,
-    });
-
-    const inPanel = ctx.drawn.filter((entry) => entry.x >= panel.x);
-    expect(inPanel.length).toBeGreaterThan(8);
-    // The pointer has to be one of them, or the reason was short enough that this proves nothing.
-    expect(inPanel.some((entry) => entry.text.startsWith('…'))).toBe(true);
-    for (const entry of inPanel) {
-      expect(
-        entry.x + entry.text.length * entry.advancePx,
-        `"${entry.text}" runs past the panel`,
-      ).toBeLessThanOrEqual(panel.x + panel.width);
-    }
-  });
-});
-
-/* -------------------------------------------------------------------------- *
- * The panel in Casual — GitHub issue #100, whose first checklist item is this panel
- * -------------------------------------------------------------------------- */
-
-/**
- * What the live-metrics panel is allowed to say to a Casual reader.
- *
- * The measurement: `drawOverlay` took no mode, so `LIVE METRICS`, `rolling mean wait`,
- * `SUPPRESSED`, `BY BANK` and `CAR LOAD` were what both audiences got. #100 reports exactly that
- * — *"during a saturated run the simulation header still prints SATURATED and AWT suppressed"*.
- *
- * Four rules, and the third and fourth are the ones that make the first two safe:
- *
- * 1. **The words move.** A player reads different labels.
- * 2. **They fit.** Every Casual string is measured at its own face against the narrowest panel the
- *    layout will hand over — the bound issue #115 § 6 exists for, applied to the strings this lane
- *    added rather than to the ones somebody remembered.
- * 3. **A refusal stays a refusal.** `SUPPRESSED` becomes a line that says there is **no average**,
- *    in the warning colour, with no number beside it and with the reason still reachable. It is
- *    never softened into *a busy day*, and it never claims a ground the run may not have.
- * 4. **Engineer is untouched.** The default is the engineer's panel, byte for byte.
- */
-describe('the live metrics panel speaks a player’s words in Casual — issue #100', () => {
+describe('the live metrics view speaks a player’s words in Casual — issue #100', () => {
   const at = 100;
 
-  /** The saturating summary the width suite already uses — `core`'s own prose, verbatim. */
-  const SATURATED: VizRecording = {
-    ...RECORDING,
-    summary: {
-      ...RECORDING.summary,
-      saturated: true,
-      awtIsValid: false,
-      awtInvalidReason:
-        'Queue length rose by 268.0 persons (53.59/min, 12.0x the queue’s own scatter) over the ' +
-        '300 s reporting window, against thresholds 8 persons and 0.5/min; the system is ' +
-        'saturated, AWT is not approximately normal and its confidence interval must be ' +
-        'suppressed.',
-    },
-  };
+  /** Every string a view carries, in one array, for the *this word reached the screen* checks. */
+  const stringsOf = (view: OverlayView): readonly string[] => [
+    view.title,
+    view.window,
+    ...view.observations.flatMap((row) => [row.label, row.value]),
+    view.estimate.label,
+    ...(view.estimate.kind === 'refused'
+      ? [view.estimate.head, view.estimate.reason]
+      : [view.estimate.value]),
+    view.bankHeading,
+    ...(view.banksEmpty === undefined ? [] : [view.banksEmpty]),
+    ...view.banks.flatMap((row) => [row.bankId, row.boarded, row.mean]),
+    view.carHeading,
+    ...view.cars.map((row) => row.load),
+  ];
 
-  const panelText = (recording: VizRecording, mode: 'basic' | 'advanced'): string => {
-    const ctx = new RecordingContext();
-    drawOverlay(ctx, {
-      recording,
-      frame: frame({ simTimeS: at }),
-      metrics: overlayAt(recording, at),
-      layout: layoutFor(recording),
-      theme: DEFAULT_THEME,
-      mode,
-    });
-    return ctx.texts.join('\n');
-  };
+  const viewOf = (recording: VizRecording, mode: 'basic' | 'advanced', t = at): OverlayView =>
+    overlayViewOf(overlayAt(recording, t), frame({ simTimeS: t }), mode);
 
   it('says what the panel is in a player’s words, and keeps the engineer’s', () => {
-    const casual = panelText(RECORDING, 'basic');
-    const engineer = panelText(RECORDING, 'advanced');
-    expect(casual).not.toBe(engineer);
-    for (const jargon of ['LIVE METRICS', 'rolling mean wait', 'BY BANK', 'CAR LOAD']) {
-      expect(engineer, jargon).toContain(jargon);
-      expect(casual, jargon).not.toContain(jargon);
-    }
-    expect(casual).toContain('RIGHT NOW');
-    expect(casual).toContain('BY LIFT GROUP');
+    expect(viewOf(RECORDING, 'basic').title).toBe(CASUAL_WORDS.title);
+    expect(viewOf(RECORDING, 'advanced').title).toBe(ENGINEER_WORDS.title);
   });
 
   it('defaults to the engineer’s panel, byte for byte', () => {
-    const ctx = new RecordingContext();
-    drawOverlay(ctx, {
-      recording: RECORDING,
-      frame: frame({ simTimeS: at }),
-      metrics: overlayAt(RECORDING, at),
-      layout: layoutFor(RECORDING),
-      theme: DEFAULT_THEME,
-    });
-    expect(ctx.texts.join('\n')).toBe(panelText(RECORDING, 'advanced'));
+    const asked = overlayViewOf(overlayAt(RECORDING, at), frame({ simTimeS: at }), 'advanced');
+    const defaulted = overlayViewOf(overlayAt(RECORDING, at), frame({ simTimeS: at }));
+    expect(stringsOf(defaulted)).toEqual(stringsOf(asked));
+  });
+
+  it('carries every word of whichever register it is in, and none of the other’s', () => {
+    /*
+     * Derived from the two tables rather than listed. A word added to one register and forgotten in
+     * the view is red; a word that leaks across registers is red on the second half.
+     */
+    const mixed = frame({ simTimeS: at });
+    for (const [mode, mine, theirs] of [
+      ['basic', CASUAL_WORDS, ENGINEER_WORDS],
+      ['advanced', ENGINEER_WORDS, CASUAL_WORDS],
+    ] as const) {
+      const view = overlayViewOf(overlayAt(RECORDING, at), mixed, mode);
+      const drawn = stringsOf(view).join('\n');
+      for (const [key, word] of Object.entries(mine)) {
+        // These two are drawn only in the states that call for them; the rest are unconditional.
+        if (key === 'bankSuppressed' || key === 'nothingYet') continue;
+        expect(drawn, `${mode} lost ${key}`).toContain(word);
+      }
+      for (const [key, word] of Object.entries(theirs)) {
+        // `longest wait` is byte-identical in both registers and is in both tables on purpose.
+        if (word === mine[key as keyof typeof mine]) continue;
+        expect(drawn, `${mode} leaked ${key} from the other register`).not.toContain(word);
+      }
+    }
   });
 
   it('keeps the window’s basis rather than dropping it', () => {
     /*
-     * The one label that could have been made plainer by making it false. `boarded (window)` is a
-     * count over the rolling window; drawn as a count over the day it would be a wrong figure, not
-     * a friendlier one — so Casual keeps the basis and says it in minutes.
+     * Casual gets the window's **length** rather than its bounds, and it is subtracted rather than
+     * assumed: early in a run the window is genuinely shorter than 300 s, and *the last 300 s*
+     * there would describe a window the panel is not showing.
      */
-    const casual = panelText(RECORDING, 'basic');
-    expect(casual).toContain('got a car (5min)');
-    const metrics = overlayAt(RECORDING, at);
-    expect(casual).toContain(`the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`);
+    const t = RECORDING.startedAt + 60;
+    const metrics = overlayAt(RECORDING, t);
+    expect(viewOf(RECORDING, 'basic', t).window).toBe(
+      `the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`,
+    );
+    expect(viewOf(RECORDING, 'advanced', t).window).toContain('window ');
   });
-
-  /** The same panel at `endedAt`, where the refusal is a fact about a day that has one. */
-  const panelTextAtEnd = (recording: VizRecording, mode: 'basic' | 'advanced'): string => {
-    const ctx = new RecordingContext();
-    const end = recording.endedAt;
-    drawOverlay(ctx, {
-      recording,
-      frame: frame({ simTimeS: end }),
-      metrics: overlayAt(recording, end),
-      layout: layoutFor(recording),
-      theme: DEFAULT_THEME,
-      mode,
-    });
-    return ctx.texts.join('\n');
-  };
 
   it('refuses a mean just as hard, and says so in words a player has', () => {
-    const casual = panelTextAtEnd(SATURATED, 'basic');
-    const engineer = panelTextAtEnd(SATURATED, 'advanced');
-    expect(engineer).toContain('SUPPRESSED');
-    expect(casual).not.toContain('SUPPRESSED');
-    // Still a refusal, and it says the thing that matters first: there is no average.
-    expect(casual).toContain('NO AVERAGE');
-    expect(casual).toMatch(/refuse/i);
-    // Never softened into a description of the day, and never claiming a ground this panel cannot
-    // see — `awtIsValid` has five grounds and only one of them is saturation.
-    expect(casual.toLowerCase()).not.toContain('busy day');
-    expect(casual.toLowerCase()).not.toContain('could not cope');
-    // The observations survive, because they are how a reader *sees* a queue diverging.
-    for (const row of ['people waiting', 'longest wait', 'got a car (5min)']) {
-      expect(casual, row).toContain(row);
-    }
+    const saturated = saturatedRecording();
+    const end = saturated.endedAt;
+    const estimate = viewOf(saturated, 'basic', end).estimate;
+    if (estimate.kind !== 'refused') throw new Error('Casual kept a refused mean');
+    // Never softer: every candidate says there is no average before it says anything else.
+    expect(estimate.head.toLowerCase()).toContain('no average');
+    expect(estimate.reason).toBe(CASUAL_REFUSAL_REASON);
+    expect(estimate.label).toBe(CASUAL_WORDS.rollingMean);
+    expect(Object.hasOwn(estimate, 'value')).toBe(false);
   });
 
-  /**
-   * `docs/20` defect 3 — the RIGHT NOW box read **`NO AVERAGE — A RESULT`** at 14 % of playback,
-   * under a label reading *average wait so far*, over a building whose queues had not formed.
-   *
-   * The three assertions are the three halves of the fix, and the first is the one that may never
-   * be traded away: the panel **withholds exactly as hard**, because § D294 refused on this canvas
-   * to un-gate a figure to fix a sentence and a bitmap has no later. What moves is the date on the
-   * verdict.
-   */
   it('does not call the refusal a result before the day has one', () => {
-    const early = panelText(SATURATED, 'basic');
-
-    // Withheld, and leading with the same head — a refusal that stops saying there is no average
-    // has stopped being one. (That no mean is drawn at all is the suite's next test, in both
-    // registers; this one is about the words around the absence.)
-    expect(early).toContain('NO AVERAGE');
-
-    // And not the finished day's verdict.
-    expect(early).not.toContain('A RESULT');
-    expect(early).not.toContain('That is a result, not a gap');
-    expect(early).toContain('NO AVERAGE YET');
-    // Wrapped by the panel — the assertion reads the sentence rather than the lines.
-    expect(early.replace(/\s+/g, ' ')).toContain(
-      'A mean over part of a day is not this day\u2019s average',
-    );
-
-    // The end still earns the verdict, so this is a gate rather than a deletion.
-    expect(panelTextAtEnd(SATURATED, 'basic')).toContain('A RESULT');
+    const saturated = saturatedRecording();
+    const early = Math.round(saturated.startedAt + (saturated.endedAt - saturated.startedAt) * 0.14);
+    const estimate = viewOf(saturated, 'basic', early).estimate;
+    if (estimate.kind !== 'refused') throw new Error('the early playhead kept its mean');
+    expect(estimate.basis).toBe('now');
+    expect(estimate.reason).toBe(CASUAL_REFUSAL_REASON_SO_FAR);
   });
 
   it('prints no mean anywhere on a refused run, in either register', () => {
-    const mean = (overlayAt(RECORDING, at).rollingMeanWaitS ?? 0).toFixed(1);
-    // The premise: the same panel on the unrefused run does print it.
-    expect(panelText(RECORDING, 'basic')).toContain(`${mean} s`);
-    for (const mode of ['basic', 'advanced'] as const) {
-      expect(panelText(SATURATED, mode), mode).not.toContain(`${mean} s`);
-    }
-  });
-
-  it('draws the refusal in the warning colour, not in body ink', () => {
-    const ctx = new RecordingContext();
-    drawOverlay(ctx, {
-      recording: SATURATED,
-      frame: frame({ simTimeS: at }),
-      metrics: overlayAt(SATURATED, at),
-      layout: layoutFor(SATURATED),
-      theme: DEFAULT_THEME,
-      mode: 'basic',
-    });
-    const refusal = ctx.calls.find(
-      (call) => call.op === 'fillText' && String(call.args[0]).startsWith('NO AVERAGE'),
-    );
-    expect(refusal).toBeDefined();
-    expect(refusal?.args[3]).toBe(DEFAULT_THEME.warning);
-  });
-
-  it('fits the narrowest panel the layout hands over — issue #115 § 6, on the new strings', () => {
+    const saturated = saturatedRecording();
+    const end = saturated.endedAt;
     /*
-     * The bound is **found**, not transcribed: `render/layout.ts` owns the floor and a literal here
-     * would be a second copy of it. Measured at each string's own face, because a bound computed at
-     * the 12 px face is 9 % too generous for every 11 px line — the error `wrap` shipped with.
+     * The mean **as this panel would print it** — `12.0 s`, with the unit — rather than as a bare
+     * numeral. The bare form is what was written first and it was a false positive waiting: `core`'s
+     * own refusal sentence says the queue rose at *12.0x the queue's own scatter*, and a check that
+     * cannot tell a suppressed figure from a digit inside the reason for suppressing it would go red
+     * on the very sentence R3 requires to be there.
      */
-    let floor = 0;
-    for (let asked = 1; asked <= 600 && floor === 0; asked += 1) {
-      const probe = buildLayout({
-        width: 2400,
-        height: 900,
-        floors: RECORDING.floors,
-        shafts: RECORDING.shafts,
-        overlayWidthPx: asked,
-      });
-      if (probe.overlay !== undefined) floor = probe.overlay.width;
+    const printed = `${saturated.summary.meanWaitS.toFixed(1)} s`;
+    // The positive control: an unrefused run at the same instant really does print it that way.
+    const healthy = viewOf(RECORDING, 'advanced', end).estimate;
+    expect(healthy.kind).toBe('figure');
+    for (const mode of ['basic', 'advanced'] as const) {
+      const drawn = stringsOf(viewOf(saturated, mode, end)).join('\n');
+      expect(drawn, `${mode} printed the refused mean`).not.toContain(printed);
     }
-    expect(floor).toBeGreaterThan(120);
+  });
 
-    for (const recording of [RECORDING, SATURATED]) {
-      const layout = buildLayout({
-        width: 2400,
-        height: 900,
-        floors: recording.floors,
-        shafts: recording.shafts,
-        overlayWidthPx: floor,
-      });
-      const panel = layout.overlay;
-      if (panel === undefined) throw new Error('expected a panel');
-      const ctx = new FacedContext();
-      drawOverlay(ctx, {
-        recording,
-        frame: frame({
-          cars: Array.from({ length: 4 }, (_ignored, index) =>
-            car({ carId: `c${String(index)}`, label: `c${String(index)}`, loadFactor: 0.25 * index }),
-          ),
-        }),
-        metrics: overlayAt(recording, at),
-        layout,
-        theme: DEFAULT_THEME,
-        mode: 'basic',
-      });
-      const inPanel = ctx.drawn.filter((entry) => entry.x >= panel.x);
-      expect(inPanel.length).toBeGreaterThan(8);
-      for (const entry of inPanel) {
-        expect(
-          entry.x + entry.text.length * entry.advancePx,
-          `"${entry.text}" runs past the panel`,
-        ).toBeLessThanOrEqual(panel.x + panel.width);
+  it('gives a refused bank the register’s own word rather than a number', () => {
+    const saturated = saturatedRecording();
+    const end = saturated.endedAt;
+    for (const [mode, words] of [
+      ['basic', CASUAL_WORDS],
+      ['advanced', ENGINEER_WORDS],
+    ] as const) {
+      const view = viewOf(saturated, mode, end);
+      expect(view.banks.length).toBeGreaterThan(0);
+      for (const bank of view.banks) {
+        expect(bank.refused, 'a refused run kept a bank mean').toBe(true);
+        expect(bank.mean).toBe(words.bankSuppressed);
       }
     }
   });

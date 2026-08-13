@@ -824,6 +824,68 @@
          entry tints it, so `▮ ▯ ◂▸ OOS ⏻` read as marks rather than as decoration. */
       .legend-glyph { color: var(--text); font-weight: 600; }
 
+      /* The live metrics card — `docs/21` § 3.4, the panel that used to be drawn into the
+         stage's bitmap. Three columns while there is room, stacked below the floor: RS-03's
+         rule is *the controls stack and nothing shrinks its text*, and `auto-fit` over a
+         `minmax` floor is that rule spelled in one line rather than in a media query. Every
+         colour is a custom property, so § 2.2 (2)'s indirection restyles this card with no code
+         change — the same promise the rest of the shell already keeps. */
+      .live-metrics {
+        margin: 0 14px 8px; padding: 9px 13px 10px;
+        border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--panel);
+      }
+      .live-metrics[hidden] { display: none; }
+      .live-metrics-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+      .live-metrics-window { font: 500 10.5px var(--mono); color: var(--dim); }
+      /* `min(210px, 100%)` rather than a bare `210px`, and the difference is a defect this lane's
+         own browser check caught: `auto-fit` keeps a track at its floor even when the container is
+         narrower than the floor, so at a 420 px viewport the card was 223 px of content in a 178 px
+         box — issue #115 § 6's shape, in CSS, on the card built to make it visible. Wrapped in
+         `min()` the track yields to the container and the words wrap instead. */
+      .live-metrics-cols {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+        gap: 6px 18px; margin-top: 6px;
+      }
+      /* A column scrolls rather than clipping — Vertical City runs thirty-five cars, and a list
+         that ended without saying so is RS-05's silent truncation. Vertical only: the horizontal
+         axis is what `dev/liveMetrics.browser.test.ts` measures, and it must stay at zero. */
+      .live-metrics-col { min-width: 0; max-height: 150px; overflow-y: auto; overflow-x: hidden; }
+      .live-metrics-row {
+        display: flex; align-items: baseline; gap: 8px; justify-content: space-between;
+        font: 500 11px var(--mono); padding: 1px 0;
+      }
+      .live-metrics-row .lm-label { color: var(--dim); }
+      .live-metrics-row .lm-value { color: var(--text); white-space: nowrap; }
+      /* The label yields before the figure does — the same rule the drawn panel kept for a bank id
+         (*the id yields, never the figures beside it*), because the figure is the thing a reader
+         cannot reconstruct from its neighbours. */
+      .live-metrics-row .lm-label { min-width: 0; overflow-wrap: anywhere; }
+      /* KB-15: the refusal is never colour alone — the word itself is the signal, and the tone
+         is beside it rather than instead of it. */
+      .live-metrics-row .lm-refused { color: var(--warn); }
+      .live-metrics-head-row {
+        font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase;
+        color: var(--dimmer); padding: 2px 0 1px;
+      }
+      .live-metrics-refusal { margin: 2px 0 0; }
+      .live-metrics-refusal .lm-head { font: 600 11px var(--mono); color: var(--warn); }
+      .live-metrics-refusal .lm-reason {
+        display: block; font: 500 10.5px var(--body); color: var(--dim); line-height: 1.35;
+        margin-top: 2px;
+      }
+      /* The car load bar. The track runs past 1.0 — `RV-14`'s *does not silently clip at 1* — and
+         the full mark says where rated load sits on it, exactly as the canvas drew it. */
+      .live-metrics-car { display: flex; align-items: center; gap: 7px; padding: 1px 0; }
+      .live-metrics-car .lm-car-label { font: 500 10.5px var(--mono); color: var(--dim); width: 34px; flex: none; }
+      .live-metrics-track {
+        position: relative; flex: 1; min-width: 24px; height: 8px;
+        border-radius: 2px; background: var(--bg);
+      }
+      .live-metrics-fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+      .live-metrics-full-mark { position: absolute; top: -1px; bottom: -1px; width: 1px; background: var(--dim); }
+      .live-metrics-car .lm-load { font: 500 10.5px var(--mono); color: var(--dim); width: 40px; flex: none; text-align: right; }
+      .live-metrics-car .lm-load.lm-overloaded { color: var(--band-3); }
+
       /* The race strip — GAMEPLAY §7.4, Everyday slice 4d. Two lanes under the stage, drawn as
          SVG polylines with fixed viewBoxes so the strip scales with the column and the geometry
          module (`live/raceStrip.ts#raceLaneOf`) never needs a pixel measurement. `vector-effect:
@@ -1893,6 +1955,43 @@
                 <span class="alarm-sub" id="alarm-sub"></span>
               </div>
             </div>
+
+            <!-- ============================================================
+                 LIVE METRICS — `docs/21` § 3.4.
+
+                 This panel was drawn **into the stage's bitmap** until this
+                 wave. That is why issue #115 § 6's clipping shipped with every
+                 tier green: four labels overhung the panel border on the
+                 viewer's own canvas and no DOM check could see them, because a
+                 string inside a canvas has no `scrollWidth`. § D316 closed the
+                 clipping; this closes the half that let it happen.
+
+                 Not one word is written here. The title, the window caption,
+                 the three observations, the estimate block and both lists are
+                 `render/overlay.ts#overlayViewOf`'s, in whichever of the two
+                 registers the reader is in, drawn by `dev/main.ts`'s
+                 `drawLiveMetrics` through `keyedFill` — issue #106's remedy,
+                 because `renderLive` runs sixty times a second and a rebuilt
+                 list drops the scroll a reader was in.
+
+                 RS-03 transfers rather than being re-decided: the three columns
+                 are `auto-fit` over a `minmax` floor, so below the floor the
+                 card **stacks** and no text shrinks. The old panel's answer to
+                 a narrow viewport was to disappear below 900 px of canvas; the
+                 card is on screen at every width, which is more rather than
+                 less.
+                 ============================================================ -->
+            <section class="live-metrics" id="live-metrics" aria-label="Live metrics" hidden>
+              <div class="live-metrics-head">
+                <span class="eyebrow" id="live-metrics-title"></span>
+                <span class="live-metrics-window" id="live-metrics-window"></span>
+              </div>
+              <div class="live-metrics-cols">
+                <div class="live-metrics-col" id="live-metrics-figures"></div>
+                <div class="live-metrics-col" id="live-metrics-banks"></div>
+                <div class="live-metrics-col" id="live-metrics-cars"></div>
+              </div>
+            </section>
 
             <p id="frame-description" class="sr-only" aria-live="polite"></p>
 

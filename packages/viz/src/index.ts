@@ -58,8 +58,9 @@
  * | {@link overlayAt} | `src/dev/main.ts`'s draw loop, every animation frame; and `drawScene` draws its result |
  * | {@link landingAssignmentsAt} | `src/dev/main.ts`'s landing selector and its draw loop |
  * | {@link meansAreSuppressed} | three of them, which is the point: `overlayAt` here, `drawHeader` in `src/render/canvas.ts`, and `statusLine` in `src/dev/main.ts` — `D1` |
- * | {@link drawOverlay} | `drawScene`, in `src/render/canvas.ts` |
+ * | {@link overlayViewOf} | `src/dev/main.ts#drawLiveMetrics`, the DOM card under the stage — `docs/21` § 3.4 took this panel off the bitmap, and `drawOverlay` went with it |
  * | {@link loadColour}, {@link loadTrackMax}, {@link doorGlyph}, {@link describeSelection} | `src/render/canvas.ts` and `src/render/overlay.ts` |
+ * | {@link loadTone} | both renderers of a car's load: `loadColour` here for the stage, and the live metrics card's tone class in `src/dev/main.ts` |
  * | {@link describeFrame} | `src/dev/main.ts`, as the canvas's `aria-label` and its live region — `KB-13` |
  * | {@link runSummaryFigures} | `disclosureItems` in `src/mode/disclosure.ts`, which `src/dev/main.ts` calls from `adopt` on every recording — `docs/10` § 11 **W2**, now through § 4's mode layer |
  * | {@link queueAt} | `src/dev/main.ts`'s draw loop, every animation frame — `docs/10` § 6, **U4** |
@@ -243,10 +244,16 @@ export {
 export {
   LOAD_ALARM,
   LOAD_FULL,
-  drawOverlay,
   loadColour,
+  loadTone,
   loadTrackMax,
-  type OverlayInput,
+  overlayViewOf,
+  type LoadTone,
+  type OverlayBankRow,
+  type OverlayCarRow,
+  type OverlayEstimate,
+  type OverlayRow,
+  type OverlayView,
 } from './render/overlay.js';
 export { describeFrame, type DescribeFrameInput } from './render/describeFrame.js';
 /*

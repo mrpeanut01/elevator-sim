@@ -84,7 +84,6 @@ function stageFor(id: string, canvas: { readonly width: number; readonly height:
     ...canvas,
     floors: recording.floors,
     shafts: recording.shafts,
-    wantsOverlay: canvas.width >= 900,
   });
 }
 
