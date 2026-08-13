@@ -30,7 +30,12 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEverydayStage,
+  openEverydayDoor,
+} from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -68,12 +73,6 @@ async function coldLoad(): Promise<Page> {
   return page;
 }
 
-/** The front door, from the menu tile — § 6.1, and the first stop on the § 3.3 daily timeline. */
-async function openDoor(page: Page): Promise<void> {
-  await page.locator('.everyday-mode[data-screen="door"]').click();
-  await page.waitForSelector('.everyday-door', { timeout: 15_000 });
-}
-
 /**
  * A rail row, by the screen it opens — the navigation a player performs.
  *
@@ -85,22 +84,19 @@ async function railTo(page: Page, label: string): Promise<void> {
   await page.locator('.everyday-rail button', { hasText: label }).first().click();
 }
 
-/**
- * Walk the § 3.3 primary from the front door to the stage.
+/*
+ * The two navigations this file used to carry itself — *open the front door from the menu tile*
+ * and *walk the § 3.3 primary from the door to the stage* — are
+ * `dev/browserTier.test-helper.ts#openEverydayDoor` and `#enterEverydayStage`, imported above.
  *
- * **The stage is a screen, so the wait is for the screen.** This helper landed waiting for
- * `.everyday-main` to go `display: none` — the § D335 hand-off's geometry, where entering the stage
- * shrank the shell to its rail and uncovered the Engineer surface beside it.
- * `everyday/stageScreen.ts` retired that: the stage mounts in the screen region like every other
- * registered key, `.everyday-main` stays `grid` for the whole loop, and waiting for the old
- * geometry would time out on a product that is working.
+ * They were correct here, and that is the point: `shell.browser.test.ts` had a third copy and
+ * `stageScreen.browser.test.ts` a fourth, and the fourth was still pressing the tile straight to
+ * `stage` — a route that stopped existing when § 6.1's front door was registered, and five cases
+ * failed on it in the harness rather than in the product. One path, one file.
+ *
+ * The **first** case below still walks the route by hand and must keep doing so: what it asserts is
+ * the § 3.3 primary's label at each stop, so the walk there is the subject rather than the setup.
  */
-async function toStage(page: Page): Promise<void> {
-  await page.locator('.everyday-bar-primary').click();
-  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-  await page.locator('.everyday-bar-primary').click();
-  await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
-}
 
 /**
  * Wait for the run *Start the day* asked for to land on the stage.
@@ -148,7 +144,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
   it('goes door → brief → stage → report → week on the § 3.3 primary alone', async () => {
     const page = await coldLoad();
     try {
-      await openDoor(page);
+      await openEverydayDoor(page);
       // § 3.3's door row: the primary is `Set up today`, and it is step 1 of the daily timeline.
       expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
 
@@ -159,7 +155,8 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       expect(await page.textContent('.everyday-bar-note')).toContain('Running the lifts:');
 
       // § 6.3 / § 7: the day is `everyday/stageScreen.ts`, drawn in the screen region like every
-      // other registered key — see {@link toStage} for the geometry this used to wait for.
+      // other registered key, so `.everyday-main` stays `grid` — this line used to wait for it to
+      // go `display: none`, which is the § D335 hand-off's geometry and never arrives now.
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
@@ -192,7 +189,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
   it('withholds today everywhere until *Close the day*, and fills it in when pressed', async () => {
     const page = await coldLoad();
     try {
-      await openDoor(page);
+      await openEverydayDoor(page);
 
       /*
        * § 16 rule 1, at the front door: today's chip is the last of the seven, and it reads the em
@@ -243,8 +240,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
        */
       await page.locator('.everyday-rail-menu').click();
       await page.waitForSelector('.everyday-mode[data-screen="door"]', { timeout: 15_000 });
-      await openDoor(page);
-      await toStage(page);
+      await enterEverydayStage(page);
       await waitForOwnRun(page);
       await closeDay(page);
 
@@ -279,7 +275,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
   it('renders the report with the API absent, and never a spinner or a zero for the world', async () => {
     const page = await coldLoad();
     try {
-      await openDoor(page);
+      await openEverydayDoor(page);
 
       /*
        * § 16 rule 15 and § 12.2's *"with the API unreachable, every world figure renders a
@@ -321,7 +317,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
   it('draws the brief’s elevation, its wrinkle and a dispatcher picker that writes', async () => {
     const page = await coldLoad();
     try {
-      await openDoor(page);
+      await openEverydayDoor(page);
       await page.locator('.everyday-bar-primary').click();
       await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
 
@@ -377,7 +373,7 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
   it('refuses a past day’s replay in the § 3.3 primary rather than pretending to open it', async () => {
     const page = await coldLoad();
     try {
-      await openDoor(page);
+      await openEverydayDoor(page);
       expect(await page.textContent('.everyday-door-kind')).toBe('TODAY’S TOWER');
 
       await page.locator('.everyday-door-back').click();

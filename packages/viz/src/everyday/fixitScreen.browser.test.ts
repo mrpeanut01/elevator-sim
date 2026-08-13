@@ -109,6 +109,69 @@ async function repairIndex(page: Page, priced: 'free' | 'costed'): Promise<numbe
   return index;
 }
 
+/** One state the § 3.3 primary was in, as {@link recordPrimaryStates} caught it. */
+interface PrimaryState {
+  readonly label: string;
+  readonly disabled: boolean;
+}
+
+/** Where the recorder parks its list. The test's own name; the product neither writes nor reads it. */
+type RecordingWindow = Window & typeof globalThis & { __primaryStates?: PrimaryState[] };
+
+/**
+ * Start recording every state the § 3.3 primary passes through, from **before** the press.
+ *
+ * ## Why a recording and not a `waitForFunction`
+ *
+ * The busy state this case is about — disabled, relabelled `Running the day…` — is real and lasts
+ * for the whole of the run. It was still missed intermittently under load, and the reason is about
+ * the driver rather than about the product: `fixitScreen.ts#primary` writes the relabel
+ * synchronously in the click handler's own task and then defers the pair past a paint, so from the
+ * page's point of view the sequence is *click task* → paint → *one task that blocks the main thread
+ * for seconds*. A `waitForFunction` issued **after** the click has to be installed by an evaluate
+ * on that same main thread; if the round trip lands after the blocking task has started, the
+ * evaluate queues behind it and first runs when the run is over and the label has been put back.
+ * The window is not short — it is **unreachable**, because the only thread that could look at it is
+ * the one doing the work.
+ *
+ * So the observer is installed before the press, and it is a `MutationObserver` whose callback is a
+ * microtask: it is delivered at the end of the click handler's own task, before the frame that
+ * schedules the run. Nothing is weakened — the same two facts are asserted, disabled and relabelled,
+ * on a state the page genuinely passed through — and the assertion stops depending on when a remote
+ * poll happens to get a turn.
+ *
+ * It watches the document rather than the button, because the button does not survive:
+ * `shell.ts#drawBar` calls `bar.replaceChildren()` and builds a fresh `.everyday-bar-primary` on
+ * every refresh, so an observer bound to the element would be watching a detached node from the
+ * first redraw onward — which is this same defect wearing a different hat.
+ */
+async function recordPrimaryStates(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const seen: PrimaryState[] = [];
+    const sample = (): void => {
+      const button = document.querySelector<HTMLButtonElement>('.everyday-bar-primary');
+      if (button === null) return;
+      const last = seen.at(-1);
+      const label = button.textContent ?? '';
+      if (last?.label === label && last.disabled === button.disabled) return;
+      seen.push({ label, disabled: button.disabled });
+    };
+    sample();
+    (window as RecordingWindow).__primaryStates = seen;
+    new MutationObserver(sample).observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
+}
+
+/** What the recorder caught, in order. */
+async function primaryStates(page: Page): Promise<readonly PrimaryState[]> {
+  return page.evaluate(() => (window as RecordingWindow).__primaryStates ?? []);
+}
+
 describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () => {
   it('draws the case rail, the complaint, the figures and the diagnosis inside the shell', async () => {
     const page = await coldLoad();
@@ -254,22 +317,31 @@ describe.skipIf(!HAS_BROWSER)('the fourth mode tile opens § 10’s screen', () 
       // screen does not label it (§ 10.2 — *nothing labels itself*), and this test does not need
       // it to, because it asserts that a verdict was drawn rather than which verdict.
       await page.locator('.everyday-fixit-repair').nth(await repairIndex(page, 'free')).click();
+      await recordPrimaryStates(page);
       await page.locator('.everyday-bar-primary').click();
 
-      /*
-       * The relabel is deferred one frame precisely so it paints before the synchronous pair, so
-       * this is the assertion that the defer works: caught between the press and the runs.
-       */
-      await page.waitForFunction(
-        () => {
-          const button = document.querySelector<HTMLButtonElement>('.everyday-bar-primary');
-          return button !== null && button.disabled && /Running the day/.test(button.textContent ?? '');
-        },
-        undefined,
-        { timeout: 15_000 },
-      );
-
       await page.waitForSelector('.everyday-fixit-outcome', { timeout: 120_000 });
+
+      /*
+       * The relabel is deferred past a paint precisely so it is on screen before the synchronous
+       * pair, so this is the assertion that the defer works: a state the primary genuinely passed
+       * through, disabled and named, between the press and the outcome below.
+       *
+       * Read off {@link recordPrimaryStates}'s recording rather than polled for — see its docstring
+       * for why a poll issued after the press cannot see a state that only exists while the main
+       * thread is busy. The two facts asserted are the two that were asserted before.
+       */
+      const states = await primaryStates(page);
+      const busyAt = states.findIndex((state) => /Running the day/.test(state.label));
+      expect(
+        busyAt,
+        `the § 3.3 primary never went busy: ${JSON.stringify(states)}`,
+      ).toBeGreaterThanOrEqual(0);
+      expect(states[busyAt]?.disabled, 'the primary was relabelled but stayed pressable').toBe(true);
+      // And it came back: a busy state that is the last one recorded is a button left inert.
+      expect(busyAt, 'the primary was still busy when the outcome was drawn').toBeLessThan(
+        states.length - 1,
+      );
       const outcome = await page.evaluate(() => ({
         head: document.querySelector('.everyday-fixit-outcome-head')?.textContent ?? '',
         rows: document.querySelectorAll('.everyday-fixit-outcome-row').length,

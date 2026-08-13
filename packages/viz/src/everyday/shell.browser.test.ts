@@ -33,6 +33,7 @@ import {
   CHROMIUM,
   HAS_BROWSER,
   enterEngineerStage,
+  enterEverydayStage,
   pressMenuRow,
   returnToEverydayMode,
 } from '../dev/browserTier.test-helper.js';
@@ -149,32 +150,22 @@ async function coldLoad(): Promise<Page> {
   return page;
 }
 
-/**
- * Walk the player's own route from the menu to the stage — § 6's daily loop, as far as the stage.
+/*
+ * The walk from the menu to the stage — § 6's daily loop, as far as the stage — lives in
+ * `dev/browserTier.test-helper.ts#enterEverydayStage` and is imported above.
  *
- * `Today's tower` used to open the stage directly, because § 6.1's front door and § 6.2's brief
- * were unbuilt; both are registered screens now, so the tile opens the door and the stage is two
- * presses further on. Every case below that wants the stage takes this route rather than a shorter
- * one, for the reason `enterEngineerStage` exists at all: a tier that reached the surface by a path
- * no player has is a tier that tests a surface nobody can open.
+ * It was a local copy here, and it was correct; two other files had their own, and one of those was
+ * still pressing the tile straight through to `stage`, which stopped existing as a route when § 6.1's
+ * front door was registered. Three copies of one path is the shape `enterEngineerStage`'s own
+ * docstring argues against — *one path moved, one file changed* — so there is one now.
+ *
+ * The wait is for **the screen**, never for the shell getting out of the way. The local copy landed
+ * asking for `.everyday-main` to go `display: none` — the § D335 hand-off's geometry, where entering
+ * the stage shrank the shell to the rail and uncovered the Engineer surface beside it.
+ * `everyday/stageScreen.ts` retired that: the stage mounts in the screen region like every other
+ * registered key and `.everyday-main` stays `grid` for the whole loop, which the first case below
+ * asserts outright.
  */
-async function enterStage(page: Page): Promise<void> {
-  await page.locator('.everyday-mode[data-screen="door"]').click();
-  await page.waitForSelector('.everyday-door', { timeout: 15_000 });
-  await page.locator('.everyday-bar-primary').click();
-  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-  await page.locator('.everyday-bar-primary').click();
-  /*
-   * **The stage is a screen, so the wait is for the screen rather than for the shell getting out of
-   * the way.** This helper landed asking for `.everyday-main` to go `display: none` — the § D335
-   * hand-off's own geometry, where entering the stage shrank the shell to the rail and uncovered
-   * the Engineer surface beside it. `everyday/stageScreen.ts` retired that: the stage mounts in the
-   * screen region like every other registered key and `.everyday-main` stays `grid` for the whole
-   * of the loop, which the case below asserts outright. Waiting for the old geometry would hang for
-   * fifteen seconds on a product that is working.
-   */
-  await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
-}
 
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
   it('draws the menu, the rail and the four mode tiles — not the Engineer menu', async () => {
@@ -436,7 +427,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
   it('mounts § 7’s stage in the screen region, with the Engineer surface still covered', async () => {
     const page = await coldLoad();
     try {
-      await enterStage(page);
+      await enterEverydayStage(page);
 
       const shown = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
@@ -503,7 +494,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
        * host, because the brief did not exist; now the player's own route makes the run theirs and
        * pressing it a second time would be testing a control nobody uses.
        */
-      await enterStage(page);
+      await enterEverydayStage(page);
 
       /*
        * Wait for that run to land, through the screen's own statement about it: the stage's centred
@@ -587,7 +578,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
   it('comes back to the menu, unmounts the stage, and keeps the Engineer surface covered', async () => {
     const page = await coldLoad();
     try {
-      await enterStage(page);
+      await enterEverydayStage(page);
 
       /*
        * **The strip is in the way now, and that is the product being right rather than an
@@ -701,14 +692,21 @@ describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 
     try {
       await stashHost(page);
 
-      // Get a day of the player's own open on § 7's stage — the state a swap must not cost them.
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '',
-        undefined,
-        { timeout: 120_000 },
-      );
+      /*
+       * Get a day of the player's own open on § 7's stage — the state a swap must not cost them.
+       *
+       * **This case was the last one in the file still pressing the tile through to `stage`**, while
+       * the two above it had already been moved onto the loop's own route. The tile is keyed `door`,
+       * so the press matched nothing and the case spent thirty seconds proving the harness wrong on a
+       * product that was working.
+       *
+       * What is asserted is unchanged, and so is what produces it: § 6.2's *Start the day* calls
+       * `host.startRun()` on the way to the stage, and `everyday/stageScreen.ts`'s mount presses the
+       * same latch when it finds no run of the player's own open — so the day below is theirs by
+       * either route, which is what § D232 makes the difference between a run that can be filed and
+       * boot's demo.
+       */
+      await enterEverydayStage(page);
       expect((await runStateOf(page)).open, 'no run was open to survive the swap').toBe(true);
       const before = await page.evaluate(
         () => document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect().width ?? 0,

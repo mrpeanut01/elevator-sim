@@ -4,8 +4,8 @@
  * The pure half is `stageScreenModel.test.ts`'s, and it covers every word and every number. What
  * is left is precisely what needs a document, a real canvas and a real animation frame:
  *
- * 1. **Entry.** Pressing *Today's tower* mounts § 7's stage rather than uncovering the Engineer
- *    surface, and the run it asks for lands. The whole hand-off retirement is one assertion here:
+ * 1. **Entry.** Walking § 6's loop mounts § 7's stage rather than uncovering the Engineer surface,
+ *    and the run it asks for lands. The whole hand-off retirement is one assertion here:
  *    `.everyday-stage-canvas` exists and `.shell` is still covered.
  * 2. **Paused at the day's own start hour, with the first frame drawn.** § 7.3, and both halves
  *    matter — a stage that entered *playing* would be a day the player never chose to start, and a
@@ -23,6 +23,24 @@
  *
  * Pattern and gate are `shell.browser.test.ts`'s; no metric is read (§ D220 § 4) — every assertion
  * below is about a control, a class name or a clock, never about how a dispatcher performed.
+ *
+ * ## How these cases reach the stage, and the one time that route moved
+ *
+ * Through `dev/browserTier.test-helper.ts#enterEverydayStage`, which walks § 6's loop —
+ * menu tile → front door → brief → stage — on § 3.3's primary at each step.
+ *
+ * It used to be one press. This file landed pressing the *Today's tower* tile and waiting for
+ * `.everyday-stage-canvas`, which was the whole route for exactly as long as § 6.1's front door and
+ * § 6.2's brief were unbuilt. Both are registered screens now, so `everyday/modes.ts` routes that
+ * tile to `door` — which is what § 4's own inventory says it should, *"reached from menu (Today's
+ * tower)"* — and `.everyday-mode[data-screen="stage"]` matches nothing on a working page. **The
+ * product was right and the helper was stale**, and it failed the way a stale selector always fails:
+ * a thirty-second timeout inside the harness, reported as five broken cases about the stage.
+ *
+ * That is `enterEngineerStage`'s lesson a second time, so the walk is shared rather than copied a
+ * third time — `shell.browser.test.ts` and `dailyLoop.browser.test.ts` press the same function — and
+ * it waits on facts that are only true once the day is *on* the stage rather than on a selector an
+ * unmounted skeleton would satisfy. Not one assertion below moved with it.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -32,7 +50,11 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEverydayStage,
+} from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
 
 /**
@@ -83,22 +105,6 @@ async function coldLoad(): Promise<Page> {
   return page;
 }
 
-/**
- * Enter the stage the way a player does: the *Today's tower* tile on the menu.
- *
- * Waits for the run rather than for the mount — the screen mounts immediately and asks the host to
- * simulate a day, so the transport is what says the stage is ready.
- */
-async function enterStage(page: Page): Promise<void> {
-  await page.click('.everyday-mode[data-screen="stage"]');
-  await page.waitForSelector('.everyday-stage-canvas');
-  await page.waitForFunction(
-    () => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '',
-    undefined,
-    { timeout: 60_000 },
-  );
-}
-
 /** Whether the canvas's backing store holds any non-transparent pixel. */
 async function canvasHasPaint(page: Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -117,12 +123,12 @@ async function canvasHasPaint(page: Page): Promise<boolean> {
 describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   it('opens as a screen, with the Engineer surface still covered behind it', async () => {
     const page = await coldLoad();
-    await enterStage(page);
+    await enterEverydayStage(page);
 
     /*
-     * The hand-off's retirement, on the product. Before § 7's stage this press shrank the shell to
-     * the 212 px rail strip and inset `div.shell` beside it; now the shell keeps its full geometry
-     * and the Engineer root stays inert underneath, exactly as it is on every other screen.
+     * The hand-off's retirement, on the product. Before § 7's stage, arriving here shrank the shell
+     * to the 212 px rail strip and inset `div.shell` beside it; now the shell keeps its full
+     * geometry and the Engineer root stays inert underneath, exactly as on every other screen.
      */
     const shell = await page.evaluate(() => {
       const engineer = document.querySelector<HTMLElement>('.shell');
@@ -152,7 +158,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
    */
   it('enters paused at the day’s own start hour, with the first frame drawn on a canvas that has a box', async () => {
     const page = await coldLoad();
-    await enterStage(page);
+    await enterEverydayStage(page);
 
     /* § 7.3, both halves. */
     const opened = (await page.textContent('.everyday-stage-clock')) ?? '';
@@ -200,7 +206,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
   it('plays, and the clock moves', async () => {
     const page = await coldLoad();
-    await enterStage(page);
+    await enterEverydayStage(page);
     /* 30× so a second of real time is ten minutes of the day — the transport, not a metric. */
     await page.click('.everyday-stage-speed[data-speed-index="4"]');
     await page.click('.everyday-stage-play');
@@ -220,7 +226,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
   it('takes an intervention, re-simulates, and keeps the playhead', async () => {
     const page = await coldLoad();
-    await enterStage(page);
+    await enterEverydayStage(page);
     const opened = await page.textContent('.everyday-stage-clock');
     await page.click('.everyday-stage-speed[data-speed-index="4"]');
     await page.click('.everyday-stage-play');
@@ -254,7 +260,7 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
 
   it('closes the day, and leaving afterwards does not warn', async () => {
     const page = await coldLoad();
-    await enterStage(page);
+    await enterEverydayStage(page);
     await page.click('.everyday-stage-play');
 
     /* § 3.4 is armed while the player's own day is open: leaving raises the strip, and *Stay*
@@ -277,7 +283,10 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.click('.everyday-bar-leave');
     /* No strip: a report is already after the fact, and warning about it would be theatre. */
     expect(await page.locator('.everyday-bar-confirm-stay').count()).toBe(0);
-    await page.waitForSelector('.everyday-mode[data-screen="stage"]');
+    /* And the menu is back. The tile is keyed `door` — § 4's *"reached from menu (Today's
+       tower)"* — which is the same route change {@link enterEverydayStage} walks; the claim here is
+       unchanged and is about the menu having been reached at all. */
+    await page.waitForSelector('.everyday-mode[data-screen="door"]');
     await page.close();
   });
 });

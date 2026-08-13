@@ -231,3 +231,89 @@ export async function pressMenuRow(page: Page, id: string): Promise<void> {
     .first()
     .click();
 }
+
+/* ========================================================================== *
+ * Reaching an Everyday screen — § 6's loop, walked the way a player walks it
+ * ========================================================================== */
+
+/**
+ * Open § 6.1's front door from the main menu — the *Today's tower* tile.
+ *
+ * **The tile's key is `door`, and it has been since § 6.1's front door was registered.** It routed
+ * to `stage` for exactly as long as the door and the brief were unbuilt, and `everyday/modes.ts`
+ * says so in the comment on that very row: a tile that still jumped the queue would be routing
+ * around two screens that exist. So `.everyday-mode[data-screen="stage"]` is a selector that
+ * matches nothing on a working product, and a test still naming it waits thirty seconds and then
+ * reports a failure about the harness in the voice of a failure about the product.
+ */
+export async function openEverydayDoor(page: Page): Promise<void> {
+  await page.locator('.everyday-mode[data-screen="door"]').click();
+  await page.waitForSelector('.everyday-door', { timeout: 15_000 });
+}
+
+/**
+ * Walk § 6's daily loop from the main menu to a stage with the player's own day paused on it —
+ * menu tile → front door → brief → stage, on § 3.3's primary at each step.
+ *
+ * ## Why the route rather than the destination
+ *
+ * `enterEngineerStage`'s argument, one shell over: a tier that reached a surface by a path no
+ * player has is a tier that tests a surface nobody can open. Every press below is § 3.3's own
+ * primary — `Set up today` on the door, `Start the day` on the brief — and the second of those is
+ * the press that makes the day **the player's**: `everyday/briefScreen.ts`'s primary calls
+ * `host.startRun()` before it navigates, which is the § D232 latch `closeShift` requires before it
+ * will file anything.
+ *
+ * That latch would be pressed either way, and saying so is the point rather than a caveat:
+ * `everyday/stageScreen.ts`'s mount presses `startRun` itself when it finds no run of the player's
+ * own open, so a helper that arrived at the stage by some other door would still leave a closable
+ * day behind it and every § 3.4 assertion downstream would pass. What such a helper would not do is
+ * **prove the two screens in between are wired**, which is exactly what went wrong: this route
+ * changed under a test that had jumped it, and nothing about the jump could notice.
+ *
+ * ## What the wait is for, and why it is four facts rather than a selector
+ *
+ * A selector matches an unmounted skeleton as happily as a working screen — which is the failure
+ * this helper exists to stop recurring, in the other direction. So arrival is asserted as the
+ * conjunction of the things that are only true once the day is actually on the stage:
+ *
+ * 1. **The canvas is in the page**, which says the `stage` key mounted rather than the router
+ *    drawing a refusal.
+ * 2. **It has a real box.** § D335's rule: a canvas measured under a `display:none` ancestor gets a
+ *    zero box and never recovers, so a non-zero `getBoundingClientRect().width` is the difference
+ *    between a mounted stage and a mounted-and-laid-out one.
+ * 3. **Its backing store is sized**, which `everyday/stageScreen.ts#sizeCanvas` only does from
+ *    inside a `draw()`, and `draw()` only runs once a recording has been adopted. This is the
+ *    round trip through the worker, waited out rather than assumed.
+ * 4. **The playhead is at the start of the day** — § 7.3's centred `Start` is up (it is `none`
+ *    while the run is in flight and gone once the transport has been played), with a clock that
+ *    reads an hour. Which hour is the *building's* and is deliberately not asserted here; see
+ *    `everyday/stageScreen.browser.test.ts`, which measures it.
+ *
+ * The generous timeout is the simulation: `dev/shiftRunner.ts` runs the shift on a worker, so the
+ * brief's primary returns long before there is anything to draw.
+ */
+export async function enterEverydayStage(page: Page): Promise<void> {
+  await openEverydayDoor(page);
+  /* § 3.3's door row, step 1 of the daily timeline: `Set up today`. */
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+  /* § 3.3's brief row, step 2: `Start the day` — `host.startRun()`, then `go('stage')`. */
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+  await page.waitForFunction(
+    () => {
+      const canvas = document.querySelector<HTMLCanvasElement>('.everyday-stage-canvas');
+      if (canvas === null || canvas.width === 0) return false;
+      if (canvas.getBoundingClientRect().width === 0) return false;
+      if (document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display !== '') {
+        return false;
+      }
+      return /^\d{2}:\d{2}$/u.test(
+        document.querySelector('.everyday-stage-clock')?.textContent ?? '',
+      );
+    },
+    undefined,
+    { timeout: 120_000 },
+  );
+}
