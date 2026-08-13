@@ -46,7 +46,7 @@ import { checkAccessCompatibility, credentialCapabilityOf } from '../access/disp
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
-import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
+import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
@@ -1958,7 +1958,9 @@ const SUITE_BENCH: SurfaceAdapter = {
    * cannot find is a coverage claim for nothing — `derive.test.ts` said so when it was listed.
    * The refusal strings are still in the corpus under this surface, driven for real below.
    */
-  covers: ['batch/suite.ts#suiteCellViewOf'],
+  // `suiteSummaryOf` composes the index's cell texts (docs/20 defect 15) and is driven below on
+  // the same view, so it is covered here rather than excluded — its one caller is the suite mount.
+  covers: ['batch/suite.ts#suiteCellViewOf', 'batch/suite.ts#suiteSummaryOf'],
   render(context) {
     const cell = { id: 'honesty-suite-cell', label: context.report.buildingName };
     const view = suiteCellViewOf(cell, context.batch);
@@ -1996,6 +1998,25 @@ const SUITE_BENCH: SurfaceAdapter = {
         energyAxis: BATCH_METRIC_CLASS[mark.metric] === 'axis',
       });
     }
+    /*
+     * The index over those rows — `docs/20` defect 15. Its cells are authored in
+     * `suiteSummaryOf` (the verdict word, plus the arm's name only where `favours` named one) and
+     * drawn before the prose, so they are seeded with the source row's own comparison shape: an
+     * index mark that outran its row's gate fails here exactly as the row itself would.
+     */
+    const summary = suiteSummaryOf([view]);
+    summary.lines[0]?.marks.forEach((mark, index) => {
+      const source = sourceRows[index];
+      if (mark === null || mark === undefined || source === undefined) return;
+      seeds.push({
+        field: `summary.marks[${String(index)}](${source.metric}).text`,
+        text: mark.text,
+        role: 'comparison',
+        declaredCount: source.pairs,
+        comparison: { favours: source.favours, verdict: source.verdict, pairs: source.pairs },
+        energyAxis: BATCH_METRIC_CLASS[source.metric] === 'axis',
+      });
+    });
     /* The refusal branches, manufactured on purpose — see the adapter docstring. */
     const third = context.batch.arms[1];
     if (third !== undefined) {

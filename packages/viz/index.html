@@ -1238,6 +1238,15 @@
       .checklist label { display: flex; gap: 6px; color: var(--text); }
       .batch-report .figure { max-width: 90em; }
       .batch-report .figure-value { display: block; margin-top: 2px; }
+      /* docs/20 defect 15 — the suite's index table, drawn before the prose it indexes. The words
+         in it are batch/report.ts's own verdict vocabulary (suite.ts#suiteSummaryOf decides every
+         cell); this block only makes ten columns scannable. */
+      .suite-summary { margin: 0 0 16px; }
+      .suite-summary caption { text-align: left; font-size: 11.5px; color: var(--dim); line-height: 1.5; padding: 0 0 6px; max-width: 90em; }
+      .suite-summary th { font: 600 9.5px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dimmer); vertical-align: bottom; }
+      .suite-summary th[scope='row'] { text-transform: none; font: 600 11.5px var(--sans); color: var(--text); vertical-align: top; }
+      .suite-summary td { font-size: 11px; line-height: 1.4; vertical-align: top; }
+      .suite-summary .suite-best { font-weight: 600; }
       progress { width: 180px; }
       progress[hidden] { display: none; }
 

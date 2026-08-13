@@ -261,3 +261,92 @@ export function suiteCellViewOf(
   };
 }
 
+/* -------------------------------------------------------------------------- *
+ * The index — docs/20 defect 15
+ * -------------------------------------------------------------------------- */
+
+/** One verdict of the index: the report's own word, and the arm only where its gate named one. */
+export interface SuiteSummaryMark {
+  /** `report.ts`'s verdict string, verbatim — the six encode distinctions no index may collapse. */
+  readonly verdict: BatchVerdict;
+  /** {@link SuiteRowMark.bestArmName}, unchanged: `favours` consumed, never re-derived. */
+  readonly bestArmName: string | null;
+  /**
+   * The index cell's whole text, authored here so no renderer composes a claim: the verdict word
+   * alone, or `verdict — arm` where the gate named one. In the honesty corpus under
+   * `batch/suite.ts#suiteCellViewOf`, seeded with the source row's own comparison shape.
+   */
+  readonly text: string;
+}
+
+/** One cell's line of the index. */
+export interface SuiteSummaryLine {
+  readonly cellId: string;
+  readonly label: string;
+  /**
+   * One entry per {@link SuiteSummary.metricLabels} column, in that order; `null` where this
+   * cell's verdict block has no row for the column — including every column of a cell whose
+   * verdict is refused, whose {@link note} then says why in the refusal's own words.
+   */
+  readonly marks: readonly (SuiteSummaryMark | null)[];
+  /** The cell's `verdictRefusal`, verbatim, or `null` when the marks speak. */
+  readonly note: string | null;
+}
+
+/** The whole index: the column set and one line per cell, both decided here, not in a renderer. */
+export interface SuiteSummary {
+  /** Column headers after the cell column — metric labels in first-appearance order. */
+  readonly metricLabels: readonly string[];
+  readonly lines: readonly SuiteSummaryLine[];
+}
+
+/**
+ * The suite's index — where each cell landed, one glance wide, drawn **before** the prose.
+ *
+ * ## The defect this closes — `docs/20` defect 15
+ *
+ * Two cells at n = 10 produced 17 800 characters of prose with the per-cell verdicts findable
+ * only by reading: nine measures × two cells, each a four-line paragraph. The prose is the
+ * product's claim and none of it may go — § D299's test binds this surface: easier to use, never
+ * saying less — so the fix is an *index over* it rather than a summary *instead of* it. Every
+ * word this table shows appears again below, in full.
+ *
+ * ## What the index is allowed to say, which is the whole design
+ *
+ * A verdict cell is `report.ts`'s own verdict string plus, only where `BatchComparisonRow.favours`
+ * named one, the arm's display name — both read off {@link SuiteCellView.rows}, which already
+ * consumed the one gate. Nothing here re-derives a winner, rewords a verdict (*"too close to
+ * call"* would collapse `unresolved` into `under-budget`), or invents a tie vocabulary: a suite
+ * of two identical arms indexes as the report's own `unresolved`/`under-budget` words, and the
+ * sentence explaining *why an exact zero is not proof of identity* stays where it was, in the
+ * prose. A cell whose verdict block is refused (arm count ≠ 2) gets no marks and carries the
+ * refusal verbatim as its {@link SuiteSummaryLine.note}.
+ *
+ * The column set is the union of the cells' metric labels in first-appearance order, computed
+ * here so two cells whose verdict blocks differ still line up — and so the renderer decides
+ * nothing (`dev/suitePanel.ts` only arranges what this returns).
+ */
+export function suiteSummaryOf(views: readonly SuiteCellView[]): SuiteSummary {
+  const metricLabels: string[] = [];
+  for (const view of views) {
+    for (const row of view.rows) {
+      if (!metricLabels.includes(row.label)) metricLabels.push(row.label);
+    }
+  }
+  const lines: SuiteSummaryLine[] = views.map((view) => ({
+    cellId: view.cellId,
+    label: view.label,
+    marks: metricLabels.map((label) => {
+      const row = view.rows.find((entry) => entry.label === label);
+      if (row === undefined) return null;
+      return {
+        verdict: row.verdict,
+        bestArmName: row.bestArmName,
+        text: row.bestArmName === null ? row.verdict : `${row.verdict} — ${row.bestArmName}`,
+      };
+    }),
+    note: view.verdictRefusal,
+  }));
+  return { metricLabels, lines };
+}
+

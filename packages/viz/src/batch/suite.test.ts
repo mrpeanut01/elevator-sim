@@ -30,6 +30,7 @@ import {
   SuiteError,
   suiteCellViewOf,
   suitePlanOf,
+  suiteSummaryOf,
   type SuiteRequest,
 } from './suite.js';
 import type { BatchResources, BatchRequest } from './types.js';
@@ -207,6 +208,81 @@ describe('the view model consumes the report and adds no gate of its own', () =>
     expect(view.verdictRefusal).toContain('2 comparisons rather than 1');
     // The arms still answer for themselves: refusing the verdict never hides the runs.
     expect(view.arms.length).toBe(3);
+  });
+});
+
+describe('the index says nothing the prose does not — docs/20 defect 15', () => {
+  /*
+   * Two cells at n = 10 were 17 800 characters of prose with the per-cell verdicts findable only
+   * by reading. The fix is an index *over* the prose, never a summary instead of it — § D299
+   * binds this surface — so what these cases hold is exactly the index's contract: report.ts's
+   * verdict words verbatim, an arm named only where `favours` named one, columns aligned across
+   * cells, and a refused verdict carried as the refusal rather than as blanks that look like
+   * data.
+   */
+  it('aligns every cell to one column set, in first-appearance order', () => {
+    const resolved = suiteCellViewOf(
+      { id: 'cell-a', label: 'Cell A' },
+      fakeResult({ replications: 60, delta: 3, spread: 0.5 }),
+    );
+    const tied = suiteCellViewOf({ id: 'cell-b', label: 'Cell B' }, fakeResult({ delta: 0 }));
+    const summary = suiteSummaryOf([resolved, tied]);
+    expect(summary.metricLabels).toEqual(resolved.rows.map((row) => row.label));
+    for (const line of summary.lines) {
+      expect(line.marks.length).toBe(summary.metricLabels.length);
+      expect(line.note).toBeNull();
+    }
+  });
+
+  it('shows the report’s own verdict words and names an arm only where favours did', () => {
+    const view = suiteCellViewOf(
+      { id: 'cell-a', label: 'Cell A' },
+      fakeResult({ replications: 60, delta: 3, spread: 0.5 }),
+    );
+    const summary = suiteSummaryOf([view]);
+    const line = summary.lines[0]!;
+    line.marks.forEach((mark, index) => {
+      const row = view.rows[index]!;
+      expect(mark).not.toBeNull();
+      // Verbatim: the six-verdict vocabulary is consumed, never reworded into an index-ese.
+      expect(mark?.verdict).toBe(row.verdict);
+      expect(['resolved', 'under-budget', 'unresolved', 'shown', 'suppressed', 'unmeasured']).toContain(
+        mark?.verdict,
+      );
+      // The one gate: the index's arm is the row's, which is `favours` — or nobody.
+      expect(mark?.bestArmName).toBe(row.bestArmName);
+      if (row.verdict !== 'resolved') expect(mark?.bestArmName).toBeNull();
+    });
+  });
+
+  it('indexes an exact tie in the report’s words, with no tie vocabulary of its own', () => {
+    // Identical arms — the state the audit called out: every delta exactly zero. The honest
+    // wording ("an interval crossing zero is not the same as the two settings being identical")
+    // lives in the prose rows and stays there; the index may only repeat the verdicts.
+    const view = suiteCellViewOf({ id: 'cell-b', label: 'Cell B' }, fakeResult({ delta: 0 }));
+    const summary = suiteSummaryOf([view]);
+    for (const mark of summary.lines[0]!.marks) {
+      expect(mark).not.toBeNull();
+      expect(['resolved', 'under-budget', 'unresolved', 'shown', 'suppressed', 'unmeasured']).toContain(
+        mark?.verdict,
+      );
+      expect(mark?.bestArmName).toBeNull();
+    }
+  });
+
+  it('carries a refused verdict as the refusal, not as blanks', () => {
+    const two = fakeResult({ replications: 10 });
+    const three = { ...two, arms: [...two.arms, { ...two.arms[1]!, armId: 'ghost-arm' }] };
+    const refused = suiteCellViewOf({ id: 'cell-c', label: 'Cell C' }, three);
+    const resolved = suiteCellViewOf(
+      { id: 'cell-a', label: 'Cell A' },
+      fakeResult({ replications: 60, delta: 3, spread: 0.5 }),
+    );
+    const summary = suiteSummaryOf([resolved, refused]);
+    const line = summary.lines[1]!;
+    expect(line.note).toBe(refused.verdictRefusal);
+    expect(line.note).toContain('a field of two');
+    for (const mark of line.marks) expect(mark).toBeNull();
   });
 });
 
