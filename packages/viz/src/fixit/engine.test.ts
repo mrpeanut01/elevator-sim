@@ -19,6 +19,7 @@ import {
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
+  fixedBadgeAfter,
   repairRowOf,
   spendOf,
   stepCapacity,
@@ -306,5 +307,62 @@ describe('a verdict may not claim more than the run measured — docs/20 defect 
     expect(outcome.body).toContain('about the repair, not about your order');
     expect(outcome.body).toContain('11 of 12 u');
     expect(outcome.body).toContain('none of it machinery');
+  });
+});
+
+describe('the FIXED badge follows the latest run — docs/20 defect 16', () => {
+  /*
+   * The audit's repro: fix the case (badge FIXED), then buy the do-nothing pair and run again to
+   * "9 waits → 9 waits · 0 % of it went away" — and the rail still read FIXED beside it. The badge
+   * is the rail's summary of where the case *stands*, not an observation about its history (that
+   * contrast — `WeekState.bestMinutePct` is a high-water mark on purpose — is argued on
+   * `fixedBadgeAfter` itself), so a later run of the same case decides it in both directions.
+   */
+  it('is true exactly for a fixed outcome, and false for each of the other three kinds', () => {
+    const fixed = classifyOutcome(CASE, MEASURED, spendOf(CASE, emptyFixitState()));
+    expect(fixed.kind).toBe('fixed');
+    expect(fixedBadgeAfter(fixed)).toBe(true);
+
+    const notEnough = classifyOutcome(
+      CASE,
+      { ...MEASURED, complaintAfter: 10, complaintGonePct: 0 },
+      spendOf(CASE, emptyFixitState()),
+    );
+    expect(notEnough.kind).toBe('not-enough');
+    expect(fixedBadgeAfter(notEnough)).toBe(false);
+
+    const worse = classifyOutcome(
+      CASE,
+      { ...MEASURED, restAwayAfterPct: 80, restDeltaPoints: -16 },
+      spendOf(CASE, emptyFixitState()),
+    );
+    expect(worse.kind).toBe('building-worse');
+    expect(fixedBadgeAfter(worse)).toBe(false);
+
+    const refused = classifyOutcome(CASE, MEASURED, {
+      repairUnits: 99,
+      extraUnits: 0,
+      editorUnits: 0,
+      totalUnits: 99,
+      machineryUnits: 0,
+    });
+    expect(refused.kind).toBe('over-budget');
+    expect(fixedBadgeAfter(refused)).toBe(false);
+  });
+
+  it('is what the panel assigns — no one-way latch survives in the mount', async () => {
+    /*
+     * The wiring pin, `reportPanel.test.ts`'s binding-site idiom: the rule being right is
+     * worthless if `dev/fixitPanel.ts` still latches. The defect's exact line is asserted absent
+     * and the assignment through the rule asserted present.
+     */
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const panel = await readFile(
+      fileURLToPath(new URL('../dev/fixitPanel.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(panel).toContain('session.fixed = fixedBadgeAfter(outcome);');
+    expect(panel).not.toContain("if (outcome.kind === 'fixed') session.fixed = true;");
   });
 });

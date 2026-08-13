@@ -1046,7 +1046,7 @@ export function mountDispatcherEditor(
    */
   const plainSliderRows = new Map<PlainLeverId, SliderHandles>();
   const plainSlots = new Map<PlainLeverId, HTMLElement>();
-  /** The four lever rows' own container, so the echo and cost line below stay below. */
+  /** The four lever rows' own container, so the block's fixed lines cannot interleave with them. */
   const plainSlotsBox = el(doc, 'div');
   /*
    * The acknowledgement pair — `docs/19` defect 5, and the audit's *surface the lever's
@@ -1057,12 +1057,23 @@ export function mountDispatcherEditor(
    * `costFunctionLine` call the summary makes** — one composition, drawn in a second place,
    * never a second composition (`authoring/dispatcherSpec.ts#costFunctionLine` stays the only
    * author of that expression).
+   *
+   * The pair sits **above** the four rows, not under them — `docs/20` defect 11's second walk
+   * found the first fix's echo at y 748–835 with the fold at 745, which is `docs/19` defect 5
+   * verbatim with the sentence written: an acknowledgement below four slider rows is pushed under
+   * the fold *by the rows it acknowledges*, at exactly the width the block was built for. Above
+   * them it cannot be — the block opens at the top of the panel — and `fold1280.browser.test.ts`
+   * measures it there rather than trusting this paragraph. The extra class on the echo is that
+   * test's handle; the node is still the one `.advice` paragraph `noteContrast` counts.
    */
   const plainEcho = el(doc, 'p', {
-    className: 'advice',
-    style: { margin: '8px 0 0' },
+    className: 'advice dispatcher-plain-echo',
+    style: { margin: '0 0 8px' },
   });
-  const plainCost = el(doc, 'div', { className: 'summary-line', style: { 'margin-top': '6px' } });
+  const plainCost = el(doc, 'div', {
+    className: 'summary-line',
+    style: { margin: '0 0 10px' },
+  });
   const plainBlock = el(doc, 'div', {
     style: { margin: '0 0 14px' },
     children: [
@@ -1078,9 +1089,9 @@ export function mountDispatcherEditor(
           'engineer’s own controls show, so the two can never disagree.',
         style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
       }),
-      plainSlotsBox,
       plainEcho,
       plainCost,
+      plainSlotsBox,
     ],
   });
 
@@ -1089,9 +1100,17 @@ export function mountDispatcherEditor(
   elements.save.parentElement?.append(runThis, rename, savedNote);
   elements.save.parentElement?.after(resultStrip);
   elements.summary.parentElement?.append(unauthorable);
-  // `parentElement?.insertBefore`, not `ChildNode.before` — the sibling-insert idiom every other
-  // mount uses, and the one the DOM test recorders answer.
-  elements.termsUsed.parentElement?.insertBefore(plainBlock, elements.termsUsed);
+  /*
+   * Before the terms **header row**, not before the header's own span — `docs/20` defect 11's
+   * other half. `elements.termsUsed.parentElement` is the `.eyebrow-row` flex row, and the first
+   * fix inserted `plainBlock` *inside* it: the whole lever block became a flex item laid out
+   * beside `THE 13 COST TERMS`, which is how a section header came to render as a 58 px
+   * one-word-per-line sliver at 1280×800. The row itself is the sibling this block goes above.
+   * Still `parentElement?.insertBefore` — the sibling-insert idiom every other mount uses, and
+   * the one the DOM test recorders answer.
+   */
+  const termsHeaderRow = elements.termsUsed.parentElement;
+  termsHeaderRow?.parentElement?.insertBefore(plainBlock, termsHeaderRow);
 
   /*
    * The two scope notes, written once at mount rather than on every render — issue #104. Each sits

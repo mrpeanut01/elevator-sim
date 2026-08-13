@@ -544,7 +544,17 @@
          pushed the header instead of truncating. Its own class, with all four properties. */
       .topbar-spec {
         font: 500 11px var(--mono); color: var(--dimmer);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        /* docs/20 defect 17 — the shrink factor is the S5 priority, applied at every width rather
+           than only below 1180 px. `.topbar-building` is squeezed whenever the pattern pill is
+           showing (the pill is nowrap by design — a truncated claim about what the run is doing
+           would say less, § D299), and at `flex: 0 1 auto` the name and this spec line shrank
+           *proportionally*, so the header read `Midto…` beside an intact spec. S5's own sentence
+           is "the building's name outranks its spec line": the outsized shrink factor makes this
+           line absorb the squeeze first — both have `overflow: hidden`, so their automatic minimum
+           is zero and the factors really decide — and the name gives way only once the spec is
+           gone. `fold1280.browser.test.ts` measures the name un-clipped beside a shown pill. */
+        flex: 0 999 auto;
       }
       .topbar-day { text-align: right; line-height: 1.3; flex: none; white-space: nowrap; }
       .topbar-day-name { font-weight: 600; font-size: 13px; }
@@ -1029,6 +1039,38 @@
 
       /* --- Editors, § 1.3 M8–M11 --- */
       .editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 20px; max-width: 1340px; }
+      /* docs/20 defect 13 — the dispatcher editor's left column held ~400 px of pick list beside
+         a ~5000 px editor panel, so from the selector section down the left half of the sheet was
+         a viewport-tall white void. The honest minimal fix keeps the panel's own content in it:
+         the catalogue column rides the sheet's scroll (`.sheet` is the scroll container, so
+         `sticky` resolves against it) instead of being left behind at the top. `align-self` is
+         what lets a grid item be shorter than its row; without it the item is stretched and
+         sticky has nowhere to move. Scoped to this editor — the register names it, the building
+         editor's two columns are both substantial — and to the two-column layout: below 768 px
+         `.editor-grid` stacks (the RX-03 block near the foot of this sheet), and a sticky first
+         section in a single column would ride over the panel below it. */
+      /* The gate is the *grid being two columns*, which no viewport query can express: the sheet
+         is narrowest at wide windows (at 1440 both rails are visible and the sheet is ~540 px —
+         one column) and widest in drawer mode (at the audit's 1280 the sheet is ~750 px — two
+         columns). A `min-width: 768px` media guard shipped first and the tier caught it the same
+         day: sticky in a single-column stack rides the catalogue over the editor panel below it,
+         and `dispatcherStrip.browser.test.ts`'s run-verb press was intercepted by a pick card. So
+         the sheet is the container and the query is the grid's own two-column threshold —
+         `minmax(330px, 1fr)` × 2 + the 20 px gap. */
+      #panel-dispatcher .sheet { container-type: inline-size; }
+      @container (min-width: 680px) {
+        #panel-dispatcher .editor-grid > div:first-child {
+          align-self: start; position: sticky; top: 0;
+          /* Measured before shipping: the pick list is ~800 px tall and the sheet's scrollport at
+             800 px viewports is ~650, so a plain sticky column would pin its top and put its own
+             tail out of reach forever — a void traded for a lockout. The column scrolls itself
+             instead. The calc is the chrome above the sheet (topbar, tab strip, margins — ~150 px
+             at every width the two-column layout serves), stated as a viewport offset because a
+             sticky box has no unit for "my scrollport's height"; erring low costs a few px of
+             internal scroll, erring high would clip the box's own bottom. */
+          max-height: calc(100vh - 160px); overflow-y: auto;
+        }
+      }
       .editor-panel { border: 1px solid var(--edge); border-radius: var(--r-panel); background: var(--card); padding: 15px 16px; }
       .field { display: block; font-size: 11.5px; color: var(--dim); }
       .field input, .field textarea, .field select {
@@ -1205,6 +1247,15 @@
       .checklist label { display: flex; gap: 6px; color: var(--text); }
       .batch-report .figure { max-width: 90em; }
       .batch-report .figure-value { display: block; margin-top: 2px; }
+      /* docs/20 defect 15 — the suite's index table, drawn before the prose it indexes. The words
+         in it are batch/report.ts's own verdict vocabulary (suite.ts#suiteSummaryOf decides every
+         cell); this block only makes ten columns scannable. */
+      .suite-summary { margin: 0 0 16px; }
+      .suite-summary caption { text-align: left; font-size: 11.5px; color: var(--dim); line-height: 1.5; padding: 0 0 6px; max-width: 90em; }
+      .suite-summary th { font: 600 9.5px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dimmer); vertical-align: bottom; }
+      .suite-summary th[scope='row'] { text-transform: none; font: 600 11.5px var(--sans); color: var(--text); vertical-align: top; }
+      .suite-summary td { font-size: 11px; line-height: 1.4; vertical-align: top; }
+      .suite-summary .suite-best { font-weight: 600; }
       progress { width: 180px; }
       progress[hidden] { display: none; }
 
@@ -2114,7 +2165,13 @@
                   </div>
                   <div class="editor-panel">
                     <label class="field">name <input id="dispatcher-name" /></label>
-                    <div class="eyebrow-row" style="margin: 14px 0 10px">
+                    <!-- `flex-wrap` — docs/20 defect 11's second finding. This row holds a ~210 px
+                         header beside a ~190 px chip in a column that is ~330 px wide at 1280×800,
+                         and an unwrappable flex row resolved that by shrinking the header span to
+                         its longest word: `THE 13 COST TERMS` rendered as a one-word-per-line
+                         sliver. Wrapping moves the chip under the header instead, so the header
+                         always reads horizontally; at widths where both fit, nothing changes. -->
+                    <div class="eyebrow-row" style="margin: 14px 0 10px; flex-wrap: wrap">
                       <span class="eyebrow" id="dispatcher-terms-used"></span>
                       <button type="button" class="chip" id="dispatcher-copy-current">start from the current one</button>
                     </div>

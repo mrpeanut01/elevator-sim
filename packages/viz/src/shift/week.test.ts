@@ -555,4 +555,43 @@ describe('re-closing the same day replays it rather than adding to it', () => {
     expect(week.completed).toEqual([]);
     expect(week.cleared).toBeNull();
   });
+
+  /*
+   * ## An intervention re-close is the same attempt continuing — `docs/20` defect 17
+   *
+   * ENGINE_CONTRACT § 1.4: an intervention is the same run's record growing, re-simulated from
+   * t = 0 — never a new run. The sheet read *"attempt 2 at this day"* to a player who pressed
+   * *Run* once and parked once, because the re-simulation re-filed through the ordinary gate and
+   * `closeDay` counted every re-close as a retry. `recordGrew` is the caller's testimony that this
+   * close replaced the run's own record rather than re-running the day; it gates the attempt count
+   * and deliberately nothing else.
+   */
+  it('does not count an attempt for a re-close whose cause is the record growing', () => {
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    expect(week.attempt).toBe(1);
+    week = closeDay(week, cleanDay(1), true);
+    expect(week.attempt).toBe(1);
+    // The negative control: the same second close without the testimony is a retry, and counts.
+    expect(closeDay(week, cleanDay(1)).attempt).toBe(2);
+  });
+
+  it('still replaces the day’s effect on a record-grown re-close — only the attempt is gated', () => {
+    // An intervention that turns a clean day into a missed one must still un-bank it: the flag is
+    // about *why the close happened*, never about what the day turned out to be.
+    let week = openWeek('c1');
+    week = closeDay(week, cleanDay(1));
+    expect(week.cleanRun).toBe(1);
+    week = closeDay(week, missedDay(1), true);
+    expect(week.cleanRun).toBe(0);
+    expect(week.streak).toBe(0);
+    expect(week.attempt).toBe(1);
+    expect(week.history.length).toBe(1);
+  });
+
+  it('a first close is attempt 1 whether or not the record grew on the way there', () => {
+    // Parking mid-run before the day ever filed: the re-simulated day is the day's first close.
+    const week = closeDay(openWeek('c1'), cleanDay(1), true);
+    expect(week.attempt).toBe(1);
+  });
 });

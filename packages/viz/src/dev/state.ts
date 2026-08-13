@@ -629,10 +629,19 @@ export function advancesTheWeek(mode: PlayMode): boolean {
  * Returns {@link ViewerState.week} **unchanged, by identity** when the mode does not advance it, so
  * *"the scenario week is untouched"* is checkable with `toBe` rather than with a deep compare that
  * a future field could slip past.
+ *
+ * `recordGrew` passes through to `closeDay` untouched — `docs/20` defect 17. It is a fact about
+ * *why this close is happening* (an intervention re-simulation, per ENGINE_CONTRACT § 1.4, is the
+ * same run's record growing rather than a new attempt), which only the shell knows; the mode gate
+ * here neither needs it nor may reinterpret it.
  */
-export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState {
+export function closedWeekOf(
+  state: ViewerState,
+  outcome: DayOutcome,
+  recordGrew = false,
+): WeekState {
   if (!advancesTheWeek(state.playMode)) return state.week;
-  return closeDay(state.week, outcome);
+  return closeDay(state.week, outcome, recordGrew);
 }
 
 /** What was last read back out of the slot, or `undefined` on a first visit. */

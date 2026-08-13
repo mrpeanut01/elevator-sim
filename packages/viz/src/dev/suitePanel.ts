@@ -36,6 +36,7 @@ import { populationLineOf, type BatchComparisonRow } from '../batch/report.js';
 import {
   suiteCellViewOf,
   suitePlanOf,
+  suiteSummaryOf,
   type SuiteCellPlan,
   type SuiteCellView,
   type SuiteRequest,
@@ -292,8 +293,65 @@ export function mountSuitePanel(options: SuitePanelOptions): void {
     return node;
   }
 
+  /**
+   * The index table — `docs/20` defect 15, drawn **before** the prose it indexes.
+   *
+   * Every decision in it is `batch/suite.ts#suiteSummaryOf`'s: the column set, the verdict words
+   * (report.ts's own six, never reworded), and which cells name an arm (only where `favours`
+   * did). This function only arranges rows — § D299's test binds this surface, so the table adds
+   * nothing and the prose below keeps every figure, qualifier and refusal it had.
+   */
+  function drawSummary(views: readonly SuiteCellView[]): void {
+    const summary = suiteSummaryOf(views);
+    if (summary.lines.length === 0) return;
+    const table = doc.createElement('table');
+    table.className = 'suite-summary';
+    const caption = doc.createElement('caption');
+    caption.textContent =
+      'Where each cell landed — an index of the full report below. Every word here appears ' +
+      'again underneath, in full; a row names an arm only where the report’s own gate did.';
+    table.append(caption);
+    const head = doc.createElement('tr');
+    for (const label of ['cell', ...summary.metricLabels]) {
+      const th = doc.createElement('th');
+      th.scope = 'col';
+      th.textContent = label;
+      head.append(th);
+    }
+    table.append(head);
+    for (const line of summary.lines) {
+      const tr = doc.createElement('tr');
+      const cellName = doc.createElement('th');
+      cellName.scope = 'row';
+      cellName.textContent = line.label;
+      tr.append(cellName);
+      if (line.note !== null) {
+        // A cell with no verdict block carries its refusal, verbatim, across the whole line.
+        const td = doc.createElement('td');
+        td.colSpan = Math.max(1, summary.metricLabels.length);
+        td.textContent = line.note;
+        tr.append(td);
+      } else {
+        for (const mark of line.marks) {
+          const td = doc.createElement('td');
+          if (mark === null) {
+            td.textContent = '—';
+          } else {
+            // The whole cell text is `suiteSummaryOf`'s — this file composes no claim.
+            td.textContent = mark.text;
+            if (mark.bestArmName !== null) td.classList.add('suite-best');
+          }
+          tr.append(td);
+        }
+      }
+      table.append(tr);
+    }
+    ui.output.append(table);
+  }
+
   function draw(views: readonly SuiteCellView[]): void {
     ui.output.replaceChildren();
+    drawSummary(views);
     for (const view of views) {
       /*
        * The population **in words**, with the exact trace key on the row's `title` — `docs/20`

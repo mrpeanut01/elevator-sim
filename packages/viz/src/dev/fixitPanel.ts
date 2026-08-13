@@ -36,6 +36,7 @@ import {
   budgetNoteOf,
   classifyOutcome,
   emptyFixitState,
+  fixedBadgeAfter,
   repairRowOf,
   spendOf,
   stepCapacity,
@@ -69,12 +70,19 @@ interface CaseSession {
   asBuilt: RecordedRun | undefined;
 }
 
-const PANEL_BG = '#141a21';
-const CARD_BG = '#1c242e';
-const INK = '#e8edf2';
-const MUTED = '#93a1b0';
-const TERRACOTTA = '#c96f4a';
-const GREEN = '#69a878';
+/*
+ * The product's own tokens, not a palette of this file's own — `docs/20` defect 16's third
+ * finding. The first slice hardcoded six dark hexes, which drew a dark room inside a light
+ * product (and would have drawn a wrong-looking light one inside the dark theme the moment the
+ * player flipped it). `dev/main.ts#applyTheme` writes every token inline on `:root`, so reading
+ * them here is what makes this overlay follow the same switch every other surface follows.
+ */
+const PANEL_BG = 'var(--bg)';
+const CARD_BG = 'var(--card)';
+const INK = 'var(--text)';
+const MUTED = 'var(--dim)';
+const BAD = 'var(--bad)';
+const GOOD = 'var(--ok)';
 
 export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
   const doc = host.document;
@@ -182,7 +190,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
         width: '288px',
         'flex-shrink': '0',
         padding: '1.25rem 1rem',
-        'border-right': `1px solid ${CARD_BG}`,
+        'border-right': '1px solid var(--edge)',
       },
       children: [
         el(doc, 'p', {
@@ -246,7 +254,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
           el(doc, 'p', { text: entry.asBuilt.note, style: { margin: '0 0 0.25rem' } }),
           el(doc, 'p', {
             text: entry.symptom,
-            style: { color: TERRACOTTA, margin: '0' },
+            style: { color: BAD, margin: '0' },
           }),
         ]),
         card(
@@ -257,7 +265,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
                 el(doc, 'span', { text: figure.label, style: { color: MUTED } }),
                 el(doc, 'span', {
                   text: figure.text,
-                  style: figure.reading === 'bad' ? { color: TERRACOTTA } : {},
+                  style: figure.reading === 'bad' ? { color: BAD } : {},
                 }),
               ],
             }),
@@ -302,9 +310,9 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
 
   function buttonStyle(active: boolean): Record<string, string> {
     return {
-      background: active ? '#2b3949' : CARD_BG,
+      background: active ? 'var(--raised)' : CARD_BG,
       color: INK,
-      border: `1px solid ${active ? '#3d5068' : '#28303a'}`,
+      border: `1px solid ${active ? 'var(--edge-strong)' : 'var(--edge)'}`,
       'border-radius': '6px',
       padding: '0.5rem 0.75rem',
       cursor: 'pointer',
@@ -316,6 +324,8 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     if (repair === undefined) return el(doc, 'div');
     const row = repairRowOf(entry, session.state, repair);
     const button = el(doc, 'button', {
+      // The class is the browser tier's handle (`fixit.browser.test.ts`); nothing styles it.
+      className: 'fixit-repair',
       style: {
         ...buttonStyle(row.selected),
         display: 'block',
@@ -328,22 +338,42 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
         el(doc, 'div', {
           style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
           children: [
-            el(doc, 'span', { text: repair.name }),
+            el(doc, 'span', { children: [tickMark(row.selected), doc.createTextNode(repair.name)] }),
             el(doc, 'span', { text: row.priceLine, style: { color: MUTED } }),
           ],
         }),
         el(doc, 'div', { text: repair.effect, style: { color: MUTED, 'font-size': '12px' } }),
         ...(row.refusal === undefined
           ? []
-          : [el(doc, 'div', { text: row.refusal, style: { color: TERRACOTTA, 'font-size': '12px' } })]),
+          : [el(doc, 'div', { text: row.refusal, style: { color: BAD, 'font-size': '12px' } })]),
       ],
     });
+    // A toggle says which state it is in — docs/20 defect 16. `aria-pressed` is the platform's
+    // word for it, and the tick above is the sighted reader's; a background colour alone was both
+    // registers' silence.
+    button.setAttribute('aria-pressed', String(row.selected));
     button.disabled = !row.selectable;
     button.addEventListener('click', () => {
       session.state = toggleRepair(entry, session.state, repair.id);
       render();
     });
     return button;
+  }
+
+  /**
+   * The selected mark, present in the layout in both states — `docs/20` defect 16.
+   *
+   * A visible tick when selected and a fixed-width blank when not, so rows do not reflow as they
+   * toggle. `aria-hidden` because the state's accessible register is the button's own
+   * `aria-pressed`, set beside it; a glyph read out as "check mark" over a pressed-state the
+   * reader was already told would be the same fact twice in different words.
+   */
+  function tickMark(selected: boolean): HTMLElement {
+    return el(doc, 'span', {
+      text: selected ? '✓ ' : '',
+      attrs: { 'aria-hidden': 'true' },
+      style: { display: 'inline-block', width: '1.1em', color: GOOD, 'font-weight': '600' },
+    });
   }
 
   function extraToggle(entry: FixitCase, session: CaseSession, extraId: string): HTMLElement {
@@ -353,6 +383,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     const affordability = affordabilityOf(entry, session.state, extra.costUnits);
     const selectable = selected || affordability.selectable;
     const button = el(doc, 'button', {
+      className: 'fixit-extra',
       style: {
         ...buttonStyle(selected),
         display: 'block',
@@ -365,7 +396,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
         el(doc, 'div', {
           style: { display: 'flex', 'justify-content': 'space-between', gap: '1rem' },
           children: [
-            el(doc, 'span', { text: extra.name }),
+            el(doc, 'span', { children: [tickMark(selected), doc.createTextNode(extra.name)] }),
             el(doc, 'span', { text: `${String(extra.costUnits)} u`, style: { color: MUTED } }),
           ],
         }),
@@ -375,11 +406,13 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
           : [
               el(doc, 'div', {
                 text: `short by ${String(affordability.shortByUnits)} u`,
-                style: { color: TERRACOTTA, 'font-size': '12px' },
+                style: { color: BAD, 'font-size': '12px' },
               }),
             ]),
       ],
     });
+    // The same toggle contract the repair rows carry — one control kind, one register.
+    button.setAttribute('aria-pressed', String(selected));
     button.disabled = !selectable;
     button.addEventListener('click', () => {
       session.state = toggleExtra(entry, session.state, extra.id);
@@ -435,7 +468,10 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
         const measurement = measuredOf(entry, pair.before.recording, pair.after.recording);
         const outcome = classifyOutcome(entry, measurement, spendOf(entry, session.state));
         session.outcome = outcome;
-        if (outcome.kind === 'fixed') session.fixed = true;
+        // The badge follows the latest run, in both directions — `fixit/engine.ts#fixedBadgeAfter`
+        // holds the argument (docs/20 defect 16: FIXED beside a 0 % outcome card is two verdicts
+        // about one case on one screen).
+        session.fixed = fixedBadgeAfter(outcome);
         render();
       }, 0);
     });
@@ -446,7 +482,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
     return card([
       el(doc, 'p', {
         text: outcome.head,
-        style: { margin: '0 0 0.25rem', 'font-weight': '600', color: outcome.kind === 'fixed' ? GREEN : INK },
+        style: { margin: '0 0 0.25rem', 'font-weight': '600', color: outcome.kind === 'fixed' ? GOOD : INK },
       }),
       el(doc, 'p', { text: outcome.body, style: { color: MUTED, margin: '0 0 0.75rem' } }),
       ...outcome.rows.map((row) =>
@@ -459,7 +495,7 @@ export function mountFixitPanel(host: FixitPanelHost): FixitPanel {
                 el(doc, 'span', { text: row.label }),
                 el(doc, 'span', {
                   text: row.passed ? 'holds' : 'does not hold',
-                  style: { color: row.passed ? GREEN : TERRACOTTA },
+                  style: { color: row.passed ? GOOD : BAD },
                 }),
               ],
             }),

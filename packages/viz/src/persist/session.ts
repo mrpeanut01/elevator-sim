@@ -225,6 +225,43 @@ export function patchTouchesLibrary(patch: Partial<ViewerState>): boolean {
 }
 
 /**
+ * Whether a `ViewerState` patch moves the week — the campaign's progress, as distinct from the
+ * library's contents.
+ *
+ * ## The defect this closes — `docs/20` defect 14
+ *
+ * Progress was written on a delay: pressing *Open the doors on tomorrow* advanced the week through
+ * `MountContext.update` — which saved only when {@link patchTouchesLibrary} answered `true` — and
+ * the advanced day did not reach `localStorage` until the **next incidental writer** ran, which is
+ * `closeShift` at the end of the day the press started. The audit measured the gap as a player: a
+ * reload one second after the press restored yesterday; six seconds later, today. A player who
+ * closes the tab after taking tomorrow loses the day.
+ *
+ * There was no timer to remove. The "debounce" was the distance between the press and whichever
+ * later action happened to save, so the fix is the same one issue #113 § 2 made for the library:
+ * name the patches that carry something worth a write, and write **at the choke point,
+ * synchronously**, on the press itself.
+ *
+ * ## Why this is safe on the hot path, by the same census as the library's
+ *
+ * `week` and `parkedWeeks` are patched through `update` from exactly three sites — the report
+ * sheet's *Open the doors on tomorrow*, its scenario-switch confirm, and the scenario cards — and
+ * every one is a discrete button press. No `input` handler patches either key. The pair is one
+ * campaign (`weeksForSession`'s invariant), which is why both keys are named rather than `week`
+ * alone: a scenario switch parks the live week in the same patch that adopts another.
+ *
+ * ## And why it cannot re-open § D231
+ *
+ * `saveSessionNow` does not write whatever it is handed — `weeksForSession` holds the stored pair
+ * back for every mode that does not own a week. So a free-play patch that carries a scaffolding
+ * week triggers a save in which the campaign's stored week is what gets written, exactly as on
+ * every other save. The predicate decides *when*; § D231's guard still decides *what*.
+ */
+export function patchMovesTheWeek(patch: Partial<ViewerState>): boolean {
+  return 'week' in patch || 'parkedWeeks' in patch;
+}
+
+/**
  * The four shelves, copied off the state as they are.
  *
  * Private for the same reason {@link snapshotOf} is: a public builder would let a caller assemble a
