@@ -231,19 +231,26 @@ function stripMemberNames(text: string): string {
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
 
 /**
- * The Everyday shell's two DOM-owning files — the second shell, exempted by name.
+ * The Everyday shell's DOM-owning files — the second shell, exempted by name.
  *
  * `everyday/` is an entry point in the same sense `dev/` is: `boot.ts` is what `index.html` loads,
- * and `shell.ts` builds the rail, the screen region and the action bar. What is *not* exempt is the
- * rest of the directory — `types.ts`, `modes.ts` and `rail.ts` are pure decisions about what the
- * shell shows, kept free of the document precisely so they can be tested in this node tier, and the
- * rules below are what hold them there.
+ * `shell.ts` builds the rail, the screen region and the action bar, and `fixitScreen.ts` is a
+ * registered screen's mount — the DOM half of a pure/DOM split whose words live in
+ * `fixitScreenModel.ts` (it is here for its one-frame `setTimeout` defer, `dev/fixitPanel.ts`'s
+ * stated-cost approach carried over). What is *not* exempt is the rest of the directory —
+ * `types.ts`, `modes.ts`, `rail.ts` and `fixitScreenModel.ts` are pure decisions about what the
+ * shell shows, kept free of the document precisely so they can be tested in this node tier, and
+ * the rules below are what hold them there.
  *
- * So the exemption is **two file names rather than a `startsWith('everyday/')`**. A prefix would
- * have exempted a directory that is mostly pure, and the day one of those three reached for a
+ * So the exemption is **file names rather than a `startsWith('everyday/')`**. A prefix would have
+ * exempted a directory that is mostly pure, and the day one of the pure files reached for a
  * `document` this suite would have said nothing.
  */
-const EVERYDAY_SHELL_FILES = new Set(['everyday/boot.ts', 'everyday/shell.ts']);
+const EVERYDAY_SHELL_FILES = new Set([
+  'everyday/boot.ts',
+  'everyday/shell.ts',
+  'everyday/fixitScreen.ts',
+]);
 
 /** A shell entry point: `dev/` wholesale, and the Everyday shell's two DOM-owning files. */
 const isDev = (id: string): boolean => id.startsWith('dev/') || EVERYDAY_SHELL_FILES.has(id);

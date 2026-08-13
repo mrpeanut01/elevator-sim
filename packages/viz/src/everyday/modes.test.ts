@@ -62,14 +62,15 @@ describe('a tile either reaches the simulation or says it does not', () => {
     }
   });
 
-  it('leaves exactly one mode playable, and it is Today’s tower', () => {
+  it('leaves exactly two modes playable — Today’s tower, and Fix a building since its screen landed', () => {
     /*
-     * Stated as a fact about this build rather than as a design intent. When a second mode's
+     * Stated as a fact about this build rather than as a design intent. When another mode's
      * Everyday screens land, this case fails — which is the point: the menu's refusals and the tree
-     * move together or the failure is visible here rather than on a player's screen.
+     * move together or the failure is visible here rather than on a player's screen. Fix a
+     * building's tile opened on the commit that registered `everyday/fixitScreen.ts`.
      */
     const playable = EVERYDAY_MODES.filter(isPlayable).map((mode) => mode.title);
-    expect(playable).toEqual(["Today's tower"]);
+    expect(playable).toEqual(["Today's tower", 'Fix a building']);
   });
 
   it('derives every tile’s availability from the screen registry, both ways', () => {
@@ -115,20 +116,28 @@ describe('the availability flags describe this tree, not a remembered one', () =
     expect(existsSync(`${SRC}rush`), 'a rush module exists but the tile still refuses').toBe(false);
   });
 
-  it('does not claim the campaign or Fix-a-building are missing — only their Everyday screens are', () => {
+  it('does not claim the campaign is missing — only its Everyday screens are', () => {
     /*
-     * The opposite direction, and the more embarrassing one. Both engines are in the tree and
+     * The opposite direction, and the more embarrassing one. The engine is in the tree and
      * exercised; a refusal reading *not built* would understate the product to the only person
-     * reading it. So both directories are asserted present *and* both refusals are asserted to be
-     * about the screen rather than about the thing.
+     * reading it. So the directory is asserted present *and* the refusal is asserted to be about
+     * the screen rather than about the thing. Fix-a-building carried the same assertion until its
+     * screen landed; its tile is now held open by the case below instead.
      */
-    for (const [dir, screen] of [
-      ['campaign', 'towers'],
-      ['fixit', 'fixit'],
-    ] as const) {
-      expect(existsSync(`${SRC}${dir}`), dir).toBe(true);
-      const mode = EVERYDAY_MODES.find((candidate) => candidate.screen === screen);
-      expect(mode?.unavailable, screen).toMatch(/screens? (?:is|are) not built/);
-    }
+    expect(existsSync(`${SRC}campaign`)).toBe(true);
+    const mode = EVERYDAY_MODES.find((candidate) => candidate.screen === 'towers');
+    expect(mode?.unavailable).toMatch(/screens? (?:is|are) not built/);
+  });
+
+  it('opens Fix a building, now that its screen exists beside its engine', () => {
+    /*
+     * § D227's rule in the direction a landed screen needs: a refusal kept over a working screen
+     * is a control telling the player not to touch a thing that works. The engine directory and
+     * the screen module are both asserted on disk, and the tile is asserted open.
+     */
+    expect(existsSync(`${SRC}fixit`)).toBe(true);
+    expect(existsSync(`${SRC}everyday/fixitScreen.ts`)).toBe(true);
+    const mode = EVERYDAY_MODES.find((candidate) => candidate.screen === 'fixit');
+    expect(mode?.unavailable).toBeUndefined();
   });
 });

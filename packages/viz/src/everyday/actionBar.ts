@@ -92,6 +92,14 @@ export interface BarPrimary {
   readonly label: string;
   readonly variants: readonly string[];
   readonly dangerVariants?: readonly string[];
+  /**
+   * Resolved-state inertness: the primary genuinely cannot act right now, and the shell draws it
+   * disabled. **Never authored in {@link ACTION_BAR_ROWS}** — § 3.3 has no inert primary cell —
+   * it is set only by a screen's `bar()` refinement for a state the table cannot know, e.g. the
+   * fixit screen's synchronous pair mid-run (`everyday/fixitScreenModel.ts#fixitBarModel`).
+   * Absent means pressable.
+   */
+  readonly inert?: boolean | undefined;
 }
 
 /** The § 3.3 row, resolved for a state and ready to draw. */
