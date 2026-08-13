@@ -453,9 +453,9 @@ export const STAGE_NO_GHOST =
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
-  '§ 7.5’s campaign dock — the campaign’s own Everyday screens are not built, so no route into this build can put the stage in a campaign',
+  '§ 7.5’s campaign dock — a campaign day reaches this stage, and the money-and-incident dock beside it is not drawn',
   '§ 7.3’s camera — the cutaway draws the whole building at once and there is nothing to pan',
-  '§ 7.6’s second and third arms — switching who is driving mid-day, and answering a campaign incident',
+  '§ 7.6’s second and third arms — the run record carries a handover and an answered incident, and this screen offers neither: a handover needs a dispatcher chosen somewhere, and an incident needs the dock above',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -488,10 +488,11 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
    * substitution that rule requires, and it is here rather than in the shell because `back` is a
    * cell a `bar()` owns.
    *
-   * Found by `screens.test.ts`'s registry-wide placeholder guard rather than by a reader: no route
-   * in this build produces `ctx === 'campaign'` on the stage yet, so the cell is unreachable today
-   * and would have been drawn the moment it was reachable. The fallback names no building because
-   * with no open tower there is nothing true to put there.
+   * Found by `screens.test.ts`'s registry-wide placeholder guard rather than by a reader — and the
+   * first draft of this comment said the cell was unreachable, which was already false when it was
+   * written: `shell.ts` sets `ctx` from the tile the player commits to, so the Campaign tile puts
+   * this stage in a campaign and draws this very cell. The fallback names no building because with
+   * no open tower there is nothing true to put there.
    */
   const base =
     table.back?.label.includes('⟨') === true
