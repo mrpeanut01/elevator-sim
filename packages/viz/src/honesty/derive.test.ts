@@ -80,6 +80,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/data.ts#loadBrowserResources',
         'dev/data.ts#loadCampaign',
         'dev/data.ts#loadFixitCases',
+        'dev/data.ts#loadProofCases',
         'dev/data.ts#resolveEdited',
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
@@ -110,6 +111,17 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * a limitation rather than presented as coverage.
          */
         'everyday/shell.ts#mountEverydayShell',
+        /*
+         * § 14's two-tabbed board screen, on the settings screen's split exactly: `BOARD_SCREEN` is
+         * a registry row whose `mount` builds tab cards, a table and a `<details>`, so it cannot
+         * run without a document. Every **word** it draws is authored elsewhere and driven by the
+         * `GAUNTLET` adapter — the ladder's rows and refusals in `gauntlet/ladder.ts`, the rating's
+         * basis and caveat in `gauntlet/rating.ts`, the gauntlet's progress and stop lines in
+         * `gauntlet/run.ts` — and its own two string tables, `BOARD_SCREEN_COPY` and
+         * `DAILY_BOARD_ABSENCE`, are driven there too rather than excused here. What the mount
+         * authors of its own is geometry, class names and the load-failure line.
+         */
+        'everyday/boardScreen.ts#BOARD_SCREEN',
         /*
          * § 15.1's settings screen, on the same split and for the same reason: `SETTINGS_SCREEN`
          * is a registry row whose `mount` builds inputs, swatch buttons and rows, so it cannot run
@@ -664,6 +676,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/parse.ts#FixitCasesError',
         'fixit/parse.ts#parseFixitCases',
         'fixit/parse.ts#playerFacingStringsOf',
+        /*
+         * `gauntlet/proofCases.ts`'s parse, one `data/` document over, on the identical ground: its
+         * sentences refuse a malformed `data/proof-cases.json` to the person editing it — a tower
+         * naming a building this build does not ship, a duplicate id, an empty side — and
+         * `gauntlet/proofCases.test.ts` fires every one of them. What a *player* reads is the
+         * parsed list, through the `GAUNTLET` adapter's `whatAreTheFortyOf` and the ladder rows.
+         */
+        'gauntlet/proofCases.ts#parseProofCases',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',

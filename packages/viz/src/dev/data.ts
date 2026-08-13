@@ -33,6 +33,7 @@ import { parseCampaign } from '../campaign/parse.js';
 import type { Campaign } from '../campaign/types.js';
 import { parseFixitCases } from '../fixit/parse.js';
 import type { FixitCases } from '../fixit/types.js';
+import { parseProofCases, type ProofCaseSet } from '../gauntlet/proofCases.js';
 import { validatePublishedGoalRates, type PublishedGoalRates } from '../scenario/published.js';
 import { parseReferenceRuns } from '../watch/reference.js';
 import type { WatchableRun } from '../watch/types.js';
@@ -311,5 +312,24 @@ export function resolveEdited(
   return resolveBuilding(building, resources.elevatorSpecs, {
     file: `${building.id}.json`,
     trafficProfileIds: resources.trafficProfileIds,
+  });
+}
+
+/**
+ * `data/proof-cases.json`, fetched and parsed — `ENGINE_CONTRACT.md` § 12.3's forty proof cases.
+ *
+ * Not part of {@link loadBrowserResources}, on {@link loadFixitCases}' stated ground: that function
+ * runs on every batch-worker start, and a worker running one case has no use for the list of forty.
+ * The board screen is the only caller, and it calls this once, on first open.
+ *
+ * The building ids the parse checks against are **derived** from the loaded resources rather than
+ * written down beside the parser, for `loadFixitCases`' reason one level up: a hand-written list
+ * would go stale the day a building lands, and the failure it would produce — a proof case silently
+ * refused — is a rating quietly taken over thirty-five.
+ */
+export async function loadProofCases(resources: BrowserResources): Promise<ProofCaseSet> {
+  const raw = await fetchJson('/proof-cases.json');
+  return parseProofCases(raw, {
+    buildingIds: new Set(resources.buildings.map((building) => building.id)),
   });
 }

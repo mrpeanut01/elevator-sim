@@ -17,8 +17,14 @@
  *
  * That is this repository's signature defect one level up from code: not a behaviour with no
  * caller, but **a requirement whose "already exists" row named a different thing**. It is also not
- * in `docs/18`'s register of honest absences, which names the server halves, the gauntlet, two rule
- * actions and fifteen Fix-a-building cases — and not the shell.
+ * in `docs/18`'s register of honest absences, which names the server halves, two rule actions and
+ * fifteen Fix-a-building cases — and not the shell.
+ *
+ * That register named **the gauntlet** too, and that entry is now struck through: slice 9a built it
+ * (`gauntlet/`, `data/proof-cases.json`, `everyday/boardScreen.ts`). The entry's stated reason —
+ * *"a rating needs a board to stand on"* — was itself the mistake, one class down from the row this
+ * paragraph is about: a rating needs a **ladder**, and a ladder over fixed cases needs no server.
+ * An absence recorded with the wrong reason outlives the reason.
  *
  * ## What this module is, and what it deliberately is not
  *

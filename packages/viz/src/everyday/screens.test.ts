@@ -29,14 +29,16 @@ describe('what this build has actually built', () => {
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
      * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`),
-     * `settings` the second (§ 15.1) and `stage` the third (§ 7, `everyday/stageScreen.ts`); the
-     * order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
+     * `settings` the second (§ 15.1), `stage` the third (§ 7, `everyday/stageScreen.ts`) and
+     * `board` the fourth (§ 14, `everyday/boardScreen.ts` — the ladder half needs no server, so the
+     * screen opens and the daily board's tab carries § 12.2's labelled unavailable state instead);
+     * the order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
      *
      * **`stage` moved sides without moving in this list**, which is the case worth reading twice:
      * it was shell-owned (the § D335 hand-off), it is now registered, and a list that only says
      * *built* cannot tell the difference. The case below is what does.
      */
-    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'settings']);
+    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'board', 'settings']);
   });
 
   it('derives BUILT from the registry, in both directions', () => {

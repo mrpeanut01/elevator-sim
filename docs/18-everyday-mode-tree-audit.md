@@ -284,7 +284,20 @@ mistakes them for oversights:
   or a rule list rather than posting something a verifier would reject, and slice 4d's ghost
   omits its *world* and *your best* arms for the same reason. §12.2's ladder and percentile line
   are recorded as absent in the withheld matrix's own docstring rather than stubbed.
-- **The gauntlet and its forty cases** — a rating needs a board to stand on.
+- ~~**The gauntlet and its forty cases** — a rating needs a board to stand on.~~ **Built (slice 9a),
+  and the reason it was listed here turned out to be wrong.** A rating needs a *ladder* to stand on,
+  and a ladder needs no server: the forty cases are fixed, every entrant meets the identical crowd
+  by § 1's seed rule, and this device can run them. What needs a server is the **daily board** —
+  other people's runs, replayed and verified — and it is still absent, now as a labelled state on
+  its own tab rather than as a refusal covering both halves. The list is
+  [`data/proof-cases.json`](../data/proof-cases.json), derived into the forty by
+  `gauntlet/proofCases.ts`, run through the bench's own worker by `gauntlet/run.ts`, folded by
+  `gauntlet/rating.ts` and drawn by `everyday/boardScreen.ts`. The eight towers are the eight this
+  build **ships**: § 12.3 names Harbour Point and Ashgate Mixed-Use, `data/buildings/` holds
+  neither, and the file's `$comment` records the substitution and what moving a case would cost.
+  **The bench's suite is not yet the third reader** — `dev/suitePanel.ts` still runs `MATRIX_CELLS`,
+  which are measured operating points and a different question; § 12.3's *one list, three readers*
+  therefore has two, and `gauntlet/proofCases.test.ts` holds the property for the readers that exist.
 - **Two rule actions** (*skip everything above floor v*, *treat up-calls as urgent*) — omitted
   with reasons: service range is building fabric, and no cost term prices direction-conditional
   urgency, so either would be a label that lies.
