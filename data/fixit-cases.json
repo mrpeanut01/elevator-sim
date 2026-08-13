@@ -7,10 +7,20 @@
       "name": "The sleeping sky lobby",
       "buildingId": "vertical-city",
       "dispatcherProfileId": "collective",
-      "run": { "seed": "20260815", "durationS": 1800, "arrivalRatePctPop5min": 2 },
+      "run": {
+        "seed": "20260815",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 2
+      },
       "asBuilt": {
         "note": "Eight shuttles link the street to three sky lobbies; local banks hang off each lobby. The fault is in how it is configured, not in what it is made of.",
-        "patch": { "dispatcher": { "idle": { "parkingStrategy": "lobby" } } }
+        "patch": {
+          "dispatcher": {
+            "idle": {
+              "parkingStrategy": "lobby"
+            }
+          }
+        }
       },
       "complaint": {
         "text": "Every evening I finish up and wait an age on the sky lobby for a car down to the street. You can see the shuttles from the window — all eight of them, sat at the ground floor.",
@@ -21,17 +31,43 @@
           "thresholdS": 60,
           "scope": {
             "mode": "origin-to-destination",
-            "floorIds": ["26", "27", "51", "52", "76", "77"],
-            "destinationFloorIds": ["G", "2"]
+            "floorIds": [
+              "26",
+              "27",
+              "51",
+              "52",
+              "76",
+              "77"
+            ],
+            "destinationFloorIds": [
+              "G",
+              "2"
+            ]
           }
         }
       },
       "symptom": "waits over a minute for a car down, while the shuttles sit at the street",
       "figures": [
-        { "kind": "complaint", "label": "Waits over a minute, sky lobby down to street", "reading": "bad" },
-        { "kind": "scope-worst-wait", "label": "Worst wait for a down shuttle", "reading": "mid" },
-        { "kind": "scope-mean-wait", "label": "Mean wait for a down shuttle", "reading": "mid" },
-        { "kind": "rest-away-pct", "label": "Rest of the building away inside a minute", "reading": "healthy" }
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute, sky lobby down to street",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait for a down shuttle",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait for a down shuttle",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the building away inside a minute",
+          "reading": "healthy"
+        }
       ],
       "diagnosis": {
         "text": "Idle cars are sent home to the ground floor — all of them, including the shuttles, whose calls come from the top of the building.",
@@ -47,7 +83,11 @@
           "effect": "Spreads waiting cars through the floors they serve — a shuttle at each lobby instead of eight at the street. The 9 waits over a minute are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
-              "idle": { "parkingStrategy": "predicted-demand", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
+              "idle": {
+                "parkingStrategy": "predicted-demand",
+                "repositionThresholdS": 2,
+                "repositionEnergyWeight": 0.1
+              }
             }
           }
         },
@@ -60,7 +100,21 @@
           "patch": {
             "building": {
               "cars": [
-                { "carIds": ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"], "set": { "ratedSpeedDeltaMps": 0.5 } }
+                {
+                  "carIds": [
+                    "S1",
+                    "S2",
+                    "S3",
+                    "S4",
+                    "S5",
+                    "S6",
+                    "S7",
+                    "S8"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
               ]
             }
           }
@@ -74,7 +128,15 @@
           "patch": {
             "building": {
               "cars": [
-                { "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2.0,
+                    "dwellHallCallS": 2.5
+                  }
+                }
               ]
             }
           }
@@ -86,7 +148,15 @@
           "costUnits": 34,
           "effect": "One more car on the sky-lobby run. That is a capital conversation with the owner — and eight parked at the wrong floor would become nine.",
           "patch": {
-            "building": { "addCars": [{ "bankId": "shuttle", "copyCarId": "S8", "id": "S9" }] }
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "shuttle",
+                  "copyCarId": "S8",
+                  "id": "S9"
+                }
+              ]
+            }
           }
         }
       ],
@@ -100,32 +170,112 @@
       "name": "Zoning that starves the top",
       "buildingId": "midtown-office",
       "dispatcherProfileId": "collective",
-      "run": { "seed": "20260813", "durationS": 1800, "arrivalRatePctPop5min": 3 },
+      "run": {
+        "seed": "20260813",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 3
+      },
       "asBuilt": {
         "note": "Four cars split into a low-rise and a high-rise bank; the upper floors were re-let to a dense tenant after the split was drawn. The fault is in how it is configured, not in what it is made of.",
         "patch": {
           "building": {
             "floorPopulations": [
-              { "floorIds": ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11"], "population": 60 },
-              { "floorIds": ["12", "13", "14", "15", "16", "17", "18", "19", "20"], "population": 130 }
+              {
+                "floorIds": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11"
+                ],
+                "population": 60
+              },
+              {
+                "floorIds": [
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20"
+                ],
+                "population": 130
+              }
             ],
             "banks": [
               {
                 "id": "low",
                 "name": "Low-rise bank",
-                "servesFloors": ["P1", "G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+                "servesFloors": [
+                  "P1",
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11"
+                ],
                 "cars": [
-                  { "id": "A", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
-                  { "id": "B", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
-                  { "id": "C", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                  {
+                    "id": "A",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "B",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "C",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  }
                 ]
               },
               {
                 "id": "high",
                 "name": "High-rise bank",
-                "servesFloors": ["P1", "G", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+                "servesFloors": [
+                  "P1",
+                  "G",
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20"
+                ],
                 "cars": [
-                  { "id": "D", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                  {
+                    "id": "D",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  }
                 ]
               }
             ]
@@ -141,16 +291,42 @@
           "thresholdS": 60,
           "scope": {
             "mode": "touches",
-            "floorIds": ["12", "13", "14", "15", "16", "17", "18", "19", "20"]
+            "floorIds": [
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18",
+              "19",
+              "20"
+            ]
           }
         }
       },
       "symptom": "a 341 s mean wait to board, on one car for nine dense floors",
       "figures": [
-        { "kind": "complaint", "label": "Mean wait to board, upper-floor journeys", "reading": "bad" },
-        { "kind": "scope-long-waits", "label": "Upper-floor journeys waiting over a minute", "reading": "mid" },
-        { "kind": "scope-worst-wait", "label": "Worst wait to board, upper floors", "reading": "mid" },
-        { "kind": "rest-away-pct", "label": "Rest of the building away inside a minute", "reading": "healthy" }
+        {
+          "kind": "complaint",
+          "label": "Mean wait to board, upper-floor journeys",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-long-waits",
+          "label": "Upper-floor journeys waiting over a minute",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait to board, upper floors",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the building away inside a minute",
+          "reading": "healthy"
+        }
       ],
       "diagnosis": {
         "text": "The split was drawn by floor count — ten floors against nine — and the heads are the other way round. Three cars carry 600 people; one car carries 1,170.",
@@ -170,19 +346,68 @@
                 {
                   "id": "low",
                   "name": "Low-rise bank",
-                  "servesFloors": ["P1", "G", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+                  "servesFloors": [
+                    "P1",
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11"
+                  ],
                   "cars": [
-                    { "id": "A", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
-                    { "id": "B", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                    {
+                      "id": "A",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    }
                   ]
                 },
                 {
                   "id": "high",
                   "name": "High-rise bank",
-                  "servesFloors": ["P1", "G", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+                  "servesFloors": [
+                    "P1",
+                    "G",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20"
+                  ],
                   "cars": [
-                    { "id": "C", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" },
-                    { "id": "D", "spec": "geared-traction", "ratedSpeedMps": 2.5, "ratedLoadLb": 2500, "doorType": "centerOpening" }
+                    {
+                      "id": "C",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "D",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    }
                   ]
                 }
               ]
@@ -197,7 +422,16 @@
           "effect": "The single upper car cycles sooner, so its 914 s worst wait shortens — but its queue is still one car's queue for 1,170 people, and this is the whole budget.",
           "patch": {
             "building": {
-              "cars": [{ "carIds": ["D"], "set": { "ratedSpeedDeltaMps": 1.0 } }]
+              "cars": [
+                {
+                  "carIds": [
+                    "D"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 1.0
+                  }
+                }
+              ]
             }
           }
         },
@@ -209,7 +443,17 @@
           "effect": "A second off every stop moves the 341 s mean a little. The queue at the upper car is hundreds of seconds deep; its doors are not.",
           "patch": {
             "building": {
-              "cars": [{ "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }]
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2.0,
+                    "dwellHallCallS": 2.5
+                  }
+                }
+              ]
             }
           }
         },
@@ -220,7 +464,15 @@
           "costUnits": 34,
           "effect": "A second car upstairs without taking one from downstairs. That is a capital conversation with the owner, and the redrawn split gets there without pouring concrete.",
           "patch": {
-            "building": { "addCars": [{ "bankId": "high", "copyCarId": "D", "id": "E" }] }
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "high",
+                  "copyCarId": "D",
+                  "id": "E"
+                }
+              ]
+            }
           }
         }
       ],
@@ -234,11 +486,23 @@
       "name": "Three cars, one car's work",
       "buildingId": "garden-apartments",
       "dispatcherProfileId": "nearest-car",
-      "run": { "seed": "20260823", "durationS": 2700, "arrivalRatePctPop5min": 7 },
+      "run": {
+        "seed": "20260823",
+        "durationS": 2700,
+        "arrivalRatePctPop5min": 7
+      },
       "asBuilt": {
         "note": "Six floors, one bank, three identical cars. The fault is in how it is configured, not in what it is made of.",
         "patch": {
-          "building": { "addCars": [{ "bankId": "main", "copyCarId": "B", "id": "C" }] }
+          "building": {
+            "addCars": [
+              {
+                "bankId": "main",
+                "copyCarId": "B",
+                "id": "C"
+              }
+            ]
+          }
         }
       },
       "complaint": {
@@ -250,16 +514,36 @@
           "thresholdS": 60,
           "scope": {
             "mode": "origin",
-            "floorIds": ["4", "5", "6"]
+            "floorIds": [
+              "4",
+              "5",
+              "6"
+            ]
           }
         }
       },
       "symptom": "waits over a minute for a car up, while three cars stand together below",
       "figures": [
-        { "kind": "complaint", "label": "Waits over a minute starting at the upper flats", "reading": "bad" },
-        { "kind": "scope-worst-wait", "label": "Worst wait at the upper flats", "reading": "mid" },
-        { "kind": "scope-mean-wait", "label": "Mean wait at the upper flats", "reading": "mid" },
-        { "kind": "rest-away-pct", "label": "The lower floors away inside a minute", "reading": "healthy" }
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute starting at the upper flats",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the upper flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait at the upper flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "The lower floors away inside a minute",
+          "reading": "healthy"
+        }
       ],
       "diagnosis": {
         "text": "The standing order always sends the nearest car and never spreads the fleet, so the three cars drift to the same busy floor and wait there together.",
@@ -275,7 +559,11 @@
           "effect": "Parks one idle car per stretch of the building instead of three together. The 7 waits over a minute from the flats are the target, and it is a setting.",
           "patch": {
             "dispatcher": {
-              "idle": { "parkingStrategy": "zone-center", "repositionThresholdS": 2, "repositionEnergyWeight": 0.1 }
+              "idle": {
+                "parkingStrategy": "zone-center",
+                "repositionThresholdS": 2,
+                "repositionEnergyWeight": 0.1
+              }
             }
           }
         },
@@ -287,7 +575,18 @@
           "effect": "Each climb is quicker, so the 112 s worst wait shortens — but the cars still start it from the wrong floor, together, and this is most of the budget.",
           "patch": {
             "building": {
-              "cars": [{ "carIds": ["A", "B", "C"], "set": { "ratedSpeedDeltaMps": 0.5 } }]
+              "cars": [
+                {
+                  "carIds": [
+                    "A",
+                    "B",
+                    "C"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
             }
           }
         },
@@ -299,7 +598,17 @@
           "effect": "A second off each stop moves the 48.9 s mean a little. The wait that prompted the letter is a car climbing five floors empty, not a door.",
           "patch": {
             "building": {
-              "cars": [{ "carIds": ["*"], "set": { "dwellCarCallS": 2.0, "dwellHallCallS": 2.5 } }]
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2.0,
+                    "dwellHallCallS": 2.5
+                  }
+                }
+              ]
             }
           }
         },
@@ -310,13 +619,4520 @@
           "costUnits": 34,
           "effect": "A fourth car for six floors that already have three standing idle together. Measured on this very day it moves not one wait — the parking rule leaves it standing with the rest.",
           "patch": {
-            "building": { "addCars": [{ "bankId": "main", "copyCarId": "C", "id": "D" }] }
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "C",
+                  "id": "D"
+                }
+              ]
+            }
           }
         }
       ],
       "result": {
         "head": "Three cars doing three cars' work.",
         "body": "The fleet now waits spread through the tower, and a call from the flats starts with a car already nearby. Nothing was bought — the third car was never the problem, and neither were the first two."
+      }
+    },
+    {
+      "id": "doors-that-never-close",
+      "name": "The doors that never close",
+      "buildingId": "crown-hotel",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260830",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 7.8
+      },
+      "asBuilt": {
+        "note": "Five cars serve every floor from the dock to the top of the house, and the door dwell on all five is set to eleven seconds — the figure the luggage trolleys needed. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "cars": [
+              {
+                "carIds": [
+                  "*"
+                ],
+                "set": {
+                  "dwellCarCallS": 11,
+                  "dwellHallCallS": 11
+                }
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Every lift on the rank sits with its doors open while the queue at reception grows. You can watch a loaded car stand there, doors wide, nobody moving.",
+        "complainer": "concierge, reception",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute on journeys through reception or the dock",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "G",
+              "B1"
+            ]
+          }
+        }
+      },
+      "symptom": "doors held eleven seconds at every stop, on every car",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute through reception or the dock",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Guest-floor journeys away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The door dwell is set for the luggage trolleys — eleven seconds at every landing, on every car, for cages that come twice an hour.",
+        "reasoning": "A trolley needs the hold; everyone else pays it at every stop, all day. Every one of the 28 waits over a minute began behind a door that was holding for nobody, the worst of them 196 s — while the guest-floor journeys that skip reception are away inside a minute on 95.6 % of rides. The machines are fine. The timing is not."
+      },
+      "budgetUnits": 12,
+      "repairs": [
+        {
+          "id": "dwell-that-reacts",
+          "role": "diagnosed",
+          "name": "A dwell that reacts to what is boarding",
+          "costUnits": 2,
+          "effect": "Standard timing at every stop, extending only while people are still stepping aboard — the eleven-second hold survives only where a trolley is loading. The 28 waits over a minute are the target.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 3,
+                    "dwellHallCallS": 5
+                  }
+                }
+              ]
+            },
+            "dispatcher": {
+              "answer": {
+                "dwellPolicy": "adaptive",
+                "dwellAdaptationGain": 0.3,
+                "maxDwellS": 11
+              }
+            }
+          }
+        },
+        {
+          "id": "regear-the-rank",
+          "role": "costly-fix",
+          "name": "Re-gear all five machines for another half metre per second",
+          "costUnits": 10,
+          "effect": "Every trip travels quicker, so the 196 s worst wait shortens — but each stop still spends eleven seconds standing open, and the stops are where this day goes.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fix-the-trolley-car-first",
+          "role": "cheap-fix",
+          "name": "Standard timing on the trolley car alone",
+          "costUnits": 3,
+          "effect": "One car of five stops holding its doors, which moves the 30.4 s mean a little. The other four keep holding, and the queue at reception keeps forming.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "S"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 3,
+                    "dwellHallCallS": 5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "sixth-lift",
+          "role": "new-shaft",
+          "name": "A sixth lift · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car on the rank, holding its doors eleven seconds like the other five. That is a capital conversation with the owner, and the doors would still own the day.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "A",
+                  "id": "E"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The doors close, and the day moves.",
+        "body": "Standard timing, with a hold that answers to what is actually boarding: the trolleys keep their eleven seconds, everyone else gets their morning back, and nothing was re-geared to do it."
+      }
+    },
+    {
+      "id": "cars-that-always-go-home",
+      "name": "The cars that always go home",
+      "buildingId": "mixed-use-high-rise",
+      "dispatcherProfileId": "eta",
+      "run": {
+        "seed": "20261131",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 5.5
+      },
+      "asBuilt": {
+        "note": "Four tower cars carry the flats above the sky lobby, and between calls every one of them is sent back down to the sky lobby to wait. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "dispatcher": {
+            "idle": {
+              "parkingStrategy": "fixed-floor",
+              "parkingFloorIndex": 31
+            }
+          }
+        }
+      },
+      "complaint": {
+        "text": "Press the button up here and watch the indicator start at the sky lobby, every single time. The cars finish a trip among the flats and are sent straight back down before anyone can want them.",
+        "complainer": "resident, floor 52",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute starting at the upper flats",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "45",
+              "46",
+              "47",
+              "48",
+              "49",
+              "50",
+              "51",
+              "52",
+              "53",
+              "54",
+              "55",
+              "56",
+              "57",
+              "58",
+              "59",
+              "60"
+            ]
+          }
+        }
+      },
+      "symptom": "waits over a minute at the top of the tower, while the cars wait at its bottom",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute starting at the upper flats",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the upper flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the upper flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the building away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "Idle cars are sent to the sky lobby — the bottom of the tower run — so every call from the upper flats starts with an empty climb.",
+        "reasoning": "The sky lobby is where the morning arrives, and the parking rule was written for it. From the flats it is the far end of the line: all 6 waits over a minute began on the top sixteen floors with every car parked at the bottom, against a worst of 74 s — and the rest of the building, 497 journeys of it, is away inside a minute on every single ride."
+      },
+      "budgetUnits": 10,
+      "repairs": [
+        {
+          "id": "wait-where-they-finish",
+          "role": "diagnosed",
+          "name": "Let a car wait where it finishes the trip",
+          "costUnits": 0,
+          "effect": "A car that ends its run among the flats stays among them until the next call. The 6 waits over a minute are the target, and it is a setting.",
+          "patch": {
+            "dispatcher": {
+              "idle": {
+                "parkingStrategy": "stay"
+              }
+            }
+          }
+        },
+        {
+          "id": "panels-at-the-sky-lobby",
+          "role": "costly-fix",
+          "name": "Destination panels at the sky lobby",
+          "costUnits": 8,
+          "effect": "Panels group the sky-lobby crowd by floor before boarding. The crowd was never the letter — the letter is the empty climb behind the 74 s worst wait.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "callType": "destination-entry",
+                "passengerAssignment": "panel"
+              }
+            }
+          }
+        },
+        {
+          "id": "quicker-tower-doors",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell on the tower cars",
+          "costUnits": 2,
+          "effect": "A second or so off every stop moves the 32.2 s mean a little. The empty climb from the sky lobby is not a door.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "R1",
+                    "R2",
+                    "R3",
+                    "R4"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fifth-tower-car",
+          "role": "new-shaft",
+          "name": "A fifth tower car · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car for the flats — sent, like the other four, to wait at the sky lobby. That is a capital conversation with the owner.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "residential-local",
+                  "copyCarId": "R4",
+                  "id": "R5"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The cars live upstairs now.",
+        "body": "A car that finishes at the flats waits at the flats. Nothing was bought: the fleet was always enough — it was commuting."
+      }
+    },
+    {
+      "id": "car-park-nobody-serves",
+      "name": "The car park nobody serves",
+      "buildingId": "midtown-office",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260834",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 1.8
+      },
+      "asBuilt": {
+        "note": "Four cars serve the tower, and exactly one of them — by the original fit-out contract — carries on down to the garage level, which half the building drives in through. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "banks": [
+              {
+                "id": "garage",
+                "name": "Garage cars",
+                "servesFloors": [
+                  "P1",
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20"
+                ],
+                "cars": [
+                  {
+                    "id": "A",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              },
+              {
+                "id": "main",
+                "name": "Main bank",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20"
+                ],
+                "cars": [
+                  {
+                    "id": "B",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "C",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "D",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 2500,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Everyone who drives in queues at one lift door while three others run above us. You can hear them arriving and leaving, one floor up, empty.",
+        "complainer": "facilities manager, garage level",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute at the garage level",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "P1"
+            ]
+          }
+        }
+      },
+      "symptom": "one car for the garage, and a 322 s worst wait beside an empty hoistway",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute at the garage level",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the garage level",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the garage level",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the building away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "Three of the four cars stop one floor short of the garage: their landing doors below were never fitted, so half the building's arrivals queue for the one car that goes all the way down.",
+        "reasoning": "Nothing about the garage car is special — same machine, same speed, same doors as the other three. It is simply the only one the contract took below the street: 21 of the 45 garage journeys waited over a minute, the mean wait to board down there is 70.0 s against a worst of 322 s, and the street-door crowd one floor up is away inside a minute on 98.0 % of its journeys."
+      },
+      "budgetUnits": 12,
+      "repairs": [
+        {
+          "id": "extend-a-second-car",
+          "role": "diagnosed",
+          "name": "Fit garage landing doors to a second shaft",
+          "costUnits": 9,
+          "effect": "The second shaft already has the hoistway depth; two landing doors and a controller change split the garage crowd in half. The 21 waits over a minute are the target.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "garage",
+                  "name": "Garage cars",
+                  "servesFloors": [
+                    "P1",
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20"
+                  ],
+                  "cars": [
+                    {
+                      "id": "C",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "D",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 2500,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "regear-the-garage-car",
+          "role": "costly-fix",
+          "name": "Re-gear the garage car for another metre per second",
+          "costUnits": 12,
+          "effect": "The garage car cycles quicker, so the 322 s worst shortens — but its queue is still half the building's arrivals on one car, and this is the whole budget.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "A"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 1.0
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "quicker-garage-doors",
+          "role": "cheap-fix",
+          "name": "Shorter doors on the garage car",
+          "costUnits": 3,
+          "effect": "A second and a half off each of the garage car's stops moves the 70.0 s mean a little. The queue is hundreds of seconds deep; the doors are not.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "A"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fifth-shaft",
+          "role": "new-shaft",
+          "name": "A fifth shaft down to the garage · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "A new car with garage landing doors from the start. The two fitted doors get there without pouring concrete, and concrete is a capital conversation.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "garage",
+                  "copyCarId": "A",
+                  "id": "E"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "Two doors open below the street.",
+        "body": "A second car reaches the garage, and the queue that used to watch one indicator now splits across two. The machines were never short — the landing doors were."
+      }
+    },
+    {
+      "id": "express-that-stops-everywhere",
+      "name": "The express that stops everywhere",
+      "buildingId": "secure-tower",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20261035",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 5.2
+      },
+      "asBuilt": {
+        "note": "Three cars were built to run express to the upper zone; since commissioning they have answered every landing in the building. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "banks": [
+              {
+                "id": "low",
+                "name": "Low bank",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15"
+                ],
+                "cars": [
+                  {
+                    "id": "A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              },
+              {
+                "id": "high",
+                "name": "High bank",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20",
+                  "21",
+                  "22",
+                  "23",
+                  "24",
+                  "25",
+                  "26",
+                  "27",
+                  "28",
+                  "29",
+                  "30"
+                ],
+                "cars": [
+                  {
+                    "id": "D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "E",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "F",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "The express bank takes longer than the ordinary lifts. I watch our three cars crawl up through the low floors collecting other tenants before they ever reach us.",
+        "complainer": "tenant, floor 25",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute on the upper-zone journeys",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30"
+            ]
+          }
+        }
+      },
+      "symptom": "express cars stopping at every floor below the zone they were built for",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute on upper-zone journeys",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Low-zone journeys away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The upper-zone cars were never restricted after commissioning, so every low-floor call they answer is a stop the upper zone pays for.",
+        "reasoning": "The building was designed as two banks — three cars for the low floors, three running express to the sixteenth and above — and the restriction was never entered. All 4 waits over a minute on upper-zone journeys sit behind a 110 s worst, while the low floors, borrowing six cars instead of three, are away inside a minute on 100.0 % of 112 journeys. What the low zone borrowed, the upper zone paid for."
+      },
+      "budgetUnits": 10,
+      "repairs": [
+        {
+          "id": "blank-the-low-landings",
+          "role": "diagnosed",
+          "name": "Blank the low-zone landings on the express cars",
+          "costUnits": 0,
+          "effect": "The upper three cars pass the low floors without stopping — the run they were built for. The 4 waits over a minute are the target, and it is a setting.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "low",
+                  "name": "Low bank",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "high",
+                  "name": "High bank",
+                  "servesFloors": [
+                    "G",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+                    "29",
+                    "30"
+                  ],
+                  "cars": [
+                    {
+                      "id": "D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "F",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "regear-the-express",
+          "role": "costly-fix",
+          "name": "Re-gear the express cars for another half metre per second",
+          "costUnits": 9,
+          "effect": "The upper cars cover the tower sooner, so the 110 s worst shortens — but they still stop at every low floor on the way, and stops are the thing an express exists to avoid.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "D",
+                    "E",
+                    "F"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "trim-express-dwell",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell on the express cars",
+          "costUnits": 2,
+          "effect": "A second and a half off every stop moves the 19.0 s mean a little. The stops themselves are the letter.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "D",
+                    "E",
+                    "F"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "seventh-car",
+          "role": "new-shaft",
+          "name": "A seventh car for the upper zone · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car upstairs, stopping everywhere like its three siblings. That is a capital conversation — and the free restriction gets there first.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "high",
+                  "copyCarId": "F",
+                  "id": "H"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The express passes the low zone again.",
+        "body": "Blanked landings restore the run the upper cars were built for. The low floors lose the cars they were borrowing, and their own three never notice the difference."
+      }
+    },
+    {
+      "id": "deliveries-on-the-passenger-group",
+      "name": "Deliveries on the passenger group",
+      "buildingId": "st-jude-hospital",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260836",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 6
+      },
+      "asBuilt": {
+        "note": "Five cars carry the whole hospital, and the two big trolley cars have their door hold set to twenty-five seconds — the time a supply cage needs — while the cages ride through the morning peak. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "cars": [
+              {
+                "carIds": [
+                  "D",
+                  "E"
+                ],
+                "set": {
+                  "dwellCarCallS": 25,
+                  "dwellHallCallS": 25
+                }
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "The lift that answers has a cage of linen in it and a porter holding the door. You wait for it to leave, and the next one is the same.",
+        "complainer": "outpatients sister, first floor",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute on journeys through the entrance or outpatients",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "G",
+              "1"
+            ]
+          }
+        }
+      },
+      "symptom": "two cars standing doors-open twenty-five seconds at every stop, through the busiest hours",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute through the entrance or outpatients",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Ward-to-ward journeys away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The supply cages ride the two big cars through the morning peak, and those cars hold their doors for the cages — twenty-five seconds at every stop, whoever is aboard.",
+        "reasoning": "Two of the five cars spend most of every stop standing open, and the waits collect where the crowd is: 15 of 164 journeys through the entrance or outpatients waited over a minute, against a worst of 105 s, while the ward-to-ward journeys that dodge both busy floors stay away inside a minute on 94.6 % of rides. The cages need the hold. They do not need the peak."
+      },
+      "budgetUnits": 10,
+      "repairs": [
+        {
+          "id": "delivery-window",
+          "role": "diagnosed",
+          "name": "A delivery window in the porters' rota",
+          "costUnits": 1,
+          "effect": "The cages move before the clinics open, and the two big cars return to standard door timing for the day. The 15 waits over a minute are the target, and the price is a rota.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "D",
+                    "E"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 3,
+                    "dwellHallCallS": 5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "lock-one-car-to-goods",
+          "role": "costly-fix",
+          "name": "Lock one big car to goods all day",
+          "costUnits": 6,
+          "effect": "One trolley car carries cages and nothing else, between the lower ground and the entrance. The other keeps its twenty-five-second hold, and the passenger group is a car short.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "LG",
+                    "G",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "E",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "goods",
+                  "name": "Goods car",
+                  "servesFloors": [
+                    "LG",
+                    "G"
+                  ],
+                  "cars": [
+                    {
+                      "id": "D",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "quicker-passenger-doors",
+          "role": "cheap-fix",
+          "name": "Quicker doors on the three passenger cars",
+          "costUnits": 3,
+          "effect": "A second and a half off the smaller cars' stops moves the 21.1 s mean a little. The letter is about the two cars that stand open, and they still do.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "A",
+                    "B",
+                    "C"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "goods-lift",
+          "role": "new-shaft",
+          "name": "A goods lift in its own shaft · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "The cages leave the passenger group for good. That is a capital conversation with the owner — the rota buys most of it for one unit.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "D",
+                  "id": "F"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The cages moved; the peak stayed.",
+        "body": "Deliveries finish before the clinics open, and the two big cars spend the day carrying people at people's timing. Nothing was bought but an earlier alarm clock."
+      }
+    },
+    {
+      "id": "one-start-time",
+      "name": "One start time for seventeen hundred",
+      "buildingId": "midtown-office",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260938",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 3.7
+      },
+      "asBuilt": {
+        "note": "Seventeen hundred desks, four cars, and one contractual start time for every tenant in the tower. The fault is in how it is configured, not in what it is made of.",
+        "patch": {}
+      },
+      "complaint": {
+        "text": "If you are not through the doors by ten to nine you are late, whatever time you left home. The lobby at nine is the whole building arriving at once.",
+        "complainer": "office manager, floor 16",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute boarding at the lobby",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "G"
+            ]
+          }
+        }
+      },
+      "symptom": "a lobby queue that outgrows four cars every morning at nine",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute boarding at the lobby",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the lobby",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the lobby",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Journeys starting upstairs away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The demand arrives faster than any four-car group can clear it. This is the case where the crowd, not the kit, is wrong.",
+        "reasoning": "Four cars leave the lobby loaded and still 21 of 84 lobby boardings waited over a minute, against a 107 s worst. The journeys that start upstairs ride untroubled — away inside a minute on 95.0 % of 141 of them — because the problem is not the machinery: it is that nine floors of tenants share one start time. No standing order clears a queue that arrives all at once."
+      },
+      "budgetUnits": 11,
+      "repairs": [
+        {
+          "id": "stagger-the-starts",
+          "role": "diagnosed",
+          "name": "Stagger the tenancy start times",
+          "costUnits": 2,
+          "effect": "The nine upper-floor tenants spread their starts across the half hour, and this run watches the first cohort arrive into the same four cars. The 21 waits over a minute are the target, and the price is a memo.",
+          "patch": {
+            "building": {
+              "floorPopulations": [
+                {
+                  "floorIds": [
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20"
+                  ],
+                  "population": 30
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "destination-panels",
+          "role": "costly-fix",
+          "name": "Destination panels in the lobby",
+          "costUnits": 10,
+          "effect": "Panels group the nine o'clock crowd by floor before it boards. Whether that clears the 107 s worst is a bench question — the crowd is still seventeen hundred desks on one clock.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "callType": "destination-entry",
+                "passengerAssignment": "panel"
+              }
+            }
+          }
+        },
+        {
+          "id": "trim-the-dwell",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell across the group",
+          "costUnits": 2,
+          "effect": "A second and a half off every stop moves the 32.8 s mean a little. The queue is the start time, not the doors.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fifth-car",
+          "role": "new-shaft",
+          "name": "A fifth car · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "More steel against a twenty-minute crush that a memo dissolves. That is a capital conversation, and the owner will ask about the memo first.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "D",
+                  "id": "E"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "Three start times instead of one.",
+        "body": "The same desks, spread across the half hour. The four cars that lost every morning now clear each cohort as it comes, and nothing in the machine room was touched."
+      }
+    },
+    {
+      "id": "every-letter-says-nine",
+      "name": "Every letter says nine o'clock",
+      "buildingId": "st-jude-hospital",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260939",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 9
+      },
+      "asBuilt": {
+        "note": "Outpatients runs every clinic from the first floor, and every appointment letter in the building says nine o'clock — seven hundred of them. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "floorPopulations": [
+              {
+                "floorIds": [
+                  "1"
+                ],
+                "population": 700
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "At nine the first-floor landing is a wall of people, sticks and pushchairs, all wanting the same three minutes of lift. By ten it is a corridor again.",
+        "complainer": "clinic coordinator, first floor",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute leaving outpatients",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "1"
+            ]
+          }
+        }
+      },
+      "symptom": "seven hundred appointment letters, one printed time",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute leaving outpatients",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait leaving outpatients",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at outpatients",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the hospital away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "Every clinic lists for nine o'clock, so seven hundred people pass through outpatients in the same short window — and the landing pays for the print run.",
+        "reasoning": "The group carries the rest of the hospital well: 95.5 % of 264 other journeys are away inside a minute. Outpatients is another story — 10 of the 91 journeys leaving it waited over a minute, one of them 114 s — because the lifts are meeting a surge the letters invented. Print half the letters with half past nine on them, and the surge halves with the paper."
+      },
+      "budgetUnits": 13,
+      "repairs": [
+        {
+          "id": "reprint-the-letters",
+          "role": "diagnosed",
+          "name": "List half the clinics for half past nine",
+          "costUnits": 2,
+          "effect": "Three hundred keep the nine o'clock slot and the rest move to the later one; this run watches the nine o'clock cohort. The 10 waits over a minute are the target, and the price is a print run.",
+          "patch": {
+            "building": {
+              "floorPopulations": [
+                {
+                  "floorIds": [
+                    "1"
+                  ],
+                  "population": 300
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "split-the-group",
+          "role": "costly-fix",
+          "name": "Send more than one car when a clinic empties",
+          "costUnits": 8,
+          "effect": "When more than a carful stands on one landing, the group splits the crowd across cars instead of sending one. It fights the surge; the letters cause it — and the 114 s worst was a letter.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "assignmentMode": "split-demand",
+                "splitThresholdPassengers": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "trim-the-dwell",
+          "role": "cheap-fix",
+          "name": "Trim the door dwell across the group",
+          "costUnits": 3,
+          "effect": "A second and a half off every stop moves the 25.4 s mean a little. The nine o'clock wall is not a door.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "sixth-car",
+          "role": "new-shaft",
+          "name": "A sixth car · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "More steel against a surge the letters print twice a day. The owner will ask who wrote the letters.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "A",
+                  "id": "F"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "Half the letters now say half past.",
+        "body": "The same clinics, two sittings. The landing clears between them, and the group that lost to a print run beats the reprint without a bolt turned."
+      }
+    },
+    {
+      "id": "everyone-leaves-at-once",
+      "name": "Everyone leaves at once",
+      "buildingId": "crown-hotel",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20261232",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 6.5
+      },
+      "asBuilt": {
+        "note": "The ballroom floor is let to a conference of seven hundred, and when a session breaks they all press down within minutes — into a group configured for an ordinary hotel afternoon. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "floorPopulations": [
+              {
+                "floorIds": [
+                  "2"
+                ],
+                "population": 700
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "When the session breaks, seven hundred people want the street and the lifts arrive one at a time, already busy. The queue on our landing goes round the cloakroom.",
+        "complainer": "events manager, ballroom floor",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute from the ballroom down to the street",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin-to-destination",
+            "floorIds": [
+              "2"
+            ],
+            "destinationFloorIds": [
+              "G"
+            ]
+          }
+        }
+      },
+      "symptom": "a landing crowd of hundreds, served one carload at a time",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute, ballroom down to the street",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on that run",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on that run",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the house away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The group treats the let-out like an ordinary afternoon: ballroom calls queue for whichever cars come free, alongside every other call in the house.",
+        "reasoning": "The house itself is fine — 92.7 % of 259 other journeys are away inside a minute. The ballroom is not: 12 of its 59 street-bound journeys waited over a minute, the worst 117 s, because a crowd of hundreds boards through the same rank as the teatime traffic. One car, keyed to the ballroom run while the conference sits, is a setting."
+      },
+      "budgetUnits": 11,
+      "repairs": [
+        {
+          "id": "key-a-car-to-the-ballroom",
+          "role": "diagnosed",
+          "name": "Key one car to the ballroom run",
+          "costUnits": 0,
+          "effect": "One car serves the street and the ballroom and nothing else while the conference is in. The 12 waits over a minute are the target, and it is a setting.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "B1",
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23"
+                  ],
+                  "cars": [
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "S",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "ballroom",
+                  "name": "Ballroom car",
+                  "servesFloors": [
+                    "G",
+                    "2"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "destination-panels",
+          "role": "costly-fix",
+          "name": "Destination panels at reception",
+          "costUnits": 9,
+          "effect": "Panels sort the reception crowd by floor before boarding. The letter is the 117 s worst wait coming down, and panels stand on the wrong side of that ride.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "callType": "destination-entry",
+                "passengerAssignment": "panel"
+              }
+            }
+          }
+        },
+        {
+          "id": "hold-doors-longer",
+          "role": "cheap-fix",
+          "name": "Hold doors longer at busy landings",
+          "costUnits": 2,
+          "effect": "Cars leave the ballroom fuller — and every other landing waits behind the same held doors. It trades the 33.0 s mean around, not away.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellHallCallS": 7
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "sixth-lift",
+          "role": "new-shaft",
+          "name": "A sixth lift · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car serving every floor, which the let-out fills one carload at a time like the rest. A capital conversation — the keyed car is free.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "A",
+                  "id": "E"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The ballroom has its own car while the conference sits.",
+        "body": "One car runs street to ballroom and back, four keep the house, and a crowd of hundreds stops queueing behind the teatime traffic. Nothing was bought — a service range moved."
+      }
+    },
+    {
+      "id": "bed-cars-locked-out",
+      "name": "The bed cars locked out of theatres",
+      "buildingId": "st-jude-hospital",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20263037",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 9
+      },
+      "asBuilt": {
+        "note": "The two cars big enough for a bed were locked out of the surgical floors during last year's refurbishment, and the lockout was never lifted. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "banks": [
+              {
+                "id": "main",
+                "name": "Main bank",
+                "servesFloors": [
+                  "LG",
+                  "G",
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11"
+                ],
+                "cars": [
+                  {
+                    "id": "A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              },
+              {
+                "id": "beds",
+                "name": "Bed cars",
+                "servesFloors": [
+                  "G",
+                  "1",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11"
+                ],
+                "cars": [
+                  {
+                    "id": "D",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 1.75,
+                    "ratedLoadLb": 4000,
+                    "doorType": "sideOpening"
+                  },
+                  {
+                    "id": "E",
+                    "spec": "geared-traction",
+                    "ratedSpeedMps": 1.75,
+                    "ratedLoadLb": 4000,
+                    "doorType": "sideOpening"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "A patient for theatre waits while both bed cars sail past floors they are no longer allowed to serve. We move beds in whatever small car turns up.",
+        "complainer": "theatre porter, second floor",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute at the surgical floors",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "LG",
+              "2",
+              "3"
+            ]
+          }
+        }
+      },
+      "symptom": "the two bed cars pass the surgical floors without stopping",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute at the surgical floors",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the surgical floors",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the surgical floors",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the hospital away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The refurbishment lockout still stands: the two cars big enough for a bed serve every floor except imaging, theatres and critical care.",
+        "reasoning": "Three cars carry the surgical floors that five were meant to. 11 of 36 journeys starting there waited over a minute, one of them 125 s, while the rest of the hospital — with all five cars answering — stays away inside a minute on 94.7 % of 228 journeys. The lockout was a sensible fence around a building site. The site closed; the fence stayed."
+      },
+      "budgetUnits": 15,
+      "repairs": [
+        {
+          "id": "lift-the-lockout",
+          "role": "diagnosed",
+          "name": "Lift the refurbishment lockout",
+          "costUnits": 5,
+          "effect": "The surgical landing doors are re-certified and the bed cars serve their floors again. The 11 waits over a minute at the surgical floors are the target.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "LG",
+                    "G",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "beds",
+                  "name": "Bed cars",
+                  "servesFloors": [
+                    "LG",
+                    "G",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11"
+                  ],
+                  "cars": [
+                    {
+                      "id": "D",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    },
+                    {
+                      "id": "E",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "dedicate-to-beds",
+          "role": "costly-fix",
+          "name": "Dedicate the two bed cars to beds all day",
+          "costUnits": 9,
+          "effect": "The big cars serve only imaging, the entrance, theatres and critical care — and stop carrying the wards and outpatients at all. The 94.7 % everywhere else is what this spends.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "LG",
+                    "G",
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "beds",
+                  "name": "Bed cars",
+                  "servesFloors": [
+                    "LG",
+                    "G",
+                    "2",
+                    "3"
+                  ],
+                  "cars": [
+                    {
+                      "id": "D",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    },
+                    {
+                      "id": "E",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "quicker-bed-car-doors",
+          "role": "cheap-fix",
+          "name": "Quicker doors on the two bed cars",
+          "costUnits": 2,
+          "effect": "A second and a half off their stops, on the floors they still serve. The letter is about the floors they do not — and the 125 s worst is on one of those.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "D",
+                    "E"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "sixth-car",
+          "role": "new-shaft",
+          "name": "A sixth car for the surgical stack · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "A new shaft to give theatres what the lockout took. The lockout costs five units to lift, and it is the lockout that took it.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "A",
+                  "id": "F"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The bed cars stop at theatres again.",
+        "body": "Two landing doors re-certified and the lockout lifted: the cars that fit a bed serve the floors that move beds. The fence around a finished building site is gone."
+      }
+    },
+    {
+      "id": "two-cars-out-wrong-month",
+      "name": "Two cars out in the wrong month",
+      "buildingId": "secure-tower",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260842",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 3
+      },
+      "asBuilt": {
+        "note": "The upper-zone refit takes two of the three high cars out together, in the fullest month of the year. The scope of works is right; the calendar is not. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "banks": [
+              {
+                "id": "low",
+                "name": "Low bank",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15"
+                ],
+                "cars": [
+                  {
+                    "id": "A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  },
+                  {
+                    "id": "C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              },
+              {
+                "id": "high",
+                "name": "High bank",
+                "servesFloors": [
+                  "G",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20",
+                  "21",
+                  "22",
+                  "23",
+                  "24",
+                  "25",
+                  "26",
+                  "27",
+                  "28",
+                  "29",
+                  "30"
+                ],
+                "cars": [
+                  {
+                    "id": "F",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "They took two of our three lifts away for refurbishment in the busiest month we have. One car is carrying fifteen floors.",
+        "complainer": "building manager, floor 21",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute on the upper-zone journeys",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30"
+            ]
+          }
+        }
+      },
+      "symptom": "one car in service for the whole upper zone",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute on upper-zone journeys",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Low-zone journeys away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The refit is right and the timing is wrong: with two cars out together, the whole upper zone hangs on one.",
+        "reasoning": "19 of 40 upper-zone journeys waited over a minute, the worst 139 s, on a mean of 52.0 s to board — while the low zone, untouched by the works, is away inside a minute on 100.0 % of 72 journeys. The same scope of works, re-phased one car at a time, keeps two cars in service every day of it."
+      },
+      "budgetUnits": 14,
+      "repairs": [
+        {
+          "id": "rephase-the-works",
+          "role": "diagnosed",
+          "name": "Re-phase the refit — one car out at a time",
+          "costUnits": 4,
+          "effect": "The same works, twice the duration, two cars in service throughout. The 19 waits over a minute are the target, and the price is the contractor's re-mobilisation.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "low",
+                  "name": "Low bank",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "high",
+                  "name": "High bank",
+                  "servesFloors": [
+                    "G",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+                    "29",
+                    "30"
+                  ],
+                  "cars": [
+                    {
+                      "id": "E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "F",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "night-working",
+          "role": "costly-fix",
+          "name": "Pay for night working",
+          "costUnits": 12,
+          "effect": "The refit runs at night and all three upper cars are in service each morning. It works — at three times the price of re-phasing the 19 waits away.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "low",
+                  "name": "Low bank",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "high",
+                  "name": "High bank",
+                  "servesFloors": [
+                    "G",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+                    "29",
+                    "30"
+                  ],
+                  "cars": [
+                    {
+                      "id": "D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "F",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "borrow-a-low-car",
+          "role": "cheap-fix",
+          "name": "Lend a low-zone car to the upper zone",
+          "costUnits": 0,
+          "effect": "One low car re-ranges to the upper zone for the duration. The 100.0 % low-zone figure is the thing this spends.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "low",
+                  "name": "Low bank",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "high",
+                  "name": "High bank",
+                  "servesFloors": [
+                    "G",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+                    "29",
+                    "30"
+                  ],
+                  "cars": [
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "F",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "temporary-hoist",
+          "role": "new-shaft",
+          "name": "A temporary external hoist · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "Scaffold, a machine room in the yard, and a car on hire for the duration. The re-phased works cost four units.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "high",
+                  "copyCarId": "F",
+                  "id": "T"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "One car out, two cars on.",
+        "body": "The same refit, re-phased across the quiet months, and the upper zone keeps two cars every morning. The month of complaints becomes a longer, quieter works order."
+      }
+    },
+    {
+      "id": "every-deck-calls-itself-full",
+      "name": "Every deck calls itself full",
+      "buildingId": "vertical-city",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260844",
+        "durationS": 1500,
+        "arrivalRatePctPop5min": 4.5
+      },
+      "asBuilt": {
+        "note": "Eight double-deck shuttles link the street to the sky lobbies. At commissioning, each deck's load weighing was set to the car's plated figure divided by the eight cars of the bank — instead of by the two decks of the car. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "banks": [
+              {
+                "id": "shuttle",
+                "name": "Double-deck sky lobby shuttle",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "26",
+                  "27",
+                  "51",
+                  "52",
+                  "76",
+                  "77"
+                ],
+                "servesFloorPairs": [
+                  [
+                    "G",
+                    "2"
+                  ],
+                  [
+                    "26",
+                    "27"
+                  ],
+                  [
+                    "51",
+                    "52"
+                  ],
+                  [
+                    "76",
+                    "77"
+                  ]
+                ],
+                "cars": [
+                  {
+                    "id": "S1",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S2",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S3",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S4",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S5",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S6",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S7",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "S8",
+                    "spec": "ultra-high-speed",
+                    "ratedSpeedMps": 10.0,
+                    "ratedLoadLb": 1000,
+                    "ratedLoadLbPerDeck": 500,
+                    "doubleDeck": true,
+                    "deckSeparationM": 4.5,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  }
+                ]
+              },
+              {
+                "id": "zone-1-local",
+                "name": "Zone 1 local (opens at both ground lobby levels)",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ],
+                "cars": [
+                  {
+                    "id": "Z1-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z1-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z1-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z1-D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z1-E",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  }
+                ]
+              },
+              {
+                "id": "zone-2-local",
+                "name": "Zone 2 local (opens at both ground lobby levels)",
+                "servesFloors": [
+                  "G",
+                  "2",
+                  "15",
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20",
+                  "21",
+                  "22",
+                  "23",
+                  "24",
+                  "25"
+                ],
+                "cars": [
+                  {
+                    "id": "Z2-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z2-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z2-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z2-D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z2-E",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  }
+                ]
+              },
+              {
+                "id": "zone-3-local",
+                "name": "Zone 3 local (sky lobby A, lower level)",
+                "servesFloors": [
+                  "26",
+                  "28",
+                  "29",
+                  "30",
+                  "31",
+                  "32",
+                  "33",
+                  "34",
+                  "35",
+                  "36",
+                  "37",
+                  "38"
+                ],
+                "cars": [
+                  {
+                    "id": "Z3-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z3-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z3-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z3-D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  }
+                ]
+              },
+              {
+                "id": "zone-4-local",
+                "name": "Zone 4 local (sky lobby A, upper level)",
+                "servesFloors": [
+                  "27",
+                  "39",
+                  "40",
+                  "41",
+                  "42",
+                  "43",
+                  "44",
+                  "45",
+                  "46",
+                  "47",
+                  "48",
+                  "49",
+                  "50"
+                ],
+                "cars": [
+                  {
+                    "id": "Z4-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z4-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z4-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  },
+                  {
+                    "id": "Z4-D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 3.0,
+                    "ratedLoadLb": 3500,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.2
+                  }
+                ]
+              },
+              {
+                "id": "zone-5-local",
+                "name": "Zone 5 hotel local (sky lobby B, both levels)",
+                "servesFloors": [
+                  "51",
+                  "52",
+                  "53",
+                  "54",
+                  "55",
+                  "56",
+                  "57",
+                  "58",
+                  "59",
+                  "60",
+                  "61",
+                  "62",
+                  "63",
+                  "64",
+                  "65",
+                  "66",
+                  "67",
+                  "68",
+                  "69",
+                  "70",
+                  "71",
+                  "72",
+                  "73",
+                  "74",
+                  "75"
+                ],
+                "cars": [
+                  {
+                    "id": "Z5-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  },
+                  {
+                    "id": "Z5-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  },
+                  {
+                    "id": "Z5-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  },
+                  {
+                    "id": "Z5-D",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  },
+                  {
+                    "id": "Z5-E",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  },
+                  {
+                    "id": "Z5-F",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 4.0,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.5
+                  }
+                ]
+              },
+              {
+                "id": "zone-6-local",
+                "name": "Zone 6 residential local (sky lobby C, both levels)",
+                "servesFloors": [
+                  "76",
+                  "77",
+                  "78",
+                  "79",
+                  "80",
+                  "81",
+                  "82",
+                  "83",
+                  "84",
+                  "85",
+                  "86",
+                  "87",
+                  "88",
+                  "89",
+                  "90",
+                  "91",
+                  "92",
+                  "93",
+                  "94",
+                  "95",
+                  "96",
+                  "97",
+                  "98",
+                  "99",
+                  "100"
+                ],
+                "cars": [
+                  {
+                    "id": "Z6-A",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "Z6-B",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  },
+                  {
+                    "id": "Z6-C",
+                    "spec": "gearless-traction",
+                    "ratedSpeedMps": 2.5,
+                    "ratedLoadLb": 3000,
+                    "doorType": "centerOpening",
+                    "passengerTransferS": 1.75
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "The queue at the street watches shuttles leave half empty and call themselves full. A handful of people board and the doors close on the rest of us.",
+        "complainer": "commuter, street lobby",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute for a shuttle up from the street",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin-to-destination",
+            "floorIds": [
+              "G",
+              "2"
+            ],
+            "destinationFloorIds": [
+              "26",
+              "27",
+              "51",
+              "52",
+              "76",
+              "77"
+            ]
+          }
+        }
+      },
+      "symptom": "decks that stop boarding at a fraction of their plated load",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute for a shuttle up from the street",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait for a shuttle up",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait for a shuttle up",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the building away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "Each deck believes it is full at five hundred pounds — the plated four thousand divided by eight cars instead of by two decks — so the shuttles run the morning at a fraction of their design load.",
+        "reasoning": "Nothing mechanical is wrong: the cars run, the doors close, the climb is quick. But a deck that carries three where thirteen fit turns the street queue over slowly. 8 of 257 shuttle journeys up from the street waited over a minute against a 77 s worst, while the local zones above — whose cars weigh correctly — stay away inside a minute on 97.0 % of 867 journeys."
+      },
+      "budgetUnits": 16,
+      "repairs": [
+        {
+          "id": "recommission-the-weighing",
+          "role": "diagnosed",
+          "name": "Re-commission the load weighing to the plate",
+          "costUnits": 6,
+          "effect": "Every deck weighs against its own plated figure and boards its design load. The 8 waits over a minute are the target.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "shuttle",
+                  "name": "Double-deck sky lobby shuttle",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "26",
+                    "27",
+                    "51",
+                    "52",
+                    "76",
+                    "77"
+                  ],
+                  "servesFloorPairs": [
+                    [
+                      "G",
+                      "2"
+                    ],
+                    [
+                      "26",
+                      "27"
+                    ],
+                    [
+                      "51",
+                      "52"
+                    ],
+                    [
+                      "76",
+                      "77"
+                    ]
+                  ],
+                  "cars": [
+                    {
+                      "id": "S1",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S2",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S3",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S4",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S5",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S6",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S7",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "S8",
+                      "spec": "ultra-high-speed",
+                      "ratedSpeedMps": 10.0,
+                      "ratedLoadLb": 4000,
+                      "ratedLoadLbPerDeck": 2000,
+                      "doubleDeck": true,
+                      "deckSeparationM": 4.5,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-1-local",
+                  "name": "Zone 1 local (opens at both ground lobby levels)",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z1-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z1-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z1-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z1-D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z1-E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-2-local",
+                  "name": "Zone 2 local (opens at both ground lobby levels)",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23",
+                    "24",
+                    "25"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z2-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z2-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z2-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z2-D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z2-E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-3-local",
+                  "name": "Zone 3 local (sky lobby A, lower level)",
+                  "servesFloors": [
+                    "26",
+                    "28",
+                    "29",
+                    "30",
+                    "31",
+                    "32",
+                    "33",
+                    "34",
+                    "35",
+                    "36",
+                    "37",
+                    "38"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z3-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z3-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z3-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z3-D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-4-local",
+                  "name": "Zone 4 local (sky lobby A, upper level)",
+                  "servesFloors": [
+                    "27",
+                    "39",
+                    "40",
+                    "41",
+                    "42",
+                    "43",
+                    "44",
+                    "45",
+                    "46",
+                    "47",
+                    "48",
+                    "49",
+                    "50"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z4-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z4-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z4-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    },
+                    {
+                      "id": "Z4-D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3500,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.2
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-5-local",
+                  "name": "Zone 5 hotel local (sky lobby B, both levels)",
+                  "servesFloors": [
+                    "51",
+                    "52",
+                    "53",
+                    "54",
+                    "55",
+                    "56",
+                    "57",
+                    "58",
+                    "59",
+                    "60",
+                    "61",
+                    "62",
+                    "63",
+                    "64",
+                    "65",
+                    "66",
+                    "67",
+                    "68",
+                    "69",
+                    "70",
+                    "71",
+                    "72",
+                    "73",
+                    "74",
+                    "75"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z5-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    },
+                    {
+                      "id": "Z5-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    },
+                    {
+                      "id": "Z5-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    },
+                    {
+                      "id": "Z5-D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    },
+                    {
+                      "id": "Z5-E",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    },
+                    {
+                      "id": "Z5-F",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 4.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.5
+                    }
+                  ]
+                },
+                {
+                  "id": "zone-6-local",
+                  "name": "Zone 6 residential local (sky lobby C, both levels)",
+                  "servesFloors": [
+                    "76",
+                    "77",
+                    "78",
+                    "79",
+                    "80",
+                    "81",
+                    "82",
+                    "83",
+                    "84",
+                    "85",
+                    "86",
+                    "87",
+                    "88",
+                    "89",
+                    "90",
+                    "91",
+                    "92",
+                    "93",
+                    "94",
+                    "95",
+                    "96",
+                    "97",
+                    "98",
+                    "99",
+                    "100"
+                  ],
+                  "cars": [
+                    {
+                      "id": "Z6-A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "Z6-B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    },
+                    {
+                      "id": "Z6-C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 2.5,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening",
+                      "passengerTransferS": 1.75
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "regear-the-shuttles",
+          "role": "costly-fix",
+          "name": "Re-gear the shuttles for another half metre per second",
+          "costUnits": 10,
+          "effect": "Each climb is quicker, so the 77 s worst shortens — but the decks still close their doors at five hundred pounds, and the queue is at the doors.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "S1",
+                    "S2",
+                    "S3",
+                    "S4",
+                    "S5",
+                    "S6",
+                    "S7",
+                    "S8"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "trim-shuttle-dwell",
+          "role": "cheap-fix",
+          "name": "Trim the shuttle door dwell",
+          "costUnits": 2,
+          "effect": "A second and a half off each stop moves the 17.3 s mean a little. The doors are not the plate.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "S1",
+                    "S2",
+                    "S3",
+                    "S4",
+                    "S5",
+                    "S6",
+                    "S7",
+                    "S8"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "ninth-shuttle",
+          "role": "new-shaft",
+          "name": "A ninth shuttle · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car reading the same wrong plate would carry three more people at a time. That is a capital conversation, and the plate costs six units to fix.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "shuttle",
+                  "copyCarId": "S8",
+                  "id": "S9"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The decks board what they were built for.",
+        "body": "One number on the commissioning sheet, corrected: each deck weighs against its own plate, thirteen ride where three did, and the street queue turns over at the speed the machines always had."
+      }
+    },
+    {
+      "id": "restaurant-above-the-ballroom",
+      "name": "The restaurant above the ballroom",
+      "buildingId": "crown-hotel",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20261333",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 6.8
+      },
+      "asBuilt": {
+        "note": "The third floor was relaunched as a restaurant and spa doing three hundred covers, above a ballroom and a reception that already fill the rank at lunch. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "floorPopulations": [
+              {
+                "floorIds": [
+                  "3"
+                ],
+                "population": 300
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Guests leave lunch and stand on our landing watching loaded cars pass. The restaurant empties slower than we can seat it.",
+        "complainer": "restaurant manager, third floor",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute leaving the restaurant floor",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "3"
+            ]
+          }
+        }
+      },
+      "symptom": "a lunchtime landing served by whatever the rest of the house spares",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute leaving the restaurant floor",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait leaving the restaurant",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the restaurant",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the house away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The restaurant shares every car with the whole house at the house's busiest hour, and the house wins.",
+        "reasoning": "6 of 44 journeys leaving the restaurant floor waited over a minute, one of them 79 s, while the house around it runs at 94.5 % away inside a minute across 217 journeys. The trolley car can reach every podium floor; keyed to reception, ballroom and restaurant, it becomes the landing's own."
+      },
+      "budgetUnits": 12,
+      "repairs": [
+        {
+          "id": "key-the-service-car",
+          "role": "diagnosed",
+          "name": "Key the service car to the restaurant run",
+          "costUnits": 3,
+          "effect": "The trolley car serves reception, the ballroom and the restaurant and nothing else over service. The 6 waits over a minute are the target.",
+          "patch": {
+            "building": {
+              "banks": [
+                {
+                  "id": "main",
+                  "name": "Main bank",
+                  "servesFloors": [
+                    "B1",
+                    "G",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8",
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15",
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22",
+                    "23"
+                  ],
+                  "cars": [
+                    {
+                      "id": "A",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "B",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "C",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    },
+                    {
+                      "id": "D",
+                      "spec": "gearless-traction",
+                      "ratedSpeedMps": 3.0,
+                      "ratedLoadLb": 3000,
+                      "doorType": "centerOpening"
+                    }
+                  ]
+                },
+                {
+                  "id": "restaurant",
+                  "name": "Restaurant car",
+                  "servesFloors": [
+                    "G",
+                    "2",
+                    "3"
+                  ],
+                  "cars": [
+                    {
+                      "id": "S",
+                      "spec": "geared-traction",
+                      "ratedSpeedMps": 1.75,
+                      "ratedLoadLb": 4000,
+                      "doorType": "sideOpening"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "regear-guest-cars",
+          "role": "costly-fix",
+          "name": "Re-gear the four guest cars for another half metre per second",
+          "costUnits": 10,
+          "effect": "Every trip is quicker, so the 79 s worst shortens — but the restaurant still queues behind the whole house for every car.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "A",
+                    "B",
+                    "C",
+                    "D"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "hold-doors-longer",
+          "role": "cheap-fix",
+          "name": "Hold doors longer at the lunch landings",
+          "costUnits": 2,
+          "effect": "Cars leave fuller and stop longer everywhere; it moves the 28.7 s mean around rather than away.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellHallCallS": 7
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "restaurant-lift",
+          "role": "new-shaft",
+          "name": "A dedicated restaurant lift · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "Its own shaft, its own doors, its own queue. The service car does the same run for three units.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "D",
+                  "id": "E"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The trolley car waits tables now.",
+        "body": "Keyed to the podium, the service car turns the restaurant landing over between its cage runs, and the four guest cars keep the house. Nothing was built; a range was drawn."
+      }
+    },
+    {
+      "id": "controller-sends-every-car",
+      "name": "The controller that sends every car",
+      "buildingId": "mixed-use-high-rise",
+      "dispatcherProfileId": "eta",
+      "run": {
+        "seed": "20260840",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 5
+      },
+      "asBuilt": {
+        "note": "The tower cars answer the flats above the sky lobby, and the controller splits every waiting group across every car it can reach — press once, and whatever is free starts moving. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "dispatcher": {
+            "dispatch": {
+              "assignmentMode": "split-demand",
+              "splitThresholdPassengers": 1
+            }
+          }
+        }
+      },
+      "complaint": {
+        "text": "Press the button up here and you can watch two indicators start at once. One car takes you; the other arrives at an empty landing, turns round and goes back.",
+        "complainer": "resident, floor 40",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute at the tower flats",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "origin",
+            "floorIds": [
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "37",
+              "38",
+              "39",
+              "40",
+              "41",
+              "42",
+              "43",
+              "44",
+              "45",
+              "46",
+              "47",
+              "48",
+              "49",
+              "50",
+              "51",
+              "52",
+              "53",
+              "54",
+              "55",
+              "56",
+              "57",
+              "58",
+              "59",
+              "60"
+            ]
+          }
+        }
+      },
+      "symptom": "two cars answering where one was wanted",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute at the tower flats",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait at the flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board at the flats",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Offices and shuttles away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The controller splits even a two-person landing across two cars, so half the fleet's trips end at landings someone else has already cleared.",
+        "reasoning": "Sending everything is a setting — the splitting threshold on the commissioning sheet is one. Every wasted trip is a car that cannot answer the next call: 4 of 124 flat journeys waited over a minute against a 92 s worst, while the offices and shuttles below, on their own duty, are away inside a minute on 100.0 % of 427 journeys."
+      },
+      "budgetUnits": 11,
+      "repairs": [
+        {
+          "id": "one-car-per-call",
+          "role": "diagnosed",
+          "name": "One car per landing call",
+          "costUnits": 2,
+          "effect": "The controller sends the best-placed car and keeps the rest for the next button. The 4 waits over a minute are the target, and it is a setting the controller always had.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "assignmentMode": "single-car"
+              }
+            }
+          }
+        },
+        {
+          "id": "regear-tower-cars",
+          "role": "costly-fix",
+          "name": "Re-gear the four tower cars for another half metre per second",
+          "costUnits": 9,
+          "effect": "Every trip is quicker — including the empty ones behind the 92 s worst, of which there are just as many.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "R1",
+                    "R2",
+                    "R3",
+                    "R4"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "trim-tower-dwell",
+          "role": "cheap-fix",
+          "name": "Trim the tower cars' door dwell",
+          "costUnits": 1,
+          "effect": "A second and a half off every stop moves the 23.6 s mean a little. The empty trips are not doors.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "R1",
+                    "R2",
+                    "R3",
+                    "R4"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fifth-tower-car",
+          "role": "new-shaft",
+          "name": "A fifth tower car · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "One more car for the controller to send along with all the others. A capital conversation — the setting costs two units.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "residential-local",
+                  "copyCarId": "R4",
+                  "id": "R5"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "One button, one car.",
+        "body": "The controller keeps its spare cars for the next call instead of the same one. Half the fleet stops arriving at cleared landings, and nothing was bought but an engineer's afternoon."
+      }
+    },
+    {
+      "id": "let-faster-than-the-lifts",
+      "name": "Let faster than the lifts can carry",
+      "buildingId": "secure-tower",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20260841",
+        "durationS": 1800,
+        "arrivalRatePctPop5min": 6.8
+      },
+      "asBuilt": {
+        "note": "A year of dense lettings put six hundred more people above an unchanged six-car group — a rise of 61 % on the population the two banks were sized for. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "building": {
+            "floorPopulations": [
+              {
+                "floorIds": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8"
+                ],
+                "population": 71
+              },
+              {
+                "floorIds": [
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14",
+                  "15"
+                ],
+                "population": 55
+              },
+              {
+                "floorIds": [
+                  "16",
+                  "17",
+                  "18",
+                  "19",
+                  "20",
+                  "21",
+                  "22"
+                ],
+                "population": 58
+              },
+              {
+                "floorIds": [
+                  "23",
+                  "24",
+                  "25",
+                  "26",
+                  "27",
+                  "28",
+                  "29"
+                ],
+                "population": 42
+              },
+              {
+                "floorIds": [
+                  "30"
+                ],
+                "population": 19
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Nothing changed about the lifts. What changed is that there are six hundred more of us, and the morning knows it.",
+        "complainer": "tenant representative, floor 19",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute on journeys through the lobby",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "G"
+            ]
+          }
+        }
+      },
+      "symptom": "a lobby sized for a smaller building than the one above it",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute on journeys through the lobby",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on those journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Floor-to-floor journeys away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "The group is genuinely undersized for the tower it now serves. Configuration buys the morning back; only a new shaft buys more.",
+        "reasoning": "32 of 349 lobby journeys waited over a minute against a 113 s worst. Between floors — the journeys that never touch the lobby — the building still works: away inside a minute on 92.9 % of 14 such journeys. The new tenants agreed staggered starts as a term of their leases; invoking that clause moves their arrivals out of the shared peak, and this run watches the morning it leaves behind. What it does not buy is growth: the next letting starts a capital conversation."
+      },
+      "budgetUnits": 16,
+      "repairs": [
+        {
+          "id": "invoke-staggered-starts",
+          "role": "diagnosed",
+          "name": "Invoke the staggered-starts clause",
+          "costUnits": 3,
+          "effect": "The new tenants take the later start their leases already allow, and this run watches the original population's morning. The 32 waits over a minute are the target.",
+          "patch": {
+            "building": {
+              "floorPopulations": [
+                {
+                  "floorIds": [
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                    "6",
+                    "7",
+                    "8"
+                  ],
+                  "population": 44
+                },
+                {
+                  "floorIds": [
+                    "9",
+                    "10",
+                    "11",
+                    "12",
+                    "13",
+                    "14",
+                    "15"
+                  ],
+                  "population": 34
+                },
+                {
+                  "floorIds": [
+                    "16",
+                    "17",
+                    "18",
+                    "19",
+                    "20",
+                    "21",
+                    "22"
+                  ],
+                  "population": 36
+                },
+                {
+                  "floorIds": [
+                    "23",
+                    "24",
+                    "25",
+                    "26",
+                    "27",
+                    "28",
+                    "29"
+                  ],
+                  "population": 26
+                },
+                {
+                  "floorIds": [
+                    "30"
+                  ],
+                  "population": 12
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "destination-panels",
+          "role": "costly-fix",
+          "name": "Destination panels in the lobby",
+          "costUnits": 13,
+          "effect": "Panels group the crowd by destination before it boards a car. Whether that moves the 22.3 s mean is a bench question; the free clause is not.",
+          "patch": {
+            "dispatcher": {
+              "dispatch": {
+                "callType": "destination-entry",
+                "passengerAssignment": "panel"
+              }
+            }
+          }
+        },
+        {
+          "id": "reactive-dwell",
+          "role": "cheap-fix",
+          "name": "A dwell that reacts to what is boarding",
+          "costUnits": 4,
+          "effect": "Doors that close when boarding stops, instead of on a timer. It shaves at the 22.3 s mean; it does not shrink the crowd.",
+          "patch": {
+            "dispatcher": {
+              "answer": {
+                "dwellPolicy": "adaptive",
+                "dwellAdaptationGain": 0.3,
+                "maxDwellS": 8
+              }
+            }
+          }
+        },
+        {
+          "id": "seventh-shaft",
+          "role": "new-shaft",
+          "name": "A seventh shaft · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "The honest end of this case: the clause buys this morning back, and the building's growth eventually buys concrete. That is the owner's conversation, at a capital price.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "high",
+                  "copyCarId": "F",
+                  "id": "H"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "The clause bought the morning back.",
+        "body": "The staggered starts the leases always allowed take six hundred arrivals out of the shared peak, and the six cars are enough for the building they were sized for. The next letting reopens this file, and its first page says shaft."
+      }
+    },
+    {
+      "id": "gym-on-the-top-floor",
+      "name": "The gym on the top floor at seven",
+      "buildingId": "garden-apartments",
+      "dispatcherProfileId": "collective",
+      "run": {
+        "seed": "20261643",
+        "durationS": 2700,
+        "arrivalRatePctPop5min": 9.5
+      },
+      "asBuilt": {
+        "note": "The top floor became the residents' gym in January, and the block's two cars still spend every idle moment parked at the front door, the way they were set when the building opened. The fault is in how it is configured, not in what it is made of.",
+        "patch": {
+          "dispatcher": {
+            "idle": {
+              "parkingStrategy": "lobby"
+            }
+          },
+          "building": {
+            "floorPopulations": [
+              {
+                "floorIds": [
+                  "6"
+                ],
+                "population": 72
+              }
+            ]
+          }
+        }
+      },
+      "complaint": {
+        "text": "Half the block goes up to the gym at seven while the other half goes down to work, and both halves wait for cars that are sitting at the door downstairs.",
+        "complainer": "resident, floor 5",
+        "measure": {
+          "kind": "long-waits",
+          "label": "waits over a minute to or from the top floor",
+          "thresholdS": 60,
+          "scope": {
+            "mode": "touches",
+            "floorIds": [
+              "6"
+            ]
+          }
+        }
+      },
+      "symptom": "gym journeys waiting for cars parked at the door",
+      "figures": [
+        {
+          "kind": "complaint",
+          "label": "Waits over a minute to or from the top floor",
+          "reading": "bad"
+        },
+        {
+          "kind": "scope-worst-wait",
+          "label": "Worst wait on gym journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "scope-mean-wait",
+          "label": "Mean wait to board on gym journeys",
+          "reading": "mid"
+        },
+        {
+          "kind": "rest-away-pct",
+          "label": "Rest of the block away inside a minute",
+          "reading": "healthy"
+        }
+      ],
+      "diagnosis": {
+        "text": "Idle cars home to the front door — which was right until the letting on the roof changed where the mornings happen.",
+        "reasoning": "All 3 waits over a minute on top-floor journeys began with both cars standing at the door, the worst of them 80 s of watching the indicator climb. The rest of the block still rides well — away inside a minute on 94.7 % of 57 journeys — because the door is where its calls start. The gym's are the other end of the shaft."
+      },
+      "budgetUnits": 10,
+      "repairs": [
+        {
+          "id": "park-at-the-top",
+          "role": "diagnosed",
+          "name": "Park the idle cars at the top floor",
+          "costUnits": 0,
+          "effect": "An idle car waits at the gym floor and meets the morning where it starts. The 3 waits over a minute are the target, and it is a setting.",
+          "patch": {
+            "dispatcher": {
+              "idle": {
+                "parkingStrategy": "fixed-floor",
+                "parkingFloorIndex": 6
+              }
+            }
+          }
+        },
+        {
+          "id": "replant-the-machines",
+          "role": "costly-fix",
+          "name": "Re-plant both machines for another half metre per second",
+          "costUnits": 8,
+          "effect": "Every climb is quicker, so the 80 s worst shortens — but the cars still start every gym run from the front door.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "A",
+                    "B"
+                  ],
+                  "set": {
+                    "ratedSpeedDeltaMps": 0.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "shorter-door-hold",
+          "role": "cheap-fix",
+          "name": "Shorten the door hold at every landing",
+          "costUnits": 1,
+          "effect": "A second off each stop moves the 30.9 s mean a little. The wait in the letter is a parked car, not a door.",
+          "patch": {
+            "building": {
+              "cars": [
+                {
+                  "carIds": [
+                    "*"
+                  ],
+                  "set": {
+                    "dwellCarCallS": 2,
+                    "dwellHallCallS": 3.5
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "third-lift",
+          "role": "new-shaft",
+          "name": "A third lift · beyond a repair budget",
+          "costUnits": 34,
+          "effect": "A third car for six floors, parked at the door with the first two. That is a capital conversation with the owner, and the parking rule is free.",
+          "patch": {
+            "building": {
+              "addCars": [
+                {
+                  "bankId": "main",
+                  "copyCarId": "B",
+                  "id": "C"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "head": "A car sleeps at the gym now.",
+        "body": "The idle fleet waits where the morning begins instead of where the building opens its post. Nothing was bought: the cars were always enough, parked one letting out of date."
       }
     }
   ]
