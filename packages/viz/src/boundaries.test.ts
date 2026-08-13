@@ -222,9 +222,23 @@ const DOM_PATTERN = /\b(?:document|window|requestAnimationFrame|HTMLCanvasElemen
  *
  * Only `x.window`, `x.document` and friends are exempted, and the positive control below is what
  * proves the narrowing did not silence the two files that genuinely touch the DOM.
+ *
+ * **The second half, added when the first half proved incomplete.** Stripping *member access* left
+ * *member declaration* untouched, so `render/overlay.ts` — which declares `readonly window: string`
+ * for the very `RunSummary.window` the paragraph above is about — tripped the rule the paragraph
+ * above exists to stop it tripping. The field could be read as `x.window` and not declared, which
+ * is not a coherent rule about a codebase.
+ *
+ * So a declared name is stripped too, and the narrowing is kept tight by **where** the name sits:
+ * a property key or a declaration is preceded by a line start, `readonly`, `{`, `,` or `;`, and
+ * followed by `:` or `?:`. That deliberately excludes `cond ? window : other`, where `window` is a
+ * bare global in value position preceded by `?` — pinned in the negative control below, because a
+ * narrowing that swallowed the ternary would be a rule with a hole shaped exactly like a real use.
  */
 function stripMemberNames(text: string): string {
-  return text.replace(/\.\s*[A-Za-z_$][\w$]*/g, '.');
+  return text
+    .replace(/\.\s*[A-Za-z_$][\w$]*/g, '.')
+    .replace(/(^|[{,;]|\breadonly)(\s*)[A-Za-z_$][\w$]*(\s*\??\s*:)/gm, '$1$2$3');
 }
 
 /** Files whose job is to touch the outside world. */
@@ -342,7 +356,21 @@ describe('the DOM is confined to the dev entry point', () => {
     ]) {
       expect(DOM_PATTERN.test(stripMemberNames(caught)), caught).toBe(true);
     }
-    for (const allowed of ['summary.window.startS', 'result.summary.window', 'a.document.b']) {
+    // A ternary puts a bare global in value position with a colon after it, which is the shape the
+    // declaration half of the narrowing must not swallow. Pinned here rather than trusted.
+    for (const stillCaught of ['cond ? window : other', 'const x = ok ? document : null;']) {
+      expect(DOM_PATTERN.test(stripMemberNames(stillCaught)), stillCaught).toBe(true);
+    }
+    for (const allowed of [
+      'summary.window.startS',
+      'result.summary.window',
+      'a.document.b',
+      // The declaration half — `render/overlay.ts`'s own field, and the shapes it appears in.
+      'readonly window: string;',
+      '{ window: string }',
+      'interface X {\n  window: string;\n}',
+      'const view = { window: caption, other: 1 };',
+    ]) {
       expect(DOM_PATTERN.test(stripMemberNames(allowed)), allowed).toBe(false);
     }
   });
