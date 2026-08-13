@@ -66,6 +66,19 @@ import { railModel, sublineFor } from '../everyday/rail.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
+import {
+  stageAlarmOf,
+  stageBarModelOf,
+  stageCrowdCapOf,
+  stageHeaderOf,
+  stageInkFor,
+  stageInterventionsOf,
+  stageLegend,
+  STAGE_ABSENCES,
+  STAGE_INTERVENTIONS,
+  STAGE_NO_GHOST,
+  STAGE_RECOMPUTING,
+} from '../everyday/stageScreenModel.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS } from '../everyday/types.js';
 import type { GoalObservations } from '../shift/types.js';
 import {
@@ -123,7 +136,13 @@ import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type Floo
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
@@ -1201,6 +1220,9 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#switchDispatcherLabelOf',
+    'live/interventions.ts#SWITCH_PINS_NOTE',
+    'live/interventions.ts#RECOMPUTING_BEAT',
     'live/interventions.ts#interventionStampOf',
     'live/patternReadout.ts#patternReadoutAt',
   ],
@@ -1226,8 +1248,49 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    /*
+     * The strip's other two controls and its beat — the log's second and third change kinds.
+     *
+     * The switch label and both stamps are **parametric over words a player reads** — a dispatcher
+     * name and the chosen option's own sentence — so they are seeded from the case's own profile
+     * name rather than from a literal: the register rule this sweep exists to enforce is that no
+     * engine identifier reaches a player surface, and a label seeded with a hard-coded name would
+     * pass while the shipped one leaked an id. `dispatcherNameOf` is the same lookup the stage
+     * uses. The pin note and the `recomputing` beat are static, and enter beside the label they
+     * are shown with: the beat is what the stamp slot reads while a re-simulation is in flight,
+     * which is a state a player produces by pressing either control.
+     */
+    const switchTargetName = dispatcherNameOf(context);
+    seeds.push({
+      field: 'switchButton.label',
+      text: switchDispatcherLabelOf(switchTargetName),
+      role: 'label',
+    });
+    seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
+    seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
+    /*
+     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
+     * what keeps `interventionStampOf`'s temporal property met by construction.
+     */
+    const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
-      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      {
+        atS: recording.startedAt + third * 1.5,
+        change: {
+          kind: 'switch-dispatcher',
+          profile: { id: 'plain-baseline', name: switchTargetName, weights: {} },
+        } as const,
+      },
+      {
+        atS: recording.startedAt + third * 2,
+        change: {
+          kind: 'answer-incident',
+          option: 'call the fitter out now',
+          serviceEvents: [],
+        } as const,
+      },
     ];
     for (const at of sampleTimes(recording)) {
       const stamp = interventionStampOf(interventionLog, at);
@@ -7777,6 +7840,188 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       }
     }
 
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **GAMEPLAY § 7's stage** — Everyday Mode's own day screen, in the corpus.
+ *
+ * ## Why the whole header is driven at sampled playheads rather than once
+ *
+ * The three § 7.1 figures are folds *at the playhead*, and the temporal axis (§ D300's E-4,
+ * § D307) is the property that exists because two surfaces published a whole-run figure at a
+ * part-way one. So every figure below carries {@link atPlayhead}, and the sampling is
+ * `sampleTimes`' — the same instants every other playhead-driven surface is asked at, so a
+ * violation on this screen is comparable with one on the canvas.
+ *
+ * Both arms of each figure are driven where the arms exist: *away inside a minute* refuses before
+ * anybody has boarded (R13's rule — a share of nothing is not 100 %) and carries its `n` after,
+ * and *the longest anybody has stood* says `and counting` while its maximum belongs to somebody
+ * still standing. Sampling only the middle of a run would drive neither.
+ *
+ * ## What is seeded that a reader might not expect
+ *
+ * The **refusals**, all of them, on `role: 'reason'`: the intervention control's three grounds, the
+ * § 3.3 primary's three, and the ghost lane's. A refusal is the class of sentence this repository
+ * has twice found stale (§ D227), and the corpus is where a stale one is caught.
+ *
+ * `stageInkFor` and `STAGE_BAND_INK` are **covered without being seeded**, and that is a true claim
+ * rather than a gap: they answer in `#RRGGBB`, not in words, and `stageLegend()` — which is seeded —
+ * reads both. What a reader reads off the ramp is the legend's four plain-words rungs, and those are
+ * `live/bands.ts`' own `legendLabel`s, driven here for the first time on a paper-mode surface.
+ *
+ * `everyday/stageScreen.ts#STAGE_SCREEN` is **not** driven and is excluded in `derive.test.ts` on
+ * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. The split
+ * is the point: everything the screen *says* is here, and what the mount authors of its own is
+ * geometry, class names and two static captions.
+ */
+const EVERYDAY_STAGE: SurfaceAdapter = {
+  id: 'everyday/stageScreenModel.ts#stageHeaderOf',
+  covers: [
+    'everyday/stageScreenModel.ts#stageHeaderOf',
+    'everyday/stageScreenModel.ts#stageAlarmOf',
+    'everyday/stageScreenModel.ts#stageInterventionsOf',
+    'everyday/stageScreenModel.ts#stageBarModelOf',
+    'everyday/stageScreenModel.ts#stageCrowdCapOf',
+    'everyday/stageScreenModel.ts#stageLegend',
+    'everyday/stageScreenModel.ts#stageInkFor',
+    'everyday/stageScreenModel.ts#STAGE_BAND_INK',
+    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
+    'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
+    'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const { recording } = context;
+    const floorLabelOf = (id: string): string =>
+      recording.floors.find((floor) => floor.id === id)?.label ?? id;
+
+    for (const rung of stageLegend()) {
+      seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
+      /* Covered, not seeded — a hex is not a sentence. Called so the claim in `covers` is true. */
+      void stageInkFor(rung.id === 'breezy' ? 1 : 200);
+    }
+    for (const absence of STAGE_ABSENCES) {
+      seeds.push({ field: 'stage.absence', text: absence, role: 'reason' });
+    }
+    for (const arm of STAGE_INTERVENTIONS) {
+      seeds.push({
+        field: `stage.intervene.${arm.change.kind}.label`,
+        text: arm.label,
+        role: 'label',
+      });
+      seeds.push({
+        field: `stage.intervene.${arm.change.kind}.explains`,
+        text: arm.explains,
+        role: 'prose',
+      });
+    }
+    seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+
+    /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */
+    const capped = stageCrowdCapOf(412);
+    if (capped.overflow !== undefined) {
+      seeds.push({ field: 'stage.landing.overflow', text: capped.overflow, role: 'label' });
+    }
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const observations = observationsAt(recording, at);
+      const head = stageHeaderOf({
+        simTimeS: at,
+        recording,
+        observations,
+        driverName: 'the plain baseline',
+      });
+      seeds.push({
+        field: `stage(@${stamp}s).clock`,
+        text: head.clock,
+        role: 'label',
+        playhead: atPlayhead(recording, at),
+      });
+      seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
+      seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      for (const figure of head.figures) {
+        seeds.push({ field: `stage(@${stamp}s).figure.label`, text: figure.label, role: 'label' });
+        seeds.push({
+          field: `stage(@${stamp}s).figure(${figure.label}).value`,
+          text: figure.value,
+          role: 'observation',
+          /* R13: a ratio's `n` sits in its own box, and a count is its own `n`. */
+          countShown: figure.count !== undefined,
+          playhead: atPlayhead(recording, at),
+        });
+        if (figure.count !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).figure(${figure.label}).count`,
+            text: figure.count,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        if (figure.refusal !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).figure(${figure.label}).refusal`,
+            text: figure.refusal,
+            role: 'reason',
+          });
+        }
+      }
+
+      const alarm = stageAlarmOf(observations, floorLabelOf);
+      if (alarm !== undefined) {
+        seeds.push({
+          field: `stage(@${stamp}s).alarm`,
+          text: alarm,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+      }
+
+      const stamped = stageInterventionsOf({
+        interventions: [{ atS: recording.startedAt, change: { kind: 'park-cars-lobby' } }],
+        simTimeS: at,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+      });
+      if (stamped.stamp !== '') {
+        seeds.push({
+          field: `stage(@${stamp}s).intervene.stamp`,
+          text: stamped.stamp,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+      }
+    }
+
+    /* Every refusal both controls can produce, on the states the sampling above cannot reach. */
+    const interventionStates = [
+      ['no-run', { hasRun: false, dayClosed: false, recomputing: false }],
+      ['filed', { hasRun: true, dayClosed: true, recomputing: false }],
+      ['recomputing', { hasRun: true, dayClosed: false, recomputing: true }],
+    ] as const;
+    for (const [label, flags] of interventionStates) {
+      const view = stageInterventionsOf({
+        interventions: [],
+        simTimeS: recording.startedAt,
+        ...flags,
+      });
+      if (view.refusal !== undefined) {
+        seeds.push({ field: `stage.intervene(${label}).refusal`, text: view.refusal, role: 'reason' });
+      }
+      const bar = stageBarModelOf({ screen: 'stage', ctx: 'daily' }, flags);
+      if (bar.note !== undefined) {
+        seeds.push({ field: `stage.bar(${label}).note`, text: bar.note, role: 'reason' });
+      }
+      seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
+    }
+    seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+
     return singleRun(this.id, seeds);
   },
 };
@@ -7837,6 +8082,10 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
   RACE_STRIP,
   WATCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 7's Everyday stage. Its
+  // header figures share wordings with the live rail's, so an earlier slot would move every
+  // rail-shaped fault onto this surface.
+  EVERYDAY_STAGE,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.

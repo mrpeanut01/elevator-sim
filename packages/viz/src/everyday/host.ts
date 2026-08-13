@@ -28,14 +28,26 @@
  *
  * - **no dispatcher or building setter** — the door screen's *pick who drives* writes through
  *   `dev/state.ts#withDispatcher`/`withBuilding`, and the lane that builds that screen adds the
+
  *   action beside its control. {@link EverydayHost.runCampaignDay} is **not** that setter: it
  *   writes both ids *and* presses run, as one indivisible campaign press, so a screen cannot use
  *   it to change the standing selection without running the day it belongs to;
  * - ~~no campaign works booking, no contract acceptance~~ — **built**: {@link EverydayHost.campaign}
  *   and {@link EverydayHost.campaignAct} are GAMEPLAY § 8's three screens' whole surface, and the
  *   career they read is described in `campaign/career.ts`;
- * - **no transport control** (pause, speed, seek) and no `playing` flag — the § 7 Everyday stage's,
- *   when it exists; the handed-off Engineer stage owns its own transport today;
+ * - **no transport control** (pause, speed, seek) and no `playing` flag — **and this absence is now
+ *   a decision rather than a gap.** The § 7 Everyday stage exists (`everyday/stageScreen.ts`) and it
+ *   owns its own transport: {@link EverydayHost.recording} hands it the finished recording, which is
+ *   plain data, and it constructs its own `Playback` over it. A transport *method* here would be a
+ *   second clock — the Engineer surface has one and the stage has one, and a façade that let either
+ *   drive the other is how the two get to disagree about where the playhead is. What does cross is
+ *   the one place they must agree: {@link EverydayHost.intervene} takes the caller's playhead
+ *   explicitly, and `dev/main.ts` seeks its own transport to it, so an intervention stamped on the
+ *   Everyday stage lands at the instant the Everyday stage was showing;
+ * - **no second recording, so no § 7.4 ghost** — `dev/ghostRun.ts` builds a rival inside the
+ *   Engineer closure, and nothing here reaches it. The stage draws `raceStripViewOf`'s *nobody* arm
+ *   and names the absence (`everyday/stageScreenModel.ts#STAGE_NO_GHOST`); a ghost method with no
+ *   rival behind it would be worse than none;
  * - **no watch entry** — § 14's spectator flow has no Everyday surface yet;
  * - **no saved-pattern or saved-building shelves** — no listed screen reads them.
  *
@@ -50,6 +62,7 @@
 import type {
   BuildingConfig,
   DispatcherProfile,
+  RunInterventionConfig,
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
@@ -60,6 +73,7 @@ import {
   type CampaignAction,
   type CampaignCareer,
 } from '../campaign/career.js';
+import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
   allBuildingIds,
@@ -189,6 +203,34 @@ export interface EverydayHost {
     readonly open: boolean;
   };
 
+  /**
+   * The finished recording on the stage, or `undefined` before any run has landed.
+   *
+   * Plain data, on this façade's own rule: a `VizRecording` already crosses a structured clone on
+   * its way out of `dev/shiftWorker.ts`, so handing one to a screen adds no coupling that the
+   * worker seam does not already require. A screen replays it with its own `Playback`; nothing live
+   * crosses.
+   *
+   * **Identity is the signal a screen watches.** The object is replaced wholesale on every run —
+   * a new day, a retry, and an {@link intervene} re-simulation all produce a new one — so a screen
+   * that keeps the last reference knows a fresh recording has arrived by `!==` and nothing else.
+   * `runId` is *not* that signal: § 1.4's re-simulation is the same run's record growing.
+   */
+  recording(): VizRecording | undefined;
+
+  /**
+   * Where the run on the stage starts on the clock, seconds since midnight, or `undefined` when
+   * its template declares no hour.
+   *
+   * Passed straight through to `live/timeline.ts#clockAt`, which owns the `DAY_START_S` fallback —
+   * so a screen never restates 06:00 and the stage's clock, the intervention stamp and the Engineer
+   * transport's ruler can never disagree about what `09:14` means.
+   */
+  dayStartS(): number | undefined;
+
+  /** Today's intervention log, in press order — § 1.4's `run = (seed, config, interventions[])`. */
+  interventions(): readonly RunInterventionConfig[];
+
   /* -------------------------------------------------------------- actions */
 
   /**
@@ -213,6 +255,24 @@ export interface EverydayHost {
    * fact.
    */
   openTomorrow(): void;
+
+  /**
+   * § 7.6's intervention: append `change` to today's record at `atS` and re-simulate from t = 0.
+   *
+   * **The playhead is the caller's, and that is the whole reason it is a parameter.** The Everyday
+   * stage runs its own transport (see the module docstring), so the shell's playhead and the stage's
+   * are two numbers; stamping at the wrong one would put a change at an instant the player was not
+   * looking at. `dev/main.ts` appends at `atS` and seeks its own transport there once the run lands,
+   * which is what makes the two agree afterwards rather than by luck.
+   *
+   * A no-op while no run is on the stage — there is no record to grow — and the screen's control is
+   * expected to refuse on the same fact rather than relying on this.
+   *
+   * The re-simulated prefix is bit-identical by construction (`sim/interventions.test.ts`), so the
+   * picture does not jump; only the future changes. The run lands as a {@link subscribe}
+   * notification with a **new** {@link recording} object, which is how a screen knows to re-seek.
+   */
+  intervene(atS: number, change: RunInterventionConfig['change']): void;
 
   /**
    * Write one plain lever — `mode/plainLevers.ts`'s seam, the identical route the Engineer
@@ -270,8 +330,19 @@ export interface EverydayHostBindings {
   runIsOwn(): boolean;
   /** § D232's flag: the player asked for play on purpose. */
   playerHasChosen(): boolean;
+  /**
+   * Where the run on the stage starts on the clock — the runner's `startOfDayS`, not a constant.
+   * `undefined` is the honest answer for a template that declares no hour.
+   */
+  dayStartS(): number | undefined;
   /** The latching run press — `MountContext.runShift`. */
   startRun(): void;
+  /**
+   * § 1.4's *record growing*: append at `atS`, re-run with cause `'intervention'`, and seek the
+   * shell's own transport to `atS` once the new recording is adopted. One implementation, shared
+   * with the Engineer stage's own button — two would be two different runs from one press.
+   */
+  intervene(atS: number, change: RunInterventionConfig['change']): void;
   /** `closeShift`, with all its gates. */
   closeDay(): void;
   /** Put the Engineer surface on its run tab — `MountContext.openTab('run')`. */
@@ -375,6 +446,9 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     },
     campaign: () => career,
     savedDispatchers: () => b.state().savedDispatchers,
+    recording: () => b.state().recording,
+    dayStartS: () => b.dayStartS(),
+    interventions: () => b.state().interventions,
     plainLevers: () => {
       const state = b.state();
       return plainLeversOf(state.dispatcherSpec, state.levers);
@@ -394,6 +468,12 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
     },
     closeDay: () => {
       b.closeDay();
+    },
+    intervene: (atS, change) => {
+      // Gated here as well as on the control, because the record cannot grow before it exists and
+      // a façade that appended to nothing would produce a run of a day nobody watched.
+      if (b.state().recording === undefined) return;
+      b.intervene(atS, change);
     },
     openTomorrow: () => {
       const state = b.state();

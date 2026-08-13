@@ -233,20 +233,46 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
       : `${String(state.outOfServiceCarIds.length)} car(s) are held out of service, and nothing in a selection holds one`,
 
   /**
-   * The intervention log — Everyday Mode's run record, on `outOfServiceCarIds`' exact footing.
+   * The intervention log — Everyday Mode's run record, on `outOfServiceCarIds`' exact footing,
+   * and **a refusal about the wire, not about the log**. Contract § 1.4 is explicit that an
+   * intervention never invalidates a run, and the product now honours that where the record can
+   * actually travel: a filed day's `WatchRecord` carries the log
+   * (`watch/record.ts#WATCH_RECORD_CARRIES`) and the reproduction gate replays it, so an
+   * intervened day banks, files and re-verifies exactly as an untouched one does. What stays
+   * refused is this surface alone — the leaderboard submission and the CLI line.
    *
    * The empty log carries: `shiftRunConfigOf` writes no `interventions` key for it, and `core`
    * pins that run byte-identical to one built before the field existed. A non-empty log does
-   * not — no field of `RunSubmission`, no CLI flag and no deep-link parameter expresses one —
-   * and the consequence is the contract's own replay-verification clause pointed the other way:
-   * the server would re-simulate the seed *without* the log, get different legs, and refuse an
-   * honest run as `metrics-do-not-reproduce`. When the wire grows a field for the record
-   * (contract § 1.4 says it must, for spectating), this arm is the one that comes back out.
+   * not, on two grounds that must not be conflated because only one of them is temporary:
+   *
+   * 1. **No field of `RunSubmission`, no CLI flag and no deep-link parameter expresses a log.**
+   *    The consequence is the contract's replay-verification clause pointed the other way: the
+   *    server would re-simulate the seed *without* the log, get different legs, and refuse an
+   *    honest run as `metrics-do-not-reproduce`. For `park-cars-lobby` and `answer-incident`
+   *    entries — plain scalars — this is a missing field, and the day the wire grows one this
+   *    ground comes back out.
+   * 2. **A `switch-dispatcher` entry carries a whole weight vector inline**, and
+   *    `submission.ts`'s founding rule is *ids rather than inline objects* — a submission
+   *    carrying its own vector is the same cheat as one carrying its own two-floor tower with
+   *    sixteen cars, posted to a board keyed by the dispatcher it only started under. That
+   *    ground is structural: the wire could only ever carry a switch as a *shipped profile id*
+   *    resolved against the server's own `data/`, which is a different field from the one the
+   *    arm needs locally (the viewer's driving profile is routinely a derived object no id
+   *    resolves — see `core`'s `InterventionChange` docstring).
+   *
+   * The message names the second ground only when the log actually contains a switch, because a
+   * refusal citing a cheat the player did not make is the accusation-shaped defect this module
+   * exists to avoid.
    */
-  interventions: (state) =>
-    state.interventions.length === 0
-      ? undefined
-      : `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, and no selection or submission carries an intervention log — a replay without it is a different run`,
+  interventions: (state) => {
+    if (state.interventions.length === 0) return undefined;
+    const base =
+      `${String(state.interventions.length)} mid-run intervention(s) are on this day's record, ` +
+      'and no selection or submission carries an intervention log — a replay without it is a different run';
+    return state.interventions.some((entry) => entry.change.kind === 'switch-dispatcher')
+      ? `${base}; a mid-run dispatcher switch also carries its weight vector inline, which a submission of ids may never hold`
+      : base;
+  },
 
   /**
    * The Everyday rules — `interventions`' exact footing, one mechanism over.

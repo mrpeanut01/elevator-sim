@@ -134,6 +134,21 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/campaignScreens.ts#BUILDING_SCREEN',
         'everyday/campaignScreens.ts#CONTRACT_SCREEN',
         'everyday/campaignScreens.ts#campaignInputOf',
+        /*
+         * GAMEPLAY § 7's stage screen, on the mounts' shared ground and on the same split: its
+         * `mount` builds a canvas, sizes it from a bounding rect and drives a
+         * `requestAnimationFrame` loop, none of which exists under Node. Every **word** it draws —
+         * the clock, the phase pill, the three § 7.1 figures with their counts and their two
+         * refusals, the alarm sentence, the four legend rungs, the intervention labels and stamp,
+         * all three intervention refusals, the § 3.3 primary's three, the ghost-lane absence and
+         * the screen's own register — is authored in `everyday/stageScreenModel.ts`, which the
+         * `EVERYDAY_STAGE` adapter drives at `sampleTimes`' playheads and over every state the
+         * model distinguishes. What the mount authors of its own is geometry, class names, and two
+         * transport captions (`▶ Play`, the paused-at-the-start line), which reach only the static
+         * sweep below — weaker than driving them, and stated as a limitation rather than presented
+         * as coverage.
+         */
+        'everyday/stageScreen.ts#STAGE_SCREEN',
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
@@ -206,15 +221,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'The Everyday shell\'s boot seam: two CSS selectors and the console lines that fire when ' +
-        'one of them finds nothing. No player reads any of it. `ENGINEER_ROOT_SELECTOR` and the ' +
-        'two `ENGINEER_*` selectors are `document.querySelector` arguments — derived only because ' +
-        'the two-adjacent-words scanner reads `[data-menu-control="main.resume"]` as prose — and ' +
-        '`dismissEngineerMenu` and `closeEngineerMenuWhenReady` return a boolean and `void` ' +
-        'respectively. `bootEveryday`\'s own strings are the two `console.error` diagnostics, on ' +
-        'the same footing as the save diagnostics above: they name a selector that has gone stale, ' +
-        'for whoever is holding the source. The day one of them is drawn on a screen it stops ' +
-        'being excludable, exactly as `loadSession`\'s did.',
+        'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
+        'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
+        '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +
+        'reads `[data-menu-control="main.resume"]` as prose — and `dismissEngineerMenu`, ' +
+        '`closeEngineerMenuWhenReady` and `bootEveryday` return a boolean, `void` and the mounted ' +
+        'shell. **`ENGINEER_ROOT_SELECTOR` and the two `console.error` diagnostics left this entry ' +
+        'with the hand-off**: § 7\'s stage is a screen, so the shell insets nothing and boot has no ' +
+        'Engineer root to query and no hand-off at which to report a menu it could not close. The ' +
+        'day a string here is drawn on a screen it stops being excludable, exactly as ' +
+        '`loadSession`\'s did.',
       ids: [
         'everyday/boot.ts#ENGINEER_MENU_SELECTOR',
         'everyday/boot.ts#ENGINEER_RESUME_SELECTOR',

@@ -80,6 +80,7 @@ function harnessOf(
     dayClosed: boolean;
     runIsOwn: boolean;
     playerHasChosen: boolean;
+    dayStartS: number;
   }>,
 ): Harness {
   const calls: string[] = [];
@@ -95,8 +96,12 @@ function harnessOf(
       dayClosed: () => flags?.dayClosed ?? false,
       runIsOwn: () => flags?.runIsOwn ?? false,
       playerHasChosen: () => flags?.playerHasChosen ?? false,
+      dayStartS: () => flags?.dayStartS,
       startRun: () => {
         calls.push('startRun');
+      },
+      intervene: (atS, change) => {
+        calls.push(`intervene:${String(atS)}:${change.kind}`);
       },
       closeDay: () => {
         calls.push('closeDay');
@@ -262,6 +267,44 @@ describe('the run actions', () => {
       withheld: [],
       interventions: [],
     });
+  });
+
+  /**
+   * § 7's stage reads the run and grows its record through these four, and each is worth a case for
+   * a different reason: `recording` is what makes the stage possible at all, `dayStartS` is what
+   * stops two surfaces disagreeing about what `09:14` means, and `intervene` carries **the
+   * caller's** playhead — which is the whole reason it takes one.
+   */
+  it('hands back the recording on the stage, and the run’s own start hour', () => {
+    const h = harnessOf({ ...base(), recording: A_RECORDING }, { dayStartS: 9 * 3600 });
+    const host = createEverydayHost(h.bindings);
+    expect(host.recording()).toBe(A_RECORDING);
+    expect(host.dayStartS()).toBe(9 * 3600);
+    // `undefined` is the honest answer for a template that declares no hour — `clockAt` owns the
+    // fallback, so a screen never restates 06:00.
+    expect(createEverydayHost(harnessOf(base()).bindings).dayStartS()).toBeUndefined();
+    expect(createEverydayHost(harnessOf(base()).bindings).recording()).toBeUndefined();
+  });
+
+  it('reads the intervention log, and appends at the playhead the caller passed', () => {
+    const withRun: ViewerState = { ...base(), recording: A_RECORDING };
+    const h = harnessOf(withRun, { playheadS: 12 });
+    const host = createEverydayHost(h.bindings);
+    expect(host.interventions()).toEqual([]);
+    host.intervene(447, { kind: 'park-cars-lobby' });
+    /*
+     * **447, not 12.** The shell's own playhead is 12 here; the Everyday stage runs its own
+     * transport and passed 447. A façade that read `playheadS()` instead would stamp every Everyday
+     * intervention at whatever instant the Engineer surface happened to be paused at — a change
+     * filed at a moment nobody was looking at.
+     */
+    expect(h.calls).toEqual(['intervene:447:park-cars-lobby']);
+  });
+
+  it('refuses to grow a record that does not exist', () => {
+    const h = harnessOf(base(), { playheadS: 12 });
+    createEverydayHost(h.bindings).intervene(10, { kind: 'park-cars-lobby' });
+    expect(h.calls).toEqual([]);
   });
 
   it('subscribe is onChange’s passthrough, unsubscribe included', () => {

@@ -624,6 +624,35 @@ renaming it would migrate data to fix a caption. The boundaries, the palette, th
 apportionment are all untouched, and `waitLegendEntries`' range tooltip stays: a range is the thing
 a reader checks a count against, and the fourth entry is still the one that most needs checking.
 
+### 4.12 The dispatcher switch has one fixed target, and the stamp keeps the handoff's sentence
+
+**What the handoff says.** GAMEPLAY § 7.6's build order for interventions is *"park the cars in
+the lobby … then dispatcher switching"*, and its scope for the switch is **"any style or saved
+dispatcher, from the stage"**. The stamp's worked example is `09:14 · switched to Lobby anchor`.
+
+**What the product does.** The stamp is the handoff's sentence verbatim in shape — `switched to
+<name>`, `live/interventions.ts#stampVerbOf`, name and never id — so there is no copy deviation to
+record. The scope is deliberately narrower: the stage offers **one** switch target, the plain
+baseline (`dev/ghostRun.ts#plainBaselineOf`, § D134's own preference list), as a single button
+beside *Park the cars in the lobby*.
+
+**The constraint.** *Any style or saved dispatcher* needs a picker, and a picker on the stage is a
+surface with its own § 7.6 obligations — a disabled-state sentence per row, the no-op case per
+target, the saved-shelf's own refusals — that belongs to the Everyday stage lane, not to the
+mechanism lane that landed the arm. The core arm already carries **any** profile (it is the whole
+`DispatcherProfile`, inline, exactly as `SimulationConfig.dispatcherProfile` serialises it), so
+widening the control from one target to a picker is a viz-only change; nothing in the record's
+shape or the engine narrows with the button. The one-target slice is the same shape § 20.12
+prescribes for the log itself — *start with park … then switching* — applied one level down.
+
+**One rule the control keeps that the handoff implies but does not spell.** The button disables
+when pressing it would change nothing — and *nothing* is decided against the **vector actually
+driving** (`dev/state.ts#drivingProfileOf`, the same derivation the run itself uses), not against
+the profile id, because a lever-moved player handing the day back to the baseline is a real change
+under an equal id. A switch also stands the player's rules and pattern switching down for the rest
+of the day (the pin, `dispatch/policy.ts#adoptWeights`), and the control's title says so in words
+(`SWITCH_PINS_NOTE`) rather than leaving it to be deduced from a rule that stopped firing.
+
 ---
 
 ## 5 — Definition of done

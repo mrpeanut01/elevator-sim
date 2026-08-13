@@ -19,15 +19,27 @@
  * which is the temporal-dead-zone class of defect the guide's § 18 notes killed the prototype
  * with, twice.
  *
- * ## What "built" means, and the two screens the shell owns
+ * ## What "built" means, and the one screen the shell owns
  *
- * `menu` and `stage` appear in no table row and are built anyway: the menu is the shell's own
- * front door, and the stage is the hand-off that uncovers the Engineer surface (§ D335 — still
- * the Engineer stage with Casual copy, named in `EVERYDAY_SHELL_ABSENCES`, not § 7's stage).
+ * `menu` appears in no table row and is built anyway: it is the shell's own front door (§ 3.5).
  * {@link EVERYDAY_SCREENS_BUILT} is therefore *shell-owned ∪ registered*, derived from this file
  * at load, never hand-written — it is the constant `types.ts` promised with a `{@link}` for a
  * wave before it existed, which made that docstring a claim about nothing: this repository's
  * signature defect, in a link.
+ *
+ * ## `stage` was the second shell-owned key, and it is not any more
+ *
+ * § D335 made it one: the stage was the *hand-off*, a route that uncovered the Engineer surface and
+ * inset it beside the rail, so there was no module to register and the key was built by the shell
+ * saying so. That was honest and it was not § 7 — the register said as much in its own first line.
+ *
+ * `everyday/stageScreen.ts` is now § 7's stage, so `stage` is an ordinary registered screen and
+ * `SHELL_OWNED` is down to the menu alone. The consequence worth stating is that
+ * {@link EverydayRoute} lost its `'handoff'` arm **entirely**: it had exactly one producer, this
+ * file, and a route value nothing can return is the dead seam this repository keeps a count of. The
+ * Engineer surface is unchanged and still boots and runs behind the shell — what it no longer has
+ * is a door, which `shell.ts`'s {@link EVERYDAY_SHELL_ABSENCES} names rather than leaves to be
+ * discovered.
  */
 
 import type { ActionBarModel } from './actionBar.js';
@@ -35,6 +47,7 @@ import { BUILDING_SCREEN, CONTRACT_SCREEN, TOWERS_SCREEN } from './campaignScree
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
 import { SETTINGS_SCREEN } from './settingsScreen.js';
+import { STAGE_SCREEN } from './stageScreen.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_SCREENS } from './types.js';
 
@@ -83,6 +96,7 @@ export interface EverydayScreenModule {
  */
 const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModule>>> =
   Object.freeze({
+    stage: STAGE_SCREEN,
     towers: TOWERS_SCREEN,
     building: BUILDING_SCREEN,
     contract: CONTRACT_SCREEN,
@@ -90,8 +104,8 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     settings: SETTINGS_SCREEN,
   });
 
-/** The two screens the shell itself provides — see the module docstring. */
-const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'stage']);
+/** The one screen the shell itself provides — see the module docstring. */
+const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu']);
 
 /**
  * The honest subset of {@link EVERYDAY_SCREENS}: the keys a player can actually enter.
@@ -115,16 +129,19 @@ export function screenModuleFor(screen: EverydayScreen): EverydayScreenModule | 
 }
 
 /** How the shell routes a key. One decision, taken here so it can be tested without a document. */
-export type EverydayRoute = 'menu' | 'handoff' | 'screen' | 'refusal';
+export type EverydayRoute = 'menu' | 'screen' | 'refusal';
 
 /**
- * `menu` draws the shell's own front door; `stage` uncovers the Engineer surface; a registered
- * key mounts its module; everything else draws {@link unbuiltReasonFor}'s sentence — the honest
- * refusal, a sentence a player reads, never a blank screen.
+ * `menu` draws the shell's own front door; a registered key mounts its module; everything else
+ * draws {@link unbuiltReasonFor}'s sentence — the honest refusal, a sentence a player reads, never
+ * a blank screen.
+ *
+ * There were three arms until § 7's stage landed. See the module docstring for why the fourth —
+ * `'handoff'`, which uncovered the Engineer surface — was removed rather than left returning for
+ * nothing.
  */
 export function routeFor(screen: EverydayScreen): EverydayRoute {
   if (screen === 'menu') return 'menu';
-  if (screen === 'stage') return 'handoff';
   return SCREEN_MODULES[screen] !== undefined ? 'screen' : 'refusal';
 }
 

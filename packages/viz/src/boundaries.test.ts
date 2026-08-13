@@ -255,6 +255,13 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/settingsScreen.ts',
   /* GAMEPLAY § 8's three campaign screens — their words stay pure in campaignModel.ts. */
   'everyday/campaignScreens.ts',
+  /*
+   * The § 7 stage's DOM half — its words, its figures and its geometry stay pure in
+   * stageScreenModel.ts. It is the one Everyday file that also holds a `requestAnimationFrame`
+   * loop, which is the whole reason the split is drawn where it is: the transport belongs to the
+   * shell tier and everything a reader reads does not.
+   */
+  'everyday/stageScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
 ]);

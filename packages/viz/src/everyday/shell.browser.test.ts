@@ -194,11 +194,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * *nothing happens when you click* in the product; this is the second reading.
        */
       await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
     } finally {
       await page.close();
     }
@@ -275,11 +271,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     const page = await coldLoad();
     try {
       await page.locator('.everyday-bar-primary').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
     } finally {
       await page.close();
     }
@@ -342,48 +334,43 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
 });
 
 describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell", () => {
-  it('uncovers the stage beside the rail, and the run advances', async () => {
+  /**
+   * **The geometry this case used to assert is gone, and its absence is the assertion now.**
+   *
+   * It read a 212 px inset on `div.shell` and `engineerReachable: true` — the § D335 hand-off, where
+   * the shell shrank to the rail strip and put the Engineer surface beside it. § 7's stage is a
+   * screen (`everyday/stageScreen.ts`), so the shell keeps one geometry, the Engineer root stays
+   * covered and inert for its whole life, and the stage a player meets is drawn in the screen region
+   * like every other. What is kept is the half that was always the point: the rail says where the
+   * player is, and the day the stage asked for actually lands.
+   */
+  it('mounts § 7’s stage in the screen region, with the Engineer surface still covered', async () => {
     const page = await coldLoad();
     try {
       await page.locator('.everyday-mode[data-screen="stage"]').click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
-      /*
-       * The hand-off's geometry. The shell shrinks to the rail strip and insets the Engineer
-       * surface beside it rather than hiding it — a `display:none` ancestor would give the stage's
-       * canvases a zero box, which is why this reads a *width* and not just visibility.
-       */
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
-      const geometry = await page.evaluate(() => ({
+      const shown = await page.evaluate(() => ({
+        mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
         inset: document.querySelector<HTMLElement>('.shell')?.style.marginLeft,
         railWidth: document.querySelector('.everyday-rail')?.getBoundingClientRect().width,
         // The rail says where the player now is, rather than still saying YOU ARE HERE.
         subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
-        engineerReachable: document.querySelector<HTMLElement>('.shell')?.inert === false,
+        engineerCovered: document.querySelector<HTMLElement>('.shell')?.inert === true,
       }));
-      expect(geometry.inset).toBe('212px');
-      expect(geometry.railWidth).toBeGreaterThan(0);
-      expect(geometry.subline).toContain('MID-DAY');
-      expect(geometry.engineerReachable).toBe(true);
+      expect(shown.mainShown).toBe('grid');
+      expect(shown.inset).toBe('');
+      expect(shown.railWidth).toBeGreaterThan(0);
+      expect(shown.subline).toContain('MID-DAY');
+      expect(shown.engineerCovered).toBe(true);
 
-      // And the stage is a stage: press the button the surface's own copy names, and the run moves.
+      // And the stage is a stage: the day it asked for lands, and its transport says so.
       await page.waitForFunction(
-        () => {
-          const button = document.querySelector('#play-pause');
-          return button instanceof HTMLButtonElement && !button.disabled;
-        },
-        undefined,
-        { timeout: 30_000 },
-      );
-      await page.locator('#run').first().click();
-      await page.waitForFunction(
-        () => /\barrived\b/.test(document.querySelector('#status-line')?.textContent ?? ''),
+        () => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '',
         undefined,
         { timeout: 60_000 },
       );
+      expect(await page.textContent('.everyday-stage-clock')).toMatch(/^\d{2}:\d{2}$/u);
     } finally {
       await page.close();
     }
@@ -405,42 +392,34 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
      */
     const page = await coldLoad();
     try {
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
-
       await stashHost(page);
 
       /*
-       * **Before the player has asked for anything, nothing is open** — § D232's ground, driven.
-       * A full shift has already run under the menu (boot's own), it is on the stage, and it is
-       * this shell's own run; what it is not is a run the player started, so leaving it must not
-       * warn. This is the assertion that would fail if the latch were `hasRun && !dayClosed`.
+       * **Before the player has asked for anything, nothing is open** — § D232's ground, driven,
+       * and now driven *on the menu*, which is where it can still be observed. A full shift has
+       * already run under the menu (boot's own) and it is this shell's own run; what it is not is a
+       * run the player started. This is the assertion that would fail if the latch were
+       * `hasRun && !dayClosed`.
+       *
+       * It moved here because entering the stage **is** the player asking now: § 7's stage presses
+       * `startRun` on mount when no run of the player's own is open, which is what *Today's tower*
+       * means. Asserting it after the mount would be asserting that a press did not happen.
        */
       expect((await runStateOf(page)).open, 'boot’s own run armed the confirm strip').toBe(false);
 
-      // Start a run through the host — the same latching press as **Run this shift**.
-      await page.evaluate(() => {
-        (window as PageHostWindow).__everydayHost?.current()?.startRun();
-      });
+      await page.locator('.everyday-mode[data-screen="stage"]').click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
       /*
-       * Wait for that run to land, through the page's own statement about it: the coach's Run
-       * control **is** the cancel control while a run is in flight. Waiting for the round trip
-       * rather than only for the latch is what keeps the closing half below deterministic — a
-       * `closeDay` pressed while the worker was still simulating would file the recording on
-       * screen and then have `applyShift` clear the sheet out from under the assertion.
+       * Wait for the stage's own day to land, through the screen's own statement about it: the
+       * centred `Start` is up exactly when a recording has been adopted and the transport is paused
+       * at the beginning of it. Waiting for the round trip rather than only for the latch is what
+       * keeps the closing half below deterministic — a `closeDay` pressed while the worker was
+       * still simulating would file the recording on screen and then have `applyShift` clear the
+       * sheet out from under the assertion.
        */
       await page.waitForFunction(
-        () => document.querySelector('#run')?.textContent === 'Cancel this run',
-        undefined,
-        { timeout: 30_000 },
-      );
-      await page.waitForFunction(
-        () => document.querySelector('#run')?.textContent === 'Run this shift',
+        () => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '',
         undefined,
         { timeout: 120_000 },
       );
@@ -451,30 +430,31 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       expect(started.dayClosed).toBe(false);
       expect(started.open, 'the host did not report the player’s own run as open').toBe(true);
 
-      // Leaving mid-run meets § 3.4's strip — over the stage, where there is no bar to replace.
+      /*
+       * Leaving mid-run meets § 3.4's strip — **in the bar**, which is § 3.4's own rule and which
+       * this stage can keep. The strip had a second home while the stage handed off, because the
+       * handed-off stage drew no bar; there is one under this stage, so there is one strip.
+       */
       await page.locator('.everyday-rail-menu').click();
       const strip = await page.evaluate(() => ({
-        shown: document.querySelector<HTMLElement>('.everyday-stage-confirm')?.style.display,
         question: document.querySelector('.everyday-bar-question')?.textContent ?? '',
         consequence: document.querySelector('.everyday-bar-consequence')?.textContent ?? '',
-        stillOnStage:
-          document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+        stillOnStage: document.querySelector('.everyday-stage-canvas') !== null,
       }));
-      expect(strip.shown).toBe('flex');
       expect(strip.question).toBe('Leave the day unfinished?');
       expect(strip.consequence).toBe(
         "Today's run will not be scored, and the board keeps whatever you posted before.",
       );
       expect(strip.stillOnStage).toBe(true);
 
-      // Stay: the strip goes down and the stage is exactly as it was.
+      // Stay: the strip goes down, the bar comes back, and the stage is exactly as it was.
       await page.locator('.everyday-bar-confirm-stay').click();
       const stayed = await page.evaluate(() => ({
-        shown: document.querySelector<HTMLElement>('.everyday-stage-confirm')?.style.display,
-        stillOnStage:
-          document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+        primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
+        question: document.querySelector('.everyday-bar-question'),
+        stillOnStage: document.querySelector('.everyday-stage-canvas') !== null,
       }));
-      expect(stayed).toEqual({ shown: 'none', stillOnStage: true });
+      expect(stayed).toEqual({ primary: 'Close the day', question: null, stillOnStage: true });
 
       // Close the day — § 3.3's stage primary, as the host carries it — and the latch disarms.
       await page.evaluate(() => {
@@ -490,38 +470,53 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
 
       // A report is already after the fact: the same leave now goes straight to the menu.
       await page.locator('.everyday-rail-menu').click();
-      const back = await page.evaluate(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display,
-      );
-      expect(back).toBe('grid');
+      const back = await page.evaluate(() => ({
+        onMenu: document.querySelector('.everyday-mode[data-screen="stage"]') !== null,
+        stageGone: document.querySelector('.everyday-stage-canvas') === null,
+      }));
+      expect(back).toEqual({ onMenu: true, stageGone: true });
     } finally {
       await page.close();
     }
   }, 180_000);
 
-  it('comes back to the menu, and covers the stage again on the way', async () => {
+  it('comes back to the menu, unmounts the stage, and keeps the Engineer surface covered', async () => {
     const page = await coldLoad();
     try {
       await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
+      /*
+       * **The strip is in the way now, and that is the product being right rather than an
+       * inconvenience.** The first draft of this case clicked the rail's Main menu row and asserted
+       * the stage was gone; it was not, because § 7's stage presses `startRun` on mount, so by the
+       * time the canvas exists the player has a day of their own open and § 3.4 arms. Under the
+       * hand-off the same click left immediately — the run on the handed-off stage was boot's demo,
+       * which § D232 exempts.
+       *
+       * So the way back to the menu mid-run is two presses, and this case makes both. It races the
+       * host notification that arms the latch, which is why the strip is answered *if* it is up
+       * rather than waited for: either order is a state a player can produce.
+       */
       await page.locator('.everyday-rail-menu').click();
+      const leaveIt = page.locator('.everyday-bar-confirm-leave');
+      if ((await leaveIt.count()) > 0) await leaveIt.click();
+      await page.waitForSelector('.everyday-mode[data-screen="stage"]', { timeout: 15_000 });
 
       const back = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,
+        stageGone: document.querySelector('.everyday-stage-canvas') === null,
         subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
         /*
-         * The cover going back on is the case that would have caught the second `inert` defect from
-         * the other side: leaving a mode has to re-inert the surface it uncovered, or the stage
-         * stays in the tab order behind the menu for the rest of the session.
+         * `inert` is now true for the Engineer root's whole life rather than only off-stage, so
+         * this reads as *it never came off* rather than *it went back on*. It is still the case
+         * that would catch the second `inert` defect: a shell that let `menuPanel.ts#coverShell`
+         * clear the attribute on the way past would report `false` here.
          */
         engineer: document.querySelector<HTMLElement>('.shell')?.inert,
       }));
       expect(back.mainShown).toBe('grid');
+      expect(back.stageGone).toBe(true);
       expect(back.subline).toContain('YOU ARE HERE');
       expect(back.engineer).toBe(true);
     } finally {
