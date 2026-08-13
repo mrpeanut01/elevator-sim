@@ -22,6 +22,7 @@ import { applyPlainLever, plainLeverEchoOf, plainLeversOf, type PlainLeverId } f
 const SPEC: DispatcherSpec = {
   name: 'Fixture',
   weights: { waitTime: 100, starvation: 30, loadFactor: 40 },
+  families: {},
   flags: { pool: false, zone: false, bypass: true },
 };
 
