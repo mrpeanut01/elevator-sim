@@ -70,9 +70,19 @@ import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
  */
 export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
   "§ 7's Everyday stage — the stage shown is the Engineer surface with Casual copy",
-  '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
-  '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out there, and mid-run it warns through § 3.4’s confirm strip, fed the run state by the data host',
-  '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
+  /*
+   * The row that said *"§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly"*
+   * is gone, because both are registered screens and the tile routes through them. A register that
+   * kept naming them would be the thing this register exists to prevent, one directory over.
+   *
+   * What is left of that entry is the half that is still true and is a different absence: § 6.1
+   * gives every past day a replay and this build has none, which `everyday/doorView.ts` refuses in
+   * the primary's own note.
+   */
+  '§ 6.1’s replay — a past day can be read from the front door’s week strip, not re-opened: a week moves forward and nothing here stands it back up',
+  '§ 6.2’s ghost — no run in this build races a second dispatcher over the same crowd, so *Race against* states what it would be instead of offering it',
+  '§ 3.3’s action bar is not drawn over the handed-off stage — the rail’s Main menu row is the way out there, and mid-run it warns through § 3.4’s confirm strip, fed the run state by the data host. Its primary goes with it, so *Close the day* has no home on that surface and the report is entered from Your week’s own card instead of from the press whose note promises to write it',
+  '§ 14 boards and § 12.2 ladder — both need a server this build has none of; Your week states what a board would be keyed on rather than drawing an empty one',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
 
@@ -1064,6 +1074,28 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           refreshBar: drawBar,
         };
         mounted = module.mount(screenRegion, context);
+        /*
+         * **Draw the bar again, now that there is a mount to answer its primary.**
+         *
+         * `drawBar()` above runs before this line, so on the *first* draw of a registered screen it
+         * resolved the § 3.3 row while `mounted` was still `undefined` — and its
+         * `route === 'screen' && mounted?.primary !== undefined` branch is what wires the press. The
+         * result was a filled, enabled primary that did nothing until something else caused a
+         * redraw: the exact silently-does-nothing control the handoff's definition of done forbids,
+         * on the loudest button on the screen.
+         *
+         * It shipped unnoticed because the only registered screen with a `primary` was
+         * `fixitScreen.ts`, which calls `refreshBar` from its own load handler a beat later and so
+         * always had one by the time anybody pressed. A screen whose row is static — the front door,
+         * the brief, the report, Your week — has nothing to trigger that beat, and the browser tier
+         * found all four dead on the first press.
+         *
+         * Here rather than in each screen's `mount`, and that is the fix rather than a convenience:
+         * a screen cannot call `refreshBar` early enough, because `mounted` is assigned by *this*
+         * statement. The bar is the shell's element (§ 3.1) and its wiring is the shell's to get
+         * right once.
+         */
+        drawBar();
         return;
       }
     }

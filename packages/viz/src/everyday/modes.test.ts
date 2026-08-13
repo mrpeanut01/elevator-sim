@@ -82,7 +82,12 @@ describe('a tile either reaches the simulation or says it does not', () => {
      * same commit, and this case is what fails when the sentence and the registry disagree.
      */
     const gates = {
-      stage: ['stage'],
+      /*
+       * Today's tower gates on the whole of § 6's loop rather than on its entry screen alone —
+       * set up, watch, read, and see the week. § 6's claim is that this mode is a *loop*, and a
+       * mode whose report dead-ends is the shape the campaign row below refuses.
+       */
+      door: ['door', 'brief', 'stage', 'report', 'week'],
       towers: ['towers', 'building', 'contract'],
       rush: ['rush'],
       fixit: ['fixit'],
@@ -94,12 +99,19 @@ describe('a tile either reaches the simulation or says it does not', () => {
     }
   });
 
-  it('hands Today’s tower straight to the stage, because the door is not built', () => {
-    // § 6.1's front door and § 6.2's brief do not exist. The tile skips them rather than routing
-    // through two empty screens, and `shell.ts`'s absences register is where that is written down.
-    expect(EVERYDAY_MODES[0]?.screen).toBe('stage');
-    for (const missing of ['door', 'brief'] as const) {
-      expect(EVERYDAY_MODES.map((mode) => mode.screen)).not.toContain(missing);
+  it('opens Today’s tower on § 6.1’s front door, now that the loop’s four screens exist', () => {
+    /*
+     * This case used to assert the opposite — *straight to the stage, because the door is not
+     * built* — and it was right when the door and the brief were unbuilt: a tile that routed
+     * through two empty screens was worse than one that skipped them. Both are registered now, so
+     * the skip is the stale thing and the guide's own route is the live one. The case is inverted
+     * rather than deleted, because *which screen the front tile opens* is exactly the fact a
+     * future lane might quietly change back.
+     */
+    expect(EVERYDAY_MODES[0]?.screen).toBe('door');
+    // And the day the tile opens is a day, not a hand-off: the whole loop is registered.
+    for (const screen of ['door', 'brief', 'stage', 'report', 'week'] as const) {
+      expect(isScreenBuilt(screen), screen).toBe(true);
     }
   });
 });

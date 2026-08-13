@@ -50,17 +50,30 @@ function unlessBuilt(refusal: string, ...screens: readonly EverydayScreen[]): st
 export const EVERYDAY_MODES: readonly EverydayMode[] = Object.freeze([
   Object.freeze({
     /*
-     * **Opens the stage, not § 6.1's front door.** The door and the brief are not built, so routing
-     * through them would put two empty screens between the player and the only playable thing in
-     * this build. The skipped screens are named in `shell.ts`'s `EVERYDAY_SHELL_ABSENCES` rather
-     * than silently dropped.
+     * **Opens § 6.1's front door**, which is what the guide asks for and what this tile could not
+     * do for two waves: the door and the brief were unbuilt, so the tile skipped to the stage and
+     * said so here. Both are registered now, so the skip is gone with them — a tile that still
+     * jumped the queue would be routing around two screens that exist, and the comment claiming
+     * they do not would be § D227's stale refusal in a code path.
+     *
+     * The tile is gated on all four screens of the loop rather than on the door alone. § 6's whole
+     * claim is that Today's tower is a **loop** — set up, watch, read, and see the week — and a
+     * mode whose report or week dead-ends mid-flow is the shape `campaign`'s own gate refuses one
+     * row down.
      */
-    screen: 'stage' as const,
+    screen: 'door' as const,
     pick: 'today' as const,
     title: "Today's tower",
     blurb: 'One building, one day, one score. The same day for everybody.',
     shape: '~3 min · no losing — a day is a score, not a pass',
-    unavailable: unlessBuilt('the stage is not built', 'stage'),
+    unavailable: unlessBuilt(
+      'the day runs, but its Everyday screens are not built yet',
+      'door',
+      'brief',
+      'stage',
+      'report',
+      'week',
+    ),
   }),
   Object.freeze({
     screen: 'towers' as const,

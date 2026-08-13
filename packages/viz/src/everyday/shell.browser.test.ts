@@ -143,6 +143,28 @@ async function coldLoad(): Promise<Page> {
   return page;
 }
 
+/**
+ * Walk the player's own route from the menu to the stage — § 6's daily loop, as far as the stage.
+ *
+ * `Today's tower` used to open the stage directly, because § 6.1's front door and § 6.2's brief
+ * were unbuilt; both are registered screens now, so the tile opens the door and the stage is two
+ * presses further on. Every case below that wants the stage takes this route rather than a shorter
+ * one, for the reason `enterEngineerStage` exists at all: a tier that reached the surface by a path
+ * no player has is a tier that tests a surface nobody can open.
+ */
+async function enterStage(page: Page): Promise<void> {
+  await page.locator('.everyday-mode[data-screen="door"]').click();
+  await page.waitForSelector('.everyday-door', { timeout: 15_000 });
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+  await page.locator('.everyday-bar-primary').click();
+  await page.waitForFunction(
+    () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
 describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
   it('draws the menu, the rail and the four mode tiles — not the Engineer menu', async () => {
     const page = await coldLoad();
@@ -193,12 +215,10 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * player meets it. `inert` on the Everyday root reads as an attribute in one test and as
        * *nothing happens when you click* in the product; this is the second reading.
        */
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await page.locator('.everyday-mode[data-screen="door"]').click();
+      // The tile opens § 6.1's front door now that it is registered — the screen region fills
+      // rather than the Engineer surface being uncovered, which is two presses further on.
+      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
     } finally {
       await page.close();
     }
@@ -266,15 +286,18 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('enters the stage through the bar’s primary — the player’s second way in', async () => {
+  it('enters the picked mode through the bar’s primary — the player’s second way in', async () => {
     const page = await coldLoad();
     try {
+      /*
+       * § 3.3's menu row: the primary follows the selected card, and the selected card is
+       * *Today's tower*. Where that lands moved this wave — the tile used to skip to the stage
+       * because § 6.1's front door was unbuilt, and now it opens the door, which is what the guide
+       * asks for. The claim the case is making is unchanged: the bar's primary enters the mode.
+       */
       await page.locator('.everyday-bar-primary').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await page.waitForSelector('.everyday-door', { timeout: 15_000 });
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
     } finally {
       await page.close();
     }
@@ -340,7 +363,7 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
   it('uncovers the stage beside the rail, and the run advances', async () => {
     const page = await coldLoad();
     try {
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
+      await enterStage(page);
 
       /*
        * The hand-off's geometry. The shell shrinks to the rail strip and insets the Engineer
@@ -400,13 +423,6 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
      */
     const page = await coldLoad();
     try {
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
-
       await stashHost(page);
 
       /*
@@ -414,28 +430,39 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
        * A full shift has already run under the menu (boot's own), it is on the stage, and it is
        * this shell's own run; what it is not is a run the player started, so leaving it must not
        * warn. This is the assertion that would fail if the latch were `hasRun && !dayClosed`.
+       *
+       * Read **at the menu**, before any navigation, which is a narrowing this wave forced and an
+       * honest one: § 6.2's *Start the day* now latches a run (`host.startRun`), because a brief
+       * whose primary only navigated would put a player on a stage they could never close. So
+       * *"the player has asked for nothing"* is no longer a state you can be in while standing on
+       * the stage, and asserting it there would be asserting a state the product cannot reach.
        */
       expect((await runStateOf(page)).open, 'boot’s own run armed the confirm strip').toBe(false);
 
-      // Start a run through the host — the same latching press as **Run this shift**.
-      await page.evaluate(() => {
-        (window as PageHostWindow).__everydayHost?.current()?.startRun();
-      });
+      /*
+       * The run is started by the walk itself — § 6.2's *Start the day* is `host.startRun()`, the
+       * same latching press as **Run this shift**. This case used to press it here, through the
+       * host, because the brief did not exist; now the player's own route makes the run theirs and
+       * pressing it a second time would be testing a control nobody uses.
+       */
+      await enterStage(page);
 
       /*
        * Wait for that run to land, through the page's own statement about it: the coach's Run
-       * control **is** the cancel control while a run is in flight. Waiting for the round trip
-       * rather than only for the latch is what keeps the closing half below deterministic — a
-       * `closeDay` pressed while the worker was still simulating would file the recording on
-       * screen and then have `applyShift` clear the sheet out from under the assertion.
+       * control **is** the cancel control while a run is in flight, so an idle label plus the § 3.4
+       * latch is the round trip finished. Waiting for it rather than only for the latch is what
+       * keeps the closing half below deterministic — a `closeDay` pressed while the worker was
+       * still simulating would file the recording on screen and then have `applyShift` clear the
+       * sheet out from under the assertion.
        */
       await page.waitForFunction(
-        () => document.querySelector('#run')?.textContent === 'Cancel this run',
+        () => document.querySelector('#run')?.textContent === 'Run this shift',
         undefined,
-        { timeout: 30_000 },
+        { timeout: 120_000 },
       );
       await page.waitForFunction(
-        () => document.querySelector('#run')?.textContent === 'Run this shift',
+        () =>
+          (window as PageHostWindow).__everydayHost?.current()?.runState().open === true,
         undefined,
         { timeout: 120_000 },
       );
@@ -497,14 +524,15 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
   it('comes back to the menu, and covers the stage again on the way', async () => {
     const page = await coldLoad();
     try {
-      await page.locator('.everyday-mode[data-screen="stage"]').click();
-      await page.waitForFunction(
-        () => document.querySelector<HTMLElement>('.everyday-main')?.style.display === 'none',
-        undefined,
-        { timeout: 15_000 },
-      );
+      await enterStage(page);
 
+      /*
+       * Two presses now, not one: walking the player's own route to the stage starts the day
+       * (§ 6.2's primary latches — see the § 3.4 case above), so leaving mid-run meets the confirm
+       * strip. *Leave it* is the arm this case is about; the strip itself is asserted above.
+       */
       await page.locator('.everyday-rail-menu').click();
+      await page.locator('.everyday-bar-confirm-leave').click();
 
       const back = await page.evaluate(() => ({
         mainShown: document.querySelector<HTMLElement>('.everyday-main')?.style.display,

@@ -31,9 +31,13 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import { BRIEF_SCREEN } from './briefScreen.js';
+import { DOOR_SCREEN } from './doorScreen.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
+import { REPORT_SCREEN } from './reportScreen.js';
 import { SETTINGS_SCREEN } from './settingsScreen.js';
+import { WEEK_SCREEN } from './weekScreen.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_SCREENS } from './types.js';
 
@@ -81,7 +85,14 @@ export interface EverydayScreenModule {
  * sentence from {@link UNBUILT_REASONS}.**
  */
 const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModule>>> =
-  Object.freeze({ fixit: FIXIT_SCREEN, settings: SETTINGS_SCREEN });
+  Object.freeze({
+    door: DOOR_SCREEN,
+    brief: BRIEF_SCREEN,
+    report: REPORT_SCREEN,
+    fixit: FIXIT_SCREEN,
+    week: WEEK_SCREEN,
+    settings: SETTINGS_SCREEN,
+  });
 
 /** The two screens the shell itself provides — see the module docstring. */
 const SHELL_OWNED: readonly EverydayScreen[] = Object.freeze(['menu', 'stage']);
@@ -132,9 +143,6 @@ export function routeFor(screen: EverydayScreen): EverydayRoute {
  * refusal is about the screen, never about the thing.
  */
 export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> = Object.freeze({
-  door: "the front door screen is not built — Today's tower opens the day directly",
-  brief: 'the brief screen is not built — the day starts without it',
-  report: 'the report screen is not built — the Engineer stage draws its own report',
   towers: 'the campaign runs, but its Everyday screens are not built yet',
   building: 'the campaign runs, but its Everyday screens are not built yet',
   contract: 'the campaign runs, but its Everyday screens are not built yet',
@@ -142,8 +150,13 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
   workshop: 'the workshop screen is not built — the levers live on the stage for now',
   bench: 'the bench screen is not built — its suite runs from the Engineer shell',
   designer: 'the designer screen is not built',
-  tuner: 'the tuner screen is not built — it is reached from the brief and the report, and neither of those is built either',
-  week: 'the week screen is not built',
+  /*
+   * The clause naming the brief and the report as *"not built either"* went with them: both are
+   * registered above, and both now point *here*. A refusal that describes the tree of two waves
+   * ago is § D227's defect, which is the one this table exists to prevent — so the sentence names
+   * what is missing (the screen) rather than what has since arrived (its two entrances).
+   */
+  tuner: 'the tuner screen is not built — the brief and the report both point at it, and there is nothing behind the door yet',
   board: 'needs a server to post and rank runs, and this build has none',
 });
 

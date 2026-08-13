@@ -169,6 +169,28 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * static sweep below.
          */
         'everyday/fixitScreen.ts#FIXIT_SCREEN',
+        /*
+         * § 6's daily loop — the four screens that make *Today's tower* a loop rather than a
+         * hand-off, on the mounts' shared ground and on the same pure/DOM split every Everyday
+         * screen sits on: each draws into the shell's scroll region, so none can run without a
+         * document, and `briefScreen.ts` additionally draws a canvas.
+         *
+         * Every **word** on all four is authored in `everyday/today.ts`, `everyday/doorView.ts`,
+         * `everyday/briefView.ts`, `everyday/weekView.ts`, `everyday/reportView.ts` and
+         * `everyday/world.ts`, whose producers the `EVERYDAY_DAILY_LOOP` adapter drives over both
+         * arms of the day-closed axis, over a past day and today, and over four states of the
+         * report — including the two withheld states § 12.2's matrix is about. The report's
+         * *sheet* is `dev/reportPanel.ts#reportViewOf`'s, driven in both registers by
+         * `DAY_REPORT_VIEW`.
+         *
+         * What the four mounts author of their own is geometry, class names and the elevation
+         * drawing's floor labels, which reach only the static sweep below — weaker than driving
+         * them, and stated as a limitation rather than presented as coverage.
+         */
+        'everyday/doorScreen.ts#DOOR_SCREEN',
+        'everyday/briefScreen.ts#BRIEF_SCREEN',
+        'everyday/reportScreen.ts#REPORT_SCREEN',
+        'everyday/weekScreen.ts#WEEK_SCREEN',
       ],
     },
     {
@@ -219,6 +241,34 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'derived; the day a token module grows a sentence a player reads, it stops being ' +
         'excludable.',
       ids: ['everyday/tokens.ts#EVERYDAY_TYPE'],
+    },
+    {
+      reason:
+        'The daily loop\'s shared drawing vocabulary, on `dev/dom.ts`\'s precedent one group down: ' +
+        'a component factory produces no sentence of its own. `EYEBROW`, `MONO`, `CARD`, `WELL`, ' +
+        '`BODY`, `QUIET` and `LEDE` are inline CSS — derived only because a two-word font-family ' +
+        'and a `1px solid` satisfy the two-adjacent-words prose test, exactly as ' +
+        '`EVERYDAY_TYPE`\'s entry above predicts for CSS tokens — and `pill`, `section`, ' +
+        '`figureCell` and `unavailableBand` put on the page only strings a caller handed them. ' +
+        'Every one of those callers is `everyday/doorView.ts`, `briefView.ts`, `weekView.ts`, ' +
+        '`reportView.ts` or `dev/reportPanel.ts`, all of which are driven. `percentFigure` is the ' +
+        'same shape one level smaller: it turns a number into `81%` and its only literal is the ' +
+        'per-cent sign. The day one of these grows a sentence a player reads, it stops being ' +
+        'excludable — which is the wording `loadSession`\'s entry earned by having that day arrive.',
+      ids: [
+        'everyday/screenDom.ts#BODY',
+        'everyday/screenDom.ts#CARD',
+        'everyday/screenDom.ts#EYEBROW',
+        'everyday/screenDom.ts#figureCell',
+        'everyday/screenDom.ts#LEDE',
+        'everyday/screenDom.ts#MONO',
+        'everyday/screenDom.ts#pill',
+        'everyday/screenDom.ts#QUIET',
+        'everyday/screenDom.ts#section',
+        'everyday/screenDom.ts#unavailableBand',
+        'everyday/screenDom.ts#WELL',
+        'everyday/figures.ts#percentFigure',
+      ],
     },
     {
       reason:
