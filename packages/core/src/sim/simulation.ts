@@ -111,7 +111,7 @@
  */
 
 import { findPassengerTransferS } from '../config/resolveCar.js';
-import { isDestinationCallType } from '../config/types.js';
+import { SERVICE_MODES, isDestinationCallType } from '../config/types.js';
 import type {
   DispatcherProfile,
   FloorConfig,
@@ -121,6 +121,7 @@ import type {
 } from '../config/types.js';
 import {
   CapacityReassignmentMonitor,
+  DISPATCH_DEFAULTS,
   callCarriesCredential,
   createArrivalModel,
   createPolicyFor,
@@ -213,6 +214,7 @@ import {
 } from './patience.js';
 import {
   INTERVENTION_KINDS,
+  isInterventionKind,
   SIM_DEFAULTS,
   SimulationError,
   type ConservationAudit,
@@ -1416,6 +1418,17 @@ export class Simulation {
             `interventions[${index}]'s incident answer names car "${effect.carId}" in bank "${effect.bankId}", which this run did not build. Known cars: ${[...this.#carsById.keys()].join(', ')}.`,
           );
         }
+        // The mode against the declared vocabulary, for the reason the kind check gives one
+        // level up: `Car.setMode` stores whatever string it is handed, and every later
+        // `acceptsHallCalls` would then answer for a mode nobody defined — a run applied as a
+        // guess, which is § 1.5's approximate replay wearing a service event's clothes. The
+        // building's own schedule gets this check from the config schema; an intervention's
+        // effects have no config pass, so it happens here.
+        if (!(SERVICE_MODES as readonly string[]).includes(effect.mode)) {
+          throw new SimulationError(
+            `interventions[${index}]'s incident answer would set car "${effect.bankId}-${effect.carId}" to mode "${String(effect.mode)}", which this build does not declare. Known modes: ${SERVICE_MODES.join(', ')}.`,
+          );
+        }
         events.push(effect);
       }
     }
@@ -1605,7 +1618,7 @@ export class Simulation {
   #scheduleInterventions(): void {
     for (const [index, entry] of this.#interventions.entries()) {
       const kind = entry.change.kind;
-      if (!(INTERVENTION_KINDS as readonly string[]).includes(kind)) {
+      if (!isInterventionKind(kind)) {
         throw new SimulationError(
           `interventions[${index}] carries change kind "${String(kind)}", which this build does not declare. Known kinds: ${INTERVENTION_KINDS.join(', ')}. A kind applied as a guess would replay a different run and call it this one (Everyday Mode contract § 1.5).`,
         );
@@ -1621,10 +1634,15 @@ export class Simulation {
       if (entry.change.kind === 'switch-dispatcher') {
         const profile = entry.change.profile;
         this.#switchWeights.set(index, resolveWeights(profile.weights, profile.id).weights);
-        const switchedModel: PassengerModel =
-          profile.dispatch?.passengerAssignment === 'panel'
-            ? 'destination-dispatch'
-            : 'conventional';
+        // Through `passengerModelOf` — the one statement of the model rule, the same function
+        // the run's own model was stamped by — with the stage defaults applied exactly as
+        // `resolveDispatchConfig` applies them. A second inline copy of the rule here was
+        // review-flagged as the two-sources shape and is gone.
+        const switchedModel: PassengerModel = passengerModelOf({
+          callType: profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType,
+          passengerAssignment:
+            profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment,
+        });
         if (switchedModel !== this.#passengerModel) {
           this.#disclaimers.push(
             `interventions[${index}] switches to dispatcher "${profile.id}", which authors the ${switchedModel} passenger model; this run stays ${this.#passengerModel}. Only the weight vector switches mid-run — a record that changed passenger model at ${entry.atS} s would publish metrics not comparable with themselves (metrics/comparability.ts) — so every stage setting of the opening profile still stands.`,

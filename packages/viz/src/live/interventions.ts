@@ -34,10 +34,27 @@ export const PARK_CARS_LOBBY_LABEL = 'Park the cars in the lobby';
  * The dispatcher-switch control's label — parametric over the *name*, never the id, because the
  * button says what pressing it does and a player is handing the day to *somebody*, not to a key
  * in a data file (gameplay § 16 rule 11: no engine identifiers in the Casual register).
+ *
+ * `Switch to …`, the imperative of the handoff's own stamp (§ 7.6: `09:14 · switched to Lobby
+ * anchor`) — the handoff wins every disagreement about copy, and the label/stamp pair keeps the
+ * park control's verb-and-past-tense shape.
  */
 export function switchDispatcherLabelOf(name: string): string {
-  return `Hand the rest of the day to ${name}`;
+  return `Switch to ${name}`;
 }
+
+/**
+ * What a switch does to the player's own choosers, said out loud — review finding 3, § D227's
+ * rule that a behaviour nothing states is a refusal waiting to go stale. Adoption *pins*: from
+ * the stamped instant the day scores with the new dispatcher's weights alone, and any rules or
+ * pattern switching the player had running stand down for the rest of the run
+ * (`dispatch/policy.ts#adoptWeights`). One sentence, always true of the mechanism, carried on
+ * the switch control's title so the player reads it before pressing rather than deducing it
+ * from a rule that stopped firing.
+ */
+export const SWITCH_PINS_NOTE =
+  'from this moment the day runs on this dispatcher’s weights alone — any rules or pattern ' +
+  'switching stand down for the rest of the day';
 
 /**
  * The stage's `recomputing` beat — contract § 1.4's own requirement, verbatim in intent: a
@@ -63,7 +80,9 @@ function stampVerbOf(change: InterventionChange): string {
     case 'park-cars-lobby':
       return 'parked the cars in the lobby';
     case 'switch-dispatcher':
-      return `handed the rest of the day to ${change.profile.name}`;
+      // The handoff's own worked example, verbatim in shape: `09:14 · switched to Lobby anchor`
+      // (§ 7.6). The handoff wins every disagreement about copy.
+      return `switched to ${change.profile.name}`;
     case 'answer-incident':
       return `answered the incident — ${change.option}`;
   }

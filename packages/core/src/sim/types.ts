@@ -390,7 +390,25 @@ export type TimeoutPolicy = (typeof TIMEOUT_POLICIES)[number];
  */
 export const INTERVENTION_KINDS = ['park-cars-lobby', 'switch-dispatcher', 'answer-incident'] as const;
 
+/**
+ * Deliberately **not** re-exported from `sim/index.ts` or `browser.ts`, and the absence is the
+ * record of a review finding: it went out on both barrels with no consumer anywhere, which is a
+ * barrel re-export standing in for a caller — the shape docs/05's standing requirement names.
+ * Its one real use is {@link isInterventionKind}'s predicate below, which callers narrow through
+ * without ever naming the type, so exporting it bought nothing. Widen the surface again when
+ * something outside this file needs to *say* the type rather than obtain it.
+ */
 export type InterventionKind = (typeof INTERVENTION_KINDS)[number];
+
+/**
+ * Whether a string is a declared intervention kind — `isSelectorInput`'s shape, for its reason.
+ * The two refusal surfaces share this one predicate: `Simulation` throws through it at
+ * scheduling time, and `packages/viz`'s `watch/record.ts` refuses a stored record through it
+ * with a row, so the vocabulary cannot drift between the loud half and the graceful one.
+ */
+export function isInterventionKind(id: string): id is InterventionKind {
+  return (INTERVENTION_KINDS as readonly string[]).includes(id);
+}
 
 /**
  * One thing a mid-run intervention may change. A discriminated union — three arms today, and a

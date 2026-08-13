@@ -1088,6 +1088,7 @@ export type {
 export {
   SIMULATION_STATUSES,
   INTERVENTION_KINDS,
+  isInterventionKind,
   SIM_DEFAULTS,
   SIM_EVENT_TYPES,
   SIM_EVENT_TYPE_IDS,
@@ -1116,7 +1117,6 @@ export type {
   ConservationAudit,
   DispatchTickPayload,
   InterventionChange,
-  InterventionKind,
   InterventionPayload,
   QueueSamplePayload,
   RunInterventionConfig,

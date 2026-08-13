@@ -34,7 +34,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { LoadedConfig } from '../config/types.js';
+import type { DispatcherProfile, LoadedConfig } from '../config/types.js';
+import { createPolicyFor, type DispatchPolicy } from '../dispatch/index.js';
 
 import { fingerprint, load } from './fixtures.test-helper.js';
 import { runSimulation } from './simulation.js';
@@ -209,6 +210,141 @@ describe('switch-dispatcher changes the future and only the future', () => {
   }, 60_000);
 });
 
+describe('the switch pins its vector where a chooser is live', () => {
+  const AT_S = 600;
+  const SEED = 20260726;
+
+  const nearestCar = (): DispatcherProfile => {
+    const profile = config.dispatcherProfilesById.get('nearest-car');
+    if (profile === undefined) throw new Error('no profile "nearest-car"');
+    return profile;
+  };
+  const SWITCH = (): RunInterventionConfig => ({
+    atS: AT_S,
+    change: { kind: 'switch-dispatcher', profile: nearestCar() },
+  });
+
+  /**
+   * **The pin's load-bearing case — review finding 1.** Every shipped profile runs
+   * `selection.policy: 'off'`, under which `#refreshWeightSet` returns before either chooser
+   * branch and an adopted vector survives with or without the pin — so a switch test on
+   * `collective` alone cannot tell the pin from dead code (mutation-verified: deleting it left
+   * such tests green). A **rules** profile is the exact shape every Everyday player with a rule
+   * row produces (`dev/state.ts#shiftRunConfigOf` through `profileWithRules`), and on it the
+   * rules branch re-imposes `arm?.weights ?? config.weights` on *every* decision — so without
+   * the pin the switch is fully inert and this test's divergence assertion goes red. The pin is
+   * what makes the player's hand outrank the chooser, and this is the run that says so.
+   */
+  it('a rules-driven profile still hands the day over — the chooser stands down (§ 7.6)', () => {
+    const collective = config.dispatcherProfilesById.get('collective');
+    if (collective === undefined) throw new Error('no profile "collective"');
+    const withRules: DispatcherProfile = {
+      ...collective,
+      id: 'collective-with-rules',
+      rules: { rows: [{ when: 'call-waited', whenValue: 60, then: 'jump-queue' }] },
+      selection: { ...(collective.selection ?? {}), policy: 'rules' },
+    };
+    const baseline = runSimulation(
+      run('garden-apartments', 'collective', SEED, { dispatcherProfile: withRules }),
+    );
+    const switched = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        dispatcherProfile: withRules,
+        interventions: [SWITCH()],
+      }),
+    );
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(
+        legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S),
+      );
+    expect(prefix(switched)).toBe(prefix(baseline));
+    expect(JSON.stringify(legsOf(switched))).not.toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  /**
+   * The contract-net aggregation delegates `adoptWeights` whole to the engine underneath
+   * (`policies/auction.ts`): the bids are priced by the inner weighted-cost policy, so pinning
+   * its vector pins every bid. A switch that moved nothing on an auction profile would mean the
+   * delegation is missing and the aggregation kept scoring with the opening weights.
+   */
+  it('an auction profile hands the day over through the delegated engine', () => {
+    const baseline = runSimulation(run('garden-apartments', 'auction', SEED));
+    const switched = runSimulation(
+      run('garden-apartments', 'auction', SEED, { interventions: [SWITCH()] }),
+    );
+    const prefix = (result: SimulationResult): string =>
+      JSON.stringify(
+        legsOf(result).filter(([, , boardedAt]) => boardedAt >= 0 && boardedAt < AT_S),
+      );
+    expect(prefix(switched)).toBe(prefix(baseline));
+    expect(JSON.stringify(legsOf(switched))).not.toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  /**
+   * A policy supplied through `config.createPolicy` that predates the optional interface member:
+   * the switch is refused per bank rather than silently not happening — warned by name, and the
+   * run is leg-for-leg the run without the entry, which is what "the control moved nothing, and
+   * the record says so" has to mean.
+   */
+  it('warns and stays inert when the supplied policy implements no adoptWeights', () => {
+    const withoutAdoptWeights = (policy: DispatchPolicy): DispatchPolicy => ({
+      id: policy.id,
+      name: policy.name,
+      engine: policy.engine,
+      config: policy.config,
+      parameters: policy.parameters,
+      get calls() {
+        return policy.calls;
+      },
+      register: (call, at, context) => policy.register(call, at, context),
+      dispatch: (callId, cars, at, context) => policy.dispatch(callId, cars, at, context),
+      reconsider: (callId, cars, at, context) => policy.reconsider(callId, cars, at, context),
+      answer: (car, call, at, cars) => policy.answer(car, call, at, cars),
+      reposition: (car, at, context) => policy.reposition(car, at, context),
+      score: (call, cars, at, context) => policy.score(call, cars, at, context),
+      eligible: (call, cars, at, context) => policy.eligible(call, cars, at, context),
+      lifecycle: (callId) => policy.lifecycle(callId),
+      complete: (callId, at) => policy.complete(callId, at),
+      cancel: (callId) => policy.cancel(callId),
+      reset: () => policy.reset(),
+    });
+    const overrides: Partial<SimulationConfig> = {
+      createPolicy: (profile, options) => withoutAdoptWeights(createPolicyFor(profile, options)),
+    };
+    const baseline = runSimulation(run('garden-apartments', 'collective', SEED, overrides));
+    const switched = runSimulation(
+      run('garden-apartments', 'collective', SEED, { ...overrides, interventions: [SWITCH()] }),
+    );
+    expect(switched.warnings.some((line) => line.includes('implements no adoptWeights'))).toBe(
+      true,
+    );
+    expect(JSON.stringify(legsOf(switched))).toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  /**
+   * A switched profile authoring the other passenger model is disclaimed by name rather than
+   * half-honoured: only the vector switches (`dispatch/selector.ts` § *Why only the weights
+   * switch*), and the sentence saying so is the difference between a scoped mechanism and a
+   * silent one.
+   */
+  it('discloses that a model-changing profile switches its weights and not its model', () => {
+    const panel = config.dispatcherProfilesById.get('destination-panel');
+    if (panel === undefined) throw new Error('no profile "destination-panel"');
+    const result = runSimulation(
+      run('garden-apartments', 'collective', SEED, {
+        interventions: [{ atS: AT_S, change: { kind: 'switch-dispatcher', profile: panel } }],
+      }),
+    );
+    // Disclaimers are folded into `warnings`, first — `#finish`'s own ordering.
+    expect(
+      result.warnings.some(
+        (line) =>
+          line.includes('destination-dispatch') && line.includes('Only the weight vector'),
+      ),
+    ).toBe(true);
+  }, 60_000);
+});
+
 /* -------------------------------------------------------------------------- *
  * answer-incident — the third arm (gameplay § 7.5, § 20.16), on the same log
  * -------------------------------------------------------------------------- */
@@ -295,6 +431,42 @@ describe('answer-incident changes the future and only the future', () => {
     expect(rewriting.warnings.some((line) => line.includes('before the answer itself'))).toBe(true);
     // The refusal is the whole effect: leg for leg, this is the baseline run.
     expect(JSON.stringify(legsOf(rewriting))).toBe(JSON.stringify(legsOf(baseline)));
+  }, 60_000);
+
+  it('throws on an effect naming a car this run did not build — scheduling time is its config time', () => {
+    expect(() =>
+      runSimulation(
+        run('garden-apartments', 'collective', SEED, {
+          interventions: [
+            {
+              atS: AT_S,
+              change: {
+                kind: 'answer-incident',
+                option: 'a corrupt entry',
+                serviceEvents: [{ atS: 700, bankId: 'main', carId: 'Z', mode: 'out-of-service' }],
+              },
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/car "Z" in bank "main", which this run did not build/u);
+  }, 60_000);
+
+  it('throws on an effect whose mode is outside the declared vocabulary — never applied as a guess', () => {
+    // `Car.setMode` stores whatever string it is handed; an out-of-vocabulary mode reaching it
+    // would have every later `acceptsHallCalls` answering for a mode nobody defined — § 1.5's
+    // approximate replay. Stored records carry this field through JSON, so it is checked here
+    // exactly as the change kind is.
+    const change = {
+      kind: 'answer-incident',
+      option: 'a corrupt entry',
+      serviceEvents: [{ atS: 700, bankId: 'main', carId: 'B', mode: 'toast' }],
+    } as unknown as RunInterventionConfig['change'];
+    expect(() =>
+      runSimulation(
+        run('garden-apartments', 'collective', SEED, { interventions: [{ atS: AT_S, change }] }),
+      ),
+    ).toThrow(/mode "toast".*in-service, independent, fire-recall, out-of-service/su);
   }, 60_000);
 });
 

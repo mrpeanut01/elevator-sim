@@ -17,6 +17,7 @@ import {
   interventionStampOf,
   PARK_CARS_LOBBY_LABEL,
   RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
   switchDispatcherLabelOf,
 } from './interventions.js';
 
@@ -72,13 +73,22 @@ describe('interventionStampOf', () => {
     expect(PARK_CARS_LOBBY_LABEL).toBe('Park the cars in the lobby');
     // The switch control speaks the *name* — a button naming `steady-hand-v2` would be an engine
     // identifier in the Casual register (§ 16 rule 11), which is why the label is parametric.
-    expect(switchDispatcherLabelOf('Steady hand')).toBe('Hand the rest of the day to Steady hand');
+    expect(switchDispatcherLabelOf('Steady hand')).toBe('Switch to Steady hand');
   });
 
-  it('stamps a dispatcher switch with the profile’s display name, never its id', () => {
+  it('stamps a dispatcher switch in the handoff’s own sentence, name and never id', () => {
+    // § 7.6's worked example is `09:14 · switched to Lobby anchor`, and the handoff wins copy.
     const stamp = interventionStampOf([{ atS: AT_0914, change: SWITCH }], AT_0914);
-    expect(stamp).toBe('09:14 · handed the rest of the day to Steady hand');
+    expect(stamp).toBe('09:14 · switched to Steady hand');
     expect(stamp).not.toContain('steady-hand-v2');
+  });
+
+  it('states the pin — a switch stands the player’s choosers down, in words (§ D227)', () => {
+    // The mechanism's one player-facing sentence, carried on the switch control's title: the
+    // adopted vector silences rules and pattern switching from the stamped instant, and a
+    // behaviour nothing states is a stale refusal waiting to happen.
+    expect(SWITCH_PINS_NOTE).toContain('weights alone');
+    expect(SWITCH_PINS_NOTE).toContain('rules or pattern switching stand down');
   });
 
   it('stamps an incident answer with the chosen option’s own words — § 20.16’s clock', () => {
@@ -128,7 +138,7 @@ describe('interventionLogOf', () => {
       ]),
     ).toEqual([
       '06:10 · parked the cars in the lobby',
-      '08:00 · handed the rest of the day to Steady hand',
+      '08:00 · switched to Steady hand',
       '09:14 · answered the incident — call the fitter out now',
     ]);
   });

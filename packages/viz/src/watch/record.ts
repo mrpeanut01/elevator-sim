@@ -53,9 +53,11 @@
  */
 
 import {
-  INTERVENTION_KINDS,
+  isInterventionKind,
   RULE_ACTIONS,
   RULE_CONDITIONS,
+  SERVICE_MODES,
+  type RunInterventionConfig,
   type SimulationConfig,
 } from '@elevator-sim/core/browser';
 
@@ -239,19 +241,25 @@ export function recordUnreadableReason(
     return `this build does not ship the arrival pattern “${record.pattern}”`;
   }
   /*
-   * The intervention vocabulary, on the ids' footing — and on the promise `persist/validate.ts`
-   * and `watch/reference.ts` both make in as many words: the log is *"passed through as data;
-   * `core` owns what an `InterventionChange` may be and refuses what it does not recognise"*.
-   * `core` keeps that promise with a throw at scheduling time; a stored record deserves the same
-   * refusal as a **row** rather than a mid-replay exception, so the kind is checked here against
-   * the vocabulary `core` exports — one source, two refusal surfaces, never a second copy of the
-   * union's cases. A record written by a newer build with a fourth kind is a run this build
-   * cannot re-ask, which is the identical sentence shape the building id gets.
+   * The intervention log, kind and payload — on the ids' footing, and on the promise
+   * `persist/validate.ts` and `watch/reference.ts` both make in as many words: the log is
+   * *"passed through as data; `core` owns what an `InterventionChange` may be and refuses what
+   * it does not recognise"*. `core` keeps that promise with a throw at scheduling time; a stored
+   * record deserves the same refusal as a **row** rather than a mid-replay exception, so each
+   * entry is checked here through the guard and the vocabularies `core` exports — one source,
+   * two refusal surfaces, never a second copy of the union's cases.
+   *
+   * The payload checks exist because these are the first arms **with** payloads (review
+   * finding 5): the persisted shape check is deliberately shallow (*"a list of objects and no
+   * further"*), so a corrupt `switch-dispatcher` profile would otherwise reach `resolveWeights`
+   * as a raw `TypeError` mid-replay, and an `answer-incident` effect with an out-of-vocabulary
+   * mode would be applied silently — `Car.setMode` stores any string — which is § 1.5's
+   * *approximate replay*, the one outcome this gate exists to forbid. `core` refuses both
+   * loudly at scheduling time; this is the same refusal wearing a picker row.
    */
-  for (const entry of record.interventions) {
-    if (!(INTERVENTION_KINDS as readonly string[]).includes(entry.change.kind)) {
-      return `this build does not ship the intervention kind “${String(entry.change.kind)}”`;
-    }
+  for (const [index, entry] of record.interventions.entries()) {
+    const reason = interventionUnreadableReason(entry, index);
+    if (reason !== null) return reason;
   }
   /*
    * The rule vocabulary, on exactly the footing the three ids above sit on — `docs/20` defect 1. A
@@ -267,6 +275,92 @@ export function recordUnreadableReason(
     }
     if (!(RULE_ACTIONS as readonly string[]).includes(row.then)) {
       return `this build does not ship the rule action “${row.then}”`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Why one stored intervention entry cannot be re-asked, or `null` — {@link recordUnreadableReason}'s
+ * per-entry half. The types say the entry is well-shaped; a record off `localStorage` or a
+ * fixture file can lie, so every read below is a runtime question about untrusted data, and the
+ * answers keep the file's sentence shape: *this build does not ship X* for a vocabulary miss,
+ * *would be a guess* for a payload the shape check cannot vouch for.
+ */
+function interventionUnreadableReason(
+  entry: RunInterventionConfig,
+  index: number,
+): string | null {
+  const guess = (what: string): string =>
+    `this record’s intervention ${String(index + 1)} ${what}, so re-simulating it would be a guess at what it changed`;
+  const raw = entry as unknown as { readonly atS?: unknown; readonly change?: unknown };
+  if (typeof raw.atS !== 'number' || !Number.isFinite(raw.atS)) {
+    return guess('carries no simulated second');
+  }
+  const change = raw.change as
+    | { readonly kind?: unknown; readonly [key: string]: unknown }
+    | null
+    | undefined;
+  if (change === null || typeof change !== 'object' || typeof change['kind'] !== 'string') {
+    return guess('carries no change kind');
+  }
+  if (!isInterventionKind(change['kind'])) {
+    return `this build does not ship the intervention kind “${change['kind']}”`;
+  }
+  if (change['kind'] === 'switch-dispatcher') {
+    const profile = change['profile'] as
+      | { readonly id?: unknown; readonly name?: unknown; readonly weights?: unknown }
+      | null
+      | undefined;
+    const weights = profile?.weights;
+    const weightsAreARecord =
+      typeof weights === 'object' &&
+      weights !== null &&
+      !Array.isArray(weights) &&
+      Object.values(weights).every((value) => typeof value === 'number' && Number.isFinite(value));
+    if (
+      profile === null ||
+      typeof profile !== 'object' ||
+      typeof profile.id !== 'string' ||
+      profile.id.length === 0 ||
+      typeof profile.name !== 'string' ||
+      !weightsAreARecord
+    ) {
+      return guess('switches to a dispatcher whose profile is not shaped like one');
+    }
+  }
+  if (change['kind'] === 'answer-incident') {
+    if (typeof change['option'] !== 'string' || change['option'].length === 0) {
+      return guess('answers an incident with no option words');
+    }
+    const effects = change['serviceEvents'];
+    if (!Array.isArray(effects)) {
+      return guess('answers an incident with no effect list');
+    }
+    for (const effect of effects as readonly {
+      readonly atS?: unknown;
+      readonly bankId?: unknown;
+      readonly carId?: unknown;
+      readonly mode?: unknown;
+    }[]) {
+      if (
+        effect === null ||
+        typeof effect !== 'object' ||
+        typeof effect.atS !== 'number' ||
+        !Number.isFinite(effect.atS) ||
+        typeof effect.bankId !== 'string' ||
+        effect.bankId.length === 0 ||
+        typeof effect.carId !== 'string' ||
+        effect.carId.length === 0
+      ) {
+        return guess('answers an incident with an effect that names no car and no second');
+      }
+      if (
+        typeof effect.mode !== 'string' ||
+        !(SERVICE_MODES as readonly string[]).includes(effect.mode)
+      ) {
+        return `this build does not ship the service mode “${String(effect.mode)}”`;
+      }
     }
   }
   return null;
