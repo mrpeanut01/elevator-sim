@@ -133,6 +133,20 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          */
         'everyday/settingsScreen.ts#SETTINGS_SCREEN',
         /*
+         * GAMEPLAY § 8's three campaign screens, on the same split and the same ground: one module
+         * with three registry rows, each `mount` building selects, a month grid and a shop out of a
+         * document. Every **word** those screens draw — the triage row's record and wear lines, the
+         * desk's decision and its four tests, the contract sheet's purse ledger, every shop tier's
+         * derived state, both refusals and the register of absences — is authored in
+         * `everyday/campaignModel.ts` over `campaign/economy.ts`, which the `EVERYDAY_CAMPAIGN`
+         * adapter drives over four careers. What these three author of their own is geometry, class
+         * names and the glyphs on the calendar cells.
+         */
+        'everyday/campaignScreens.ts#TOWERS_SCREEN',
+        'everyday/campaignScreens.ts#BUILDING_SCREEN',
+        'everyday/campaignScreens.ts#CONTRACT_SCREEN',
+        'everyday/campaignScreens.ts#campaignInputOf',
+        /*
          * GAMEPLAY § 7's stage screen, on the mounts' shared ground and on the same split: its
          * `mount` builds a canvas, sizes it from a bounding rect and drives a
          * `requestAnimationFrame` loop, none of which exists under Node. Every **word** it draws —

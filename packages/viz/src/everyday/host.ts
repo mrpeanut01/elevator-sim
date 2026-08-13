@@ -26,13 +26,19 @@
  * levers; the stage needs the run actions) and nothing speculative. Named absences, for the lane
  * that needs one to add with its consumer:
  *
- * - **no building setter** — `dev/state.ts#withBuilding` parks a week as it goes (issue #107), so
- *   the screen that offers it is the campaign's building desk rather than the daily door: § 6's
- *   whole premise is *one building, one crowd, one seed, everybody*, and a control that changed
- *   the tower on the front door would be changing the day out from under the score. The daily
- *   loop's own *"you can change all of them and the run stops counting"* routes to the tuner,
- *   which is unbuilt and refuses in `screens.ts`'s words;
- * - **no campaign works booking, no contract acceptance** — the campaign lane's, with its screens;
+ * - **no standalone building setter** — `dev/state.ts#withBuilding` parks a week as it goes
+ *   (issue #107), so the screen that offers it is the campaign's building desk rather than the
+ *   daily door: § 6's whole premise is *one building, one crowd, one seed, everybody*, and a
+ *   control that changed the tower on the front door would be changing the day out from under the
+ *   score. The daily loop's own *"you can change all of them and the run stops counting"* routes to
+ *   the tuner, which is unbuilt and refuses in `screens.ts`'s words.
+ *   {@link EverydayHost.runCampaignDay} is **not** the exception it looks like: it writes a tower's
+ *   building id *and* its dispatcher id *and* presses run, as one indivisible campaign press, so no
+ *   screen can use it to move the standing selection without running the day that selection belongs
+ *   to — which is the § 8.5 press, not a setter wearing its clothes;
+ * - ~~no campaign works booking, no contract acceptance~~ — **built**: {@link EverydayHost.campaign}
+ *   and {@link EverydayHost.campaignAct} are GAMEPLAY § 8's three screens' whole surface, and the
+ *   career they read is described in `campaign/career.ts`;
  * - **no transport control** (pause, speed, seek) and no `playing` flag — **and this absence is now
  *   a decision rather than a gap.** The § 7 Everyday stage exists (`everyday/stageScreen.ts`) and it
  *   owns its own transport: {@link EverydayHost.recording} hands it the finished recording, which is
@@ -66,6 +72,13 @@ import type {
 } from '@elevator-sim/core/browser';
 
 import { specIsDirty } from '../authoring/dispatcherSpec.js';
+import {
+  applyCampaignAction,
+  openingCareer,
+  towerById,
+  type CampaignAction,
+  type CampaignCareer,
+} from '../campaign/career.js';
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
 import {
@@ -85,7 +98,7 @@ import {
   type PlainLeverView,
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
-import { contractById } from '../shift/contracts.js';
+import { contractById, statLineOf } from '../shift/contracts.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -198,6 +211,27 @@ export interface EverydayHost {
 
   /** The traffic profile for an id, or `undefined`. Honest lookup, as {@link buildingById}. */
   trafficProfileById(id: string): TrafficProfile | undefined;
+
+  /**
+   * `shift/contracts.ts#statLineOf`'s line for a building — `9 floors · 3 lifts · 240 people` — or
+   * `undefined` for an id this build did not resolve.
+   *
+   * On the host rather than in the screen because the line is generated from a **resolved**
+   * building (`docs/12` § 4.4: the file wins over any authored stat line), and resolving one needs
+   * the elevator specs the boot closure holds. A screen given only {@link buildingById}'s document
+   * would have to resolve it a second way, which is the two-copies-of-one-fact shape § 4.4 exists
+   * to prevent.
+   */
+  buildingSpecLine(id: string): string | undefined;
+
+  /**
+   * The career GAMEPLAY § 8's three campaign screens read — the whole record, as plain data.
+   *
+   * One object for all three screens, which is § 16 rule 14: *"the brief, the stage, the report and
+   * the calendar all read it"*. `campaign/career.ts` owns its shape and `campaign/economy.ts`
+   * derives every figure from it, so no screen counts anything.
+   */
+  campaign(): CampaignCareer;
 
   /** The dispatchers the reader saved, id and profile. Read-only. */
   savedDispatchers(): readonly SavedDispatcher[];
@@ -345,6 +379,31 @@ export interface EverydayHost {
   setPlainLever(id: PlainLeverId, value: number | boolean): void;
 
   /**
+   * Move the career — `campaign/career.ts#applyCampaignAction`, and the only writer of it.
+   *
+   * One channel rather than a method per verb, because an action is plain data and eleven methods
+   * would be eleven more names on a façade whose docstring argues for the smallest surface that has
+   * callers. The reducer refuses an action the record cannot legally take, and every control the
+   * screens draw is gated on the same predicate — so this arm is the second lock, never the first.
+   */
+  campaignAct(action: CampaignAction): void;
+
+  /**
+   * Run a campaign day on one tower — § 8.5's *"Lock it in and run day N"*, as one press.
+   *
+   * **This is what makes the standing order reach the simulation.** It writes the tower's building
+   * and its dispatcher into the run selection and then latches the same run press
+   * {@link startRun} does, so moving the select on the triage screen changes the legs of the next
+   * run rather than only a label — the standing requirement this repository has paid to learn,
+   * applied to a control before the panel around it was written.
+   *
+   * A no-op for a tower the career does not hold, and for one whose building this build did not
+   * resolve: running the shipped default under another building's name would be a substituted
+   * answer, which `buildingById`'s docstring already refuses one layer down.
+   */
+  runCampaignDay(towerId: string): void;
+
+  /**
    * Hear about state changes, so a screen re-renders. Returns the unsubscribe. See the module
    * docstring for the cadence (state changes, never per frame).
    */
@@ -432,6 +491,28 @@ function openTomorrowPatch(week: WeekState): Partial<ViewerState> {
  */
 export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost {
   const b = bindings;
+
+  /*
+   * The career, held here and nowhere else.
+   *
+   * It is **not** on `ViewerState`, and that is a decision rather than a shortcut: the campaign's
+   * twenty-day contracts, purses and wear clocks are a second progression beside `state.week`, and
+   * putting them on the persisted state would mean a schema, a migration and a reconciliation
+   * between two records that both claim to know what day it is. `campaign/career.ts`'s docstring
+   * carries the argument and names the cost — this build keeps no career between sessions, which
+   * the rail already says.
+   *
+   * Held in this closure rather than in a screen, because the three campaign screens mount and
+   * unmount as the player moves between them and a record that lived in one of them would be lost
+   * on every navigation. Seeded from the standing dispatcher so a fresh career's one building
+   * starts on whatever is driving today rather than on an id this module chose.
+   */
+  let career: CampaignCareer = openingCareer(b.state().dispatcherId);
+  const campaignListeners = new Set<() => void>();
+  const notifyCampaign = (): void => {
+    for (const listener of [...campaignListeners]) listener();
+  };
+
   return {
     week: () => b.state().week,
     contract: () => contractById(b.state().week.contractId),
@@ -460,6 +541,11 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       allDispatchers(b.resources, b.state().savedDispatchers).find((profile) => profile.id === id),
     trafficProfileById: (id) =>
       b.resources.trafficProfiles.profiles.find((profile) => profile.id === id),
+    buildingSpecLine: (id) => {
+      const resolved = b.resources.buildings.find((building) => building.id === id);
+      return resolved === undefined ? undefined : statLineOf(resolved);
+    },
+    campaign: () => career,
     savedDispatchers: () => b.state().savedDispatchers,
     recording: () => b.state().recording,
     dayStartS: () => b.dayStartS(),
@@ -529,7 +615,30 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       const applied = applyPlainLever(state.dispatcherSpec, state.levers, id, value);
       b.applyPatch({ dispatcherSpec: applied.spec, levers: applied.levers });
     },
-    subscribe: (listener) => b.onChange(listener),
+    campaignAct: (action) => {
+      const next = applyCampaignAction(career, action);
+      /* A refused action moves nothing and notifies nobody: a redraw over an unchanged record
+         would repaint a screen mid-interaction for no reason a player could see. */
+      if (next === career) return;
+      career = next;
+      notifyCampaign();
+    },
+    runCampaignDay: (towerId) => {
+      const tower = towerById(career, towerId);
+      if (tower === undefined) return;
+      if (!b.resources.buildings.some((building) => building.id === tower.buildingId)) return;
+      b.applyPatch({ buildingId: tower.buildingId, dispatcherId: tower.dispatcherId });
+      b.openRunTab();
+      b.startRun();
+    },
+    subscribe: (listener) => {
+      const stopState = b.onChange(listener);
+      campaignListeners.add(listener);
+      return () => {
+        campaignListeners.delete(listener);
+        stopState();
+      };
+    },
   };
 }
 

@@ -49,6 +49,7 @@
 import type { ActionBarModel } from './actionBar.js';
 import { BOARD_SCREEN } from './boardScreen.js';
 import { BRIEF_SCREEN } from './briefScreen.js';
+import { BUILDING_SCREEN, CONTRACT_SCREEN, TOWERS_SCREEN } from './campaignScreens.js';
 import { DOOR_SCREEN } from './doorScreen.js';
 import { FIXIT_SCREEN } from './fixitScreen.js';
 import type { EverydayHost } from './host.js';
@@ -112,6 +113,9 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     brief: BRIEF_SCREEN,
     stage: STAGE_SCREEN,
     report: REPORT_SCREEN,
+    towers: TOWERS_SCREEN,
+    building: BUILDING_SCREEN,
+    contract: CONTRACT_SCREEN,
     fixit: FIXIT_SCREEN,
     week: WEEK_SCREEN,
     board: BOARD_SCREEN,
@@ -170,9 +174,6 @@ export function routeFor(screen: EverydayScreen): EverydayRoute {
  * refusal is about the screen, never about the thing.
  */
 export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> = Object.freeze({
-  towers: 'the campaign runs, but its Everyday screens are not built yet',
-  building: 'the campaign runs, but its Everyday screens are not built yet',
-  contract: 'the campaign runs, but its Everyday screens are not built yet',
   rush: 'not built yet — the rush needs held time and a setup screen, and neither exists',
   workshop: 'the workshop screen is not built — the levers live on the stage for now',
   bench: 'the bench screen is not built — its suite runs from the Engineer shell',
@@ -190,6 +191,15 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
    * the daily half and false of the ladder — the half that needs no server and now opens. A
    * refusal whose screen has landed is the defect this keying exists to catch, and it is caught
    * by `screens.test.ts` in both directions rather than by anybody remembering.
+   *
+   * **Three more left together on the merge that brought § 8's campaign in, and the sentence they
+   * shared is the one to read.** `towers`, `building` and `contract` all said *"the campaign runs,
+   * but its Everyday screens are not built yet"* — a refusal `modes.ts`'s rule had already made as
+   * honest as it could be, naming the missing screen rather than the working engine behind it.
+   * `everyday/campaignScreens.ts` is that trio of screens, so all three keys route rather than
+   * refuse, and the sentence that was true of the engine-without-a-screen has nothing left to be
+   * true of. It is deleted rather than reworded: this table keys the unbuilt, and there is no arm
+   * of it for *built, but only just*.
    */
   tuner: 'the tuner screen is not built — the brief and the report both point at it, and there is nothing behind the door yet',
 });

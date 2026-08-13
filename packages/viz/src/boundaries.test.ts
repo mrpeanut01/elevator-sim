@@ -267,6 +267,8 @@ const EVERYDAY_SHELL_FILES = new Set([
   'everyday/fixitScreen.ts',
   /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
   'everyday/settingsScreen.ts',
+  /* GAMEPLAY § 8's three campaign screens — their words stay pure in campaignModel.ts. */
+  'everyday/campaignScreens.ts',
   /*
    * The § 7 stage's DOM half — its words, its figures and its geometry stay pure in
    * stageScreenModel.ts. It is the one Everyday file that also holds a `requestAnimationFrame`

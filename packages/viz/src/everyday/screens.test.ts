@@ -23,24 +23,26 @@ import {
 import { EVERYDAY_SCREENS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is the shell’s own menu and every registered module — the whole daily loop, plus fixit, the board and settings', () => {
+  it('is the shell’s own menu and every registered module — the whole daily loop, § 8’s three, plus fixit, the board and settings', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
      *
      * `fixit` was the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`) and
-     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`). Two lanes then landed six more
-     * between them: § 7's stage (`everyday/stageScreen.ts`) and § 14's board
+     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`). Three lanes then landed nine
+     * more between them: § 7's stage (`everyday/stageScreen.ts`) and § 14's board
      * (`everyday/boardScreen.ts` — the ladder half needs no server, so the screen opens and the
-     * daily board's tab carries § 12.2's labelled unavailable state instead), and § 6's daily loop
+     * daily board's tab carries § 12.2's labelled unavailable state instead), § 6's daily loop
      * — the front door, the brief, the report and Your week — which is what turns *Today's tower*
-     * from a hand-off into a loop.
+     * from a hand-off into a loop, and § 8's campaign trio, `towers`, `building` and `contract`
+     * (`everyday/campaignScreens.ts` — one module with three rows, because the three are one flow).
      *
      * The order is `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory
      * and not a record of what registered when. It is why this list can be recomputed from
-     * `types.ts` and the registry after a merge rather than reconstructed from two branches'
-     * registration orders.
+     * `types.ts` and the registry after a merge rather than reconstructed from three branches'
+     * registration orders — which is exactly what was done here, since no two of those lanes
+     * registered in the same order and none of their orders is this one.
      *
      * **`stage` moved sides without moving in this list**, which is the case worth reading twice:
      * it was shell-owned (the § D335 hand-off), it is now registered, and a list that only says
@@ -52,6 +54,9 @@ describe('what this build has actually built', () => {
       'brief',
       'stage',
       'report',
+      'towers',
+      'building',
+      'contract',
       'fixit',
       'week',
       'board',

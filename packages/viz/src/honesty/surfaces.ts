@@ -97,6 +97,15 @@ import {
 } from '../everyday/types.js';
 import { weekScreenViewOf } from '../everyday/weekView.js';
 import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
+import type { GoalObservations } from '../shift/types.js';
+import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
+import {
+  applyCampaignAction,
+  freshTower,
+  openingCareer,
+  type CampaignCareer,
+  type CampaignTower,
+} from '../campaign/career.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -7448,6 +7457,363 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
   },
 };
 
+/**
+ * **GAMEPLAY § 8's three campaign screens** — the triage list, the building desk and the contract
+ * sheet, driven over every state their pure half distinguishes.
+ *
+ * ## Why this surface is worth driving rather than sampling
+ *
+ * These screens are almost entirely **derived claims**: a record (`17 cleared · 1 missed`), a purse
+ * ledger, a wear head, a renewal priced off a clear rate, a rolling calendar whose columns and cells
+ * must come from one array, and a shop in which every tier states why it may not be bought. Each is
+ * an observation with a denominator on the face of it, which is R13's shape, and each is derived
+ * from `campaign/economy.ts` — so the honest failure mode here is not a wrong sentence but a right
+ * sentence about a figure nothing measured.
+ *
+ * Two of those are drawn as **refusals** and both are seeded as reasons rather than labels: the trip
+ * budget's *was* figure, which this simulator does not record, and § 8.8's offers, which need a
+ * complexity the contract publishes for six buildings and a week switch these screens do not reach.
+ * A refusal nothing sweeps is the sentence that goes stale the day somebody wires the seam it
+ * refuses about — which is § D227, and is why `CAMPAIGN_ABSENCES` is here too.
+ *
+ * ## The states, iterated rather than picked
+ *
+ * A first day with nothing bought; a two-tower career in its second month with a renewal due and a
+ * wear clock past its head; a month with works booked and a buy half-made; and a run on the stage,
+ * so the four tests grade rather than sit pending. `everyday/campaignScreens.ts` is **not** driven
+ * here and is excluded in `derive.test.ts` on the DOM mounts' shared ground — it needs a document,
+ * and what it authors of its own is geometry and class names.
+ */
+const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
+  id: 'everyday/campaignModel.ts#towersView',
+  covers: [
+    'everyday/campaignModel.ts#towersView',
+    'everyday/campaignModel.ts#buildingView',
+    'everyday/campaignModel.ts#contractView',
+    'everyday/campaignModel.ts#calendarView',
+    'everyday/campaignModel.ts#campaignTestRows',
+    'everyday/campaignModel.ts#campaignTestGoals',
+    'everyday/campaignModel.ts#testsHeldLine',
+    'everyday/campaignModel.ts#careerStageLabel',
+    'everyday/campaignModel.ts#recordLine',
+    'everyday/campaignModel.ts#TOWERS_COPY',
+    'everyday/campaignModel.ts#BUILDING_COPY',
+    'everyday/campaignModel.ts#CONTRACT_COPY',
+    'everyday/campaignModel.ts#WEAR_HEADS',
+    'everyday/campaignModel.ts#TEST_TENSIONS',
+    'everyday/campaignModel.ts#TRIPS_REFUSAL',
+    'everyday/campaignModel.ts#CALENDAR_LEGEND',
+    'everyday/campaignModel.ts#MONTH_LEGEND',
+    /* Reached through the three views above: every figure they print is one of these. */
+    'campaign/economy.ts#SHOP',
+    'campaign/economy.ts#SLOTS',
+    'campaign/economy.ts#DIFFICULTIES',
+    'campaign/economy.ts#shopTierState',
+    'campaign/economy.ts#worksDayLine',
+    'campaign/economy.ts#purseOf',
+    'campaign/economy.ts#shopTotalUnits',
+    'campaign/economy.ts#shopCategoryById',
+    'campaign/economy.ts#shopTierAt',
+    'campaign/economy.ts#slotsOpen',
+    'campaign/economy.ts#nextSlot',
+    'campaign/economy.ts#COMPLEXITY',
+    'campaign/economy.ts#complexityOf',
+    'campaign/economy.ts#earnedSoFar',
+    'campaign/economy.ts#carriedIn',
+    'campaign/economy.ts#atRiskTowers',
+    'campaign/economy.ts#contractIsLost',
+    'everyday/campaignModel.ts#CALENDAR_GLYPHS',
+    'campaign/career.ts#BUILD_IDS',
+    'campaign/career.ts#applyCampaignAction',
+    /* The record and its decisions — every option the desk offers is authored here. */
+    'campaign/career.ts#CAMPAIGN_ABSENCES',
+    'campaign/career.ts#needOf',
+    'campaign/career.ts#nextLineOf',
+    'campaign/career.ts#BUILD_LABELS',
+    'campaign/career.ts#openingCareer',
+    'campaign/career.ts#freshTower',
+    'campaign/career.ts#quirkOf',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    const buildings = new Map([
+      ['garden-apartments', { name: 'Garden Apartments', spec: '7 floors · 2 cars · 0.63 m/s · 240 people' }],
+      ['chancery-house', { name: 'Chancery House', spec: '20 floors · 6 cars · 5 m/s · 612 people' }],
+    ]);
+    const dispatchers = [
+      { id: 'eta', name: 'Minimum estimated wait', note: undefined, saved: false },
+      { id: 'mine', name: 'Morning Shift v3', note: undefined, saved: true },
+    ];
+
+    const first = openingCareer('eta');
+    const worn: CampaignTower = {
+      ...freshTower({ contractId: 'c6', buildingId: 'chancery-house', dispatcherId: 'mine', rate: 4 }),
+      day: 19,
+      missed: 1,
+      months: 2,
+      trips: 41_000,
+    };
+    const second: CampaignCareer = { ...first, today: 24, towers: [...first.towers, worn] };
+    const spending: CampaignCareer = {
+      ...first,
+      towers: [{ ...first.towers[0]!, day: 6, carry: 120 }],
+    };
+    const booked = applyCampaignAction(
+      applyCampaignAction(spending, {
+        kind: 'press-tier',
+        towerId: 'c1',
+        categoryId: 'machines',
+        level: 1,
+      }),
+      { kind: 'pick-start', startIdx: 11 },
+    );
+    const pending = applyCampaignAction(spending, {
+      kind: 'press-tier',
+      towerId: 'c1',
+      categoryId: 'doors',
+      level: 2,
+    });
+    /* A run on the stage, so the three measurable tests grade rather than sit pending. */
+    const observations: GoalObservations = {
+      arrived: 400,
+      carryPct: 97,
+      minutePct: 80,
+      peakQueue: 21,
+      abandoned: 0,
+      worstWaitS: 164,
+      worstWaitIsCensored: false,
+    };
+
+    const cases: readonly (readonly [string, CampaignCareer, GoalObservations | undefined])[] = [
+      ['first-day', first, undefined],
+      ['second-month', { ...second, openTowerId: 'c6' }, observations],
+      ['booked', booked, observations],
+      ['picking-a-night', pending, undefined],
+    ];
+
+    for (const [label, career, observed] of cases) {
+      const input = {
+        career,
+        buildings,
+        dispatchers,
+        observations: observed,
+        history: [],
+      } as const;
+
+      const towers = towersView(input);
+      seeds.push({ field: `${label}.towers.title`, text: towers.title, role: 'label' });
+      seeds.push({ field: `${label}.towers.stage`, text: towers.stagePill, role: 'label' });
+      seeds.push({ field: `${label}.towers.meta`, text: towers.meta, role: 'observation' });
+      seeds.push({ field: `${label}.towers.lede`, text: towers.lede, role: 'prose' });
+      seeds.push({ field: `${label}.towers.standing.note`, text: towers.standing.note, role: 'prose' });
+      seeds.push({ field: `${label}.towers.standing.value`, text: towers.standing.value, role: 'observation' });
+      for (const slot of towers.standing.slots) {
+        seeds.push({ field: `${label}.towers.slot.${slot.heading}.tag`, text: slot.tag, role: 'label' });
+        seeds.push({ field: `${label}.towers.slot.${slot.heading}.note`, text: slot.note, role: 'prose' });
+      }
+      for (const stat of towers.stats) {
+        seeds.push({
+          field: `${label}.towers.stat.${stat.label}`,
+          text: stat.value,
+          role: 'observation',
+        });
+        seeds.push({ field: `${label}.towers.stat.${stat.label}.note`, text: stat.note, role: 'prose' });
+      }
+      seeds.push({ field: `${label}.towers.calendar.note`, text: towers.calendar.note, role: 'prose' });
+      for (const entry of towers.calendar.legend) {
+        seeds.push({ field: `${label}.towers.legend.${entry.label}`, text: entry.label, role: 'label' });
+      }
+      for (const row of towers.calendar.rows) {
+        /* One tooltip per row is enough: they are one sentence with a day substituted. */
+        const cell = row.cells.find((entry) => entry.mark !== 'blank') ?? row.cells[0];
+        if (cell !== undefined) {
+          seeds.push({ field: `${label}.towers.calendar.${row.towerId}.tip`, text: cell.tip, role: 'label' });
+        }
+      }
+      for (const heading of towers.headings) {
+        seeds.push({ field: `${label}.towers.head.${heading}`, text: heading, role: 'label' });
+      }
+      for (const row of towers.rows) {
+        const at = `${label}.towers.row.${row.towerId}`;
+        seeds.push({ field: `${at}.spec`, text: row.spec, role: 'observation' });
+        seeds.push({ field: `${at}.quirk`, text: row.quirk, role: 'prose' });
+        seeds.push({ field: `${at}.terms`, text: row.terms, role: 'observation' });
+        seeds.push({ field: `${at}.day`, text: row.day, role: 'observation' });
+        /* `N cleared · M missed` is a record with both halves on its face — the R13 shape. */
+        seeds.push({ field: `${at}.record`, text: row.record, role: 'observation' });
+        seeds.push({ field: `${at}.wear`, text: row.wear, role: 'observation' });
+        seeds.push({ field: `${at}.order.note`, text: row.order.note, role: 'prose' });
+        for (const build of row.order.builds) {
+          seeds.push({ field: `${at}.build.${build.id}`, text: build.label, role: 'label' });
+        }
+        seeds.push({ field: `${at}.status`, text: row.status, role: 'label' });
+        seeds.push({ field: `${at}.statusSub`, text: row.statusSub, role: 'prose' });
+        seeds.push({ field: `${at}.cta`, text: row.cta, role: 'label' });
+      }
+      seeds.push({
+        field: `${label}.towers.footer`,
+        text: towers.footer,
+        role: 'observation',
+        declaredCount: towers.rows.length,
+      });
+      seeds.push({ field: `${label}.towers.offers`, text: towers.offers.refusal, role: 'reason' });
+      seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
+      seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
+      seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
+      for (const [index, entry] of towers.absences.entries.entries()) {
+        seeds.push({ field: `${label}.towers.absence.${String(index)}`, text: entry, role: 'reason' });
+      }
+
+      const desk = buildingView(input);
+      if (desk !== undefined) {
+        seeds.push({ field: `${label}.desk.name`, text: desk.name, role: 'label' });
+        seeds.push({ field: `${label}.desk.spec`, text: desk.spec, role: 'observation' });
+        seeds.push({ field: `${label}.desk.state`, text: desk.statePill, role: 'label' });
+        if (desk.need !== undefined) {
+          seeds.push({ field: `${label}.desk.need.allowance`, text: desk.need.allowance, role: 'observation' });
+          seeds.push({ field: `${label}.desk.need.due`, text: desk.need.due, role: 'label' });
+          seeds.push({ field: `${label}.desk.need.title`, text: desk.need.title, role: 'label' });
+          seeds.push({ field: `${label}.desk.need.brief`, text: desk.need.brief, role: 'prose' });
+          if (desk.need.offer !== undefined) {
+            seeds.push({ field: `${label}.desk.offer.rate`, text: desk.need.offer.rate, role: 'observation' });
+            seeds.push({ field: `${label}.desk.offer.head`, text: desk.need.offer.head, role: 'prose' });
+            seeds.push({ field: `${label}.desk.offer.why`, text: desk.need.offer.why, role: 'prose' });
+          }
+        }
+        if (desk.options !== undefined) {
+          seeds.push({ field: `${label}.desk.options.note`, text: desk.options.note, role: 'prose' });
+          seeds.push({ field: `${label}.desk.options.purse`, text: desk.options.purse, role: 'observation' });
+          for (const option of desk.options.rows) {
+            const at = `${label}.desk.option.${option.id}`;
+            seeds.push({ field: `${at}.label`, text: option.label, role: 'label' });
+            seeds.push({ field: `${at}.cost`, text: option.cost, role: option.affordable ? 'label' : 'reason' });
+            seeds.push({ field: `${at}.when`, text: option.when, role: 'label' });
+            seeds.push({ field: `${at}.effect`, text: option.effect, role: 'prose' });
+          }
+        }
+        if (desk.quiet !== undefined) {
+          seeds.push({ field: `${label}.desk.quiet.heading`, text: desk.quiet.heading, role: 'label' });
+          seeds.push({ field: `${label}.desk.quiet.body`, text: desk.quiet.body, role: 'prose' });
+          seeds.push({ field: `${label}.desk.quiet.next`, text: desk.quiet.next, role: 'prose' });
+        }
+        seeds.push({ field: `${label}.desk.order.sub`, text: desk.order.sub, role: 'prose' });
+        seeds.push({ field: `${label}.desk.order.note`, text: desk.order.view.note, role: 'prose' });
+        for (const row of desk.fitted.rows) {
+          seeds.push({ field: `${label}.desk.fitted.${row.categoryId}`, text: row.label, role: 'label' });
+          seeds.push({ field: `${label}.desk.fitted.${row.categoryId}.level`, text: row.level, role: 'observation' });
+        }
+        seeds.push({ field: `${label}.desk.purse.onHand`, text: desk.purse.onHand, role: 'observation' });
+        seeds.push({ field: `${label}.desk.purse.note`, text: desk.purse.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.purse.link`, text: desk.purse.link, role: 'label' });
+        seeds.push({ field: `${label}.desk.quirk`, text: desk.quirk.text, role: 'prose' });
+        seeds.push({ field: `${label}.desk.quirk.sub`, text: desk.quirk.sub, role: 'prose' });
+        seeds.push({ field: `${label}.desk.condition.head`, text: desk.condition.head, role: 'label' });
+        seeds.push({ field: `${label}.desk.condition.trips`, text: desk.condition.trips, role: 'observation' });
+        seeds.push({ field: `${label}.desk.condition.note`, text: desk.condition.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.rate.now`, text: desk.odds.now, role: 'observation' });
+        seeds.push({ field: `${label}.desk.rate.note`, text: desk.odds.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.temporary`, text: desk.temporary.body, role: 'reason' });
+        seeds.push({ field: `${label}.desk.month.day`, text: desk.month.day, role: 'observation' });
+        seeds.push({ field: `${label}.desk.month.cleared`, text: desk.month.cleared, role: 'observation' });
+        seeds.push({ field: `${label}.desk.month.missed`, text: desk.month.missed, role: 'observation' });
+        seeds.push({ field: `${label}.desk.tests.eyebrow`, text: desk.tests.eyebrow, role: 'label' });
+        seeds.push({ field: `${label}.desk.tests.note`, text: desk.tests.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.tests.held`, text: desk.tests.held, role: 'observation' });
+        for (const row of desk.tests.rows) {
+          const at = `${label}.desk.test.${row.id}`;
+          seeds.push({ field: `${at}.label`, text: row.label, role: 'label' });
+          seeds.push({ field: `${at}.target`, text: row.target, role: 'label' });
+          seeds.push({ field: `${at}.was`, text: row.was, role: 'observation' });
+          seeds.push({ field: `${at}.tension`, text: row.tension, role: 'prose' });
+          if (row.reading !== undefined) {
+            seeds.push({ field: `${at}.reading`, text: row.reading.display, role: 'observation' });
+          }
+          if (row.refusal !== undefined) {
+            seeds.push({ field: `${at}.refusal`, text: row.refusal, role: 'reason' });
+          }
+        }
+      }
+
+      const sheet = contractView(input);
+      if (sheet !== undefined) {
+        seeds.push({ field: `${label}.contract.title`, text: sheet.title, role: 'label' });
+        seeds.push({ field: `${label}.contract.meta`, text: sheet.meta, role: 'observation' });
+        seeds.push({ field: `${label}.contract.lede`, text: sheet.lede, role: 'prose' });
+        seeds.push({ field: `${label}.contract.difficulty.note`, text: sheet.difficulty.note, role: 'prose' });
+        seeds.push({ field: `${label}.contract.difficulty.footer`, text: sheet.difficulty.footer, role: 'prose' });
+        for (const entry of sheet.difficulty.buttons) {
+          seeds.push({ field: `${label}.contract.difficulty.${entry.id}`, text: entry.label, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.month.note`, text: sheet.month.note, role: 'observation' });
+        for (const head of sheet.month.heads) {
+          seeds.push({ field: `${label}.contract.head.${head}`, text: head, role: 'label' });
+        }
+        const cell = sheet.month.weeks[0]?.cells[0];
+        if (cell !== undefined) {
+          seeds.push({ field: `${label}.contract.month.tip`, text: cell.tip, role: 'label' });
+        }
+        if (sheet.month.prompt !== undefined) {
+          seeds.push({ field: `${label}.contract.month.prompt`, text: sheet.month.prompt, role: 'prose' });
+          seeds.push({ field: `${label}.contract.month.cancel`, text: sheet.month.cancel, role: 'label' });
+        }
+        for (const entry of sheet.month.booked) {
+          seeds.push({ field: `${label}.contract.booked.${entry.name}`, text: entry.when, role: 'observation' });
+        }
+        if (sheet.month.worksCost !== undefined) {
+          seeds.push({ field: `${label}.contract.worksCost`, text: sheet.month.worksCost, role: 'observation' });
+        }
+        for (const entry of sheet.month.legend) {
+          seeds.push({ field: `${label}.contract.legend.${entry}`, text: entry, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.purse.onHand`, text: sheet.purse.onHand, role: 'observation' });
+        seeds.push({ field: `${label}.contract.purse.note`, text: sheet.purse.note, role: 'observation' });
+        for (const week of sheet.purse.weeks) {
+          seeds.push({ field: `${label}.contract.purse.${week.label}`, text: week.value, role: 'observation' });
+          seeds.push({ field: `${label}.contract.purse.${week.label}.note`, text: week.note, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.rate.now`, text: sheet.purse.oddsNow, role: 'observation' });
+        seeds.push({ field: `${label}.contract.rate.after`, text: sheet.purse.oddsAfter, role: 'observation' });
+        seeds.push({ field: `${label}.contract.rate.note`, text: sheet.purse.oddsNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.carry`, text: sheet.purse.carryNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.kit`, text: sheet.purse.kitNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.tests.conflict`, text: sheet.tests.conflict, role: 'prose' });
+        seeds.push({ field: `${label}.contract.shop.eyebrow`, text: sheet.shop.eyebrow, role: 'label' });
+        seeds.push({ field: `${label}.contract.shop.sub`, text: sheet.shop.sub, role: 'prose' });
+        for (const category of sheet.shop.categories) {
+          const at = `${label}.contract.shop.${category.id}`;
+          seeds.push({ field: `${at}.name`, text: category.name, role: 'label' });
+          seeds.push({ field: `${at}.sub`, text: category.sub, role: 'prose' });
+          seeds.push({ field: `${at}.owned`, text: category.owned, role: 'observation' });
+          for (const row of category.rows) {
+            const tier = `${at}.${row.levelLabel}`;
+            seeds.push({ field: `${tier}.name`, text: row.name, role: 'label' });
+            seeds.push({ field: `${tier}.cost`, text: row.cost, role: 'observation' });
+            seeds.push({ field: `${tier}.effect`, text: row.effect, role: 'prose' });
+            seeds.push({
+              field: `${tier}.state`,
+              text: row.state,
+              role: row.pressable ? 'observation' : 'reason',
+            });
+          }
+        }
+        seeds.push({ field: `${label}.contract.terms.heading`, text: sheet.terms.heading, role: 'label' });
+        for (const row of sheet.terms.rows) {
+          seeds.push({ field: `${label}.contract.term.${row.label}`, text: row.label, role: 'label' });
+          seeds.push({ field: `${label}.contract.term.${row.label}.got`, text: row.got, role: 'observation' });
+        }
+        seeds.push({ field: `${label}.contract.shaft.heading`, text: sheet.shaft.heading, role: 'label' });
+        seeds.push({ field: `${label}.contract.shaft.body`, text: sheet.shaft.body, role: 'prose' });
+        seeds.push({ field: `${label}.contract.shaft.body2`, text: sheet.shaft.body2, role: 'prose' });
+      }
+    }
+
+
+    return singleRun(this.id, seeds);
+  },
+};
 
 /**
  * **GAMEPLAY § 7's stage** — Everyday Mode's own day screen, in the corpus.
@@ -8507,6 +8873,25 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 3.2's swap row and the
   // Engineer header's return, whose captions share a shape with the rail's other footer rows.
   ENGINEER_DOOR,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the second time this array has recorded that sentence and the first time it
+   * was recorded by a merge git did not stop to ask about.
+   *
+   * The campaign lane appended it after `WITHHELD_MATRIX`, which was the end of the array on that
+   * branch and is the middle of it here. There was **no conflict marker**: both branches added
+   * lines after a line they agreed on, so the textual merge simply took both and the adapter
+   * landed four surfaces up. Left there it would have sat ahead of `LIVE_METRICS`, `GAUNTLET`,
+   * `EVERYDAY_DAILY_LOOP` and `ENGINEER_DOOR` — and its own comment names the collision it would
+   * cause, because § 8's three screens share record-shaped phrases with the week's surfaces and
+   * `EVERYDAY_DAILY_LOOP` is where the week now lives. Every week-shaped fault would have moved
+   * onto this surface without a line of either branch changing, which is the failure `EVERYDAY_DAILY_LOOP`'s
+   * own note (four entries above) describes from the other side.
+   *
+   * The rule is applied to the merged array rather than to either branch's, and a clean auto-merge
+   * is not evidence that it was: this position was chosen, not inherited.
+   */
+  EVERYDAY_CAMPAIGN,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
