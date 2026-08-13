@@ -321,15 +321,31 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
        * claim under test is the § D227 guarantee: the rail refuses in the registry's sentence,
        * as words on the row, never as a `title` attribute nobody hovers.
        */
-      const row = await page.evaluate(() => {
-        const rows = [...document.querySelectorAll('.everyday-rail button')];
-        const workshop = rows.find((r) => (r.textContent ?? '').includes('Dispatcher workshop'));
-        return workshop instanceof HTMLButtonElement
-          ? { disabled: workshop.disabled, text: workshop.textContent ?? '' }
-          : null;
-      });
-      expect(row?.disabled).toBe(true);
-      expect(row?.text).toContain('the workshop screen is not built');
+      const rowFor = async (label: string) =>
+        page.evaluate((wanted) => {
+          const rows = [...document.querySelectorAll('.everyday-rail button')];
+          const found = rows.find((r) => (r.textContent ?? '').includes(wanted));
+          return found instanceof HTMLButtonElement
+            ? { disabled: found.disabled, text: found.textContent ?? '' }
+            : null;
+        }, label);
+
+      const designer = await rowFor('Design a building');
+      expect(designer?.disabled).toBe(true);
+      expect(designer?.text).toContain('the designer screen is not built');
+
+      /*
+       * And the other direction, which is the half § D227 is about and the half that moved: the
+       * workshop and the bench landed and left `UNBUILT_REASONS` on the same commit, so their
+       * rows open and carry no refusal. The subject of this case is the pair *refuses ⇔ unbuilt*,
+       * so it is asserted both ways rather than repointed at whichever screen is unbuilt today —
+       * the same move the Settings case above made when § 15.1 landed.
+       */
+      for (const label of ['Dispatcher workshop', 'Test bench']) {
+        const row = await rowFor(label);
+        expect(row?.disabled, label).toBe(false);
+        expect(row?.text, label).not.toContain('not built');
+      }
     } finally {
       await page.close();
     }
