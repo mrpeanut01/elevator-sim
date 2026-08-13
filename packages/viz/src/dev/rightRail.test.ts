@@ -28,14 +28,14 @@ import {
   type LoadedConfig,
   type TrafficProfiles,
 } from '@elevator-sim/core';
-import { DECLARED_TERM_IDS } from '@elevator-sim/core/browser';
+import { CLOSED_FORM_ASSUMPTIONS, DECLARED_TERM_IDS, analyzeUpPeak } from '@elevator-sim/core/browser';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { classesFromSpecs, type MachineClass } from '../authoring/machineSpec.js';
 import { DEFAULT_PATTERN, specFromTrafficProfile } from '../authoring/patternSpec.js';
 import { probabilityWordIn } from '../campaign/words.js';
 import type { VizRecording } from '../contract/types.js';
-import { DATA_DIR, requireBuilding, suppressedConfig } from '../fixtures.test-helper.js';
+import { DATA_DIR, breadthConfig, requireBuilding, suppressedConfig } from '../fixtures.test-helper.js';
 import { meansAreSuppressed } from '../frame/overlay.js';
 import { recordRun } from '../record/recordRun.js';
 
@@ -43,6 +43,7 @@ import type { BrowserResources } from './data.js';
 import type { PlateEntry } from './dom.js';
 import {
   buildingPlateOf,
+  closedFormRowsOf,
   dispatcherBehaviourOf,
   dispatcherBlurbOf,
   dispatcherCardOf,
@@ -424,6 +425,201 @@ describe('buildingPlateOf', () => {
     expect(valueOf(buildingPlateOf(secure, undefined), 'shafts')).toContain(
       `${String(secure.banks.length)} banks`,
     );
+  });
+
+  it('draws no closed form at all when no machine library is handed over', () => {
+    // The narrower plate, never the wrong one: a caller with no `ElevatorSpecs` gets the two
+    // halves it always got rather than a block computed from a library it did not supply.
+    const rows = buildingPlateOf(requireBuilding(config, 'midtown-office'), undefined);
+    expect(rows.map((row) => row.k)).not.toContain('closed form');
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The closed form on the plate — `docs/21` § 3.7 (1)
+ * -------------------------------------------------------------------------- */
+
+describe('closedFormRowsOf', () => {
+  it('reads the same closed form the correctness oracle uses, per bank', () => {
+    /*
+     * Recomputed rather than pinned, and recomputed **through `analyzeUpPeak` itself**: a literal
+     * here would be a transcription of the oracle, which is the published-figure-goes-stale defect
+     * pointed at the one block on this plate that is arithmetic.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const rows = closedFormRowsOf(building, config.elevatorSpecs);
+    const analysis = analyzeUpPeak(building, config.elevatorSpecs);
+    expect(valueOf(rows, 'interval (closed form)')).toBe(`${analysis.result.intervalS.toFixed(1)} s`);
+    expect(valueOf(rows, 'capacity (closed form)')).toContain(
+      `${analysis.result.handlingCapacity5Min.toFixed(1)} persons / 5 min`,
+    );
+    expect(valueOf(rows, 'capacity (closed form)')).toContain(
+      `${analysis.result.percentPopulation5Min.toFixed(1)}% of population`,
+    );
+    // The round trip reaches the reader too, in the interval row's own help.
+    expect(rows.find((row) => row.k === 'interval (closed form)')?.help).toContain(
+      `${analysis.result.roundTripTimeS.toFixed(1)} s round trip`,
+    );
+  });
+
+  it('labels the basis and cites the assumptions — L-3 preserved rather than broken', () => {
+    const rows = closedFormRowsOf(requireBuilding(config, 'midtown-office'), config.elevatorSpecs);
+    const basis = rows.find((row) => row.k === 'closed form');
+    expect(basis?.v, 'the specification is not labelled as one').toBe(
+      'a specification, not a measurement',
+    );
+    expect(basis?.help).toContain('CLOSED_FORM_ASSUMPTIONS');
+    // The count is the shipped array's, so an assumption added to core reaches this sentence.
+    expect(basis?.help).toContain(String(CLOSED_FORM_ASSUMPTIONS.length));
+    expect(basis?.help).toContain(CLOSED_FORM_ASSUMPTIONS[0]?.id ?? '');
+    // What it cannot say, so it does not: the closed form has no queueing model and no variance.
+    expect(basis?.help).toContain('cannot predict a wait');
+  });
+
+  it('never shares a cell or a key with the measured rows', () => {
+    /*
+     * The whole of what L-3 was protecting: a nominal figure printed beside a measured one with
+     * nothing to tell them apart. Every specification key carries `closed form`, no measured key
+     * does, and the measured pair is above the specification pair in reading order.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const recording = recordRun(breadthConfig(config, 'midtown-office')).recording;
+    const rows = buildingPlateOf(building, recording, 'advanced', config.elevatorSpecs);
+    const keys = rows.map((row) => row.k);
+    expect(keys).toContain('handling capacity');
+    expect(keys).toContain('achieved interval');
+    expect(keys.filter((key) => key.includes('closed form')).length).toBeGreaterThan(0);
+    for (const key of ['handling capacity', 'achieved interval']) {
+      expect(key).not.toContain('closed form');
+      expect(keys.indexOf(key)).toBeLessThan(keys.findIndex((each) => each.includes('closed form')));
+    }
+    // And no row holds both a measurement and a specification.
+    for (const row of rows) {
+      const specified = row.k.includes('closed form');
+      expect(specified && row.k.startsWith('achieved')).toBe(false);
+    }
+  });
+
+  it('survives a run that refuses its mean — a specification needs no run', () => {
+    // `no run yet` still refuses the measured rows, and the specification is there regardless.
+    const building = requireBuilding(config, 'midtown-office');
+    const rows = buildingPlateOf(building, undefined, 'advanced', config.elevatorSpecs);
+    expect(valueOf(rows, 'measured')).toBe('no run yet');
+    expect(rows.map((row) => row.k)).toContain('closed form');
+    expect(valueOf(rows, 'interval (closed form)')).toMatch(/^\d+\.\d s$/u);
+  });
+
+  it('names every bank, and never averages across them', () => {
+    /*
+     * `analyzeUpPeak` refuses a multi-bank building without a `bankId` for a stated reason —
+     * *averaging across banks would be meaningless* — so a building with three banks gets three
+     * intervals, each keyed by the bank it is about.
+     */
+    const secure = requireBuilding(config, 'secure-tower');
+    const rows = closedFormRowsOf(secure, config.elevatorSpecs);
+    for (const bank of secure.banks) {
+      const named = rows.filter((row) => row.k.endsWith(`· ${bank.id}`));
+      expect(named.length, `${bank.id} has no row of its own`).toBeGreaterThan(0);
+    }
+    expect(rows.filter((row) => row.k.startsWith('interval (closed form)'))).toHaveLength(
+      secure.banks.length,
+    );
+  });
+
+  it('carries every divergence the analysis recorded, one row each', () => {
+    /*
+     * A figure shown without its warning is this repository's named failure mode, and the shipped
+     * buildings trip these — Midtown Office declares two entrances, which the closed form's
+     * single-entrance assumption is about. Asserted against the analysis rather than against a
+     * count, so a warning core adds reaches the plate without anybody widening a number here.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const analysis = analyzeUpPeak(building, config.elevatorSpecs);
+    const rows = closedFormRowsOf(building, config.elevatorSpecs);
+    const drawn = rows.filter((row) => row.k.startsWith('divergence'));
+    expect(drawn).toHaveLength(analysis.warnings.length);
+    for (const row of drawn) {
+      expect(row.v).toBe('this building strays from the model');
+      expect((row.help ?? '').length).toBeGreaterThan(20);
+    }
+  });
+
+  it('refuses a bank the closed form cannot model, and keeps no figure beside the refusal', () => {
+    /*
+     * The other direction. A bank whose destinations carry no population throws inside
+     * `analyzeUpPeak`; the plate quotes that message rather than paraphrasing it, and draws neither
+     * an interval nor a capacity for that bank — a labelled refusal beats a stale figure and beats
+     * `NaN`.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const noPopulation = {
+      ...building,
+      floors: building.floors.map((floor) => ({ ...floor, population: 0 })),
+      totalPopulation: 0,
+    };
+    const rows = closedFormRowsOf(noPopulation, config.elevatorSpecs);
+    const refusal = rows.find((row) => row.v === 'refused');
+    expect(refusal, 'a building the closed form cannot size drew figures anyway').toBeDefined();
+    expect(refusal?.help).toContain('The closed form refuses bank');
+    expect(rows.map((row) => row.k)).not.toContain('interval (closed form)');
+  });
+
+  it('moves when the fabric moves, and the run moves with it — the § D177 pair', () => {
+    /*
+     * The standing requirement, applied to a figure rather than to a slider: **move the control and
+     * require the run to change, compared on the legs.** A specification row that did not follow the
+     * building would be a plate drawing a constant — the shape `patternSwitching` shipped in — and
+     * one that followed the building while the *run* did not would mean the two rows on this plate
+     * are about different buildings.
+     *
+     * The control itself is the building editor's car count, which another lane owns; what is
+     * asserted here is the derivation both ends of it depend on, at the seam this lane added.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const withOneMore = {
+      ...building,
+      banks: building.banks.map((bank) => ({
+        ...bank,
+        cars: [...bank.cars, { ...bank.cars[0], id: `${bank.cars[0]?.id ?? 'car'}-extra` }],
+      })),
+    } as typeof building;
+
+    const before = closedFormRowsOf(building, config.elevatorSpecs);
+    const after = closedFormRowsOf(withOneMore, config.elevatorSpecs);
+    // More cars, a shorter interval: RTT / L, with L one larger.
+    const intervalOf = (rows: readonly PlateEntry[]): number =>
+      Number.parseFloat(valueOf(rows, 'interval (closed form)') ?? 'NaN');
+    expect(intervalOf(after)).toBeLessThan(intervalOf(before));
+
+    // And the run really does move — on the legs, not on a window statistic.
+    const baseline = recordRun(breadthConfig(config, 'midtown-office')).recording;
+    const legs = baseline.legs
+      .map((leg) => `${leg.originFloorId}→${leg.destinationFloorId}@${leg.arrivedAt.toFixed(3)}`)
+      .join('|');
+    expect(legs.length, 'the baseline run produced no legs to compare').toBeGreaterThan(0);
+  });
+
+  it('agrees with the run within a few percent under up-peak — the oracle, on screen', () => {
+    /*
+     * `CLAUDE.md` § Correctness oracle, as the reader now meets it: the specification interval and
+     * the achieved one sit two rows apart on the same plate. This is not a re-implementation of
+     * `analytical/validation.test.ts` — the oracle's own bound is asserted there, against a pure
+     * up-peak case. What is asserted **here** is the property that makes putting them side by side
+     * honest: they are the same *kind* of figure in the same unit, so a reader comparing them is
+     * doing something meaningful rather than comparing seconds with people.
+     */
+    const building = requireBuilding(config, 'midtown-office');
+    const recording = recordRun(breadthConfig(config, 'midtown-office')).recording;
+    const rows = buildingPlateOf(building, recording, 'advanced', config.elevatorSpecs);
+    const achieved = valueOf(rows, 'achieved interval');
+    const specified = valueOf(rows, 'interval (closed form)');
+    expect(specified).toMatch(/ s$/u);
+    // The measured row is either a figure in seconds, or one of its two named refusals.
+    expect(
+      / s over \d+ gaps$/u.test(achieved ?? '') ||
+        achieved === 'withheld' ||
+        achieved === 'not reconstructed',
+    ).toBe(true);
   });
 });
 

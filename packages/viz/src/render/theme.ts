@@ -212,6 +212,22 @@ function shellTokensOf(palette: Palette): Readonly<Record<string, string>> {
     '--band-2': palette.bandLong,
     '--band-3': palette.bandAbandoned,
     /*
+     * The elevation's eight shaft tints — `render/tokens.ts#SHAFT_GOLD` and its seven siblings say
+     * why they are palette fields rather than literals in `dev/buildingEditor.ts`. They are
+     * **shell** tokens and not stage ones: the elevation is DOM, and the editor writes them into
+     * inline styles, which is precisely why they had to stop being a private list — an inline
+     * style is not reached by a `:root[data-theme]` block, so a mode-blind literal there is a
+     * colour no theme can repaint (§ D251).
+     */
+    '--shaft-1': palette.shaftGold,
+    '--shaft-2': palette.shaftSage,
+    '--shaft-3': palette.shaftTerracotta,
+    '--shaft-4': palette.shaftBrass,
+    '--shaft-5': palette.shaftSlate,
+    '--shaft-6': palette.shaftTan,
+    '--shaft-7': palette.shaftGrey,
+    '--shaft-8': palette.shaftMustard,
+    /*
      * Three **stage** colours the shell now needs, and § D236 is why: the stage key in
      * `index.html` draws a swatch per car state and per direction, and a key drawn in a different
      * colour from the thing it keys is a fifth copy of the palette — the defect this whole file

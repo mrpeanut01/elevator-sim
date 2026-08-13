@@ -318,9 +318,11 @@ describe('the stage asks for less gutter when the shafts do not fit', () => {
      * Measured before the change: **Vertical City shows 27 of 35 at 1920**. `RS-05`'s *"showing 27
      * of 35"* notice was doing its job and saying so, and eight shafts of a building whose whole
      * subject is its shafts were off the picture on the largest screen anybody has — because
-     * `QUEUE_GUTTER_PX` and `OVERLAY_WIDTH_PX` were handed over unchanged whatever was being drawn.
+     * `QUEUE_GUTTER_PX` and a 250 px metrics panel were handed over unchanged whatever was being
+     * drawn. The panel is DOM since `docs/21` § 3.4, so the ladder is gutters only and every
+     * building starts wider than it did; the claim is unchanged and can only have got easier.
      */
-    const layout = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(35), wantsOverlay: true });
+    const layout = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(35) });
     expect(layout.hiddenShaftCount, 'shafts are still being dropped at a desktop canvas').toBe(0);
     expect(layout.columns).toHaveLength(35);
   });
@@ -328,32 +330,21 @@ describe('the stage asks for less gutter when the shafts do not fit', () => {
   it('is inert for a building that already fitted', () => {
     /*
      * The other direction, and the one that would be expensive to get wrong: a ladder that yielded
-     * scenery it did not need to would take the live-metrics panel off a six-shaft building for no
-     * reason. The first rung is the request that shipped, so a picture that was right does not move.
+     * scenery it did not need to would narrow a six-shaft building's picture for no reason. The
+     * first rung is the request that shipped, so a picture that was right does not move.
+     *
+     * `overlayWidthPx: 250` used to be part of *the request that shipped* and is gone with the
+     * panel (`docs/21` § 3.4). The first rung is the rider gutter alone now, and this asserts the
+     * ladder still stops there rather than yielding it.
      */
-    const roomy = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(6), wantsOverlay: true });
+    const roomy = stageLayoutFor({ ...CANVAS, floors, shafts: shaftsOf(6) });
     const asShipped = buildLayout({
       ...CANVAS,
       floors,
       shafts: shaftsOf(6),
       gutterRightPx: 280,
-      overlayWidthPx: 250,
     });
-    expect(roomy.overlay, 'a building that fits lost its metrics panel').toBeDefined();
     expect(roomy.plot).toEqual(asShipped.plot);
-  });
-
-  it('never re-enables an overlay RS-03 has dropped', () => {
-    // `wantsOverlay` answers a different question — the canvas is too narrow for the panel at all —
-    // and a rung that turned it back on would be this function overruling that rule.
-    const narrow = stageLayoutFor({
-      width: 600,
-      height: 720,
-      floors,
-      shafts: shaftsOf(35),
-      wantsOverlay: false,
-    });
-    expect(narrow.overlay).toBeUndefined();
   });
 
   it('still draws a picture when nothing on the ladder fits them all', () => {
@@ -364,7 +355,6 @@ describe('the stage asks for less gutter when the shafts do not fit', () => {
       height: 640,
       floors,
       shafts: shaftsOf(35),
-      wantsOverlay: false,
     });
     expect(phone.columns.length).toBeGreaterThan(0);
     expect(phone.hiddenShaftCount).toBeGreaterThan(0);
@@ -1649,5 +1639,33 @@ describe('the submit path asks the predicate its own docstring names — GitHub 
       asked,
       'the predicate is asked after the request has already gone, which refuses nothing',
     ).toBeLessThan(posted);
+  });
+});
+
+describe('an intervention re-simulation is not a new attempt — docs/20 defect 17', () => {
+  /*
+   * The decision itself is `shift/week.ts#closeDay`'s `recordGrew` parameter and is driven in
+   * `week.test.ts`; what only this file can pin is the wiring, which lives inside `boot()` where
+   * no Node test can call it. Two sites, each read at the source in `reportPanel.test.ts`'s
+   * binding-site idiom: the intervention button is the one caller allowed to start a run as
+   * `'intervention'`, and `closeShift` is the one reader that turns the latch into the flag
+   * `closedWeekOf` gates the attempt count on. A latch written by nobody, or written and never
+   * read, would leave `week.test.ts` green while the sheet counts a parked car as a retry.
+   */
+  async function mainSource(): Promise<string> {
+    return readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+  }
+
+  it('exactly one run start says intervention, and it is the intervention button’s', async () => {
+    const source = await mainSource();
+    // The callback-closing shape of the one legitimate site, `}, 'intervention')` — a second
+    // caller passing the cause would count here and go red by name.
+    const starts = source.match(/\}, 'intervention'\)/g) ?? [];
+    expect(starts.length, 'one runShift call carries the cause').toBe(1);
+  });
+
+  it('closeShift hands the latch to closedWeekOf, where it gates the attempt', async () => {
+    const source = await mainSource();
+    expect(source).toContain("closedWeekOf(state, outcome, runCause === 'intervention')");
   });
 });

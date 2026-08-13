@@ -39,9 +39,23 @@
  * to reach, so it cannot be tested and it drifts.
  */
 
-import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
+import {
+  SimulationError,
+  type BuildingConfig,
+  type RunInterventionConfig,
+} from '@elevator-sim/core/browser';
 
-import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
+import {
+  provideEngineerSettings,
+  type EngineerSettingsBridge,
+} from '../everyday/engineerBridge.js';
+import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from '../everyday/host.js';
+import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
+import {
+  ENGINEER_RETURN_LABEL,
+  ENGINEER_RETURN_TITLE,
+  EVERYDAY_ROOT_CLASS,
+} from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
@@ -113,7 +127,13 @@ import {
 import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   GHOST_OPTIONS,
@@ -146,6 +166,7 @@ import {
   type Theme,
 } from '../render/canvas.js';
 import { describeFrame } from '../render/describeFrame.js';
+import { overlayViewOf, type OverlayView } from '../render/overlay.js';
 import { buildLayout, type Layout, type ShaftGeometry } from '../render/layout.js';
 import {
   CARD_HEIGHT,
@@ -214,6 +235,7 @@ import {
   clearSession,
   loadLibrary,
   loadSession,
+  patchMovesTheWeek,
   patchTouchesLibrary,
   saveSession,
 } from '../persist/session.js';
@@ -229,6 +251,7 @@ import {
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
+  drivingProfileOf,
   initialState,
   profileById,
   resolvedBuildingOf,
@@ -240,7 +263,7 @@ import {
   type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
-import { ghostPlanOf } from './ghostRun.js';
+import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
 import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
@@ -287,16 +310,21 @@ const DEFAULT_BASE_SPEED = 60;
 
 /** Width of the right gutter, where the landing counts and the rider queues are drawn. */
 const QUEUE_GUTTER_PX = 280;
-/** Width reserved for the live metrics panel. Dropped below this viewport width — `RS-03`. */
-const OVERLAY_WIDTH_PX = 250;
-const OVERLAY_MIN_VIEWPORT_PX = 900;
+/*
+ * `OVERLAY_WIDTH_PX` (250) and `OVERLAY_MIN_VIEWPORT_PX` (900) used to sit here — the room the
+ * live metrics panel was given inside the bitmap, and the canvas width below which `RS-03` took it
+ * away. Both are gone with `docs/21` § 3.4: the panel is a DOM card under the stage, so it needs no
+ * room on the canvas and it does not disappear on a narrow viewport — it **stacks**, which is what
+ * RS-03 asks of controls and is more rather than less. The room the panel was holding is the
+ * plot's now, which is the beneficiary § D316 named.
+ */
 
 /**
  * What the stage asks for around the plot, widest request first — GitHub issue #41.
  *
  * ## The defect: two numbers that were the same at every width and every building
  *
- * {@link QUEUE_GUTTER_PX} and {@link OVERLAY_WIDTH_PX} were passed to `buildLayout` unchanged
+ * {@link QUEUE_GUTTER_PX} and a 250 px metrics panel were passed to `buildLayout` unchanged
  * whatever was being drawn, so 530 px of a canvas went to scenery whether the building had two
  * shafts or thirty-five. Measured: **Vertical City draws 27 of 35 at a 1920 px viewport** —
  * `RS-05`'s *"showing 27 of 35"* notice is doing its job and saying so, and eight shafts of a
@@ -311,21 +339,24 @@ const OVERLAY_MIN_VIEWPORT_PX = 900;
  * building one and reading `Layout.hiddenShaftCount`, which is the layout's own measurement of
  * exactly this question, already carried for the `RS-05` notice.
  *
- * The rungs yield in `fitGutters`' own order and for its stated reason — *the overlay panel is a
- * whole surface and goes first, then the right gutter*. The last rung asks for **nothing**, which
- * hands the layout its own documented default rather than a floor copied from it: this file never
- * names a minimum, and `layout.ts` still clamps whatever it is handed.
+ * The rungs yield in `fitGutters`' own order and for its stated reason. The last rung asks for
+ * **nothing**, which hands the layout its own documented default rather than a floor copied from
+ * it: this file never names a minimum, and `layout.ts` still clamps whatever it is handed.
  *
  * A building that fits on rung one stays on rung one, so no picture that was right moves.
+ *
+ * **It had a first rung that also asked for the metrics panel**, and dropping it was the ladder's
+ * whole first step. `docs/21` § 3.4 moved that panel to the DOM, so the ladder is gutters only and
+ * every building starts 250 px wider than it did — a shaft that was hidden at rung one can only
+ * become visible.
  */
-const STAGE_GUTTER_LADDER: readonly { readonly gutter: number; readonly overlay: boolean }[] =
+const STAGE_GUTTER_LADDER: readonly { readonly gutter: number }[] =
   Object.freeze([
-    { gutter: QUEUE_GUTTER_PX, overlay: true },
-    { gutter: QUEUE_GUTTER_PX, overlay: false },
-    { gutter: Math.round(QUEUE_GUTTER_PX / 2), overlay: false },
+    { gutter: QUEUE_GUTTER_PX },
+    { gutter: Math.round(QUEUE_GUTTER_PX / 2) },
     // `gutter: 0` is *ask for nothing*, which `buildLayout` reads as its own `DEFAULTS.gutterRightPx`
     // — see the note above about never copying that number here.
-    { gutter: 0, overlay: false },
+    { gutter: 0 },
   ]);
 /** One display frame at 60 Hz, in simulated seconds at the current speed — `KB-06`, `PB-08`. */
 const FRAME_S = 1 / 60;
@@ -409,24 +440,21 @@ export function waitLegendEntries(bands?: WaitBands | undefined): readonly WaitL
  * whether they fit, and asking it is what keeps this file free of a copy of `render/layout.ts`'s
  * private minimums.
  *
- * `wantsOverlay` stays the caller's, because it answers a different question — `RS-03` drops the
- * live-metrics panel below 900 px of canvas whether or not the shafts fit — and a rung that
- * re-enabled it would be this function overruling that rule.
+ * It took a `wantsOverlay` until `docs/21` § 3.4, because `RS-03` dropped the live-metrics panel
+ * below 900 px of canvas whether or not the shafts fit. The panel is DOM now and reserves nothing
+ * here, so the question is gone rather than answered.
  */
 export function stageLayoutFor(options: {
   readonly width: number;
   readonly height: number;
   readonly floors: readonly VizFloor[];
   readonly shafts: readonly ShaftGeometry[];
-  readonly wantsOverlay: boolean;
 }): Layout {
-  const { wantsOverlay, ...rest } = options;
   let last: Layout | undefined;
   for (const rung of STAGE_GUTTER_LADDER) {
     const layout = buildLayout({
-      ...rest,
+      ...options,
       ...(rung.gutter === 0 ? {} : { gutterRightPx: rung.gutter }),
-      overlayWidthPx: rung.overlay && wantsOverlay ? OVERLAY_WIDTH_PX : 0,
     });
     if (layout.hiddenShaftCount === 0) return layout;
     last = layout;
@@ -437,7 +465,7 @@ export function stageLayoutFor(options: {
    * that refused to draw would turn *some shafts do not fit* into *no picture at all*, which is
    * § D234's own defect.
    */
-  return last ?? buildLayout({ ...rest, overlayWidthPx: 0 });
+  return last ?? buildLayout(options);
 }
 
 /* ========================================================================== *
@@ -688,6 +716,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
   /**
+   * Why the run on screen was started — `docs/20` defect 17, and the one fact `closeShift` cannot
+   * read off the recording.
+   *
+   * ENGINE_CONTRACT § 1.4: an intervention is **the same run's record growing** — append to the
+   * log, re-simulate from t = 0 — never a new run. But the record cannot testify to that at filing
+   * time, because a plain retry of an unchanged selection reproduces the same `{seed, config}` too
+   * (§ D223's correction inside `closeDay`'s docstring). So the *intent* is latched where it
+   * exists: {@link runShift} writes it on every start, `'player'` unless the caller says
+   * otherwise, and the intervention button is the one caller that says otherwise. `closeShift`
+   * hands it to `closedWeekOf`, where it gates exactly one thing — the attempt count. A player who
+   * pressed *Run* once and parked once has made one attempt at the day, not two.
+   *
+   * A third `let` beside {@link filedRunId} and {@link simulatedRecording} on their own rule:
+   * *has this run been filed?*, *did we run it?* and *why did it start?* are three questions, and
+   * § D311 is what happens when two of them share a flag.
+   */
+  let runCause: 'player' | 'intervention' = 'player';
+  /**
    * The run **this shell simulated**, as opposed to the run on screen — GitHub issue #136.
    *
    * The two are the same except after {@link loadRecordingFile}, which is the whole of the issue:
@@ -851,6 +897,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * has not, has not.
    */
   let filedThisSitting = false;
+
+  /**
+   * Who the Everyday data host notifies when the state changes — the listener half of
+   * `everyday/host.ts`'s `subscribe`. Filled through the bindings' `onChange`, drained at the end
+   * of {@link renderAll}, which is the one choke point every state write already passes through —
+   * so a subscriber hears about exactly the changes a panel would redraw for, and never about a
+   * playhead frame ({@link renderLive} deliberately does not notify; the host's `playheadS` is a
+   * pull).
+   *
+   * A `const` array, but declared up here with the `let`s all the same: `renderAll` runs in
+   * boot's own sequence below, and a `const` after that sequence is the TDZ throw the guard in
+   * `main.test.ts` exists for — that guard's regex watches `let` only, so this comment is the
+   * fence for the `const` case.
+   */
+  const everydayHostListeners: (() => void)[] = [];
 
   /*
    * **Both of the two below are here for `carBadgeHits`' reason, and both were not.**
@@ -1037,8 +1098,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       top: '10px',
       left: '10px',
       'z-index': '5',
-      background: '#23201C',
-      color: '#FBF7EF',
+      // The spectator pill inverts with the page, as `watchPanel.ts`'s chrome does and for
+      // § 14.1's reason — the two ground tokens read upside down, never a literal.
+      background: 'var(--text)',
+      color: 'var(--bg)',
       padding: '4px 10px',
       'border-radius': '999px',
       font: '11px/1.2 system-ui, sans-serif',
@@ -2399,6 +2462,21 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (result.ok) void loadBoards();
   }
 
+  /*
+   * The Everyday settings screen's Motion row, wired to **this** menu's switch rather than to a
+   * second value — `everyday/engineerBridge.ts` has the whole argument. The write goes through
+   * `dispatchMenu` as the same `set-setting` intent `menu/screens.ts`'s `settings.reduce-motion`
+   * toggle dispatches, so the application (`playback?.pause()`), the redraw and `saveSessionNow()`
+   * all happen exactly as they would from the Engineer menu, and the two surfaces cannot disagree.
+   */
+  const engineerSettingsBridge: EngineerSettingsBridge = {
+    reduceMotion: () => menuState.settings.reduceMotion,
+    setReduceMotion: (value) => {
+      dispatchMenu({ kind: 'set-setting', field: 'reduceMotion', value: value ? 'on' : 'off' });
+    },
+  };
+  provideEngineerSettings(engineerSettingsBridge);
+
   const menuHost: MenuPanelHost = {
     doc: document,
     catalogue: menuCatalogue,
@@ -2752,6 +2830,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * only thing that action can honestly mean. It also needs no new element on a page whose markup
    * is canonical (`docs/12` § D174).
    */
+  /*
+   * The `recomputing` beat — contract § 1.4: re-simulate synchronously below ~400 ms; above it,
+   * a beat rather than a freeze. The re-run is a worker round trip, so the stage never freezes;
+   * what the beat buys is the stamp slot saying *why* the day is about to change under the
+   * playhead. Armed on press by {@link appendIntervention}, shown only once 400 ms of wall clock
+   * have genuinely passed — a 181 ms building must not flash it — and settled by *whatever* ends
+   * the run. Wall clock, deliberately: this measures the player's wait, which is the one duration
+   * the kernel's clock cannot see.
+   *
+   * **Declared above the runner that settles it, and that placement is the fix rather than a
+   * filing choice.** The settle happens in `onRunning(false)` — the one hook that sees a success,
+   * a cancel and a failure alike — so the state it clears must exist before the runner is
+   * constructed. It did not: these three sat with the strip a hundred lines below, and only an
+   * accident of boot order (nothing starts a run in between) kept a `ReferenceError` off the
+   * page. The strip's own elements stay where they are; only the state moves, because
+   * `settleRecompute` touches no DOM.
+   */
+  let interventionRecomputeTimer: number | undefined;
+  let interventionRecomputing = false;
+  const settleRecompute = (): void => {
+    if (interventionRecomputeTimer !== undefined) window.clearTimeout(interventionRecomputeTimer);
+    interventionRecomputeTimer = undefined;
+    interventionRecomputing = false;
+  };
+
   const shiftRunner = createShiftRunner({
     spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
     clock,
@@ -2771,7 +2874,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * job's own callback, and this is the one hook that also sees a cancel and a failure, so
        * the race strip's *waiting* line can never outlive the run it was waiting for.
        */
-      if (!running) ghostInFlight = false;
+      if (!running) {
+        ghostInFlight = false;
+        /*
+         * And neither can the intervention strip's `recomputing` beat — review finding 4. The
+         * success path settles it in its own `runShift` callback; a failed or cancelled re-run
+         * never reaches that callback, and a beat left standing would promise a recompute that
+         * stopped happening. Idempotent when no timer is armed, so ordinary runs pay nothing.
+         */
+        settleRecompute();
+      }
     },
     onFailed: (message) => {
       failRun(message);
@@ -2805,6 +2917,209 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * band set and built once, and the playhead only ever writes text into these four nodes.
    */
   let legendCountCells: readonly HTMLElement[] = [];
+
+  /* ---------------------------------------------------------------------- *
+   * LIVE METRICS, as a card — `docs/21` § 3.4
+   * ---------------------------------------------------------------------- */
+
+  /**
+   * The three lists' fills, and the cells each build hands back.
+   *
+   * ## Why this is keyed structure plus written cells, and not a `fill`
+   *
+   * `renderLive` runs at 60 Hz and every figure on this card moves. A `fill` per frame is GitHub
+   * issue #106 exactly — the detached-button defect — and two of its three consequences are live
+   * here: a reader scrolling the car list of Vertical City's thirty-five cars would lose their
+   * place sixty times a second, and a `title` could never appear because hover is cancelled before
+   * the browser's delay elapses. `dev/watchPanel.ts` records the third.
+   *
+   * So each list is keyed on its **structure** — which banks exist, which cars, which arm the
+   * estimate is in — and the moving parts are text and style writes into nodes the build handed
+   * back. That is `legendCountCells`' pattern above, and it is the only shape that survives a
+   * panel whose every value changes on every frame.
+   */
+  const fillLiveFigures = keyedFill(ui.liveMetrics.figures);
+  const fillLiveBanks = keyedFill(ui.liveMetrics.banks);
+  const fillLiveCars = keyedFill(ui.liveMetrics.cars);
+  let liveObservationCells: readonly HTMLElement[] = [];
+  let liveEstimateCell: HTMLElement | undefined;
+  let liveBankCells: readonly { readonly boarded: HTMLElement; readonly mean: HTMLElement }[] = [];
+  let liveCarCells: readonly {
+    readonly fill: HTMLElement;
+    readonly mark: HTMLElement;
+    readonly load: HTMLElement;
+  }[] = [];
+
+  /** A label-and-value row. The value cell is handed back so the playhead can write into it. */
+  function liveRow(label: string, className = 'lm-value'): {
+    readonly node: HTMLElement;
+    readonly value: HTMLElement;
+  } {
+    const value = el(document, 'span', { className });
+    return {
+      node: el(document, 'div', {
+        className: 'live-metrics-row',
+        children: [el(document, 'span', { className: 'lm-label', text: label }), value],
+      }),
+      value,
+    };
+  }
+
+  /**
+   * Draw the live metrics card from one view — the same view the honesty sweep drives.
+   *
+   * Every word comes from `render/overlay.ts#overlayViewOf`, in the reader's own register, and
+   * nothing here decides a format: the view hands over strings. What this function decides is
+   * which node a string goes in, which is the split `dev/dom.ts` documents and the only one that
+   * keeps the panel drivable without a document.
+   *
+   * **The refusal arm draws no value cell at all.** `OverlayEstimate`'s refused member carries no
+   * `value` field, so this is a property of the type rather than of the care taken here — `docs/10`
+   * R3, made structural by the migration.
+   */
+  function drawLiveMetrics(view: OverlayView): void {
+    setText(ui.liveMetrics.title, view.title);
+    setText(ui.liveMetrics.window, view.window);
+
+    const estimate = view.estimate;
+    fillLiveFigures(
+      [
+        view.observations.map((row) => row.label).join('|'),
+        estimate.kind,
+        estimate.label,
+        estimate.kind === 'refused' ? `${estimate.head}|${estimate.reason}|${estimate.basis}` : '',
+      ].join('~'),
+      () => {
+        const rows = view.observations.map((row) => liveRow(row.label));
+        liveObservationCells = rows.map((row) => row.value);
+        const nodes: Node[] = rows.map((row) => row.node);
+        if (estimate.kind === 'refused') {
+          liveEstimateCell = undefined;
+          nodes.push(
+            el(document, 'div', {
+              className: 'live-metrics-row',
+              children: [el(document, 'span', { className: 'lm-label', text: estimate.label })],
+            }),
+            el(document, 'p', {
+              className: 'live-metrics-refusal',
+              children: [
+                el(document, 'span', { className: 'lm-head', text: estimate.head }),
+                el(document, 'span', { className: 'lm-reason', text: estimate.reason }),
+              ],
+            }),
+          );
+        } else {
+          const row = liveRow(estimate.label);
+          liveEstimateCell = row.value;
+          nodes.push(row.node);
+        }
+        return nodes;
+      },
+    );
+    for (const [index, row] of view.observations.entries()) {
+      const cell = liveObservationCells[index];
+      if (cell !== undefined) setText(cell, row.value);
+    }
+    if (liveEstimateCell !== undefined && estimate.kind !== 'refused') {
+      setText(liveEstimateCell, estimate.value);
+    }
+
+    fillLiveBanks(
+      [
+        view.bankHeading,
+        view.banksEmpty ?? '',
+        view.banks.map((bank) => `${bank.bankId}${bank.refused ? '!' : ''}`).join('|'),
+      ].join('~'),
+      () => {
+        const heading = el(document, 'div', {
+          className: 'live-metrics-head-row',
+          text: view.bankHeading,
+        });
+        if (view.banksEmpty !== undefined) {
+          liveBankCells = [];
+          return [
+            heading,
+            el(document, 'div', { className: 'live-metrics-row', children: [
+              el(document, 'span', { className: 'lm-label', text: view.banksEmpty }),
+            ] }),
+          ];
+        }
+        const built = view.banks.map((bank) => {
+          const boarded = el(document, 'span', { className: 'lm-value' });
+          const mean = el(document, 'span', {
+            className: bank.refused ? 'lm-value lm-refused' : 'lm-value',
+          });
+          return {
+            node: el(document, 'div', {
+              className: 'live-metrics-row',
+              children: [
+                el(document, 'span', { className: 'lm-label', text: bank.bankId }),
+                el(document, 'span', { children: [boarded, document.createTextNode('  '), mean] }),
+              ],
+            }),
+            boarded,
+            mean,
+          };
+        });
+        liveBankCells = built.map((entry) => ({ boarded: entry.boarded, mean: entry.mean }));
+        return [heading, ...built.map((entry) => entry.node)];
+      },
+    );
+    for (const [index, bank] of view.banks.entries()) {
+      const cells = liveBankCells[index];
+      if (cells === undefined) continue;
+      setText(cells.boarded, bank.boarded);
+      setText(cells.mean, bank.mean);
+    }
+
+    fillLiveCars(
+      [
+        view.carHeading,
+        view.cars
+          .map((car) => `${car.carId}·${car.label}·${car.tone}${car.overloaded ? '!' : ''}`)
+          .join('|'),
+      ].join('~'),
+      () => {
+        const heading = el(document, 'div', {
+          className: 'live-metrics-head-row',
+          text: view.carHeading,
+        });
+        const built = view.cars.map((car) => {
+          const bar = el(document, 'span', { className: `live-metrics-fill lm-tone-${car.tone}` });
+          const mark = el(document, 'span', { className: 'live-metrics-full-mark' });
+          const load = el(document, 'span', {
+            className: car.overloaded ? 'lm-load lm-overloaded' : 'lm-load',
+          });
+          return {
+            node: el(document, 'div', {
+              className: 'live-metrics-car',
+              children: [
+                el(document, 'span', { className: 'lm-car-label', text: car.label }),
+                el(document, 'span', { className: 'live-metrics-track', children: [bar, mark] }),
+                load,
+              ],
+            }),
+            fill: bar,
+            mark,
+            load,
+          };
+        });
+        liveCarCells = built.map((entry) => ({
+          fill: entry.fill,
+          mark: entry.mark,
+          load: entry.load,
+        }));
+        return [heading, ...built.map((entry) => entry.node)];
+      },
+    );
+    for (const [index, car] of view.cars.entries()) {
+      const cells = liveCarCells[index];
+      if (cells === undefined) continue;
+      cells.fill.style.width = `${(car.fillFraction * 100).toFixed(2)}%`;
+      cells.mark.style.left = `${(car.fullMarkFraction * 100).toFixed(2)}%`;
+      setText(cells.load, car.load);
+    }
+  }
 
   /* ---------------------------------------------------------------------- *
    * The intervention strip — Everyday Mode slice 3 (contract § 1.4, § 7.6)
@@ -2847,9 +3162,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
         'everything before this moment is unchanged, and playback resumes here',
     },
   });
+  /*
+   * The second intervention — § 20.12's own ordering (*start with park the cars in the lobby,
+   * then dispatcher switching*). The target is the plain baseline through `plainBaselineOf`, the
+   * § D134 resolution the ghost already uses, so the driver this hands the day to and the rival
+   * the race strip draws cannot be two different dispatchers. The label speaks the profile's
+   * *name*; the core arm carries the profile whole, exactly as `ghostRun.ts` swaps the field.
+   */
+  const switchTarget = plainBaselineOf(resources);
+  const switchButton = el(document, 'button', {
+    className: 'chip',
+    text: switchTarget === undefined ? '' : switchDispatcherLabelOf(switchTarget.name),
+    attrs: {
+      type: 'button',
+      // The pin, stated where the player decides — SWITCH_PINS_NOTE's own docstring (§ D227:
+      // a behaviour nothing states is a stale refusal waiting to happen).
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        SWITCH_PINS_NOTE,
+    },
+  });
+  setHidden(switchButton, switchTarget === undefined);
   const interventionStrip = el(document, 'div', {
     style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
-    children: [interventionButton, interventionStamp],
+    children: [interventionButton, switchButton, interventionStamp],
   });
   {
     // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
@@ -2857,27 +3193,99 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
   }
 
-  interventionButton.addEventListener('click', () => {
-    if (state.recording === undefined || playback === undefined) return;
-    const atS = playback.simTimeS;
-    state = {
-      ...state,
-      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
-    };
+  /**
+   * § 1.4's *record growing*, in one place — the button below and the Everyday stage's control both
+   * land here.
+   *
+   * **`atS` is the caller's playhead rather than this shell's**, and that is what makes one
+   * implementation serviceable for two stages. The Engineer button passes its own transport's
+   * position; `everyday/stageScreen.ts` runs its own `Playback` over the same recording and passes
+   * *its* position, which is the instant the player was actually looking at. Reading `playback`
+   * here instead would stamp an Everyday intervention wherever this surface happened to be paused —
+   * a change filed at a moment nobody saw.
+   *
+   * A second copy of this in the host bindings would be two different runs from one press, which is
+   * the shape `docs/20` defect 17 already had to unpick once.
+   */
+  function interveneAt(atS: number, change: RunInterventionConfig['change']): void {
+    if (state.recording === undefined) return;
+    state = { ...state, interventions: [...state.interventions, { atS, change }] };
     renderAll();
+    settleRecompute();
+    interventionRecomputeTimer = window.setTimeout(() => {
+      interventionRecomputing = true;
+      setText(interventionStamp, RECOMPUTING_BEAT);
+    }, 400);
     runShift(() => {
       // After adopt: the new Playback exists by the time a run lands, and seeking does not
       // start or stop playback — a reader who was paused stays paused at the stamped instant.
+      settleRecompute();
       playback?.seekTo(atS);
-    });
+      // The one `runShift` call that is § 1.4's *record growing* rather than a new ask — see
+      // {@link runCause}. Said here, at the site that appended to the log a few statements up,
+      // because intent exists nowhere else: the re-simulated recording is indistinguishable from
+      // a retry's. Both controls funnel through this helper, so both inherit the cause.
+    }, 'intervention');
+  }
+
+  interventionButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    interveneAt(playback.simTimeS, { kind: 'park-cars-lobby' });
+  });
+  switchButton.addEventListener('click', () => {
+    if (state.recording === undefined || playback === undefined) return;
+    if (switchTarget === undefined) return;
+    interveneAt(playback.simTimeS, { kind: 'switch-dispatcher', profile: switchTarget });
   });
 
-  /** The strip's two live facts: whether the control can act now, and the latest stamp. */
+  /** A profile's vector, canonically — key order is authoring noise, not a difference. */
+  const vectorOf = (weights: Readonly<Record<string, number>>): string =>
+    JSON.stringify(
+      Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
+    );
+  /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
+  let switchNoopCache: { readonly forState: ViewerState; readonly noop: boolean } | undefined;
+  /**
+   * Whether pressing the switch would genuinely change nothing — review finding 2. The old
+   * check compared base **ids**, and the driving profile is *derived* (levers, selector, rules —
+   * `drivingProfileOf`'s chain), so it disabled the control exactly where pressing it would
+   * change the run: a lever-moved player handing the day back to the plain baseline. § D177's
+   * inert-control class with the polarity reversed. Now: with a handover already on the log, the
+   * press is a no-op only if that handover names this target (the pin makes later state moot);
+   * otherwise the press is a no-op only if the *vector actually driving* equals the target's —
+   * compared canonically, through the one derivation `shiftRunConfigOf` itself runs — **and** no
+   * chooser is live, because on a rules or selector profile the switch also stands the chooser
+   * down, which is a change even at equal base weights.
+   */
+  const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
+    if (switchTarget === undefined) return true;
+    let latest: string | undefined;
+    for (const entry of viewState.interventions) {
+      if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
+    }
+    if (latest !== undefined) return latest === switchTarget.id;
+    if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
+    const driving = drivingProfileOf(resources, viewState);
+    const noop =
+      vectorOf(driving.weights) === vectorOf(switchTarget.weights) &&
+      (driving.selection?.policy ?? 'off') === 'off';
+    switchNoopCache = { forState: viewState, noop };
+    return noop;
+  };
+
+  /** The strip's live facts: whether each control can act now, and the latest stamp. */
   function drawIntervention(view: ViewAt): void {
     const hasRun = view.recording !== undefined;
     // Disabled rather than hidden while no run is on screen: a control that cannot act now says
     // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
     interventionButton.disabled = !hasRun;
+    // Also disabled when the press would genuinely change nothing — a handover to the vector
+    // already driving is a control that moves nothing, which § D177 ranks below no control at all.
+    switchButton.disabled = !hasRun || switchWouldChangeNothing(view.state);
+    if (interventionRecomputing) {
+      setText(interventionStamp, RECOMPUTING_BEAT);
+      return;
+    }
     setText(
       interventionStamp,
       interventionStampOf(view.state.interventions, view.simTimeS, runStartOfDayS),
@@ -2904,8 +3312,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * *the library moved* is a fact rather than a convention each editor has to remember. See
        * {@link patchTouchesLibrary} for why no debounce is needed: the hot patches — a slider drag
        * writing `dispatcherSpec` — do not touch a shelf, and the ones that do are button presses.
+       *
+       * **And the week is written the moment it moves** — `docs/20` defect 14, the same defect
+       * about the campaign's progress instead of its library. *Open the doors on tomorrow*
+       * advanced the week here and the advanced day did not reach `localStorage` until the end of
+       * the day the press started, so a tab closed a second after the press lost it. Same fix,
+       * same choke point, second predicate — {@link patchMovesTheWeek} holds the census of the
+       * three sites that patch a week and why none of them is hot, and § D231's `weeksForSession`
+       * still decides *what* gets written on every save this triggers.
        */
-      if (patchTouchesLibrary(patch)) saveSessionNow();
+      if (patchTouchesLibrary(patch) || patchMovesTheWeek(patch)) saveSessionNow();
       renderAll();
     },
     runShift(onRan) {
@@ -3188,6 +3604,61 @@ function boot(ui: Elements, resources: BrowserResources): void {
   syncUrl();
   requestAnimationFrame(tick);
 
+  /*
+   * The Everyday data host — `everyday/host.ts`'s bindings, implemented against this closure and
+   * published for the shell `everyday/boot.ts` mounted while this boot was still fetching data.
+   *
+   * Every binding is a thin read of a closure fact or a press of a seam that already exists;
+   * every derivation over them lives in `createEverydayHost`, where it is testable without a
+   * document. Two are worth naming here because they are the § 3.4 latch's own grounds:
+   *
+   * - `runIsOwn` is `bankingRefusalFor`'s identity comparison, read rather than re-argued — a
+   *   watched or file-loaded run is somebody else's, and § 3.4 exempts it (*there is nothing of
+   *   yours to lose*);
+   * - `playerHasChosen` is § D232's flag, so boot's own demo run never arms the confirm strip —
+   *   a warning about a run nobody started would be theatre (issue #39's class).
+   *
+   * `startRun` goes through `context.runShift`, which is one of `playerStartedARun`'s two latch
+   * sites — a run the host starts is a run a player pressed for, on a screen this shell cannot
+   * see, and it must file exactly as the Run button's does.
+   *
+   * Published after the boot sequence above, so a host method can never observe a half-booted
+   * closure. Everything the Engineer surface does is unchanged when nothing consumes this: the
+   * bindings write nothing at publish time, and the listener list drains empty.
+   */
+  const everydayHostBindings: EverydayHostBindings = {
+    resources,
+    state: () => state,
+    playheadS: () => playback?.simTimeS ?? state.recording?.startedAt ?? 0,
+    dayClosed: () => state.recording !== undefined && filedRunId === state.recording.runId,
+    runIsOwn: () => state.recording !== undefined && state.recording === simulatedRecording,
+    playerHasChosen: () => playerHasChosen,
+    dayStartS: () => runStartOfDayS,
+    startRun: () => {
+      context.runShift();
+    },
+    intervene: (atS, change) => {
+      interveneAt(atS, change);
+    },
+    closeDay: () => {
+      closeShift();
+    },
+    openRunTab: () => {
+      context.openTab('run');
+    },
+    applyPatch: (patch) => {
+      context.update(patch);
+    },
+    onChange: (listener) => {
+      everydayHostListeners.push(listener);
+      return () => {
+        const at = everydayHostListeners.indexOf(listener);
+        if (at >= 0) everydayHostListeners.splice(at, 1);
+      };
+    },
+  };
+  EVERYDAY_HOST.publish(createEverydayHost(everydayHostBindings));
+
   /* ====================================================================== *
    * Rendering
    * ====================================================================== */
@@ -3297,6 +3768,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
     drawIntervention(view);
     drawWatching();
     drawStage();
+    /*
+     * The Everyday host's subscribers, last — after every panel above, so a screen that reads the
+     * host inside its listener reads the same state the page has just been drawn from. Over a
+     * snapshot, so a listener that unsubscribes (or subscribes a sibling) mid-notification does
+     * not skip or double-call a neighbour.
+     */
+    for (const listener of [...everydayHostListeners]) listener();
   }
 
   /**
@@ -3335,8 +3813,8 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // The inverted treatment — § 14.1's *"the single strongest signal"*. Inline rather than in
       // `index.html`'s stylesheet for `waitLiveRegion`'s stated reason: the sheet is not this
       // lane's to edit, and the class above is what a future sheet would hook.
-      headerEl.style.setProperty('background', view === undefined ? '' : '#23201C');
-      headerEl.style.setProperty('color', view === undefined ? '' : '#FBF7EF');
+      headerEl.style.setProperty('background', view === undefined ? '' : 'var(--text)');
+      headerEl.style.setProperty('color', view === undefined ? '' : 'var(--bg)');
     }
     watchPanel.showChrome(view, watching?.run);
     watchPill.style.display = view === undefined ? 'none' : 'block';
@@ -3785,6 +4263,36 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.header.openMenu.addEventListener('click', () => {
       dispatchMenu({ kind: 'reopen' });
     });
+
+    /*
+     * GAMEPLAY § 3.2's swap, returning — the half that makes the door two-way.
+     *
+     * The rail row in the other shell opens this surface; for one wave nothing brought a player
+     * back, so crossing over stranded them in the developer tool for the rest of the visit. This is
+     * that way back, and it is deliberately the *player's* control rather than a debug affordance:
+     * it sits beside `Menu`, which is the other "leave this surface" button, and it presses through
+     * `everyday/swap.ts`'s port so this module never names the Everyday shell.
+     *
+     * **Both words come from `everyday/types.ts`.** `index.html` carries the id and nothing else —
+     * the rail's own row reads its note from the same module, and two shells describing one door in
+     * two wordings is exactly what that module was extracted to prevent.
+     *
+     * The control is `hidden` until a shell is mounted, and it is not refused when none is: on a
+     * page with no Everyday Mode there is no world to go back to, so a sentence saying the swap is
+     * unavailable would be claiming one exists. `everyday/swap.ts`'s docstring has the argument.
+     * Nothing unsubscribes because this boot runs once and lives as long as the document.
+     */
+    ui.header.backToEveryday.textContent = ENGINEER_RETURN_LABEL;
+    ui.header.backToEveryday.title = ENGINEER_RETURN_TITLE;
+    const showSwapDoor = (): void => {
+      ui.header.backToEveryday.hidden = everydaySwap() === undefined;
+    };
+    showSwapDoor();
+    onEverydaySwapProvided(showSwapDoor);
+    ui.header.backToEveryday.addEventListener('click', () => {
+      everydaySwap()?.returnToEveryday();
+    });
+
     ui.header.viewMode.addEventListener('change', () => {
       const value = ui.header.viewMode.value;
       if (!isViewMode(value)) return;
@@ -4258,7 +4766,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * calling this, and on a synchronous run that overlay was painted over a finished recording.
    * See {@link applyShift}.
    */
-  function runShift(onRan?: (recording: VizRecording) => void): void {
+  function runShift(
+    onRan?: (recording: VizRecording) => void,
+    cause: 'player' | 'intervention' = 'player',
+  ): void {
+    // Latched per start, so the value `closeShift` reads is about the run that will land — the
+    // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
+    // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
+    runCause = cause;
     setText(ui.transport.error, '');
     /*
      * The restore notice survives boot's own run and nothing after it.
@@ -4872,7 +5387,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * it, because a decision made inside this closure needs a document, a canvas and a click to
      * reach — which is why this one went four modes without a test.
      */
-    const week = closedWeekOf(state, outcome);
+    /*
+     * `recordGrew` — `docs/20` defect 17. A re-file caused by the intervention button is the same
+     * run's record growing (ENGINE_CONTRACT § 1.4), so it replaces the day's effect without
+     * counting an attempt; {@link runCause} is where the intent was latched and `closeDay`'s
+     * docstring is where the one thing it gates is argued.
+     */
+    const week = closedWeekOf(state, outcome, runCause === 'intervention');
     filedReportInput = {
       recording,
       observations,
@@ -5087,12 +5608,17 @@ function boot(ui: Elements, resources: BrowserResources): void {
     if (recording === undefined || playback === undefined) {
       context2d.clearRect(0, 0, width, height);
       setHidden(ui.stage.alarm, true);
+      /*
+       * The card goes with the picture — `docs/21` L-5's *hidden: a slot with nothing to say*. Not
+       * an empty card with its headings still on it: a caption over nothing is R3's blank where a
+       * number should be, one container up.
+       */
+      setHidden(ui.liveMetrics.root, true);
       canvas.setAttribute('aria-label', 'No shift has been run yet, so the stage is empty.');
       return;
     }
 
     const frame = playback.frame();
-    const wantsOverlay = width >= OVERLAY_MIN_VIEWPORT_PX;
     // SG-15: the filter narrows what is laid out, so the shown bank gets the whole plot width.
     // Everything keyed by floor — queues, landings, locked-out marks — stays whole-building.
     const bank = shaftsForBank(recording.shafts, bankFilter);
@@ -5106,9 +5632,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
       height,
       floors: recording.floors,
       shafts: bank.shafts,
-      wantsOverlay,
     });
+    /*
+     * The live metrics, drawn as a **card under the stage** rather than into this bitmap —
+     * `docs/21` § 3.4. Computed here rather than in a mount of its own because `overlayAt` is a
+     * scan over the recording's legs and this function already needs the frame at the same instant;
+     * two scans per frame for one panel would be the cache `frame/overlay.ts` refuses to have.
+     */
     const overlay = overlayAt(recording, frame.simTimeS);
+    setHidden(ui.liveMetrics.root, false);
+    drawLiveMetrics(overlayViewOf(overlay, frame, state.mode));
     const assignments: readonly LandingAssignment[] = landingAssignmentsAt(recording, frame.simTimeS);
     const lockedOut: readonly LockedOutLanding[] = lockedOutAt(recording, frame.simTimeS);
     const hits = drawScene(context2d as unknown as Canvas2DLike, {
@@ -5117,7 +5650,6 @@ function boot(ui: Elements, resources: BrowserResources): void {
       frame,
       dispatcherName: dispatcherNameOf(recording),
       layout,
-      overlay: wantsOverlay ? overlay : undefined,
       selection: selectionFor(assignments),
       unservedFloorIds: unservedFloorsOf(recording),
       unansweredCallFloorIds: assignments
@@ -6491,7 +7023,8 @@ if (typeof document !== 'undefined') {
   void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     const pre = document.createElement('pre');
-    pre.style.cssText = 'color:#e0473a;padding:12px;white-space:pre-wrap;font:12px ui-monospace,monospace';
+    pre.style.cssText =
+      'color:var(--bad);padding:12px;white-space:pre-wrap;font:12px var(--mono)';
     pre.textContent = `The viewer did not start.\n\n${message}`;
     document.body.prepend(pre);
   });

@@ -74,6 +74,7 @@ import {
   clearSession,
   loadLibrary,
   loadSession,
+  patchMovesTheWeek,
   patchTouchesLibrary,
   saveSession,
 } from './session.js';
@@ -610,6 +611,67 @@ describe('a patch that moves the library is recognised as one', () => {
     }
     // And the table the shipped code decides through is the ledger's, not a second copy of it.
     expect(Object.entries(LIBRARY_STATE_KEYS).sort()).toEqual(Object.entries(LIBRARY_FROM).sort());
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A save is written when the week moves — docs/20 defect 14
+ * -------------------------------------------------------------------------- */
+
+describe('a patch that moves the week is recognised as one', () => {
+  /*
+   * ## The defect this is the gate for
+   *
+   * Progress was written on a delay. *Open the doors on tomorrow* advanced the week through
+   * `MountContext.update`, which saved only on {@link patchTouchesLibrary} — so the advanced day
+   * reached `localStorage` when the **next incidental writer** ran, which is `closeShift` at the
+   * end of the day the press had just started. The audit measured it as a player: reload one second
+   * after the press and yesterday comes back; wait six and today does. There was no timer to
+   * remove — the "debounce" was the distance to the next unrelated save — so the fix is issue
+   * #113 § 2's, applied to progress: a second predicate at the same choke point, and the write is
+   * synchronous on the press.
+   */
+  it('is true for the patch Open the doors on tomorrow sends', () => {
+    // The shape from `dev/reportPanel.ts`'s `#report-next-day` handler, key for key.
+    expect(
+      patchMovesTheWeek({
+        week: nextDay(viewerState().week),
+        recording: undefined,
+        report: undefined,
+        tomorrow: undefined,
+        withheld: [],
+        interventions: [],
+      }),
+    ).toBe(true);
+  });
+
+  it('is true for a scenario switch, which parks the live week in the same patch', () => {
+    // `dev/scenariosPanel.ts` and the report sheet's switch-confirm both move the pair together —
+    // `weeksForSession`'s own invariant — so either key alone must be enough to trigger the write.
+    expect(patchMovesTheWeek({ parkedWeeks: [] })).toBe(true);
+    expect(patchMovesTheWeek({ week: viewerState().week, parkedWeeks: [] })).toBe(true);
+  });
+
+  it('is false for the patches a drag produces, which is what keeps the choke point cheap', () => {
+    // The same hot path the library predicate is measured against: nothing an `input` handler
+    // patches carries a week, so the second predicate adds no write to a slider drag.
+    expect(patchMovesTheWeek({ dispatcherSpec: viewerState().dispatcherSpec })).toBe(false);
+    expect(patchMovesTheWeek({ buildingSpec: viewerState().buildingSpec })).toBe(false);
+    expect(patchMovesTheWeek({ levers: viewerState().levers })).toBe(false);
+    expect(patchMovesTheWeek({ seed: 42n })).toBe(false);
+    expect(patchMovesTheWeek({})).toBe(false);
+  });
+
+  it('is asked at the choke point, beside the library’s — the flush is on the press, not a timer', () => {
+    /*
+     * The wiring pin, in `reportPanel.test.ts`'s binding-site idiom. The predicate being right is
+     * worthless if `dev/main.ts` never asks it: this is the line that makes the write synchronous
+     * at the action, and a patch-shaped test cannot see whether it exists.
+     */
+    const shell = readFileSync(fileURLToPath(new URL('../dev/main.ts', import.meta.url)), 'utf8');
+    expect(shell).toContain(
+      'if (patchTouchesLibrary(patch) || patchMovesTheWeek(patch)) saveSessionNow();',
+    );
   });
 });
 

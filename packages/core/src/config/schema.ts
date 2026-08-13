@@ -992,10 +992,59 @@ export const dispatcherProfilesSchema = z
         weightSetsByPattern: z.record(identifier, identifier),
       })
       .optional(),
+    /*
+     * The named play styles a Casual surface offers over the library — GAMEPLAY §11.2, and
+     * `config/types.ts#PlayStyle` for why they are data and why they are file-level rather than a
+     * `player` block on each profile (a style is not one-to-one with a vector, and a new object
+     * section on the profile would enter the tuning search space carrying prose).
+     *
+     * `trade` is capped at the dispatcher blurbs' 160 characters for `trafficProfileSchema`'s
+     * stated reason: an uncapped authored string on a driven surface is § D186's defect with a
+     * different key name.
+     */
+    playStyles: z
+      .array(
+        z.strictObject({
+          $comment: comment,
+          id: identifier,
+          name: z.string().min(1, 'a play style is what a player reads; it may not be empty'),
+          trade: z
+            .string()
+            .min(1, 'a style with nothing to say about its trade still has to say it on purpose')
+            .max(
+              160,
+              'a trade sentence over 160 characters is maintainer prose on a player surface; see DECISIONS.md § D186',
+            ),
+          profileId: identifier,
+          parking: z.boolean(),
+          zone: z.boolean(),
+        }),
+      )
+      .optional(),
   })
   .superRefine((file, ctx) => {
     checkUniqueIds(file.terms, 'terms', ctx);
     checkUniqueIds(file.profiles, 'profiles', ctx);
+    /*
+     * Ids only. **Whether a style's `profileId` names a declared profile is deliberately not
+     * checked here**, and the precedent is `patternSwitching.weightSetsByPattern` twelve lines
+     * up, which is exactly the same relationship and is also unchecked: `config/parse.ts` warns
+     * `unknown-weight-set-profile` and `resolveWeightSets` throws at the point of use.
+     *
+     * It was checked here first, and three call sites showed why it cannot be. Rebuilding this
+     * document around a **subset** of its profiles is idiomatic in this tree —
+     * `persist/validate.ts` checks one saved dispatcher against the shipped term library,
+     * `tuning/space/docExamples.test.ts` loads every worked example in `docs/06` the same way —
+     * and under a cross-file refinement each of those refused with a message about `steady-hand`,
+     * which is a sentence about the shipped library and not about the thing being validated. A
+     * check that fires on documents nobody is making a claim about is a check that will be worked
+     * around.
+     *
+     * The guarantee is kept where it is a fact about `data/`: `everyday/workshopModel.test.ts`
+     * asserts every shipped style resolves to a shipped profile, and `styleSelectionOf` answers
+     * `undefined` for one that does not — an absence rather than a substitution.
+     */
+    if (file.playStyles !== undefined) checkUniqueIds(file.playStyles, 'playStyles', ctx);
     const termIds = new Set(file.terms.map((term) => term.id));
     const known = [...termIds].join(', ');
     file.profiles.forEach((profile, index) => {

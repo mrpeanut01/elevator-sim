@@ -6,9 +6,9 @@
  *
  * §20.8 as vendored is inverted for this tree: there is exactly one bench (`dev/batchPanel.ts`),
  * it *is* the pairwise one, and the thing that does not exist is the multi-cell sweep. So this
- * module is only the sweep's shape — a field of **two** dispatcher arms, a set of ticked cells,
- * one `BatchRequest` per cell — and everything it says about a result is `batchReport`'s, read,
- * never recomputed. Two refusals define it:
+ * module is only the sweep's shape — a field of **at least two** dispatcher arms, a set of ticked
+ * cells, one `BatchRequest` per cell — and everything it says about a result is `batchReport`'s,
+ * read, never recomputed. Two refusals define it:
  *
  * - **It does not reimplement the bench.** Requests run through `runBatch` (the shipped worker
  *   path), reports come from `batchReport`, and the six-verdict vocabulary (`report.ts` —
@@ -58,11 +58,28 @@ export class SuiteError extends Error {
 }
 
 /**
- * Exactly two arms, as a tuple rather than an array — the field-of-two condition held by the
- * type. The dispatcher stays on the arm and everything else on the request, which is
- * `batch/types.ts`'s misalignment-unexpressible split, inherited rather than restated.
+ * **At least two arms**, as a tuple rather than a plain array — the floor held by the type. The
+ * dispatcher stays on the arm and everything else on the request, which is `batch/types.ts`'s
+ * misalignment-unexpressible split, inherited rather than restated.
+ *
+ * ## Why the ceiling moved out of the type and the floor did not
+ *
+ * This was `readonly [BatchArmRequest, BatchArmRequest]` — exactly two — and that was right while
+ * the only caller was the Engineer suite panel's two selects. GAMEPLAY §12.1 gives the Everyday
+ * bench a field of *"two at least, four at most"*, and the two halves of that sentence are not the
+ * same kind of rule. **Two at least** is arithmetic: a comparison of one arm is not a comparison,
+ * and no report can be drawn from it, so the type says so. **Four at most** is a screen's own
+ * limit on how many columns a matrix can be read across — §12.1 puts its enforcement on the
+ * toggles, and `everyday/benchModel.ts#benchFieldRefusal` is where it lives.
+ *
+ * **What did not move is the verdict gate**, which is the property this tuple was often mistaken
+ * for. A pairwise verdict is drawn only when `report.comparisons.length === 1`
+ * ({@link suiteCellViewOf}), and `batchReport` compares every arm after the first *with* the
+ * first — so three arms produce two comparisons and the refusal below is drawn instead. Widening
+ * the field cannot produce a verdict block over three arms; it produces a cell that says why
+ * there is none.
  */
-export type SuiteField = readonly [BatchArmRequest, BatchArmRequest];
+export type SuiteField = readonly [BatchArmRequest, BatchArmRequest, ...(readonly BatchArmRequest[])];
 
 /** What to sweep: which cells, at what budget, with which two dispatchers. */
 export interface SuiteRequest {
@@ -95,7 +112,7 @@ export interface SuiteCellPlan {
  * and without an injectable lookup those refusals would be sentences no test had ever seen fire.
  *
  * @throws SuiteError on a plan that cannot run: no cells ticked, a duplicate tick, a field that
- *   is not two arms at run time (the type already forbids it at compile time; a deserialised
+ *   is under two arms at run time (the type already forbids it at compile time; a deserialised
  *   state can still get here), or a cell whose traffic spec carries something `BatchRequest`
  *   cannot — refused by name rather than silently dropped, because a suite that ran a cell
  *   *minus* its demand template would report on a population the matrix never measured.
@@ -112,9 +129,9 @@ export function suitePlanOf(
   if (new Set(request.cellIds).size !== request.cellIds.length) {
     throw new SuiteError('a cell is ticked twice; a suite runs each ticked cell once.');
   }
-  if (request.field.length !== 2) {
+  if (request.field.length < 2) {
     throw new SuiteError(
-      `a suite compares a field of exactly two dispatchers; this one carries ${String(request.field.length)}.`,
+      `a suite compares a field of at least two dispatchers; this one carries ${String(request.field.length)}.`,
     );
   }
   return request.cellIds.map((cellId) => {
@@ -259,5 +276,94 @@ export function suiteCellViewOf(
     arms,
     rows,
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * The index — docs/20 defect 15
+ * -------------------------------------------------------------------------- */
+
+/** One verdict of the index: the report's own word, and the arm only where its gate named one. */
+export interface SuiteSummaryMark {
+  /** `report.ts`'s verdict string, verbatim — the six encode distinctions no index may collapse. */
+  readonly verdict: BatchVerdict;
+  /** {@link SuiteRowMark.bestArmName}, unchanged: `favours` consumed, never re-derived. */
+  readonly bestArmName: string | null;
+  /**
+   * The index cell's whole text, authored here so no renderer composes a claim: the verdict word
+   * alone, or `verdict — arm` where the gate named one. In the honesty corpus under
+   * `batch/suite.ts#suiteCellViewOf`, seeded with the source row's own comparison shape.
+   */
+  readonly text: string;
+}
+
+/** One cell's line of the index. */
+export interface SuiteSummaryLine {
+  readonly cellId: string;
+  readonly label: string;
+  /**
+   * One entry per {@link SuiteSummary.metricLabels} column, in that order; `null` where this
+   * cell's verdict block has no row for the column — including every column of a cell whose
+   * verdict is refused, whose {@link note} then says why in the refusal's own words.
+   */
+  readonly marks: readonly (SuiteSummaryMark | null)[];
+  /** The cell's `verdictRefusal`, verbatim, or `null` when the marks speak. */
+  readonly note: string | null;
+}
+
+/** The whole index: the column set and one line per cell, both decided here, not in a renderer. */
+export interface SuiteSummary {
+  /** Column headers after the cell column — metric labels in first-appearance order. */
+  readonly metricLabels: readonly string[];
+  readonly lines: readonly SuiteSummaryLine[];
+}
+
+/**
+ * The suite's index — where each cell landed, one glance wide, drawn **before** the prose.
+ *
+ * ## The defect this closes — `docs/20` defect 15
+ *
+ * Two cells at n = 10 produced 17 800 characters of prose with the per-cell verdicts findable
+ * only by reading: nine measures × two cells, each a four-line paragraph. The prose is the
+ * product's claim and none of it may go — § D299's test binds this surface: easier to use, never
+ * saying less — so the fix is an *index over* it rather than a summary *instead of* it. Every
+ * word this table shows appears again below, in full.
+ *
+ * ## What the index is allowed to say, which is the whole design
+ *
+ * A verdict cell is `report.ts`'s own verdict string plus, only where `BatchComparisonRow.favours`
+ * named one, the arm's display name — both read off {@link SuiteCellView.rows}, which already
+ * consumed the one gate. Nothing here re-derives a winner, rewords a verdict (*"too close to
+ * call"* would collapse `unresolved` into `under-budget`), or invents a tie vocabulary: a suite
+ * of two identical arms indexes as the report's own `unresolved`/`under-budget` words, and the
+ * sentence explaining *why an exact zero is not proof of identity* stays where it was, in the
+ * prose. A cell whose verdict block is refused (arm count ≠ 2) gets no marks and carries the
+ * refusal verbatim as its {@link SuiteSummaryLine.note}.
+ *
+ * The column set is the union of the cells' metric labels in first-appearance order, computed
+ * here so two cells whose verdict blocks differ still line up — and so the renderer decides
+ * nothing (`dev/suitePanel.ts` only arranges what this returns).
+ */
+export function suiteSummaryOf(views: readonly SuiteCellView[]): SuiteSummary {
+  const metricLabels: string[] = [];
+  for (const view of views) {
+    for (const row of view.rows) {
+      if (!metricLabels.includes(row.label)) metricLabels.push(row.label);
+    }
+  }
+  const lines: SuiteSummaryLine[] = views.map((view) => ({
+    cellId: view.cellId,
+    label: view.label,
+    marks: metricLabels.map((label) => {
+      const row = view.rows.find((entry) => entry.label === label);
+      if (row === undefined) return null;
+      return {
+        verdict: row.verdict,
+        bestArmName: row.bestArmName,
+        text: row.bestArmName === null ? row.verdict : `${row.verdict} — ${row.bestArmName}`,
+      };
+    }),
+    note: view.verdictRefusal,
+  }));
+  return { metricLabels, lines };
 }
 

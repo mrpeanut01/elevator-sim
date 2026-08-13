@@ -1,0 +1,142 @@
+{
+  "$comment": [
+    "THE FORTY PROOF CASES — eight towers x five crowd shapes, fixed forever.",
+    "",
+    "docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md section 12.3 is the contract: one",
+    "list, three readers (the gauntlet, the ladder's 'What are the forty?' panel, and the bench's",
+    "suite). A rating is the mean of all forty, and the cases never move, so two ratings a month",
+    "apart stay comparable. That last clause is the whole reason this file exists in data/ rather",
+    "than as a constant: CLAUDE.md invariant 7 puts anything tunable in data, and a fixture list a",
+    "public rating is computed over is the strongest case of it. A second copy of these names",
+    "anywhere in packages/ is a defect, and gauntlet/proofCases.test.ts fails on one.",
+    "",
+    "WHAT IS AUTHORED HERE AND WHAT IS NOT. Ids, rates, horizons and demand blocks are authored.",
+    "Building NAMES and specs are not: they are resolved from data/buildings/ at load, on",
+    "data/reference-runs.json's own ground -- a name authored beside an id is a second source of",
+    "truth that goes stale the day the building is edited. The 'why' line is authored, because it",
+    "is an argument about the set rather than a fact about the building.",
+    "",
+    "THE EIGHT ARE NOT THE CONTRACT'S EIGHT, AND THE DEPARTURE IS NAMED RATHER THAN HIDDEN.",
+    "Section 12.3 names Harbour Point (16 fl, 6 lifts) and Ashgate Mixed-Use (22 fl, 5 lifts).",
+    "Neither is in data/buildings/, and a case naming a building this build does not ship cannot",
+    "run -- a rating over 30 of 40 is not the rating section 12.3 defines, and substituting one",
+    "shipped building silently for another is the false-statement-about-the-thing-asked-after that",
+    "dev/main.ts#dispatcherNameOf refuses by name. So the two shipped buildings the contract does",
+    "not name -- mixed-use-high-rise and secure-tower -- take those two places, and this paragraph",
+    "is the record. The day either building is authored, it takes its place back and every rating",
+    "measured before that day stops being comparable with every rating measured after: that is what",
+    "'the cases never move' costs, and it is the reason moving one is a decision rather than an edit.",
+    "",
+    "THE SPECS IN SECTION 12.3'S TABLE ARE THE PROTOTYPE'S AND ARE NOT REPRODUCED. It says Chancery",
+    "House is 14 floors and 3 lifts; data/buildings/chancery-house.json is 19 floors and 6 cars.",
+    "CLAUDE.md: the handoff wins every disagreement about what the screen looks like, and the",
+    "simulator wins every disagreement about what a number means. A floor count is a number.",
+    "",
+    "THE RATES ARE PER TOWER AND THE SHAPES ARE PER CROWD, which is the one structural decision in",
+    "this file. A crowd shape is a directional split and a group shape -- properties of the people.",
+    "A level that fills a 101-floor tower empties a six-floor one, so the level belongs to the",
+    "building. Where a rate below is also a matrix cell's rate, benchmark/matrixCells.ts' rationale",
+    "for it is the reason and is cited; the rest are authored by analogy and say so.",
+    "",
+    "WINDOWS ARE FULL-RUN ON ALL FORTY. The peak-5min window is empty often enough on the sparse",
+    "towers to invalidate the case (matrixCells.ts, garden-residential's rationale), and forty cases",
+    "reported over two different windows would be forty numbers under one label.",
+    "",
+    "THE SEED RULE IS NOT IN THIS FILE. Section 1: hash(towerId, crowdIndex), fixed forever. It is",
+    "computed in gauntlet/proofCases.ts#proofSeedOf so that a seed cannot be edited into",
+    "incomparability by a hand that meant to change a rate. Invariant 5 still holds -- every case",
+    "carries the seed it ran under, into the rating record."
+  ],
+  "version": 1,
+  "towers": [
+    {
+      "id": "chancery-house",
+      "arrivalRatePctPop5min": 2,
+      "why": "a short building where one lift out changes everything"
+    },
+    {
+      "id": "garden-apartments",
+      "arrivalRatePctPop5min": 2,
+      "why": "sparse traffic, and idle cars in the wrong place"
+    },
+    {
+      "id": "secure-tower",
+      "arrivalRatePctPop5min": 1.5,
+      "why": "a credential on every call, so authorisation and dispatch meet on every decision"
+    },
+    {
+      "id": "crown-hotel",
+      "arrivalRatePctPop5min": 1.5,
+      "why": "unannounced surges and luggage"
+    },
+    {
+      "id": "mixed-use-high-rise",
+      "arrivalRatePctPop5min": 2,
+      "why": "offices over homes on one stack, shuttles above locals, and no single crowd shape that suits both"
+    },
+    {
+      "id": "midtown-office",
+      "arrivalRatePctPop5min": 1,
+      "why": "zoning, and a genuine evening exodus"
+    },
+    {
+      "id": "st-jude-hospital",
+      "arrivalRatePctPop5min": 2,
+      "why": "priority traffic that must survive ordinary traffic"
+    },
+    {
+      "id": "vertical-city",
+      "arrivalRatePctPop5min": 0.75,
+      "why": "a sky lobby, where parking is the whole game"
+    }
+  ],
+  "crowds": [
+    {
+      "id": "up-peak",
+      "label": "The morning intake",
+      "tests": "everybody arrives at the front door and goes up; filling cars and getting back down",
+      "durationS": 900,
+      "demand": {
+        "directionalSplit": { "incoming": 1, "outgoing": 0, "interfloor": 0 }
+      }
+    },
+    {
+      "id": "down-peak",
+      "label": "Everybody leaving at once",
+      "tests": "every floor calls down together; cars come down full and the ones above are passed",
+      "durationS": 900,
+      "demand": {
+        "directionalSplit": { "incoming": 0, "outgoing": 1, "interfloor": 0 }
+      }
+    },
+    {
+      "id": "two-way",
+      "label": "Lunch, both ways",
+      "tests": "up and down at the same time, so a car is rarely empty in the direction somebody needs",
+      "durationS": 1200,
+      "demand": {
+        "directionalSplit": { "incoming": 0.45, "outgoing": 0.45, "interfloor": 0.1 }
+      }
+    },
+    {
+      "id": "interfloor",
+      "label": "A meeting-heavy afternoon",
+      "tests": "people moving between upper floors with a quiet front door",
+      "durationS": 1200,
+      "demand": {
+        "directionalSplit": { "incoming": 0.15, "outgoing": 0.15, "interfloor": 0.7 }
+      }
+    },
+    {
+      "id": "surge",
+      "label": "A coach at eleven",
+      "tests": "a large party arriving together for one floor, with no warning, mid-shift",
+      "durationS": 600,
+      "demand": {
+        "directionalSplit": { "incoming": 0.85, "outgoing": 0.1, "interfloor": 0.05 },
+        "batchSize": { "distribution": "geometric", "mean": 6 },
+        "batchSharesDestination": true
+      }
+    }
+  ]
+}

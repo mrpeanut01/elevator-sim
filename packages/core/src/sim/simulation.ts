@@ -111,21 +111,24 @@
  */
 
 import { findPassengerTransferS } from '../config/resolveCar.js';
-import { isDestinationCallType } from '../config/types.js';
+import { SERVICE_MODES, isDestinationCallType } from '../config/types.js';
 import type {
   DispatcherProfile,
   FloorConfig,
   ResolvedBank,
   ResolvedBuilding,
+  ResolvedServiceEvent,
 } from '../config/types.js';
 import {
   CapacityReassignmentMonitor,
+  DISPATCH_DEFAULTS,
   callCarriesCredential,
   createArrivalModel,
   createPolicyFor,
   groupContext,
   repositionContextFor,
   resolvePrepositionContext,
+  resolveWeights,
   weightSetSourceFrom,
   withLandingCounts,
   type ArrivalModel,
@@ -210,6 +213,8 @@ import {
   type PatienceConfig,
 } from './patience.js';
 import {
+  INTERVENTION_KINDS,
+  isInterventionKind,
   SIM_DEFAULTS,
   SimulationError,
   type ConservationAudit,
@@ -501,13 +506,30 @@ export class Simulation {
   /**
    * The run's intervention log, in authored order — `SimulationConfig.interventions`, or `[]`.
    *
-   * Read in two places and only two: {@link #scheduleInterventions}, which puts one kernel event
-   * on the queue per entry so an already-idle fleet acts at `atS` rather than at the next
-   * arrival, and {@link #idleOverrideAt}, which every `#park` decision asks for the settings in
-   * force *now*. Empty, both are no-ops that allocate nothing and take no branch a previous run
-   * did not — the whole of the absent-equals-empty identity the config field promises.
+   * Read in three places and only three: {@link #scheduleInterventions}, which puts one kernel
+   * event on the queue per acting entry so an already-idle fleet parks at `atS` rather than at
+   * the next arrival and a bank's policies adopt a switched vector at `atS` rather than never;
+   * {@link #idleOverrideAt}, which every `#park` decision asks for the settings in force *now*;
+   * and {@link #scheduleServiceEvents}, which folds each `answer-incident` entry's effects into
+   * the one service schedule the run drives. Empty, all three are no-ops that allocate nothing
+   * and take no branch a previous run did not — the whole of the absent-equals-empty identity
+   * the config field promises.
    */
   readonly #interventions: readonly RunInterventionConfig[];
+  /**
+   * `switch-dispatcher` entries' resolved vectors, by log index — resolved once at scheduling
+   * time through the same `resolveWeights` the run's own profile went through, so a misspelled
+   * term id in a switched profile is the same loud `DispatchError` it would be on the profile
+   * that opened the run, thrown before a single event fires rather than mid-run.
+   */
+  readonly #switchWeights = new Map<number, ReadonlyMap<string, number>>();
+  /**
+   * The service schedule this run drives: the building's own resolved events, then every
+   * `answer-incident` entry's effects, in log order. Built by {@link #scheduleServiceEvents} and
+   * indexed by {@link #onServiceChange}, so the handler reads the schedule the run actually
+   * scheduled — the same argument `ServiceChangePayload` makes about stale copies.
+   */
+  #serviceSchedule: readonly ResolvedServiceEvent[] = [];
 
   readonly #policies = new Map<string, DispatchPolicy>();
   /**
@@ -1296,7 +1318,8 @@ export class Simulation {
    * ---------------------------------------------------------------- */
 
   /**
-   * Put the building's authored service schedule on the queue.
+   * Put the run's service schedule on the queue — the building's authored events, then every
+   * `answer-incident` intervention's effects.
    *
    * **In array order, and not sorted.** The kernel's total order is `(time, sequence)` and the
    * sequence is the order things were scheduled in, so two entries with the same `atS` fire in
@@ -1308,9 +1331,31 @@ export class Simulation {
    * a recall authored at 10 000 s on a 1800 s trace would extend a run by more than two hours to
    * do nothing. Refused **loudly** — a schedule entry that never fires is a configuration that
    * did not happen, which is exactly what `warnings` is for.
+   *
+   * ## Why an incident answer schedules through *this* event kind and not a sibling
+   *
+   * The decision the Everyday campaign's incident dock rests on, recorded here because this is
+   * the seam that makes it. An `answer-incident` entry's effects are service-mode changes, and
+   * {@link #onServiceChange} is the sole authority on what a mode change *does to the group* —
+   * re-offering released calls with their original `registeredAt`, revoking promises a withdrawn
+   * car cannot keep, re-dispatching the bank. A sibling `intervention`-kind handler applying
+   * `Car.setMode` itself would be a second copy of all of that, wrong the day either copy moved —
+   * the two-sources failure `runner/metrics.ts` names. So the answer's effects are **appended to
+   * the one schedule** (building's events first, keeping their indexes and their warnings'
+   * wording; answers after, in log order) and fire as ordinary `serviceChange` events, while the
+   * answer entry itself puts nothing on the intervention queue — its `atS` is the record's
+   * `runIncidentClock`, a fact for the report, not an action for the kernel.
+   *
+   * The effects were validated by {@link #answeredIncidentEvents} before they got here, so the
+   * deadline branch below can only fire on the building's own entries and its message may keep
+   * naming `serviceEvents[…]`.
    */
   #scheduleServiceEvents(): void {
-    const events = this.#resolved.serviceEvents ?? [];
+    this.#serviceSchedule = Object.freeze([
+      ...(this.#resolved.serviceEvents ?? []),
+      ...this.#answeredIncidentEvents(),
+    ]);
+    const events = this.#serviceSchedule;
     for (const [index, event] of events.entries()) {
       if (event.atS > this.#deadlineS) {
         this.#deadlineTruncations += 1;
@@ -1326,6 +1371,68 @@ export class Simulation {
         }),
       );
     }
+  }
+
+  /**
+   * The service events the run's `answer-incident` interventions carry, validated — the second
+   * half of {@link #scheduleServiceEvents}' schedule.
+   *
+   * Three refusals, each on its own ground:
+   *
+   * - **An effect before its own answer is refused loudly.** Contract § 1.4's whole mechanism is
+   *   that everything before `atS` is bit-identical on re-simulation; an answer at 12:31 whose
+   *   effect lands at 09:00 would rewrite a past the player has already watched, so it is a
+   *   defect in the entry, warned by name, and never scheduled.
+   * - **An effect past the drain deadline is refused loudly**, exactly as a building's own
+   *   schedule entry is, and counted in the same `deadlineTruncations`.
+   * - **An effect naming a car this run did not build throws.** The building's own schedule gets
+   *   this check at config time (`resolveBuilding` raises a located `ConfigError`); an
+   *   intervention's effects have no config pass, so scheduling time is their config time, and a
+   *   silently skipped effect would be a run that did not do the thing its record says it did.
+   *
+   * The entry-level deadline refusal (`entry.atS` itself past the deadline) is
+   * {@link #scheduleInterventions}' and is not repeated here — an entry it warned about is
+   * skipped whole, silently, so the record produces one warning per defect rather than two.
+   */
+  #answeredIncidentEvents(): readonly ResolvedServiceEvent[] {
+    const events: ResolvedServiceEvent[] = [];
+    for (const [index, entry] of this.#interventions.entries()) {
+      if (entry.change.kind !== 'answer-incident') continue;
+      if (entry.atS > this.#deadlineS) continue;
+      for (const effect of entry.change.serviceEvents) {
+        if (effect.atS < entry.atS) {
+          this.#warnings.push(
+            `interventions[${index}] answers an incident at ${entry.atS} s with an effect setting car "${effect.bankId}-${effect.carId}" to "${effect.mode}" at ${effect.atS} s — before the answer itself. An answer cannot reschedule the past (contract § 1.4's prefix is bit-identical by construction), so this effect was not scheduled.`,
+          );
+          continue;
+        }
+        if (effect.atS > this.#deadlineS) {
+          this.#deadlineTruncations += 1;
+          this.#warnings.push(
+            `interventions[${index}]'s incident answer would set car "${effect.bankId}-${effect.carId}" to "${effect.mode}" at ${effect.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and the car's mode is unchanged by it.`,
+          );
+          continue;
+        }
+        if (!this.#carsById.has(`${effect.bankId}-${effect.carId}`)) {
+          throw new SimulationError(
+            `interventions[${index}]'s incident answer names car "${effect.carId}" in bank "${effect.bankId}", which this run did not build. Known cars: ${[...this.#carsById.keys()].join(', ')}.`,
+          );
+        }
+        // The mode against the declared vocabulary, for the reason the kind check gives one
+        // level up: `Car.setMode` stores whatever string it is handed, and every later
+        // `acceptsHallCalls` would then answer for a mode nobody defined — a run applied as a
+        // guess, which is § 1.5's approximate replay wearing a service event's clothes. The
+        // building's own schedule gets this check from the config schema; an intervention's
+        // effects have no config pass, so it happens here.
+        if (!(SERVICE_MODES as readonly string[]).includes(effect.mode)) {
+          throw new SimulationError(
+            `interventions[${index}]'s incident answer would set car "${effect.bankId}-${effect.carId}" to mode "${String(effect.mode)}", which this build does not declare. Known modes: ${SERVICE_MODES.join(', ')}.`,
+          );
+        }
+        events.push(effect);
+      }
+    }
+    return events;
   }
 
   /**
@@ -1379,7 +1486,9 @@ export class Simulation {
    * field, and building it is out of scope here.
    */
   #onServiceChange(index: number, at: SimTime): void {
-    const event = this.#resolved.serviceEvents?.[index];
+    // The run's own combined schedule — building events first, incident answers after — which is
+    // the array {@link #scheduleServiceEvents} scheduled these indexes from.
+    const event = this.#serviceSchedule[index];
     /* c8 ignore next 5 -- the index came from the same array a moment ago. */
     if (event === undefined) {
       throw new SimulationError(
@@ -1483,15 +1592,70 @@ export class Simulation {
    * event on the queue keeps the run alive to its time, so an intervention stamped after the last
    * possible departure would extend the run to do nothing — and an intervention that never fires
    * is a change of mind that did not happen, which is exactly what `warnings` is for.
+   *
+   * An entry whose `change.kind` this build does not declare **throws**, before any event fires.
+   * The log is data off a worker boundary and a `localStorage` round trip, so it can carry a kind
+   * a newer build wrote; treating it as any known kind would replay something *approximate*
+   * (contract § 1.5's forbidden outcome), and skipping it quietly would replay a different run
+   * and call it this one. `packages/viz`'s stored-record gate refuses the same log with a row
+   * instead of a throw, on the promise this refusal keeps.
+   *
+   * Per kind:
+   *
+   * - `park-cars-lobby` schedules its event; the handler walks the already-idle fleet.
+   * - `switch-dispatcher` resolves the profile's vector **here**, through the same
+   *   {@link resolveWeights} the run's own profile went through — so a misspelled term id is the
+   *   same loud `DispatchError`, thrown at scheduling time — and schedules the event that adopts
+   *   it. A switched profile authoring the *other passenger model* gets a disclaimer, not a model
+   *   change: `dispatch/selector.ts` § *Why only the weights switch* is the argument, and the
+   *   model the record stamps stays the model the cars ran. A policy supplied through
+   *   `config.createPolicy` that predates {@link DispatchPolicy.adoptWeights} is warned about by
+   *   bank, because a switch such a bank cannot adopt is a control that moved nothing.
+   * - `answer-incident` schedules **nothing here**: its effects ride the service schedule
+   *   ({@link #scheduleServiceEvents} says why), and its `atS` is the record's `runIncidentClock`
+   *   — a fact for the report rather than an action for the kernel.
    */
   #scheduleInterventions(): void {
     for (const [index, entry] of this.#interventions.entries()) {
+      const kind = entry.change.kind;
+      if (!isInterventionKind(kind)) {
+        throw new SimulationError(
+          `interventions[${index}] carries change kind "${String(kind)}", which this build does not declare. Known kinds: ${INTERVENTION_KINDS.join(', ')}. A kind applied as a guess would replay a different run and call it this one (Everyday Mode contract § 1.5).`,
+        );
+      }
       if (entry.atS > this.#deadlineS) {
         this.#deadlineTruncations += 1;
         this.#warnings.push(
-          `interventions[${index}] would apply "${entry.change.kind}" at ${entry.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and no car's parking changes because of it.`,
+          `interventions[${index}] would apply "${entry.change.kind}" at ${entry.atS} s, which is past this run's drain deadline of ${this.#deadlineS} s (demand horizon ${this.#trace.durationS} s + sim.drainGraceS ${this.#options.drainGraceS} s). It was not scheduled and nothing in the run changes because of it.`,
         );
         continue;
+      }
+      if (entry.change.kind === 'answer-incident') continue;
+      if (entry.change.kind === 'switch-dispatcher') {
+        const profile = entry.change.profile;
+        this.#switchWeights.set(index, resolveWeights(profile.weights, profile.id).weights);
+        // Through `passengerModelOf` — the one statement of the model rule, the same function
+        // the run's own model was stamped by — with the stage defaults applied exactly as
+        // `resolveDispatchConfig` applies them. A second inline copy of the rule here was
+        // review-flagged as the two-sources shape and is gone.
+        const switchedModel: PassengerModel = passengerModelOf({
+          callType: profile.dispatch?.callType ?? DISPATCH_DEFAULTS.callType,
+          passengerAssignment:
+            profile.dispatch?.passengerAssignment ?? DISPATCH_DEFAULTS.passengerAssignment,
+        });
+        if (switchedModel !== this.#passengerModel) {
+          this.#disclaimers.push(
+            `interventions[${index}] switches to dispatcher "${profile.id}", which authors the ${switchedModel} passenger model; this run stays ${this.#passengerModel}. Only the weight vector switches mid-run — a record that changed passenger model at ${entry.atS} s would publish metrics not comparable with themselves (metrics/comparability.ts) — so every stage setting of the opening profile still stands.`,
+          );
+        }
+        const unadoptable = [...this.#policies.entries()]
+          .filter(([, policy]) => policy.adoptWeights === undefined)
+          .map(([bankId]) => bankId);
+        if (unadoptable.length > 0) {
+          this.#warnings.push(
+            `interventions[${index}] switches the dispatcher at ${entry.atS} s, and the policy of bank(s) ${unadoptable.join(', ')} (supplied through config.createPolicy) implements no adoptWeights, so assignment in ${unadoptable.length === this.#policies.size ? 'every bank' : 'those banks'} keeps scoring with the opening profile's weights.`,
+          );
+        }
       }
       this.#kernel.schedule(
         entry.atS,
@@ -1503,16 +1667,27 @@ export class Simulation {
   }
 
   /**
-   * An intervention taking effect: walk the fleet's idle cars through stage 7, under the
-   * override that is in force as of this instant.
+   * An intervention taking effect, per kind.
    *
-   * The override itself needs no application step — {@link #idleOverrideAt} is consulted by every
-   * later {@link #park} — so the whole job of this handler is the fleet that is *already parked*:
-   * an idle car takes a stage 7 decision only when something asks it to, and without this walk a
-   * building standing quiet at `atS` would honour *park the cars in the lobby* only when the next
-   * arrival happened to free a car. Guarded per car by {@link #isIdle}, exactly as
-   * {@link #stepCar} guards its own call, because `#park` may move a car and a car with its doors
-   * open is not the group's to move.
+   * **`park-cars-lobby`** walks the fleet's idle cars through stage 7, under the override in
+   * force as of this instant. The override itself needs no application step —
+   * {@link #idleOverrideAt} is consulted by every later {@link #park} — so the whole job of this
+   * arm is the fleet that is *already parked*: an idle car takes a stage 7 decision only when
+   * something asks it to, and without this walk a building standing quiet at `atS` would honour
+   * *park the cars in the lobby* only when the next arrival happened to free a car. Guarded per
+   * car by {@link #isIdle}, exactly as {@link #stepCar} guards its own call, because `#park` may
+   * move a car and a car with its doors open is not the group's to move.
+   *
+   * **`switch-dispatcher`** hands every bank's policy the vector {@link #scheduleInterventions}
+   * resolved, through {@link DispatchPolicy.adoptWeights}. This one is a *push* at the event
+   * where the park override is a *pull* per decision, and the asymmetry is deliberate: parking
+   * decisions are taken by many callers at arbitrary instants, so their override must be a pure
+   * function of `(log, at)`; the weight vector is read from policy state on every scoring pass,
+   * so one write at one `(time, sequence)` on the queue is exactly as deterministic and replays
+   * identically (invariants 4 and 5). Nothing is re-dispatched here: assignments already made
+   * stand — stage 5's reassignment machinery, under the profile's own `reassignmentPolicy`, is
+   * the only thing entitled to move one — and every decision from this instant on scores with
+   * the new vector, which is the whole of what a change of driver is.
    */
   #onIntervention(index: number, at: SimTime): void {
     const entry = this.#interventions[index];
@@ -1521,6 +1696,17 @@ export class Simulation {
       throw new SimulationError(
         `Intervention ${index} is not in this run's log; the schedule and the config disagree.`,
       );
+    }
+    if (entry.change.kind === 'switch-dispatcher') {
+      const weights = this.#switchWeights.get(index);
+      /* c8 ignore next 5 -- #scheduleInterventions resolved this index a moment ago. */
+      if (weights === undefined) {
+        throw new SimulationError(
+          `Intervention ${index} fired with no resolved weights; the schedule and the log disagree.`,
+        );
+      }
+      for (const policy of this.#policies.values()) policy.adoptWeights?.(weights);
+      return;
     }
     for (const car of this.#building.cars) {
       if (this.#isIdle(car)) this.#park(car, at);
@@ -1532,9 +1718,15 @@ export class Simulation {
    *
    * A pure function of `(interventions, at)` — the log is scanned, never mutated, and no state
    * records "the intervention has happened", so a decision at `at` gives the same answer whether
-   * it runs before or after the {@link #onIntervention} walk at the same instant. The *latest*
-   * entry at or before `at` wins, which with one change kind is indistinguishable from "any", and
-   * with a second kind (dispatcher switching) is the semantics a log of changes has to have.
+   * it runs before or after the {@link #onIntervention} walk at the same instant.
+   *
+   * The scan is over the **parking kind alone**, and the *latest* such entry at or before `at`
+   * wins. That is the semantics a log of changes to independent settings has to have: each kind
+   * is its own control, so a `switch-dispatcher` at 10:00 does not un-park a fleet parked at
+   * 08:00 — the player asked for both, and revoking one with the other would make the log's
+   * entries interfere in an order-dependent way no stamp on the report describes. A future kind
+   * that *does* address parking (an un-park, say) joins this scan; a kind about anything else
+   * does not.
    *
    * `undefined` — not a copy of `idle` — when no entry is in force, so the ordinary run passes no
    * override and `repositionDecisionFor` hands its helpers the identical frozen config it always
@@ -1545,10 +1737,9 @@ export class Simulation {
   #idleOverrideAt(at: SimTime, idle: ResolvedIdleStage): ResolvedIdleStage | undefined {
     let inForce: RunInterventionConfig | undefined;
     for (const entry of this.#interventions) {
-      if (entry.atS <= at) inForce = entry;
+      if (entry.atS <= at && entry.change.kind === 'park-cars-lobby') inForce = entry;
     }
     if (inForce === undefined) return undefined;
-    // One arm today. A second kind extends this switch, not the mechanism around it.
     return { ...idle, parkingStrategy: 'lobby' };
   }
 

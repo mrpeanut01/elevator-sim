@@ -1054,12 +1054,61 @@ export interface PatternSwitchingConfig extends Commented {
 }
 
 /** The whole of `data/dispatcher-profiles.json`. */
+/**
+ * One **named play style** — a starting point a player picks a dispatcher from, in words
+ * addressed to them (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` §11.2,
+ * `ENGINE_CONTRACT.md` §6.2).
+ *
+ * ## Why this is data, and file-level rather than per profile
+ *
+ * A style is *a weight vector plus two group settings, with a name* — which is precisely what
+ * CLAUDE.md invariant 7 says belongs in `data/` rather than in code: a table in a renderer mapping
+ * profile ids to Casual prose is the shape `PlayerTermWords` and {@link HARD_CONSTRAINT_WORDS}
+ * already forbid one register down, and it goes stale the day a profile is renamed.
+ *
+ * It sits beside {@link DispatcherProfiles.profiles} rather than on each profile for two reasons.
+ * A style is **not** one-to-one with a profile — §6.2's *Steady hand* and *Lobby anchor* start
+ * from the same vector and differ only in where the idle cars wait — so a field on the profile
+ * could not express the pair. And a `player` block *inside* `dispatcherProfileSchema` would enter
+ * `DISPATCHER_PROFILE_OBJECT_SECTIONS`, and from there the tuning search space, as a section with
+ * no tunable in it: a dimension an optimizer would search for prose.
+ *
+ * ## What a style may and may not say
+ *
+ * {@link trade} names **the trade**, never the quality. §11.1's own rule for the nameplate —
+ * *"one plain sentence about the trade, not a claim of quality"* — and R2 one level up: a claim
+ * that one dispatcher is better than another needs a paired-t interval that excludes zero, and no
+ * authored sentence is one. `schema.ts` caps it at the dispatcher blurbs' 160 characters and
+ * refuses a style naming a profile the file does not declare.
+ */
+export interface PlayStyle extends Commented {
+  /** Stable key. Never rendered — {@link name} is what a player reads. */
+  readonly id: string;
+  /** The style as a player reads it — `Steady hand`, never a profile id. */
+  readonly name: string;
+  /** One plain sentence about the trade this style makes. Never a claim of quality. */
+  readonly trade: string;
+  /** The profile whose weight vector this style starts from. Must exist in the same file. */
+  readonly profileId: string;
+  /** Whether the style parks the idle cars at the lobby — the `lobby` lever of §6.1. */
+  readonly parking: boolean;
+  /** Whether the style gives each car a slice of the tower — the `spread` lever of §6.1. */
+  readonly zone: boolean;
+}
+
 export interface DispatcherProfiles extends Commented {
   readonly version: number;
   readonly terms: readonly CostTerm[];
   readonly normalization: Commented & { readonly required: boolean };
   readonly profiles: readonly DispatcherProfile[];
   readonly patternSwitching?: PatternSwitchingConfig | undefined;
+  /**
+   * The named entry points a Casual surface offers over {@link profiles} — see {@link PlayStyle}.
+   *
+   * Optional, because a file that declares none is a complete dispatcher library and the workshop
+   * says so rather than inventing six; present in the shipped `data/dispatcher-profiles.json`.
+   */
+  readonly playStyles?: readonly PlayStyle[] | undefined;
 }
 
 // ---------------------------------------------------------------------------

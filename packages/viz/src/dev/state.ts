@@ -401,7 +401,9 @@ export interface ViewerState {
   readonly outOfServiceCarIds: readonly string[];
   /**
    * The player's mid-run interventions, in press order — Everyday Mode's run record (contract
-   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until the stage control is pressed.
+   * § 1.4, `run = { seed, config, interventions[] }`). `[]` until a stage intervention control
+   * is pressed — parking the fleet or handing the day to another dispatcher; a campaign
+   * incident's answer joins the same log on the day its dock lands.
    *
    * ## What survives, and what clears it — the decision, stated
    *
@@ -629,10 +631,19 @@ export function advancesTheWeek(mode: PlayMode): boolean {
  * Returns {@link ViewerState.week} **unchanged, by identity** when the mode does not advance it, so
  * *"the scenario week is untouched"* is checkable with `toBe` rather than with a deep compare that
  * a future field could slip past.
+ *
+ * `recordGrew` passes through to `closeDay` untouched — `docs/20` defect 17. It is a fact about
+ * *why this close is happening* (an intervention re-simulation, per ENGINE_CONTRACT § 1.4, is the
+ * same run's record growing rather than a new attempt), which only the shell knows; the mode gate
+ * here neither needs it nor may reinterpret it.
  */
-export function closedWeekOf(state: ViewerState, outcome: DayOutcome): WeekState {
+export function closedWeekOf(
+  state: ViewerState,
+  outcome: DayOutcome,
+  recordGrew = false,
+): WeekState {
   if (!advancesTheWeek(state.playMode)) return state.week;
-  return closeDay(state.week, outcome);
+  return closeDay(state.week, outcome, recordGrew);
 }
 
 /** What was last read back out of the slot, or `undefined` on a first visit. */
@@ -1095,6 +1106,40 @@ export function profileById(
   return first;
 }
 
+/**
+ * The profile this state actually drives — the base by id, then the levers, then the selector,
+ * then the rules, in {@link shiftRunConfigOf}'s own order and extracted from it so there is one
+ * derivation rather than two (review finding 2: the stage's switch-dispatcher control must
+ * compare against *the vector actually driving*, and a private copy of this chain in `dev/main.ts`
+ * would be the second answer that drifts).
+ *
+ * The selector is written over the profile the levers already produced, because it is the
+ * reader's most explicit statement about how the dispatcher should behave *during* the run and
+ * because `profileFromSpec` carries the base profile's own `selection` through its spread — so
+ * writing it first would leave the working copy losing to a field it was seeded from. The rules
+ * write **after** the selector — the reader's most explicit statement writes last, the same
+ * ordering argument the selector makes against the levers one step up. With no rows
+ * `profileWithRules` is the identity (the same object), so a reader who has written nothing runs
+ * exactly the profile the two writes above produced.
+ */
+export function drivingProfileOf(
+  resources: BrowserResources,
+  state: ViewerState,
+): DispatcherProfile {
+  const base = profileById(resources, state.savedDispatchers, state.dispatcherId);
+  return profileWithRules(
+    profileWithSelector(
+      profileFromSpec(specFromProfile(base, base.name), {
+        id: base.id,
+        base,
+        levers: state.levers,
+      }),
+      state.selectorSpec,
+    ),
+    state.ruleRows,
+  );
+}
+
 export function allBuildingIds(
   resources: BrowserResources,
   saved: readonly SavedBuilding[],
@@ -1248,36 +1293,9 @@ export function shiftRunConfigOf(
   const grown = withDoorTiming(grownBuilding(fabric, state.week.day), doorTimingFor(state.levers));
   const building = resolveBuilding(parseBuilding(grown as unknown), specs);
 
-  // 3 — the dispatcher, plus the levers, plus the weight-set selector.
-  const base = profileById(resources, state.savedDispatchers, state.dispatcherId);
-  /*
-   * The selector is written **last**, over the profile the levers already produced, because it is
-   * the reader's most explicit statement about how the dispatcher should behave *during* the run
-   * and because `profileFromSpec` carries the base profile's own `selection` through its spread —
-   * so writing it first would leave the working copy losing to a field it was seeded from.
-   *
-   * Both halves of the selector are written here, and it has to be both: `selection` is a fact
-   * about the profile and `patternSwitching` is a fact about the file, and a run carrying one
-   * without the other is either a dispatcher declaring a rule with no arms (refused by name in
-   * `resolveWeightSets`) or an arm map nothing consults.
-   */
-  /*
-   * The rules write **after** the selector — the reader's most explicit statement writes last,
-   * the same ordering argument the selector makes against the levers one step up. With no rows
-   * `profileWithRules` is the identity (the same object), so a reader who has written nothing
-   * runs exactly the profile the two writes above produced.
-   */
-  const dispatcherProfile = profileWithRules(
-    profileWithSelector(
-      profileFromSpec(specFromProfile(base, base.name), {
-        id: base.id,
-        base,
-        levers: state.levers,
-      }),
-      state.selectorSpec,
-    ),
-    state.ruleRows,
-  );
+  // 3 — the dispatcher, plus the levers, plus the weight-set selector, through the one
+  // derivation {@link drivingProfileOf} holds.
+  const dispatcherProfile = drivingProfileOf(resources, state);
   const dispatcherProfiles = dispatcherProfilesWithSelector(
     resources.dispatcherProfiles,
     state.selectorSpec,

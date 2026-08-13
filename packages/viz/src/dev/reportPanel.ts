@@ -638,9 +638,17 @@ export function goalRowViewOf(line: GoalLine): GoalRowView {
   const { reading } = line;
   const dressing =
     reading.state === 'met'
-      ? { colour: 'var(--ok)', background: 'rgb(63 178 127 / 0.07)', help: 'met' }
+      ? {
+          colour: 'var(--ok)',
+          background: 'color-mix(in srgb, var(--ok) 7%, transparent)',
+          help: 'met',
+        }
       : reading.state === 'missed'
-        ? { colour: 'var(--bad)', background: 'rgb(224 71 58 / 0.07)', help: 'missed' }
+        ? {
+            colour: 'var(--bad)',
+            background: 'color-mix(in srgb, var(--bad) 7%, transparent)',
+            help: 'missed',
+          }
         : /*
            * The design has no third row treatment because its prototype grades everything. `pending`
            * is not a miss — under `WAKE_UP_ARRIVALS` arrivals nothing is graded at all (§ 1.5 B3) —

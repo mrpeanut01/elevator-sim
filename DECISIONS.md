@@ -23426,3 +23426,317 @@ building it is not this decision's scope.
 The menu, the rail and the refusals are built and driven. § 4's sixteen screens are not, and the
 Everyday stage is not — `EVERYDAY_SHELL_ABSENCES` is the list, on screen. No phase verdict moves:
 Phase 9's row is about the honesty property and mode parity, and neither is touched.
+
+---
+
+## D336 — the Engineer shell is paper, and the palette pin moved with the mode it pins
+
+`docs/21-engineer-reimagined-contract.md` § 2.2 (1) asks for this in terms: *"`dev/tokens.test.ts`'s
+pins move to the new `:root` in the same commit, and the move is recorded in `DECISIONS.md` (a pin is
+a pin to a decision, and the decision is changing)."* This is that record.
+
+### What changed
+
+`packages/viz/index.html` declared the docs/12 § 1.1 S6/S7 dark palette in `:root` and an authored
+light palette in `:root[data-theme='light']`. The two blocks have **swapped**: `:root` is now guide
+§ 19's paper palette — the token language Everyday Mode already reads — and the S6/S7 values live in
+`:root[data-theme='dark']`. `render/tokens.ts#LIGHT_PALETTE` is the paper palette's home, and it
+takes every § 19-sourced value **by import from `everyday/tokens.ts`**, which is the module both
+products read. There is no third copy, and `dev/tokens.test.ts` asserts that in three directions:
+the resolver against each block, `everyday/tokens.ts` against `:root`, and the guide's § 19 fenced
+block against both, read as text.
+
+**This is a re-skin, not the deletion of a mode.** Both palettes still exist, both are still pinned
+in both directions, and the dark mode is still reachable through the same `Settings → theme` control
+it has always been reachable through. What moved is which one a reader gets when they have expressed
+no preference.
+
+### Why the values are not § 19's in five places, and why that is written down rather than decided
+
+§ 2.2 (5): *"the simulator's accessibility floor outranks the prototype's greys."* § 19's palette is
+a **fill** palette for a drawn building and a set of cards; this shell hangs 9–13 px text on almost
+every colour it owns. Measured on § 19's own paper, five of its values cannot carry that text:
+
+| claim | § 19 | measured on paper | shipped | 
+|---|---|---|---|
+| eyebrow / secondary ink | `#8D8271` | 3.38:1 | `#5d564b` |
+| accent | sun `#F2A63B` | 1.83:1 | `#8d6a2f` |
+| warning band | sun | 1.83:1 | `#8a6212` |
+| cleared / good | moss `#4F8A5B` | 3.68:1 | `#43774d` |
+| alarm / abandoned | `#D4573A` | 3.60:1 | terracotta `#B8462B` |
+
+Each shipped value is the same **family** at the value the floor demands, and the last is § 19's own
+deeper sibling rather than an invention. The deviation is not a note: `dev/tokens.test.ts` asserts
+**both halves** of every row — that § 19's value still fails the floor that forced the deviation, and
+that the shipped value clears it. A guide that moves a value past the floor turns the first half red,
+and the § 19 value is re-adopted rather than the deviation outliving its reason.
+
+### The private palettes, and the one the census missed
+
+§ 2.2 (3) named five. All five are gone, and the sweep that says so — `dev/paletteLiterals.test.ts`,
+`live/palette.test.ts`'s instrument pointed at `dev/` — found a **sixth** nobody had listed:
+`reportPanel.ts` drew the met/missed goal washes as `rgb(63 178 127 / 0.07)` and
+`rgb(224 71 58 / 0.07)`, which are the **dark** band values, frozen, on a page whose bands are now
+paper's. Both are `color-mix` over `--ok`/`--bad` now.
+
+The allowlist that sweep carries is **empty**, and that is a measurement: `dev/` draws no scrim and
+no colour the palette does not name. The stale-entry direction is asserted anyway, with a planted
+entry as its negative control, because an allowlist that only grows is a list of things nobody looks
+at (§ D192).
+
+### The shaft tints — a private palette that was also mode-blind
+
+`buildingEditor.ts#SHAFT_TINTS` held six hex literals and this editor writes them into **inline
+styles**, which no `:root[data-theme]` block reaches — § D251's defect, in the elevation. Two things
+were true of it and neither was visible: the six were dark-mode values, and five of them were the
+same string as `--accent`, `--accent-soft`, `--measured`, `--transfer` and `--secure`, so a shaft
+band and a credential-restricted floor were one colour.
+
+They are `--shaft-1…8` now, declared in both blocks, backed by `Palette` fields, projected by
+`render/theme.ts#shellTokensOf`. **Eight rather than six**, because § 19's `Shaft tints` line has
+eight. Their values deviate from § 19's for the reason the table above gives, with one addition
+specific to them: this surface draws the car's **id** in the tint, so a fill's bar is not the bar
+that applies. All sixteen clear the 4.0 hue floor on all five surfaces in both modes.
+
+`everyday/tokens.ts` deliberately ships no shaft tints — *"the lane that draws shafts adds the eight
+tints beside its caller"*. This is that lane, and *beside its caller* is read as **beside the palette
+every other colour on this surface comes from**, not in a second private list.
+
+### The evidence, and what it does not claim
+
+`dev/paperShell.browser.test.ts` drives Midtown Office at seed 42 through the player's own path
+(`enterEngineerStage` — the *Today's tower* tile, never by taking the cover off) and reads the
+**resolved** page: § 19's values on the root and on `body`, no element drawing a colour the palette
+does not own, the § 1.2 carriers still present, and the elevation's band border and label resolving
+to the paper tint through the inline style. That last one is the § D251 defect read at the pixel.
+
+No metric is asserted (§ D220 § 4). **No claim is made that the paper shell looks right** — that is
+the claim `render/tokens.ts` has always refused to make about a palette, and a driven page measures
+what is drawn rather than whether it is handsome. What is claimed is that the tokens land, that
+nothing paints around them, and that the shell still says everything § 1 says it says.
+
+### What is not claimed, and what is still owed
+
+Zero behaviour change: no logic was edited, only style values and their pinning. `dev/fixitPanel.ts`
+was **not** restyled by this lane — `fix/docs20-polish-six` had already repainted it onto the
+product's tokens, and its version is carried here verbatim (with `fixit/engine.ts`, which it
+depends on) rather than re-done. `dev/dispatcherEditor.ts` needed no migration: its only
+hex-shaped strings are GitHub issue numbers in prose.
+
+## D337 — LIVE METRICS leaves the bitmap, and the plate is allowed to compute a round trip once it says so
+
+`docs/21-engineer-reimagined-contract.md` § 7 owes this file an entry for *the LIVE METRICS
+migration (§ 3.4)*. This is that record, and it carries two decisions beside it — § 3.7 (1)'s
+specification row and § 3.5's scope-note audit — because all three were the same lane and the second
+is the one a reviewer should distrust first.
+
+### 1. The panel is a DOM card, and the reason is what no tier could see
+
+`render/overlay.ts#drawOverlay` drew the live metrics into the stage's own bitmap. GitHub issue
+#115 § 6 found four of its strings overhanging the panel border at the viewer's own 910 × 547 canvas
+— `boarded (window) 75 legs` at 173 px against a 135.3 px panel — and § D316 closed that by giving
+`render/layout.ts` a `MIN_OVERLAY_WIDTH_PX` floor computed from an assumed 7.2 px character advance.
+
+**What § D316 could not close is why the defect shipped for a wave with every tier green.** A string
+inside a canvas has no `scrollWidth`. Not one automated check in this repository could see the
+panel's geometry, and the one number in that file which had been *measured* rather than assumed
+(`ADVANCE_SMALL_PX`) was the one that had been wrong by 9 %.
+
+So the panel is now a **view** (`render/overlay.ts#overlayViewOf`) and a **card**
+(`dev/main.ts#drawLiveMetrics`, `#live-metrics` in `index.html`), and the question is asked of a real
+browser: `scrollWidth <= clientWidth` on the card and every element in it, over **all eight shipped
+buildings** in **both registers**, in `dev/liveMetrics.browser.test.ts`. That check is strictly
+stronger than the arithmetic it replaces — it measures the real face at the real width, including
+the authored bank ids nobody chose — and **it found a defect on its first run**: `auto-fit` keeps a
+grid track at its `minmax` floor even when the container is narrower than the floor, so at 420 px the
+card was 223 px of content in a 178 px box. Issue #115 § 6's shape, in CSS, on the card built to make
+it visible. `minmax(min(210px, 100%), 1fr)` closes it.
+
+**Three carriers moved and none was dropped**, which is § D299 § 1's test and `docs/21` § 1.3 (a)'s:
+
+| `docs/21` § 1.2 row | old carrier | new carrier |
+|---|---|---|
+| `LIVE METRICS` in two registers | `drawOverlay` | `overlayViewOf` — `ENGINEER_WORDS`/`CASUAL_WORDS` unchanged, word for word |
+| suppressed statistics replaced by refusals in either register | `drawOverlay`'s branch | `OverlayEstimate`'s refused arm, which **has no `value` field** — R3 as a shape rather than as care taken |
+| content width contract with `render/layout.ts` (`MIN_OVERLAY_WIDTH_PX`, § D316) | the 210 px floor | the measured DOM overflow check, plus RS-03's stacking rule in CSS |
+
+What the migration **deletes** is three pieces of arithmetic only a fixed-size bitmap needed: the row
+allocator, the greedy wrap, and the *showing 3 of 12 banks* line. Each of those is a **truncation**
+disappearing, never a fact — the card lists every bank and every car. RS-03 also improves rather than
+transfers: the old panel vanished below 900 px of canvas, and the card stacks at every width.
+
+**`Layout.overlay` is gone with it**, and that is the standing requirement rather than tidiness: a
+`Rect` no shipped path reads is the dead-seam shape this repository has closed eleven times. The room
+it reserved is the plot's now, so `hiddenShaftCount` can only fall — the beneficiary § D316 named,
+collected. `dev/main.ts`'s gutter ladder loses its overlay rung with it.
+
+**The 60 Hz hazard is named and answered.** Every figure on this card moves, so a `fill` per frame is
+GitHub issue #106's detached-button defect with a scroll container attached. Each of the three lists
+is keyed on its **structure** through `keyedFill` and the moving parts are text and style writes into
+cells the build handed back — `legendCountCells`' pattern. The browser tier measures it: the car list
+is scrolled to 40 px, the transport is pressed, and the scroll is still at 40 px while the window
+caption keeps moving.
+
+### 2. The plate may compute a round trip, and the rule survives by labelling rather than by refusal
+
+`docs/21` L-3 is `dev/rightRail.ts`'s own sentence: *a plate never computes a round trip; it reads
+one off the run, or it says there is no run.* § 3.7 (1) asks for the Barney/CIBSE closed form on that
+plate, and the two are reconciled by reading what the rule was protecting against — which its next
+sentence states: *"a nominal figure printed beside measured ones is an invitation to compare them,
+which is exactly the comparison a single run cannot support."* The defect is the **unlabelled**
+adjacency, not the arithmetic.
+
+So `closedFormRowsOf` draws, per bank, an `interval (closed form)` and a `capacity (closed form)`
+under a row whose value **is** the basis — `a specification, not a measurement` — whose help cites
+`CLOSED_FORM_ASSUMPTIONS` by count and by name, and whose divergence rows carry every warning the
+analysis recorded. Three things keep L-3 true and all three are structural: the basis is on every
+key; `no run yet` still refuses the measured rows and the specification appears anyway, because a
+specification needs no run; and the measured pair is **above** the specification pair in reading
+order, sharing no cell and no tone. The rail's module docstring is corrected rather than left
+standing — § D227's rule binds a refusal as hard as a claim.
+
+**This puts CLAUDE.md's correctness oracle on screen for the first time.** *Under pure up-peak,
+simulated interval and handling capacity must match the closed form within a few percent* has been a
+test since Phase 2 and has never been visible; it is now two rows under the two the run measured, on
+every building, so a divergence a reader can see is a defect report per that rule. The figures come
+from `authoring/buildingSpec.ts#upPeakBanksOf` — the existing seam the building editor's live readout
+already uses — so the `tp` rule for building types the reference table has no row for, the per-code
+warning sentences and the quoted refusal keep exactly one author.
+
+### 3. Scope-note coverage is a property now, and it immediately found an undriven note
+
+`dev/scopeNotes.audit.test.ts` derives the keys that need a note from `scope/surface.ts` — every
+non-`presentation` control and every latent — and asserts both directions: each is a note site or a
+stated absence, each site's claimed commitment is checked against `commitmentOf`'s current answer,
+each note is read back out of the shipped mount, each sentence is counted over the whole page, and
+each mount's source is required to carry the guard rather than the sentence.
+
+It found one thing on its first run, and it is the thing the audit exists for rather than a defect:
+**`dev/ruleEditor.ts`'s `next-run` note was driven by nothing.** `scopeNotes.test.ts`'s five mounts do
+not include the rule editor and `ruleEditor.test.ts` is about the rows. The note was correct;
+nothing said so, and nothing would have said anything if it had gone. It is a note site now.
+
+The second finding is a wording one and is recorded rather than changed: the three `next-run` blocks
+use **two** sentences. The levers and the selector say *Locked for this shift: changes apply to your
+next run*; the rule editor says *Rules take effect on your next run*, because a rule **is** a mid-day
+mechanism and *locked for this shift* over it would invite the reading that the rules stop firing.
+§ D227 asks for true, not uniform, so the audit counts each phrase where it is true rather than
+demanding one.
+
+**The failure direction is unchanged and is the point**: a withdrawn commitment takes the sentence
+off the screen (`docs/21` L-7). Nothing here asks a mount for a fallback; what it asks is that the
+table and the screen agree in both directions, so that silence is loud in the suite rather than quiet
+on the page.
+## D338 — the two worlds co-exist: § 3.2's swap is a door, and the Engineer header is the way back
+
+### The state this closes
+
+§ D335 put the page's front door on Everyday Mode and made the Engineer surface the thing *Today's
+tower* handed off to. § 7's stage screen then retired that hand-off — correctly; the hand-off was
+never § 7 — and left the Engineer surface **booting, running, laid out, covered, and reachable by
+nothing**. `everyday/shell.ts`'s `EVERYDAY_SHELL_ABSENCES` said so in its second entry, which is the
+right way to ship a gap and not a way to keep one.
+
+The product owner's standing requirement is that both worlds co-exist: Casual is where everyone
+starts, Engineer brings the full detail. For one wave the product had one world and a second one
+running behind a curtain nobody could pull.
+
+### What was built
+
+**Out.** The § 3.2 footer row is live. `shell.ts#enterEngineer` releases the cover
+(`setCoveredInert(false)`) and then steps the Everyday root aside; the order is not interchangeable,
+because releasing first disconnects the `MutationObserver` that re-asserts `inert` before anything
+else moves. Both writes are one synchronous block, so no frame is painted between an uncovered
+Engineer surface and a still-painted Everyday one, and the transition ends with the `resize` § D335
+already dispatched on the way in.
+
+**Back.** A new `#back-to-everyday` control in the Engineer header, beside `Menu` — the other
+*leave this surface* button, which is where an Engineer reader will look. It reaches the shell
+through `everyday/swap.ts`, a provided port on `everyday/engineerBridge.ts`'s exact pattern and for
+its exact reason: `everyday/boot.ts` imports `dev/main.js`, so `dev/main.ts` importing
+`everyday/shell.js` would close the cycle that has already produced one module-init `undefined` in
+this directory.
+
+### `inert` still has two writers, and the rule is unchanged
+
+§ D335's rule reads *the outer cover wins while it is up*. The swap does not weaken it; it is the
+moment the outer cover stops being up. `menuPanel.ts#coverShell` is the only writer while Everyday
+Mode is stepped aside, which is the state the Engineer surface expects when nobody is covering it,
+and the observer is re-armed by `coverEngineer()` on the return. Every write on both paths goes
+through `setInert`'s read-first guard — the one whose absence starved the renderer completely.
+
+### Cover, never hide — now in both directions, and `visibility` is why
+
+The Engineer root has always stayed laid out because a `display:none` ancestor gives a canvas a zero
+box and a view measured while hidden draws nothing when revealed. The Everyday root now gets the
+same treatment on the other side of the door, because it holds § 7's stage: a canvas sized from
+`getBoundingClientRect()` by a `resize` listener that is **still attached** while the player is in
+the other world. `visibility:hidden` suppresses the paint and keeps the box; `display:none` does not.
+`inert` and `aria-hidden` go with it for `coverShell`'s own stated reason.
+
+The assertion is measured rather than argued: `shell.browser.test.ts` records the stage canvas's
+width before the swap and requires the identical value after the return. Under `display:none` that
+is `0`.
+
+### Nothing is discarded, so there is no § 3.4 strip
+
+No screen is unmounted, no run stopped, no `ctx` cleared, no latch reset — the shell is covered, not
+destroyed. The browser case takes the trip **from the stage, mid-run**, and checks the day rather
+than the shell: the host still reports the player's run open, the § 3.3 primary still reads
+`Close the day`, and the rail's Main menu row still raises § 3.4. A confirm strip states a
+consequence; this transition has none to state, and a strip over nothing is friction pretending to
+be care.
+
+### The choice is not remembered, and that is § 3.5 rather than a second rule
+
+§ 3.5: the app always opens on the main menu, and it is not overridable. A remembered world is that
+override wearing `localStorage`, and it fails worse than the deleted `startScreen` prop would have:
+the screen it restores is a developer tool the player has no memory of choosing. It would also need
+a second boot path, since `boot.ts#closeEngineerMenuWhenReady` presses the Engineer menu away
+*behind the cover* and that is only correct while the cover is up.
+
+So the swap is a fact about this visit, and **the product says so** rather than leaving a player to
+discover it by reloading: `types.ts#ENGINEER_SWAP_NOTE` is drawn on the row itself — *"the same day
+on the full instrument panel — nothing stops, and this visit only: reloading opens Everyday Mode
+again"* — and the reload is asserted from the Engineer side in the browser tier.
+
+### Two refusals deleted, on the commit that made them false
+
+`types.ts#ENGINEER_SWAP_REFUSAL` (*"not built yet — Everyday Mode is the only play style in this
+build"*) is gone, with the `unavailable` arm of `RailFooter.engineerSwap` and the seventh entry of
+`settingsView.ts#SETTINGS_ABSENCES`. § D227 binds both ways, and the direction that bites after a
+lane lands is the second: a control that does something may not claim it does nothing. The
+`EVERYDAY_SHELL_ABSENCES` entry naming the missing door went the same way — a register that keeps a
+closed absence is decoration.
+
+### The browser tier was measuring nothing, and that is the finding
+
+`dev/browserTier.test-helper.ts#enterEngineerStage` pressed the *Today's tower* tile and waited for
+`.everyday-main` to go `display: none` — the hand-off's own latch. § 7's stage writes no such style,
+so measured on `integration/everyday-and-engineer` at `c4b8cf0` the tier was **red in 25 cases across
+12 files**, every one of them failing inside that helper, on a page where the product worked. It now
+presses the swap row and waits on two facts rather than one — the Engineer root back in the page and
+this shell out of the paint — because a latch on either alone would have passed against the hand-off
+too. After the change: **12 files, 58 cases, green.**
+
+That is also why the helper is a shared module: one door moved, one file changed.
+
+### What is asserted, and the one thing it is not
+
+`everyday/shell.browser.test.ts` drives the whole round trip, and every leg presses a **real
+control** and requires it to act — `#open-menu` opening the Engineer menu, the rail's Main menu row
+raising the confirm strip — rather than reading `inert` and calling it proof. That distinction is the
+point: `inert` paints identically, and § D335's second defect was exactly a surface that looked
+uncovered and swallowed every click.
+
+What is **not** claimed is that the Engineer surface is a good place for a Casual player to land. It
+is the developer tool, it says so, and the swap's job is to make crossing over a choice with a way
+back rather than a trap.
+
+### Known-red beside this work, and untouched by it
+
+`everyday/fixitScreen.browser.test.ts`'s *"runs the day from the bar's primary, holds it inert
+meanwhile"* fails on the base and after this change, deterministically, in both. It waits 15 s for a
+one-frame `Running the day` relabel that the synchronous pair of runs has already replaced. Nothing
+in this lane is on that path; it is filed rather than folded in, because a lane that quietly fixes an
+unrelated red is a lane whose own evidence is harder to read.

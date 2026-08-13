@@ -73,8 +73,13 @@ export type GhostPlan =
  * § D134's preference list (`dev/defaults.ts`), not a private literal — the same resolution
  * `initialState` uses, so *the plain baseline* and *what the viewer opens on* cannot drift into
  * being two different dispatchers. Falls back to file order exactly as the opening control does.
+ *
+ * Exported for the stage's `switch-dispatcher` intervention control (`dev/main.ts`), which hands
+ * the rest of the day to exactly this profile: the ghost's *plain baseline* and the button's are
+ * one resolution, so the rival the strip races and the driver the handover names cannot drift
+ * into being two different dispatchers either.
  */
-function plainBaselineOf(resources: BrowserResources): DispatcherProfile | undefined {
+export function plainBaselineOf(resources: BrowserResources): DispatcherProfile | undefined {
   const profiles = resources.dispatcherProfiles.profiles;
   const id = preferredId(PREFERRED_VIEWER_DISPATCHERS, profiles) ?? profiles[0]?.id;
   return profiles.find((profile) => profile.id === id);

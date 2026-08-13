@@ -373,27 +373,40 @@ describe('rename is offered, and only where it is honest', () => {
 
 describe('a profile carrying what the editor cannot author says so', () => {
   /*
-   * *"Five families are advertised and only two are authorable."* The editor's document is thirteen
+   * *"Five families are advertised and only two are authorable."* The editor's document was thirteen
    * weights plus three flags, and `profileFromSpec` spreads its `base` — so editing a multi-round
-   * auction's weights and saving gives back a multi-round auction, with nothing on screen having
+   * auction's weights and saving gave back a multi-round auction, with nothing on screen having
    * mentioned the auction. § D227: a control that cannot write something must say so.
+   *
+   * **Six of the seven entries left on the commit that gave them controls** (`docs/21` § 3.6,
+   * `dev/familyControls.ts`), which is the register rule: a registered gap that has been fixed must
+   * stop being registered, or the register becomes decoration. The assertions below are the
+   * *inverse* of the ones they replaced, and deliberately so — each one used to require the block
+   * to be named and now requires it not to be, because naming it would be § D227 in its worse
+   * polarity: a refusal telling the reader not to touch a control that works.
+   *
+   * The both-direction half — *no registered block has a control, and no controlled block is
+   * registered* — is `familyControls.test.ts`'s, over the whole shipped library.
    */
-  it('names the auction on a profile that has one', () => {
-    expect(unauthorableBlocksOf(profile('auction-multi-round'))).toContain('auction');
+  it('no longer names the auction, which now has three controls', () => {
+    expect(profile('auction-multi-round').auction).toBeDefined();
+    expect(unauthorableBlocksOf(profile('auction-multi-round'))).toEqual([]);
   });
 
-  it('names the destination panel wiring, which no control here reaches', () => {
-    expect(unauthorableBlocksOf(profile('destination-panel'))).toContain('panel');
-    // And not on the Level-0 destination, which authors no `passengerAssignment` at all.
-    expect(unauthorableBlocksOf(profile('destination-eta'))).not.toContain('panel');
+  it('no longer names the destination panel wiring, which now has a gated control', () => {
+    expect(profile('destination-panel').dispatch?.passengerAssignment).toBe('panel');
+    expect(unauthorableBlocksOf(profile('destination-panel'))).toEqual([]);
+    expect(unauthorableBlocksOf(profile('destination-eta'))).toEqual([]);
   });
 
-  it('names the zone’s split threshold, which the zone flag turns on and cannot size', () => {
-    expect(unauthorableBlocksOf(profile('zoned-uppeak'))).toContain('zoning');
+  it('no longer names the zone’s split threshold, which now has a control that sizes it', () => {
+    expect(profile('zoned-uppeak').dispatch?.splitThresholdPassengers).toBe(10);
+    expect(unauthorableBlocksOf(profile('zoned-uppeak'))).toEqual([]);
   });
 
-  it('names a hard constraint, and says nothing about a plain weight vector', () => {
-    expect(unauthorableBlocksOf(profile('collective'))).toEqual(['constraints']);
+  it('no longer names a hard constraint, and still says nothing about a plain weight vector', () => {
+    expect(profile('collective').hardConstraints).toEqual(['noDirectionReversal']);
+    expect(unauthorableBlocksOf(profile('collective'))).toEqual([]);
     // The negative control, and the case that must stay silent: two of the shipped profiles are
     // weights and nothing else, and a warning on those would be noise on every screen.
     expect(unauthorableBlocksOf(profile('eta'))).toEqual([]);
@@ -401,11 +414,16 @@ describe('a profile carrying what the editor cannot author says so', () => {
     expect(unauthorableBlocksOf(undefined)).toEqual([]);
   });
 
-  it('is derived from the profile rather than from its role, which three of thirteen do not declare', () => {
-    // `role` is free-form and optional. `collective-enroute` carries an eligibility rule and
-    // declares no role at all, so a role-keyed note would miss it.
+  it('is still derived from the profile rather than from its role', () => {
+    // `role` is free-form and optional, and `collective-enroute` declares none while carrying an
+    // eligibility rule — so a role-keyed register would have missed it. It is derived from the
+    // `selection` field, which is the one block left.
     expect(profile('collective-enroute').role).toBeUndefined();
-    expect(unauthorableBlocksOf(profile('collective-enroute'))).toContain('constraints');
+    expect(unauthorableBlocksOf(profile('collective-enroute'))).toEqual([]);
+    const switching = { ...profile('eta'), selection: { policy: 'fuzzy' } } as unknown as Parameters<
+      typeof unauthorableBlocksOf
+    >[0];
+    expect(unauthorableBlocksOf(switching)).toEqual(['selection']);
   });
 });
 

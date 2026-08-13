@@ -222,30 +222,90 @@ const DOM_PATTERN = /\b(?:document|window|requestAnimationFrame|HTMLCanvasElemen
  *
  * Only `x.window`, `x.document` and friends are exempted, and the positive control below is what
  * proves the narrowing did not silence the two files that genuinely touch the DOM.
+ *
+ * **The second half, added when the first half proved incomplete.** Stripping *member access* left
+ * *member declaration* untouched, so `render/overlay.ts` — which declares `readonly window: string`
+ * for the very `RunSummary.window` the paragraph above is about — tripped the rule the paragraph
+ * above exists to stop it tripping. The field could be read as `x.window` and not declared, which
+ * is not a coherent rule about a codebase.
+ *
+ * So a declared name is stripped too, and the narrowing is kept tight by **where** the name sits:
+ * a property key or a declaration is preceded by a line start, `readonly`, `{`, `,` or `;`, and
+ * followed by `:` or `?:`. That deliberately excludes `cond ? window : other`, where `window` is a
+ * bare global in value position preceded by `?` — pinned in the negative control below, because a
+ * narrowing that swallowed the ternary would be a rule with a hole shaped exactly like a real use.
  */
 function stripMemberNames(text: string): string {
-  return text.replace(/\.\s*[A-Za-z_$][\w$]*/g, '.');
+  return text
+    .replace(/\.\s*[A-Za-z_$][\w$]*/g, '.')
+    .replace(/(^|[{,;]|\breadonly)(\s*)[A-Za-z_$][\w$]*(\s*\??\s*:)/gm, '$1$2$3');
 }
 
 /** Files whose job is to touch the outside world. */
 const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('.test-helper.ts');
 
 /**
- * The Everyday shell's two DOM-owning files — the second shell, exempted by name.
+ * The Everyday shell's DOM-owning files — the second shell, exempted by name.
  *
  * `everyday/` is an entry point in the same sense `dev/` is: `boot.ts` is what `index.html` loads,
- * and `shell.ts` builds the rail, the screen region and the action bar. What is *not* exempt is the
- * rest of the directory — `types.ts`, `modes.ts` and `rail.ts` are pure decisions about what the
- * shell shows, kept free of the document precisely so they can be tested in this node tier, and the
- * rules below are what hold them there.
+ * `shell.ts` builds the rail, the screen region and the action bar, and `fixitScreen.ts` is a
+ * registered screen's mount — the DOM half of a pure/DOM split whose words live in
+ * `fixitScreenModel.ts` (it is here for its one-frame `setTimeout` defer, `dev/fixitPanel.ts`'s
+ * stated-cost approach carried over). What is *not* exempt is the rest of the directory —
+ * `types.ts`, `modes.ts`, `rail.ts` and `fixitScreenModel.ts` are pure decisions about what the
+ * shell shows, kept free of the document precisely so they can be tested in this node tier, and
+ * the rules below are what hold them there.
  *
- * So the exemption is **two file names rather than a `startsWith('everyday/')`**. A prefix would
- * have exempted a directory that is mostly pure, and the day one of those three reached for a
+ * So the exemption is **file names rather than a `startsWith('everyday/')`**. A prefix would have
+ * exempted a directory that is mostly pure, and the day one of the pure files reached for a
  * `document` this suite would have said nothing.
  */
-const EVERYDAY_SHELL_FILES = new Set(['everyday/boot.ts', 'everyday/shell.ts']);
+const EVERYDAY_SHELL_FILES = new Set([
+  'everyday/boot.ts',
+  'everyday/shell.ts',
+  /* The fixit screen's DOM half — its words and decisions stay pure in fixitScreenModel.ts. */
+  'everyday/fixitScreen.ts',
+  /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
+  'everyday/settingsScreen.ts',
+  /* GAMEPLAY § 8's three campaign screens — their words stay pure in campaignModel.ts. */
+  'everyday/campaignScreens.ts',
+  /*
+   * The § 7 stage's DOM half — its words, its figures and its geometry stay pure in
+   * stageScreenModel.ts. It is the one Everyday file that also holds a `requestAnimationFrame`
+   * loop, which is the whole reason the split is drawn where it is: the transport belongs to the
+   * shell tier and everything a reader reads does not.
+   */
+  'everyday/stageScreen.ts',
+  /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
+  'everyday/workshopScreen.ts',
+  /* The § 12 bench's DOM half — its words stay pure in benchModel.ts, and it owns a batch Worker. */
+  'everyday/benchScreen.ts',
+  /* The rush setup screen's DOM half — its ramp arithmetic and words stay in rushScreenModel.ts. */
+  'everyday/rushScreen.ts',
+  /* The drawing board's DOM half — its figures, steps and warnings stay in designerModel.ts. */
+  'everyday/designerScreen.ts',
+  /* The tuner's DOM half — its seven controls and their seams stay in tunerModel.ts. */
+  'everyday/tunerScreen.ts',
+  /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
+  'everyday/profileStore.ts',
+  /*
+   * § 6's daily loop — four DOM halves and the vocabulary they share. Each one's words and
+   * decisions stay pure in its `*View.ts` sibling (`doorView`, `briefView`, `reportView`,
+   * `weekView`) plus `today.ts`, `figures.ts` and `world.ts`, none of which are exempt and all of
+   * which are driven in this node tier.
+   *
+   * `briefScreen.ts` is here for a second reason worth naming: it is the only Everyday file that
+   * draws to a canvas, so it reads `devicePixelRatio` and a `resize` listener off the document's
+   * own view — ENGINE_CONTRACT § 14's rules, which cannot be followed without touching them.
+   */
+  'everyday/screenDom.ts',
+  'everyday/doorScreen.ts',
+  'everyday/briefScreen.ts',
+  'everyday/reportScreen.ts',
+  'everyday/weekScreen.ts',
+]);
 
-/** A shell entry point: `dev/` wholesale, and the Everyday shell's two DOM-owning files. */
+/** A shell entry point: `dev/` wholesale, and the Everyday shell's DOM-owning files. */
 const isDev = (id: string): boolean => id.startsWith('dev/') || EVERYDAY_SHELL_FILES.has(id);
 
 describe('CLAUDE.md invariant 6 — core never depends on viz', () => {
@@ -308,7 +368,21 @@ describe('the DOM is confined to the dev entry point', () => {
     ]) {
       expect(DOM_PATTERN.test(stripMemberNames(caught)), caught).toBe(true);
     }
-    for (const allowed of ['summary.window.startS', 'result.summary.window', 'a.document.b']) {
+    // A ternary puts a bare global in value position with a colon after it, which is the shape the
+    // declaration half of the narrowing must not swallow. Pinned here rather than trusted.
+    for (const stillCaught of ['cond ? window : other', 'const x = ok ? document : null;']) {
+      expect(DOM_PATTERN.test(stripMemberNames(stillCaught)), stillCaught).toBe(true);
+    }
+    for (const allowed of [
+      'summary.window.startS',
+      'result.summary.window',
+      'a.document.b',
+      // The declaration half — `render/overlay.ts`'s own field, and the shapes it appears in.
+      'readonly window: string;',
+      '{ window: string }',
+      'interface X {\n  window: string;\n}',
+      'const view = { window: caption, other: 1 };',
+    ]) {
       expect(DOM_PATTERN.test(stripMemberNames(allowed)), allowed).toBe(false);
     }
   });

@@ -60,6 +60,8 @@
 
 import { COST_TERMS_BY_ID } from '@elevator-sim/core/browser';
 import type { CostTerm, DispatcherProfile } from '@elevator-sim/core/browser';
+import { collectSearchSpace } from '@elevator-sim/experiments/browser';
+import type { ParameterValue, SearchSpace } from '@elevator-sim/experiments/browser';
 
 import {
   DWELL_CHOICES,
@@ -76,6 +78,9 @@ import {
   type GroupLevers,
 } from '../authoring/dispatcherSpec.js';
 
+import { applyControlEdit } from '../controls/controls.js';
+import { renderControls, valueAtSliderPosition } from '../controls/render.js';
+import type { Control } from '../controls/types.js';
 import {
   applyPlainLever,
   plainLeverEchoOf,
@@ -91,7 +96,16 @@ import type { ShapedDayReport } from '../shift/report.js';
 
 import { chip, el, fill, pick, plateRow, setHidden, setStyle, setText, slider, toggle } from './dom.js';
 import type { DispatcherEditorElements } from './elementMap.js';
+import {
+  FAMILY_EYEBROW,
+  SELECTION_REFUSAL,
+  familyControlsViewOf,
+  familyValuesOf,
+  prunedFamilyMoves,
+  type FamilyControlsView,
+} from './familyControls.js';
 import type { MountContext, Panel, ViewAt } from './mountTypes.js';
+import { instantiateControlNode } from './parameterForm.js';
 import { reportViewOf, runProgressOf, type RunProgress } from './reportPanel.js';
 import { allDispatchers, profileById } from './state.js';
 
@@ -671,48 +685,45 @@ export function renamedDispatchers(
 /**
  * The blocks a profile carries that this editor's document cannot express.
  *
- * `data/dispatcher-profiles.json` advertises five families — `baseline`, `auction`, `zoning`,
- * `destination` and the weighted-cost engine everything shares — and **two of them are authorable
- * here**. The editor's document is thirteen weights plus three flags, so there is no control for an
- * auction's rounds, a zone's split threshold, a destination panel's `passengerAssignment`, a
- * reassignment policy or a hard constraint. Copying such a profile *does* round-trip those fields,
- * because {@link profileFromSpec} spreads its `base` — which is precisely what makes the silence
- * dangerous: the reader edits a multi-round auction's weights, saves, and gets a multi-round
+ * ## What this register said, and what closed it — `docs/21` § 3.6
+ *
+ * It named **seven**: `auction`, `zoning`, `panel`, `reassignment`, `timing`, `constraints` and
+ * `selection`. `data/dispatcher-profiles.json` advertises five families and two of them were
+ * authorable here, because the editor's document was thirteen weights plus three flags — no control
+ * for an auction's rounds, a zone's split threshold, a destination panel's `passengerAssignment`, a
+ * reassignment policy or a hard constraint. Copying such a profile *did* round-trip those fields,
+ * because {@link profileFromSpec} spreads its `base`, which is exactly what made the silence
+ * dangerous: the reader edited a multi-round auction's weights, saved, and got a multi-round
  * auction, with nothing on screen having mentioned the auction.
  *
- * § D227's rule, in its own words: *a control that writes nothing must say so.* This is the same
- * rule pointed at the gap between what a document carries and what a panel can reach, and it is
- * reported rather than fixed — building an auction editor is a lane, and a **silent** partial editor
- * is the defect.
+ * `dev/familyControls.ts` is the fix for six of the seven, and **each left this register on the
+ * commit that made it authorable** — the `OUTSTANDING` rule applied here: a registered gap that has
+ * been fixed must stop being registered, or the register becomes decoration.
+ *
+ * ## Why `selection` stays, and why its ground changed
+ *
+ * It is the one family that failed § 3.6's rule 2 — *name the non-test caller before the control is
+ * built*. Not because nothing reads the fields: `resolveDispatchConfig` resolves all seven and the
+ * run honours them. Because **something else already writes them on the way to the run**.
+ * `dev/state.ts#drivingProfileOf` ends in `profileWithSelector(…, state.selectorSpec)`, which
+ * rebuilds `profile.selection` from the Selector panel's own document and deletes what that
+ * document does not carry — so a value written here would be overwritten before the shift started.
+ * That is § D219's defect with a different cause, and the correct deliverable for a block that
+ * fails the caller test is a refusal naming the real ground rather than a control.
+ *
+ * The refusal itself is {@link familyControls.SELECTION_REFUSAL}, and it now names the panel that
+ * *does* own the field — which is the half the old one-clause sentence left the reader to find.
  *
  * Derived from the profile rather than from its `role`, because `role` is free-form and three of the
  * thirteen shipped profiles declare none while carrying exactly these blocks.
  */
-export type UnauthorableBlock =
-  | 'auction'
-  | 'zoning'
-  | 'panel'
-  | 'reassignment'
-  | 'timing'
-  | 'constraints'
-  | 'selection';
+export type UnauthorableBlock = 'selection';
 
 export function unauthorableBlocksOf(
   profile: DispatcherProfile | undefined,
 ): readonly UnauthorableBlock[] {
   if (profile === undefined) return [];
-  const dispatch = profile.dispatch;
-  const found: UnauthorableBlock[] = [];
-  if (profile.auction !== undefined) found.push('auction');
-  if (dispatch?.splitThresholdPassengers !== undefined) found.push('zoning');
-  if (dispatch?.passengerAssignment !== undefined) found.push('panel');
-  if (dispatch?.reassignmentPolicy !== undefined) found.push('reassignment');
-  if (dispatch?.assignmentTiming !== undefined) found.push('timing');
-  if (profile.hardConstraints !== undefined || profile.eligibility !== undefined) {
-    found.push('constraints');
-  }
-  if (profile.selection !== undefined) found.push('selection');
-  return found;
+  return profile.selection === undefined ? [] : ['selection'];
 }
 
 /*
@@ -819,6 +830,34 @@ function withCount(value: string, count: string | null): string {
   return count === null ? value : `${value} (${count})`;
 }
 
+/**
+ * Read one generated control's input back as the value its declaration says it holds.
+ *
+ * `dev/parameterForm.ts`'s rule and `dev/campaignPanel.ts`'s copy of it, at the third mount of the
+ * same controls: keyed on the **control's own `kind`**, never on the element's type, so the two
+ * cannot disagree about what a control holds. A slider reports a position on a fixed 0–1000 track
+ * and is converted through the declaration's own scale — reading `input.value` as the parameter
+ * value would silently linearise every log-scaled dimension.
+ */
+function familyValueFrom(
+  control: Control,
+  input: HTMLInputElement | HTMLSelectElement,
+): ParameterValue {
+  const role = input.dataset['role'];
+  switch (control.kind) {
+    case 'slider':
+      return role === 'slider'
+        ? valueAtSliderPosition(control, Number(input.value))
+        : Number(input.value);
+    case 'stepper':
+      return Number(input.value);
+    case 'checkbox':
+      return (input as HTMLInputElement).checked;
+    case 'select':
+      return input.value;
+  }
+}
+
 /** The note for a strip that is not showing a pairing, with the playhead's clock where it belongs. */
 function runReadOutNoteOf(state: Exclude<EditorRunReadOut, 'paired'>, progress: RunProgress): string {
   const base = RUN_READ_OUT_COPY[state];
@@ -846,15 +885,16 @@ const RENAME_COPY: Readonly<Record<RenameState, string>> = Object.freeze({
   ready: 'Renames the saved dispatcher you are editing. Nothing else changes — same id, same weights.',
 });
 
-/** What each unauthorable block is, in the reader's words. One clause, naming the field. */
+/**
+ * What each unauthorable block is, in the reader's words — one entry, because six left.
+ *
+ * The copy is `familyControls.ts`'s, not a second sentence about the same refusal: the module that
+ * decided the block is unauthorable is the one that says why, which is the rule
+ * `rightRail.ts`'s machines refusal states — *a refusal is pinned by the thing it points at, never
+ * by another sentence.*
+ */
 const UNAUTHORABLE_COPY: Readonly<Record<UnauthorableBlock, string>> = Object.freeze({
-  auction: 'its auction (how many rounds of bidding, and the reserve)',
-  zoning: 'the size of the landing crowd that splits a zone',
-  panel: 'its destination panel wiring (who is told the destination, and when)',
-  reassignment: 'when an assignment stops being changeable',
-  timing: 'whether an assignment is made at once or deferred',
-  constraints: 'its hard constraints and eligibility rules',
-  selection: 'its mid-run weight-set selection',
+  selection: SELECTION_REFUSAL,
 });
 
 /*
@@ -893,6 +933,23 @@ const DRAFT_NOTE =
       `hands it over, or ${RUN_THIS_COPY.saveFirst.label} while the draft is still unfiled; ` +
       'either one re-runs the whole day from the start rather than steering the one you are ' +
       'watching.'
+    : '';
+
+/**
+ * The family block's own scope line — the same commitment as {@link DRAFT_NOTE}, said once for a
+ * block that sits below it.
+ *
+ * It **names** the draft rather than restating its sentence, for {@link DRAFT_NOTE}'s own stated
+ * reason one paragraph up: a claim written twice is two claims, and the day one of them is edited
+ * the panel says different things about one document. What this line adds is the fact a reader of
+ * thirty-eight new controls needs and cannot get from the sentence above — that these write the
+ * *same* draft the weights do, so one run verb hands the lot over.
+ */
+const FAMILY_SCOPE_NOTE =
+  commitmentOf('viewer.dispatcherSpec', 'writes-only') === 'draft'
+    ? 'These write the same draft the thirteen weights do, and the same note above applies to them: ' +
+      `nothing here reaches a run until ${RUN_THIS_COPY.select.label} or ` +
+      `${RUN_THIS_COPY.saveFirst.label} hands the whole draft over.`
     : '';
 
 const LEVERS_NOTE =
@@ -1046,7 +1103,7 @@ export function mountDispatcherEditor(
    */
   const plainSliderRows = new Map<PlainLeverId, SliderHandles>();
   const plainSlots = new Map<PlainLeverId, HTMLElement>();
-  /** The four lever rows' own container, so the echo and cost line below stay below. */
+  /** The four lever rows' own container, so the block's fixed lines cannot interleave with them. */
   const plainSlotsBox = el(doc, 'div');
   /*
    * The acknowledgement pair — `docs/19` defect 5, and the audit's *surface the lever's
@@ -1057,12 +1114,23 @@ export function mountDispatcherEditor(
    * `costFunctionLine` call the summary makes** — one composition, drawn in a second place,
    * never a second composition (`authoring/dispatcherSpec.ts#costFunctionLine` stays the only
    * author of that expression).
+   *
+   * The pair sits **above** the four rows, not under them — `docs/20` defect 11's second walk
+   * found the first fix's echo at y 748–835 with the fold at 745, which is `docs/19` defect 5
+   * verbatim with the sentence written: an acknowledgement below four slider rows is pushed under
+   * the fold *by the rows it acknowledges*, at exactly the width the block was built for. Above
+   * them it cannot be — the block opens at the top of the panel — and `fold1280.browser.test.ts`
+   * measures it there rather than trusting this paragraph. The extra class on the echo is that
+   * test's handle; the node is still the one `.advice` paragraph `noteContrast` counts.
    */
   const plainEcho = el(doc, 'p', {
-    className: 'advice',
-    style: { margin: '8px 0 0' },
+    className: 'advice dispatcher-plain-echo',
+    style: { margin: '0 0 8px' },
   });
-  const plainCost = el(doc, 'div', { className: 'summary-line', style: { 'margin-top': '6px' } });
+  const plainCost = el(doc, 'div', {
+    className: 'summary-line',
+    style: { margin: '0 0 10px' },
+  });
   const plainBlock = el(doc, 'div', {
     style: { margin: '0 0 14px' },
     children: [
@@ -1078,20 +1146,126 @@ export function mountDispatcherEditor(
           'engineer’s own controls show, so the two can never disagree.',
         style: { 'font-size': '11.5px', color: 'var(--dim)', margin: '0 0 8px', 'line-height': '1.5' },
       }),
-      plainSlotsBox,
       plainEcho,
       plainCost,
+      plainSlotsBox,
     ],
   });
+
+  /*
+   * The family controls — `docs/21` § 3.6, and the block that closed six of the seven entries in
+   * {@link unauthorableBlocksOf}.
+   *
+   * Built here rather than in `index.html` for the reason every other addition to this panel is:
+   * the rows are **generated from `collectSearchSpace()`**, so the markup cannot reserve them —
+   * there is no fixed number of them, and a schema row added in `core` has to appear here with no
+   * change to this file. `renderControls` decides what a control looks like and
+   * `instantiateControlNode` puts it in the DOM, which is `campaignPanel.ts`'s pattern and
+   * deliberately not a second `createElement` walk.
+   *
+   * **The body is rebuilt whole on every render, and that is safe here where it is not safe for
+   * the term sliders.** The module docstring's rule is about a drag: replacing an
+   * `<input type="range">` mid-drag releases the pointer capture. These rows report on `change`
+   * rather than on `input` — the browser fires it on release — so the rebuild happens after the
+   * drag has ended. It is the same trade `campaignPanel.ts` makes over the same controls.
+   */
+  const familyStatus = el(doc, 'div', { className: 'summary-line', style: { margin: '0 0 8px' } });
+  const familyBody = el(doc, 'div');
+  const familyRefusal = el(doc, 'p', {
+    className: 'helpful',
+    attrs: { role: 'alert' },
+    style: { color: 'var(--bad)', 'font-size': '11.5px', margin: '6px 0 0', 'line-height': '1.5' },
+  });
+  const familyElsewhere = el(doc, 'p', {
+    className: 'helpful',
+    style: { color: 'var(--dim)', 'font-size': '11.5px', margin: '8px 0 0', 'line-height': '1.5' },
+  });
+  const familyNote = el(doc, 'p', {
+    className: 'helpful',
+    style: { color: 'var(--dim)', 'font-size': '11.5px', margin: '0 0 8px', 'line-height': '1.5' },
+  });
+  const familyEyebrow = el(doc, 'div', { className: 'eyebrow', style: { 'margin-bottom': '6px' } });
+  const familyBlock = el(doc, 'div', {
+    style: { 'margin-top': '16px', 'padding-top': '14px', 'border-top': '1px solid var(--hairline)' },
+    children: [
+      familyEyebrow,
+      familyNote,
+      ...(FAMILY_SCOPE_NOTE === ''
+        ? []
+        : [el(doc, 'p', { className: 'advice', text: FAMILY_SCOPE_NOTE, style: { 'margin-bottom': '10px' } })]),
+      familyStatus,
+      familyBody,
+      familyRefusal,
+      familyElsewhere,
+    ],
+  });
+
+  /**
+   * The space the controls are generated from, or the reason there are none.
+   *
+   * Collected once at mount: `collectSearchSpace()` walks every declared schema, and it is a pure
+   * function of `core`'s declarations, so a second call would be a second answer to a question with
+   * one answer. It is allowed to fail — the collector throws by name on a schema that declares two
+   * different things about one id — and a failure draws its own sentence rather than taking the
+   * editor down, because the thirteen weights above it are still authorable.
+   */
+  let familySpace: SearchSpace | undefined;
+  let familySpaceRefusal = '';
+  try {
+    familySpace = collectSearchSpace();
+  } catch (error) {
+    familySpaceRefusal =
+      'The family controls are not drawn: the parameter schema this build declares could not be ' +
+      `collected — ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  /** The last drawn block, so the change handler can find the control an input belongs to. */
+  let familyView: FamilyControlsView | undefined;
+  /** The profile the draft currently describes, and the one it was read from. */
+  let familyDraft: DispatcherProfile | undefined;
+  let familySource: DispatcherProfile | undefined;
+  /**
+   * What was last put in the DOM, so a render that would draw the same thing draws nothing.
+   *
+   * The module docstring's rule — *rebuilt only when the set of rows changes* — pointed at a block
+   * with thirty-seven of them, and it is load-bearing rather than tidy here. `renderAll` runs on
+   * **every** state write, a shift in progress produces a stream of them, and rebuilding two
+   * hundred elements on each one is measurable: without this guard
+   * `everyday/fixitScreen.browser.test.ts` timed out waiting for a busy state to appear and clear,
+   * on a screen that has nothing to do with this panel. That is the whole page paying for a block
+   * on a tab nobody has opened.
+   *
+   * Keyed on **what would be drawn** rather than on the state that produces it — every control's
+   * id, value and enabled flag, plus the override sentence beside it — so the guard cannot skip a
+   * redraw that would have changed a pixel, whatever moved upstream to cause it.
+   */
+  let builtFamilyKey = '';
 
   setHidden(savedNote, true);
   setHidden(unauthorable, true);
   elements.save.parentElement?.append(runThis, rename, savedNote);
+  /*
+   * Above the verbs, by `insertBefore` on the row's own parent rather than by `actions.before(…)`.
+   * The sibling-insert idiom every other mount on this page uses, and the one the DOM recorders
+   * answer — `mountRecorder.test-helper.ts` implements `insertBefore` and `after` and not `before`,
+   * which is not an omission to route around: the recorder models the inserts the product makes,
+   * and a mount reaching for a fourth one is a mount whose placement no node test can read.
+   */
+  const actionsRow = elements.save.parentElement;
+  actionsRow?.parentElement?.insertBefore(familyBlock, actionsRow);
   elements.save.parentElement?.after(resultStrip);
   elements.summary.parentElement?.append(unauthorable);
-  // `parentElement?.insertBefore`, not `ChildNode.before` — the sibling-insert idiom every other
-  // mount uses, and the one the DOM test recorders answer.
-  elements.termsUsed.parentElement?.insertBefore(plainBlock, elements.termsUsed);
+  /*
+   * Before the terms **header row**, not before the header's own span — `docs/20` defect 11's
+   * other half. `elements.termsUsed.parentElement` is the `.eyebrow-row` flex row, and the first
+   * fix inserted `plainBlock` *inside* it: the whole lever block became a flex item laid out
+   * beside `THE 13 COST TERMS`, which is how a section header came to render as a 58 px
+   * one-word-per-line sliver at 1280×800. The row itself is the sibling this block goes above.
+   * Still `parentElement?.insertBefore` — the sibling-insert idiom every other mount uses, and
+   * the one the DOM test recorders answer.
+   */
+  const termsHeaderRow = elements.termsUsed.parentElement;
+  termsHeaderRow?.parentElement?.insertBefore(plainBlock, termsHeaderRow);
 
   /*
    * The two scope notes, written once at mount rather than on every render — issue #104. Each sits
@@ -1384,6 +1558,170 @@ export function mountDispatcherEditor(
     }
   }
 
+  /* --- the family controls ------------------------------------------------ */
+
+  /*
+   * One route from an input back to the model — `dev/parameterForm.ts`'s own arrangement, and
+   * `campaignPanel.ts`'s: the value is read through the control's declared `kind`, written through
+   * `applyControlEdit`, and the block is redrawn either way. On acceptance because a gate may have
+   * cascaded — moving `dispatch.reassignmentPolicy` to `until-commitment` opens three controls
+   * below it — and on refusal because the input has to go back to what the model holds rather than
+   * keeping a value the model rejected.
+   *
+   * `change` rather than `input`, which is what makes the whole-body rebuild safe. See the mount.
+   */
+  familyBody.addEventListener('change', (event) => {
+    const at = view;
+    const current = spec();
+    const space = familySpace;
+    const draft = familyDraft;
+    if (at === undefined || current === undefined || space === undefined || draft === undefined) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+    const id = target.dataset['parameter'];
+    if (id === undefined) return;
+    const row = familyView?.blocks
+      .flatMap((block) => block.rows)
+      .find((candidate) => candidate.control.id === id);
+    if (row === undefined) return;
+
+    const values = familyValuesOf(space, draft, current.families);
+    const edit = applyControlEdit(space, values, id, familyValueFrom(row.control, target));
+    if (!edit.accepted) {
+      /*
+       * Drawn here and now rather than left to the render, because the render below is what puts
+       * the input back to the model's value: writing the reason after it would be a sentence about
+       * a control the reader can no longer see the rejected value in, and writing it before means
+       * `render` must not clear it. It does not — the refusal node is written only on this path and
+       * cleared on the next accepted edit or profile change.
+       */
+      setText(familyRefusal, edit.reason);
+      setHidden(familyRefusal, false);
+      render(at);
+      return;
+    }
+    const value = edit.values.get(id);
+    if (value === undefined) return;
+    setText(familyRefusal, '');
+    setHidden(familyRefusal, true);
+    /*
+     * Pruned on the way in, not on the way out. A reader who moves a control and puts it back must
+     * leave no trace on the document, or the *saved* profile would spell out a value it inherited —
+     * and the acceptance criterion for this block is that re-authoring a shipped profile's exact
+     * values produces a bit-identical run.
+     */
+    patchSpec({
+      families: prunedFamilyMoves(space, familySource, { ...current.families, [id]: value }),
+    });
+  });
+
+  function drawFamilies(at: ViewAt, current: DispatcherSpec, source: DispatcherProfile | undefined): void {
+    const space = familySpace;
+    familySource = source;
+    if (space === undefined) {
+      familyDraft = undefined;
+      familyView = undefined;
+      setText(familyEyebrow, FAMILY_EYEBROW);
+      setText(familyNote, '');
+      setHidden(familyNote, true);
+      setText(familyStatus, '');
+      if (builtFamilyKey !== 'refused') {
+        builtFamilyKey = 'refused';
+        fill(familyBody);
+      }
+      setText(familyElsewhere, '');
+      setText(familyRefusal, familySpaceRefusal);
+      setHidden(familyRefusal, false);
+      return;
+    }
+    /*
+     * The profile the draft *currently* describes, families and flags applied — which is the point
+     * every `activeWhen` is evaluated against. Reading the point off the source profile instead
+     * would gate `dispatch.passengerAssignment` on the source's call type rather than on the one
+     * the reader has just switched on with the flag above, and the control would stay locked after
+     * the switch that unlocks it.
+     */
+    familyDraft = profileFromSpec(current, {
+      id: at.state.editingDispatcherId,
+      base: source,
+      levers: at.state.levers,
+    });
+    const drawn = familyControlsViewOf({
+      space,
+      spec: current,
+      levers: at.state.levers,
+      draft: familyDraft,
+      base: source,
+    });
+    familyView = drawn;
+    setText(familyEyebrow, drawn.eyebrow);
+    setText(familyNote, drawn.note);
+    setHidden(familyNote, false);
+    setText(familyStatus, drawn.status);
+    setText(familyElsewhere, drawn.elsewhere);
+    /*
+     * The guard {@link builtFamilyKey} documents. The four `setText` calls above stay unconditional
+     * — they are writes of one string each and `setText` is already a no-op when it matches — and
+     * only the two hundred elements below are keyed.
+     */
+    const key = JSON.stringify(
+      drawn.blocks.map((block) => [
+        block.family,
+        block.rows.map((row) => [
+          row.control.id,
+          row.control.value,
+          row.control.enabled,
+          row.overriddenBy ?? '',
+        ]),
+      ]),
+    );
+    if (key === builtFamilyKey) return;
+    builtFamilyKey = key;
+    fill(
+      familyBody,
+      ...drawn.blocks.map((block) =>
+        el(doc, 'div', {
+          style: { margin: '0 0 14px' },
+          children: [
+            el(doc, 'div', {
+              className: 'eyebrow',
+              text: block.title,
+              style: { 'margin-bottom': '2px' },
+            }),
+            /*
+             * **The named non-test caller, on the screen** — § 3.6 rule 2's evidence, drawn rather
+             * than only asserted in a test. It is the sentence that says this block is not a panel
+             * over a dead field, and it is per block because three of the eleven are read by
+             * something other than the dispatch resolve.
+             */
+            el(doc, 'div', {
+              className: 'helpful',
+              text: block.caller,
+              style: { color: 'var(--dim)', 'font-size': '11px', 'margin-bottom': '6px' },
+            }),
+            instantiateControlNode(doc, renderControls(block.rows.map((row) => row.control))),
+            ...block.rows
+              .filter((row) => row.overriddenBy !== undefined)
+              .map((row) =>
+                el(doc, 'p', {
+                  className: 'helpful',
+                  text: `${row.control.label} — ${row.overriddenBy ?? ''}`,
+                  style: {
+                    color: 'var(--warn)',
+                    'font-size': '11.5px',
+                    margin: '4px 0 0',
+                    'line-height': '1.5',
+                  },
+                }),
+              ),
+          ],
+        }),
+      ),
+    );
+  }
+
   /* --- the term rows ------------------------------------------------------ */
 
   function drawTerms(rows: readonly TermRow[]): void {
@@ -1553,6 +1891,13 @@ export function mountDispatcherEditor(
     );
     setText(elements.dwellHint, dwellHintOf(state.levers, running));
 
+    /*
+     * The family controls — `docs/21` § 3.6. After the flags and the levers because that is the
+     * order the run applies them in: a flag above outranks a control below, and
+     * `familyOverridesOf` says so at the control it outranks.
+     */
+    drawFamilies(at, current, source);
+
     /* Summary, advice, dirty. */
     setText(
       elements.summary,
@@ -1564,20 +1909,19 @@ export function mountDispatcherEditor(
 
     /*
      * **What this editor cannot write about the profile in front of the reader** — issue #113 § 5,
-     * and § D227's rule that a control which writes nothing must say so. The note is keyed on the
-     * *source* profile rather than on the spec, because the spec has no room for these fields at
-     * all: they survive a save by riding on `profileFromSpec`'s `base`, which is exactly why their
-     * absence from the panel is invisible without this line.
+     * and § D227's rule that a control which writes nothing must say so.
+     *
+     * One block now, not seven (`docs/21` § 3.6). The sentence that used to be here said *the spec
+     * has no room for these fields at all*, and it stopped being true of six of them the moment
+     * `DispatcherSpec.families` landed — so it is replaced rather than left standing, which is what
+     * this note's own rule requires of a description as much as of a refusal.
+     *
+     * Still keyed on the **source** profile rather than on the spec, and for the surviving block
+     * the reason is unchanged: `selection` rides through a save on `profileFromSpec`'s `base`, so
+     * its absence from the panel is invisible without this line.
      */
     const carried = unauthorableBlocksOf(source);
-    setText(
-      unauthorable,
-      carried.length === 0
-        ? ''
-        : `Carried through unchanged and not editable here: ${carried
-            .map((block) => UNAUTHORABLE_COPY[block])
-            .join('; ')}. Saving keeps them exactly as they are.`,
-    );
+    setText(unauthorable, carried.map((block) => UNAUTHORABLE_COPY[block]).join(' '));
     setHidden(unauthorable, carried.length === 0);
 
     /*

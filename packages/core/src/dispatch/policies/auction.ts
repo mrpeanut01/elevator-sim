@@ -612,6 +612,15 @@ export class AuctionDispatchPolicy implements DispatchPolicy {
     return this.#inner.cancel(callId);
   }
 
+  /**
+   * A `switch-dispatcher` intervention, delegated whole. The engine underneath is the one that
+   * scores, so pinning its vector pins every bid — the aggregation changes who decides, never
+   * what a bid is worth, which is this class's founding sentence.
+   */
+  adoptWeights(weights: ReadonlyMap<string, number>): void {
+    this.#inner.adoptWeights(weights);
+  }
+
   reset(): void {
     this.#auctions.clear();
     this.#inner.reset();

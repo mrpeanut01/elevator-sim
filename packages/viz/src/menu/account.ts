@@ -283,6 +283,34 @@ export interface FormIssue {
 }
 
 /**
+ * Everything wrong with a display name, as the one sentence the player is shown — or `undefined`
+ * for a name the server would take.
+ *
+ * Extracted from {@link formIssues}'s naming arm so the rule has **one home with two readers**:
+ * this screen's naming stage, and Everyday Mode's settings screen
+ * (`everyday/settingsView.ts`), whose § 15.1 name field is the same string bound for the same
+ * boards. Two copies of a courtesy rule drift exactly the way two copies of anything drift here,
+ * and the direction that matters is unchanged from the module docstring: stricter than the server
+ * is the failure nobody can see, so the bounds stay asserted equal to the server's own in
+ * `client.test.ts`.
+ */
+export function displayNameIssueOf(raw: string): string | undefined {
+  const name = raw.trim();
+  if (name.length < MIN_DISPLAY_NAME) {
+    return 'Pick a name to appear on the boards.';
+  }
+  if (name.length > MAX_DISPLAY_NAME) {
+    return `A display name is at most ${String(MAX_DISPLAY_NAME)} characters.`;
+  }
+  if (/[\p{Cc}\p{Cf}]/u.test(name)) {
+    // The server's own rule and its own reason: this string is drawn on every board, and a name
+    // carrying a newline or a bidi override is a name that rearranges somebody else's row.
+    return 'A display name cannot contain control characters.';
+  }
+  return undefined;
+}
+
+/**
  * Everything wrong with the form, all at once.
  *
  * All at once rather than first-wrong, for the reason `freePlayIssues` gives: a form that reports
@@ -297,19 +325,8 @@ export function formIssues(state: AccountState): readonly FormIssue[] {
   const issues: FormIssue[] = [];
 
   if (namingStage(state)) {
-    const name = state.form.displayName.trim();
-    if (name.length < MIN_DISPLAY_NAME) {
-      issues.push({ field: 'displayName', message: 'Pick a name to appear on the boards.' });
-    } else if (name.length > MAX_DISPLAY_NAME) {
-      issues.push({
-        field: 'displayName',
-        message: `A display name is at most ${String(MAX_DISPLAY_NAME)} characters.`,
-      });
-    } else if (/[\p{Cc}\p{Cf}]/u.test(name)) {
-      // The server's own rule and its own reason: this string is drawn on every board, and a name
-      // carrying a newline or a bidi override is a name that rearranges somebody else's row.
-      issues.push({ field: 'displayName', message: 'A display name cannot contain control characters.' });
-    }
+    const issue = displayNameIssueOf(state.form.displayName);
+    if (issue !== undefined) issues.push({ field: 'displayName', message: issue });
     return Object.freeze(issues);
   }
 

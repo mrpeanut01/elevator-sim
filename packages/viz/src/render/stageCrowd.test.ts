@@ -109,8 +109,6 @@ function stageFor(id: string, canvas: { readonly width: number; readonly height:
     ...canvas,
     floors: recording.floors,
     shafts: recording.shafts,
-    // The shell's own rule — `RS-03` drops the panel below 900 px of canvas.
-    wantsOverlay: canvas.width >= 900,
   });
 }
 
@@ -136,10 +134,15 @@ describe('the stage has a crowd on it — issue #115 § 2, issue #103', () => {
     expect(withLane).toHaveLength(6);
   });
 
-  it('reserves it at a laptop canvas too, where the metrics panel has already gone', () => {
+  it('reserves it at a laptop canvas too, where the stage has least room', () => {
+    /*
+     * This case used to also assert `layout.overlay === undefined` — RS-03 dropping the metrics
+     * panel below 900 px of canvas. `docs/21` § 3.4 took that panel off the bitmap altogether, so
+     * there is no panel to drop and the lane's claim stands on its own: the same six buildings, at
+     * the narrower canvas, agree with the desktop reading.
+     */
     for (const id of BUILDING_IDS) {
       const layout = stageFor(id, LAPTOP_CANVAS);
-      expect(layout.overlay, `${id}: RS-03 drops the panel below 900 px`).toBeUndefined();
       expect(
         layout.riderLane === undefined,
         `${id}: the lane at a laptop canvas disagrees with the desktop one`,

@@ -1,5 +1,6 @@
 /**
- * The palette, twice — `docs/12-design-handoff.md` § 1.1 S6/S7, and the light mode beside it.
+ * The palette, twice — `docs/12-design-handoff.md` § 1.1 S6/S7 as the dark mode, and guide § 19's
+ * paper palette as the light one (`docs/21-engineer-reimagined-contract.md` § 2.2).
  *
  * ## Why this file exists
  *
@@ -52,6 +53,8 @@
  * the one `DEFAULT_THEME` has kept since wave 2: **two different claims never share a colour**,
  * and where the design would make them, the *narrower* claim moves and the band palette does not.
  */
+
+import { EVERYDAY_COLORS } from '../everyday/tokens.js';
 
 /* -------------------------------------------------------------------------- *
  * Shell — § 1.1 S6, verbatim from the artefact
@@ -148,6 +151,52 @@ export const BAND_SETTLING = '#3fb27f';
 export const BAND_WAITING = '#e0b040';
 export const BAND_LONG = '#e0773a';
 export const BAND_ABANDONED = '#e0473a';
+
+/* -------------------------------------------------------------------------- *
+ * The elevation editor's shaft tints — guide § 19's eighth palette line
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One tint per **bank** in the building editor's elevation — `dev/buildingEditor.ts#SHAFT_TINTS`.
+ *
+ * ## Why they are here rather than in `dev/`
+ *
+ * They were six literals in `buildingEditor.ts`, which made them **mode-blind**: the editor writes
+ * them into inline styles, and an inline style is not reached by a `:root[data-theme]` block — the
+ * § D251 defect, wearing the elevation's hat. Two consequences that were both live: the six were
+ * dark-mode values on a page that had a light mode, and five of them were *the same string* as
+ * `ACCENT`, `ACCENT_SOFT`, `MEASURED`, `FLOOR_LABEL_TRANSFER` and `FLOOR_LABEL_RESTRICTED`, so a
+ * shaft and a credential-restricted floor were one colour and this file's own rule — *two
+ * different claims never share a colour* — was false of them. Both close by moving here.
+ *
+ * ## Eight, not six, and § 19 is why
+ *
+ * Guide § 19's palette ends with a `Shaft tints` line of **eight**, and
+ * `docs/21-engineer-reimagined-contract.md` § 2.2 (3) names this migration by name. The eight are
+ * adopted as § 19's *hue order* — gold, sage, terracotta, brass, slate, tan, warm grey, mustard —
+ * at the value each needs to clear the hue floor, which is the § 2.2 (5) deviation path and the
+ * same one the bands took. § 19's own tints are a **fill** palette for Casual's drawn building;
+ * this surface draws the car's id *in the tint* (`buildingEditor.ts` sets the band's border, both
+ * grips, the label's colour and the legend swatch from one value), so the constraint that forced
+ * the deviation is that a fill's bar and a label's bar are not the same bar.
+ *
+ * They are never the only signal: the band carries the car id as text and the legend row spells
+ * `{id} · {role} · {serves}` beside it (KB-15).
+ *
+ * `everyday/tokens.ts` deliberately ships **no** shaft tints — *"a constant exported ahead of its
+ * consumer is the dead-seam shape this repository keeps paying for, so the lane that draws shafts
+ * adds the eight tints beside its caller"*. This is that lane, and beside its caller means beside
+ * the palette every other colour on this surface comes from, not in a second private list.
+ * `dev/tokens.test.ts` pins the eight to § 19's block as text in both modes' worth of argument.
+ */
+export const SHAFT_GOLD = '#c08a3e';
+export const SHAFT_SAGE = '#7e8f86';
+export const SHAFT_TERRACOTTA = '#c3644d';
+export const SHAFT_BRASS = '#9b7c48';
+export const SHAFT_SLATE = '#72837a';
+export const SHAFT_TAN = '#d09a5a';
+export const SHAFT_GREY = '#857e74';
+export const SHAFT_MUSTARD = '#c9a227';
 
 /* -------------------------------------------------------------------------- *
  * Stage — the artefact's `draw()`, named
@@ -343,6 +392,16 @@ export interface Palette {
   readonly bandLong: string;
   readonly bandAbandoned: string;
 
+  /* The elevation editor's eight shaft tints — guide § 19's last palette line. */
+  readonly shaftGold: string;
+  readonly shaftSage: string;
+  readonly shaftTerracotta: string;
+  readonly shaftBrass: string;
+  readonly shaftSlate: string;
+  readonly shaftTan: string;
+  readonly shaftGrey: string;
+  readonly shaftMustard: string;
+
   /* Stage — the artefact's `draw()`. */
   readonly skyDawn: PaletteRamp;
   readonly skyDay: PaletteRamp;
@@ -389,87 +448,140 @@ export interface Palette {
 }
 
 /* -------------------------------------------------------------------------- *
- * The light mode
+ * The light mode — guide § 19's paper palette
  * -------------------------------------------------------------------------- */
 
 /**
- * The second palette — **authored here, and never seen in a browser.**
+ * A § 19 value's hex, lowercased — `everyday/tokens.ts` transcribes the guide's uppercase and this
+ * file's whole vocabulary is lowercase (`theme.test.ts` asserts `/^#[0-9a-f]{6}$/` on every
+ * resolved value). Module-private: the palette below is the only caller, and an exported helper
+ * would be a colour-shaped export `theme.test.ts`'s derivation cannot classify.
+ */
+function paper(hex: string): string {
+  return hex.toLowerCase();
+}
+
+/**
+ * The second palette — **guide § 19's paper language, held to this file's own floors.**
+ * `docs/21-engineer-reimagined-contract.md` § 2.2; the § 19 block itself is transcribed once, in
+ * `everyday/tokens.ts`, and every value taken from it below is **imported from that module** — a
+ * third copy of the Casual palette would be the § 2.2 defect this file exists to close.
  *
  * ## What it is, and what it is not
  *
- * It is not the dark palette inverted. A channel-inverted `#0b0e14` is a lilac, an inverted amber
- * is a blue, and an inverted *night sky* is a white one — which would take the one mark on this
- * canvas that says what time it is and delete the information. So the light mode is built by
- * asking, token by token, **what claim this colour makes and what carries that claim on a page
- * that is already bright**. Most answers are the same hue at a darker value. The handful that are
- * not are argued at the constant, because a light palette full of unexplained sign flips is a
- * palette nobody can maintain.
+ * It is not the dark palette inverted, and it is no longer a neutral cool grey: it is the Casual
+ * handoff's paper world (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`
+ * § 19), applied to the Engineer shell so the two products read as one. The method is unchanged
+ * from the palette this replaces: token by token, **what claim does this colour make and what
+ * carries that claim on paper**. Where § 19 names the claim, § 19's value is used. Where § 19's
+ * value fails a measured floor, the same hue is taken at the value the floor demands and the
+ * deviation is recorded (docs/12 § 4's four-move shape) in the table below. Where § 19 names
+ * nothing — the stage's scenery, the third green, the violet pair — the claim keeps the answer the
+ * previous light mode argued for it, warmed onto the ink family where it sat on a cool grey.
+ *
+ * ## The § 19 deviations, all of them — the contrast floor outranks the prototype's values
+ *
+ * `theme.test.ts` holds content tokens to 4.0:1 on their panel, the ink ladder to WCAG AA's 4.5:1
+ * on all five surfaces, and `noteContrast.*` holds the shipped note pairings to 4.5:1. Measured on
+ * § 19's own paper surfaces, five § 19 values cannot carry the words this shell hangs on them:
+ *
+ * | claim | § 19 says | measured | shipped instead |
+ * |---|---|---|---|
+ * | eyebrow / secondary ink | `#8D8271` (labels) | 3.38:1 on paper | `#5d564b`, an authored rung between § 19's ink-soft and warm grey — the warm grey itself is the only § 19 grey that clears 4.5, and the ladder's visible-step rule leaves it only room at the bottom rung ({@link Palette.floorLabel}) |
+ * | accent | sun `#F2A63B` | 1.83:1 on paper | `#8d6a2f` — the sun family at reading value, and the prototype's own dark gold (its timestamps, eyebrows-on-amber and inert-control notes are this exact literal) |
+ * | warning band | sun | as above | `#8a6212`, deep sun — the value § D235's light mode already measured for this claim |
+ * | good / cleared | moss `#4F8A5B` | 3.68:1 on paper | `#43774d`, moss one step deeper |
+ * | alarm / abandoned | alarm `#D4573A` | 3.60:1 on paper | terracotta `#B8462B` — § 19's own deeper member of the same family, which does clear |
+ *
+ * Each deviation is pinned by measurement in `dev/tokens.test.ts`: the § 19 value is asserted to
+ * *fail* the floor it failed, so if the guide ever moves to a passing value the pin goes red and
+ * the § 19 value is re-adopted rather than the deviation quietly outliving its constraint.
  *
  * ## The evidence tier, stated plainly
  *
- * `docs/16` S9: `static sweep < model walk < document recorder < browser`, and this repository has
- * none (`docs/05`: *"no Playwright, no Puppeteer, no jsdom"*). **Nothing below is a claim that the
- * light stage looks right, and no such claim may be made anywhere from it.** What is checked is
- * arithmetic and structure: `render/theme.test.ts` asserts that this palette differs from the dark
- * one at every field, that it repeats the dark palette's *collisions* exactly — the property
- * `render/`'s fill-identified tests depend on — and that its twenty-seven shell tokens clear a
- * contrast floor against the surface they are drawn on.
+ * What is checked here is arithmetic and structure: `render/theme.test.ts` asserts that this
+ * palette differs from the dark one at every field, that it repeats the dark palette's
+ * *collisions* exactly — the property `render/`'s fill-identified tests depend on — and that its
+ * shell tokens clear the floors above. How it *looks* is the browser tier's to confirm
+ * (`noteContrast.browser.test.ts`, `paperShell.browser.test.ts`), and no claim beyond those
+ * measurements is made from this file.
  *
  * ## Alphas
  *
- * A translucent token's alpha is carried across **unchanged** wherever the mark keeps both its
- * role and its ground: the building mass, the floor slab, the door-gap and the two pills are the
- * dark mode's own numbers with the colour behind them flipped.
- *
- * Four are not: the shaft recess, its hairline, the travelling cable and the ground line. Every
- * one of them is drawn *inside or on top of* something whose own alpha moved — the recess is 0.10
- * deep here against 0.55 there — so the dark mode's figure carries no information about what this
- * one should be, and the new number is a **judgement**. Said here once rather than dressed up as a
- * derivation at four constants: how any of it *reads* is exactly the claim the paragraph above
- * refuses to make, and an unverifiable ratio is worse than an admitted guess.
+ * Unchanged in role from the palette this replaces: an alpha carries across wherever the mark
+ * keeps its role and its ground, and the four judgements (recess, its hairline, cable, ground
+ * line) stay judgements — only the colour under each alpha moved from a cool grey to the ink
+ * family, so a wash on paper is warm rather than blue.
  */
 export const LIGHT_PALETTE: Palette = Object.freeze({
   /* -- Shell. The surfaces run ground → raised, so they lighten in both modes: a light mode's
-     "raised" plate that was darker than its card would read as a hole. The lines run the other
-     way from the dark mode's, away from the surface in both — lighter than the card there, darker
-     than it here. The ink loses contrast from `text` down, and `textMuted` is deliberately the
-     *higher*-contrast secondary, which is the order the dark palette already uses. */
-  page: '#e7ebf2',
-  rail: '#eef1f6',
-  card: '#f5f7fa',
-  cardRaised: '#fbfcfe',
+     "raised" plate that was darker than its card would read as a hole. § 19's own ramp supplies
+     four of the five rungs — the sunk pair as the grounds, paper (§ 19: *page, cards*) as the
+     panel every card draws, § 19's card above it — and `raised`, the fifth surface § 19 does not
+     name, stays the white the previous light mode argued for it. The lines run away from the
+     surface in both modes — lighter than the card in dark, darker than it here: § 19's three
+     rules in reverse strength order, then the prototype's own control border (`#C9BBA4`, its
+     ghost buttons and dashed outlines) as the strongest line, then § 19's faint grey as the
+     hint underline below it. */
+  page: paper(EVERYDAY_COLORS.cardSunkDeep),
+  rail: paper(EVERYDAY_COLORS.cardSunk),
+  card: paper(EVERYDAY_COLORS.paper),
+  cardRaised: paper(EVERYDAY_COLORS.card),
   raised: '#ffffff',
-  hairline: '#e0e5ee',
-  edge: '#ccd4e0',
-  edgeMid: '#bac4d3',
-  edgeStrong: '#9aa7b9',
-  hintUnderline: '#8593a7',
-  // The three sub-`text` rungs are § D235's ladder in this mode: each clears 4.5:1 against
-  // `page`, the *darkest* light surface and therefore the worst ground for dark ink — 7.08:1,
-  // 5.61:1 and 4.67:1, against the 6.24 / 4.22 / 2.97 they replaced. `fainter` stays where it
-  // was for the reason `TEXT_FAINTER` gives: nothing draws it.
-  text: '#101720',
-  textMuted: '#424e5d',
-  textDim: '#515d6c',
-  fainter: '#99a3b0',
-  accent: '#1c6fc4',
+  hairline: paper(EVERYDAY_COLORS.ruleLight),
+  edge: paper(EVERYDAY_COLORS.ruleMid),
+  edgeMid: paper(EVERYDAY_COLORS.rule),
+  edgeStrong: '#c9bba4',
+  hintUnderline: paper(EVERYDAY_COLORS.faint),
+  // The ink ladder is § 19's, except the rung the deviations table above is about: ink, ink soft,
+  // then an authored `#5d564b` between ink soft and warm grey, then warm grey at the bottom.
+  // § 19's label grey (`#8D8271`) measures 3.38:1 on paper and carries none of this shell's small
+  // text; the warm grey (4.73:1 on the deepest surface) clears AA only at the bottom rung, because
+  // the ladder's visible-step rule (× 1.05 per rung) leaves no room under it for a fourth § 19
+  // grey. `fainter` keeps § 19's faintest grey for the reason `TEXT_FAINTER` gives: nothing draws
+  // it, so it has no legibility to fail.
+  text: paper(EVERYDAY_COLORS.ink),
+  textMuted: paper(EVERYDAY_COLORS.inkSoft),
+  textDim: '#5d564b',
+  fainter: paper(EVERYDAY_COLORS.fainter),
+  // The accent is § 19's sun *family* at reading value — the deviations table above. `#8d6a2f` is
+  // the prototype's own dark gold, spent there on exactly this duty: small text that has to read
+  // on paper and amber.
+  accent: '#8d6a2f',
   // The link colour. *Darker* than the accent here and lighter than it in dark — in both modes
-  // the direction that separates a link from the page it is written on.
-  accentSoft: '#15528f',
-  // Drawn on the accent fill, so it inverts with the accent and not with the page.
-  accentInk: '#f2f8ff',
+  // the direction that separates a link from the page it is written on. Sun family, deepest rung.
+  accentSoft: '#6b5124',
+  // Drawn on the accent fill, so it inverts with the accent and not with the page: warm paper
+  // white on the dark gold.
+  accentInk: '#fff9ec',
   over: '#bc3a20',
   measured: '#3d7a2e',
 
-  /* -- The four bands, in ladder order and in their own hues. § S7's four are a *dark-mode*
-     specification: `#3fb27f` on `#f5f7fa` is 2.3:1 and the wait ladder is the one thing on this
-     canvas three surfaces must agree about, so the light mode takes the same four hues at the
-     value they need to be legible ink on a pale card. The ladder's *order* — green, amber,
-     orange, red — is what carries the claim, and it is unchanged. */
-  bandSettling: '#1c7a55',
+  /* -- The four bands, in ladder order. § S7's four are a *dark-mode* specification and § 19's
+     moss/sun/alarm are a prototype's, and neither survives measurement as small ink on paper —
+     the deviations table above carries the figures. So the ladder keeps its claim-order — green,
+     amber, orange, red — in § 19's hue families at reading value: moss one step deeper, deep sun,
+     the deep orange between, and § 19's terracotta (the alarm's own deeper sibling) for the
+     abandoned band. */
+  bandSettling: '#43774d',
   bandWaiting: '#8a6212',
   bandLong: '#b04a14',
-  bandAbandoned: '#bf2a1c',
+  bandAbandoned: paper(EVERYDAY_COLORS.terracotta),
+
+  /* -- The eight shaft tints, in § 19's own order. The constant above says why they are here and
+     why the guide's values are deepened; the measurement is that all eight clear the 4.0 hue
+     floor on **all five** paper surfaces (4.09 at the tightest, the gold on `--bg`), which is
+     more than the group they join is held to. Distinct from each other and from every other
+     field in this palette, so the elevation cannot borrow a claim that belongs to a band, a
+     credential or the accent — which is exactly what the six they replace were doing. */
+  shaftGold: '#96681a',
+  shaftSage: '#4f6f64',
+  shaftTerracotta: '#a83e24',
+  shaftBrass: '#7d5423',
+  shaftSlate: '#3f5f6b',
+  shaftTan: '#a85c22',
+  shaftGrey: '#5f5850',
+  shaftMustard: '#6f6413',
 
   /* -- The sky. THE DECISION THAT IS NOT AN ANALOGUE, AND THE LARGEST ONE.
      The dark stage is a night-lit tower: its four ramps live between `#0c1018` and `#2d2320`, no
@@ -493,10 +605,12 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
   skyNight: ['#8e9ab4', '#c3cbd9'] as const,
 
   /* -- The building. The mass is the rail at the dark mode's own 0.86, so the tower reads as one
-     body against whichever sky is behind it; the slab is the same 0.045 wash with its sign
-     flipped, dark on a pale mass instead of light on a dark one. */
-  stageMass: 'rgba(238,241,246,0.86)',
-  stageSlab: 'rgba(16,24,36,0.045)',
+     body against whichever sky is behind it — the rail is § 19's sunk card now, so the triplet
+     moved with it; the slab is the same 0.045 wash with its sign flipped, and its triplet — like
+     every dark wash below — is § 19's ink rather than the cool near-black it used to be, so a
+     shadow on paper is warm. */
+  stageMass: 'rgba(245,239,227,0.86)',
+  stageSlab: 'rgba(35,32,28,0.045)',
 
   /* -- The shaft recess. NOT AN ANALOGUE: A HOLE IS DARK IN BOTH MODES, BUT NOT THIS DARK.
      The claim is *this is cut into the facade*, and a recess reads as a recess by being darker
@@ -505,8 +619,8 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
      dark marks are its shafts is the half-repainted picture in miniature. 0.10, and the hairline
      that delimits it goes to 0.16 — still a *darker* line than the recess, which is the same
      relationship the dark mode gets from a lighter one. */
-  stageShaftRecess: 'rgba(38,54,74,0.10)',
-  stageShaftHairline: 'rgba(20,32,48,0.16)',
+  stageShaftRecess: 'rgba(58,52,44,0.10)',
+  stageShaftHairline: 'rgba(35,32,28,0.16)',
 
   /* -- The travelling cable, and the ground line. Both are judgements — the header says why: the
      cable is drawn inside a recess that is five and a half times shallower here, and the ground
@@ -514,8 +628,8 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
      transfers. Both are set well above their dark counterparts (0.06 → 0.14, 0.14 → 0.28) on the
      reasoning that a *dark* mark's whole visible range on this stage sits between the mass and
      black, and these two are the thinnest marks the stage draws. Unverified, and flagged. */
-  stageCable: 'rgba(24,36,54,0.14)',
-  stageGround: 'rgba(16,24,36,0.28)',
+  stageCable: 'rgba(42,38,32,0.14)',
+  stageGround: 'rgba(35,32,28,0.28)',
 
   /* -- The windows. NOT AN ANALOGUE: THE DAY WINDOW FLIPS SIGN AND THE NIGHT WINDOW DOES NOT.
      At night a lit window is *warmer and stronger* than the facade in both modes — the claim is
@@ -531,59 +645,67 @@ export const LIGHT_PALETTE: Palette = Object.freeze({
 
   // The gap the doors open into. An aperture, on the recess's argument: dark in both modes,
   // shallower here, because it is cut into a pale car rather than into a dark one.
-  doorGap: 'rgba(22,32,46,0.55)',
+  doorGap: 'rgba(38,34,28,0.55)',
 
-  /* -- Floor labels. The gutter is scenery and stays a step below the ink; the three special
-     floors keep their hues (blue entrance, violet transfer, tan restricted) at reading value. */
-  floorLabel: '#5d6978',
-  floorLabelEntrance: '#37599f',
+  /* -- Floor labels. The gutter carries `--faint` and is therefore § 19's warm grey — the one
+     ramp grey that clears AA — per the deviations table; the three special floors keep their hues
+     at reading value: the entrance blue is § 19's sky deepened past the floor (`#4E9DD8` itself
+     is 2.64:1 on paper), the violet and the tan are the previous light mode's, § 19 naming no
+     counterpart for either claim. */
+  floorLabel: '#6e665a',
+  floorLabelEntrance: '#2e6da4',
   floorLabelTransfer: '#7b3f96',
   floorLabelRestricted: '#86612a',
 
   /* -- Cars. NOT AN ANALOGUE: THE OCCUPANT TEXT INVERTS.
-     The four load colours are chosen at a **matched value** — 0.128, 0.148, 0.156 and 0.168
-     relative luminance, a spread of four hundredths — so that one label colour reads on all four.
+     The four load colours are chosen at a **matched value** — 0.149, 0.162, 0.168 and 0.147
+     relative luminance, a spread of two hundredths — so that one label colour reads on all four.
      In the dark mode that label is near-black because every car is brighter than the page; here
      every car is darker than the sky it is drawn on, so the label is near-white. It inverts with
      the *car*, exactly as `accentInk` inverts with the accent, and for the same reason: it is text
      on a fill, not text on the page. `theme.test.ts` composites the label over each of the four
      and holds the result to a floor, in both modes — which is the one thing about this block that
-     is checked rather than asserted. */
-  carLight: '#1c7a55',
-  carMid: '#1c6fc4',
+     is checked rather than asserted. The label's triplet is § 19's own card white, so the count
+     inside a car is written in paper. */
+  carLight: '#43774d',
+  carMid: '#8d6a2f',
   carHeavy: '#a5620a',
-  carOverload: '#bf2a1c',
+  carOverload: paper(EVERYDAY_COLORS.terracotta),
   carDown: '#8438b0',
-  carOccupantText: 'rgba(247,250,253,0.92)',
+  carOccupantText: 'rgba(251,247,239,0.92)',
 
   /* -- The two directions. `waitingUp` is teal-shifted off `bandSettling` here for the reason it
      is there and not one inch less: the two are drawn on the same row, `canvas.test.ts` counts
      riders *by their fill*, and one string for both claims makes that count measure something
      else. The band keeps § S7's ladder value and the direction pair moves — in both modes. */
-  // `#0d7069`, one step down from the `#0f7a72` this shipped as — § D236. The `▲` is *text* on
-  // the stage key as well as a mark on the canvas, and the key sits on `--bg`, the darkest light
-  // surface: `#0f7a72` measured 4.34:1 there, under WCAG AA's 4.5 for a 10.5 px glyph. Found by
-  // driving the light theme, not by arithmetic — `theme.test.ts` measures `--panel`, where the
-  // old value was 4.83 and passed.
+  // `#0d7069` — § D236's own value, kept: the `▲` is *text* on the stage key as well as a mark on
+  // the canvas, the key sits on `--bg`, and this teal clears 4.5:1 on § 19's deepest sunk surface
+  // (4.66) where § 19's sage tints (`#5F7268`, `#7E8F86`) measure 4.29 and under. Teal-shifted
+  // off the settling green for the reason the dark constant gives — `canvas.test.ts` counts
+  // riders by their fill.
   waitingUp: '#0d7069',
   waitingDown: '#8438b0',
 
   /* -- The out-of-service badge. The filled pill is `over` at 0.9, as it is in dark, so its text
-     inverts with the pill. The unfilled pill is the same 0.07 wash with its sign flipped. */
+     inverts with the pill. The unfilled pill is the ink wash at the dark mode's 0.07. */
   oosOn: 'rgba(188,58,32,0.9)',
   oosOnText: '#fdf2ef',
-  oosOff: 'rgba(16,24,36,0.07)',
+  oosOff: 'rgba(35,32,28,0.07)',
   // Follows `textDim`, as the dark mode's `OOS_OFF_TEXT = TEXT_DIM` does. `theme.test.ts` holds
   // the two modes to the same collision set, so this one moves whenever `textDim` does.
-  oosOffText: '#515d6c',
+  oosOffText: '#5d564b',
 
   /* -- Alarms and relief. `relief` is the third green and must stay clear of the other two for
-     the reason `RELIEF` gives; here it is the *deepest*, where in dark it is the brightest. */
-  alarm: '#bf2a1c',
-  relief: '#0d5c3e',
+     the reason `RELIEF` gives; here it is the *deepest*, where in dark it is the brightest —
+     moss-family now, so all three greens on the paper stage share § 19's cast. */
+  alarm: paper(EVERYDAY_COLORS.terracotta),
+  relief: '#2e5a38',
   // The selection mark. `HIGHLIGHT` is brighter than `TEXT` in dark; the rule underneath is
-  // *further from the surface than the ink is*, which on a light page means darker.
-  highlight: '#04080e',
+  // *further from the surface than the ink is*, which on paper means darker than § 19's ink.
+  highlight: '#120e08',
   warning: '#8a6212',
-  previewFloorLine: '#dbe2ec',
+  // The editor preview's floor line — a rule on paper, one step off the § 19 rule triplet so a
+  // preview line and a card border stay two claims. The prototype's own `#e9dfcc` (its sunk-well
+  // hairline), not an invention.
+  previewFloorLine: '#e9dfcc',
 });

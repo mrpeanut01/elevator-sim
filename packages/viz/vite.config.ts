@@ -85,6 +85,7 @@ const WEB_DATA_FILES: readonly string[] = Object.freeze([
   'scenario-goals.json',
   'fixit-cases.json',
   'reference-runs.json',
+  'proof-cases.json',
 ]);
 
 /** The manifest body: every `data/buildings/*.json`, by name, sorted so the output is stable. */

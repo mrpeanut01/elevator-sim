@@ -142,6 +142,19 @@ export interface HeaderElements {
    * Campaign ended the menu for the session.
    */
   readonly openMenu: HTMLButtonElement;
+  /**
+   * The way back to Everyday Mode — GAMEPLAY § 3.2's swap, returning.
+   *
+   * The Engineer surface is reached by a rail row in the other shell, and for one wave it had no
+   * return at all: a player who crossed over was in the developer tool for the rest of the visit.
+   * This is that return, and it is in the header beside {@link openMenu} because the two are the
+   * same kind of control — *leave this surface for somewhere you chose* — and a reader who has found
+   * one has found the other.
+   *
+   * `hidden` in the markup, revealed by `everyday/swap.ts`'s port. See the comment on the element in
+   * `index.html` for why that is a true statement rather than a refusal.
+   */
+  readonly backToEveryday: HTMLButtonElement;
 }
 
 /** § 1.2 L1–L3 — the mood card and the four live stats. */
@@ -226,6 +239,37 @@ export interface StageElements {
    * `firstElementChild`, and the manifest exists so that neither is necessary.
    */
   readonly legendTitle: HTMLElement;
+}
+
+/**
+ * The live metrics card, under the stage — `docs/21` § 3.4.
+ *
+ * ## Why the panel has element ids at all now
+ *
+ * It did not until this wave: `LIVE METRICS` was drawn into the stage's own bitmap, which is
+ * exactly why issue #115 § 6's clipping shipped for a wave with every tier green. A string inside a
+ * canvas has no `scrollWidth`, so no DOM check could see four labels overhanging the panel border.
+ * Six handles is the price of that check being possible, and `dev/liveMetrics.browser.test.ts` is
+ * what buys with them.
+ *
+ * The three lists are separate hosts rather than one because each is filled through its own
+ * `keyedFill` — `renderLive` runs sixty times a second, and a card rebuilt whole on every frame
+ * loses the scroll position of whichever list a reader was in, which is issue #106's defect one
+ * container over.
+ */
+export interface LiveMetricsElements {
+  /** The whole card. Hidden when there is no run — a slot with nothing to say (`docs/21` L-5). */
+  readonly root: HTMLElement;
+  /** The register's own title: `LIVE METRICS`, or Casual's `RIGHT NOW`. */
+  readonly title: HTMLElement;
+  /** The window the figures fold, in the register's own way of saying the span. */
+  readonly window: HTMLElement;
+  /** The three observations and the estimate block. */
+  readonly figures: HTMLElement;
+  /** The per-bank rows, under their own heading. */
+  readonly banks: HTMLElement;
+  /** The per-car load rows, under theirs. */
+  readonly cars: HTMLElement;
 }
 
 /**
@@ -561,6 +605,8 @@ export interface Elements {
   readonly decisionLog: HTMLElement;
   readonly coach: CoachElements;
   readonly stage: StageElements;
+  /** The live metrics card, under the stage — `docs/21` § 3.4. */
+  readonly liveMetrics: LiveMetricsElements;
   /** The race strip under the stage — GAMEPLAY §7.4, slice 4d. */
   readonly race: RaceElements;
   readonly transport: TransportElements;
@@ -626,6 +672,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     banner: 'banner',
     right: 'topbar-right',
     openMenu: 'open-menu',
+    backToEveryday: 'back-to-everyday',
   }),
   mood: Object.freeze({
     face: 'mood-face',
@@ -675,6 +722,14 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     description: 'frame-description',
     legend: 'legend',
     legendTitle: 'legend-title',
+  }),
+  liveMetrics: Object.freeze({
+    root: 'live-metrics',
+    title: 'live-metrics-title',
+    window: 'live-metrics-window',
+    figures: 'live-metrics-figures',
+    banks: 'live-metrics-banks',
+    cars: 'live-metrics-cars',
   }),
   race: Object.freeze({
     root: 'race-strip',

@@ -13,11 +13,17 @@
  *
  * ## Why the canvas is driven rather than skipped
  *
- * `drawScene`, `drawOverlay` and `drawPreview` are the surfaces a player actually looks at, and
- * they take a `Canvas2DLike` — a **structural** interface with `fillText` on it and no DOM
- * anywhere. So they are driven with a context that records every `fillText`, and every string the
- * bitmap would have carried is checked exactly like a string a function returned. A search over
- * the experience layer that exempted the canvas would exempt the screen.
+ * `drawScene` and `drawPreview` are surfaces a player actually looks at, and they take a
+ * `Canvas2DLike` — a **structural** interface with `fillText` on it and no DOM anywhere. So they
+ * are driven with a context that records every `fillText`, and every string the bitmap would have
+ * carried is checked exactly like a string a function returned. A search over the experience layer
+ * that exempted the canvas would exempt the screen.
+ *
+ * `drawOverlay` was the third and is gone: `docs/21` § 3.4 made the live metrics panel a view and a
+ * DOM card, so its strings arrive through {@link LIVE_METRICS} under **named fields** rather than as
+ * `fillText[15]` of a captured array. That is the one thing the capture cannot give — per-string
+ * provenance — and the migration is why it is now worth saying that the capture is a fallback for
+ * what is genuinely a picture rather than the way this corpus prefers to read words.
  *
  * ## Coverage is asserted, never assumed
  *
@@ -46,13 +52,123 @@ import { checkAccessCompatibility, credentialCapabilityOf } from '../access/disp
 import { describeLockedOut, lockedOutLandingsAt, type LockedOutLanding } from '../access/lockedOut.js';
 import { describePinnedQueues, pinnedQueuesAt, type PinnedQueue } from '../frame/pinnedQueue.js';
 import { batchReport, populationLineOf, type BatchReport } from '../batch/report.js';
-import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
-import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
+import { SuiteError, suiteCellViewOf, suitePlanOf, suiteSummaryOf } from '../batch/suite.js';
+import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult, type BatchWorkerMessage } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
+import { ACTION_BAR_ROWS, actionBarFor, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
+import {
+  buildingLineOf,
+  FIXIT_SCREEN_COPY,
+  fixitBarModel,
+  fixitCaseRailModel,
+  fixitMachineryRows,
+  fixitRepairStateLine,
+  fixitSpendSummary,
+} from '../everyday/fixitScreenModel.js';
+import {
+  benchBudgetNoteOf,
+  benchEntrantsOf,
+  benchFieldRefusal,
+  benchResultViewOf,
+  benchTestsOf,
+  benchTestsRefusal,
+  benchVerdictNoteOf,
+  benchWorkLineOf,
+  BENCH_COPY,
+  BENCH_FIELD_MAX,
+  BENCH_REPLICATION_CHOICES,
+} from '../everyday/benchModel.js';
+import {
+  behaviourBlockOf,
+  carriedBlocksOf,
+  constraintCardsOf,
+  libraryCardsOf,
+  /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
+  mathsDisclosureOf as workshopMathsOf,
+  nameplateOf as workshopNameplateOf,
+  playStyleAbsenceOf,
+  playStyleCardsOf,
+  rulesBlockOf,
+  switchingBlockOf,
+  termDisclosureOf,
+  workshopLeversOf,
+  WORKSHOP_COPY,
+} from '../everyday/workshopModel.js';
+import { briefBarModel, briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
+import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
+import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
+import { AVATAR_SWATCHES } from '../everyday/profile.js';
+import {
+  DESIGNER_ABSENCES,
+  DESIGNER_COPY,
+  classOfSpec,
+  designerCapacityLine,
+  designerFigures,
+  designerPlateRows,
+  designerReading,
+  designerWarnings,
+} from '../everyday/designerModel.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
+import {
+  RUSH_ABSENCES,
+  RUSH_BESTS,
+  RUSH_PRIMARY_REFUSAL,
+  RUSH_SCREEN_COPY,
+  rushBandViews,
+  rushDrivingLine,
+  rushFactViews,
+  rushGeneratedRangeLine,
+  rushHoldLineFigure,
+  rushOpeningLine,
+} from '../everyday/rushScreenModel.js';
+import {
+  TUNER_COPY,
+  TUNE_CARDS,
+  movedKeys,
+  patternWithTune,
+  tuneCapacityReadout,
+  tuneDwellChips,
+  tuneReadout,
+  tuneSandboxStrip,
+  tuneSpeedReadout,
+  tuneStateFrom,
+} from '../everyday/tunerModel.js';
+import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
+import { everydayReportViewOf } from '../everyday/reportView.js';
+import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
-import { EVERYDAY_SCREENS, type RunContext } from '../everyday/types.js';
+import {
+  stageAlarmOf,
+  stageBarModelOf,
+  stageCrowdCapOf,
+  stageHeaderOf,
+  stageInkFor,
+  stageInterventionsOf,
+  stageLegend,
+  STAGE_ABSENCES,
+  STAGE_INTERVENTIONS,
+  STAGE_NO_GHOST,
+  STAGE_RECOMPUTING,
+} from '../everyday/stageScreenModel.js';
+import { todayOf } from '../everyday/today.js';
+import {
+  ENGINEER_RETURN_LABEL,
+  ENGINEER_RETURN_TITLE,
+  EVERYDAY_SCREENS,
+  RUN_CONTEXTS,
+} from '../everyday/types.js';
+import { weekScreenViewOf } from '../everyday/weekView.js';
+import { percentileLine, WORLD_FIGURES_ABSENT, WORLD_FIGURES_LABEL, WORLD_FIGURES_REASON } from '../everyday/world.js';
+import type { GoalObservations } from '../shift/types.js';
+import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
+import {
+  applyCampaignAction,
+  freshTower,
+  openingCareer,
+  type CampaignCareer,
+  type CampaignTower,
+} from '../campaign/career.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -84,6 +200,7 @@ import {
   emptyFixitState,
   repairRowOf,
   spendOf,
+  stepSpeed,
   toggleExtra,
   toggleRepair,
   type FixitMeasurement,
@@ -91,11 +208,38 @@ import {
 import { figureValuesOf, measuredOf } from '../fixit/run.js';
 import type { FixitCase } from '../fixit/types.js';
 import { frameAt } from '../frame/frameAt.js';
+import { BOARD_SCREEN_COPY, DAILY_BOARD_ABSENCE } from '../everyday/boardScreen.js';
+import {
+  caseNameOf,
+  caseNamesOf,
+  ladderRowsOf,
+  sendGateOf,
+  whatAreTheFortyOf,
+  LADDER_EMPTY,
+  LADDER_WORLD_ABSENCE,
+  REFERENCE_RUN_LABEL,
+  type LadderEntry,
+} from '../gauntlet/ladder.js';
+import { proofCasesOf, type ProofCase, type ProofCaseSet } from '../gauntlet/proofCases.js';
+import {
+  proofCaseCountOf,
+  ratingFigureOf,
+  RATING_BASIS,
+  RATING_CAVEAT,
+  type RatingSummary,
+} from '../gauntlet/rating.js';
+import { runGauntlet, GAUNTLET_CANCELLED, type GauntletWorker } from '../gauntlet/run.js';
 import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type FloorQueue, type LandingAssignment } from '../frame/overlay.js';
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
@@ -119,7 +263,7 @@ import { DEFAULT_THEME, drawScene, describeSelection, landingOptionLabel, type C
 import { describeFrame, suppressionSentenceOf } from '../render/describeFrame.js';
 import { buildLayout } from '../render/layout.js';
 import { buildingMood, moodObservationsOf, type BuildingMood } from '../render/mood.js';
-import { drawOverlay } from '../render/overlay.js';
+import { overlayViewOf } from '../render/overlay.js';
 import { describePreview, drawPreview } from '../render/preview.js';
 import { NO_SHEET_YET, reportCardOf, type CardRecipe } from '../render/reportCard.js';
 import { runIdentityIssues } from '../scope/runIdentity.js';
@@ -196,7 +340,17 @@ import {
   termRowsOf,
 } from '../dev/dispatcherEditor.js';
 import {
+  FAMILY_ELSEWHERE,
+  FAMILY_EYEBROW,
+  FAMILY_NOTE,
+  FLAG_OWNED,
+  SELECTION_REFUSAL,
+  familyControlsViewOf,
+  familyPartitionOf,
+} from '../dev/familyControls.js';
+import {
   RULES_EXCLUSIVITY_NOTE,
+  defaultRuleRow,
   fallbackLineOf,
   leverLineOf,
   readbackOf,
@@ -285,6 +439,7 @@ import {
   type WeekState,
 } from '../shift/types.js';
 import {
+  defaultSelectorSpec,
   patternLine,
   patternName,
   policyLine,
@@ -893,7 +1048,6 @@ const CANVAS: SurfaceAdapter = {
     'render/canvas.ts#describeSelection',
     'render/canvas.ts#landingOptionLabel',
     'render/canvas.ts#fitLabel',
-    'render/overlay.ts#drawOverlay',
     /*
      * The header banner's Casual refusal — GitHub issue #100. Declared in `mode/disclosure.ts`
      * beside the per-ground table it reads, and **driven from here**, because `drawHeader` is its
@@ -903,16 +1057,6 @@ const CANVAS: SurfaceAdapter = {
      */
     'mode/disclosure.ts#suppressionBannerFor',
     'mode/disclosure.ts#NO_AVERAGE_LEAD',
-    /*
-     * The panel's refusal, in both registers — `docs/20` defect 3. `drawOverlay` is their only
-     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
-     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
-     * PENDING` is the engineer's arm of the same gate, drawn by the same function.
-     */
-    'mode/disclosure.ts#casualRefusalFor',
-    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
-    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
-    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
     /*
      * The stage's crowd, reached only through `drawScene` — the `renderSlider`/`renderControls`
      * case this interface's `covers` docstring names.
@@ -926,6 +1070,14 @@ const CANVAS: SurfaceAdapter = {
      */
     'render/riderFigures.ts#drawRiderLane',
     'render/riderFigures.ts#drawAlarmRule',
+    /*
+     * `loadColour` is the same reading, one file over, and it arrived in this list the day the four
+     * load bands were named: its arms read `'at-design-load'` now rather than a bare `theme.X`, and
+     * a hyphen is a word break to the two-adjacent-words scanner. It returns a **colour**, and it is
+     * listed rather than excluded because `drawScene` really does call it on every car of every
+     * frame this adapter draws — a coverage claim, on the precedent two lines up.
+     */
+    'render/overlay.ts#loadColour',
   ],
   render(context) {
     const { recording } = context;
@@ -936,7 +1088,6 @@ const CANVAS: SurfaceAdapter = {
       floors: recording.floors,
       shafts: recording.shafts,
       gutterRightPx: 168,
-      overlayWidthPx: 240,
     });
     for (const at of sampleTimes(recording)) {
       const bundle = context.bundleAt(at);
@@ -972,7 +1123,6 @@ const CANVAS: SurfaceAdapter = {
           // See `dispatcherNameOf` — the subtitle a player reads is the profile's name.
           dispatcherName: dispatcherNameOf(context),
           layout,
-          overlay: bundle.metrics,
           ...(selection === undefined ? {} : { selection }),
           unservedFloorIds: unservedFloors(recording),
           unansweredCallFloorIds: bundle.unanswered,
@@ -989,76 +1139,6 @@ const CANVAS: SurfaceAdapter = {
             playhead: atPlayhead(recording, at),
           });
         }
-      }
-      /*
-       * **Both registers, on every case** — GitHub issue #100, and `honesty/types.ts#HONESTY_MODES`
-       * said this day would come: *"the value of generating the axis is the day a mode-aware
-       * renderer lands: it is driven on both modes from that day, rather than from the day somebody
-       * remembers to check it."* `render/overlay.ts` is that renderer, and § D194's measured null —
-       * the second mode value producing zero new strings — stops being null here.
-       *
-       * Rendered both ways rather than branching on `context.case.mode`, which is the disclosure
-       * adapter's own precedent: a mode that only half the cases draw is a mode half the corpus
-       * never sees, and the panel's Casual words include the one string on it that may never be
-       * wrong — the refusal.
-       *
-       * `drawScene` above draws the panel too, and this loop draws it again at every sampled
-       * playhead. That is deliberate duplication rather than waste: `drawOverlay` is a shipped entry
-       * point in its own right — `render/canvas.ts` is not its only caller — and seeding it under its
-       * own `field` is what makes a violation report name the panel instead of the scene it happened
-       * to be composited into. Identical strings cost the search nothing; a misattributed one costs
-       * a reader the fix.
-       */
-      for (const mode of VIEW_MODES) {
-        const overlayCtx = textCapturingContext();
-        drawOverlay(overlayCtx, {
-          recording,
-          frame: bundle.frame,
-          metrics: bundle.metrics,
-          layout,
-          theme: DEFAULT_THEME,
-          mode,
-        });
-        for (const [index, text] of overlayCtx.texts.entries()) {
-          seeds.push({
-            field: `drawOverlay(${mode}@${at.toFixed(0)}s).fillText[${String(index)}]`,
-            text,
-            role: 'prose',
-            playhead: atPlayhead(recording, at),
-          });
-        }
-      }
-      /*
-       * **The RIGHT NOW panel's refusal, with the window it folds** — `docs/20` defect 3.
-       *
-       * The loop above captures every string the panel draws and can declare a basis for **none** of
-       * them: a text-capturing context returns an array, and per-string provenance is precisely what
-       * it throws away. So the refusal is seeded again, from the shipped function that words it, with
-       * the basis that function returns.
-       *
-       * That is not a duplicate reading of the same thing. The loop asks *what did the panel draw*;
-       * this asks *what did the panel claim about which window*, which is the question R6's
-       * structural half is. Until it was asked, `NO AVERAGE — A RESULT` and *"That is a result, not
-       * a gap"* were `role: 'prose'` strings with no numeral and no declaration — invisible to both
-       * halves of the property that exists to catch exactly them.
-       *
-       * Seeded only where the panel actually draws it (`metrics.suppressed`), because a refusal the
-       * surface does not show is a string the corpus should not contain.
-       */
-      if (bundle.metrics.suppressed) {
-        const refusal = casualRefusalFor(bundle.metrics.suppressionBasis === 'whole-run');
-        seeds.push({
-          field: `drawOverlay(@${at.toFixed(0)}s).refusal.head`,
-          text: refusal.heads[0] ?? '',
-          role: 'reason',
-          playhead: atPlayhead(recording, at, refusal.basis),
-        });
-        seeds.push({
-          field: `drawOverlay(@${at.toFixed(0)}s).refusal.reason`,
-          text: refusal.reason,
-          role: 'reason',
-          playhead: atPlayhead(recording, at, refusal.basis),
-        });
       }
       if (selection !== undefined) {
         seeds.push({
@@ -1173,6 +1253,9 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#switchDispatcherLabelOf',
+    'live/interventions.ts#SWITCH_PINS_NOTE',
+    'live/interventions.ts#RECOMPUTING_BEAT',
     'live/interventions.ts#interventionStampOf',
     'live/patternReadout.ts#patternReadoutAt',
   ],
@@ -1198,8 +1281,49 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    /*
+     * The strip's other two controls and its beat — the log's second and third change kinds.
+     *
+     * The switch label and both stamps are **parametric over words a player reads** — a dispatcher
+     * name and the chosen option's own sentence — so they are seeded from the case's own profile
+     * name rather than from a literal: the register rule this sweep exists to enforce is that no
+     * engine identifier reaches a player surface, and a label seeded with a hard-coded name would
+     * pass while the shipped one leaked an id. `dispatcherNameOf` is the same lookup the stage
+     * uses. The pin note and the `recomputing` beat are static, and enter beside the label they
+     * are shown with: the beat is what the stamp slot reads while a re-simulation is in flight,
+     * which is a state a player produces by pressing either control.
+     */
+    const switchTargetName = dispatcherNameOf(context);
+    seeds.push({
+      field: 'switchButton.label',
+      text: switchDispatcherLabelOf(switchTargetName),
+      role: 'label',
+    });
+    seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
+    seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
+    /*
+     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
+     * what keeps `interventionStampOf`'s temporal property met by construction.
+     */
+    const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
-      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      {
+        atS: recording.startedAt + third * 1.5,
+        change: {
+          kind: 'switch-dispatcher',
+          profile: { id: 'plain-baseline', name: switchTargetName, weights: {} },
+        } as const,
+      },
+      {
+        atS: recording.startedAt + third * 2,
+        change: {
+          kind: 'answer-incident',
+          option: 'call the fitter out now',
+          serviceEvents: [],
+        } as const,
+      },
     ];
     for (const at of sampleTimes(recording)) {
       const stamp = interventionStampOf(interventionLog, at);
@@ -1958,7 +2082,9 @@ const SUITE_BENCH: SurfaceAdapter = {
    * cannot find is a coverage claim for nothing — `derive.test.ts` said so when it was listed.
    * The refusal strings are still in the corpus under this surface, driven for real below.
    */
-  covers: ['batch/suite.ts#suiteCellViewOf'],
+  // `suiteSummaryOf` composes the index's cell texts (docs/20 defect 15) and is driven below on
+  // the same view, so it is covered here rather than excluded — its one caller is the suite mount.
+  covers: ['batch/suite.ts#suiteCellViewOf', 'batch/suite.ts#suiteSummaryOf'],
   render(context) {
     const cell = { id: 'honesty-suite-cell', label: context.report.buildingName };
     const view = suiteCellViewOf(cell, context.batch);
@@ -1996,6 +2122,25 @@ const SUITE_BENCH: SurfaceAdapter = {
         energyAxis: BATCH_METRIC_CLASS[mark.metric] === 'axis',
       });
     }
+    /*
+     * The index over those rows — `docs/20` defect 15. Its cells are authored in
+     * `suiteSummaryOf` (the verdict word, plus the arm's name only where `favours` named one) and
+     * drawn before the prose, so they are seeded with the source row's own comparison shape: an
+     * index mark that outran its row's gate fails here exactly as the row itself would.
+     */
+    const summary = suiteSummaryOf([view]);
+    summary.lines[0]?.marks.forEach((mark, index) => {
+      const source = sourceRows[index];
+      if (mark === null || mark === undefined || source === undefined) return;
+      seeds.push({
+        field: `summary.marks[${String(index)}](${source.metric}).text`,
+        text: mark.text,
+        role: 'comparison',
+        declaredCount: source.pairs,
+        comparison: { favours: source.favours, verdict: source.verdict, pairs: source.pairs },
+        energyAxis: BATCH_METRIC_CLASS[source.metric] === 'axis',
+      });
+    });
     /* The refusal branches, manufactured on purpose — see the adapter docstring. */
     const third = context.batch.arms[1];
     if (third !== undefined) {
@@ -3417,6 +3562,7 @@ const AUTHORING: SurfaceAdapter = {
         spec: {
           name: 'My dispatcher',
           weights: { rideTime: 50, waitTime: 100 },
+          families: {},
           flags: { pool: false, zone: false, bypass: true },
         },
       },
@@ -4276,6 +4422,11 @@ const RIGHT_RAIL: SurfaceAdapter = {
   id: 'dev/rightRail.ts#buildingPlateOf',
   covers: [
     'dev/rightRail.ts#buildingPlateOf',
+    /* The specification block on that plate — `docs/21` § 3.7 (1). Reached only through
+       `buildingPlateOf`, which is what drives it above. */
+    'dev/rightRail.ts#closedFormRowsOf',
+    /* The per-bank analysis both the plate and the building editor's live readout draw from. */
+    'authoring/buildingSpec.ts#upPeakBanksOf',
     'dev/rightRail.ts#dispatcherPlateOf',
     'dev/rightRail.ts#dispatcherBlurbOf',
     /*
@@ -4366,7 +4517,14 @@ const RIGHT_RAIL: SurfaceAdapter = {
       ['with-run', context.recording, 'basic'],
       ['no-run', undefined, 'basic'],
     ] as const) {
-      for (const row of buildingPlateOf(context.building, recording, mode)) {
+      /*
+       * `specs` is handed over so the **closed-form rows are swept** — `docs/21` § 3.7 (1). They are
+       * the one block on this plate that is not a reading of a run, and the labelling that keeps
+       * them honest (*a specification, not a measurement*, the assumption citation, the divergence
+       * sentences) is exactly the kind of claim this corpus exists to hold. Omitting `specs` here
+       * would have shipped a new figure block with no register at all.
+       */
+      for (const row of buildingPlateOf(context.building, recording, mode, specs)) {
         seeds.push({
           field: `buildingPlateOf(${mode}, ${label}).${row.k}`,
           text: `${row.k}: ${row.v}`,
@@ -5008,6 +5166,14 @@ const MENU: SurfaceAdapter = {
     // would be R1's defect with a friendly face. Driven below rather than excused.
     'menu/partsOfDay.ts#partsOfDay',
     'menu/account.ts#formIssues',
+    /*
+     * The naming rule itself, reached only *through* `formIssues` — the second shape this list's
+     * docstring names. It was extracted so Everyday Mode's § 15.1 name field refuses in the same
+     * words rather than in a second copy of them, and driving `formIssues` over the naming stage
+     * (below, through `signedIn`'s unnamed player) is what drives it: every sentence it can
+     * return is one `formIssues` hands back.
+     */
+    'menu/account.ts#displayNameIssueOf',
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
     'menu/client.ts#CLIENT_FAILURES',
@@ -6188,6 +6354,21 @@ const FIXIT_COVERS: readonly string[] = [
   'fixit/engine.ts#toggleRepair',
   'fixit/engine.ts#toggleExtra',
   'fixit/run.ts#figureValuesOf',
+  /*
+   * The Everyday screen's pure half (GAMEPLAY § 10, `everyday/fixitScreen.ts` is the DOM half and
+   * is excluded on the mounts' shared ground). These hold every word the screen draws of its own —
+   * the rail chrome and its derived `{fixed}/{total}`, the § 3.3 substitutions the fixit row
+   * leaves state-dependent, the § 9-priced stepper lines and the running-total split — and they
+   * are driven below over states the engine's own reducers build. `buildingLineOf` is not listed
+   * because the derivation does not find it (a `·`-joined name and floor count carries no two
+   * adjacent prose words); it is rendered below anyway, inside the rail rows.
+   */
+  'everyday/fixitScreenModel.ts#FIXIT_SCREEN_COPY',
+  'everyday/fixitScreenModel.ts#fixitCaseRailModel',
+  'everyday/fixitScreenModel.ts#fixitBarModel',
+  'everyday/fixitScreenModel.ts#fixitMachineryRows',
+  'everyday/fixitScreenModel.ts#fixitSpendSummary',
+  'everyday/fixitScreenModel.ts#fixitRepairStateLine',
 ];
 
 function fixitSearchCase(context: HonestyContext): FixitCase {
@@ -6347,6 +6528,100 @@ const FIXIT: SurfaceAdapter = {
     ] as const) {
       seeds.push({ field: `outcome.${name}.head`, text: outcome.head, role: 'label', provenance: 'authored' });
       seeds.push({ field: `outcome.${name}.body`, text: outcome.body, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ================================================================== *
+     * The Everyday screen's own words — GAMEPLAY § 10's screen chrome.
+     *
+     * Everything above is the machinery both surfaces read; everything here is what
+     * `everyday/fixitScreen.ts` draws around it, held pure in `fixitScreenModel.ts` precisely so
+     * it can be driven here (the mount itself is DOM-bound and excluded, exactly as the Engineer
+     * panel's is). The states are built by the engine's own reducers wherever a reducer can reach
+     * them, on this adapter's established habit.
+     * ================================================================== */
+
+    /* ---- the case rail: both tags, and the derived {fixed}/{total} on both sides of solved ---- */
+    for (const [where, solvedIds] of [
+      ['none-solved', new Set<string>()],
+      ['one-solved', new Set([entry.id])],
+    ] as const) {
+      const rail = fixitCaseRailModel([entry], solvedIds, entry.id, () =>
+        buildingLineOf(context.buildingName, context.recording.floors.length),
+      );
+      seeds.push({ field: `rail.${where}.heading`, text: rail.heading, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `rail.${where}.hint`, text: rail.hint, role: 'prose', provenance: 'authored' });
+      /*
+       * `{fixed}/{total} fixed` is a count of the rows beside it, so it is an observation with its
+       * own denominator on the face of it — the R13 shape, declared rather than left to the
+       * property to infer.
+       */
+      seeds.push({
+        field: `rail.${where}.count`,
+        text: rail.count,
+        role: 'observation',
+        declaredCount: rail.rows.length,
+        countShown: true,
+      });
+      for (const row of rail.rows) {
+        seeds.push({ field: `rail.${where}.tag`, text: row.tag, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `rail.${where}.tower`, text: row.towerLine, role: 'observation' });
+      }
+    }
+
+    /* ---- the § 3.3 substitutions, over all four states the screen can be in ---- */
+    const barBase = actionBarFor({ screen: 'fixit', ctx: 'daily' });
+    for (const [where, view] of [
+      ['unready', { ready: false, running: false, ran: false, solved: false }],
+      ['ready', { ready: true, running: false, ran: false, solved: false }],
+      ['ran', { ready: true, running: false, ran: true, solved: false }],
+      ['running', { ready: true, running: true, ran: false, solved: false }],
+      ['solved', { ready: true, running: false, ran: true, solved: true }],
+    ] as const) {
+      const row = fixitBarModel(barBase, view);
+      seeds.push({ field: `bar.${where}.primary`, text: row.primary.label, role: 'label', provenance: 'authored' });
+      if (row.note !== undefined) {
+        seeds.push({ field: `bar.${where}.note`, text: row.note, role: 'prose', provenance: 'authored' });
+      }
+      if (row.wayOut !== undefined && row.inverted) {
+        seeds.push({ field: `bar.${where}.wayOut`, text: row.wayOut, role: 'label', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the § 9-priced steppers, at the budget and under it ---- */
+    for (const [where, machineState, affordable] of [
+      ['affordable', empty, true],
+      ['at-budget', { ...empty, speedSteps: 1, capacitySteps: 1 }, false],
+    ] as const) {
+      for (const row of fixitMachineryRows(machineState, affordable, affordable)) {
+        seeds.push({ field: `machines.${where}.${row.key}.label`, text: row.label, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `machines.${where}.${row.key}.readout`, text: row.readout, role: 'observation' });
+        seeds.push({ field: `machines.${where}.${row.key}.priced`, text: row.priced, role: 'label' });
+      }
+    }
+
+    /* ---- the running total's two lines, on states the reducers built ---- */
+    for (const [where, state] of [
+      ['nothing', empty],
+      ['repairs', spent],
+      ['machinery', stepSpeed(entry, empty, 1)],
+    ] as const) {
+      const summary = fixitSpendSummary(entry, spendOf(entry, state));
+      seeds.push({ field: `spend.${where}.spent`, text: summary.spentLine, role: 'observation' });
+      seeds.push({ field: `spend.${where}.committed`, text: summary.committedLine, role: 'observation' });
+      seeds.push({ field: `spend.${where}.capital`, text: summary.capitalLine, role: 'observation' });
+    }
+
+    /* ---- the repair row's state word, all three arms ---- */
+    for (const [where, row] of [
+      ['selected', { selected: true, refusal: undefined }],
+      ['affordable', { selected: false, refusal: undefined }],
+      ['refused', { selected: false, refusal: repairRowOf(entry, spent, entry.repairs[3]!).refusal }],
+    ] as const) {
+      seeds.push({
+        field: `repair.state.${where}`,
+        text: fixitRepairStateLine(row),
+        role: where === 'refused' ? 'reason' : 'label',
+      });
     }
 
     return singleRun(this.id, seeds);
@@ -6720,12 +6995,17 @@ const WATCH: SurfaceAdapter = {
  * | Your week | **exists** — `dev/leftRail.ts`'s week card: the three run figures, the seven-day sparkline, and `shift/weekLabel.ts#coachWeekLines`' ribbon |
  * | the report | **exists** — `dev/reportPanel.ts#emptyReportView`, the sheet's own account of why it is empty |
  * | the board | **exists, without a server** — `menu/screens.ts`'s leaderboard body over `menu/client.ts`'s types |
- * | the ladder | **does not exist** — a standing dispatcher rating is unbuilt; slice 4d omitted the ghost's *best* arm for the same reason (*"needs a rating that does not exist"*), and a sweep of a ladder would be a sweep of a screen nobody can open |
+ * | the ladder | **exists** — `gauntlet/ladder.ts` over `gauntlet/rating.ts`'s mean of the forty, drawn by `everyday/boardScreen.ts`. It needs no server, because a rating is measured on this device |
  * | the percentile line | **does not exist** — nothing in this tree computes *"better than 64 % of today's players"*: there is no world distribution, and `menu/client.ts` has no endpoint that would carry one |
  *
- * The two absences are named here rather than stubbed, on § 20.11's own rule about reference runs
- * and slice 4d's about the world band: a surface invented in order to be swept is a surface with no
- * reader, and the sweep would then certify it.
+ * **The ladder row said *does not exist* until the gauntlet landed, and this is the correction.**
+ * It is worth leaving visible: a matrix whose whole job is to say which cells are absent is exactly
+ * the thing that goes stale when one of them is filled, and `docs/18` had already struck the same
+ * claim through two files over while this row still made it.
+ *
+ * The one remaining absence is named here rather than stubbed, on § 20.11's own rule about reference
+ * runs and slice 4d's about the world band: a surface invented in order to be swept is a surface
+ * with no reader, and the sweep would then certify it.
  *
  * ## What is marked withheld, and what deliberately is not
  *
@@ -6927,30 +7207,36 @@ function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
 }
 
 /**
- * **Everyday Mode's front door** — the menu's four tiles, the rail, and the register of absences.
+ * **Everyday Mode's front door and frame** — the menu's four tiles, the rail with its footer, the
+ * § 3.3 action-bar table, § 3.4's confirm strips, the per-screen refusals, and the register of
+ * absences.
  *
  * ## Why this is in the corpus at all, and why it is the pure half only
  *
  * It is the first screen a player meets, and almost everything on it is a **claim about what this
- * build can do**: four tiles that say what each mode is and how long it takes, three of which say
- * why they do not open, a rail whose rows carry the same kind of refusal, and a list headed *what
- * this build does not do yet*. Those are exactly the sentences that go stale — the roadmap's
- * standing requirement is about a control that says it writes nothing while writing something, and
- * `docs/05`'s § D227 is about the mirror image. A front door full of refusals nothing sweeps is that
- * defect with a bigger audience.
+ * build can do**: four tiles that say what each mode is and how long it takes, those of them that
+ * refuse saying why, a rail whose rows carry the same kind of refusal, a bar whose every cell
+ * promises what a control does, and a list headed *what this build does not do yet*. Those are
+ * exactly the sentences that go stale — the roadmap's standing requirement is about a control that
+ * says it writes nothing while writing something, and `docs/05`'s § D227 is about the mirror
+ * image. A front door full of refusals nothing sweeps is that defect with a bigger audience.
  *
  * `everyday/shell.ts#mountEverydayShell` is **not** driven here and is excluded in
  * `derive.test.ts` on the DOM mounts' shared ground: it needs a document. The split is deliberate
- * and is the reason `modes.ts` and `rail.ts` are pure — the mount draws what they decide, so driving
- * them is driving the words. What the mount authors of its own is the two headings and the menu
- * lede, which reach only the static sweep, and that is a limitation rather than coverage.
+ * and is the reason `modes.ts`, `rail.ts`, `actionBar.ts` and `screens.ts` are pure — the mount
+ * draws what they decide, so driving them is driving the words. What the mount authors of its own
+ * is the headings, the menu lede and the refusal screen's way-back line, which reach only the
+ * static sweep, and that is a limitation rather than coverage.
  *
  * ## Why the rail is driven over every screen and every context
  *
- * `sublineFor` is a total function over the sixteen screen keys and three run contexts, and its
- * whole job is to tell a player **where they are**. A subline that says `MID-DAY` on the rush or
- * `READING THE REPORT` at the front door is a false statement about the player's own position, and
- * the only way to know none of them does that is to ask for all of them.
+ * `sublineFor` is a total function over `EVERYDAY_SCREENS × RUN_CONTEXTS` — both iterated from
+ * the constants rather than restated, after a hand-written three-context loop here went stale the
+ * day `watch` landed — and its whole job is to tell a player **where they are**. A subline that
+ * says `MID-DAY` on the rush or `READING THE REPORT` at the front door is a false statement about
+ * the player's own position, and the only way to know none of them does that is to ask for all of
+ * them. The § 3.3 table is swept row for row on the same argument: every cell is a claim about
+ * what a control does or costs, and the table is the one place the claims live.
  */
 const EVERYDAY_MENU: SurfaceAdapter = {
   id: 'everyday/modes.ts#EVERYDAY_MODES',
@@ -6958,8 +7244,32 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/modes.ts#EVERYDAY_MODES',
     'everyday/rail.ts#sublineFor',
     'everyday/rail.ts#railGroups',
+    'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
+    'everyday/actionBar.ts#ACTION_BAR_ROWS',
+    'everyday/actionBar.ts#actionBarFor',
+    'everyday/actionBar.ts#confirmStripFor',
+    'everyday/actionBar.ts#TIMELINE_STEPS',
+    /*
+     * **`screens.ts#UNBUILT_REASONS` and `#unbuiltReasonFor` left this list on the merge that
+     * registered the last three screens, and they left because they stopped being text producers.**
+     *
+     * The table is keyed exactly over the unbuilt keys and every § 4 key is now built, so it holds
+     * no sentence, and `derive.test.ts`'s scan finds no prose in either declaration —
+     * `unbuiltReasonFor`'s only literal is the message it throws, which the derivation excludes on
+     * purpose. A `covers` entry for a declaration that produces nothing is a coverage claim for
+     * nothing, which is the case that failed here first and is the reason these two are deleted
+     * rather than left as decoration.
+     *
+     * **They come back with the first sentence.** `render` below still loops the registry and seeds
+     * `screen.<key>.unbuilt` for every key that carries a reason, so the day a screen is
+     * unregistered the table bears prose again, the derivation finds it, and `derive.test.ts` fails
+     * it as an *unclassified* producer until this entry is restored. The mechanism runs in both
+     * directions on its own; nobody has to remember.
+     */
+    'everyday/screens.ts#SCREEN_NAMES',
     'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
+    'everyday/host.ts#HOST_PENDING_REASON',
   ],
   render(context) {
     void context;
@@ -6987,22 +7297,26 @@ const EVERYDAY_MENU: SurfaceAdapter = {
 
     /* Every screen × every context, for the reason in the docstring. */
     for (const screen of EVERYDAY_SCREENS) {
-      for (const ctx of ['daily', 'campaign', 'rush'] as const satisfies readonly RunContext[]) {
+      for (const ctx of RUN_CONTEXTS) {
         seeds.push({
           field: `rail.subline.${screen}.${ctx}`,
-          text: sublineFor({ screen, ctx, history: [] }),
+          text: sublineFor({ screen, ctx }),
           role: 'label',
         });
       }
     }
 
     /*
-     * Both shapes of rail: outside a campaign, and inside one where the CAMPAIGN group appears.
-     * Driving only the first would leave two rows — *All buildings*, *Contract & works* — swept by
-     * nothing, and they are rows that open screens which do not exist.
+     * Both shapes of rail: outside a campaign, and inside one where the CAMPAIGN group appears —
+     * with a placeholder building so the desk row (whose label *is* the building's name) is
+     * present in the swept shape. Driving only the first shape would leave the campaign rows swept
+     * by nothing, and they are rows that open screens which do not exist.
      */
     for (const inCampaign of [false, true]) {
-      const model = railModel({ screen: 'menu', ctx: 'campaign', history: [] }, inCampaign);
+      const model = railModel(
+        { screen: 'menu', ctx: 'campaign' },
+        inCampaign ? { inCampaign, openBuilding: '⟨building⟩' } : {},
+      );
       const where = inCampaign ? 'in-campaign' : 'no-campaign';
       seeds.push({ field: `rail.${where}.brand`, text: model.brand, role: 'label' });
       seeds.push({ field: `rail.${where}.mode`, text: model.mode, role: 'label' });
@@ -7025,8 +7339,2310 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       }
     }
 
+    /*
+     * § 3.2's footer, once — it does not vary by campaign shape. The identity card's streak line
+     * is the honest-absence form (no profile store exists), which is exactly the kind of sentence
+     * that goes stale the day one does.
+     */
+    const footer = railModel({ screen: 'menu', ctx: 'daily' }).footer;
+    seeds.push({ field: 'rail.footer.playingAs', text: footer.identity.heading, role: 'label' });
+    seeds.push({ field: 'rail.footer.name', text: footer.identity.name, role: 'label' });
+    seeds.push({ field: 'rail.footer.streak', text: footer.identity.streak, role: 'reason' });
+    seeds.push({ field: 'rail.footer.settings', text: footer.settings.label, role: 'label' });
+    if (footer.settings.unavailable !== undefined) {
+      seeds.push({
+        field: 'rail.footer.settings.unavailable',
+        text: footer.settings.unavailable,
+        role: 'reason',
+      });
+    }
+    /*
+     * The swap row's label only. Its note — and the Engineer header's two words, which no rail
+     * model carries — are the `ENGINEER_DOOR` adapter's; the row lost its `unavailable` arm when the
+     * door was built, and a seed for a refusal that no longer exists would be this file claiming a
+     * string the derivation cannot find.
+     */
+    seeds.push({ field: 'rail.footer.swap', text: footer.engineerSwap.label, role: 'label' });
+
+    /*
+     * § 3.3's table, row for row: every cell is a claim about a control. The `⟨…⟩` cells are the
+     * guide's own state-dependent placeholders, swept as authored so a drift in the convention is
+     * visible here too.
+     */
+    for (const row of ACTION_BAR_ROWS) {
+      const key = row.ctx === undefined ? `bar.${row.screen}` : `bar.${row.screen}.${row.ctx}`;
+      seeds.push({ field: `${key}.leave`, text: row.leave.label, role: 'label' });
+      if (row.back !== undefined) {
+        seeds.push({ field: `${key}.back`, text: row.back.label, role: 'label' });
+      }
+      for (const [index, variant] of row.primary.variants.entries()) {
+        seeds.push({ field: `${key}.primary.${String(index)}`, text: variant, role: 'label' });
+      }
+      if (row.note !== undefined) {
+        seeds.push({ field: `${key}.note`, text: row.note, role: 'prose' });
+      }
+      for (const [index, variant] of (row.noteVariants ?? []).entries()) {
+        seeds.push({ field: `${key}.note.${String(index)}`, text: variant, role: 'prose' });
+      }
+      if (row.wayOut !== undefined) {
+        seeds.push({ field: `${key}.wayOut`, text: row.wayOut, role: 'label' });
+      }
+    }
+    for (const [flow, stops] of Object.entries(TIMELINE_STEPS)) {
+      for (const stop of stops) {
+        seeds.push({
+          field: `bar.timeline.${flow}.${stop.screen}`,
+          text: stop.label,
+          role: 'label',
+        });
+      }
+    }
+
+    /* § 3.4's strips — the daily/campaign pair and the rush pair; `watch` never warns. */
+    for (const ctx of RUN_CONTEXTS) {
+      const strip = confirmStripFor(ctx);
+      if (strip === undefined) continue;
+      seeds.push({ field: `bar.confirm.${ctx}.question`, text: strip.question, role: 'prose' });
+      seeds.push({
+        field: `bar.confirm.${ctx}.consequence`,
+        text: strip.consequence,
+        role: 'prose',
+      });
+      seeds.push({ field: `bar.confirm.${ctx}.leave`, text: strip.leaveLabel, role: 'label' });
+      seeds.push({ field: `bar.confirm.${ctx}.stay`, text: strip.stayLabel, role: 'label' });
+    }
+
+    /*
+     * The per-screen refusals and § 4 names, from the registry: the router's refusal screen, the
+     * rail captions and the bar's refusing note all quote these, so they are swept at the source.
+     */
+    for (const screen of EVERYDAY_SCREENS) {
+      seeds.push({ field: `screen.${screen}.name`, text: SCREEN_NAMES[screen], role: 'label' });
+      const reason = UNBUILT_REASONS[screen];
+      if (reason !== undefined) {
+        seeds.push({ field: `screen.${screen}.unbuilt`, text: reason, role: 'reason' });
+      }
+    }
+
     for (const [index, absence] of EVERYDAY_SHELL_ABSENCES.entries()) {
       seeds.push({ field: `absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+
+    /*
+     * The shell's one boot-order sentence: a registered screen entered before `dev/main.ts` has
+     * published the data host. A refusal about a screen, so the role the rules give a refusal —
+     * and swept at its source in `host.ts`, where it is pure, exactly like the registry's
+     * per-screen sentences above.
+     */
+    seeds.push({ field: 'host.pending', text: HOST_PENDING_REASON, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **The three standalone Everyday screens' pure halves** — GAMEPLAY § 9.1's rush setup, § 13's
+ * drawing board and § 3.3's tuner over § 18's seven controls.
+ *
+ * ## Why these three belong in a corpus about honesty
+ *
+ * Between them they are almost nothing but claims about controls and about arithmetic:
+ *
+ * - the rush setup's five bands are **figures read off ENGINE_CONTRACT § 3.2's arrival expression**,
+ *   printed beside the guide's own words for them, and its facts are two withheld values and one
+ *   computed one — the exact shape R3 and R13 exist for;
+ * - the designer's four figures, three § 10 warnings and rating plate are predictions the closed
+ *   form made about a drawing, every one of which has a refusing arm that must print `—` rather than
+ *   a stale number;
+ * - the tuner's rows each name the field they write, and its sandbox strip is a claim about whether
+ *   a run will be posted.
+ *
+ * Every one of those is a sentence that goes stale the day its seam moves, which is what this corpus
+ * is for.
+ *
+ * ## What is driven, and what is not
+ *
+ * Both arms of everything that has two: the designer's figures over a spec the closed form sizes and
+ * over one it refuses, its warnings over a design inside its class and one past it, the tuner's strip
+ * and stamp with nothing moved and with something moved, its § 3.3 note over both variants, and the
+ * rush's bar refinement.
+ *
+ * The three **mounts** are excluded in `derive.test.ts` on the DOM mounts' shared ground — they need
+ * a document — which is the same pure/DOM split `EVERYDAY_MENU` and `EVERYDAY_SETTINGS` describe.
+ * What those mounts author of their own is geometry and class names, not sentences.
+ */
+const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
+  id: 'everyday/designerModel.ts#designerFigures',
+  covers: [
+    'everyday/rushScreenModel.ts#RUSH_SCREEN_COPY',
+    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
+    'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
+    'everyday/rushScreenModel.ts#RUSH_BANDS',
+    'everyday/rushScreenModel.ts#RUSH_BESTS',
+    'everyday/rushScreenModel.ts#rushBandViews',
+    'everyday/rushScreenModel.ts#rushFactViews',
+    'everyday/rushScreenModel.ts#rushDrivingLine',
+    'everyday/rushScreenModel.ts#rushHoldLineFigure',
+    'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
+    'everyday/rushScreenModel.ts#rushOpeningLine',
+    'everyday/designerModel.ts#DESIGNER_COPY',
+    'everyday/designerModel.ts#DESIGNER_ABSENCES',
+    'everyday/designerModel.ts#designerFigures',
+    'everyday/designerModel.ts#designerWarnings',
+    'everyday/designerModel.ts#designerPlateRows',
+    'everyday/designerModel.ts#designerCapacityLine',
+    /*
+     * `designerReading` is deliberately **not** claimed. It authors no prose: it reads
+     * `SpecBankAnalysis.reading`, which is `authoring/buildingSpec.ts`'s own arm of § 10's
+     * stops-versus-travel branch and is already driven by the AUTHORING adapter. The sentence is
+     * rendered below all the same, on this adapter's states, so it is swept here and claimed there.
+     */
+    'everyday/tunerModel.ts#TUNER_COPY',
+    'everyday/tunerModel.ts#TUNE_CARDS',
+    'everyday/tunerModel.ts#tuneSandboxStrip',
+    'everyday/tunerModel.ts#tuneDwellChips',
+    'everyday/tunerModel.ts#tuneReadout',
+    'everyday/tunerModel.ts#tuneSpeedReadout',
+    'everyday/tunerModel.ts#tuneCapacityReadout',
+    'everyday/tunerModel.ts#patternWithTune',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    /* ---------------------------------------------------------- § 9.1 rush */
+    for (const [key, text] of Object.entries(RUSH_SCREEN_COPY)) {
+      seeds.push({
+        field: `rush.copy.${key}`,
+        text,
+        role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
+      });
+    }
+    for (const [index, absence] of RUSH_ABSENCES.entries()) {
+      seeds.push({ field: `rush.absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+    seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
+    seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
+    seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
+    seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });
+    seeds.push({
+      field: 'rush.driving',
+      text: rushDrivingLine('Collective control'),
+      role: 'prose',
+    });
+    for (const band of rushBandViews()) {
+      seeds.push({ field: `rush.band.${band.waves}.waves`, text: band.waves, role: 'label' });
+      seeds.push({ field: `rush.band.${band.waves}.rate`, text: band.rate, role: 'label' });
+      seeds.push({ field: `rush.band.${band.waves}.note`, text: band.note, role: 'prose' });
+      /*
+       * The two figures the band prints. `observation` rather than `estimate`: they are the value
+       * of a stated expression at a stated wave, not a mean of anything — there is no sample behind
+       * a ramp, which is why R13 must not ask one of them for an `n`.
+       */
+      seeds.push({ field: `rush.band.${band.waves}.perMinute`, text: band.perMinute, role: 'observation' });
+      seeds.push({ field: `rush.band.${band.waves}.against`, text: band.against, role: 'observation' });
+    }
+    for (const fact of rushFactViews()) {
+      seeds.push({
+        field: `rush.fact.${fact.label}`,
+        text: fact.value,
+        role: fact.withheld ? 'label' : 'observation',
+      });
+      seeds.push({ field: `rush.fact.${fact.label}.label`, text: fact.label, role: 'prose' });
+    }
+    for (const best of RUSH_BESTS) {
+      seeds.push({ field: `rush.best.${best.name}.name`, text: best.name, role: 'label' });
+      seeds.push({ field: `rush.best.${best.name}.who`, text: best.who, role: 'label' });
+      seeds.push({ field: `rush.best.${best.name}.wave`, text: best.wave, role: 'label' });
+    }
+
+    /* ------------------------------------------------------- § 13 designer */
+    for (const [key, text] of Object.entries(DESIGNER_COPY)) {
+      seeds.push({
+        field: `designer.copy.${key}`,
+        text,
+        role: key === 'specNote' || key === 'lede' || key === 'notScored' ? 'prose' : 'label',
+      });
+    }
+    for (const [index, absence] of DESIGNER_ABSENCES.entries()) {
+      seeds.push({ field: `designer.absence.${String(index)}`, text: absence, role: 'reason' });
+    }
+
+    const specs = context.elevatorSpecs;
+    const classes = classesFromSpecs(specs);
+    const sized = specFromBuilding(context.building.config, context.building.id);
+    /*
+     * The refusing arm, built by the one edit that produces it: a design whose only shaft is taken
+     * out of the lobby serves nothing the closed form can board anybody at, so `analyzeUpPeak`
+     * throws and every figure must come back `—` with the reason beside it rather than as a number.
+     */
+    const refused: typeof sized = { ...sized, cars: 1, noLobby: { 0: true }, bandByCar: { 0: [sized.floors, sized.floors] } };
+    /* A design past its class's ceiling, for § 10's first warning — both numbers, named. */
+    const overClass: typeof sized = { ...sized, specClass: 'hydraulic', floors: 40, ratedSpeedMps: 0.75, ratedLoadLb: 2500 };
+
+    for (const [arm, drawn] of [
+      ['sized', sized],
+      ['refused', refused],
+      ['over-class', overClass],
+    ] as const) {
+      const analysis = upPeakAnalysisOf(drawn, specs);
+      for (const figure of designerFigures(drawn, analysis)) {
+        seeds.push({
+          field: `designer.${arm}.figure.${figure.label}`,
+          text: figure.value,
+          role: figure.withheld ? 'label' : 'observation',
+        });
+        seeds.push({
+          field: `designer.${arm}.figure.${figure.label}.note`,
+          text: figure.note,
+          role: figure.withheld ? 'reason' : 'observation',
+        });
+      }
+      for (const [index, warning] of designerWarnings(drawn, classOfSpec(classes, drawn), analysis).entries()) {
+        seeds.push({
+          field: `designer.${arm}.warning.${String(index)}`,
+          text: warning.text,
+          role: 'prose',
+        });
+      }
+      for (const row of designerPlateRows(drawn, classOfSpec(classes, drawn))) {
+        seeds.push({ field: `designer.${arm}.plate.${row.key}`, text: row.value, role: 'observation' });
+      }
+      seeds.push({
+        field: `designer.${arm}.capacity`,
+        text: designerCapacityLine(drawn),
+        role: 'observation',
+      });
+      const reading = designerReading(analysis);
+      if (reading !== '') {
+        seeds.push({ field: `designer.${arm}.reading`, text: reading, role: 'prose' });
+      }
+    }
+
+    /* ---------------------------------------------------------- § 18 tuner */
+    for (const [key, text] of Object.entries(TUNER_COPY)) {
+      seeds.push({
+        field: `tuner.copy.${key}`,
+        text,
+        role: key === 'lede' || key.endsWith('Body') || key === 'stepsHint' ? 'prose' : 'label',
+      });
+    }
+    const standingTune = tuneStateFrom(sized, DEFAULT_PATTERN, undefined);
+    const movedTune = { ...standingTune, cars: standingTune.cars + 1, rate: standingTune.rate + 2 };
+    for (const [arm, tune] of [
+      ['standing', standingTune],
+      ['moved', movedTune],
+    ] as const) {
+      const moved = movedKeys(standingTune, tune);
+      const strip = tuneSandboxStrip(moved);
+      seeds.push({ field: `tuner.${arm}.strip.state`, text: strip.state, role: 'label' });
+      seeds.push({ field: `tuner.${arm}.strip.note`, text: strip.note, role: 'prose' });
+      seeds.push({
+        field: `tuner.${arm}.pattern.name`,
+        text: patternWithTune(DEFAULT_PATTERN, tune).name,
+        role: 'label',
+      });
+      seeds.push({ field: `tuner.${arm}.speed`, text: tuneSpeedReadout(tune), role: 'observation' });
+      seeds.push({ field: `tuner.${arm}.cap`, text: tuneCapacityReadout(tune), role: 'observation' });
+      for (const card of TUNE_CARDS) {
+        for (const row of card.rows) {
+          seeds.push({ field: `tuner.${arm}.${row.key}.label`, text: row.label, role: 'label' });
+          seeds.push({ field: `tuner.${arm}.${row.key}.hint`, text: row.hint, role: 'prose' });
+          seeds.push({
+            field: `tuner.${arm}.${row.key}.readout`,
+            text: tuneReadout(row, tune),
+            role: 'observation',
+          });
+        }
+        seeds.push({ field: `tuner.${arm}.card.${card.name}`, text: card.effect, role: 'prose' });
+        seeds.push({ field: `tuner.${arm}.card.${card.name}.sub`, text: card.sub, role: 'label' });
+      }
+    }
+    for (const chip of tuneDwellChips(undefined)) {
+      seeds.push({ field: `tuner.dwell.${chip.label}`, text: chip.label, role: 'label' });
+      seeds.push({ field: `tuner.dwell.${chip.label}.seconds`, text: chip.seconds, role: 'label' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **Everyday Mode's settings screen** — GAMEPLAY § 15.1, the words half.
+ *
+ * ## Why a settings panel belongs in a corpus about honesty
+ *
+ * Almost every string on it is a claim about a **control**: what a row does, where a name is
+ * shown, what this device keeps, and — for six of § 15.1's rows — why the control is not there at
+ * all. That is the roadmap's standing requirement in its most literal form: a control that says
+ * it writes nothing while writing something, and § D227's mirror image, a refusal standing over a
+ * seam that works. The register in {@link SETTINGS_ABSENCES} is six such refusals in one array,
+ * and a refusal nothing sweeps is exactly the sentence that goes stale the day somebody wires the
+ * seam it refuses about.
+ *
+ * ## What is driven, and the one state that is not a fixture
+ *
+ * Every state the pure view distinguishes, iterated rather than sampled: no stored profile and a
+ * stored one, a name the display-name rule takes and one it refuses, a write that survived the tab
+ * and one that did not, and **all three** values of the Engineer bridge — reduced, full, and
+ * *absent*. The third is the honest one to insist on: while `dev/main.ts` is still booting there is
+ * no switch to write, so the screen draws a sentence in the row's place, and that sentence is a
+ * claim about a control that does not exist yet. A sweep that only ever saw the two flipped states
+ * would never read it.
+ *
+ * `everyday/settingsScreen.ts#SETTINGS_SCREEN` is **not** driven here and is excluded in
+ * `derive.test.ts` on the DOM mounts' shared ground — it needs a document — which is the same
+ * pure/DOM split `EVERYDAY_MENU` describes for the shell. What that mount authors of its own is
+ * geometry and two class names, not sentences.
+ */
+const EVERYDAY_SETTINGS: SurfaceAdapter = {
+  id: 'everyday/settingsView.ts#settingsScreenViewOf',
+  covers: [
+    'everyday/settingsView.ts#settingsScreenViewOf',
+    'everyday/settingsView.ts#SETTINGS_ABSENCES',
+    /*
+     * `everyday/types.ts#ENGINEER_SWAP_REFUSAL` used to be claimed here, reached through the
+     * register above. The row it refused about is built, so the refusal is deleted and the register
+     * is six entries rather than seven; the swap's words are the `ENGINEER_DOOR` adapter's now.
+     */
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    const stored = { name: 'A player', avatarColor: AVATAR_SWATCHES[2].color };
+    const cases = [
+      ['fresh', { profile: undefined, reduceMotion: false }],
+      ['named', { profile: stored, reduceMotion: false }],
+      ['reduced', { profile: stored, reduceMotion: true }],
+      /* The still-booting window: the Motion row's absence rather than the row. */
+      ['booting', { profile: stored, reduceMotion: undefined }],
+      /* A refused draft — `menu/account.ts`'s sentence, drawn beside the field. */
+      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false }],
+      /* A store that keeps nothing: the profile is real for this tab and says so. */
+      ['not-durable', { profile: stored, durable: false, reduceMotion: false }],
+    ] as const;
+
+    for (const [label, input] of cases) {
+      const view = settingsScreenViewOf(input);
+      seeds.push({ field: `${label}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `${label}.title`, text: view.title, role: 'label' });
+      seeds.push({ field: `${label}.lede`, text: view.lede, role: 'prose' });
+
+      seeds.push({ field: `${label}.you.heading`, text: view.you.heading, role: 'label' });
+      seeds.push({ field: `${label}.you.nameLabel`, text: view.you.nameLabel, role: 'label' });
+      seeds.push({ field: `${label}.you.name`, text: view.you.nameValue, role: 'label' });
+      seeds.push({ field: `${label}.you.pictureLabel`, text: view.you.pictureLabel, role: 'label' });
+      seeds.push({ field: `${label}.you.note`, text: view.you.note, role: 'prose' });
+      seeds.push({ field: `${label}.you.home`, text: view.you.home, role: 'prose' });
+      if (view.you.nameIssue !== undefined) {
+        seeds.push({ field: `${label}.you.nameIssue`, text: view.you.nameIssue, role: 'reason' });
+      }
+      if (view.you.saveNotice !== undefined) {
+        seeds.push({ field: `${label}.you.saveNotice`, text: view.you.saveNotice, role: 'reason' });
+      }
+
+      seeds.push({ field: `${label}.playing.heading`, text: view.playing.heading, role: 'label' });
+      for (const row of view.playing.rows) {
+        seeds.push({ field: `${label}.playing.${row.id}.label`, text: row.label, role: 'label' });
+        /* The § 16 register: one clause saying what the row does. */
+        seeds.push({ field: `${label}.playing.${row.id}.note`, text: row.note, role: 'prose' });
+        seeds.push({ field: `${label}.playing.${row.id}.value`, text: row.value, role: 'label' });
+      }
+      if (view.playing.absentNote !== undefined) {
+        seeds.push({
+          field: `${label}.playing.absent`,
+          text: view.playing.absentNote,
+          role: 'reason',
+        });
+      }
+
+      seeds.push({ field: `${label}.device.heading`, text: view.device.heading, role: 'label' });
+      for (const [index, fact] of view.device.facts.entries()) {
+        const at = `${label}.device.${String(index)}`;
+        seeds.push({ field: `${at}.label`, text: fact.label, role: 'label' });
+        seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
+        seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
+      }
+
+      seeds.push({
+        field: `${label}.absences.heading`,
+        text: view.absences.heading,
+        role: 'label',
+      });
+      for (const [index, entry] of view.absences.entries.entries()) {
+        seeds.push({ field: `${label}.absence.${String(index)}`, text: entry, role: 'reason' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **GAMEPLAY § 8's three campaign screens** — the triage list, the building desk and the contract
+ * sheet, driven over every state their pure half distinguishes.
+ *
+ * ## Why this surface is worth driving rather than sampling
+ *
+ * These screens are almost entirely **derived claims**: a record (`17 cleared · 1 missed`), a purse
+ * ledger, a wear head, a renewal priced off a clear rate, a rolling calendar whose columns and cells
+ * must come from one array, and a shop in which every tier states why it may not be bought. Each is
+ * an observation with a denominator on the face of it, which is R13's shape, and each is derived
+ * from `campaign/economy.ts` — so the honest failure mode here is not a wrong sentence but a right
+ * sentence about a figure nothing measured.
+ *
+ * Two of those are drawn as **refusals** and both are seeded as reasons rather than labels: the trip
+ * budget's *was* figure, which this simulator does not record, and § 8.8's offers, which need a
+ * complexity the contract publishes for six buildings and a week switch these screens do not reach.
+ * A refusal nothing sweeps is the sentence that goes stale the day somebody wires the seam it
+ * refuses about — which is § D227, and is why `CAMPAIGN_ABSENCES` is here too.
+ *
+ * ## The states, iterated rather than picked
+ *
+ * A first day with nothing bought; a two-tower career in its second month with a renewal due and a
+ * wear clock past its head; a month with works booked and a buy half-made; and a run on the stage,
+ * so the four tests grade rather than sit pending. `everyday/campaignScreens.ts` is **not** driven
+ * here and is excluded in `derive.test.ts` on the DOM mounts' shared ground — it needs a document,
+ * and what it authors of its own is geometry and class names.
+ */
+const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
+  id: 'everyday/campaignModel.ts#towersView',
+  covers: [
+    'everyday/campaignModel.ts#towersView',
+    'everyday/campaignModel.ts#buildingView',
+    'everyday/campaignModel.ts#contractView',
+    'everyday/campaignModel.ts#calendarView',
+    'everyday/campaignModel.ts#campaignTestRows',
+    'everyday/campaignModel.ts#campaignTestGoals',
+    'everyday/campaignModel.ts#testsHeldLine',
+    'everyday/campaignModel.ts#careerStageLabel',
+    'everyday/campaignModel.ts#recordLine',
+    'everyday/campaignModel.ts#TOWERS_COPY',
+    'everyday/campaignModel.ts#BUILDING_COPY',
+    'everyday/campaignModel.ts#CONTRACT_COPY',
+    'everyday/campaignModel.ts#WEAR_HEADS',
+    'everyday/campaignModel.ts#TEST_TENSIONS',
+    'everyday/campaignModel.ts#TRIPS_REFUSAL',
+    'everyday/campaignModel.ts#CALENDAR_LEGEND',
+    'everyday/campaignModel.ts#MONTH_LEGEND',
+    /* Reached through the three views above: every figure they print is one of these. */
+    'campaign/economy.ts#SHOP',
+    'campaign/economy.ts#SLOTS',
+    'campaign/economy.ts#DIFFICULTIES',
+    'campaign/economy.ts#shopTierState',
+    'campaign/economy.ts#worksDayLine',
+    'campaign/economy.ts#purseOf',
+    'campaign/economy.ts#shopTotalUnits',
+    'campaign/economy.ts#shopCategoryById',
+    'campaign/economy.ts#shopTierAt',
+    'campaign/economy.ts#slotsOpen',
+    'campaign/economy.ts#nextSlot',
+    'campaign/economy.ts#COMPLEXITY',
+    'campaign/economy.ts#complexityOf',
+    'campaign/economy.ts#earnedSoFar',
+    'campaign/economy.ts#carriedIn',
+    'campaign/economy.ts#atRiskTowers',
+    'campaign/economy.ts#contractIsLost',
+    'everyday/campaignModel.ts#CALENDAR_GLYPHS',
+    'campaign/career.ts#BUILD_IDS',
+    'campaign/career.ts#applyCampaignAction',
+    /* The record and its decisions — every option the desk offers is authored here. */
+    'campaign/career.ts#CAMPAIGN_ABSENCES',
+    'campaign/career.ts#needOf',
+    'campaign/career.ts#nextLineOf',
+    'campaign/career.ts#BUILD_LABELS',
+    'campaign/career.ts#openingCareer',
+    'campaign/career.ts#freshTower',
+    'campaign/career.ts#quirkOf',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    const buildings = new Map([
+      ['garden-apartments', { name: 'Garden Apartments', spec: '7 floors · 2 cars · 0.63 m/s · 240 people' }],
+      ['chancery-house', { name: 'Chancery House', spec: '20 floors · 6 cars · 5 m/s · 612 people' }],
+    ]);
+    const dispatchers = [
+      { id: 'eta', name: 'Minimum estimated wait', note: undefined, saved: false },
+      { id: 'mine', name: 'Morning Shift v3', note: undefined, saved: true },
+    ];
+
+    const first = openingCareer('eta');
+    const worn: CampaignTower = {
+      ...freshTower({ contractId: 'c6', buildingId: 'chancery-house', dispatcherId: 'mine', rate: 4 }),
+      day: 19,
+      missed: 1,
+      months: 2,
+      trips: 41_000,
+    };
+    const second: CampaignCareer = { ...first, today: 24, towers: [...first.towers, worn] };
+    const spending: CampaignCareer = {
+      ...first,
+      towers: [{ ...first.towers[0]!, day: 6, carry: 120 }],
+    };
+    const booked = applyCampaignAction(
+      applyCampaignAction(spending, {
+        kind: 'press-tier',
+        towerId: 'c1',
+        categoryId: 'machines',
+        level: 1,
+      }),
+      { kind: 'pick-start', startIdx: 11 },
+    );
+    const pending = applyCampaignAction(spending, {
+      kind: 'press-tier',
+      towerId: 'c1',
+      categoryId: 'doors',
+      level: 2,
+    });
+    /* A run on the stage, so the three measurable tests grade rather than sit pending. */
+    const observations: GoalObservations = {
+      arrived: 400,
+      carryPct: 97,
+      minutePct: 80,
+      peakQueue: 21,
+      abandoned: 0,
+      worstWaitS: 164,
+      worstWaitIsCensored: false,
+    };
+
+    const cases: readonly (readonly [string, CampaignCareer, GoalObservations | undefined])[] = [
+      ['first-day', first, undefined],
+      ['second-month', { ...second, openTowerId: 'c6' }, observations],
+      ['booked', booked, observations],
+      ['picking-a-night', pending, undefined],
+    ];
+
+    for (const [label, career, observed] of cases) {
+      const input = {
+        career,
+        buildings,
+        dispatchers,
+        observations: observed,
+        history: [],
+      } as const;
+
+      const towers = towersView(input);
+      seeds.push({ field: `${label}.towers.title`, text: towers.title, role: 'label' });
+      seeds.push({ field: `${label}.towers.stage`, text: towers.stagePill, role: 'label' });
+      seeds.push({ field: `${label}.towers.meta`, text: towers.meta, role: 'observation' });
+      seeds.push({ field: `${label}.towers.lede`, text: towers.lede, role: 'prose' });
+      seeds.push({ field: `${label}.towers.standing.note`, text: towers.standing.note, role: 'prose' });
+      seeds.push({ field: `${label}.towers.standing.value`, text: towers.standing.value, role: 'observation' });
+      for (const slot of towers.standing.slots) {
+        seeds.push({ field: `${label}.towers.slot.${slot.heading}.tag`, text: slot.tag, role: 'label' });
+        seeds.push({ field: `${label}.towers.slot.${slot.heading}.note`, text: slot.note, role: 'prose' });
+      }
+      for (const stat of towers.stats) {
+        seeds.push({
+          field: `${label}.towers.stat.${stat.label}`,
+          text: stat.value,
+          role: 'observation',
+        });
+        seeds.push({ field: `${label}.towers.stat.${stat.label}.note`, text: stat.note, role: 'prose' });
+      }
+      seeds.push({ field: `${label}.towers.calendar.note`, text: towers.calendar.note, role: 'prose' });
+      for (const entry of towers.calendar.legend) {
+        seeds.push({ field: `${label}.towers.legend.${entry.label}`, text: entry.label, role: 'label' });
+      }
+      for (const row of towers.calendar.rows) {
+        /* One tooltip per row is enough: they are one sentence with a day substituted. */
+        const cell = row.cells.find((entry) => entry.mark !== 'blank') ?? row.cells[0];
+        if (cell !== undefined) {
+          seeds.push({ field: `${label}.towers.calendar.${row.towerId}.tip`, text: cell.tip, role: 'label' });
+        }
+      }
+      for (const heading of towers.headings) {
+        seeds.push({ field: `${label}.towers.head.${heading}`, text: heading, role: 'label' });
+      }
+      for (const row of towers.rows) {
+        const at = `${label}.towers.row.${row.towerId}`;
+        seeds.push({ field: `${at}.spec`, text: row.spec, role: 'observation' });
+        seeds.push({ field: `${at}.quirk`, text: row.quirk, role: 'prose' });
+        seeds.push({ field: `${at}.terms`, text: row.terms, role: 'observation' });
+        seeds.push({ field: `${at}.day`, text: row.day, role: 'observation' });
+        /* `N cleared · M missed` is a record with both halves on its face — the R13 shape. */
+        seeds.push({ field: `${at}.record`, text: row.record, role: 'observation' });
+        seeds.push({ field: `${at}.wear`, text: row.wear, role: 'observation' });
+        seeds.push({ field: `${at}.order.note`, text: row.order.note, role: 'prose' });
+        for (const build of row.order.builds) {
+          seeds.push({ field: `${at}.build.${build.id}`, text: build.label, role: 'label' });
+        }
+        seeds.push({ field: `${at}.status`, text: row.status, role: 'label' });
+        seeds.push({ field: `${at}.statusSub`, text: row.statusSub, role: 'prose' });
+        seeds.push({ field: `${at}.cta`, text: row.cta, role: 'label' });
+      }
+      seeds.push({
+        field: `${label}.towers.footer`,
+        text: towers.footer,
+        role: 'observation',
+        declaredCount: towers.rows.length,
+      });
+      seeds.push({ field: `${label}.towers.offers`, text: towers.offers.refusal, role: 'reason' });
+      seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
+      seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
+      seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
+      for (const [index, entry] of towers.absences.entries.entries()) {
+        seeds.push({ field: `${label}.towers.absence.${String(index)}`, text: entry, role: 'reason' });
+      }
+
+      const desk = buildingView(input);
+      if (desk !== undefined) {
+        seeds.push({ field: `${label}.desk.name`, text: desk.name, role: 'label' });
+        seeds.push({ field: `${label}.desk.spec`, text: desk.spec, role: 'observation' });
+        seeds.push({ field: `${label}.desk.state`, text: desk.statePill, role: 'label' });
+        if (desk.need !== undefined) {
+          seeds.push({ field: `${label}.desk.need.allowance`, text: desk.need.allowance, role: 'observation' });
+          seeds.push({ field: `${label}.desk.need.due`, text: desk.need.due, role: 'label' });
+          seeds.push({ field: `${label}.desk.need.title`, text: desk.need.title, role: 'label' });
+          seeds.push({ field: `${label}.desk.need.brief`, text: desk.need.brief, role: 'prose' });
+          if (desk.need.offer !== undefined) {
+            seeds.push({ field: `${label}.desk.offer.rate`, text: desk.need.offer.rate, role: 'observation' });
+            seeds.push({ field: `${label}.desk.offer.head`, text: desk.need.offer.head, role: 'prose' });
+            seeds.push({ field: `${label}.desk.offer.why`, text: desk.need.offer.why, role: 'prose' });
+          }
+        }
+        if (desk.options !== undefined) {
+          seeds.push({ field: `${label}.desk.options.note`, text: desk.options.note, role: 'prose' });
+          seeds.push({ field: `${label}.desk.options.purse`, text: desk.options.purse, role: 'observation' });
+          for (const option of desk.options.rows) {
+            const at = `${label}.desk.option.${option.id}`;
+            seeds.push({ field: `${at}.label`, text: option.label, role: 'label' });
+            seeds.push({ field: `${at}.cost`, text: option.cost, role: option.affordable ? 'label' : 'reason' });
+            seeds.push({ field: `${at}.when`, text: option.when, role: 'label' });
+            seeds.push({ field: `${at}.effect`, text: option.effect, role: 'prose' });
+          }
+        }
+        if (desk.quiet !== undefined) {
+          seeds.push({ field: `${label}.desk.quiet.heading`, text: desk.quiet.heading, role: 'label' });
+          seeds.push({ field: `${label}.desk.quiet.body`, text: desk.quiet.body, role: 'prose' });
+          seeds.push({ field: `${label}.desk.quiet.next`, text: desk.quiet.next, role: 'prose' });
+        }
+        seeds.push({ field: `${label}.desk.order.sub`, text: desk.order.sub, role: 'prose' });
+        seeds.push({ field: `${label}.desk.order.note`, text: desk.order.view.note, role: 'prose' });
+        for (const row of desk.fitted.rows) {
+          seeds.push({ field: `${label}.desk.fitted.${row.categoryId}`, text: row.label, role: 'label' });
+          seeds.push({ field: `${label}.desk.fitted.${row.categoryId}.level`, text: row.level, role: 'observation' });
+        }
+        seeds.push({ field: `${label}.desk.purse.onHand`, text: desk.purse.onHand, role: 'observation' });
+        seeds.push({ field: `${label}.desk.purse.note`, text: desk.purse.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.purse.link`, text: desk.purse.link, role: 'label' });
+        seeds.push({ field: `${label}.desk.quirk`, text: desk.quirk.text, role: 'prose' });
+        seeds.push({ field: `${label}.desk.quirk.sub`, text: desk.quirk.sub, role: 'prose' });
+        seeds.push({ field: `${label}.desk.condition.head`, text: desk.condition.head, role: 'label' });
+        seeds.push({ field: `${label}.desk.condition.trips`, text: desk.condition.trips, role: 'observation' });
+        seeds.push({ field: `${label}.desk.condition.note`, text: desk.condition.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.rate.now`, text: desk.odds.now, role: 'observation' });
+        seeds.push({ field: `${label}.desk.rate.note`, text: desk.odds.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.temporary`, text: desk.temporary.body, role: 'reason' });
+        seeds.push({ field: `${label}.desk.month.day`, text: desk.month.day, role: 'observation' });
+        seeds.push({ field: `${label}.desk.month.cleared`, text: desk.month.cleared, role: 'observation' });
+        seeds.push({ field: `${label}.desk.month.missed`, text: desk.month.missed, role: 'observation' });
+        seeds.push({ field: `${label}.desk.tests.eyebrow`, text: desk.tests.eyebrow, role: 'label' });
+        seeds.push({ field: `${label}.desk.tests.note`, text: desk.tests.note, role: 'prose' });
+        seeds.push({ field: `${label}.desk.tests.held`, text: desk.tests.held, role: 'observation' });
+        for (const row of desk.tests.rows) {
+          const at = `${label}.desk.test.${row.id}`;
+          seeds.push({ field: `${at}.label`, text: row.label, role: 'label' });
+          seeds.push({ field: `${at}.target`, text: row.target, role: 'label' });
+          seeds.push({ field: `${at}.was`, text: row.was, role: 'observation' });
+          seeds.push({ field: `${at}.tension`, text: row.tension, role: 'prose' });
+          if (row.reading !== undefined) {
+            seeds.push({ field: `${at}.reading`, text: row.reading.display, role: 'observation' });
+          }
+          if (row.refusal !== undefined) {
+            seeds.push({ field: `${at}.refusal`, text: row.refusal, role: 'reason' });
+          }
+        }
+      }
+
+      const sheet = contractView(input);
+      if (sheet !== undefined) {
+        seeds.push({ field: `${label}.contract.title`, text: sheet.title, role: 'label' });
+        seeds.push({ field: `${label}.contract.meta`, text: sheet.meta, role: 'observation' });
+        seeds.push({ field: `${label}.contract.lede`, text: sheet.lede, role: 'prose' });
+        seeds.push({ field: `${label}.contract.difficulty.note`, text: sheet.difficulty.note, role: 'prose' });
+        seeds.push({ field: `${label}.contract.difficulty.footer`, text: sheet.difficulty.footer, role: 'prose' });
+        for (const entry of sheet.difficulty.buttons) {
+          seeds.push({ field: `${label}.contract.difficulty.${entry.id}`, text: entry.label, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.month.note`, text: sheet.month.note, role: 'observation' });
+        for (const head of sheet.month.heads) {
+          seeds.push({ field: `${label}.contract.head.${head}`, text: head, role: 'label' });
+        }
+        const cell = sheet.month.weeks[0]?.cells[0];
+        if (cell !== undefined) {
+          seeds.push({ field: `${label}.contract.month.tip`, text: cell.tip, role: 'label' });
+        }
+        if (sheet.month.prompt !== undefined) {
+          seeds.push({ field: `${label}.contract.month.prompt`, text: sheet.month.prompt, role: 'prose' });
+          seeds.push({ field: `${label}.contract.month.cancel`, text: sheet.month.cancel, role: 'label' });
+        }
+        for (const entry of sheet.month.booked) {
+          seeds.push({ field: `${label}.contract.booked.${entry.name}`, text: entry.when, role: 'observation' });
+        }
+        if (sheet.month.worksCost !== undefined) {
+          seeds.push({ field: `${label}.contract.worksCost`, text: sheet.month.worksCost, role: 'observation' });
+        }
+        for (const entry of sheet.month.legend) {
+          seeds.push({ field: `${label}.contract.legend.${entry}`, text: entry, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.purse.onHand`, text: sheet.purse.onHand, role: 'observation' });
+        seeds.push({ field: `${label}.contract.purse.note`, text: sheet.purse.note, role: 'observation' });
+        for (const week of sheet.purse.weeks) {
+          seeds.push({ field: `${label}.contract.purse.${week.label}`, text: week.value, role: 'observation' });
+          seeds.push({ field: `${label}.contract.purse.${week.label}.note`, text: week.note, role: 'label' });
+        }
+        seeds.push({ field: `${label}.contract.rate.now`, text: sheet.purse.oddsNow, role: 'observation' });
+        seeds.push({ field: `${label}.contract.rate.after`, text: sheet.purse.oddsAfter, role: 'observation' });
+        seeds.push({ field: `${label}.contract.rate.note`, text: sheet.purse.oddsNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.total`, text: sheet.purse.totalNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.carry`, text: sheet.purse.carryNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.purse.kit`, text: sheet.purse.kitNote, role: 'prose' });
+        seeds.push({ field: `${label}.contract.tests.conflict`, text: sheet.tests.conflict, role: 'prose' });
+        seeds.push({ field: `${label}.contract.shop.eyebrow`, text: sheet.shop.eyebrow, role: 'label' });
+        seeds.push({ field: `${label}.contract.shop.sub`, text: sheet.shop.sub, role: 'prose' });
+        for (const category of sheet.shop.categories) {
+          const at = `${label}.contract.shop.${category.id}`;
+          seeds.push({ field: `${at}.name`, text: category.name, role: 'label' });
+          seeds.push({ field: `${at}.sub`, text: category.sub, role: 'prose' });
+          seeds.push({ field: `${at}.owned`, text: category.owned, role: 'observation' });
+          for (const row of category.rows) {
+            const tier = `${at}.${row.levelLabel}`;
+            seeds.push({ field: `${tier}.name`, text: row.name, role: 'label' });
+            seeds.push({ field: `${tier}.cost`, text: row.cost, role: 'observation' });
+            seeds.push({ field: `${tier}.effect`, text: row.effect, role: 'prose' });
+            seeds.push({
+              field: `${tier}.state`,
+              text: row.state,
+              role: row.pressable ? 'observation' : 'reason',
+            });
+          }
+        }
+        seeds.push({ field: `${label}.contract.terms.heading`, text: sheet.terms.heading, role: 'label' });
+        for (const row of sheet.terms.rows) {
+          seeds.push({ field: `${label}.contract.term.${row.label}`, text: row.label, role: 'label' });
+          seeds.push({ field: `${label}.contract.term.${row.label}.got`, text: row.got, role: 'observation' });
+        }
+        seeds.push({ field: `${label}.contract.shaft.heading`, text: sheet.shaft.heading, role: 'label' });
+        seeds.push({ field: `${label}.contract.shaft.body`, text: sheet.shaft.body, role: 'prose' });
+        seeds.push({ field: `${label}.contract.shaft.body2`, text: sheet.shaft.body2, role: 'prose' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * The dispatcher editor's family controls — `docs/21` § 3.6, `dev/familyControls.ts`.
+ *
+ * What is new here and not already in `CONTROLS` is the **frame** around the generated controls:
+ * the block titles, the per-block *Read by …* line naming the non-test caller, the status count,
+ * the sentence about the two dimensions that live on a flag instead, and the override notes that
+ * say a control below is outranked by a switch above. The controls themselves are `CONTROLS`'s and
+ * are not re-seeded here; what is seeded is what this panel adds.
+ *
+ * Driven over four states rather than one, because three of the strings only exist in some of them:
+ * a profile with no zoning draws no zoning override, a profile with a dwell chip pressed draws
+ * three, and the gate reason on `dispatch.passengerAssignment` only appears while the destination
+ * flag is off. The refusal is seeded as a constant because it is drawn by the register's own node
+ * (`unauthorableBlocksOf` → `UNAUTHORABLE_COPY`) rather than by the block's view — one string, one
+ * author, two readers.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`.
+ */
+const FAMILY_CONTROLS: SurfaceAdapter = {
+  id: 'dev/familyControls.ts#familyControlsViewOf',
+  covers: [
+    'dev/familyControls.ts#familyControlsViewOf',
+    'dev/familyControls.ts#familyOverridesOf',
+    'dev/familyControls.ts#familyPartitionOf',
+    'dev/familyControls.ts#FAMILY_TITLES',
+    'dev/familyControls.ts#FAMILY_CALLERS',
+    'dev/familyControls.ts#FAMILY_DIMENSIONS',
+    'dev/familyControls.ts#FAMILY_EYEBROW',
+    'dev/familyControls.ts#FAMILY_NOTE',
+    'dev/familyControls.ts#FAMILY_ELSEWHERE',
+    'dev/familyControls.ts#FLAG_OWNED',
+    'dev/familyControls.ts#SELECTION_REFUSAL',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const space = context.space;
+
+    /*
+     * The refusal, and the two sentences that are true of the panel however it is configured. Each
+     * is seeded once — a constant repeated per profile would put thirteen copies of one sentence in
+     * front of R13's frequency clause and say nothing new about any of them.
+     */
+    seeds.push({ field: 'SELECTION_REFUSAL', text: SELECTION_REFUSAL, role: 'reason' });
+    seeds.push({ field: 'FAMILY_NOTE', text: FAMILY_NOTE, role: 'prose' });
+    seeds.push({ field: 'FAMILY_ELSEWHERE', text: FAMILY_ELSEWHERE, role: 'reason' });
+    seeds.push({ field: 'FAMILY_EYEBROW', text: FAMILY_EYEBROW, role: 'label' });
+    for (const id of FLAG_OWNED) {
+      seeds.push({ field: `FLAG_OWNED.${id}`, text: id, role: 'label', provenance: 'schema' });
+    }
+    /*
+     * The partition, as words. `unaccounted` is what the block would have to say if a schema row
+     * landed in no family — it is empty on every shipped tree and is seeded anyway, because the
+     * sentence a surface prints when something is missing is exactly the one nobody drives.
+     */
+    const partition = familyPartitionOf(space);
+    seeds.push({
+      field: 'familyPartitionOf.unaccounted',
+      text:
+        partition.unaccounted.length === 0
+          ? ''
+          : `${String(partition.unaccounted.length)} declared dimensions are drawn by no control: ${partition.unaccounted.join(', ')}`,
+      role: 'reason',
+    });
+
+    const states: readonly {
+      readonly label: string;
+      readonly profileId: string;
+      readonly levers: typeof DEFAULT_LEVERS;
+      readonly zone: boolean;
+    }[] = [
+      { label: 'as-authored', profileId: '', levers: DEFAULT_LEVERS, zone: false },
+      { label: 'zoned', profileId: '', levers: DEFAULT_LEVERS, zone: true },
+      {
+        label: 'dwell-pressed',
+        profileId: '',
+        levers: { ...DEFAULT_LEVERS, dwell: DWELL_CHOICES[0] },
+        zone: false,
+      },
+      {
+        label: 'parked',
+        profileId: '',
+        levers: { ...DEFAULT_LEVERS, parking: true },
+        zone: false,
+      },
+    ];
+
+    for (const profile of context.profiles) {
+      const base = profile as unknown as Parameters<typeof specFromProfile>[0];
+      const read = specFromProfile(base, base.name);
+      for (const state of states) {
+        const spec: DispatcherSpec = {
+          ...read,
+          families: {},
+          flags: { ...read.flags, zone: state.zone || read.flags.zone },
+        };
+        const draft = profileFromSpec(spec, { id: 'honesty', base, levers: state.levers });
+        const view = familyControlsViewOf({
+          space,
+          spec,
+          levers: state.levers,
+          draft,
+          base,
+        });
+        const at = `${base.id}.${state.label}`;
+        seeds.push({ field: `${at}.status`, text: view.status, role: 'observation' });
+        for (const block of view.blocks) {
+          seeds.push({ field: `${at}.${block.family}.title`, text: block.title, role: 'label' });
+          /*
+           * The caller line is the panel's own claim about the code — *this block is read by X* —
+           * so it is an observation rather than a label. If it ever names something that is not a
+           * caller, that is a false statement on a player-facing surface and it belongs in front of
+           * the same properties every other claim here does.
+           */
+          seeds.push({
+            field: `${at}.${block.family}.caller`,
+            text: block.caller,
+            role: 'observation',
+          });
+          for (const row of block.rows) {
+            if (row.overriddenBy === undefined) continue;
+            seeds.push({
+              field: `${at}.${block.family}.${row.control.id}.overriddenBy`,
+              text: row.overriddenBy,
+              role: 'reason',
+            });
+          }
+        }
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **GAMEPLAY § 7's stage** — Everyday Mode's own day screen, in the corpus.
+ *
+ * ## Why the whole header is driven at sampled playheads rather than once
+ *
+ * The three § 7.1 figures are folds *at the playhead*, and the temporal axis (§ D300's E-4,
+ * § D307) is the property that exists because two surfaces published a whole-run figure at a
+ * part-way one. So every figure below carries {@link atPlayhead}, and the sampling is
+ * `sampleTimes`' — the same instants every other playhead-driven surface is asked at, so a
+ * violation on this screen is comparable with one on the canvas.
+ *
+ * Both arms of each figure are driven where the arms exist: *away inside a minute* refuses before
+ * anybody has boarded (R13's rule — a share of nothing is not 100 %) and carries its `n` after,
+ * and *the longest anybody has stood* says `and counting` while its maximum belongs to somebody
+ * still standing. Sampling only the middle of a run would drive neither.
+ *
+ * ## What is seeded that a reader might not expect
+ *
+ * The **refusals**, all of them, on `role: 'reason'`: the intervention control's three grounds, the
+ * § 3.3 primary's three, and the ghost lane's. A refusal is the class of sentence this repository
+ * has twice found stale (§ D227), and the corpus is where a stale one is caught.
+ *
+ * `stageInkFor` and `STAGE_BAND_INK` are **covered without being seeded**, and that is a true claim
+ * rather than a gap: they answer in `#RRGGBB`, not in words, and `stageLegend()` — which is seeded —
+ * reads both. What a reader reads off the ramp is the legend's four plain-words rungs, and those are
+ * `live/bands.ts`' own `legendLabel`s, driven here for the first time on a paper-mode surface.
+ *
+ * `everyday/stageScreen.ts#STAGE_SCREEN` is **not** driven and is excluded in `derive.test.ts` on
+ * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. The split
+ * is the point: everything the screen *says* is here, and what the mount authors of its own is
+ * geometry, class names and two static captions.
+ */
+const EVERYDAY_STAGE: SurfaceAdapter = {
+  id: 'everyday/stageScreenModel.ts#stageHeaderOf',
+  covers: [
+    'everyday/stageScreenModel.ts#stageHeaderOf',
+    'everyday/stageScreenModel.ts#stageAlarmOf',
+    'everyday/stageScreenModel.ts#stageInterventionsOf',
+    'everyday/stageScreenModel.ts#stageBarModelOf',
+    'everyday/stageScreenModel.ts#stageCrowdCapOf',
+    'everyday/stageScreenModel.ts#stageLegend',
+    'everyday/stageScreenModel.ts#stageInkFor',
+    'everyday/stageScreenModel.ts#STAGE_BAND_INK',
+    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
+    'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
+    'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
+    'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const { recording } = context;
+    const floorLabelOf = (id: string): string =>
+      recording.floors.find((floor) => floor.id === id)?.label ?? id;
+
+    for (const rung of stageLegend()) {
+      seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
+      /* Covered, not seeded — a hex is not a sentence. Called so the claim in `covers` is true. */
+      void stageInkFor(rung.id === 'breezy' ? 1 : 200);
+    }
+    for (const absence of STAGE_ABSENCES) {
+      seeds.push({ field: 'stage.absence', text: absence, role: 'reason' });
+    }
+    for (const arm of STAGE_INTERVENTIONS) {
+      seeds.push({
+        field: `stage.intervene.${arm.change.kind}.label`,
+        text: arm.label,
+        role: 'label',
+      });
+      seeds.push({
+        field: `stage.intervene.${arm.change.kind}.explains`,
+        text: arm.explains,
+        role: 'prose',
+      });
+    }
+    seeds.push({ field: 'stage.race.noGhost', text: STAGE_NO_GHOST, role: 'reason' });
+
+    /* § 14's overflow chip — the one string `stageCrowdCapOf` produces. */
+    const capped = stageCrowdCapOf(412);
+    if (capped.overflow !== undefined) {
+      seeds.push({ field: 'stage.landing.overflow', text: capped.overflow, role: 'label' });
+    }
+
+    for (const at of sampleTimes(recording)) {
+      const stamp = at.toFixed(0);
+      const observations = observationsAt(recording, at);
+      const head = stageHeaderOf({
+        simTimeS: at,
+        recording,
+        observations,
+        driverName: 'the plain baseline',
+      });
+      seeds.push({
+        field: `stage(@${stamp}s).clock`,
+        text: head.clock,
+        role: 'label',
+        playhead: atPlayhead(recording, at),
+      });
+      seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
+      seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      for (const figure of head.figures) {
+        seeds.push({ field: `stage(@${stamp}s).figure.label`, text: figure.label, role: 'label' });
+        seeds.push({
+          field: `stage(@${stamp}s).figure(${figure.label}).value`,
+          text: figure.value,
+          role: 'observation',
+          /* R13: a ratio's `n` sits in its own box, and a count is its own `n`. */
+          countShown: figure.count !== undefined,
+          playhead: atPlayhead(recording, at),
+        });
+        if (figure.count !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).figure(${figure.label}).count`,
+            text: figure.count,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        if (figure.refusal !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).figure(${figure.label}).refusal`,
+            text: figure.refusal,
+            role: 'reason',
+          });
+        }
+      }
+
+      const alarm = stageAlarmOf(observations, floorLabelOf);
+      if (alarm !== undefined) {
+        seeds.push({
+          field: `stage(@${stamp}s).alarm`,
+          text: alarm,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+      }
+
+      const stamped = stageInterventionsOf({
+        interventions: [{ atS: recording.startedAt, change: { kind: 'park-cars-lobby' } }],
+        simTimeS: at,
+        hasRun: true,
+        dayClosed: false,
+        recomputing: false,
+      });
+      if (stamped.stamp !== '') {
+        seeds.push({
+          field: `stage(@${stamp}s).intervene.stamp`,
+          text: stamped.stamp,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+      }
+    }
+
+    /* Every refusal both controls can produce, on the states the sampling above cannot reach. */
+    const interventionStates = [
+      ['no-run', { hasRun: false, dayClosed: false, recomputing: false }],
+      ['filed', { hasRun: true, dayClosed: true, recomputing: false }],
+      ['recomputing', { hasRun: true, dayClosed: false, recomputing: true }],
+    ] as const;
+    for (const [label, flags] of interventionStates) {
+      const view = stageInterventionsOf({
+        interventions: [],
+        simTimeS: recording.startedAt,
+        ...flags,
+      });
+      if (view.refusal !== undefined) {
+        seeds.push({ field: `stage.intervene(${label}).refusal`, text: view.refusal, role: 'reason' });
+      }
+      const bar = stageBarModelOf({ screen: 'stage', ctx: 'daily' }, flags);
+      if (bar.note !== undefined) {
+        seeds.push({ field: `stage.bar(${label}).note`, text: bar.note, role: 'reason' });
+      }
+      seeds.push({ field: `stage.bar(${label}).primary`, text: bar.primary.label, role: 'label' });
+    }
+    seeds.push({ field: 'stage.recomputing', text: STAGE_RECOMPUTING, role: 'prose' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **LIVE METRICS, as a card** — `docs/21` § 3.4, and the adapter that moved rather than appeared.
+ *
+ * ## What this drives, and what used to drive it
+ *
+ * The panel's strings were swept through `CANVAS`, by capturing `drawOverlay`'s `fillText` calls
+ * into an array. That worked and it cost the corpus something it could not get back: a captured
+ * array has no per-string provenance, so a violation could be reported against *the fifteenth
+ * `fillText` of the panel at 340 s* and nothing more. Every string is a **named field** of
+ * `overlayViewOf`'s view now — `estimate.head`, `banks[2].mean`, `cars[0].load` — so a finding
+ * names the row rather than an index into a draw order.
+ *
+ * The `role` split is what the array could not carry either: an observation is a `label`, a
+ * refusal is a `reason`, and R6's structural half can only read a basis off a seed that has one.
+ * Both refusal strings carry `metrics.suppressionBasis`, which is the producer's own reading of its
+ * clock (`docs/20` defect 3) rather than a comparison made here.
+ *
+ * ## Both registers, at every sampled playhead
+ *
+ * Unchanged from the loop this replaces, and for `honesty/types.ts#HONESTY_MODES`' stated reason:
+ * *the value of generating the axis is the day a mode-aware renderer lands*. The panel's Casual
+ * words include the one string on this surface that may never be wrong — the refusal — so a mode
+ * only half the cases draw is half a screen the search never sees.
+ *
+ * ## What is **not** driven here, and why that is honest
+ *
+ * `dev/main.ts#drawLiveMetrics` — the card's DOM half — is excluded on the DOM mounts' shared
+ * ground in `derive.test.ts`. It needs a document, and the pure/DOM split exists precisely so that
+ * every word is drivable without one: the mount decides which node a string goes in and authors
+ * none of them.
+ *
+ * Appended at the end of {@link SURFACE_ADAPTERS}, per the fault-ordering rule stated at
+ * `SHIFT_REPORT`: `faults.ts` corrupts the **first** string matching a shape, and this surface
+ * re-renders phrases the canvas adapter also draws.
+ */
+const LIVE_METRICS: SurfaceAdapter = {
+  id: 'render/overlay.ts#overlayViewOf',
+  covers: [
+    'render/overlay.ts#overlayViewOf',
+    'render/overlay.ts#ENGINEER_WORDS',
+    'render/overlay.ts#CASUAL_WORDS',
+    /*
+     * The panel's refusal, in both registers — `docs/20` defect 3. `overlayViewOf` is their only
+     * caller, this adapter is what drives it, and the seeds below render `casualRefusalFor` under
+     * its own field so R6's structural half can read the basis it returns. `SUPPRESSION_REASON_
+     * PENDING` is the engineer's arm of the same gate, worded by the same function.
+     */
+    'mode/disclosure.ts#casualRefusalFor',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON',
+    'mode/disclosure.ts#CASUAL_REFUSAL_REASON_SO_FAR',
+    'mode/disclosure.ts#SUPPRESSION_REASON_PENDING',
+    /* The four load bands, as names. The card draws one per car row; `loadColour` is the stage's
+       projection of the same judgement and is covered by `CANVAS`. */
+    'render/overlay.ts#loadTone',
+  ],
+  render(context) {
+    const { recording } = context;
+    const seeds: TextSeed[] = [];
+    for (const at of sampleTimes(recording)) {
+      const bundle = context.bundleAt(at);
+      for (const mode of VIEW_MODES) {
+        const view = overlayViewOf(bundle.metrics, bundle.frame, mode);
+        const where = `${mode}@${at.toFixed(0)}s`;
+        seeds.push({
+          field: `overlayViewOf(${where}).title`,
+          text: view.title,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        seeds.push({
+          field: `overlayViewOf(${where}).window`,
+          text: view.window,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const [index, row] of view.observations.entries()) {
+          const at_ = `overlayViewOf(${where}).observations[${String(index)}]`;
+          seeds.push({
+            field: `${at_}.label`,
+            text: row.label,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+          /*
+           * The value goes in as its own seed rather than joined to the label, and that is R13's
+           * shape rather than tidiness: a figure the search can see is a figure it can ask *what
+           * is this a count of* about. `waiting now 70` as one string is one prose blob.
+           */
+          seeds.push({
+            field: `${at_}.value`,
+            text: `${row.label} ${row.value}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        const estimate = view.estimate;
+        seeds.push({
+          field: `overlayViewOf(${where}).estimate.label`,
+          text: estimate.label,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        if (estimate.kind === 'refused') {
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.head`,
+            text: estimate.head,
+            role: 'reason',
+            playhead: atPlayhead(recording, at, estimate.basis),
+          });
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.reason`,
+            text: estimate.reason,
+            role: 'reason',
+            playhead: atPlayhead(recording, at, estimate.basis),
+          });
+        } else {
+          seeds.push({
+            field: `overlayViewOf(${where}).estimate.value`,
+            text: `${estimate.label} ${estimate.value}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        seeds.push({
+          field: `overlayViewOf(${where}).bankHeading`,
+          text: view.bankHeading,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        if (view.banksEmpty !== undefined) {
+          seeds.push({
+            field: `overlayViewOf(${where}).banksEmpty`,
+            text: view.banksEmpty,
+            role: 'reason',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        for (const [index, bank] of view.banks.entries()) {
+          seeds.push({
+            field: `overlayViewOf(${where}).banks[${String(index)}]`,
+            text: `${bank.bankId} ${bank.boarded} ${bank.mean}`,
+            role: bank.refused ? 'reason' : 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+        seeds.push({
+          field: `overlayViewOf(${where}).carHeading`,
+          text: view.carHeading,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+        for (const [index, car] of view.cars.entries()) {
+          seeds.push({
+            field: `overlayViewOf(${where}).cars[${String(index)}]`,
+            text: `${car.label} ${car.load}`,
+            role: 'prose',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+      }
+    }
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * The gauntlet and the ladder — GAMEPLAY § 14, § 20.10, contract § 12.3
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The forty proof cases, the rating they produce, and the ladder that shows it.**
+ *
+ * ## Why this belongs in a corpus about honesty more than most surfaces do
+ *
+ * A ladder rating is the only **standing public claim** this product makes about a dispatcher —
+ * every other figure is a fact about one run, said once and gone. R2 is the rule it lives closest
+ * to (*"a score is a property of a run, never of a dispatcher"*), and a rating is deliberately a
+ * property of a dispatcher, made admissible only by the two sentences drawn beside it: what it is a
+ * mean of ({@link RATING_BASIS}) and what a gap between two rows is not ({@link RATING_CAVEAT}).
+ * Those two are exactly the sentences whose absence R13 and R2 exist to catch, so the rating figure
+ * is seeded as an `estimate` carrying its own `n` — the `proof cases` column beside it — and the
+ * search may ask R13's question of it directly.
+ *
+ * The refusals matter for the same reason one level down: § 20.10's gate (*"a dirty dispatcher
+ * cannot be sent, and the button says why"*), a cancelled gauntlet's *"nothing is rated"*, the
+ * unrated and *edited since* row states, the empty table, and § 12.2's labelled absence where the
+ * daily board's server would be. Each is a claim about what this build will not do, which is the
+ * class § D227 records going stale.
+ *
+ * ## The proof set is synthetic here, and the shipped one is validated at the door
+ *
+ * `FIXIT`'s precedent exactly: the authored halves are synthetic (two towers over the context's own
+ * buildings, two crowd shapes with placeholder labels) and the shipped `data/proof-cases.json` is
+ * refused at load by `parseProofCases`, whose refusals `gauntlet/proofCases.test.ts` drives. What
+ * this adapter drives is the machinery that wraps the document — and the placeholders are
+ * deliberate a second time: `gauntlet/proofCases.test.ts` asserts that no module under
+ * `packages/viz/src` contains a shipped tower name or crowd label, and this file is inside that
+ * scope.
+ *
+ * ## The gauntlet runs against a worker double, which is the only way it speaks at all
+ *
+ * `runGauntlet`'s player-facing strings are its progress line and its two stop reasons, and all
+ * three exist only while forty simulations are in flight. The double answers each `postMessage`
+ * synchronously from the context's own finished batch, so the progress line, the finished rating,
+ * the failed-case refusal and the cancellation are every one of them rendered from a real
+ * `BatchResult` rather than from a fixture.
+ */
+const GAUNTLET: SurfaceAdapter = {
+  id: 'gauntlet/ladder.ts#ladderRowsOf',
+  covers: [
+    'gauntlet/ladder.ts#ladderRowsOf',
+    'gauntlet/ladder.ts#sendGateOf',
+    'gauntlet/ladder.ts#whatAreTheFortyOf',
+    'gauntlet/ladder.ts#caseNameOf',
+    'gauntlet/ladder.ts#caseNamesOf',
+    'gauntlet/ladder.ts#REFERENCE_RUN_LABEL',
+    'gauntlet/ladder.ts#LADDER_EMPTY',
+    'gauntlet/ladder.ts#LADDER_WORLD_ABSENCE',
+    'gauntlet/rating.ts#RATING_BASIS',
+    'gauntlet/rating.ts#RATING_CAVEAT',
+    'gauntlet/rating.ts#ratingFigureOf',
+    'gauntlet/rating.ts#proofCaseCountOf',
+    // Driven through `runGauntlet`, which folds every case through them before it finishes.
+    'gauntlet/rating.ts#ratedCaseOf',
+    'gauntlet/rating.ts#proofCaseScoreOf',
+    'gauntlet/proofCases.ts#proofCasesOf',
+    'gauntlet/proofCases.ts#proofCaseRequestOf',
+    'gauntlet/run.ts#runGauntlet',
+    'gauntlet/run.ts#GAUNTLET_CANCELLED',
+    // The board screen's own two string tables; its `mount` is excluded on the mounts' ground.
+    'everyday/boardScreen.ts#BOARD_SCREEN_COPY',
+    'everyday/boardScreen.ts#DAILY_BOARD_ABSENCE',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const towers = context.buildings.slice(0, 2);
+    /*
+     * Placeholder labels, in the `⟨…⟩` register this corpus already uses for a substituted cell.
+     * A shipped crowd label here would be the second copy of the fixture list that
+     * `gauntlet/proofCases.ts` exists to prevent, in the file that checks for it.
+     */
+    const set: ProofCaseSet = {
+      version: 1,
+      towers: towers.map((building, index) => ({
+        id: building.id,
+        arrivalRatePctPop5min: 1 + index,
+        why: '⟨why this building is in the set⟩',
+      })),
+      crowds: [
+        {
+          id: 'shape-a',
+          label: '⟨first crowd shape⟩',
+          tests: '⟨what the first shape tests⟩',
+          durationS: 900,
+          demand: { directionalSplit: { incoming: 1, outgoing: 0, interfloor: 0 } },
+        },
+        {
+          id: 'shape-b',
+          label: '⟨second crowd shape⟩',
+          tests: '⟨what the second shape tests⟩',
+          durationS: 900,
+          demand: { directionalSplit: { incoming: 0, outgoing: 1, interfloor: 0 } },
+        },
+      ],
+    };
+    const nameOf = (towerId: string): string =>
+      towers.find((building) => building.id === towerId)?.name ?? towerId;
+
+    /* § 14.2's disclosure — every building, every shape, and the closing arithmetic. */
+    const forty = whatAreTheFortyOf(set, (towerId) => {
+      const building = towers.find((candidate) => candidate.id === towerId);
+      const lifts = building?.banks.reduce((count, bank) => count + bank.cars.length, 0) ?? 0;
+      return {
+        name: nameOf(towerId),
+        spec: `${String(building?.floors.length ?? 0)} floors · ${String(lifts)} lifts`,
+      };
+    });
+    seeds.push({ field: 'forty.heading', text: forty.heading, role: 'label' });
+    for (const [index, tower] of forty.towers.entries()) {
+      seeds.push({ field: `forty.tower.${String(index)}.name`, text: tower.name, role: 'label' });
+      seeds.push({ field: `forty.tower.${String(index)}.spec`, text: tower.spec, role: 'label' });
+      seeds.push({ field: `forty.tower.${String(index)}.why`, text: tower.why, role: 'prose' });
+    }
+    for (const [index, crowd] of forty.crowds.entries()) {
+      seeds.push({ field: `forty.crowd.${String(index)}.label`, text: crowd.label, role: 'label' });
+      seeds.push({ field: `forty.crowd.${String(index)}.tests`, text: crowd.tests, role: 'prose' });
+    }
+    seeds.push({ field: 'forty.arithmetic', text: forty.arithmetic, role: 'prose' });
+    seeds.push({ field: 'forty.basis', text: forty.basis, role: 'prose' });
+    /* The caveat is a refusal to name a winner, which is R2's own exemption. */
+    seeds.push({ field: 'forty.caveat', text: forty.caveat, role: 'reason' });
+
+    /* § 20.10's gate, all three states — nothing open, an unsaved edit, and a saved dispatcher. */
+    for (const [key, candidate] of [
+      ['none', undefined],
+      ['dirty', { dispatcherId: 'candidate', dispatcherName: '⟨dispatcher⟩', dirty: true }],
+      ['saved', { dispatcherId: 'candidate', dispatcherName: '⟨dispatcher⟩', dirty: false }],
+    ] as const) {
+      const gate = sendGateOf(candidate);
+      seeds.push({ field: `send.${key}.label`, text: gate.label, role: 'label' });
+      if (gate.refusal !== null) {
+        seeds.push({ field: `send.${key}.refusal`, text: gate.refusal, role: 'reason' });
+      }
+    }
+
+    /*
+     * The forty themselves, three ways: finished, failed at the first case, and cancelled. The
+     * double answers synchronously from the context's own batch, so every figure below came out of
+     * a real run rather than out of this file.
+     */
+    const workerOf = (message: BatchWorkerMessage): (() => GauntletWorker) => {
+      return () => {
+        let handler: ((event: { data: unknown }) => void) | undefined;
+        return {
+          postMessage: () => {
+            handler?.({ data: message });
+          },
+          terminate: () => {},
+          addEventListener: (type: string, listener: unknown) => {
+            if (type === 'message') handler = listener as (event: { data: unknown }) => void;
+          },
+        } as GauntletWorker;
+      };
+    };
+
+    let finished: RatingSummary | undefined;
+    const progressLines: string[] = [];
+    runGauntlet({
+      set,
+      dispatcherProfileId: context.batch.arms[0]?.dispatcherProfileId ?? 'collective',
+      replications: 1,
+      towerNameOf: nameOf,
+      createWorker: workerOf({ kind: 'done', result: context.batch }),
+      onProgress: (progress) => progressLines.push(progress.line),
+      onFinished: (summary) => {
+        finished = summary;
+      },
+      onStopped: () => {},
+    });
+    for (const [index, line] of progressLines.entries()) {
+      seeds.push({ field: `run.progress.${String(index)}`, text: line, role: 'label' });
+    }
+
+    for (const [key, message] of [
+      ['failed', { kind: 'failed', message: '⟨what the worker said⟩' } as const],
+    ] as const) {
+      runGauntlet({
+        set,
+        dispatcherProfileId: 'collective',
+        replications: 1,
+        towerNameOf: nameOf,
+        createWorker: workerOf(message),
+        onProgress: () => {},
+        onFinished: () => {},
+        onStopped: (reason) => {
+          seeds.push({ field: `run.${key}`, text: reason, role: 'reason' });
+        },
+      });
+    }
+    seeds.push({ field: 'run.cancelled', text: GAUNTLET_CANCELLED, role: 'reason' });
+
+    /*
+     * The table. Three rows: a reference run with a complete rating, the same dispatcher after an
+     * edit (`edited since`), and one that has never run (`unrated`). Every state § 14 names.
+     */
+    const names = caseNamesOf(set, nameOf);
+    const entries: LadderEntry[] = [];
+    if (finished !== undefined) {
+      entries.push({
+        dispatcherId: 'reference',
+        dispatcherName: '⟨reference dispatcher⟩',
+        isReference: true,
+        fingerprint: 'as-rated',
+        summary: finished,
+      });
+      entries.push({
+        dispatcherId: 'edited',
+        dispatcherName: '⟨edited dispatcher⟩',
+        isReference: false,
+        fingerprint: 'as-rated',
+        summary: finished,
+      });
+      entries.push({
+        dispatcherId: 'never-run',
+        dispatcherName: '⟨unrated dispatcher⟩',
+        isReference: false,
+        fingerprint: 'as-rated',
+        summary: { ...finished, rating: null, casesRated: 0, complete: false, weakest: null },
+      });
+    }
+    const rows = ladderRowsOf(entries, {
+      fingerprintOf: (id) => (id === 'edited' ? 'moved-since' : 'as-rated'),
+      caseNameOf: (caseId) => names.get(caseId) ?? caseId,
+    });
+    for (const row of rows) {
+      const at = `ladder.${row.dispatcherId}`;
+      seeds.push({ field: `${at}.name`, text: row.name, role: 'label' });
+      /*
+       * R13's question, asked of the one figure in this product that is a standing claim: the
+       * rating is a mean, and the count it is a mean over is the column beside it. `declaredCount`
+       * is the summary's own `casesRated` and `countShown` says the cell is in the same row.
+       */
+      seeds.push({
+        field: `${at}.rating`,
+        text: row.rating,
+        role: 'estimate',
+        declaredCount: entries.find((entry) => entry.dispatcherId === row.dispatcherId)?.summary
+          .casesRated,
+        countShown: true,
+      });
+      seeds.push({ field: `${at}.proofCases`, text: row.proofCases, role: 'observation' });
+      seeds.push({ field: `${at}.weakest`, text: row.weakestAt, role: 'label' });
+      if (row.referenceLabel !== null) {
+        seeds.push({ field: `${at}.reference`, text: row.referenceLabel, role: 'label' });
+      }
+      if (row.staleness !== null) {
+        seeds.push({ field: `${at}.staleness`, text: row.staleness, role: 'reason' });
+      }
+      if (row.incompleteNote !== null) {
+        seeds.push({ field: `${at}.incomplete`, text: row.incompleteNote, role: 'reason' });
+      }
+    }
+
+    /* The two formatters on a rating nothing produced — § 13's `—`, never a zero. */
+    const nothing: RatingSummary = {
+      rating: null,
+      casesRated: 0,
+      casesRun: 0,
+      casesTotal: proofCasesOf(set).length,
+      complete: false,
+      weakest: null,
+      cases: [],
+    };
+    seeds.push({ field: 'rating.none.figure', text: ratingFigureOf(nothing), role: 'suppressed' });
+    seeds.push({ field: 'rating.none.cases', text: proofCaseCountOf(nothing), role: 'observation' });
+    seeds.push({
+      field: 'case.name',
+      text: caseNameOf(proofCasesOf(set)[0] as ProofCase, nameOf(towers[0]?.id ?? '')),
+      role: 'label',
+    });
+
+    /* The screen's chrome, its two absences, and the standing sentences beside the table. */
+    for (const [key, text] of Object.entries(BOARD_SCREEN_COPY)) {
+      seeds.push({ field: `board.copy.${key}`, text, role: 'label' });
+    }
+    seeds.push({ field: 'board.daily.absent', text: DAILY_BOARD_ABSENCE, role: 'reason' });
+    seeds.push({ field: 'ladder.world.absent', text: LADDER_WORLD_ABSENCE, role: 'reason' });
+    seeds.push({ field: 'ladder.empty', text: LADDER_EMPTY, role: 'reason' });
+    seeds.push({ field: 'ladder.reference.label', text: REFERENCE_RUN_LABEL, role: 'label' });
+    seeds.push({ field: 'rating.basis', text: RATING_BASIS, role: 'prose' });
+    seeds.push({ field: 'rating.caveat', text: RATING_CAVEAT, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **Everyday Mode's daily loop** — GAMEPLAY § 6 and § 14, the words half of four screens.
+ *
+ * ## Why this loop belongs in a corpus about honesty more than any other Everyday surface
+ *
+ * Because almost everything on it is a **withheld** state, and § 12.2 says the withheld states
+ * must be enumerated *from the state model* rather than from hand-written fixtures. Four screens
+ * draw two independent absences that combine:
+ *
+ * - **the day is not closed** — § 16 rule 1's `—`, on today's chip at the front door, on today's
+ *   card in Your week, and on the percentile line. It is a fact about the reader's own run;
+ * - **the world is unreachable** — § 16 rule 15's labelled band, which in this build is the
+ *   *normal* state, because there is no server. It is a fact about other players.
+ *
+ * A screen that printed `0%` for the first would tell a reader nobody got away inside a minute; a
+ * screen that printed `0 players` for the second would tell them nobody played. Both are R3's
+ * blank-versus-failure rule, and both are exactly the kind of sentence a search finds and a
+ * reviewer does not. Every case below is driven with the day open **and** closed for that reason.
+ *
+ * ## And two refusals that are claims about controls
+ *
+ * § 6.1's replay and § 6.2's ghost are both refused in this build, and both refusals are sentences
+ * a player reads about a control they can see. That is § D227's shape — a refusal is pinned by a
+ * run, never by another sentence — and a refusal nothing sweeps is the sentence that goes stale
+ * the day somebody wires the seam it refuses about.
+ *
+ * ## What is driven, and what is not
+ *
+ * Every pure producer of the four screens, over both arms of the day-closed axis and over a week
+ * with history and one without. The four **mounts** are excluded in `derive.test.ts` on the DOM
+ * mounts' shared ground — they draw into the shell's scroll region, so they cannot run without a
+ * document — which is the same pure/DOM split `EVERYDAY_MENU` and `EVERYDAY_SETTINGS` describe.
+ * What those mounts author of their own is geometry and class names.
+ *
+ * The report screen's own view is driven here; the **sheet** inside it is `reportViewOf`'s, which
+ * `DAY_REPORT_VIEW` already drives in both registers. This adapter seeds what `reportView.ts` adds
+ * on top: the Everyday empty state, the levers' no-surface sentence, the closing block's title,
+ * the tomorrow button's note, and the stale-sheet warning — five claims about what this screen is
+ * showing, none of which exist on the Engineer panel.
+ */
+const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
+  id: 'everyday/today.ts#todayOf',
+  covers: [
+    'everyday/today.ts#todayOf',
+    'everyday/doorView.ts#doorScreenViewOf',
+    'everyday/doorView.ts#DOOR_STEPS',
+    'everyday/doorView.ts#SAME_FOR_EVERYONE',
+    'everyday/briefView.ts#briefScreenViewOf',
+    'everyday/briefView.ts#briefBarModel',
+    'everyday/briefView.ts#BRIEF_NOTE_LEAD',
+    'everyday/briefView.ts#GHOST_REFUSAL',
+    'everyday/briefView.ts#lockedForScore',
+    'everyday/weekView.ts#weekScreenViewOf',
+    'everyday/reportView.ts#everydayReportViewOf',
+    'everyday/world.ts#percentileLine',
+    'everyday/world.ts#WORLD_FIGURES_LABEL',
+    'everyday/world.ts#WORLD_FIGURES_REASON',
+    'everyday/world.ts#WORLD_FIGURES_ABSENT',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const bundle = shiftBundleOf(context);
+
+    for (const entry of bundle.days) {
+      /*
+       * The day record first — one object, four screens (§ 16 rule 14). Seeded once per day rather
+       * than once per screen, because the whole claim of that rule is that the brief and the door
+       * are quoting the *same* sentences.
+       */
+      const today = todayOf({
+        week: entry.week,
+        // No period, on `shiftBundleOf`'s own stated ground: what a period changes is which event
+        // the card picks, and every event's words are already in the corpus.
+        calendar: null,
+        building: context.building,
+        buildingId: context.building.id,
+        dispatcherName: entry.report.metaLines[0],
+        goals: entry.readings,
+        seed: 424_242n,
+      });
+      const at = `day${String(entry.day)}`;
+      seeds.push({ field: `${at}.today.label`, text: today.dayLabel, role: 'label' });
+      seeds.push({ field: `${at}.today.lede`, text: today.lede, role: 'observation' });
+      seeds.push({ field: `${at}.today.seed`, text: today.seedLine, role: 'label' });
+      for (const fact of today.facts) {
+        seeds.push({ field: `${at}.today.fact.${fact.label}`, text: fact.value, role: 'observation' });
+      }
+      if (today.load !== undefined) {
+        seeds.push({ field: `${at}.today.load.word`, text: today.load.word, role: 'label' });
+        seeds.push({ field: `${at}.today.load.note`, text: today.load.note, role: 'observation' });
+      }
+      if (today.outOfService !== undefined) {
+        seeds.push({
+          field: `${at}.today.outage`,
+          text: today.outOfService.sentence,
+          role: 'observation',
+        });
+      }
+      for (const ask of today.asks) {
+        seeds.push({ field: `${at}.today.asks`, text: ask, role: 'label' });
+      }
+
+      /*
+       * **Both arms of the day-closed axis, on every screen that has one** — § 12.2's matrix, as
+       * far as this build reaches it. `closed: false` is the state a reader is in for the whole of
+       * the day they are playing, and it is the arm that draws every `—`.
+       */
+      for (const closed of [false, true]) {
+        const arm = `${at}.${closed ? 'closed' : 'open'}`;
+
+        /* ---- the front door, at today and at a past day (the replay refusal) ---- */
+        for (const offset of [0, DAY_OFFSET_MIN]) {
+          const door = doorScreenViewOf({
+            week: entry.week,
+            today,
+            dayOffset: offset,
+            dayClosed: closed,
+          });
+          const where = `${arm}.door${String(offset)}`;
+          seeds.push({ field: `${where}.kind`, text: door.kindPill, role: 'label' });
+          seeds.push({ field: `${where}.stepper`, text: door.stepper.label, role: 'label' });
+          seeds.push({ field: `${where}.rule`, text: door.rule, role: 'prose' });
+          for (const chip of door.chips) {
+            seeds.push({ field: `${where}.chip.score`, text: chip.score, role: 'observation' });
+            seeds.push({ field: `${where}.chip.note`, text: chip.note, role: 'label' });
+          }
+          seeds.push({ field: `${where}.world.label`, text: door.world.label, role: 'label' });
+          seeds.push({ field: `${where}.world.reason`, text: door.world.reason, role: 'reason' });
+          for (const absent of door.world.absent) {
+            seeds.push({ field: `${where}.world.absent`, text: absent, role: 'reason' });
+          }
+          for (const step of door.steps) {
+            seeds.push({ field: `${where}.step.${step.n}.head`, text: step.head, role: 'label' });
+            seeds.push({ field: `${where}.step.${step.n}.body`, text: step.body, role: 'prose' });
+          }
+          seeds.push({ field: `${where}.driver`, text: door.driver.note, role: 'prose' });
+          seeds.push({ field: `${where}.same`, text: door.sameForEveryone, role: 'prose' });
+          seeds.push({ field: `${where}.primary.label`, text: door.primary.label, role: 'label' });
+          /* The § 6.1 replay refusal on the past-day arm; the § 3.3 note on today's. */
+          seeds.push({
+            field: `${where}.primary.note`,
+            text: door.primary.note,
+            role: door.primary.inert ? 'reason' : 'prose',
+          });
+        }
+
+        /* ---- Your week: today's card, the tally, the percentile, the board's absence ---- */
+        const week = weekScreenViewOf({
+          week: entry.week,
+          towerToday: context.buildingName,
+          dayClosed: closed,
+          // A sheet stands exactly when the day is closed here, which is the shipped pairing; the
+          // two-can-disagree arm is `weekView.test.ts`'s, where it is a claim about a control.
+          sheetStanding: closed,
+        });
+        seeds.push({ field: `${arm}.week.streak`, text: week.streakLine, role: 'observation' });
+        for (const card of week.cards) {
+          seeds.push({ field: `${arm}.week.card.score`, text: card.score, role: 'observation' });
+          seeds.push({ field: `${arm}.week.card.note`, text: card.note, role: 'label' });
+        }
+        seeds.push({ field: `${arm}.week.tally`, text: week.tally.line, role: 'observation' });
+        seeds.push({ field: `${arm}.week.readNote`, text: week.readNote, role: 'prose' });
+        seeds.push({
+          field: `${arm}.week.percentile`,
+          text: week.percentile.line,
+          role: 'reason',
+        });
+        seeds.push({ field: `${arm}.week.split`, text: week.splitCaption, role: 'prose' });
+        seeds.push({ field: `${arm}.week.board.refusal`, text: week.board.refusal, role: 'reason' });
+        for (const rule of week.board.rules) {
+          seeds.push({ field: `${arm}.week.board.rule`, text: rule.title, role: 'label' });
+          seeds.push({ field: `${arm}.week.board.body`, text: rule.body, role: 'prose' });
+        }
+      }
+
+      /* ---- the brief: the wrinkle, what today asks, and the two refusals ---- */
+      /*
+       * The dispatcher list the brief offers, carrying the Engineer's own Casual sentence per
+       * profile — `dispatcherCardOf(profile, peers, 'basic').sub`, which is the same expression
+       * `briefScreen.ts` hands the view and which `DISPATCHER_CARDS` already drives on its own
+       * surface. The peers are `context.profiles`, which is the list the rail shows.
+       */
+      const options = context.profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        description: dispatcherCardOf(profile, context.profiles, 'basic').sub,
+      }));
+      const brief = briefScreenViewOf({
+        today,
+        dispatchers: options,
+        savedIds: [],
+        selectedId: options[0]?.id ?? '',
+      });
+      seeds.push({ field: `${at}.brief.title`, text: brief.title, role: 'label' });
+      seeds.push({ field: `${at}.brief.wrinkle.title`, text: brief.wrinkle.title, role: 'label' });
+      seeds.push({ field: `${at}.brief.wrinkle.body`, text: brief.wrinkle.body, role: 'observation' });
+      seeds.push({ field: `${at}.brief.wrinkle.shared`, text: brief.wrinkle.shared, role: 'prose' });
+      seeds.push({ field: `${at}.brief.asks.note`, text: brief.asks.note, role: 'prose' });
+      seeds.push({ field: `${at}.brief.count`, text: brief.drivers.count, role: 'observation' });
+      seeds.push({ field: `${at}.brief.bar`, text: brief.barNote, role: 'label' });
+      for (const [name, card] of [
+        ['ghost', brief.ghost],
+        ['locked', brief.locked],
+      ] as const) {
+        seeds.push({ field: `${at}.brief.${name}.what`, text: card.what, role: 'prose' });
+        seeds.push({ field: `${at}.brief.${name}.why`, text: card.why, role: 'reason' });
+        seeds.push({ field: `${at}.brief.${name}.caveat`, text: card.caveat, role: 'prose' });
+      }
+
+      /*
+       * ---- the report screen's own additions ----
+       *
+       * Three states: nothing filed, a filed sheet, and a filed sheet with a newer unfiled run on
+       * the stage. The third is the one worth insisting on — it is the sentence that stops a reader
+       * taking this sheet for an account of the run they can currently see.
+       */
+      for (const [label, input] of [
+        ['empty', { report: undefined, previous: undefined, overnight: undefined, newerRunOnStage: false }],
+        ['filed', { report: entry.report, previous: undefined, overnight: undefined, newerRunOnStage: false }],
+        ['paired', { report: entry.report, previous: entry.swapped, overnight: undefined, newerRunOnStage: false }],
+        ['stale', { report: entry.report, previous: undefined, overnight: undefined, newerRunOnStage: true }],
+      ] as const) {
+        const view = everydayReportViewOf(input);
+        const where = `${at}.report.${label}`;
+        if (view.emptyLede !== undefined) {
+          seeds.push({ field: `${where}.empty`, text: view.emptyLede, role: 'prose' });
+        }
+        seeds.push({ field: `${where}.figuresHeading`, text: view.headings.figures, role: 'label' });
+        seeds.push({ field: `${where}.overnightHeading`, text: view.headings.overnight, role: 'label' });
+        seeds.push({ field: `${where}.honesty.title`, text: view.honesty.title, role: 'label' });
+        /*
+         * `role: 'reason'`, which is what `DAY_REPORT` and `DAY_REPORT_VIEW` classify the same
+         * string as — and the classification is load-bearing rather than cosmetic. The small
+         * print's whole job is to **refuse** a comparative reading of one day, and it does that in
+         * R2's own words (*"it cannot tell you that X is better than anything — that needs 50 or
+         * more paired runs …"*), which names an ordering and names a dispatcher. Seeded `prose`
+         * it fired `single-run-comparative` on eighteen strings across three cases on this
+         * adapter's first run — the property's own documented third narrowing, met from the wrong
+         * side. A refusal is the one string entitled to name the ordering it is refusing.
+         */
+        seeds.push({ field: `${where}.honesty.body`, text: view.honesty.body, role: 'reason' });
+        if (view.honesty.pointer !== undefined) {
+          seeds.push({ field: `${where}.pointer`, text: view.honesty.pointer.why, role: 'prose' });
+        }
+        for (const lever of view.levers) {
+          if (lever.noSurfaceNote === undefined) continue;
+          seeds.push({ field: `${where}.lever.refusal`, text: lever.noSurfaceNote, role: 'reason' });
+        }
+        if (view.tomorrow !== undefined) {
+          seeds.push({ field: `${where}.tomorrow.label`, text: view.tomorrow.label, role: 'label' });
+          seeds.push({ field: `${where}.tomorrow.note`, text: view.tomorrow.note, role: 'prose' });
+        }
+        if (view.staleNote !== undefined) {
+          seeds.push({ field: `${where}.stale`, text: view.staleNote, role: 'reason' });
+        }
+      }
+    }
+
+    /*
+     * The two constants no rendered view reaches on its own: `DOOR_STEPS`' and `SAME_FOR_EVERYONE`
+     * are seeded through the door view above, and `percentileLine`'s two arms through Your week.
+     * `GHOST_REFUSAL` and `lockedForScore` likewise. What is left is the world band's own three,
+     * asserted here as well so the exclusion list never has to claim they are unchecked.
+     */
+    seeds.push({ field: 'world.label', text: WORLD_FIGURES_LABEL, role: 'label' });
+    seeds.push({ field: 'world.reason', text: WORLD_FIGURES_REASON, role: 'reason' });
+    for (const absent of WORLD_FIGURES_ABSENT) {
+      seeds.push({ field: 'world.absent', text: absent, role: 'reason' });
+    }
+    for (const closed of [false, true]) {
+      seeds.push({ field: `world.percentile.${String(closed)}`, text: percentileLine(closed), role: 'reason' });
+    }
+    for (const step of DOOR_STEPS) {
+      seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
+    }
+    seeds.push({ field: 'door.same', text: SAME_FOR_EVERYONE, role: 'prose' });
+    /*
+     * Both arms of § 3.3's brief note — the named one and the fallback. The fallback is seeded
+     * because it is what a bar drawn before the screen knows its driver says, and a sentence no
+     * case renders is a sentence the search has never read: this whole refinement exists because
+     * the *unrefined* row reached a player with a `⟨style⟩` marker in it for a whole wave.
+     */
+    seeds.push({
+      field: 'brief.bar.named',
+      text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), 'Steady hand').note ?? '',
+      role: 'label',
+    });
+    seeds.push({
+      field: 'brief.bar.unnamed',
+      text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), undefined).note ?? '',
+      role: 'label',
+    });
+    seeds.push({ field: 'brief.ghost.why', text: GHOST_REFUSAL.why, role: 'reason' });
+    seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/**
+ * **The door between the two products** — GAMEPLAY § 3.2's *Switch to Engineer* row and the header
+ * control that brings a player back.
+ *
+ * ## Why three sentences deserve an adapter of their own
+ *
+ * Because every one of them is a claim about a **transition**, which is the one kind of claim no
+ * screen can be read to check. The row promises that nothing stops when the page changes hands; the
+ * header's title promises the return lands on the screen the player left; both promise, in the same
+ * breath, that the choice does not survive a reload. A player who believes the first two and is
+ * wrong loses a day's run to a button press, and a player who believes the third and is wrong finds
+ * a developer tool where their game was.
+ *
+ * They are also exactly the sentences this repository has watched go stale. The row's previous text
+ * was a **refusal** — *"not built yet, Everyday Mode is the only play style in this build"* — and
+ * `docs/05`'s § D227 is about the wave in which a sentence like that outlives the thing it refuses
+ * about. The refusal is gone with the same commit that built the door; what is here now is the
+ * positive form, which is the form that can go stale in the other direction.
+ *
+ * ## What is driven, and what is not
+ *
+ * All three words, and the rail footer row that carries two of them. What is **not** here is the
+ * transition itself — `shell.ts#enterEngineer`, the `inert` sequencing and the `visibility` write
+ * are DOM, excluded on the mounts' shared ground, and pinned instead by
+ * `everyday/shell.browser.test.ts`'s round trip. That split is the point rather than a gap: this
+ * adapter checks that the promise is *sayable*, and the browser tier checks that it is *true*.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`: the row's note shares its
+ * shape with the rail's other footer captions, so an earlier slot would move every footer-shaped
+ * fault onto this surface.
+ */
+const ENGINEER_DOOR: SurfaceAdapter = {
+  id: 'everyday/types.ts#ENGINEER_SWAP_NOTE',
+  covers: [
+    'everyday/types.ts#ENGINEER_SWAP_NOTE',
+    'everyday/types.ts#ENGINEER_RETURN_LABEL',
+    'everyday/types.ts#ENGINEER_RETURN_TITLE',
+  ],
+  render(context) {
+    void context;
+    const swap = railModel({ screen: 'menu', ctx: 'daily' }).footer.engineerSwap;
+    return singleRun(this.id, [
+      { field: 'rail.footer.swap.label', text: swap.label, role: 'label' },
+      /*
+       * `prose` rather than `reason`: it is not a refusal any more, and the exemption a refusal
+       * carries — it may name the thing it is refusing — is one this sentence has no claim on.
+       */
+      { field: 'rail.footer.swap.note', text: swap.note, role: 'prose' },
+      { field: 'engineer.header.back.label', text: ENGINEER_RETURN_LABEL, role: 'label' },
+      { field: 'engineer.header.back.title', text: ENGINEER_RETURN_TITLE, role: 'prose' },
+    ]);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * The dispatcher workshop — GAMEPLAY § 11 over `everyday/workshopModel.ts`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Everyday Mode's dispatcher workshop** — the six disclosure layers, driven over the shipped
+ * dispatcher library.
+ *
+ * ## Why this surface is worth sweeping, and what it is most likely to get wrong
+ *
+ * It is the screen § D301 calls the mass-market draw, and almost every string on it is a **claim
+ * about a control**: what a lever owns, what a weight serves, which filter runs before the
+ * scoring, what the profile carries that the screen cannot draw, whether the switching block
+ * reaches the run. That is exactly the class the roadmap's standing requirement is about, in both
+ * directions — a control that says it writes nothing while writing something (§ D227), and a
+ * control that writes nothing and does not say so (§ D219).
+ *
+ * The three classes of sentence it could most easily get wrong are all driven below. **A cost
+ * line** (R2 — it must not read as a claim about a day), **the maths disclosure** (§ 16 rule 12 —
+ * the plain sentence first, then every symbol, then the expression), and **the refusals**: the
+ * inert-term refusal § D112 earned, the clockless time rule, the unnamed hard constraint, and the
+ * *inert while one setting runs all shift* sentence, which is the one that would be a lie if the
+ * detector were ever built under `off`.
+ *
+ * ## Driven over every style, and both switching states
+ *
+ * Each of the shipped play styles is loaded in turn, so the cards, the term rows, the cost line
+ * and the maths symbols are rendered against six different vectors rather than one — a term whose
+ * player words are only reachable under a profile that weights it would otherwise never be swept.
+ * The switching block is rendered under `off` *and* under `fuzzy`, because its inert note exists
+ * only in the first and its detector help only in the second.
+ *
+ * `everyday/workshopScreen.ts#WORKSHOP_SCREEN` is not driven here and is excluded in
+ * `derive.test.ts` on the DOM mounts' shared ground: it needs a document. What that mount authors
+ * of its own is geometry, class names and the two joining words `when` and `then`.
+ */
+const EVERYDAY_WORKSHOP: SurfaceAdapter = {
+  id: 'everyday/workshopModel.ts#WORKSHOP_COPY',
+  covers: [
+    'everyday/workshopModel.ts#WORKSHOP_COPY',
+    'everyday/workshopModel.ts#playStyleAbsenceOf',
+    'everyday/workshopModel.ts#termDisclosureOf',
+    'everyday/workshopModel.ts#mathsDisclosureOf',
+    'everyday/workshopModel.ts#behaviourBlockOf',
+    'everyday/workshopModel.ts#constraintCardsOf',
+    'everyday/workshopModel.ts#carriedBlocksOf',
+    'everyday/workshopModel.ts#switchingBlockOf',
+    'everyday/workshopModel.ts#rulesBlockOf',
+    'everyday/workshopModel.ts#nameplateOf',
+    /*
+     * Three exports are deliberately **not** listed and are rendered anyway:
+     * `playStyleCardsOf`, `libraryCardsOf` and `workshopLeversOf`. The derivation does not find
+     * them, and it is right not to — none of them authors a phrase. The style cards carry
+     * `data/dispatcher-profiles.json`'s own `name` and `trade` (swept above, seed by seed), the
+     * library cards carry each profile's `name`, and the lever views are `mode/plainLevers.ts`'s,
+     * already driven by the editor adapter. Listing them would be a coverage claim about
+     * functions that produce no prose of their own, which is the stale-coverage half of
+     * `derive.test.ts`'s guard.
+     */
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const file = context.dispatcherProfiles;
+
+    for (const [key, text] of Object.entries(WORKSHOP_COPY)) {
+      seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the left panel: six style cards, the rest of the shelf, the nameplate ---- */
+    for (const card of playStyleCardsOf(file, 'collective', DEFAULT_LEVERS, blankSpec([]))) {
+      seeds.push({ field: `style.${card.id}.name`, text: card.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `style.${card.id}.trade`, text: card.trade, role: 'prose', provenance: 'authored' });
+    }
+    /* The refusal a build with no declared styles draws — reachable only through a file that has
+     * none, so it is manufactured here rather than left as a sentence no run has seen. */
+    const { playStyles: _styles, ...bare } = file;
+    const absence = playStyleAbsenceOf(bare);
+    if (absence !== undefined) {
+      seeds.push({ field: 'style.absent', text: absence, role: 'reason', provenance: 'authored' });
+    }
+    for (const card of libraryCardsOf(file, 'collective')) {
+      seeds.push({ field: `library.${card.profileId}`, text: card.name, role: 'label', provenance: 'authored' });
+    }
+
+    /* ---- the ladder, once per shipped style, so every vector is swept ---- */
+    const styled = (file.playStyles ?? []).map((style) => style.profileId);
+    const profiles = file.profiles.filter((profile) => styled.includes(profile.id));
+    for (const profile of profiles.length > 0 ? profiles : file.profiles.slice(0, 1)) {
+      const spec = specFromProfile(profile, profile.name);
+      const label = profile.id;
+
+      for (const lever of workshopLeversOf(spec, DEFAULT_LEVERS)) {
+        seeds.push({ field: `${label}.lever.${lever.id}`, text: lever.label, role: 'label' });
+        seeds.push({ field: `${label}.lever.${lever.id}.sub`, text: plainLeverSub(lever), role: 'prose' });
+        seeds.push({ field: `${label}.lever.${lever.id}.echo`, text: plainLeverEchoOf(lever), role: 'prose' });
+        seeds.push({ field: `${label}.lever.${lever.id}.help`, text: plainLeverHelp(lever), role: 'reason' });
+      }
+
+      const terms = termDisclosureOf(file.terms, spec);
+      seeds.push({ field: `${label}.terms.summary`, text: terms.summary, role: 'label' });
+      seeds.push({ field: `${label}.terms.hint`, text: terms.hint, role: 'prose', provenance: 'authored' });
+      for (const row of terms.rows) {
+        seeds.push({ field: `${label}.term.${row.termId}`, text: `${row.label} — ${row.serves}`, role: 'label' });
+        if (row.inertWhy !== undefined) {
+          seeds.push({ field: `${label}.term.${row.termId}.inert`, text: row.inertWhy, role: 'reason' });
+        }
+      }
+
+      const maths = workshopMathsOf(spec, file.terms);
+      seeds.push({ field: `${label}.maths.plain`, text: maths.plainSentence, role: 'prose', provenance: 'authored' });
+      for (const symbol of maths.symbols) {
+        seeds.push({
+          field: `${label}.maths.symbol.${symbol.symbol}`,
+          text: `${symbol.symbol} — ${symbol.name}, ${symbol.serves} · ${symbol.weight}`,
+          role: 'label',
+        });
+      }
+      /*
+       * The cost line, on `role: 'observation'` rather than `estimate`. It is a statement of the
+       * configuration a reader is looking at — the same claim `vectorLineOf` makes one surface
+       * over — and not a figure any run produced, so R13 asking it for an `n` would be asking the
+       * wrong question of it.
+       */
+      seeds.push({ field: `${label}.maths.line`, text: maths.line, role: 'observation' });
+      seeds.push({ field: `${label}.maths.signs`, text: maths.signs, role: 'prose', provenance: 'authored' });
+
+      const behaviour = behaviourBlockOf(spec, DEFAULT_LEVERS);
+      seeds.push({ field: `${label}.behaviour.boundary`, text: behaviour.boundary, role: 'reason', provenance: 'authored' });
+      for (const flag of behaviour.flags) {
+        seeds.push({ field: `${label}.flag.${flag.key}`, text: `${flag.label} — ${flag.hint}`, role: 'label' });
+      }
+      for (const lever of behaviour.groupLevers) {
+        seeds.push({ field: `${label}.group.${lever.key}`, text: `${lever.label} — ${lever.hint}`, role: 'label' });
+      }
+
+      for (const card of constraintCardsOf(profile)) {
+        seeds.push({ field: `${label}.constraint.${card.id}`, text: `${card.name} — ${card.effect}`, role: 'reason' });
+      }
+      for (const entry of carriedBlocksOf(profile)) {
+        seeds.push({ field: `${label}.carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * The unnamed-constraint fallback, manufactured: no shipped profile can reach it (the record
+     * in `core` is total over `HardConstraintId`), and a refusal no run has ever rendered is a
+     * refusal nobody has read. `FIXIT`'s over-budget note is manufactured on the same ground.
+     */
+    const invented = { ...file.profiles[0]!, hardConstraints: ['someFutureFilter'] };
+    for (const card of constraintCardsOf(invented)) {
+      if (!card.unnamed) continue;
+      seeds.push({ field: 'constraint.unnamed', text: `${card.name} — ${card.effect}`, role: 'reason' });
+    }
+    /* Every carried-block sentence, over a profile that carries all of them it can. */
+    for (const profile of file.profiles) {
+      for (const entry of carriedBlocksOf(profile)) {
+        seeds.push({ field: `carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the switching block, in both states ---- */
+    const selectorContext = selectorContextFrom(file, 900);
+    const base = defaultSelectorSpec(selectorContext);
+    for (const policy of ['off', 'fuzzy'] as const) {
+      const view = switchingBlockOf({ ...base, policy }, selectorContext);
+      seeds.push({ field: `switching.${policy}.policyLine`, text: view.policyLine, role: 'prose' });
+      if (view.inertNote !== undefined) {
+        seeds.push({ field: `switching.${policy}.inert`, text: view.inertNote, role: 'reason', provenance: 'authored' });
+      }
+      for (const mode of view.modes) {
+        seeds.push({ field: `switching.${policy}.mode.${mode.policy}`, text: mode.label, role: 'label', provenance: 'authored' });
+      }
+      for (const control of view.controls) {
+        seeds.push({ field: `switching.${policy}.control.${control.field}`, text: control.label, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `switching.${policy}.control.${control.field}.help`, text: control.help, role: 'prose' });
+      }
+      for (const card of view.patterns) {
+        if (card.line !== undefined) {
+          seeds.push({ field: `switching.${policy}.pattern.${card.patternId}`, text: card.line, role: 'prose' });
+        }
+        if (card.signature !== undefined) {
+          seeds.push({ field: `switching.${policy}.pattern.${card.patternId}.signature`, text: card.signature, role: 'observation' });
+        }
+      }
+    }
+
+    /* ---- the rules editor: every offered phrase, a live row, and a live refusal ---- */
+    for (const hasClock of [true, false]) {
+      const rows: RuleRow[] = [
+        defaultRuleRow(),
+        { ...defaultRuleRow(), when: 'time-before', whenValue: 32_400 },
+      ];
+      const block = rulesBlockOf(rows, 'Steady hand', { hasClock });
+      const where = hasClock ? 'clock' : 'no-clock';
+      seeds.push({ field: `rules.${where}.fallback`, text: block.fallback, role: 'label' });
+      seeds.push({ field: `rules.${where}.exclusivity`, text: block.exclusivity, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `rules.${where}.vocabulary`, text: block.vocabularyNote, role: 'reason', provenance: 'authored' });
+      for (const option of block.whenOptions) {
+        seeds.push({ field: `rules.when.${option.id}`, text: option.template, role: 'label' });
+        for (const value of option.values ?? []) {
+          seeds.push({ field: `rules.when.${option.id}.${String(value.value)}`, text: value.label, role: 'label' });
+        }
+      }
+      for (const option of block.thenOptions) {
+        seeds.push({ field: `rules.then.${option.id}`, text: option.template, role: 'label' });
+        for (const value of option.values ?? []) {
+          seeds.push({ field: `rules.then.${option.id}.${String(value.value)}`, text: value.label, role: 'label' });
+        }
+      }
+      for (const row of block.rows) {
+        seeds.push({ field: `rules.${where}.row.${String(row.index)}.readback`, text: row.readback, role: 'prose' });
+        seeds.push({ field: `rules.${where}.row.${String(row.index)}.lever`, text: row.lever, role: 'label' });
+        for (const [at, issue] of row.issues.entries()) {
+          seeds.push({ field: `rules.${where}.row.${String(row.index)}.issue.${String(at)}`, text: issue.message, role: 'reason' });
+        }
+      }
+      const empty = rulesBlockOf([], 'Steady hand', { hasClock }).empty;
+      if (empty !== undefined) {
+        seeds.push({ field: `rules.${where}.empty`, text: empty, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the nameplate, in both of its states ---- */
+    const clean = specFromProfile(file.profiles[0]!, file.profiles[0]!.name);
+    const moved = { ...clean, weights: { ...clean.weights, starvation: 71 } };
+    for (const [where, spec, rows] of [
+      ['unchanged', clean, [] as readonly RuleRow[]],
+      ['dirty', moved, [defaultRuleRow()] as readonly RuleRow[]],
+    ] as const) {
+      const plate = workshopNameplateOf({
+        startedFrom: file.profiles[0]!.name,
+        spec,
+        levers: DEFAULT_LEVERS,
+        baseSpec: clean,
+        baseLevers: DEFAULT_LEVERS,
+        ruleRows: rows,
+      });
+      if (plate.unchanged !== undefined) {
+        seeds.push({ field: `nameplate.${where}.unchanged`, text: plate.unchanged, role: 'prose', provenance: 'authored' });
+      }
+      seeds.push({ field: `nameplate.${where}.startedFrom`, text: plate.startedFrom, role: 'label' });
+      seeds.push({ field: `nameplate.${where}.levers`, text: plate.leversMoved, role: 'observation' });
+      seeds.push({ field: `nameplate.${where}.rules`, text: plate.rules, role: 'observation' });
+      seeds.push({ field: `nameplate.${where}.bench`, text: plate.provedOnTheBench, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * The test bench — GAMEPLAY § 12 over `everyday/benchModel.ts`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Everyday Mode's test bench** — the field, the tests, the budget, and everything it says about
+ * a result it did not compute.
+ *
+ * ## What the sweep is actually asking of this surface
+ *
+ * § 12's whole claim is that the bench *"is allowed to shrug"*, and the failure mode is the one
+ * CLAUDE.md names outright: a screen that turns a two-run subtraction into a verdict. So the seeds
+ * below carry the **refusals** — the field's two bounds, the empty tick list, the two budget
+ * notes, the three-arm verdict refusal — and the two sentences that would be the defect if they
+ * were ever drawn without them: § 12.2's *Too close to call*, which sits **beside**
+ * `report.ts`'s `unresolved` and never in place of it, and the never-a-subtraction rule itself.
+ *
+ * The per-cell figures and comparison rows are **not** re-seeded here: they are `batchReport`'s
+ * own sentences, driven by `BATCH_REPORT`, and re-rendered under the suite's id by `SUITE_BENCH`.
+ * Adding a third copy would put duplicates ahead of the originals and move every batch-shaped
+ * fault onto this surface, which is the ordering rule stated at `SHIFT_REPORT`.
+ *
+ * `everyday/benchScreen.ts#BENCH_SCREEN` is not driven here and is excluded in `derive.test.ts`
+ * on the DOM mounts' shared ground: it mounts DOM and owns a batch `Worker`.
+ */
+const EVERYDAY_BENCH: SurfaceAdapter = {
+  id: 'everyday/benchModel.ts#BENCH_COPY',
+  covers: [
+    'everyday/benchModel.ts#BENCH_COPY',
+    'everyday/benchModel.ts#BENCH_STANDING_NOTES',
+    'everyday/benchModel.ts#benchEntrantsOf',
+    'everyday/benchModel.ts#benchFieldRefusal',
+    'everyday/benchModel.ts#benchTestsRefusal',
+    'everyday/benchModel.ts#benchBudgetNoteOf',
+    'everyday/benchModel.ts#benchWorkLineOf',
+    'everyday/benchModel.ts#benchVerdictNoteOf',
+    'everyday/benchModel.ts#benchResultViewOf',
+    // Driven through `benchFieldRefusal`, which it calls before narrowing to the tuple: a field
+    // it returns `undefined` for is exactly a field that refusal names.
+    'everyday/benchModel.ts#benchFieldOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+
+    for (const [key, text] of Object.entries(BENCH_COPY)) {
+      seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the field, at every size the toggles can reach ---- */
+    const shelf = context.dispatcherProfiles.profiles.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+    }));
+    for (const size of [0, 1, 2, BENCH_FIELD_MAX, BENCH_FIELD_MAX + 1]) {
+      const picked = shelf.slice(0, size).map((entry) => entry.id);
+      const refusal = benchFieldRefusal(picked);
+      if (refusal !== undefined) {
+        seeds.push({ field: `field.${String(size)}.refusal`, text: refusal, role: 'reason' });
+      }
+      seeds.push({
+        field: `field.${String(size)}.verdictNote`,
+        text: benchVerdictNoteOf(size),
+        role: 'reason',
+      });
+      for (const entrant of benchEntrantsOf(shelf, picked)) {
+        seeds.push({ field: `field.${String(size)}.entrant.${entrant.profileId}`, text: entrant.name, role: 'label' });
+        if (entrant.refusal !== undefined) {
+          seeds.push({ field: `field.${String(size)}.entrant.${entrant.profileId}.refusal`, text: entrant.refusal, role: 'reason' });
+        }
+      }
+    }
+
+    /* ---- the tests, and the empty-tick refusal ---- */
+    for (const test of benchTestsOf(['midtown-up-peak'])) {
+      seeds.push({ field: `test.${test.cellId}`, text: test.label, role: 'label' });
+    }
+    const noTests = benchTestsRefusal([]);
+    if (noTests !== undefined) {
+      seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    }
+
+    /* ---- the budget: every choice's work line, and both notes ---- */
+    for (const choice of BENCH_REPLICATION_CHOICES) {
+      seeds.push({
+        field: `budget.${String(choice)}.work`,
+        text: benchWorkLineOf(3, choice, 2),
+        role: 'observation',
+      });
+      const note = benchBudgetNoteOf(choice);
+      if (note !== undefined) {
+        seeds.push({ field: `budget.${String(choice)}.note`, text: note, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * ---- the result: the standing notes, the index's own words, and the three-arm refusal ----
+     *
+     * The index's verdict words are `suiteSummaryOf`'s and are seeded here under the bench's id
+     * because this is the surface a player reads them on; the per-row sentences below them are
+     * `batchReport`'s and are deliberately not re-seeded (see the adapter docstring).
+     */
+    const cell = { id: 'midtown-up-peak', label: 'Midtown Office, up-peak 1 %' };
+    const two = suiteCellViewOf(cell, context.batch);
+    const third = context.batch.arms[1];
+    const many =
+      third === undefined
+        ? undefined
+        : suiteCellViewOf(cell, {
+            ...context.batch,
+            arms: [...context.batch.arms, { ...third, armId: 'bench-ghost-arm' }],
+          });
+    const view = benchResultViewOf(many === undefined ? [two] : [two, many]);
+    seeds.push({ field: 'result.caption', text: view.caption, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'result.neverASubtraction', text: view.neverASubtraction, role: 'prose', provenance: 'authored' });
+    for (const [index, note] of view.standingNotes.entries()) {
+      seeds.push({ field: `result.standing.${String(index)}`, text: note, role: 'prose', provenance: 'authored' });
+    }
+    for (const line of view.summary.lines) {
+      for (const [index, mark] of line.marks.entries()) {
+        if (mark === null) continue;
+        seeds.push({ field: `result.${line.cellId}.mark.${String(index)}`, text: mark.text, role: 'observation' });
+      }
+      if (line.note !== null) {
+        seeds.push({ field: `result.${line.cellId}.note`, text: line.note, role: 'reason' });
+      }
+    }
+    /*
+     * § 12.2's heading, seeded only where a drawn row actually came back `unresolved`. Seeding it
+     * unconditionally would be the surface asserting a shrug it had not measured, which is the
+     * mirror image of the defect this whole screen exists to refuse.
+     */
+    for (const cellId of view.tooCloseCellIds) {
+      seeds.push({ field: `result.${cellId}.tooClose`, text: BENCH_COPY.tooCloseHeading, role: 'reason' });
     }
 
     return singleRun(this.id, seeds);
@@ -7074,6 +9690,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
   EVERYDAY_MENU,
+  EVERYDAY_SETTINGS,
   REPORT_CARD,
   // Appended, same reason again: the suite re-seeds the bench's sentences under its own surface
   // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
@@ -7088,10 +9705,101 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: slice 4d's race strip.
   RACE_STRIP,
   WATCH,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 7's Everyday stage. Its
+  // header figures share wordings with the live rail's, so an earlier slot would move every
+  // rail-shaped fault onto this surface.
+  EVERYDAY_STAGE,
   // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 12.2's withheld matrix
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.
   WITHHELD_MATRIX,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: `docs/21` § 3.4's live
+  // metrics card re-renders phrases `CANVAS` also draws — the refusal head and reason above all —
+  // so placing it earlier would move every panel-shaped fault onto this surface.
+  LIVE_METRICS,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: the ladder re-seeds a
+  // rating and a case count, which are figure-shaped, so placing it earlier would move
+  // batch-shaped faults onto this surface.
+  GAUNTLET,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the part worth reading. The daily-loop lane had it between
+   * `EVERYDAY_SETTINGS` and `REPORT_CARD`, which was the end of the array on that branch and is
+   * the middle of it here. Left where it merged, it would sit ahead of eleven surfaces it shares
+   * wordings with — the report card's figures, the week's withheld cells, § 7's stage header —
+   * and every fault of those shapes would have moved onto this surface without a line of either
+   * branch changing. That is exactly the silent re-mapping the rule exists to stop, so the rule is
+   * applied to the merged array rather than to each branch's.
+   */
+  EVERYDAY_DAILY_LOOP,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 3.2's swap row and the
+  // Engineer header's return, whose captions share a shape with the rail's other footer rows.
+  ENGINEER_DOOR,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the second time this array has recorded that sentence and the first time it
+   * was recorded by a merge git did not stop to ask about.
+   *
+   * The campaign lane appended it after `WITHHELD_MATRIX`, which was the end of the array on that
+   * branch and is the middle of it here. There was **no conflict marker**: both branches added
+   * lines after a line they agreed on, so the textual merge simply took both and the adapter
+   * landed four surfaces up. Left there it would have sat ahead of `LIVE_METRICS`, `GAUNTLET`,
+   * `EVERYDAY_DAILY_LOOP` and `ENGINEER_DOOR` — and its own comment names the collision it would
+   * cause, because § 8's three screens share record-shaped phrases with the week's surfaces and
+   * `EVERYDAY_DAILY_LOOP` is where the week now lives. Every week-shaped fault would have moved
+   * onto this surface without a line of either branch changing, which is the failure `EVERYDAY_DAILY_LOOP`'s
+   * own note (four entries above) describes from the other side.
+   *
+   * The rule is applied to the merged array rather than to either branch's, and a clean auto-merge
+   * is not evidence that it was: this position was chosen, not inherited.
+   */
+  EVERYDAY_CAMPAIGN,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — **and this pair is the one
+   * the rule bites hardest on**, which is why they go here rather than where their branch had them
+   * (its own end, four surfaces up from this one).
+   *
+   * § 11's workshop re-renders the dispatcher library's term rows, its cost line and its maths
+   * disclosure, and every one of those shares a wording with `EDITOR`, `CONTROLS`,
+   * `EDITED_PROFILE` and `RULES_EDITOR`. § 12's bench re-seeds a suite index — cells, replication
+   * counts, a verdict — which is `BATCH_REPORT`'s and `SUITE_BENCH`'s shape exactly. Placed
+   * earlier, these two would have taken editor-shaped and batch-shaped faults off six surfaces at
+   * once, which is more re-mapping than any single insertion in this array has ever risked.
+   */
+  EVERYDAY_WORKSHOP,
+  EVERYDAY_BENCH,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT: `docs/21` § 3.6's family
+   * controls.
+   *
+   * Its branch's note read *"re-renders nothing another adapter draws, but the rule is about
+   * position, and the position for a new adapter is the end"* — and the second clause is why the
+   * first one not surviving the merge costs nothing. That branch did not carry § 11's workshop,
+   * which now seeds the dispatcher library's term rows and cost line two entries above; whether
+   * this panel's block frame shares a wording with any of them is **unmeasured here**, and the
+   * end of the array is the position that does not require it to be measured.
+   *
+   * The claim is therefore withdrawn rather than restated. What is left is the rule, which was
+   * always the load-bearing half.
+   */
+  FAMILY_CONTROLS,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and **moved here on the
+   * merge**, which is the third time this array has recorded that sentence.
+   *
+   * Its branch's note read *"the three standalone Everyday screens re-seed figure shapes the
+   * designer and the report already draw"*, and on that branch the position it named was the end of
+   * a nineteen-entry array. Here it is thirty-seven entries in, and the surfaces it would have sat
+   * ahead of are the ones it collides with hardest: § 7's stage header, the report card, the week's
+   * withheld cells, § 11's workshop and § 12's bench all draw figure-shaped and band-shaped
+   * wordings, and this adapter re-seeds a design's four figures, a rush's five bands and a tuner's
+   * readouts. Left where it merged it would have taken figure-shaped faults off five surfaces at
+   * once.
+   *
+   * The rule is applied to the merged array rather than to either branch's, and a clean auto-merge
+   * is not evidence that it was: this position was chosen, not inherited.
+   */
+  EVERYDAY_STANDALONE_SCREENS,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

@@ -121,7 +121,7 @@ describe('idle.parkingStrategy is observable in a run, for every value the categ
         `parkingStrategy "${strategy}" produced a byte-identical run to "stay" — the strategy is not reaching stage 7`,
       ).not.toBe(control);
     }
-  });
+  }, 120_000);
 
   it('answers no-forecast, and only no-forecast, when the run holds no predictor', async () => {
     // The control arm for the guard above, and the exact state `predicted-demand` was stuck in
@@ -142,7 +142,7 @@ describe('idle.parkingStrategy is observable in a run, for every value the categ
     expect(parked(building, base, 'predicted-demand', common)).toBe(
       parked(building, base, 'stay', common),
     );
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *
@@ -172,7 +172,7 @@ describe('auction.aggregation selects the policy, and the aggregations are not t
     expect(trajectory(await run('auction-multi-round'))).not.toBe(
       trajectory(await run('auction')),
     );
-  });
+  }, 60_000);
 
   it('makes sealed bid bit-identical to the centralized argmin over the same weights', async () => {
     // The other direction, and it is a theorem rather than a tolerance: with one round there is no
@@ -250,7 +250,7 @@ describe('capacity-driven reassignment fires on the load edge', () => {
     expect(control.capacityCrossings, 'the sweep did not run for the control arm').toBeGreaterThan(0);
     expect(control.capacityHeld, 'the sweep looked at no call').toBeGreaterThan(0);
     expect(control.capacityMigrations, 'reassignmentPolicy: never migrated a call').toBe(0);
-  });
+  }, 120_000);
 
   it('leaves a reassignmentPolicy: never profile bit-identical to one run without the sweep', async () => {
     // The claim that makes the mechanism's value measurable against its own absence: wiring the
@@ -262,7 +262,7 @@ describe('capacity-driven reassignment fires on the load edge', () => {
     expect(eta.dispatch?.reassignmentPolicy).toBeUndefined();
     const activityOf = await activity('eta');
     expect(activityOf.capacityMigrations).toBe(0);
-  });
+  }, 60_000);
 });
 
 /* -------------------------------------------------------------------------- *

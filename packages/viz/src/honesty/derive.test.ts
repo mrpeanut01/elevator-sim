@@ -80,6 +80,7 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'dev/data.ts#loadBrowserResources',
         'dev/data.ts#loadCampaign',
         'dev/data.ts#loadFixitCases',
+        'dev/data.ts#loadProofCases',
         'dev/data.ts#resolveEdited',
         'dev/motion.ts#REDUCED_MOTION_QUERY',
         'dev/motion.ts#prefersReducedMotion',
@@ -100,14 +101,66 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         /*
          * The Everyday shell's mount, on the mounts' shared ground: it builds the rail, the screen
          * region and the pinned bar, so it cannot run without a document. The split it sits on is
-         * deliberate rather than incidental — `everyday/modes.ts` and `everyday/rail.ts` hold every
-         * word the mount draws about what a mode is and where the player is, and the
-         * `EVERYDAY_MENU` adapter drives both over every screen and both shapes of rail. What is
-         * left here is what the mount authors of its own: two headings, the menu lede and the stub
-         * screen's one sentence, which reach the static sweep below. Weaker than driving them, and
-         * stated as a limitation rather than presented as coverage.
+         * deliberate rather than incidental — `everyday/modes.ts`, `everyday/rail.ts`,
+         * `everyday/actionBar.ts` and `everyday/screens.ts` hold every word the mount draws about
+         * what a mode is, where the player is, what each bar control does and why an unbuilt
+         * screen refuses, and the `EVERYDAY_MENU` adapter drives all four over every screen, every
+         * run context and both shapes of rail. What is left here is what the mount authors of its
+         * own: the headings, the menu lede, the refusal screen's way-back line and the glyph
+         * characters, which reach the static sweep below. Weaker than driving them, and stated as
+         * a limitation rather than presented as coverage.
          */
         'everyday/shell.ts#mountEverydayShell',
+        /*
+         * § 14's two-tabbed board screen, on the settings screen's split exactly: `BOARD_SCREEN` is
+         * a registry row whose `mount` builds tab cards, a table and a `<details>`, so it cannot
+         * run without a document. Every **word** it draws is authored elsewhere and driven by the
+         * `GAUNTLET` adapter — the ladder's rows and refusals in `gauntlet/ladder.ts`, the rating's
+         * basis and caveat in `gauntlet/rating.ts`, the gauntlet's progress and stop lines in
+         * `gauntlet/run.ts` — and its own two string tables, `BOARD_SCREEN_COPY` and
+         * `DAILY_BOARD_ABSENCE`, are driven there too rather than excused here. What the mount
+         * authors of its own is geometry, class names and the load-failure line.
+         */
+        'everyday/boardScreen.ts#BOARD_SCREEN',
+        /*
+         * § 15.1's settings screen, on the same split and for the same reason: `SETTINGS_SCREEN`
+         * is a registry row whose `mount` builds inputs, swatch buttons and rows, so it cannot run
+         * without a document. Every **word** on that screen — the lede, the name note, the row
+         * captions, the two statements of fact and all six refusals in the register — is authored
+         * in `everyday/settingsView.ts`, which the `EVERYDAY_SETTINGS` adapter drives over every
+         * state the view distinguishes, including the one where the Engineer bridge has not
+         * arrived. What the mount authors of its own is geometry and two class names.
+         */
+        'everyday/settingsScreen.ts#SETTINGS_SCREEN',
+        /*
+         * GAMEPLAY § 8's three campaign screens, on the same split and the same ground: one module
+         * with three registry rows, each `mount` building selects, a month grid and a shop out of a
+         * document. Every **word** those screens draw — the triage row's record and wear lines, the
+         * desk's decision and its four tests, the contract sheet's purse ledger, every shop tier's
+         * derived state, both refusals and the register of absences — is authored in
+         * `everyday/campaignModel.ts` over `campaign/economy.ts`, which the `EVERYDAY_CAMPAIGN`
+         * adapter drives over four careers. What these three author of their own is geometry, class
+         * names and the glyphs on the calendar cells.
+         */
+        'everyday/campaignScreens.ts#TOWERS_SCREEN',
+        'everyday/campaignScreens.ts#BUILDING_SCREEN',
+        'everyday/campaignScreens.ts#CONTRACT_SCREEN',
+        'everyday/campaignScreens.ts#campaignInputOf',
+        /*
+         * GAMEPLAY § 7's stage screen, on the mounts' shared ground and on the same split: its
+         * `mount` builds a canvas, sizes it from a bounding rect and drives a
+         * `requestAnimationFrame` loop, none of which exists under Node. Every **word** it draws —
+         * the clock, the phase pill, the three § 7.1 figures with their counts and their two
+         * refusals, the alarm sentence, the four legend rungs, the intervention labels and stamp,
+         * all three intervention refusals, the § 3.3 primary's three, the ghost-lane absence and
+         * the screen's own register — is authored in `everyday/stageScreenModel.ts`, which the
+         * `EVERYDAY_STAGE` adapter drives at `sampleTimes`' playheads and over every state the
+         * model distinguishes. What the mount authors of its own is geometry, class names, and two
+         * transport captions (`▶ Play`, the paused-at-the-start line), which reach only the static
+         * sweep below — weaker than driving them, and stated as a limitation rather than presented
+         * as coverage.
+         */
+        'everyday/stageScreen.ts#STAGE_SCREEN',
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
@@ -144,7 +197,81 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * static sweep below, which is a stated limitation exactly as it is for the menu.
          */
         'dev/fixitPanel.ts#mountFixitPanel',
+        /*
+         * The Everyday Fix-a-building **screen** (GAMEPLAY § 10), on the mounts' shared ground and
+         * on the same split the Everyday shell sits on: it draws into the shell's scroll region,
+         * so it cannot run without a document. Its pure half is `everyday/fixitScreenModel.ts`,
+         * whose six producers the FIXIT adapter drives — the rail chrome and its derived
+         * `{fixed}/{total}`, the § 3.3 substitutions over all five screen states, the § 9-priced
+         * stepper lines, the running-total split and the repair state word — beside the engine
+         * and run producers both this screen and the Engineer panel above read. What is left here
+         * is the one sentence the mount authors of its own: the load-failure line, which is mount
+         * status text on exactly the footing of every mount in this group, reaching only the
+         * static sweep below.
+         */
+        'everyday/fixitScreen.ts#FIXIT_SCREEN',
+        /*
+         * § 6's daily loop — the four screens that make *Today's tower* a loop rather than a
+         * hand-off, on the mounts' shared ground and on the same pure/DOM split every Everyday
+         * screen sits on: each draws into the shell's scroll region, so none can run without a
+         * document, and `briefScreen.ts` additionally draws a canvas.
+         *
+         * Every **word** on all four is authored in `everyday/today.ts`, `everyday/doorView.ts`,
+         * `everyday/briefView.ts`, `everyday/weekView.ts`, `everyday/reportView.ts` and
+         * `everyday/world.ts`, whose producers the `EVERYDAY_DAILY_LOOP` adapter drives over both
+         * arms of the day-closed axis, over a past day and today, and over four states of the
+         * report — including the two withheld states § 12.2's matrix is about. The report's
+         * *sheet* is `dev/reportPanel.ts#reportViewOf`'s, driven in both registers by
+         * `DAY_REPORT_VIEW`.
+         *
+         * What the four mounts author of their own is geometry, class names and the elevation
+         * drawing's floor labels, which reach only the static sweep below — weaker than driving
+         * them, and stated as a limitation rather than presented as coverage.
+         */
+        'everyday/doorScreen.ts#DOOR_SCREEN',
+        'everyday/briefScreen.ts#BRIEF_SCREEN',
+        'everyday/reportScreen.ts#REPORT_SCREEN',
+        'everyday/weekScreen.ts#WEEK_SCREEN',
+        /*
+         * The Everyday workshop (GAMEPLAY § 11) and bench (§ 12) **screens**, on the mounts'
+         * shared ground. Both are registry rows whose `mount` builds sliders, selects, `<details>`
+         * and — the bench — a batch `Worker`, so neither can run without a document. Their pure
+         * halves are `everyday/workshopModel.ts` and `everyday/benchModel.ts`, which the
+         * `EVERYDAY_WORKSHOP` and `EVERYDAY_BENCH` adapters drive over the shipped dispatcher
+         * library, every play style, every cost term, both switching states and a rule list with
+         * a live refusal in it. What the mounts author of their own is geometry, three class
+         * names and the two joining words `when` and `then`.
+         */
+        'everyday/workshopScreen.ts#WORKSHOP_SCREEN',
+        'everyday/benchScreen.ts#BENCH_SCREEN',
+        /*
+         * The three standalone Everyday screens (GAMEPLAY § 9.1, § 13 and § 3.3 over § 18), on the
+         * mounts' shared ground and on the same split every other screen in this group sits on.
+         * Each draws into the shell's scroll region, so none can run without a document; each has a
+         * pure half — `everyday/rushScreenModel.ts`, `everyday/designerModel.ts`,
+         * `everyday/tunerModel.ts` — and the `EVERYDAY_STANDALONE_SCREENS` adapter drives all
+         * three, over both arms of everything with two: a sized design and a refused one, a class
+         * the drawing fits and one it is past, a tuner with nothing moved and one with something.
+         * What is left here is what the mounts author of their own: the designer's saved-and-run
+         * confirmation, which quotes the allocated id, and its catch, which quotes the loader's own
+         * refusal rather than paraphrasing it. Both reach the static sweep below, which is weaker
+         * than driving them and is stated as a limitation.
+         */
+        'everyday/rushScreen.ts#RUSH_SCREEN',
+        'everyday/designerScreen.ts#DESIGNER_SCREEN',
+        'everyday/tunerScreen.ts#TUNER_SCREEN',
       ],
+    },
+    {
+      reason:
+        'The Everyday data façade. Its methods hand back plain data the screens word; the only ' +
+        'literals it authors are the two fallback names a save allocates when the reader typed ' +
+        'nothing — `My pattern`, beside `dev/trafficEditor.ts`’s identical one — and those are ' +
+        'identifiers in a list, not claims about a run. Every sentence a player reads about a ' +
+        'building or a pattern is authored by the screen that draws it, and those screens’ pure ' +
+        'halves are driven. `HOST_PENDING_REASON` is the one sentence this module does put on a ' +
+        'screen, and it is driven by `EVERYDAY_MENU` rather than excluded here.',
+      ids: ['everyday/host.ts#createEverydayHost'],
     },
     {
       reason:
@@ -167,21 +294,61 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
     },
     {
       reason:
-        'The Everyday shell\'s boot seam: two CSS selectors and the console lines that fire when ' +
-        'one of them finds nothing. No player reads any of it. `ENGINEER_ROOT_SELECTOR` and the ' +
-        'two `ENGINEER_*` selectors are `document.querySelector` arguments — derived only because ' +
-        'the two-adjacent-words scanner reads `[data-menu-control="main.resume"]` as prose — and ' +
-        '`dismissEngineerMenu` and `closeEngineerMenuWhenReady` return a boolean and `void` ' +
-        'respectively. `bootEveryday`\'s own strings are the two `console.error` diagnostics, on ' +
-        'the same footing as the save diagnostics above: they name a selector that has gone stale, ' +
-        'for whoever is holding the source. The day one of them is drawn on a screen it stops ' +
-        'being excludable, exactly as `loadSession`\'s did.',
+        'The Everyday shell\'s boot seam: two CSS selectors and the functions that press what they ' +
+        'find. No player reads any of it. The two `ENGINEER_*` selectors are ' +
+        '`document.querySelector` arguments — derived only because the two-adjacent-words scanner ' +
+        'reads `[data-menu-control="main.resume"]` as prose — and `dismissEngineerMenu`, ' +
+        '`closeEngineerMenuWhenReady` and `bootEveryday` return a boolean, `void` and the mounted ' +
+        'shell. **`ENGINEER_ROOT_SELECTOR` and the two `console.error` diagnostics left this entry ' +
+        'with the hand-off**: § 7\'s stage is a screen, so the shell insets nothing and boot has no ' +
+        'Engineer root to query and no hand-off at which to report a menu it could not close. The ' +
+        'day a string here is drawn on a screen it stops being excludable, exactly as ' +
+        '`loadSession`\'s did.',
       ids: [
         'everyday/boot.ts#ENGINEER_MENU_SELECTOR',
         'everyday/boot.ts#ENGINEER_RESUME_SELECTOR',
         'everyday/boot.ts#bootEveryday',
         'everyday/boot.ts#closeEngineerMenuWhenReady',
         'everyday/boot.ts#dismissEngineerMenu',
+      ],
+    },
+    {
+      reason:
+        'GAMEPLAY § 19\'s design tokens. The type stack\'s font-family values — ' +
+        '"\'Familjen Grotesk\', sans-serif" and friends — are CSS, read by no player as a ' +
+        'sentence, and are derived only because a two-word font name satisfies the ' +
+        'two-adjacent-words prose test, exactly as the scanner\'s own docstring predicts for ' +
+        'CSS tokens. The palette, radius and gap objects carry no prose at all and are not ' +
+        'derived; the day a token module grows a sentence a player reads, it stops being ' +
+        'excludable.',
+      ids: ['everyday/tokens.ts#EVERYDAY_TYPE'],
+    },
+    {
+      reason:
+        'The daily loop\'s shared drawing vocabulary, on `dev/dom.ts`\'s precedent one group down: ' +
+        'a component factory produces no sentence of its own. `EYEBROW`, `MONO`, `CARD`, `WELL`, ' +
+        '`BODY`, `QUIET` and `LEDE` are inline CSS — derived only because a two-word font-family ' +
+        'and a `1px solid` satisfy the two-adjacent-words prose test, exactly as ' +
+        '`EVERYDAY_TYPE`\'s entry above predicts for CSS tokens — and `pill`, `section`, ' +
+        '`figureCell` and `unavailableBand` put on the page only strings a caller handed them. ' +
+        'Every one of those callers is `everyday/doorView.ts`, `briefView.ts`, `weekView.ts`, ' +
+        '`reportView.ts` or `dev/reportPanel.ts`, all of which are driven. `percentFigure` is the ' +
+        'same shape one level smaller: it turns a number into `81%` and its only literal is the ' +
+        'per-cent sign. The day one of these grows a sentence a player reads, it stops being ' +
+        'excludable — which is the wording `loadSession`\'s entry earned by having that day arrive.',
+      ids: [
+        'everyday/screenDom.ts#BODY',
+        'everyday/screenDom.ts#CARD',
+        'everyday/screenDom.ts#EYEBROW',
+        'everyday/screenDom.ts#figureCell',
+        'everyday/screenDom.ts#LEDE',
+        'everyday/screenDom.ts#MONO',
+        'everyday/screenDom.ts#pill',
+        'everyday/screenDom.ts#QUIET',
+        'everyday/screenDom.ts#section',
+        'everyday/screenDom.ts#unavailableBand',
+        'everyday/screenDom.ts#WELL',
+        'everyday/figures.ts#percentFigure',
       ],
     },
     {
@@ -612,6 +779,14 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'fixit/parse.ts#FixitCasesError',
         'fixit/parse.ts#parseFixitCases',
         'fixit/parse.ts#playerFacingStringsOf',
+        /*
+         * `gauntlet/proofCases.ts`'s parse, one `data/` document over, on the identical ground: its
+         * sentences refuse a malformed `data/proof-cases.json` to the person editing it — a tower
+         * naming a building this build does not ship, a duplicate id, an empty side — and
+         * `gauntlet/proofCases.test.ts` fires every one of them. What a *player* reads is the
+         * parsed list, through the `GAUNTLET` adapter's `whatAreTheFortyOf` and the ladder rows.
+         */
+        'gauntlet/proofCases.ts#parseProofCases',
         'scenario/published.ts#classOfCounts',
         'scenario/published.ts#validatePublishedGoalRates',
         'editor/editorValidate.ts#validateBuildingText',
@@ -817,6 +992,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'that is weaker than the search and is stated as a limitation rather than presented as ' +
         'coverage.',
       ids: ['dev/shiftRunner.ts#createShiftRunner'],
+    },
+    {
+      reason:
+        'A storage slot with no sentence in it — **the id/key case again**. All three are derived ' +
+        'only because `PROFILE_KEY`’s value, `elevator-sim.everyday-profile`, reads to the two-' +
+        'adjacent-words scanner as a phrase; it is a `localStorage` key in the same family as ' +
+        '`persist/types.ts#SESSION_KEY`, and nothing any of the three returns is shown to ' +
+        'anybody. What they carry is a player’s own name and one of six colours, and the screen ' +
+        'that draws those is `everyday/settingsView.ts`, driven by `EVERYDAY_SETTINGS`. The ' +
+        'refusals here are refusals to *restore* — a version this build cannot read, a colour ' +
+        'outside the curated six — and they produce no words at all, only `undefined`, which is ' +
+        'the whole reason the caller has a fallback profile. `everyday/profile.test.ts` asserts ' +
+        'each of them directly.',
+      ids: [
+        'everyday/profile.ts#loadProfile',
+        'everyday/profile.ts#saveProfile',
+        'everyday/profile.ts#createProfileStore',
+      ],
     },
   ]);
 

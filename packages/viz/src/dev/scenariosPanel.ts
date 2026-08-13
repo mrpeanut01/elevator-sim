@@ -54,32 +54,64 @@ import { shiftLengthForContract } from './state.js';
  * -------------------------------------------------------------------------- */
 
 /**
- * The five swatches, verbatim from `design.html`'s `PRESETS[*].art`, keyed by building id.
+ * The eight swatches, keyed by building id — the design's `PRESETS[*].art`, in tokens.
  *
  * Keyed on an id, which `dev/dom.ts` forbids its *helpers* from doing — and this is not one of
  * those. The rule there is that no shared component may key on a metric or a goal kind, because a
  * metric list in the UI is a list that goes stale. This is per-building decoration authored by the
  * design for these five buildings, it makes no claim about any of them, and a building the design
  * never drew — one the reader built — falls through to {@link FALLBACK_ART} rather than to nothing.
+ *
+ * ## Tokens, not literals — § D251, and `docs/21` § 2.2 (3)
+ *
+ * These were sixteen hex literals in eight gradients, written into inline `style` attributes,
+ * where no `:root[data-theme]` block reaches them: eight dark cards that stayed dark on a paper
+ * page. The shape the design drew is preserved exactly — a hue at the top falling to the card's
+ * own ground at 70 %, and Midtown Office's window stripe over it — and only the *source* of each
+ * colour changed. The base is `--card`, the panel these cards sit on, so a swatch is the card it
+ * is drawn on with a wash of its own hue rather than a colour of its own.
+ *
+ * The eight hues are the **shaft tints** (`render/tokens.ts#SHAFT_GOLD` and its siblings). Two
+ * reasons, and neither is that they were nearest to hand: they are the palette's eight *decoration*
+ * hues — chosen to be distinguishable from each other and to carry no wait-age claim, which is
+ * exactly what a swatch needs — and they follow the theme, which is the whole point of this
+ * migration. A tint means *this bank* in the elevation and *this building* here; no surface draws
+ * both, and neither is a claim about a number. The mapping keeps each building's character from
+ * the design's own choice: Midtown's steel blue, the garden's green, the secure tower's violet-grey
+ * slate, and so on.
  */
 export const SCENARIO_ART: Readonly<Record<string, string>> = Object.freeze({
   'midtown-office':
-    'linear-gradient(180deg,#1d2735,#131924 70%),repeating-linear-gradient(90deg,#0000 0 6px,#ffffff08 6px 8px)',
-  'garden-apartments': 'linear-gradient(180deg,#22301f,#131924 70%)',
-  'secure-tower': 'linear-gradient(180deg,#2a2230,#131924 70%)',
-  'mixed-use-high-rise': 'linear-gradient(180deg,#1b2a33,#131924 70%)',
-  'vertical-city': 'linear-gradient(180deg,#241f33,#131924 70%)',
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-5) 34%, var(--card)),var(--card) 70%),' +
+    'repeating-linear-gradient(90deg,transparent 0 6px,color-mix(in srgb, var(--text) 5%, transparent) 6px 8px)',
+  'garden-apartments':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-2) 34%, var(--card)),var(--card) 70%)',
+  'secure-tower':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-7) 34%, var(--card)),var(--card) 70%)',
+  'mixed-use-high-rise':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-1) 34%, var(--card)),var(--card) 70%)',
+  'vertical-city':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-8) 34%, var(--card)),var(--card) 70%)',
   // The three buildings that landed after the handoff was drawn (`docs/12` § 4.7). The design has
   // no swatch for them, so these are authored in its idiom rather than copied from it: the same
-  // `#131924` base at 70 %, a hue that reads as the building's character, and no second layer —
+  // base at 70 %, a hue that reads as the building's character, and no second layer —
   // Midtown Office's window stripe is the design's own and is not imitated here.
-  'chancery-house': 'linear-gradient(180deg,#2e2a1d,#131924 70%)',
-  'crown-hotel': 'linear-gradient(180deg,#2b2027,#131924 70%)',
-  'st-jude-hospital': 'linear-gradient(180deg,#1d2f2c,#131924 70%)',
+  'chancery-house':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-4) 34%, var(--card)),var(--card) 70%)',
+  'crown-hotel':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-3) 34%, var(--card)),var(--card) 70%)',
+  'st-jude-hospital':
+    'linear-gradient(180deg,color-mix(in srgb, var(--shaft-6) 34%, var(--card)),var(--card) 70%)',
 });
 
-/** The *build your own* swatch, and the swatch for any building the design never drew. */
-export const FALLBACK_ART = 'linear-gradient(180deg,#1a2430,#10151e 70%)';
+/**
+ * The *build your own* swatch, and the swatch for any building the design never drew.
+ *
+ * The one swatch with no hue: a building nobody has drawn a character for gets the surface ladder
+ * and nothing else, which is the same *there is nothing to say here* the rails draw with a hidden
+ * slot rather than an empty one.
+ */
+export const FALLBACK_ART = 'linear-gradient(180deg,var(--raised),var(--card) 70%)';
 
 /* -------------------------------------------------------------------------- *
  * The card

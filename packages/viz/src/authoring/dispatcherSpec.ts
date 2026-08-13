@@ -37,6 +37,14 @@
  */
 
 import type { DispatcherProfile } from '@elevator-sim/core/browser';
+import {
+  applyPatch,
+  candidateFromProfile,
+  collectSearchSpace,
+  decodeCandidate,
+  type ParameterValue,
+  type SearchSpace,
+} from '@elevator-sim/experiments/browser';
 
 /** The twelve term ids, in the order `data/dispatcher-profiles.json` declares them. */
 export type TermId = string;
@@ -67,6 +75,20 @@ export interface DispatcherSpec {
   /** Term id to a `0..100` slider position. `weight = position / 100`. */
   readonly weights: Readonly<Record<TermId, number>>;
   readonly flags: DispatcherFlags;
+  /**
+   * The family controls' moves — `docs/21` § 3.6, `dev/familyControls.ts`.
+   *
+   * A dotted `collectSearchSpace()` id to the value the reader set, and **only** the ids they
+   * actually moved. Not a full point: a record of every dimension would author every default onto
+   * every saved profile, and the module docstring's rule is that a profile which spells out a value
+   * it inherited is not the same document as one that inherited it.
+   *
+   * Flat rather than nested by section for the reason the whole spec is flat — the ids are the
+   * schema's own paths, so nothing here has to invent what a section is. {@link profileFromSpec}
+   * turns them back into nested JSON through `decodeCandidate`, which is the shipped conversion an
+   * optimizer's winner goes through, not a second one written here.
+   */
+  readonly families: Readonly<Record<string, ParameterValue>>;
 }
 
 /**
@@ -194,6 +216,51 @@ const BYPASS_ON = 0.8;
  */
 const BYPASS_OFF = 1;
 
+/**
+ * The dispatcher search space, built once.
+ *
+ * Memoised because {@link profileFromSpec} runs on every render of four panels and on every build
+ * of a run, and `collectSearchSpace()` walks every declared schema each time it is called. The
+ * space is a pure function of `core`'s declarations, so one copy is one answer.
+ */
+let searchSpace: SearchSpace | undefined;
+
+function familySpace(): SearchSpace {
+  searchSpace ??= collectSearchSpace();
+  return searchSpace;
+}
+
+/**
+ * A base profile with the family controls' moves merged onto it, per field within each section.
+ *
+ * `decodeCandidate` + `applyPatch` are `tuning/space/encode.ts`'s own pair — the conversion an
+ * optimizer's winner goes through on its way to a profile — rather than a second walk written here.
+ * That buys three things this module would otherwise have had to re-decide: `constraints.*` is
+ * emitted as the `hardConstraints` **array** it is authored as, sections merge field by field so a
+ * move under `idle.*` does not drop the base's `predictorHorizonS`, and an id the space does not
+ * declare is refused rather than written.
+ *
+ * Identity when nothing moved, and that is structural rather than an optimisation: the acceptance
+ * criterion for the family controls is that re-authoring a shipped profile's exact values produces
+ * a **bit-identical** run, and the cheapest way to be sure is for the empty case to return the same
+ * object it was handed.
+ */
+function withFamilies(
+  base: DispatcherProfile | undefined,
+  families: Readonly<Record<string, ParameterValue>>,
+): DispatcherProfile | undefined {
+  const ids = Object.keys(families);
+  if (ids.length === 0) return base;
+  const space = familySpace();
+  const candidate = new Map<string, ParameterValue>();
+  for (const id of ids) {
+    if (space.byId.has(id)) candidate.set(id, families[id] as ParameterValue);
+  }
+  if (candidate.size === 0) return base;
+  const source = base ?? ({ id: 'draft', name: 'draft', weights: {} } as DispatcherProfile);
+  return applyPatch(space, source, decodeCandidate(space, candidate)) as unknown as DispatcherProfile;
+}
+
 /** Read a shipped or saved profile into the editor's shape. Total. */
 export function specFromProfile(profile: DispatcherProfile, name?: string): DispatcherSpec {
   const weights: Record<string, number> = {};
@@ -203,6 +270,10 @@ export function specFromProfile(profile: DispatcherProfile, name?: string): Disp
   return {
     name: name ?? `Copy of ${profile.name}`,
     weights,
+    // Empty, and never read back off the profile: the profile *is* the base the family controls
+    // are moves against, so a record populated from it would say every field had been moved and
+    // `profileFromSpec` would author the lot.
+    families: {},
     flags: {
       pool: profile.dispatch?.callType !== undefined && profile.dispatch.callType !== 'up-down-buttons',
       zone: profile.idle?.parkingStrategy === 'zone-center',
@@ -219,6 +290,7 @@ export function blankSpec(termIds: readonly TermId[]): DispatcherSpec {
   return {
     name: 'My dispatcher',
     weights,
+    families: {},
     flags: { pool: false, zone: false, bypass: true },
   };
 }
@@ -247,7 +319,19 @@ export interface ToProfileOptions {
  * decisions.
  */
 export function profileFromSpec(spec: DispatcherSpec, options: ToProfileOptions): DispatcherProfile {
-  const base = options.base;
+  /*
+   * The family moves are merged onto the base **first**, so everything below writes over them.
+   *
+   * That ordering is a decision and it is drawn on screen. Six fields are written from the three
+   * flags and the dwell chips — `dispatch.callType`, `dispatch.assignmentMode`,
+   * `answer.bypassLoadThreshold`, the three dwell fields and `idle.parkingStrategy` — and a reader
+   * looking at both controls has to be told which one the run obeys. Flags win, because they are
+   * the coarse control a reader reaches first and the one whose label makes a claim about the
+   * whole dispatcher; `dev/familyControls.ts#familyOverridesOf` names each override at the control
+   * it outranks, and `familyControls.test.ts` proves the list is neither short nor long by running
+   * this conversion over every flag and lever combination.
+   */
+  const base = withFamilies(options.base, spec.families);
   const levers = options.levers ?? DEFAULT_LEVERS;
 
   const weights: Record<string, number> = {};
@@ -353,6 +437,25 @@ export function inertTerms(spec: DispatcherSpec): readonly { readonly termId: Te
 export function specIsDirty(spec: DispatcherSpec, source: DispatcherProfile | undefined): boolean {
   if (source === undefined) return true;
   const original = specFromProfile(source, spec.name);
+  /*
+   * A family move counts as dirty — and it is checked against the source profile's own value
+   * rather than against the record being non-empty, because `dev/familyControls.ts` keeps the
+   * record pruned and this function must agree with it. A panel that said *unsaved changes* about
+   * a control the reader had put back is the stale-confirmation defect the mount's
+   * `forgetConfirmation` exists for, arriving from the other direction.
+   */
+  const moved = Object.entries(spec.families);
+  // Guarded rather than folded into the loop: `candidateFromProfile` walks every declared
+  // dimension, this function runs on every render of the panel, and the record is empty on every
+  // profile nobody has opened a family block on.
+  if (moved.length > 0) {
+    const space = familySpace();
+    const point = candidateFromProfile(space, source);
+    for (const [id, value] of moved) {
+      const held = point.get(id) ?? space.byId.get(id)?.default;
+      if (String(held) !== String(value)) return true;
+    }
+  }
   const terms = new Set([...Object.keys(original.weights), ...Object.keys(spec.weights)]);
   for (const term of terms) {
     if ((original.weights[term] ?? 0) !== (spec.weights[term] ?? 0)) return true;

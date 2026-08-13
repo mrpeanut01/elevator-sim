@@ -251,6 +251,25 @@ export interface FixitOutcome {
 }
 
 /**
+ * Whether the case wears the FIXED badge after this run — `docs/20` defect 16's second finding.
+ *
+ * **A statement about the latest run, never a high-water mark.** The panel latched
+ * `session.fixed = true` on the first fixed outcome and nothing cleared it, so a case stayed
+ * badged FIXED beside an outcome card reading *"9 waits → 9 waits · 0 % of it went away"* — two
+ * verdicts about one case on one screen. The badge and the outcome card now come from the same
+ * run.
+ *
+ * The contrast that makes this a rule rather than a taste: `WeekState.bestMinutePct` *is* a
+ * high-water mark, deliberately — it is worded as *an observation about what the building has
+ * been seen to do*. FIXED is not an observation about history; it is the rail's summary of
+ * *where this case stands*, and a case whose current configuration fails its own complaint does
+ * not stand fixed. A player who wants the badge back re-runs the configuration that earned it.
+ */
+export function fixedBadgeAfter(outcome: FixitOutcome): boolean {
+  return outcome.kind === 'fixed';
+}
+
+/**
  * Classify the pair into § 10.4's four outcomes and word the three rows.
  *
  * Budget first: an over-budget spec was refused by the owner before anything ran, and the copy

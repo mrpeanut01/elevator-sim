@@ -285,8 +285,25 @@ export function wasGraded(readings: readonly GoalReading[]): boolean {
  * build, a scenario since renamed) banks the day and clears nothing, rather than losing the day to
  * an exception. The banner is simply absent, which is the honest rendering of *"we do not know what
  * this was an assignment for"*.
+ *
+ * ## `recordGrew` — a re-close that is not a retry (`docs/20` defect 17)
+ *
+ * ENGINE_CONTRACT § 1.4: an intervention is **the same run's record growing** — the log gains an
+ * entry and the whole day is re-simulated from t = 0 — never a new run. So when the re-simulated
+ * day files again, everything about the re-close is the ordinary replace (the figures moved, so
+ * the banked contribution is recomputed and the history entry is replaced), **except the attempt
+ * count**: a player who pressed *Run* once and parked once has made one attempt at the day, and a
+ * sheet reading *"attempt 2 at this day"* is counting a change of mind as a retry.
+ *
+ * `true` exactly when the run being filed is a re-simulation the current record's growth caused;
+ * the caller is the one who knows, because the record itself cannot say — a retry of an unchanged
+ * selection reproduces the same `{seed, config}` too (§ D223's own correction two paragraphs
+ * down), so intent is the only discriminator there is. It gates **only** the attempt line: on a
+ * first close it is irrelevant (`attempt` becomes 1 either way), and the replace semantics above
+ * are deliberately untouched, because an intervention that turned a clean day into a missed one
+ * must still un-bank it.
  */
-export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
+export function closeDay(week: WeekState, outcome: DayOutcome, recordGrew = false): WeekState {
   /*
    * ## A day banks once, and a retry replays it rather than adding to it
    *
@@ -372,7 +389,10 @@ export function closeDay(week: WeekState, outcome: DayOutcome): WeekState {
       ? [...week.history.slice(0, -1), outcome]
       : [...week.history, outcome].slice(-HISTORY_DAYS),
     cleared,
-    attempt: retry ? week.attempt + 1 : 1,
+    // A re-close that the record's own growth caused is the same attempt continuing — see the
+    // `recordGrew` docstring. `Math.max(1, …)` is unreachable belt (a `retry` implies a first
+    // close set 1) and is not written, so a broken invariant would surface rather than be rounded.
+    attempt: retry ? (recordGrew ? week.attempt : week.attempt + 1) : 1,
     closedDay: outcome.day,
     banked: base,
   };

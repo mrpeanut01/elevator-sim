@@ -159,6 +159,80 @@ describe('the watch record', () => {
     expect(recordUnreadableReason(alien, RESOURCES)).toContain('when-the-moon-is-full');
   });
 
+  it('refuses a record naming an intervention kind this build does not ship — the same pattern', () => {
+    // `persist/validate.ts` checks the log as *a list of objects and no further*, on the stated
+    // promise that `core` refuses what it does not recognise; `core` keeps it with a throw at
+    // scheduling time, and this gate keeps it with a row — a record written by a newer build must
+    // lose its `Watch it` button rather than replay something approximate (§ 1.5).
+    const record = watchRecordOf(baseState(), RESOURCES);
+    expect(record).toBeDefined();
+    if (record === undefined) return;
+    const alien = {
+      ...record,
+      interventions: [{ atS: 120, change: { kind: 'reverse-gravity' } as never }],
+    };
+    expect(recordUnreadableReason(alien, RESOURCES)).toContain('reverse-gravity');
+  });
+
+  it('refuses the new arms’ malformed payloads as rows, never as mid-replay exceptions', () => {
+    const record = watchRecordOf(baseState(), RESOURCES);
+    expect(record).toBeDefined();
+    if (record === undefined) return;
+
+    // A switch whose profile is not shaped like one: `resolveWeights` would otherwise meet it
+    // as a raw TypeError halfway through a replay somebody pressed `Watch it` on.
+    const corruptSwitch = {
+      ...record,
+      interventions: [
+        { atS: 120, change: { kind: 'switch-dispatcher', profile: { id: 'x' } } as never },
+      ],
+    };
+    expect(recordUnreadableReason(corruptSwitch, RESOURCES)).toContain(
+      'not shaped like one',
+    );
+
+    // An answer effect with an out-of-vocabulary mode: `Car.setMode` stores any string, so an
+    // unchecked record would be *applied silently* — the approximate replay § 1.5 forbids.
+    const alienMode = {
+      ...record,
+      interventions: [
+        {
+          atS: 120,
+          change: {
+            kind: 'answer-incident',
+            option: 'call the fitter',
+            serviceEvents: [{ atS: 200, bankId: 'main', carId: 'B', mode: 'toast' }],
+          } as never,
+        },
+      ],
+    };
+    expect(recordUnreadableReason(alienMode, RESOURCES)).toContain('toast');
+
+    // And the well-formed shapes of both arms pass exactly as a park entry always has.
+    const wellFormed = {
+      ...record,
+      interventions: [
+        { atS: 60, change: { kind: 'park-cars-lobby' } as const },
+        {
+          atS: 120,
+          change: {
+            kind: 'switch-dispatcher',
+            profile: RESOURCES.dispatcherProfiles.profiles[0],
+          } as never,
+        },
+        {
+          atS: 180,
+          change: {
+            kind: 'answer-incident',
+            option: 'call the fitter',
+            serviceEvents: [{ atS: 200, bankId: 'main', carId: 'B', mode: 'out-of-service' }],
+          } as never,
+        },
+      ],
+    };
+    expect(recordUnreadableReason(wellFormed, RESOURCES)).toBeNull();
+  });
+
   it('names the issue that refused a record, rather than blaming the file', () => {
     /*
      * The first half of defect 1. `recordRefusalFor` is `null` exactly when a record exists, and

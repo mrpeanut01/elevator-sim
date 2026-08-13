@@ -84,15 +84,26 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **379 538** | **606** | **37** | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **480 580** | **4 710** | **38** | **0** | **green**, and the register is now empty |
+  | always-on | 49 | **566 408** | **606** | **48** | **0** | **green**, and on its own merits |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **706 094** | **4 710** | **49** | **0** | **green**, and the register is still empty |
 
-  **Re-measured 2026-08-12 on the integrated tree, both tiers, in one sitting** — the row above is
-  that measurement. It moved for one reason and the reason is a *new surface* rather than drift:
-  [§ D335](DECISIONS.md) put Everyday Mode's front door into the corpus, so each tier gains **one**
-  surface and about **five thousand** strings, and the cases, the simulations and the failing-case
-  columns are all unmoved. That is what a wave which adds a screen and sweeps it is supposed to look
-  like.
+  **Re-measured 2026-08-13 on the integrated tree, both tiers, in one sitting** — the row above is
+  that measurement, taken after every lane of the Everyday-and-Engineer wave had merged and never
+  once on a branch. **Eleven surfaces and roughly 190 000 strings** joined each tier, which is the
+  largest single move this row has recorded and is what building the other twelve of § 4's screens
+  looks like: the stage, the daily loop's four, the campaign's three, the workshop, the bench, the
+  three standalone screens, the gauntlet's ladder, the door between the two products, and the
+  Engineer editor's family controls all entered the corpus at once.
+
+  **The cases, the simulations and the failing-case columns are all unmoved**, and that is the
+  claim worth reading twice: the corpus grew by half again and found nothing, on a wave that added
+  thirteen screens. The surfaces column is the honest measure of what this wave built — a screen
+  that is not in this count is a screen the search has never read.
+
+  The deep tier is still exactly one surface above the always-on tier, for the reason it has always
+  been: `campaign/judge.ts#judgeStage` is silent in one tier by construction and loud in the other.
+  Thirteen new surfaces on both sides did not disturb that, which is the gap being a property
+  rather than a coincidence.
 
   The `EVERYDAY_MENU` adapter drives the four mode tiles, the rail over **every** screen key in all
   three run contexts, both shapes of the rail, and the shell's register of absences. It does not
@@ -284,18 +295,38 @@ by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 **The page opens on Everyday Mode, and that changed on 2026-08-12.** `packages/viz/index.html` loads
 `everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the Engineer surface still
 builds and starts exactly as before — and mounts a 212 px rail, a pinned action bar and a four-tile
-menu over it ([§ D335](DECISIONS.md)). **The Engineer surface is what *Today's tower* hands off to**,
-so it is still the stage, and the change is one line of HTML to revert.
+menu over it ([§ D335](DECISIONS.md)). The change is one line of HTML to revert.
 
-Three consequences worth knowing before you touch either shell. **`inert` has two writers** —
+**Both worlds co-exist, and § 3.2's *Switch to Engineer* row is the door between them
+([§ D338](DECISIONS.md)).** It used to be *Today's tower* that handed off; § 7's stage is a screen
+now — and the *Today's tower* tile opens § 6.1's front door, which is what § 4's inventory says it
+reaches — so the rail's footer row is what crosses over. The Engineer header
+carries the way back (`#back-to-everyday`), reached through `everyday/swap.ts`'s provided port
+because `dev/main.ts` may not import the Everyday shell — `boot.ts` already imports `dev/main.ts`,
+and closing that cycle is what produced this directory's last module-init `undefined`.
+
+Four consequences worth knowing before you touch either shell. **`inert` has two writers** —
 `menuPanel.ts#coverShell` and `everyday/shell.ts` — and the rule between them is that the outer cover
 wins while it is up; writing it unguarded hangs the renderer, because `el.inert = true` on an
-already-inert element still calls `setAttribute` and still records a mutation. **The browser tier
-reaches the Engineer surface through the player's own path** (`enterEngineerStage`,
-`reopenEngineerMenu`) rather than by taking the cover off, which is the difference between a tier that
-tests the product and one that tests a surface nobody can open. And **three of the four mode tiles
-refuse**, two of them about a *screen* rather than about the thing behind it — the campaign and
-Fix-a-building engines both run, and their Everyday screens do not.
+already-inert element still calls `setAttribute` and still records a mutation. **Both roots are
+covered and neither is ever hidden**: the Engineer root because its canvases size from their laid-out
+box, and now the Everyday root for the same reason on the other side of the door, since § 7's stage
+holds a canvas whose `resize` listener is still attached while the other world has the page —
+`visibility:hidden` keeps the box, `display:none` does not, and the browser tier asserts the canvas's
+width is identical either side of a round trip. **The browser tier reaches the Engineer surface
+through the player's own path** (`enterEngineerStage`, `reopenEngineerMenu`) rather than by taking the
+cover off, which is the difference between a tier that tests the product and one that tests a surface
+nobody can open — and that helper had gone stale with the hand-off, leaving the tier red in 25 cases
+across 12 files while the product worked. And **all four mode tiles open now**: every one of
+§ 4's seventeen screen keys is registered in `everyday/screens.ts`, so `UNBUILT_REASONS` is empty for
+the first time. The constant and the both-directions test around it stay exactly where they are — a
+screen that ever leaves the registry owes its sentence back, and an empty table is a state that must
+keep being checked rather than a rule that can be deleted.
+
+**The swap is not remembered, and that is § 3.5 rather than a second rule.** A reload lands on the
+Everyday main menu whichever world the player was in, because a remembered world is the entry-screen
+override the guide forbids wearing `localStorage`. The rail's row says so on its own face
+(`types.ts#ENGINEER_SWAP_NOTE`), which is where a reader will meet it.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
 *Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted

@@ -235,24 +235,39 @@ export function elevationRowHeightPx(rowCount: number): number {
 }
 
 /**
- * Tints for the shaft bands, one per **bank**.
+ * Tints for the shaft bands, one per **bank** — guide § 19's eight, by token name.
  *
  * Deliberately **not** the wait-age band palette (§ 1.1 S7). Those four colours are reserved for
  * every claim about how long somebody has stood, on every surface, and a shaft tinted amber here
- * would be a colour-coded assertion about a queue that does not exist. These are the transport's
- * phase hues and the accent, which carry no such meaning.
+ * would be a colour-coded assertion about a queue that does not exist.
+ *
+ * ## Names, not values — § D251's rule, and the defect it closes here
+ *
+ * These were six hex literals in this file, and this file writes them into **inline styles**
+ * (`setStyle(handles.label, 'color', car.tint)` and four more). An inline style is not reached by
+ * a `:root[data-theme]` block, so the six were a palette no theme could repaint — the § D251
+ * defect, wearing the elevation's hat, and it bit the moment the page's own mode became paper.
+ * Five of the six were also *the same string* as `--accent`, `--accent-soft`, `--measured`,
+ * `--transfer` and `--secure`, so a shaft band and a credential-restricted floor were one colour.
+ *
+ * Both close by naming tokens: `render/tokens.ts` owns the eight (`SHAFT_GOLD` and its siblings,
+ * where the § 19 provenance and the deviation are argued), `render/theme.ts` projects them onto
+ * `--shaft-1…8` in both modes, and `index.html` declares them. Eight rather than six because
+ * § 19's `Shaft tints` line has eight, which `docs/21` § 2.2 (3) asks for by name.
  */
 export const SHAFT_TINTS: readonly string[] = Object.freeze([
-  '#4f9ee8',
-  '#c69ad8',
-  '#9fc48a',
-  '#dbb075',
-  '#7fb6f0',
-  '#c9a56a',
+  'var(--shaft-1)',
+  'var(--shaft-2)',
+  'var(--shaft-3)',
+  'var(--shaft-4)',
+  'var(--shaft-5)',
+  'var(--shaft-6)',
+  'var(--shaft-7)',
+  'var(--shaft-8)',
 ]);
 
 export function shaftTintOf(bankIndex: number): string {
-  return SHAFT_TINTS[bankIndex % SHAFT_TINTS.length] ?? '#4f9ee8';
+  return SHAFT_TINTS[bankIndex % SHAFT_TINTS.length] ?? 'var(--shaft-1)';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -2033,7 +2048,7 @@ export function mountBuildingEditor(
         bottom: '0',
         left: `${CAPACITY_TICK_PCT.toFixed(4)}%`,
         width: '1px',
-        background: 'rgb(255 255 255 / 0.28)',
+        background: 'color-mix(in srgb, var(--text) 28%, transparent)',
       },
     });
     const knob = el(doc, 'span', {
@@ -2092,7 +2107,9 @@ export function mountBuildingEditor(
       className: 'elev-row',
       style: {
         height: `${String(rowHeight)}px`,
-        background: row.isEntrance ? '#141c28' : 'transparent',
+        background: row.isEntrance
+          ? 'color-mix(in srgb, var(--entrance) 9%, transparent)'
+          : 'transparent',
         'border-bottom': '1px solid var(--hairline)',
       },
       children: [label, sky, occ, people, el(doc, 'span', { style: { flex: '1' } })],
@@ -2187,7 +2204,11 @@ export function mountBuildingEditor(
       setStyle(
         handles.root,
         'background',
-        row.isEntrance ? '#141c28' : row.isSky ? 'rgb(198 154 216 / 0.07)' : 'transparent',
+        row.isEntrance
+          ? 'color-mix(in srgb, var(--entrance) 9%, transparent)'
+          : row.isSky
+            ? 'color-mix(in srgb, var(--transfer) 7%, transparent)'
+            : 'transparent',
       );
       setText(handles.label, row.label);
       setStyle(handles.label, 'color', row.labelColor);
@@ -2243,7 +2264,7 @@ export function mountBuildingEditor(
             el(doc, 'span', { text: car.role, style: { width: '78px', flex: 'none' } }),
             el(doc, 'span', {
               text: car.serves,
-              style: { width: '90px', flex: 'none', color: '#c6d0dc' },
+              style: { width: '90px', flex: 'none', color: 'var(--dim)' },
             }),
             el(doc, 'span', {
               text: car.pinned ? 'pinned' : '',

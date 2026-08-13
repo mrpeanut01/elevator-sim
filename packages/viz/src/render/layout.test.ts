@@ -135,7 +135,6 @@ describe('buildLayout', () => {
       floors: FLOORS,
       shafts: Array.from({ length: cars }, (_, index) => shaft(String.fromCharCode(65 + index))),
       gutterRightPx: 280,
-      overlayWidthPx: width >= 900 ? 250 : 0,
     });
 
   it('draws the whole bank on a phone, where it used to draw one shaft of it', () => {
@@ -167,10 +166,17 @@ describe('buildLayout', () => {
 
   it('is inert at desktop widths — no picture that fitted has moved', () => {
     // The clamp is a floor, not a redesign. At 1232 px (a 1920 × 1080 window) the shipped request
-    // already leaves the plot 49 % of the canvas, so the gutters come through untouched.
+    // already leaves the plot more than half the canvas, so the gutters come through untouched.
     const wide = asShipped(1232, 6);
     expect(wide.plot.x).toBe(12 + 72);
-    expect(wide.plot.width).toBe(1232 - 24 - 72 - 280 - 250);
+    /*
+     * `− 250` used to close this arithmetic: the live metrics panel's reservation. `docs/21` § 3.4
+     * moved that panel to the DOM, so the plot is **250 px wider at every width** — which is the
+     * beneficiary § D316 named when it gave the panel a floor rather than letting it clip. The
+     * expression is still the request rather than a pinned number, so it stays a claim about the
+     * layout rather than a transcription of one run of it.
+     */
+    expect(wide.plot.width).toBe(1232 - 24 - 72 - 280);
   });
 
   it('spends the air between shafts before it spends a shaft', () => {
