@@ -110,6 +110,16 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * a limitation rather than presented as coverage.
          */
         'everyday/shell.ts#mountEverydayShell',
+        /*
+         * § 15.1's settings screen, on the same split and for the same reason: `SETTINGS_SCREEN`
+         * is a registry row whose `mount` builds inputs, swatch buttons and rows, so it cannot run
+         * without a document. Every **word** on that screen — the lede, the name note, the row
+         * captions, the two statements of fact and all six refusals in the register — is authored
+         * in `everyday/settingsView.ts`, which the `EVERYDAY_SETTINGS` adapter drives over every
+         * state the view distinguishes, including the one where the Engineer bridge has not
+         * arrived. What the mount authors of its own is geometry and two class names.
+         */
+        'everyday/settingsScreen.ts#SETTINGS_SCREEN',
         'dev/buildingEditor.ts#mountBuildingEditor',
         'dev/dispatcherEditor.ts#mountDispatcherEditor',
         'dev/machinesEditor.ts#mountMachinesEditor',
@@ -843,6 +853,24 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'that is weaker than the search and is stated as a limitation rather than presented as ' +
         'coverage.',
       ids: ['dev/shiftRunner.ts#createShiftRunner'],
+    },
+    {
+      reason:
+        'A storage slot with no sentence in it — **the id/key case again**. All three are derived ' +
+        'only because `PROFILE_KEY`’s value, `elevator-sim.everyday-profile`, reads to the two-' +
+        'adjacent-words scanner as a phrase; it is a `localStorage` key in the same family as ' +
+        '`persist/types.ts#SESSION_KEY`, and nothing any of the three returns is shown to ' +
+        'anybody. What they carry is a player’s own name and one of six colours, and the screen ' +
+        'that draws those is `everyday/settingsView.ts`, driven by `EVERYDAY_SETTINGS`. The ' +
+        'refusals here are refusals to *restore* — a version this build cannot read, a colour ' +
+        'outside the curated six — and they produce no words at all, only `undefined`, which is ' +
+        'the whole reason the caller has a fallback profile. `everyday/profile.test.ts` asserts ' +
+        'each of them directly.',
+      ids: [
+        'everyday/profile.ts#loadProfile',
+        'everyday/profile.ts#saveProfile',
+        'everyday/profile.ts#createProfileStore',
+      ],
     },
   ]);
 

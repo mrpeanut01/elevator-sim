@@ -249,10 +249,15 @@ const isTest = (id: string): boolean => id.endsWith('.test.ts') || id.endsWith('
 const EVERYDAY_SHELL_FILES = new Set([
   'everyday/boot.ts',
   'everyday/shell.ts',
+  /* The fixit screen's DOM half — its words and decisions stay pure in fixitScreenModel.ts. */
   'everyday/fixitScreen.ts',
+  /* The settings screen's DOM half — its words and decisions stay pure in settingsView.ts. */
+  'everyday/settingsScreen.ts',
+  /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
+  'everyday/profileStore.ts',
 ]);
 
-/** A shell entry point: `dev/` wholesale, and the Everyday shell's two DOM-owning files. */
+/** A shell entry point: `dev/` wholesale, and the Everyday shell's DOM-owning files. */
 const isDev = (id: string): boolean => id.startsWith('dev/') || EVERYDAY_SHELL_FILES.has(id);
 
 describe('CLAUDE.md invariant 6 — core never depends on viz', () => {

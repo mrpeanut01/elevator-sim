@@ -23,14 +23,16 @@ import {
 import { EVERYDAY_SCREENS } from './types.js';
 
 describe('what this build has actually built', () => {
-  it('is the shell’s two screens and every registered module — today the two plus fixit', () => {
+  it('is the shell’s two screens and every registered module — today the two plus fixit and settings', () => {
     /*
      * Stated as a fact about this tree rather than a design intent, exactly as `modes.test.ts`
      * does for the tiles: the day a screen lane lands, this case fails and is updated in the same
      * commit — which is the point, because this list is what the menu and the rail derive from.
-     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`).
+     * `fixit` is the first registered module (GAMEPLAY § 10, `everyday/fixitScreen.ts`) and
+     * `settings` the second (§ 15.1, `everyday/settingsScreen.ts`); the order is
+     * `EVERYDAY_SCREENS`' own, because the constant is a filter over the inventory.
      */
-    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit']);
+    expect(EVERYDAY_SCREENS_BUILT).toEqual(['menu', 'stage', 'fixit', 'settings']);
   });
 
   it('derives BUILT from the registry, in both directions', () => {

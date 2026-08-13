@@ -172,6 +172,17 @@ describe('the footer', () => {
     expect(footer.identity.initial).toBe('N');
   });
 
+  it('colours the disc from the profile, sun until the player picks — § 20.15’s one place', () => {
+    expect(railFooter({ screen: 'menu', ctx: 'daily' }).identity.avatarColor).toBe('#F2A63B');
+    const footer = railFooter(
+      { screen: 'menu', ctx: 'daily' },
+      { profile: { name: 'Nadia R.', avatarColor: '#5F7268' } },
+    );
+    expect(footer.identity.avatarColor).toBe('#5F7268');
+    // The streak is not the profile store's to give: with none stated, the honest absence stays.
+    expect(footer.identity.streak).toContain('no days saved');
+  });
+
   it('draws Settings as a destination with the › hint, HERE on its own screen', () => {
     // § 3.2: the one rail item drawn as a bordered row with a gear icon and a ›.
     expect(railFooter({ screen: 'menu', ctx: 'daily' }).settings.hint).toBe('›');

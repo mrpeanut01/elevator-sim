@@ -61,8 +61,10 @@ import {
 } from '../everyday/fixitScreenModel.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
+import { AVATAR_SWATCHES } from '../everyday/profile.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
+import { settingsScreenViewOf } from '../everyday/settingsView.js';
 import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
 import { EVERYDAY_SCREENS, RUN_CONTEXTS } from '../everyday/types.js';
 import { admitProfile } from '../campaign/dimensions.js';
@@ -5042,6 +5044,14 @@ const MENU: SurfaceAdapter = {
     // would be R1's defect with a friendly face. Driven below rather than excused.
     'menu/partsOfDay.ts#partsOfDay',
     'menu/account.ts#formIssues',
+    /*
+     * The naming rule itself, reached only *through* `formIssues` — the second shape this list's
+     * docstring names. It was extracted so Everyday Mode's § 15.1 name field refuses in the same
+     * words rather than in a second copy of them, and driving `formIssues` over the naming stage
+     * (below, through `signedIn`'s unnamed player) is what drives it: every sentence it can
+     * return is one `formIssues` hands back.
+     */
+    'menu/account.ts#displayNameIssueOf',
     'menu/account.ts#postingRefusal',
     'menu/account.ts#signedIn',
     'menu/client.ts#CLIENT_FAILURES',
@@ -7289,6 +7299,118 @@ const EVERYDAY_MENU: SurfaceAdapter = {
   },
 };
 
+/**
+ * **Everyday Mode's settings screen** — GAMEPLAY § 15.1, the words half.
+ *
+ * ## Why a settings panel belongs in a corpus about honesty
+ *
+ * Almost every string on it is a claim about a **control**: what a row does, where a name is
+ * shown, what this device keeps, and — for six of § 15.1's rows — why the control is not there at
+ * all. That is the roadmap's standing requirement in its most literal form: a control that says
+ * it writes nothing while writing something, and § D227's mirror image, a refusal standing over a
+ * seam that works. The register in {@link SETTINGS_ABSENCES} is six such refusals in one array,
+ * and a refusal nothing sweeps is exactly the sentence that goes stale the day somebody wires the
+ * seam it refuses about.
+ *
+ * ## What is driven, and the one state that is not a fixture
+ *
+ * Every state the pure view distinguishes, iterated rather than sampled: no stored profile and a
+ * stored one, a name the display-name rule takes and one it refuses, a write that survived the tab
+ * and one that did not, and **all three** values of the Engineer bridge — reduced, full, and
+ * *absent*. The third is the honest one to insist on: while `dev/main.ts` is still booting there is
+ * no switch to write, so the screen draws a sentence in the row's place, and that sentence is a
+ * claim about a control that does not exist yet. A sweep that only ever saw the two flipped states
+ * would never read it.
+ *
+ * `everyday/settingsScreen.ts#SETTINGS_SCREEN` is **not** driven here and is excluded in
+ * `derive.test.ts` on the DOM mounts' shared ground — it needs a document — which is the same
+ * pure/DOM split `EVERYDAY_MENU` describes for the shell. What that mount authors of its own is
+ * geometry and two class names, not sentences.
+ */
+const EVERYDAY_SETTINGS: SurfaceAdapter = {
+  id: 'everyday/settingsView.ts#settingsScreenViewOf',
+  covers: [
+    'everyday/settingsView.ts#settingsScreenViewOf',
+    'everyday/settingsView.ts#SETTINGS_ABSENCES',
+    /*
+     * The swap refusal, reached through the register above and through the rail's footer — one
+     * sentence with two readers, which is why it sits in `types.ts` where neither can shadow it.
+     */
+    'everyday/types.ts#ENGINEER_SWAP_REFUSAL',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+
+    const stored = { name: 'A player', avatarColor: AVATAR_SWATCHES[2].color };
+    const cases = [
+      ['fresh', { profile: undefined, reduceMotion: false }],
+      ['named', { profile: stored, reduceMotion: false }],
+      ['reduced', { profile: stored, reduceMotion: true }],
+      /* The still-booting window: the Motion row's absence rather than the row. */
+      ['booting', { profile: stored, reduceMotion: undefined }],
+      /* A refused draft — `menu/account.ts`'s sentence, drawn beside the field. */
+      ['refused-name', { profile: stored, draftName: 'x', reduceMotion: false }],
+      /* A store that keeps nothing: the profile is real for this tab and says so. */
+      ['not-durable', { profile: stored, durable: false, reduceMotion: false }],
+    ] as const;
+
+    for (const [label, input] of cases) {
+      const view = settingsScreenViewOf(input);
+      seeds.push({ field: `${label}.eyebrow`, text: view.eyebrow, role: 'label' });
+      seeds.push({ field: `${label}.title`, text: view.title, role: 'label' });
+      seeds.push({ field: `${label}.lede`, text: view.lede, role: 'prose' });
+
+      seeds.push({ field: `${label}.you.heading`, text: view.you.heading, role: 'label' });
+      seeds.push({ field: `${label}.you.nameLabel`, text: view.you.nameLabel, role: 'label' });
+      seeds.push({ field: `${label}.you.name`, text: view.you.nameValue, role: 'label' });
+      seeds.push({ field: `${label}.you.pictureLabel`, text: view.you.pictureLabel, role: 'label' });
+      seeds.push({ field: `${label}.you.note`, text: view.you.note, role: 'prose' });
+      seeds.push({ field: `${label}.you.home`, text: view.you.home, role: 'prose' });
+      if (view.you.nameIssue !== undefined) {
+        seeds.push({ field: `${label}.you.nameIssue`, text: view.you.nameIssue, role: 'reason' });
+      }
+      if (view.you.saveNotice !== undefined) {
+        seeds.push({ field: `${label}.you.saveNotice`, text: view.you.saveNotice, role: 'reason' });
+      }
+
+      seeds.push({ field: `${label}.playing.heading`, text: view.playing.heading, role: 'label' });
+      for (const row of view.playing.rows) {
+        seeds.push({ field: `${label}.playing.${row.id}.label`, text: row.label, role: 'label' });
+        /* The § 16 register: one clause saying what the row does. */
+        seeds.push({ field: `${label}.playing.${row.id}.note`, text: row.note, role: 'prose' });
+        seeds.push({ field: `${label}.playing.${row.id}.value`, text: row.value, role: 'label' });
+      }
+      if (view.playing.absentNote !== undefined) {
+        seeds.push({
+          field: `${label}.playing.absent`,
+          text: view.playing.absentNote,
+          role: 'reason',
+        });
+      }
+
+      seeds.push({ field: `${label}.device.heading`, text: view.device.heading, role: 'label' });
+      for (const [index, fact] of view.device.facts.entries()) {
+        const at = `${label}.device.${String(index)}`;
+        seeds.push({ field: `${at}.label`, text: fact.label, role: 'label' });
+        seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
+        seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
+      }
+
+      seeds.push({
+        field: `${label}.absences.heading`,
+        text: view.absences.heading,
+        role: 'label',
+      });
+      for (const [index, entry] of view.absences.entries.entries()) {
+        seeds.push({ field: `${label}.absence.${String(index)}`, text: entry, role: 'reason' });
+      }
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -7330,6 +7452,7 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // surface and silently change what the shrink assertions are about.
   GLOSSARY,
   EVERYDAY_MENU,
+  EVERYDAY_SETTINGS,
   REPORT_CARD,
   // Appended, same reason again: the suite re-seeds the bench's sentences under its own surface
   // id, and placing it earlier would put duplicates of BATCH_REPORT's strings ahead of the
