@@ -49,10 +49,12 @@ import { batchReport, populationLineOf, type BatchReport } from '../batch/report
 import { SuiteError, suiteCellViewOf, suitePlanOf } from '../batch/suite.js';
 import { BATCH_METRIC_CLASS, BATCH_METRIC_PRESENTATION, BATCH_METRICS, type BatchResult } from '../batch/types.js';
 import { briefingFor } from '../campaign/brief.js';
+import { ACTION_BAR_ROWS, confirmStripFor, TIMELINE_STEPS } from '../everyday/actionBar.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { railModel, sublineFor } from '../everyday/rail.js';
+import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
-import { EVERYDAY_SCREENS, type RunContext } from '../everyday/types.js';
+import { EVERYDAY_SCREENS, RUN_CONTEXTS } from '../everyday/types.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -6927,30 +6929,36 @@ function ruleRowOf(when: RuleRow['when'], then: RuleRow['then']): RuleRow {
 }
 
 /**
- * **Everyday Mode's front door** — the menu's four tiles, the rail, and the register of absences.
+ * **Everyday Mode's front door and frame** — the menu's four tiles, the rail with its footer, the
+ * § 3.3 action-bar table, § 3.4's confirm strips, the per-screen refusals, and the register of
+ * absences.
  *
  * ## Why this is in the corpus at all, and why it is the pure half only
  *
  * It is the first screen a player meets, and almost everything on it is a **claim about what this
- * build can do**: four tiles that say what each mode is and how long it takes, three of which say
- * why they do not open, a rail whose rows carry the same kind of refusal, and a list headed *what
- * this build does not do yet*. Those are exactly the sentences that go stale — the roadmap's
- * standing requirement is about a control that says it writes nothing while writing something, and
- * `docs/05`'s § D227 is about the mirror image. A front door full of refusals nothing sweeps is that
- * defect with a bigger audience.
+ * build can do**: four tiles that say what each mode is and how long it takes, those of them that
+ * refuse saying why, a rail whose rows carry the same kind of refusal, a bar whose every cell
+ * promises what a control does, and a list headed *what this build does not do yet*. Those are
+ * exactly the sentences that go stale — the roadmap's standing requirement is about a control that
+ * says it writes nothing while writing something, and `docs/05`'s § D227 is about the mirror
+ * image. A front door full of refusals nothing sweeps is that defect with a bigger audience.
  *
  * `everyday/shell.ts#mountEverydayShell` is **not** driven here and is excluded in
  * `derive.test.ts` on the DOM mounts' shared ground: it needs a document. The split is deliberate
- * and is the reason `modes.ts` and `rail.ts` are pure — the mount draws what they decide, so driving
- * them is driving the words. What the mount authors of its own is the two headings and the menu
- * lede, which reach only the static sweep, and that is a limitation rather than coverage.
+ * and is the reason `modes.ts`, `rail.ts`, `actionBar.ts` and `screens.ts` are pure — the mount
+ * draws what they decide, so driving them is driving the words. What the mount authors of its own
+ * is the headings, the menu lede and the refusal screen's way-back line, which reach only the
+ * static sweep, and that is a limitation rather than coverage.
  *
  * ## Why the rail is driven over every screen and every context
  *
- * `sublineFor` is a total function over the sixteen screen keys and three run contexts, and its
- * whole job is to tell a player **where they are**. A subline that says `MID-DAY` on the rush or
- * `READING THE REPORT` at the front door is a false statement about the player's own position, and
- * the only way to know none of them does that is to ask for all of them.
+ * `sublineFor` is a total function over `EVERYDAY_SCREENS × RUN_CONTEXTS` — both iterated from
+ * the constants rather than restated, after a hand-written three-context loop here went stale the
+ * day `watch` landed — and its whole job is to tell a player **where they are**. A subline that
+ * says `MID-DAY` on the rush or `READING THE REPORT` at the front door is a false statement about
+ * the player's own position, and the only way to know none of them does that is to ask for all of
+ * them. The § 3.3 table is swept row for row on the same argument: every cell is a claim about
+ * what a control does or costs, and the table is the one place the claims live.
  */
 const EVERYDAY_MENU: SurfaceAdapter = {
   id: 'everyday/modes.ts#EVERYDAY_MODES',
@@ -6958,7 +6966,15 @@ const EVERYDAY_MENU: SurfaceAdapter = {
     'everyday/modes.ts#EVERYDAY_MODES',
     'everyday/rail.ts#sublineFor',
     'everyday/rail.ts#railGroups',
+    'everyday/rail.ts#railFooter',
     'everyday/rail.ts#railModel',
+    'everyday/actionBar.ts#ACTION_BAR_ROWS',
+    'everyday/actionBar.ts#actionBarFor',
+    'everyday/actionBar.ts#confirmStripFor',
+    'everyday/actionBar.ts#TIMELINE_STEPS',
+    'everyday/screens.ts#UNBUILT_REASONS',
+    'everyday/screens.ts#unbuiltReasonFor',
+    'everyday/screens.ts#SCREEN_NAMES',
     'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
   ],
   render(context) {
@@ -6987,22 +7003,26 @@ const EVERYDAY_MENU: SurfaceAdapter = {
 
     /* Every screen × every context, for the reason in the docstring. */
     for (const screen of EVERYDAY_SCREENS) {
-      for (const ctx of ['daily', 'campaign', 'rush'] as const satisfies readonly RunContext[]) {
+      for (const ctx of RUN_CONTEXTS) {
         seeds.push({
           field: `rail.subline.${screen}.${ctx}`,
-          text: sublineFor({ screen, ctx, history: [] }),
+          text: sublineFor({ screen, ctx }),
           role: 'label',
         });
       }
     }
 
     /*
-     * Both shapes of rail: outside a campaign, and inside one where the CAMPAIGN group appears.
-     * Driving only the first would leave two rows — *All buildings*, *Contract & works* — swept by
-     * nothing, and they are rows that open screens which do not exist.
+     * Both shapes of rail: outside a campaign, and inside one where the CAMPAIGN group appears —
+     * with a placeholder building so the desk row (whose label *is* the building's name) is
+     * present in the swept shape. Driving only the first shape would leave the campaign rows swept
+     * by nothing, and they are rows that open screens which do not exist.
      */
     for (const inCampaign of [false, true]) {
-      const model = railModel({ screen: 'menu', ctx: 'campaign', history: [] }, inCampaign);
+      const model = railModel(
+        { screen: 'menu', ctx: 'campaign' },
+        inCampaign ? { inCampaign, openBuilding: '⟨building⟩' } : {},
+      );
       const where = inCampaign ? 'in-campaign' : 'no-campaign';
       seeds.push({ field: `rail.${where}.brand`, text: model.brand, role: 'label' });
       seeds.push({ field: `rail.${where}.mode`, text: model.mode, role: 'label' });
@@ -7022,6 +7042,92 @@ const EVERYDAY_MENU: SurfaceAdapter = {
             });
           }
         }
+      }
+    }
+
+    /*
+     * § 3.2's footer, once — it does not vary by campaign shape. The identity card's streak line
+     * is the honest-absence form (no profile store exists), which is exactly the kind of sentence
+     * that goes stale the day one does.
+     */
+    const footer = railModel({ screen: 'menu', ctx: 'daily' }).footer;
+    seeds.push({ field: 'rail.footer.playingAs', text: footer.identity.heading, role: 'label' });
+    seeds.push({ field: 'rail.footer.name', text: footer.identity.name, role: 'label' });
+    seeds.push({ field: 'rail.footer.streak', text: footer.identity.streak, role: 'reason' });
+    seeds.push({ field: 'rail.footer.settings', text: footer.settings.label, role: 'label' });
+    if (footer.settings.unavailable !== undefined) {
+      seeds.push({
+        field: 'rail.footer.settings.unavailable',
+        text: footer.settings.unavailable,
+        role: 'reason',
+      });
+    }
+    seeds.push({ field: 'rail.footer.swap', text: footer.engineerSwap.label, role: 'label' });
+    if (footer.engineerSwap.unavailable !== undefined) {
+      seeds.push({
+        field: 'rail.footer.swap.unavailable',
+        text: footer.engineerSwap.unavailable,
+        role: 'reason',
+      });
+    }
+
+    /*
+     * § 3.3's table, row for row: every cell is a claim about a control. The `⟨…⟩` cells are the
+     * guide's own state-dependent placeholders, swept as authored so a drift in the convention is
+     * visible here too.
+     */
+    for (const row of ACTION_BAR_ROWS) {
+      const key = row.ctx === undefined ? `bar.${row.screen}` : `bar.${row.screen}.${row.ctx}`;
+      seeds.push({ field: `${key}.leave`, text: row.leave.label, role: 'label' });
+      if (row.back !== undefined) {
+        seeds.push({ field: `${key}.back`, text: row.back.label, role: 'label' });
+      }
+      for (const [index, variant] of row.primary.variants.entries()) {
+        seeds.push({ field: `${key}.primary.${String(index)}`, text: variant, role: 'label' });
+      }
+      if (row.note !== undefined) {
+        seeds.push({ field: `${key}.note`, text: row.note, role: 'prose' });
+      }
+      for (const [index, variant] of (row.noteVariants ?? []).entries()) {
+        seeds.push({ field: `${key}.note.${String(index)}`, text: variant, role: 'prose' });
+      }
+      if (row.wayOut !== undefined) {
+        seeds.push({ field: `${key}.wayOut`, text: row.wayOut, role: 'label' });
+      }
+    }
+    for (const [flow, stops] of Object.entries(TIMELINE_STEPS)) {
+      for (const stop of stops) {
+        seeds.push({
+          field: `bar.timeline.${flow}.${stop.screen}`,
+          text: stop.label,
+          role: 'label',
+        });
+      }
+    }
+
+    /* § 3.4's strips — the daily/campaign pair and the rush pair; `watch` never warns. */
+    for (const ctx of RUN_CONTEXTS) {
+      const strip = confirmStripFor(ctx);
+      if (strip === undefined) continue;
+      seeds.push({ field: `bar.confirm.${ctx}.question`, text: strip.question, role: 'prose' });
+      seeds.push({
+        field: `bar.confirm.${ctx}.consequence`,
+        text: strip.consequence,
+        role: 'prose',
+      });
+      seeds.push({ field: `bar.confirm.${ctx}.leave`, text: strip.leaveLabel, role: 'label' });
+      seeds.push({ field: `bar.confirm.${ctx}.stay`, text: strip.stayLabel, role: 'label' });
+    }
+
+    /*
+     * The per-screen refusals and § 4 names, from the registry: the router's refusal screen, the
+     * rail captions and the bar's refusing note all quote these, so they are swept at the source.
+     */
+    for (const screen of EVERYDAY_SCREENS) {
+      seeds.push({ field: `screen.${screen}.name`, text: SCREEN_NAMES[screen], role: 'label' });
+      const reason = UNBUILT_REASONS[screen];
+      if (reason !== undefined) {
+        seeds.push({ field: `screen.${screen}.unbuilt`, text: reason, role: 'reason' });
       }
     }
 
