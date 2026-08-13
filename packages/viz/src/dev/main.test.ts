@@ -1651,3 +1651,31 @@ describe('the submit path asks the predicate its own docstring names — GitHub 
     ).toBeLessThan(posted);
   });
 });
+
+describe('an intervention re-simulation is not a new attempt — docs/20 defect 17', () => {
+  /*
+   * The decision itself is `shift/week.ts#closeDay`'s `recordGrew` parameter and is driven in
+   * `week.test.ts`; what only this file can pin is the wiring, which lives inside `boot()` where
+   * no Node test can call it. Two sites, each read at the source in `reportPanel.test.ts`'s
+   * binding-site idiom: the intervention button is the one caller allowed to start a run as
+   * `'intervention'`, and `closeShift` is the one reader that turns the latch into the flag
+   * `closedWeekOf` gates the attempt count on. A latch written by nobody, or written and never
+   * read, would leave `week.test.ts` green while the sheet counts a parked car as a retry.
+   */
+  async function mainSource(): Promise<string> {
+    return readFile(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+  }
+
+  it('exactly one run start says intervention, and it is the intervention button’s', async () => {
+    const source = await mainSource();
+    // The callback-closing shape of the one legitimate site, `}, 'intervention')` — a second
+    // caller passing the cause would count here and go red by name.
+    const starts = source.match(/\}, 'intervention'\)/g) ?? [];
+    expect(starts.length, 'one runShift call carries the cause').toBe(1);
+  });
+
+  it('closeShift hands the latch to closedWeekOf, where it gates the attempt', async () => {
+    const source = await mainSource();
+    expect(source).toContain("closedWeekOf(state, outcome, runCause === 'intervention')");
+  });
+});

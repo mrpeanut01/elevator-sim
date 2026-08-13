@@ -689,6 +689,24 @@ function boot(ui: Elements, resources: BrowserResources): void {
   /** The run whose day has already been filed. See {@link tick}. */
   let filedRunId: string | undefined;
   /**
+   * Why the run on screen was started — `docs/20` defect 17, and the one fact `closeShift` cannot
+   * read off the recording.
+   *
+   * ENGINE_CONTRACT § 1.4: an intervention is **the same run's record growing** — append to the
+   * log, re-simulate from t = 0 — never a new run. But the record cannot testify to that at filing
+   * time, because a plain retry of an unchanged selection reproduces the same `{seed, config}` too
+   * (§ D223's correction inside `closeDay`'s docstring). So the *intent* is latched where it
+   * exists: {@link runShift} writes it on every start, `'player'` unless the caller says
+   * otherwise, and the intervention button is the one caller that says otherwise. `closeShift`
+   * hands it to `closedWeekOf`, where it gates exactly one thing — the attempt count. A player who
+   * pressed *Run* once and parked once has made one attempt at the day, not two.
+   *
+   * A third `let` beside {@link filedRunId} and {@link simulatedRecording} on their own rule:
+   * *has this run been filed?*, *did we run it?* and *why did it start?* are three questions, and
+   * § D311 is what happens when two of them share a flag.
+   */
+  let runCause: 'player' | 'intervention' = 'player';
+  /**
    * The run **this shell simulated**, as opposed to the run on screen — GitHub issue #136.
    *
    * The two are the same except after {@link loadRecordingFile}, which is the whole of the issue:
@@ -2870,7 +2888,10 @@ function boot(ui: Elements, resources: BrowserResources): void {
       // After adopt: the new Playback exists by the time a run lands, and seeking does not
       // start or stop playback — a reader who was paused stays paused at the stamped instant.
       playback?.seekTo(atS);
-    });
+      // The one caller that is § 1.4's *record growing* rather than a new ask — see {@link
+      // runCause}. Said here, at the site that appended to the log two statements up, because
+      // intent exists nowhere else: the re-simulated recording is indistinguishable from a retry's.
+    }, 'intervention');
   });
 
   /** The strip's two live facts: whether the control can act now, and the latest stamp. */
@@ -4267,7 +4288,14 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * calling this, and on a synchronous run that overlay was painted over a finished recording.
    * See {@link applyShift}.
    */
-  function runShift(onRan?: (recording: VizRecording) => void): void {
+  function runShift(
+    onRan?: (recording: VizRecording) => void,
+    cause: 'player' | 'intervention' = 'player',
+  ): void {
+    // Latched per start, so the value `closeShift` reads is about the run that will land — the
+    // runner supersedes in-flight asks, and the latest ask is the one whose recording files. See
+    // {@link runCause}; `'player'` is the default because every press but one means *a new ask*.
+    runCause = cause;
     setText(ui.transport.error, '');
     /*
      * The restore notice survives boot's own run and nothing after it.
@@ -4881,7 +4909,13 @@ function boot(ui: Elements, resources: BrowserResources): void {
      * it, because a decision made inside this closure needs a document, a canvas and a click to
      * reach — which is why this one went four modes without a test.
      */
-    const week = closedWeekOf(state, outcome);
+    /*
+     * `recordGrew` — `docs/20` defect 17. A re-file caused by the intervention button is the same
+     * run's record growing (ENGINE_CONTRACT § 1.4), so it replaces the day's effect without
+     * counting an attempt; {@link runCause} is where the intent was latched and `closeDay`'s
+     * docstring is where the one thing it gates is argued.
+     */
+    const week = closedWeekOf(state, outcome, runCause === 'intervention');
     filedReportInput = {
       recording,
       observations,
