@@ -65,6 +65,35 @@ import {
   fixitRepairStateLine,
   fixitSpendSummary,
 } from '../everyday/fixitScreenModel.js';
+import {
+  benchBudgetNoteOf,
+  benchEntrantsOf,
+  benchFieldRefusal,
+  benchResultViewOf,
+  benchTestsOf,
+  benchTestsRefusal,
+  benchVerdictNoteOf,
+  benchWorkLineOf,
+  BENCH_COPY,
+  BENCH_FIELD_MAX,
+  BENCH_REPLICATION_CHOICES,
+} from '../everyday/benchModel.js';
+import {
+  behaviourBlockOf,
+  carriedBlocksOf,
+  constraintCardsOf,
+  libraryCardsOf,
+  /* Aliased: `dev/leftRail.ts` and `dev/rightRail.ts` already export these two names. */
+  mathsDisclosureOf as workshopMathsOf,
+  nameplateOf as workshopNameplateOf,
+  playStyleAbsenceOf,
+  playStyleCardsOf,
+  rulesBlockOf,
+  switchingBlockOf,
+  termDisclosureOf,
+  workshopLeversOf,
+  WORKSHOP_COPY,
+} from '../everyday/workshopModel.js';
 import { briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
@@ -278,6 +307,7 @@ import {
 } from '../dev/dispatcherEditor.js';
 import {
   RULES_EXCLUSIVITY_NOTE,
+  defaultRuleRow,
   fallbackLineOf,
   leverLineOf,
   readbackOf,
@@ -366,6 +396,7 @@ import {
   type WeekState,
 } from '../shift/types.js';
 import {
+  defaultSelectorSpec,
   patternLine,
   patternName,
   policyLine,
@@ -8787,6 +8818,395 @@ const ENGINEER_DOOR: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * The dispatcher workshop — GAMEPLAY § 11 over `everyday/workshopModel.ts`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Everyday Mode's dispatcher workshop** — the six disclosure layers, driven over the shipped
+ * dispatcher library.
+ *
+ * ## Why this surface is worth sweeping, and what it is most likely to get wrong
+ *
+ * It is the screen § D301 calls the mass-market draw, and almost every string on it is a **claim
+ * about a control**: what a lever owns, what a weight serves, which filter runs before the
+ * scoring, what the profile carries that the screen cannot draw, whether the switching block
+ * reaches the run. That is exactly the class the roadmap's standing requirement is about, in both
+ * directions — a control that says it writes nothing while writing something (§ D227), and a
+ * control that writes nothing and does not say so (§ D219).
+ *
+ * The three classes of sentence it could most easily get wrong are all driven below. **A cost
+ * line** (R2 — it must not read as a claim about a day), **the maths disclosure** (§ 16 rule 12 —
+ * the plain sentence first, then every symbol, then the expression), and **the refusals**: the
+ * inert-term refusal § D112 earned, the clockless time rule, the unnamed hard constraint, and the
+ * *inert while one setting runs all shift* sentence, which is the one that would be a lie if the
+ * detector were ever built under `off`.
+ *
+ * ## Driven over every style, and both switching states
+ *
+ * Each of the shipped play styles is loaded in turn, so the cards, the term rows, the cost line
+ * and the maths symbols are rendered against six different vectors rather than one — a term whose
+ * player words are only reachable under a profile that weights it would otherwise never be swept.
+ * The switching block is rendered under `off` *and* under `fuzzy`, because its inert note exists
+ * only in the first and its detector help only in the second.
+ *
+ * `everyday/workshopScreen.ts#WORKSHOP_SCREEN` is not driven here and is excluded in
+ * `derive.test.ts` on the DOM mounts' shared ground: it needs a document. What that mount authors
+ * of its own is geometry, class names and the two joining words `when` and `then`.
+ */
+const EVERYDAY_WORKSHOP: SurfaceAdapter = {
+  id: 'everyday/workshopModel.ts#WORKSHOP_COPY',
+  covers: [
+    'everyday/workshopModel.ts#WORKSHOP_COPY',
+    'everyday/workshopModel.ts#playStyleAbsenceOf',
+    'everyday/workshopModel.ts#termDisclosureOf',
+    'everyday/workshopModel.ts#mathsDisclosureOf',
+    'everyday/workshopModel.ts#behaviourBlockOf',
+    'everyday/workshopModel.ts#constraintCardsOf',
+    'everyday/workshopModel.ts#carriedBlocksOf',
+    'everyday/workshopModel.ts#switchingBlockOf',
+    'everyday/workshopModel.ts#rulesBlockOf',
+    'everyday/workshopModel.ts#nameplateOf',
+    /*
+     * Three exports are deliberately **not** listed and are rendered anyway:
+     * `playStyleCardsOf`, `libraryCardsOf` and `workshopLeversOf`. The derivation does not find
+     * them, and it is right not to — none of them authors a phrase. The style cards carry
+     * `data/dispatcher-profiles.json`'s own `name` and `trade` (swept above, seed by seed), the
+     * library cards carry each profile's `name`, and the lever views are `mode/plainLevers.ts`'s,
+     * already driven by the editor adapter. Listing them would be a coverage claim about
+     * functions that produce no prose of their own, which is the stale-coverage half of
+     * `derive.test.ts`'s guard.
+     */
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+    const file = context.dispatcherProfiles;
+
+    for (const [key, text] of Object.entries(WORKSHOP_COPY)) {
+      seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the left panel: six style cards, the rest of the shelf, the nameplate ---- */
+    for (const card of playStyleCardsOf(file, 'collective', DEFAULT_LEVERS, blankSpec([]))) {
+      seeds.push({ field: `style.${card.id}.name`, text: card.name, role: 'label', provenance: 'authored' });
+      seeds.push({ field: `style.${card.id}.trade`, text: card.trade, role: 'prose', provenance: 'authored' });
+    }
+    /* The refusal a build with no declared styles draws — reachable only through a file that has
+     * none, so it is manufactured here rather than left as a sentence no run has seen. */
+    const { playStyles: _styles, ...bare } = file;
+    const absence = playStyleAbsenceOf(bare);
+    if (absence !== undefined) {
+      seeds.push({ field: 'style.absent', text: absence, role: 'reason', provenance: 'authored' });
+    }
+    for (const card of libraryCardsOf(file, 'collective')) {
+      seeds.push({ field: `library.${card.profileId}`, text: card.name, role: 'label', provenance: 'authored' });
+    }
+
+    /* ---- the ladder, once per shipped style, so every vector is swept ---- */
+    const styled = (file.playStyles ?? []).map((style) => style.profileId);
+    const profiles = file.profiles.filter((profile) => styled.includes(profile.id));
+    for (const profile of profiles.length > 0 ? profiles : file.profiles.slice(0, 1)) {
+      const spec = specFromProfile(profile, profile.name);
+      const label = profile.id;
+
+      for (const lever of workshopLeversOf(spec, DEFAULT_LEVERS)) {
+        seeds.push({ field: `${label}.lever.${lever.id}`, text: lever.label, role: 'label' });
+        seeds.push({ field: `${label}.lever.${lever.id}.sub`, text: plainLeverSub(lever), role: 'prose' });
+        seeds.push({ field: `${label}.lever.${lever.id}.echo`, text: plainLeverEchoOf(lever), role: 'prose' });
+        seeds.push({ field: `${label}.lever.${lever.id}.help`, text: plainLeverHelp(lever), role: 'reason' });
+      }
+
+      const terms = termDisclosureOf(file.terms, spec);
+      seeds.push({ field: `${label}.terms.summary`, text: terms.summary, role: 'label' });
+      seeds.push({ field: `${label}.terms.hint`, text: terms.hint, role: 'prose', provenance: 'authored' });
+      for (const row of terms.rows) {
+        seeds.push({ field: `${label}.term.${row.termId}`, text: `${row.label} — ${row.serves}`, role: 'label' });
+        if (row.inertWhy !== undefined) {
+          seeds.push({ field: `${label}.term.${row.termId}.inert`, text: row.inertWhy, role: 'reason' });
+        }
+      }
+
+      const maths = workshopMathsOf(spec, file.terms);
+      seeds.push({ field: `${label}.maths.plain`, text: maths.plainSentence, role: 'prose', provenance: 'authored' });
+      for (const symbol of maths.symbols) {
+        seeds.push({
+          field: `${label}.maths.symbol.${symbol.symbol}`,
+          text: `${symbol.symbol} — ${symbol.name}, ${symbol.serves} · ${symbol.weight}`,
+          role: 'label',
+        });
+      }
+      /*
+       * The cost line, on `role: 'observation'` rather than `estimate`. It is a statement of the
+       * configuration a reader is looking at — the same claim `vectorLineOf` makes one surface
+       * over — and not a figure any run produced, so R13 asking it for an `n` would be asking the
+       * wrong question of it.
+       */
+      seeds.push({ field: `${label}.maths.line`, text: maths.line, role: 'observation' });
+      seeds.push({ field: `${label}.maths.signs`, text: maths.signs, role: 'prose', provenance: 'authored' });
+
+      const behaviour = behaviourBlockOf(spec, DEFAULT_LEVERS);
+      seeds.push({ field: `${label}.behaviour.boundary`, text: behaviour.boundary, role: 'reason', provenance: 'authored' });
+      for (const flag of behaviour.flags) {
+        seeds.push({ field: `${label}.flag.${flag.key}`, text: `${flag.label} — ${flag.hint}`, role: 'label' });
+      }
+      for (const lever of behaviour.groupLevers) {
+        seeds.push({ field: `${label}.group.${lever.key}`, text: `${lever.label} — ${lever.hint}`, role: 'label' });
+      }
+
+      for (const card of constraintCardsOf(profile)) {
+        seeds.push({ field: `${label}.constraint.${card.id}`, text: `${card.name} — ${card.effect}`, role: 'reason' });
+      }
+      for (const entry of carriedBlocksOf(profile)) {
+        seeds.push({ field: `${label}.carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * The unnamed-constraint fallback, manufactured: no shipped profile can reach it (the record
+     * in `core` is total over `HardConstraintId`), and a refusal no run has ever rendered is a
+     * refusal nobody has read. `FIXIT`'s over-budget note is manufactured on the same ground.
+     */
+    const invented = { ...file.profiles[0]!, hardConstraints: ['someFutureFilter'] };
+    for (const card of constraintCardsOf(invented)) {
+      if (!card.unnamed) continue;
+      seeds.push({ field: 'constraint.unnamed', text: `${card.name} — ${card.effect}`, role: 'reason' });
+    }
+    /* Every carried-block sentence, over a profile that carries all of them it can. */
+    for (const profile of file.profiles) {
+      for (const entry of carriedBlocksOf(profile)) {
+        seeds.push({ field: `carried.${entry.block}`, text: entry.words, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the switching block, in both states ---- */
+    const selectorContext = selectorContextFrom(file, 900);
+    const base = defaultSelectorSpec(selectorContext);
+    for (const policy of ['off', 'fuzzy'] as const) {
+      const view = switchingBlockOf({ ...base, policy }, selectorContext);
+      seeds.push({ field: `switching.${policy}.policyLine`, text: view.policyLine, role: 'prose' });
+      if (view.inertNote !== undefined) {
+        seeds.push({ field: `switching.${policy}.inert`, text: view.inertNote, role: 'reason', provenance: 'authored' });
+      }
+      for (const mode of view.modes) {
+        seeds.push({ field: `switching.${policy}.mode.${mode.policy}`, text: mode.label, role: 'label', provenance: 'authored' });
+      }
+      for (const control of view.controls) {
+        seeds.push({ field: `switching.${policy}.control.${control.field}`, text: control.label, role: 'label', provenance: 'authored' });
+        seeds.push({ field: `switching.${policy}.control.${control.field}.help`, text: control.help, role: 'prose' });
+      }
+      for (const card of view.patterns) {
+        if (card.line !== undefined) {
+          seeds.push({ field: `switching.${policy}.pattern.${card.patternId}`, text: card.line, role: 'prose' });
+        }
+        if (card.signature !== undefined) {
+          seeds.push({ field: `switching.${policy}.pattern.${card.patternId}.signature`, text: card.signature, role: 'observation' });
+        }
+      }
+    }
+
+    /* ---- the rules editor: every offered phrase, a live row, and a live refusal ---- */
+    for (const hasClock of [true, false]) {
+      const rows: RuleRow[] = [
+        defaultRuleRow(),
+        { ...defaultRuleRow(), when: 'time-before', whenValue: 32_400 },
+      ];
+      const block = rulesBlockOf(rows, 'Steady hand', { hasClock });
+      const where = hasClock ? 'clock' : 'no-clock';
+      seeds.push({ field: `rules.${where}.fallback`, text: block.fallback, role: 'label' });
+      seeds.push({ field: `rules.${where}.exclusivity`, text: block.exclusivity, role: 'prose', provenance: 'authored' });
+      seeds.push({ field: `rules.${where}.vocabulary`, text: block.vocabularyNote, role: 'reason', provenance: 'authored' });
+      for (const option of block.whenOptions) {
+        seeds.push({ field: `rules.when.${option.id}`, text: option.template, role: 'label' });
+        for (const value of option.values ?? []) {
+          seeds.push({ field: `rules.when.${option.id}.${String(value.value)}`, text: value.label, role: 'label' });
+        }
+      }
+      for (const option of block.thenOptions) {
+        seeds.push({ field: `rules.then.${option.id}`, text: option.template, role: 'label' });
+        for (const value of option.values ?? []) {
+          seeds.push({ field: `rules.then.${option.id}.${String(value.value)}`, text: value.label, role: 'label' });
+        }
+      }
+      for (const row of block.rows) {
+        seeds.push({ field: `rules.${where}.row.${String(row.index)}.readback`, text: row.readback, role: 'prose' });
+        seeds.push({ field: `rules.${where}.row.${String(row.index)}.lever`, text: row.lever, role: 'label' });
+        for (const [at, issue] of row.issues.entries()) {
+          seeds.push({ field: `rules.${where}.row.${String(row.index)}.issue.${String(at)}`, text: issue.message, role: 'reason' });
+        }
+      }
+      const empty = rulesBlockOf([], 'Steady hand', { hasClock }).empty;
+      if (empty !== undefined) {
+        seeds.push({ field: `rules.${where}.empty`, text: empty, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /* ---- the nameplate, in both of its states ---- */
+    const clean = specFromProfile(file.profiles[0]!, file.profiles[0]!.name);
+    const moved = { ...clean, weights: { ...clean.weights, starvation: 71 } };
+    for (const [where, spec, rows] of [
+      ['unchanged', clean, [] as readonly RuleRow[]],
+      ['dirty', moved, [defaultRuleRow()] as readonly RuleRow[]],
+    ] as const) {
+      const plate = workshopNameplateOf({
+        startedFrom: file.profiles[0]!.name,
+        spec,
+        levers: DEFAULT_LEVERS,
+        baseSpec: clean,
+        baseLevers: DEFAULT_LEVERS,
+        ruleRows: rows,
+      });
+      if (plate.unchanged !== undefined) {
+        seeds.push({ field: `nameplate.${where}.unchanged`, text: plate.unchanged, role: 'prose', provenance: 'authored' });
+      }
+      seeds.push({ field: `nameplate.${where}.startedFrom`, text: plate.startedFrom, role: 'label' });
+      seeds.push({ field: `nameplate.${where}.levers`, text: plate.leversMoved, role: 'observation' });
+      seeds.push({ field: `nameplate.${where}.rules`, text: plate.rules, role: 'observation' });
+      seeds.push({ field: `nameplate.${where}.bench`, text: plate.provedOnTheBench, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * The test bench — GAMEPLAY § 12 over `everyday/benchModel.ts`
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **Everyday Mode's test bench** — the field, the tests, the budget, and everything it says about
+ * a result it did not compute.
+ *
+ * ## What the sweep is actually asking of this surface
+ *
+ * § 12's whole claim is that the bench *"is allowed to shrug"*, and the failure mode is the one
+ * CLAUDE.md names outright: a screen that turns a two-run subtraction into a verdict. So the seeds
+ * below carry the **refusals** — the field's two bounds, the empty tick list, the two budget
+ * notes, the three-arm verdict refusal — and the two sentences that would be the defect if they
+ * were ever drawn without them: § 12.2's *Too close to call*, which sits **beside**
+ * `report.ts`'s `unresolved` and never in place of it, and the never-a-subtraction rule itself.
+ *
+ * The per-cell figures and comparison rows are **not** re-seeded here: they are `batchReport`'s
+ * own sentences, driven by `BATCH_REPORT`, and re-rendered under the suite's id by `SUITE_BENCH`.
+ * Adding a third copy would put duplicates ahead of the originals and move every batch-shaped
+ * fault onto this surface, which is the ordering rule stated at `SHIFT_REPORT`.
+ *
+ * `everyday/benchScreen.ts#BENCH_SCREEN` is not driven here and is excluded in `derive.test.ts`
+ * on the DOM mounts' shared ground: it mounts DOM and owns a batch `Worker`.
+ */
+const EVERYDAY_BENCH: SurfaceAdapter = {
+  id: 'everyday/benchModel.ts#BENCH_COPY',
+  covers: [
+    'everyday/benchModel.ts#BENCH_COPY',
+    'everyday/benchModel.ts#BENCH_STANDING_NOTES',
+    'everyday/benchModel.ts#benchEntrantsOf',
+    'everyday/benchModel.ts#benchFieldRefusal',
+    'everyday/benchModel.ts#benchTestsRefusal',
+    'everyday/benchModel.ts#benchBudgetNoteOf',
+    'everyday/benchModel.ts#benchWorkLineOf',
+    'everyday/benchModel.ts#benchVerdictNoteOf',
+    'everyday/benchModel.ts#benchResultViewOf',
+    // Driven through `benchFieldRefusal`, which it calls before narrowing to the tuple: a field
+    // it returns `undefined` for is exactly a field that refusal names.
+    'everyday/benchModel.ts#benchFieldOf',
+  ],
+  render(context) {
+    const seeds: TextSeed[] = [];
+
+    for (const [key, text] of Object.entries(BENCH_COPY)) {
+      seeds.push({ field: `copy.${key}`, text, role: 'prose', provenance: 'authored' });
+    }
+
+    /* ---- the field, at every size the toggles can reach ---- */
+    const shelf = context.dispatcherProfiles.profiles.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+    }));
+    for (const size of [0, 1, 2, BENCH_FIELD_MAX, BENCH_FIELD_MAX + 1]) {
+      const picked = shelf.slice(0, size).map((entry) => entry.id);
+      const refusal = benchFieldRefusal(picked);
+      if (refusal !== undefined) {
+        seeds.push({ field: `field.${String(size)}.refusal`, text: refusal, role: 'reason' });
+      }
+      seeds.push({
+        field: `field.${String(size)}.verdictNote`,
+        text: benchVerdictNoteOf(size),
+        role: 'reason',
+      });
+      for (const entrant of benchEntrantsOf(shelf, picked)) {
+        seeds.push({ field: `field.${String(size)}.entrant.${entrant.profileId}`, text: entrant.name, role: 'label' });
+        if (entrant.refusal !== undefined) {
+          seeds.push({ field: `field.${String(size)}.entrant.${entrant.profileId}.refusal`, text: entrant.refusal, role: 'reason' });
+        }
+      }
+    }
+
+    /* ---- the tests, and the empty-tick refusal ---- */
+    for (const test of benchTestsOf(['midtown-up-peak'])) {
+      seeds.push({ field: `test.${test.cellId}`, text: test.label, role: 'label' });
+    }
+    const noTests = benchTestsRefusal([]);
+    if (noTests !== undefined) {
+      seeds.push({ field: 'tests.refusal', text: noTests, role: 'reason', provenance: 'authored' });
+    }
+
+    /* ---- the budget: every choice's work line, and both notes ---- */
+    for (const choice of BENCH_REPLICATION_CHOICES) {
+      seeds.push({
+        field: `budget.${String(choice)}.work`,
+        text: benchWorkLineOf(3, choice, 2),
+        role: 'observation',
+      });
+      const note = benchBudgetNoteOf(choice);
+      if (note !== undefined) {
+        seeds.push({ field: `budget.${String(choice)}.note`, text: note, role: 'reason', provenance: 'authored' });
+      }
+    }
+
+    /*
+     * ---- the result: the standing notes, the index's own words, and the three-arm refusal ----
+     *
+     * The index's verdict words are `suiteSummaryOf`'s and are seeded here under the bench's id
+     * because this is the surface a player reads them on; the per-row sentences below them are
+     * `batchReport`'s and are deliberately not re-seeded (see the adapter docstring).
+     */
+    const cell = { id: 'midtown-up-peak', label: 'Midtown Office, up-peak 1 %' };
+    const two = suiteCellViewOf(cell, context.batch);
+    const third = context.batch.arms[1];
+    const many =
+      third === undefined
+        ? undefined
+        : suiteCellViewOf(cell, {
+            ...context.batch,
+            arms: [...context.batch.arms, { ...third, armId: 'bench-ghost-arm' }],
+          });
+    const view = benchResultViewOf(many === undefined ? [two] : [two, many]);
+    seeds.push({ field: 'result.caption', text: view.caption, role: 'label', provenance: 'authored' });
+    seeds.push({ field: 'result.neverASubtraction', text: view.neverASubtraction, role: 'prose', provenance: 'authored' });
+    for (const [index, note] of view.standingNotes.entries()) {
+      seeds.push({ field: `result.standing.${String(index)}`, text: note, role: 'prose', provenance: 'authored' });
+    }
+    for (const line of view.summary.lines) {
+      for (const [index, mark] of line.marks.entries()) {
+        if (mark === null) continue;
+        seeds.push({ field: `result.${line.cellId}.mark.${String(index)}`, text: mark.text, role: 'observation' });
+      }
+      if (line.note !== null) {
+        seeds.push({ field: `result.${line.cellId}.note`, text: line.note, role: 'reason' });
+      }
+    }
+    /*
+     * § 12.2's heading, seeded only where a drawn row actually came back `unresolved`. Seeding it
+     * unconditionally would be the surface asserting a shrug it had not measured, which is the
+     * mirror image of the defect this whole screen exists to refuse.
+     */
+    for (const cellId of view.tooCloseCellIds) {
+      seeds.push({ field: `result.${cellId}.tooClose`, text: BENCH_COPY.tooCloseHeading, role: 'reason' });
+    }
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -8892,6 +9312,20 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * is not evidence that it was: this position was chosen, not inherited.
    */
   EVERYDAY_CAMPAIGN,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — **and this pair is the one
+   * the rule bites hardest on**, which is why they go here rather than where their branch had them
+   * (its own end, four surfaces up from this one).
+   *
+   * § 11's workshop re-renders the dispatcher library's term rows, its cost line and its maths
+   * disclosure, and every one of those shares a wording with `EDITOR`, `CONTROLS`,
+   * `EDITED_PROFILE` and `RULES_EDITOR`. § 12's bench re-seeds a suite index — cells, replication
+   * counts, a verdict — which is `BATCH_REPORT`'s and `SUITE_BENCH`'s shape exactly. Placed
+   * earlier, these two would have taken editor-shaped and batch-shaped faults off six surfaces at
+   * once, which is more re-mapping than any single insertion in this array has ever risked.
+   */
+  EVERYDAY_WORKSHOP,
+  EVERYDAY_BENCH,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

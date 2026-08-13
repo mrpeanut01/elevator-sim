@@ -47,6 +47,7 @@
  */
 
 import type { ActionBarModel } from './actionBar.js';
+import { BENCH_SCREEN } from './benchScreen.js';
 import { BOARD_SCREEN } from './boardScreen.js';
 import { BRIEF_SCREEN } from './briefScreen.js';
 import { BUILDING_SCREEN, CONTRACT_SCREEN, TOWERS_SCREEN } from './campaignScreens.js';
@@ -57,6 +58,7 @@ import { REPORT_SCREEN } from './reportScreen.js';
 import { SETTINGS_SCREEN } from './settingsScreen.js';
 import { STAGE_SCREEN } from './stageScreen.js';
 import { WEEK_SCREEN } from './weekScreen.js';
+import { WORKSHOP_SCREEN } from './workshopScreen.js';
 import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 import { EVERYDAY_SCREENS } from './types.js';
 
@@ -117,6 +119,8 @@ const SCREEN_MODULES: Readonly<Partial<Record<EverydayScreen, EverydayScreenModu
     building: BUILDING_SCREEN,
     contract: CONTRACT_SCREEN,
     fixit: FIXIT_SCREEN,
+    workshop: WORKSHOP_SCREEN,
+    bench: BENCH_SCREEN,
     week: WEEK_SCREEN,
     board: BOARD_SCREEN,
     settings: SETTINGS_SCREEN,
@@ -175,8 +179,6 @@ export function routeFor(screen: EverydayScreen): EverydayRoute {
  */
 export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> = Object.freeze({
   rush: 'not built yet — the rush needs held time and a setup screen, and neither exists',
-  workshop: 'the workshop screen is not built — the levers live on the stage for now',
-  bench: 'the bench screen is not built — its suite runs from the Engineer shell',
   designer: 'the designer screen is not built',
   /*
    * The clause naming the brief and the report as *"not built either"* went with them: both are
@@ -200,6 +202,14 @@ export const UNBUILT_REASONS: Readonly<Partial<Record<EverydayScreen, string>>> 
    * refuse, and the sentence that was true of the engine-without-a-screen has nothing left to be
    * true of. It is deleted rather than reworded: this table keys the unbuilt, and there is no arm
    * of it for *built, but only just*.
+   *
+   * **Two more left on the merge that brought § 11's workshop and § 12's bench in, and they are
+   * the pair this table's wording rule was written for.** `workshop` said *"the levers live on the
+   * stage for now"* and `bench` said *"its suite runs from the Engineer shell"* — both naming a
+   * missing screen over a working mechanism, which is the honest form. Both mechanisms are still
+   * exactly where those sentences said they were; what changed is that each now has an Everyday
+   * screen in front of it (`everyday/workshopScreen.ts`, `everyday/benchScreen.ts`), so the clause
+   * *for now* has expired and the sentence goes with it.
    */
   tuner: 'the tuner screen is not built — the brief and the report both point at it, and there is nothing behind the door yet',
 });

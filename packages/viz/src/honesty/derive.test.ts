@@ -232,6 +232,18 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
         'everyday/briefScreen.ts#BRIEF_SCREEN',
         'everyday/reportScreen.ts#REPORT_SCREEN',
         'everyday/weekScreen.ts#WEEK_SCREEN',
+        /*
+         * The Everyday workshop (GAMEPLAY § 11) and bench (§ 12) **screens**, on the mounts'
+         * shared ground. Both are registry rows whose `mount` builds sliders, selects, `<details>`
+         * and — the bench — a batch `Worker`, so neither can run without a document. Their pure
+         * halves are `everyday/workshopModel.ts` and `everyday/benchModel.ts`, which the
+         * `EVERYDAY_WORKSHOP` and `EVERYDAY_BENCH` adapters drive over the shipped dispatcher
+         * library, every play style, every cost term, both switching states and a rule list with
+         * a live refusal in it. What the mounts author of their own is geometry, three class
+         * names and the two joining words `when` and `then`.
+         */
+        'everyday/workshopScreen.ts#WORKSHOP_SCREEN',
+        'everyday/benchScreen.ts#BENCH_SCREEN',
       ],
     },
     {

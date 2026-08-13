@@ -127,12 +127,23 @@ describe('the plan refuses what it cannot run', () => {
     ).toThrow(/ticked twice/);
   });
 
-  it('refuses a field that is not two arms at run time', () => {
+  it('refuses a field under two arms at run time, and plans one of three', () => {
+    const oneArm = { ...ALL_CELLS, field: [FIELD[0]] } as unknown as SuiteRequest;
+    expect(() => suitePlanOf(oneArm)).toThrow(/at least two dispatchers/);
+
+    /*
+     * Three arms **plan**, and that is the field's widening (GAMEPLAY §12.1 — *"two at least,
+     * four at most"*). What did not widen is the verdict gate: `batchReport` compares every arm
+     * after the first with the first, so three arms produce two comparisons and
+     * `suiteCellViewOf` draws its refusal rather than a pairwise verdict — asserted below on a
+     * three-arm result, which is the property this test used to protect by forbidding the plan.
+     */
     const threeArms = {
       ...ALL_CELLS,
       field: [...FIELD, { armId: 'third', dispatcherProfileId: 'nearest-car' }],
     } as unknown as SuiteRequest;
-    expect(() => suitePlanOf(threeArms)).toThrow(/exactly two dispatchers/);
+    expect(suitePlanOf(threeArms)).toHaveLength(ALL_CELLS.cellIds.length);
+    expect(suitePlanOf(threeArms)[0]?.request.arms).toHaveLength(3);
   });
 
   it('refuses an unknown cell id by name, with the known ids listed', () => {

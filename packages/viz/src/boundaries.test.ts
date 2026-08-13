@@ -276,6 +276,10 @@ const EVERYDAY_SHELL_FILES = new Set([
    * shell tier and everything a reader reads does not.
    */
   'everyday/stageScreen.ts',
+  /* The § 11 workshop's DOM half — its words and decisions stay pure in workshopModel.ts. */
+  'everyday/workshopScreen.ts',
+  /* The § 12 bench's DOM half — its words stay pure in benchModel.ts, and it owns a batch Worker. */
+  'everyday/benchScreen.ts',
   /* The one place Everyday touches window.localStorage; profile.ts itself is storage-agnostic. */
   'everyday/profileStore.ts',
   /*
