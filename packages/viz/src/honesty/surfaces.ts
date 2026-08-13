@@ -110,7 +110,13 @@ import { landingAssignmentsAt, meansAreSuppressed, overlayAt, queueAt, type Floo
 import { WAIT_BANDS, moodAt, waitBandsAt } from '../live/bands.js';
 import { decisionRowsAt } from '../live/decisions.js';
 import { honestyAt } from '../live/honesty.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import {
   GHOST_OPTIONS,
   RACE_NOT_RUN,
@@ -1188,6 +1194,9 @@ const LIVE_RAIL: SurfaceAdapter = {
     'live/timeline.ts#timelineOf',
     'live/timeline.ts#phaseAt',
     'live/interventions.ts#PARK_CARS_LOBBY_LABEL',
+    'live/interventions.ts#switchDispatcherLabelOf',
+    'live/interventions.ts#SWITCH_PINS_NOTE',
+    'live/interventions.ts#RECOMPUTING_BEAT',
     'live/interventions.ts#interventionStampOf',
     'live/patternReadout.ts#patternReadoutAt',
   ],
@@ -1213,8 +1222,49 @@ const LIVE_RAIL: SurfaceAdapter = {
      * by a guard in the caller.
      */
     seeds.push({ field: 'interventionButton.label', text: PARK_CARS_LOBBY_LABEL, role: 'label' });
+    /*
+     * The strip's other two controls and its beat — the log's second and third change kinds.
+     *
+     * The switch label and both stamps are **parametric over words a player reads** — a dispatcher
+     * name and the chosen option's own sentence — so they are seeded from the case's own profile
+     * name rather than from a literal: the register rule this sweep exists to enforce is that no
+     * engine identifier reaches a player surface, and a label seeded with a hard-coded name would
+     * pass while the shipped one leaked an id. `dispatcherNameOf` is the same lookup the stage
+     * uses. The pin note and the `recomputing` beat are static, and enter beside the label they
+     * are shown with: the beat is what the stamp slot reads while a re-simulation is in flight,
+     * which is a state a player produces by pressing either control.
+     */
+    const switchTargetName = dispatcherNameOf(context);
+    seeds.push({
+      field: 'switchButton.label',
+      text: switchDispatcherLabelOf(switchTargetName),
+      role: 'label',
+    });
+    seeds.push({ field: 'switchButton.title', text: SWITCH_PINS_NOTE, role: 'observation' });
+    seeds.push({ field: 'interventionStamp.recomputing', text: RECOMPUTING_BEAT, role: 'observation' });
+    /*
+     * One log carrying all three kinds, stamped across the run, so every stamp sentence enters the
+     * corpus at the playheads that can show it — and the deliberate `''` before the first, which is
+     * what keeps `interventionStampOf`'s temporal property met by construction.
+     */
+    const third = (recording.endedAt - recording.startedAt) / 3;
     const interventionLog = [
-      { atS: (recording.startedAt + recording.endedAt) / 2, change: { kind: 'park-cars-lobby' } as const },
+      { atS: recording.startedAt + third, change: { kind: 'park-cars-lobby' } as const },
+      {
+        atS: recording.startedAt + third * 1.5,
+        change: {
+          kind: 'switch-dispatcher',
+          profile: { id: 'plain-baseline', name: switchTargetName, weights: {} },
+        } as const,
+      },
+      {
+        atS: recording.startedAt + third * 2,
+        change: {
+          kind: 'answer-incident',
+          option: 'call the fitter out now',
+          serviceEvents: [],
+        } as const,
+      },
     ];
     for (const at of sampleTimes(recording)) {
       const stamp = interventionStampOf(interventionLog, at);

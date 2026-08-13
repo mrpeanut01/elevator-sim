@@ -259,12 +259,17 @@ export function abandonmentEvent(
 /**
  * One intervention taking effect at its scheduled simulated time.
  *
- * The event exists for the already-parked fleet: the override itself is read by every later
- * `#park` decision whether or not this fires, but a car that is *currently* idle takes a stage 7
- * decision only when something asks it to, and without this event a fleet standing still at
- * `atS` would ignore *park the cars in the lobby* until the next arrival happened to free a car.
- * Scheduled from `SimulationConfig.interventions` at `run()`, beside the trace and the service
- * schedule, so its time is the kernel's and never a wall clock (CLAUDE.md invariant 3).
+ * For `park-cars-lobby` the event exists for the already-parked fleet: the override itself is
+ * read by every later `#park` decision whether or not this fires, but a car that is *currently*
+ * idle takes a stage 7 decision only when something asks it to, and without this event a fleet
+ * standing still at `atS` would ignore *park the cars in the lobby* until the next arrival
+ * happened to free a car. For `switch-dispatcher` the event **is** the switch: every bank's
+ * policy adopts the resolved vector here, at one `(time, sequence)` on the queue, and every
+ * scoring pass after it reads the new weights. An `answer-incident` entry schedules no event of
+ * this kind at all — its effects ride the service schedule as ordinary `serviceChange` events
+ * (`Simulation.#scheduleServiceEvents` records the decision). Scheduled from
+ * `SimulationConfig.interventions` at `run()`, beside the trace and the service schedule, so its
+ * time is the kernel's and never a wall clock (CLAUDE.md invariant 3).
  */
 export function interventionEvent(
   payload: InterventionPayload,

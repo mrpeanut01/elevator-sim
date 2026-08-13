@@ -624,7 +624,7 @@ function metaLinesFor(input: DayReportInput, dispatcherName: string, dayStartS: 
      * The intervention log, last — `docs/19` defect 10, and it is identity rather than a reading:
      * the run record is `{ seed, config, interventions[] }`, and a sheet that reproduces without
      * the log describes a different day. One line per press, in time order, in the stage stamp's
-     * own words (`interventionLogOf` shares `STAMP_VERBS` and the clock with `interventionStampOf`),
+     * own words (`interventionLogOf` shares `stampVerbOf` and the clock with `interventionStampOf`),
      * on both shapes of sheet — a Free Play day can be intervened in exactly as a campaign day can.
      * Last rather than beside the seed, because the lines above are what was *asked for* and these
      * are what the player *did to it* mid-run; an untouched day prints nothing here, which is how

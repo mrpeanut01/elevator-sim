@@ -594,6 +594,13 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
    * the same reading `#weights` has for stage 3.
    */
   #activeRuleIdle: ResolvedIdleStage | undefined;
+  /**
+   * A `switch-dispatcher` intervention's vector, pinned — or `undefined`, which is every instant
+   * of every run whose log holds no switch. While set, {@link adoptWeights}' contract holds:
+   * `#weights` **is** this map, and {@link #refreshWeightSet} returns before the selector or the
+   * rules can un-choose what the player chose.
+   */
+  #interventionWeights: ReadonlyMap<string, number> | undefined;
 
   constructor(config: ResolvedDispatchConfig) {
     this.config = config;
@@ -897,6 +904,11 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     at: SimTime,
     context: DispatchContext | undefined,
   ): void {
+    // A pinned intervention vector wins over both branches below, and the return is *before*
+    // the ArrivalWindow is consulted rather than after: the detector does not merely lose the
+    // vote, it stops being asked, so `#selectorState` and `#lastTraffic` freeze at their
+    // pre-switch values and a report reads the history the run actually had.
+    if (this.#interventionWeights !== undefined) return;
     const rules = this.config.ruleSets;
     if (rules !== undefined) {
       // The rules branch — no ArrivalWindow, no rates: every input is state this policy already
@@ -937,6 +949,26 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     // and guessing the least-bad one would hide exactly that.
     this.#weights = result.arm?.weights ?? this.config.weights;
     this.#activePatternId = result.arm?.patternId;
+  }
+
+  /**
+   * Adopt a `switch-dispatcher` intervention's vector — see the interface member's contract.
+   *
+   * Pins as well as adopts: {@link #refreshWeightSet} returns before either selector branch while
+   * the pin stands, so the vector in force from this instant is the player's for the rest of the
+   * run. `#activePatternId` and `#activeRuleIdle` are cleared rather than left standing, because
+   * both name a *chooser's* choice and the chooser has been relieved — a report that still said
+   * `two-way` was in force would be captioning a detector that stopped being asked.
+   *
+   * Deliberately **not** counted in {@link weightSetSwitches}: that figure is the liveness
+   * study's evidence that a *selector* selected, and folding the player's hand into it would let
+   * a study read an intervention as a detection.
+   */
+  adoptWeights(weights: ReadonlyMap<string, number>): void {
+    this.#interventionWeights = weights;
+    this.#weights = weights;
+    this.#activePatternId = undefined;
+    this.#activeRuleIdle = undefined;
   }
 
   /* ---------------------------------------------------------------- *
@@ -1278,6 +1310,10 @@ export class WeightedCostDispatchPolicy implements DispatchPolicy {
     this.#activeRuleIdle = undefined;
     this.#lastTraffic = undefined;
     this.#switchCount = 0;
+    // The intervention pin goes with the lifecycles, for their reason: the log belongs to one
+    // replication's record, and a second replication that began already switched would be
+    // running a config its own record does not carry.
+    this.#interventionWeights = undefined;
   }
 }
 

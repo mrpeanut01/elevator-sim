@@ -39,7 +39,11 @@
  * to reach, so it cannot be tested and it drifts.
  */
 
-import { SimulationError, type BuildingConfig } from '@elevator-sim/core/browser';
+import {
+  SimulationError,
+  type BuildingConfig,
+  type InterventionChange,
+} from '@elevator-sim/core/browser';
 
 import {
   provideEngineerSettings,
@@ -118,7 +122,13 @@ import {
 import { WAIT_BANDS, waitBandsAt } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import type { WaitBandDefinition, WaitBands } from '../live/types.js';
-import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
+import {
+  interventionStampOf,
+  PARK_CARS_LOBBY_LABEL,
+  RECOMPUTING_BEAT,
+  SWITCH_PINS_NOTE,
+  switchDispatcherLabelOf,
+} from '../live/interventions.js';
 import { patternReadoutAt } from '../live/patternReadout.js';
 import {
   GHOST_OPTIONS,
@@ -235,6 +245,7 @@ import {
   specsWithSaved,
   buildingNameOf,
   disclosureOf,
+  drivingProfileOf,
   initialState,
   profileById,
   resolvedBuildingOf,
@@ -246,7 +257,7 @@ import {
   type ShiftRunConfig,
   type ViewerState,
 } from './state.js';
-import { ghostPlanOf } from './ghostRun.js';
+import { ghostPlanOf, plainBaselineOf } from './ghostRun.js';
 import { recordRefusalFor, watchRecordOf } from '../watch/record.js';
 import type { WatchableRun } from '../watch/types.js';
 import type { WatchingView } from '../watch/view.js';
@@ -2808,6 +2819,31 @@ function boot(ui: Elements, resources: BrowserResources): void {
    * only thing that action can honestly mean. It also needs no new element on a page whose markup
    * is canonical (`docs/12` § D174).
    */
+  /*
+   * The `recomputing` beat — contract § 1.4: re-simulate synchronously below ~400 ms; above it,
+   * a beat rather than a freeze. The re-run is a worker round trip, so the stage never freezes;
+   * what the beat buys is the stamp slot saying *why* the day is about to change under the
+   * playhead. Armed on press by {@link appendIntervention}, shown only once 400 ms of wall clock
+   * have genuinely passed — a 181 ms building must not flash it — and settled by *whatever* ends
+   * the run. Wall clock, deliberately: this measures the player's wait, which is the one duration
+   * the kernel's clock cannot see.
+   *
+   * **Declared above the runner that settles it, and that placement is the fix rather than a
+   * filing choice.** The settle happens in `onRunning(false)` — the one hook that sees a success,
+   * a cancel and a failure alike — so the state it clears must exist before the runner is
+   * constructed. It did not: these three sat with the strip a hundred lines below, and only an
+   * accident of boot order (nothing starts a run in between) kept a `ReferenceError` off the
+   * page. The strip's own elements stay where they are; only the state moves, because
+   * `settleRecompute` touches no DOM.
+   */
+  let interventionRecomputeTimer: number | undefined;
+  let interventionRecomputing = false;
+  const settleRecompute = (): void => {
+    if (interventionRecomputeTimer !== undefined) window.clearTimeout(interventionRecomputeTimer);
+    interventionRecomputeTimer = undefined;
+    interventionRecomputing = false;
+  };
+
   const shiftRunner = createShiftRunner({
     spawn: () => new Worker(new URL('./shiftWorker.ts', import.meta.url), { type: 'module' }),
     clock,
@@ -2827,7 +2863,16 @@ function boot(ui: Elements, resources: BrowserResources): void {
        * job's own callback, and this is the one hook that also sees a cancel and a failure, so
        * the race strip's *waiting* line can never outlive the run it was waiting for.
        */
-      if (!running) ghostInFlight = false;
+      if (!running) {
+        ghostInFlight = false;
+        /*
+         * And neither can the intervention strip's `recomputing` beat — review finding 4. The
+         * success path settles it in its own `runShift` callback; a failed or cancelled re-run
+         * never reaches that callback, and a beat left standing would promise a recompute that
+         * stopped happening. Idempotent when no timer is armed, so ordinary runs pay nothing.
+         */
+        settleRecompute();
+      }
     },
     onFailed: (message) => {
       failRun(message);
@@ -2903,9 +2948,30 @@ function boot(ui: Elements, resources: BrowserResources): void {
         'everything before this moment is unchanged, and playback resumes here',
     },
   });
+  /*
+   * The second intervention — § 20.12's own ordering (*start with park the cars in the lobby,
+   * then dispatcher switching*). The target is the plain baseline through `plainBaselineOf`, the
+   * § D134 resolution the ghost already uses, so the driver this hands the day to and the rival
+   * the race strip draws cannot be two different dispatchers. The label speaks the profile's
+   * *name*; the core arm carries the profile whole, exactly as `ghostRun.ts` swaps the field.
+   */
+  const switchTarget = plainBaselineOf(resources);
+  const switchButton = el(document, 'button', {
+    className: 'chip',
+    text: switchTarget === undefined ? '' : switchDispatcherLabelOf(switchTarget.name),
+    attrs: {
+      type: 'button',
+      // The pin, stated where the player decides — SWITCH_PINS_NOTE's own docstring (§ D227:
+      // a behaviour nothing states is a stale refusal waiting to happen).
+      title:
+        'appends to this day’s record at the playhead and re-simulates the day from the start — ' +
+        SWITCH_PINS_NOTE,
+    },
+  });
+  setHidden(switchButton, switchTarget === undefined);
   const interventionStrip = el(document, 'div', {
     style: { display: 'flex', 'align-items': 'center', gap: '10px', margin: '0 0 8px' },
-    children: [interventionButton, interventionStamp],
+    children: [interventionButton, switchButton, interventionStamp],
   });
   {
     // `.stage-wrap` is the canvas's own wrapper; the strip goes immediately before it.
@@ -2913,30 +2979,88 @@ function boot(ui: Elements, resources: BrowserResources): void {
     stageWrap?.parentElement?.insertBefore(interventionStrip, stageWrap);
   }
 
-  interventionButton.addEventListener('click', () => {
+  /** Append one entry at the playhead and re-run the day — the whole § 1.4 mechanism, shared. */
+  const appendIntervention = (change: InterventionChange): void => {
     if (state.recording === undefined || playback === undefined) return;
     const atS = playback.simTimeS;
     state = {
       ...state,
-      interventions: [...state.interventions, { atS, change: { kind: 'park-cars-lobby' } }],
+      interventions: [...state.interventions, { atS, change }],
     };
     renderAll();
+    settleRecompute();
+    interventionRecomputeTimer = window.setTimeout(() => {
+      interventionRecomputing = true;
+      setText(interventionStamp, RECOMPUTING_BEAT);
+    }, 400);
     runShift(() => {
       // After adopt: the new Playback exists by the time a run lands, and seeking does not
       // start or stop playback — a reader who was paused stays paused at the stamped instant.
+      settleRecompute();
       playback?.seekTo(atS);
-      // The one caller that is § 1.4's *record growing* rather than a new ask — see {@link
-      // runCause}. Said here, at the site that appended to the log two statements up, because
-      // intent exists nowhere else: the re-simulated recording is indistinguishable from a retry's.
+      // The one `runShift` call that is § 1.4's *record growing* rather than a new ask — see
+      // {@link runCause}. Said here, at the site that appended to the log a few statements up,
+      // because intent exists nowhere else: the re-simulated recording is indistinguishable from
+      // a retry's. Both controls funnel through this helper, so both inherit the cause.
     }, 'intervention');
+  };
+
+  interventionButton.addEventListener('click', () => {
+    appendIntervention({ kind: 'park-cars-lobby' });
+  });
+  switchButton.addEventListener('click', () => {
+    if (switchTarget === undefined) return;
+    appendIntervention({ kind: 'switch-dispatcher', profile: switchTarget });
   });
 
-  /** The strip's two live facts: whether the control can act now, and the latest stamp. */
+  /** A profile's vector, canonically — key order is authoring noise, not a difference. */
+  const vectorOf = (weights: Readonly<Record<string, number>>): string =>
+    JSON.stringify(
+      Object.fromEntries(Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))),
+    );
+  /** Memo per state object — the derivation walks the whole chain and this runs per frame. */
+  let switchNoopCache: { readonly forState: ViewerState; readonly noop: boolean } | undefined;
+  /**
+   * Whether pressing the switch would genuinely change nothing — review finding 2. The old
+   * check compared base **ids**, and the driving profile is *derived* (levers, selector, rules —
+   * `drivingProfileOf`'s chain), so it disabled the control exactly where pressing it would
+   * change the run: a lever-moved player handing the day back to the plain baseline. § D177's
+   * inert-control class with the polarity reversed. Now: with a handover already on the log, the
+   * press is a no-op only if that handover names this target (the pin makes later state moot);
+   * otherwise the press is a no-op only if the *vector actually driving* equals the target's —
+   * compared canonically, through the one derivation `shiftRunConfigOf` itself runs — **and** no
+   * chooser is live, because on a rules or selector profile the switch also stands the chooser
+   * down, which is a change even at equal base weights.
+   */
+  const switchWouldChangeNothing = (viewState: ViewerState): boolean => {
+    if (switchTarget === undefined) return true;
+    let latest: string | undefined;
+    for (const entry of viewState.interventions) {
+      if (entry.change.kind === 'switch-dispatcher') latest = entry.change.profile.id;
+    }
+    if (latest !== undefined) return latest === switchTarget.id;
+    if (switchNoopCache?.forState === viewState) return switchNoopCache.noop;
+    const driving = drivingProfileOf(resources, viewState);
+    const noop =
+      vectorOf(driving.weights) === vectorOf(switchTarget.weights) &&
+      (driving.selection?.policy ?? 'off') === 'off';
+    switchNoopCache = { forState: viewState, noop };
+    return noop;
+  };
+
+  /** The strip's live facts: whether each control can act now, and the latest stamp. */
   function drawIntervention(view: ViewAt): void {
     const hasRun = view.recording !== undefined;
     // Disabled rather than hidden while no run is on screen: a control that cannot act now says
     // so (`docs/design` § 7.6's rule), and the title carries what pressing it will do.
     interventionButton.disabled = !hasRun;
+    // Also disabled when the press would genuinely change nothing — a handover to the vector
+    // already driving is a control that moves nothing, which § D177 ranks below no control at all.
+    switchButton.disabled = !hasRun || switchWouldChangeNothing(view.state);
+    if (interventionRecomputing) {
+      setText(interventionStamp, RECOMPUTING_BEAT);
+      return;
+    }
     setText(
       interventionStamp,
       interventionStampOf(view.state.interventions, view.simTimeS, runStartOfDayS),

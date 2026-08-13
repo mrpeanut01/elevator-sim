@@ -46,6 +46,38 @@
  * destroys comparison power — and two shifts of the same day that held different cars would not be
  * comparable with each other either. {@link carsToDerate} is that order, and `events.ts#carsToHold`
  * now calls it rather than keeping a second copy of the same rule.
+ *
+ * ## The campaign incident's *answer* rides the intervention log, in this module's own terms
+ *
+ * The reconciliation decision, recorded here because this module owns the incident vocabulary
+ * and would be the thing a second mechanism duplicated. An incident this module schedules is
+ * known **before** the run — it is part of what the day *is*, so it lives on the
+ * `BuildingConfig` and is invisible to the run record's log. The player's answer to an open
+ * incident (gameplay § 7.5, `HAPPENING NOW`) is the opposite kind of fact: a decision made *at a
+ * simulated instant during the run*, and § 7.5 says in as many words that it is *"mechanically
+ * one instance of § 7.6"*. So the answer is an `answer-incident` entry on
+ * `SimulationConfig.interventions` — `core`'s `InterventionChange` third arm — whose `atS` **is**
+ * `runIncidentClock` (§ 20.16: stamped on the stage, listed on the report by
+ * `live/interventions.ts#interventionLogOf` with every other entry), and whose effects are this
+ * module's exact plain-data terms: a car named `(bankId, carId)` — {@link CarRef} — changing
+ * `ServiceMode` at an absolute second.
+ *
+ * **Inside the engine the answer schedules through the *same* event kind as this module's
+ * output — `serviceChange`, never a sibling.** `Simulation.#scheduleServiceEvents` holds the
+ * argument where the seam is made: `#onServiceChange` is the sole authority on what a mode
+ * change does to the group (re-offers, promise revocation, re-dispatch), and a sibling handler
+ * applying `Car.setMode` itself would be a second copy of all of it. The answer's effects are
+ * appended to the one schedule after the building's own events and fire as ordinary entries,
+ * with one constraint this module's output never needed: every effect must fall at or after the
+ * answer's own `atS`, because an answer that rescheduled the past would break § 1.4's
+ * bit-identical prefix — `core` refuses such an entry loudly.
+ *
+ * No composer is exported from here yet, and that is deliberate rather than unfinished: the one
+ * screen that answers an incident is the Everyday campaign dock, which does not exist, and a
+ * `buildAnswer()` helper with no non-test caller would be this repository's dead-seam shape
+ * manufactured on purpose. The arm, its scheduling, its refusals and its report lines are all
+ * live and tested (`core/src/sim/interventions.test.ts`, `live/interventions.test.ts`); the dock
+ * composes the entry from its option data on the day it lands.
  */
 
 import type { BuildingConfig, ServiceEventConfig } from '@elevator-sim/core/browser';

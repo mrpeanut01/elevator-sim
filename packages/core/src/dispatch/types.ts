@@ -1057,6 +1057,23 @@ export interface DispatchPolicy {
   /** Drop a call that will never be served. */
   cancel(callId: string): boolean;
 
+  /**
+   * Adopt a mid-run intervention's weight vector, and score with it from this moment on.
+   *
+   * The seam behind `switch-dispatcher` (Everyday Mode contract § 1.4, gameplay § 7.6): the run's
+   * kernel calls it exactly once per switch entry, at that entry's scheduled instant, with a
+   * vector already resolved through `resolveWeights`. Adoption **pins** the vector — the profile's
+   * own weight-set selector and rule arms stop choosing for the rest of the run, because an
+   * explicit change of driver outranks the detector (the gameplay guide's `mode: one`, entered
+   * mid-run). `reset()` clears the pin with the lifecycles, so a policy reused across
+   * replications starts each one on its own configuration.
+   *
+   * **Optional**, because `SimulationConfig.createPolicy` lets a study or a fixture supply a
+   * hand-built policy that predates this member; a run whose log asks a policy without it to
+   * switch says so in `warnings` rather than silently not switching.
+   */
+  adoptWeights?(weights: ReadonlyMap<string, number>): void;
+
   /** Forget every call. For reusing a policy across replications. */
   reset(): void;
 }
