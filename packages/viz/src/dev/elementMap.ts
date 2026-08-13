@@ -142,6 +142,19 @@ export interface HeaderElements {
    * Campaign ended the menu for the session.
    */
   readonly openMenu: HTMLButtonElement;
+  /**
+   * The way back to Everyday Mode — GAMEPLAY § 3.2's swap, returning.
+   *
+   * The Engineer surface is reached by a rail row in the other shell, and for one wave it had no
+   * return at all: a player who crossed over was in the developer tool for the rest of the visit.
+   * This is that return, and it is in the header beside {@link openMenu} because the two are the
+   * same kind of control — *leave this surface for somewhere you chose* — and a reader who has found
+   * one has found the other.
+   *
+   * `hidden` in the markup, revealed by `everyday/swap.ts`'s port. See the comment on the element in
+   * `index.html` for why that is a true statement rather than a refusal.
+   */
+  readonly backToEveryday: HTMLButtonElement;
 }
 
 /** § 1.2 L1–L3 — the mood card and the four live stats. */
@@ -626,6 +639,7 @@ export const ELEMENT_IDS: IdsFor<Elements> = Object.freeze({
     banner: 'banner',
     right: 'topbar-right',
     openMenu: 'open-menu',
+    backToEveryday: 'back-to-everyday',
   }),
   mood: Object.freeze({
     face: 'mood-face',

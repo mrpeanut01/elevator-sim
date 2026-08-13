@@ -37,9 +37,13 @@
  * `SHELL_OWNED` is down to the menu alone. The consequence worth stating is that
  * {@link EverydayRoute} lost its `'handoff'` arm **entirely**: it had exactly one producer, this
  * file, and a route value nothing can return is the dead seam this repository keeps a count of. The
- * Engineer surface is unchanged and still boots and runs behind the shell — what it no longer has
- * is a door, which `shell.ts`'s {@link EVERYDAY_SHELL_ABSENCES} names rather than leaves to be
- * discovered.
+ * Engineer surface is unchanged and still boots and runs behind the shell.
+ *
+ * **Its door did not come back as a route, and must not.** § 3.2's *Switch to Engineer* hands the
+ * whole page to the other shell and leaves this one mounted behind it — a mode switch rather than a
+ * navigation — so it is `shell.ts#enterEngineer`, reached from the rail's footer, and there is no
+ * key for it in `EVERYDAY_SCREENS` and no arm for it here. Reintroducing one would put back exactly
+ * the value that was deleted for having nothing to return it.
  */
 
 import type { ActionBarModel } from './actionBar.js';

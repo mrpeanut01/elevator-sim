@@ -21,9 +21,14 @@
  *
  * ## Reached through the player's own path
  *
- * `enterEngineerStage` presses the *Today's tower* tile, which is what a player presses (§ D335).
+ * `enterEngineerStage` presses the rail's *Switch to Engineer* row, which is what a player presses.
  * The cover is never taken off by hand: a helper that dismantled the front door would let this case
  * pass against a surface nobody can open, which is the defect class this repository counts.
+ *
+ * It named the *Today's tower* tile until the swap row was built — § D335 shipped the stage as a
+ * hand-off through that tile, and § 7's stage screen retired it. The helper's own docstring carries
+ * the whole history; the point that does not move is that this file presses whatever the product's
+ * door currently is.
  *
  * ## Midtown Office, seed 42
  *

@@ -11,7 +11,7 @@
  * key draws that key's one refusal sentence — the same sentence the rail's caption and the mode
  * tiles read, so no two surfaces refuse in different words.
  *
- * ## The hand-off retired, and what that cost
+ * ## The hand-off retired, and the door that replaced it
  *
  * § D335 shipped `stage` as a *hand-off*: the shell shrank to the 212 px rail strip, uncovered
  * `div.shell` and inset the whole Engineer application beside it. It was honest, it was reversible,
@@ -19,18 +19,25 @@
  * other — so `screens.ts` has no `'handoff'` route left to return and this module has no second
  * geometry to draw.
  *
- * **The shell therefore covers the Engineer surface for its whole life, and it still covers rather
- * than hides.** The difference stays load-bearing: `div.shell` holds canvases that size themselves
- * from their laid-out box, a `display:none` ancestor gives them a zero box, and a simulator view
- * measured while hidden draws nothing when revealed. The Engineer root stays laid out, `inert`, and
- * exactly as it was — it boots and runs unchanged, which is what makes reverting one line of
- * `packages/viz/index.html` a working product rather than a hope.
+ * Retiring it left the Engineer surface **booting, running, covered, and unreachable**: for one
+ * wave nothing in the shipped page opened it, which was the second entry of
+ * {@link EVERYDAY_SHELL_ABSENCES}. § 3.2's footer row is the door, and it is built now — see
+ * {@link enterEngineer} and {@link returnToEveryday}, which are the whole of it.
  *
- * What it no longer has is a **door**: the § 3.2 footer's *Switch to Engineer* row is that door and
- * it is not built, so nothing in this build opens the Engineer surface. That is the one thing this
- * change took away and it is the second entry of {@link EVERYDAY_SHELL_ABSENCES} rather than a
- * discovery waiting to happen. It also makes `types.ts#ENGINEER_SWAP_REFUSAL` — *"Everyday Mode is
- * the only play style in this build"* — true, which it was not while the stage handed off.
+ * **Both worlds are covered, never hidden, and the symmetry is the design rather than a
+ * coincidence.** `div.shell` holds canvases that size themselves from their laid-out box, a
+ * `display:none` ancestor gives them a zero box, and a simulator view measured while hidden draws
+ * nothing when revealed — so the Engineer root has always stayed laid out and `inert` behind this
+ * shell. The Everyday root now gets exactly the same treatment on the other side of the door: it
+ * keeps its box, its § 7 stage stays mounted with a canvas that still measures, and it steps out of
+ * the paint and out of the page rather than out of the layout. `visibility:hidden` is the primitive
+ * that does that and `display:none` is the one that does not, and the difference is the whole
+ * argument — see {@link setEverydayCovered}.
+ *
+ * The consequence a player meets is that **nothing is discarded by a swap**: no screen is unmounted,
+ * no run is stopped, no context is cleared, and the return lands on the screen they left. That is
+ * why the door has no § 3.4 confirm strip — a strip states a consequence, and this transition has
+ * none to state.
  *
  * ## Why the app opens here and cannot be told not to
  *
@@ -38,6 +45,17 @@
  * deep-link parameter and no `startScreen` prop; the prop was removed outright and must not come
  * back."* So this module exposes no initial-screen argument. A caller that wants to test a screen
  * calls {@link EverydayShell.go} after mounting, which is a navigation a player could also perform.
+ *
+ * **The Engineer swap does not remember, and that is the same rule rather than a separate one.**
+ * Nothing anywhere writes down which world had the page. A reload therefore lands on Everyday Mode's
+ * main menu whichever world the player was in, and the reasoning is § 3.5's own: a remembered world
+ * *is* an entry-screen override — a `startScreen` prop wearing `localStorage` — and it fails worse
+ * than the prop would, because the screen it would restore is a developer tool the player has no
+ * memory of choosing and no obvious way out of. It would also need a second boot path: the Engineer
+ * menu opens itself at boot and `everyday/boot.ts#closeEngineerMenuWhenReady` presses it away
+ * *behind the cover*, which is only correct while the cover is up. The swap is therefore a fact
+ * about this visit, and the rail's own row says so in
+ * `types.ts#ENGINEER_SWAP_NOTE` rather than leaving the player to find out by reloading.
  */
 
 import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
@@ -50,6 +68,7 @@ import { railModel } from './rail.js';
 import type { RailModel } from './rail.js';
 import { routeFor, SCREEN_NAMES, screenModuleFor, unbuiltReasonFor } from './screens.js';
 import type { EverydayScreenContext, EverydayScreenHandle } from './screens.js';
+import { provideEverydaySwap } from './swap.js';
 import {
   EVERYDAY_COLORS as C,
   EVERYDAY_GAPS as GAP,
@@ -69,7 +88,16 @@ import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
  */
 export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
   '§ 6.1 front door and § 6.2 brief — Today’s tower opens the day directly',
-  'the Engineer surface still boots and runs behind this shell, and nothing here opens it — the rail’s Switch to Engineer row is that door and it is not built; one line of packages/viz/index.html reverts the whole product to it',
+  /*
+   * **The second entry is gone, and its deletion is the commit rather than a tidy-up.**
+   *
+   * It read: *"the Engineer surface still boots and runs behind this shell, and nothing here opens
+   * it — the rail's Switch to Engineer row is that door and it is not built"*. That row is built.
+   * A register is only worth the number of people who read it, and an entry naming an absence that
+   * has been closed is how a register stops being read — so it goes on the commit that closes it,
+   * which is the direction `screens.ts`'s refusal table is keyed in both ways to enforce one level
+   * down.
+   */
   '§ 14 boards and § 12.2 ladder — both need a server this build has none of',
   '§ 9 Endless rush — no held time, no setup screen',
 ]);
@@ -151,9 +179,28 @@ export interface EverydayShell {
    * and because both writers read one fact — `runState().open` — they cannot disagree.
    */
   setRunOpen(open: boolean): void;
-  /** Remove the shell and restore the Engineer surface. Used by the Engineer swap once built. */
+  /**
+   * § 3.2's footer row, as a call — hand the page to the Engineer surface.
+   *
+   * Exposed for the same reason {@link go} is: it is a press a player makes, and a test that
+   * performed the transition by reaching past this method would be testing a transition the product
+   * does not have. Idempotent.
+   */
+  enterEngineer(): void;
+  /** Which world has the page. `'engineer'` between the two presses, `'everyday'` otherwise. */
+  world(): EverydayWorld;
+  /**
+   * Remove the shell and restore the Engineer surface **permanently**.
+   *
+   * Not what the swap does — the swap covers, and everything it covers stays mounted and running.
+   * Nothing in the shipped page calls this; it is the mount's own teardown, and it exists so a test
+   * that mounts a second shell into one document can take the first one down.
+   */
   destroy(): void;
 }
+
+/** Which of the two shells the page belongs to at this moment. */
+export type EverydayWorld = 'everyday' | 'engineer';
 
 /**
  * What the shell is mounted over.
@@ -302,6 +349,82 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   function coverEngineer(): void {
     setCoveredInert(true);
     doc.defaultView?.dispatchEvent(new Event('resize'));
+  }
+
+  /* ---------------------------------------------------------------- *
+   * § 3.2's door — the swap, in both directions
+   * ---------------------------------------------------------------- */
+
+  /** Which world has the page. See {@link EverydayShell.world}. */
+  let world: EverydayWorld = 'everyday';
+
+  /**
+   * Take this shell out of the paint and out of the page — **without taking it out of the layout**.
+   *
+   * `visibility` rather than `display`, and the reason is the module docstring's, pointed the other
+   * way. A `display:none` ancestor collapses every box beneath it to zero, and this shell's screen
+   * region can hold `everyday/stageScreen.ts` — a canvas sized from `getBoundingClientRect()` by a
+   * `resize` listener that is still attached while the player is in the Engineer world. Hidden that
+   * way, the first `resize` after the swap would size it to nothing and the return would paint an
+   * empty stage. `visibility:hidden` suppresses the paint and leaves the box, so the rect the canvas
+   * reads is the rect it will have when it is visible again.
+   *
+   * The other two writes are what `visibility` alone does not settle. `inert` is belt to
+   * `visibility`'s braces — the attribute is what `menuPanel.ts#coverShell` and
+   * {@link coverObserver} both speak, so writing it here keeps this root's state legible in the same
+   * vocabulary as everything else on `body`. `aria-hidden` goes with it for `coverShell`'s own
+   * stated reason: `inert` is the newer of the two, and a reader on an assistive technology that has
+   * not implemented it would otherwise still be walked through a shell nobody can see.
+   *
+   * It is written through {@link setInert} like every other `inert` on this path. This root is
+   * excluded from {@link coverObserver} so it cannot start the cycle, but the guard costs nothing
+   * and the write that forgets it is the one that hangs.
+   */
+  function setEverydayCovered(covered: boolean): void {
+    root.style.visibility = covered ? 'hidden' : '';
+    setInert(root, covered);
+    if (covered) root.setAttribute('aria-hidden', 'true');
+    else root.removeAttribute('aria-hidden');
+  }
+
+  /**
+   * § 3.2's *Switch to Engineer* — hand the page to the other shell.
+   *
+   * **The order of the two writes is the whole of the `inert` contract and is not interchangeable.**
+   * {@link setCoveredInert}`(false)` goes first: it disconnects {@link coverObserver} *before*
+   * anything else moves, so the re-assert that keeps the page inert while this shell is up cannot
+   * fire against the transition and put back what this function is clearing. § D335's rule — *the
+   * outer cover wins while it is up* — is not weakened by that; it is honoured, because this is the
+   * moment the outer cover stops being up. `menuPanel.ts#coverShell` is then the only writer again,
+   * which is exactly the state the Engineer surface expects to be in when nobody is covering it.
+   *
+   * Both writes are in one synchronous block, so no frame is painted between an uncovered Engineer
+   * surface and a stepped-aside Everyday one. The `resize` at the end is § D335's own: this shell's
+   * departure changes what is on screen, and every canvas on the surface now receiving it
+   * re-measures on that event.
+   */
+  function enterEngineer(): void {
+    if (world === 'engineer') return;
+    world = 'engineer';
+    setCoveredInert(false);
+    setEverydayCovered(true);
+    doc.defaultView?.dispatchEvent(new Event('resize'));
+  }
+
+  /**
+   * The way back — `dev/main.ts`'s header control, through `everyday/swap.ts`'s port.
+   *
+   * The mirror of {@link enterEngineer}, in the mirrored order: this shell comes back first, then
+   * {@link coverEngineer} re-inerts everything behind it and re-arms the observer. Nothing is
+   * re-drawn and nothing is re-mounted — `state`, the mounted screen, § 3.4's latch and the data
+   * host's subscription were all untouched by the trip, which is what makes the return land on the
+   * screen the player left rather than at the front door.
+   */
+  function returnToEveryday(): void {
+    if (world === 'everyday') return;
+    world = 'everyday';
+    setEverydayCovered(false);
+    coverEngineer();
   }
 
   /**
@@ -555,7 +678,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       rail.append(block);
     }
 
-    /* § 3.2's footer: identity card, the bordered Settings row, the stubbed Engineer swap. */
+    /* § 3.2's footer: identity card, the bordered Settings row, the Engineer swap. */
     const footer = el(doc, 'div');
     footer.style.cssText = 'margin-top:auto;padding-top:18px';
 
@@ -634,13 +757,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     }
     footer.append(settingsRow);
 
+    /*
+     * § 3.2's last row, and the one control on this rail that is not a navigation: it hands the
+     * whole page to the other shell. It is drawn like the Settings row above it rather than like a
+     * mode tile, because it is chrome — and its note is drawn rather than left on `title`, on the
+     * mode tiles' own argument that a tooltip is not a sentence a player reads. The note is not a
+     * refusal; it is the two facts the label cannot carry.
+     */
     const swap = el(doc, 'button', 'everyday-engineer-swap');
     swap.type = 'button';
-    swap.textContent = model.footer.engineerSwap.label;
-    swap.disabled = model.footer.engineerSwap.unavailable !== undefined;
-    if (model.footer.engineerSwap.unavailable !== undefined) {
-      swap.title = model.footer.engineerSwap.unavailable;
-    }
     swap.style.cssText = [
       'width:100%',
       'box-sizing:border-box',
@@ -652,9 +777,15 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       'padding:7px 10px',
       'font-size:11.5px',
       'font-weight:600',
-      `color:${C.warmGrey}`,
-      'cursor:not-allowed',
+      `color:${C.fainter}`,
+      'cursor:pointer',
     ].join(';');
+    const swapLabel = el(doc, 'span', undefined, model.footer.engineerSwap.label);
+    swapLabel.style.cssText = 'display:block';
+    const swapNote = el(doc, 'span', undefined, model.footer.engineerSwap.note);
+    swapNote.style.cssText = `display:block;font-size:10px;font-weight:400;color:${C.label};margin-top:2px`;
+    swap.append(swapLabel, swapNote);
+    swap.addEventListener('click', enterEngineer);
     footer.append(swap);
     rail.append(footer);
   }
@@ -1068,6 +1199,13 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    */
   const stopProfileWatch = profileStore.subscribe(drawRail);
 
+  /*
+   * The return half of § 3.2's door — `everyday/swap.ts` has the argument for why it is a provided
+   * port rather than an import. Published after the first `draw()`, so the header control cannot be
+   * revealed over a shell that has not covered the page yet.
+   */
+  provideEverydaySwap({ returnToEveryday });
+
   return {
     root,
     go,
@@ -1075,6 +1213,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     setRunOpen: (open) => {
       runOpen = open;
     },
+    enterEngineer,
+    world: () => world,
     destroy: () => {
       stopProfileWatch();
       unmountCurrent();
@@ -1083,6 +1223,11 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       slotUnsubscribe?.();
       dataHostUnsubscribe?.();
       dataHost = undefined;
+      /*
+       * And the port goes with it, for the same reason one level up: a header button holding a
+       * closure over a removed root would put an empty cover back over the page.
+       */
+      provideEverydaySwap(undefined);
       setCoveredInert(false);
       root.remove();
       doc.defaultView?.dispatchEvent(new Event('resize'));

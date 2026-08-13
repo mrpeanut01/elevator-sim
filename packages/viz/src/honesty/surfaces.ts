@@ -79,7 +79,12 @@ import {
   STAGE_NO_GHOST,
   STAGE_RECOMPUTING,
 } from '../everyday/stageScreenModel.js';
-import { EVERYDAY_SCREENS, RUN_CONTEXTS } from '../everyday/types.js';
+import {
+  ENGINEER_RETURN_LABEL,
+  ENGINEER_RETURN_TITLE,
+  EVERYDAY_SCREENS,
+  RUN_CONTEXTS,
+} from '../everyday/types.js';
 import { admitProfile } from '../campaign/dimensions.js';
 import { failStateCounts, failStateReports, evidenceFrom, type DemonstrationEvidence } from '../campaign/failStates.js';
 import { judgeStage } from '../campaign/judge.js';
@@ -7277,14 +7282,13 @@ const EVERYDAY_MENU: SurfaceAdapter = {
         role: 'reason',
       });
     }
+    /*
+     * The swap row's label only. Its note — and the Engineer header's two words, which no rail
+     * model carries — are the `ENGINEER_DOOR` adapter's; the row lost its `unavailable` arm when the
+     * door was built, and a seed for a refusal that no longer exists would be this file claiming a
+     * string the derivation cannot find.
+     */
     seeds.push({ field: 'rail.footer.swap', text: footer.engineerSwap.label, role: 'label' });
-    if (footer.engineerSwap.unavailable !== undefined) {
-      seeds.push({
-        field: 'rail.footer.swap.unavailable',
-        text: footer.engineerSwap.unavailable,
-        role: 'reason',
-      });
-    }
 
     /*
      * § 3.3's table, row for row: every cell is a claim about a control. The `⟨…⟩` cells are the
@@ -7396,10 +7400,10 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
     'everyday/settingsView.ts#settingsScreenViewOf',
     'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*
-     * The swap refusal, reached through the register above and through the rail's footer — one
-     * sentence with two readers, which is why it sits in `types.ts` where neither can shadow it.
+     * `everyday/types.ts#ENGINEER_SWAP_REFUSAL` used to be claimed here, reached through the
+     * register above. The row it refused about is built, so the refusal is deleted and the register
+     * is six entries rather than seven; the swap's words are the `ENGINEER_DOOR` adapter's now.
      */
-    'everyday/types.ts#ENGINEER_SWAP_REFUSAL',
   ],
   render(context) {
     void context;
@@ -7656,6 +7660,60 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
   },
 };
 
+/**
+ * **The door between the two products** — GAMEPLAY § 3.2's *Switch to Engineer* row and the header
+ * control that brings a player back.
+ *
+ * ## Why three sentences deserve an adapter of their own
+ *
+ * Because every one of them is a claim about a **transition**, which is the one kind of claim no
+ * screen can be read to check. The row promises that nothing stops when the page changes hands; the
+ * header's title promises the return lands on the screen the player left; both promise, in the same
+ * breath, that the choice does not survive a reload. A player who believes the first two and is
+ * wrong loses a day's run to a button press, and a player who believes the third and is wrong finds
+ * a developer tool where their game was.
+ *
+ * They are also exactly the sentences this repository has watched go stale. The row's previous text
+ * was a **refusal** — *"not built yet, Everyday Mode is the only play style in this build"* — and
+ * `docs/05`'s § D227 is about the wave in which a sentence like that outlives the thing it refuses
+ * about. The refusal is gone with the same commit that built the door; what is here now is the
+ * positive form, which is the form that can go stale in the other direction.
+ *
+ * ## What is driven, and what is not
+ *
+ * All three words, and the rail footer row that carries two of them. What is **not** here is the
+ * transition itself — `shell.ts#enterEngineer`, the `inert` sequencing and the `visibility` write
+ * are DOM, excluded on the mounts' shared ground, and pinned instead by
+ * `everyday/shell.browser.test.ts`'s round trip. That split is the point rather than a gap: this
+ * adapter checks that the promise is *sayable*, and the browser tier checks that it is *true*.
+ *
+ * Appended last, per the fault-ordering rule stated at `SHIFT_REPORT`: the row's note shares its
+ * shape with the rail's other footer captions, so an earlier slot would move every footer-shaped
+ * fault onto this surface.
+ */
+const ENGINEER_DOOR: SurfaceAdapter = {
+  id: 'everyday/types.ts#ENGINEER_SWAP_NOTE',
+  covers: [
+    'everyday/types.ts#ENGINEER_SWAP_NOTE',
+    'everyday/types.ts#ENGINEER_RETURN_LABEL',
+    'everyday/types.ts#ENGINEER_RETURN_TITLE',
+  ],
+  render(context) {
+    void context;
+    const swap = railModel({ screen: 'menu', ctx: 'daily' }).footer.engineerSwap;
+    return singleRun(this.id, [
+      { field: 'rail.footer.swap.label', text: swap.label, role: 'label' },
+      /*
+       * `prose` rather than `reason`: it is not a refusal any more, and the exemption a refusal
+       * carries — it may name the thing it is refusing — is one this sentence has no claim on.
+       */
+      { field: 'rail.footer.swap.note', text: swap.note, role: 'prose' },
+      { field: 'engineer.header.back.label', text: ENGINEER_RETURN_LABEL, role: 'label' },
+      { field: 'engineer.header.back.title', text: ENGINEER_RETURN_TITLE, role: 'prose' },
+    ]);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -7720,6 +7778,9 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   // re-renders cells other adapters draw in their ordinary state, so placing it earlier would move
   // every week-shaped and menu-shaped fault onto this surface.
   WITHHELD_MATRIX,
+  // Appended last, per the fault-ordering rule stated at SHIFT_REPORT: § 3.2's swap row and the
+  // Engineer header's return, whose captions share a shape with the rail's other footer rows.
+  ENGINEER_DOOR,
 ]);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */

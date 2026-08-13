@@ -50,7 +50,12 @@ import {
   type EngineerSettingsBridge,
 } from '../everyday/engineerBridge.js';
 import { createEverydayHost, EVERYDAY_HOST, type EverydayHostBindings } from '../everyday/host.js';
-import { EVERYDAY_ROOT_CLASS } from '../everyday/types.js';
+import { everydaySwap, onEverydaySwapProvided } from '../everyday/swap.js';
+import {
+  ENGINEER_RETURN_LABEL,
+  ENGINEER_RETURN_TITLE,
+  EVERYDAY_ROOT_CLASS,
+} from '../everyday/types.js';
 import type { AccountForm } from '../menu/account.js';
 import {
   SIGNED_OUT,
@@ -4049,6 +4054,36 @@ function boot(ui: Elements, resources: BrowserResources): void {
     ui.header.openMenu.addEventListener('click', () => {
       dispatchMenu({ kind: 'reopen' });
     });
+
+    /*
+     * GAMEPLAY § 3.2's swap, returning — the half that makes the door two-way.
+     *
+     * The rail row in the other shell opens this surface; for one wave nothing brought a player
+     * back, so crossing over stranded them in the developer tool for the rest of the visit. This is
+     * that way back, and it is deliberately the *player's* control rather than a debug affordance:
+     * it sits beside `Menu`, which is the other "leave this surface" button, and it presses through
+     * `everyday/swap.ts`'s port so this module never names the Everyday shell.
+     *
+     * **Both words come from `everyday/types.ts`.** `index.html` carries the id and nothing else —
+     * the rail's own row reads its note from the same module, and two shells describing one door in
+     * two wordings is exactly what that module was extracted to prevent.
+     *
+     * The control is `hidden` until a shell is mounted, and it is not refused when none is: on a
+     * page with no Everyday Mode there is no world to go back to, so a sentence saying the swap is
+     * unavailable would be claiming one exists. `everyday/swap.ts`'s docstring has the argument.
+     * Nothing unsubscribes because this boot runs once and lives as long as the document.
+     */
+    ui.header.backToEveryday.textContent = ENGINEER_RETURN_LABEL;
+    ui.header.backToEveryday.title = ENGINEER_RETURN_TITLE;
+    const showSwapDoor = (): void => {
+      ui.header.backToEveryday.hidden = everydaySwap() === undefined;
+    };
+    showSwapDoor();
+    onEverydaySwapProvided(showSwapDoor);
+    ui.header.backToEveryday.addEventListener('click', () => {
+      everydaySwap()?.returnToEveryday();
+    });
+
     ui.header.viewMode.addEventListener('change', () => {
       const value = ui.header.viewMode.value;
       if (!isViewMode(value)) return;

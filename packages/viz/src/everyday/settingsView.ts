@@ -41,8 +41,10 @@
  *   as *"The server replayed your seed and it reproduced."*). *Clear saved progress* is refused
  *   because it would lie: `dev/main.ts` saves the running session on every state change, so a
  *   cleared slot is rewritten moments later and the button's claim does not survive its own
- *   click. *Switch to Engineer* is refused in the rail's own words ({@link ENGINEER_SWAP_REFUSAL})
- *   so the two surfaces refuse once. *Sign out* is refused because nothing on this surface is
+ *   click. *Switch to Engineer* used to be refused here in the rail's own words, and is now not
+ *   named at all: the rail's § 3.2 footer row opens the Engineer surface, so the entry went with
+ *   the refusal rather than being reworded — see the note where it stood. *Sign out* is refused
+ *   because nothing on this surface is
  *   signed in — `menu/account.ts`'s session is the Engineer screen's, token in memory, and a
  *   button ending a session this screen never shows would be § 20.12's lie in reverse.
  *
@@ -63,7 +65,6 @@ import {
   DEFAULT_EVERYDAY_PROFILE,
   type EverydayProfile,
 } from './profile.js';
-import { ENGINEER_SWAP_REFUSAL } from './types.js';
 
 /** One avatar swatch, drawable: § 15.1's six, with the picked one carrying the ink edge. */
 export interface SettingsSwatchView {
@@ -146,7 +147,19 @@ export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',
   'Clear saved progress — not offered yet: the running session would write itself straight back on its next save',
-  `Switch to Engineer — ${ENGINEER_SWAP_REFUSAL}`,
+  /*
+   * **`Switch to Engineer` was the seventh entry and it is deleted, not reworded.**
+   *
+   * It read *"Switch to Engineer — not built yet, Everyday Mode is the only play style in this
+   * build"*, and the rail's § 3.2 footer row now opens the Engineer surface. A register that went on
+   * refusing it would be § D227's defect in the more dangerous direction: a refusal standing over a
+   * seam that works, telling a reader not to press a control that does something.
+   *
+   * It is not replaced by a *statement* either, tempting as that is. This section is § 15.1's `THIS
+   * DEVICE` register, whose contract is rows this screen does not draw; the swap is drawn — on the
+   * rail, two centimetres to the left — and duplicating a live control's description here would be
+   * the two-wordings defect this array's own entries exist to prevent.
+   */
 ]);
 
 /** What the view is computed from — the store's profile, the field's draft, and the two seams. */

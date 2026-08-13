@@ -284,18 +284,35 @@ by serving fewer people has not saved anything. See [§ D106](DECISIONS.md).
 **The page opens on Everyday Mode, and that changed on 2026-08-12.** `packages/viz/index.html` loads
 `everyday/boot.ts`, which imports `dev/main.ts` for its side effect — so the Engineer surface still
 builds and starts exactly as before — and mounts a 212 px rail, a pinned action bar and a four-tile
-menu over it ([§ D335](DECISIONS.md)). **The Engineer surface is what *Today's tower* hands off to**,
-so it is still the stage, and the change is one line of HTML to revert.
+menu over it ([§ D335](DECISIONS.md)). The change is one line of HTML to revert.
 
-Three consequences worth knowing before you touch either shell. **`inert` has two writers** —
+**Both worlds co-exist, and § 3.2's *Switch to Engineer* row is the door between them
+([§ D336](DECISIONS.md)).** It used to be *Today's tower* that handed off; § 7's stage is a screen
+now, so the tile draws a stage and the rail's footer row is what crosses over. The Engineer header
+carries the way back (`#back-to-everyday`), reached through `everyday/swap.ts`'s provided port
+because `dev/main.ts` may not import the Everyday shell — `boot.ts` already imports `dev/main.ts`,
+and closing that cycle is what produced this directory's last module-init `undefined`.
+
+Four consequences worth knowing before you touch either shell. **`inert` has two writers** —
 `menuPanel.ts#coverShell` and `everyday/shell.ts` — and the rule between them is that the outer cover
 wins while it is up; writing it unguarded hangs the renderer, because `el.inert = true` on an
-already-inert element still calls `setAttribute` and still records a mutation. **The browser tier
-reaches the Engineer surface through the player's own path** (`enterEngineerStage`,
-`reopenEngineerMenu`) rather than by taking the cover off, which is the difference between a tier that
-tests the product and one that tests a surface nobody can open. And **three of the four mode tiles
-refuse**, two of them about a *screen* rather than about the thing behind it — the campaign and
-Fix-a-building engines both run, and their Everyday screens do not.
+already-inert element still calls `setAttribute` and still records a mutation. **Both roots are
+covered and neither is ever hidden**: the Engineer root because its canvases size from their laid-out
+box, and now the Everyday root for the same reason on the other side of the door, since § 7's stage
+holds a canvas whose `resize` listener is still attached while the other world has the page —
+`visibility:hidden` keeps the box, `display:none` does not, and the browser tier asserts the canvas's
+width is identical either side of a round trip. **The browser tier reaches the Engineer surface
+through the player's own path** (`enterEngineerStage`, `reopenEngineerMenu`) rather than by taking the
+cover off, which is the difference between a tier that tests the product and one that tests a surface
+nobody can open — and that helper had gone stale with the hand-off, leaving the tier red in 25 cases
+across 12 files while the product worked. And **three of the four mode tiles refuse**, two of them
+about a *screen* rather than about the thing behind it — the campaign and Fix-a-building engines both
+run, and their Everyday screens do not.
+
+**The swap is not remembered, and that is § 3.5 rather than a second rule.** A reload lands on the
+Everyday main menu whichever world the player was in, because a remembered world is the entry-screen
+override the guide forbids wearing `localStorage`. The rail's row says so on its own face
+(`types.ts#ENGINEER_SWAP_NOTE`), which is where a reader will meet it.
 
 **The viewer is now built to a design handoff, and the handoff is canonical for the interface.**
 *Elevator Sim Reimagined* is vendored at [`docs/design/`](docs/design/); the requirements extracted

@@ -145,23 +145,60 @@ export interface EverydayState {
 /** The root, named rather than assumed — GAMEPLAY § 3.5. */
 export const EVERYDAY_ROOT: EverydayScreen = 'menu';
 
+/* -------------------------------------------------------------------------- *
+ * The door between the two worlds — GAMEPLAY § 3.2's footer row, and its return
+ * -------------------------------------------------------------------------- */
+
 /**
- * Why the way out of Everyday Mode does not open — one sentence, two readers: `rail.ts`'s § 3.2
- * footer swap and `settingsView.ts`'s § 15.1 *This device* register, which offers the same row.
- * Two surfaces refusing one thing in two wordings is the defect `screens.ts`'s refusal table
- * exists to prevent, one level down.
+ * The three words of the swap, **here rather than beside any of their readers, and that placement
+ * is a fix rather than a preference.**
  *
- * **Here rather than beside either reader, and that placement is a fix rather than a preference.**
- * It began in `rail.ts`; `settingsView.ts` imported it, and the settings screen is reached through
- * `screens.ts`'s registry, which imports the screen module — so the import graph closed into
- * `rail → screens → settingsScreen → settingsView → rail` and the constant read `undefined` at
- * module-init time on whichever file the cycle entered second. The register drew
- * *"Switch to Engineer — undefined"* and only the test that compared the two sites caught it.
- * This module imports nothing, so a constant declared here cannot be caught in a cycle — the same
- * argument {@link EVERYDAY_ROOT_CLASS} is here for, and § 18's own note about declaration order.
+ * There used to be one constant in this block — `ENGINEER_SWAP_REFUSAL`, *"not built yet — Everyday
+ * Mode is the only play style in this build"* — and it began in `rail.ts`. `settingsView.ts`
+ * imported it, and the settings screen is reached through `screens.ts`'s registry, which imports the
+ * screen module, so the import graph closed into `rail → screens → settingsScreen → settingsView →
+ * rail` and the constant read `undefined` at module-init time on whichever file the cycle entered
+ * second. The register drew *"Switch to Engineer — undefined"* and only the test that compared the
+ * two sites caught it. This module imports nothing, so a constant declared here cannot be caught in
+ * a cycle — the same argument {@link EVERYDAY_ROOT_CLASS} is here for.
+ *
+ * That reasoning binds harder now than it did, because the readers are no longer both in
+ * `everyday/`: {@link ENGINEER_RETURN_LABEL} and {@link ENGINEER_RETURN_TITLE} are drawn by
+ * `dev/main.ts`, on the **Engineer** header. `dev/main.ts` already imports this module for
+ * {@link EVERYDAY_ROOT_CLASS} and may not import `everyday/shell.ts` — that direction is the cycle
+ * `everyday/boot.ts` closes — so a word shared by the two shells has exactly one place it can live,
+ * and this is it.
+ *
+ * **The refusal is deleted rather than reworded, and that is the point of this commit.** § D227's
+ * rule cuts both ways: a control that writes nothing must say so, and a control that writes
+ * something may not claim it writes nothing. The row opens the Engineer surface now, so a sentence
+ * calling it unbuilt would be the stale refusal that rule is written about — the more dangerous
+ * half, because it tells a reader not to press a control that works.
  */
-export const ENGINEER_SWAP_REFUSAL =
-  'not built yet — Everyday Mode is the only play style in this build';
+export const ENGINEER_SWAP_NOTE =
+  'the same day on the full instrument panel — nothing stops, and this visit only: reloading opens Everyday Mode again';
+
+/**
+ * The Engineer header's way back, as a label — `dev/main.ts#wireHeaderAndFooter` writes it onto
+ * `#back-to-everyday`.
+ *
+ * The markup carries the id and no text: a second copy of the words in `index.html` is a second
+ * place for them to go stale, and the page is already the file this repository checks in both
+ * directions for exactly that reason.
+ */
+export const ENGINEER_RETURN_LABEL = '‹ Everyday Mode';
+
+/**
+ * The same control's full sentence, on `title`.
+ *
+ * It states the two things a player cannot see from the button: that the Engineer surface **keeps
+ * running** behind Everyday Mode rather than being torn down, and that they land back on the screen
+ * they left rather than at the front door. Both are properties of `shell.ts`'s cover — it never
+ * unmounts a screen and never writes `display` — so this sentence is pinned by
+ * `everyday/shell.browser.test.ts`'s round trip rather than by its own plausibility.
+ */
+export const ENGINEER_RETURN_TITLE =
+  'Back to Everyday Mode, on the screen you left. Nothing here stops — this surface keeps running behind it.';
 
 /**
  * The class on the Everyday shell's own root element.

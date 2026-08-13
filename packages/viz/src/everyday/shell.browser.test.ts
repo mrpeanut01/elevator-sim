@@ -29,7 +29,13 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import {
+  CHROMIUM,
+  HAS_BROWSER,
+  enterEngineerStage,
+  pressMenuRow,
+  returnToEverydayMode,
+} from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -217,7 +223,7 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
     }
   });
 
-  it('offers the Engineer swap and refuses it, because that play style is not built', async () => {
+  it('offers the Engineer swap as a live row, with its note drawn rather than on a tooltip', async () => {
     const page = await coldLoad();
     try {
       const swap = await page.evaluate(() => {
@@ -226,9 +232,17 @@ describe.skipIf(!HAS_BROWSER)('the app opens on Everyday Mode', () => {
           ? null
           : { disabled: button.disabled, title: button.title, label: button.textContent ?? '' };
       });
-      expect(swap?.disabled).toBe(true);
-      expect(swap?.title).toMatch(/not built yet/);
-      expect(swap?.label).toContain('Engineer');
+      /*
+       * This case used to assert the opposite — disabled, with *not built yet* on `title`. The
+       * assertion moved rather than being deleted, because what is under test either way is the pair
+       * *refuses ⇔ unbuilt*, and § D227 is the direction that matters now.
+       */
+      expect(swap?.disabled).toBe(false);
+      expect(swap?.label).toContain('Switch to Engineer');
+      expect(swap?.label).not.toContain('not built');
+      // The note is words on the row, on the mode tiles' argument: a `title` is not a sentence.
+      expect(swap?.label).toContain('nothing stops');
+      expect(swap?.title).toBe('');
     } finally {
       await page.close();
     }
@@ -518,4 +532,194 @@ describe.skipIf(!HAS_BROWSER)("Today's tower is playable through the new shell",
       await page.close();
     }
   });
+});
+
+/**
+ * **§ 3.2's door, both ways** — the product owner's standing requirement that the two worlds
+ * co-exist, driven as a round trip.
+ *
+ * ## Why none of this can be asserted anywhere else
+ *
+ * Every claim below is about *a page changing hands*, and the two ways it goes wrong are both
+ * invisible to a screenshot and to a node test:
+ *
+ * - **Visible but not interactive.** `inert` paints identically. A surface that is uncovered and
+ *   still `inert` looks exactly like a working one, and the whole of § D335's second defect was that
+ *   shape. So every case here presses a real control on the surface it has just uncovered and
+ *   requires the press to *do* something — the menu opening, the confirm strip appearing — rather
+ *   than reading an attribute and calling it proof.
+ * - **Interactive but measured at zero.** A canvas laid out under a `display:none` ancestor has a
+ *   zero box and paints nothing when revealed. `shell.ts#setEverydayCovered` uses `visibility` for
+ *   exactly that reason, and the assertion that it worked is the § 7 stage's canvas having the same
+ *   non-zero box on both sides of the trip.
+ *
+ * ## And the state claim, which is the reason the door exists
+ *
+ * A swap that discarded the open day would be a control that costs a player their run — worse than
+ * no door. The trip is therefore taken *from the stage, mid-run*, and what is checked on return is
+ * not that the shell survived but that **the day did**: the host still reports the player's run
+ * open, the § 3.3 primary still reads `Close the day`, and § 3.4 still arms.
+ */
+describe.skipIf(!HAS_BROWSER)('switching between the two worlds — GAMEPLAY § 3.2', () => {
+  it('opens the Engineer surface from the rail, and hands it a page that takes clicks', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEngineerStage(page);
+
+      const crossed = await page.evaluate(() => ({
+        engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
+        everydayInert: document.querySelector<HTMLElement>('.everyday')?.inert,
+        everydayVisibility: document.querySelector<HTMLElement>('.everyday')?.style.visibility,
+        everydayAria: document.querySelector<HTMLElement>('.everyday')?.getAttribute('aria-hidden'),
+        // Covered, never hidden — on this side of the door too. A zero box here is the defect.
+        everydayBox: document.querySelector('.everyday')?.getBoundingClientRect().width ?? 0,
+        engineerStageBox: document.querySelector('#stage')?.getBoundingClientRect().width ?? 0,
+      }));
+      expect(crossed.engineerInert).toBe(false);
+      expect(crossed.everydayInert).toBe(true);
+      expect(crossed.everydayVisibility).toBe('hidden');
+      expect(crossed.everydayAria).toBe('true');
+      expect(crossed.everydayBox).toBeGreaterThan(0);
+      expect(crossed.engineerStageBox).toBeGreaterThan(0);
+
+      /*
+       * The half an attribute read cannot give: a control on the uncovered surface, pressed, doing
+       * its job. `#open-menu` is the Engineer header's own, its handler is `dispatchMenu`, and an
+       * `inert` ancestor swallows the click silently — which is precisely how this defect ships.
+       */
+      await page.locator('#open-menu').first().click();
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === false,
+        undefined,
+        { timeout: 15_000 },
+      );
+      // And back out of it, through the row a player presses, so the surface is left as it was.
+      await pressMenuRow(page, 'main.resume');
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 15_000 },
+      );
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+
+  it('comes back from the Engineer header onto the screen it left, with the day still open', async () => {
+    const page = await coldLoad();
+    try {
+      await stashHost(page);
+
+      // Get a day of the player's own open on § 7's stage — the state a swap must not cost them.
+      await page.locator('.everyday-mode[data-screen="stage"]').click();
+      await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.everyday-stage-start')?.style.display === '',
+        undefined,
+        { timeout: 120_000 },
+      );
+      expect((await runStateOf(page)).open, 'no run was open to survive the swap').toBe(true);
+      const before = await page.evaluate(
+        () => document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect().width ?? 0,
+      );
+      expect(before).toBeGreaterThan(0);
+
+      await enterEngineerStage(page);
+      /*
+       * The stage screen is still mounted while the other world has the page — covered, not
+       * unmounted — which is what makes the return a resume rather than a re-entry. `§ 16` rule 9:
+       * nothing in the rail changes what is running.
+       */
+      expect(
+        await page.evaluate(() => document.querySelector('.everyday-stage-canvas') !== null),
+        'the swap unmounted the screen the player was on',
+      ).toBe(true);
+
+      await returnToEverydayMode(page);
+
+      const home = await page.evaluate(() => ({
+        engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
+        everydayInert: document.querySelector<HTMLElement>('.everyday')?.inert,
+        everydayAria: document.querySelector<HTMLElement>('.everyday')?.getAttribute('aria-hidden'),
+        // The screen the player left — not the menu. § 3.5 governs *entry*, and this is not one.
+        onStage: document.querySelector('.everyday-stage-canvas') !== null,
+        canvasBox:
+          document.querySelector('.everyday-stage-canvas')?.getBoundingClientRect().width ?? 0,
+        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+        primary: document.querySelector('.everyday-bar-primary')?.textContent ?? '',
+      }));
+      expect(home.engineerInert).toBe(true);
+      expect(home.everydayInert).toBe(false);
+      expect(home.everydayAria).toBeNull();
+      expect(home.onStage).toBe(true);
+      expect(home.subline).toContain('MID-DAY');
+      expect(home.primary).toBe('Close the day');
+      /*
+       * The measured half of *cover, never hide*: the canvas kept its box across a trip in which it
+       * was never painted. Under `display:none` this is `0` and the returned stage draws nothing.
+       */
+      expect(home.canvasBox).toBe(before);
+
+      // The day itself, from the host rather than from the screen drawing it.
+      const survived = await runStateOf(page);
+      expect(survived.hasRun).toBe(true);
+      expect(survived.dayClosed).toBe(false);
+      expect(survived.open, 'the swap discarded the player’s open day').toBe(true);
+
+      /*
+       * And Everyday Mode takes clicks again — the same *visible but not interactive* trap, on the
+       * return leg. The rail's Main menu row runs `requestLeave`, which mid-run raises § 3.4's
+       * strip, so a strip appearing is a click that reached a handler **and** the run-open latch
+       * surviving the trip. Answered with *Stay*, so nothing is left half-asked.
+       */
+      await page.locator('.everyday-rail-menu').click();
+      expect(await page.textContent('.everyday-bar-question')).toBe('Leave the day unfinished?');
+      await page.locator('.everyday-bar-confirm-stay').click();
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
+    } finally {
+      await page.close();
+    }
+  }, 240_000);
+
+  it('survives a round trip on the menu too, and does not remember the world across a reload', async () => {
+    const page = await coldLoad();
+    try {
+      await enterEngineerStage(page);
+      await returnToEverydayMode(page);
+
+      // The menu is interactive, by a press that navigates rather than by an attribute.
+      await page.locator('.everyday-rail-settings').click();
+      await page.waitForFunction(
+        () => (document.querySelector('.everyday-rail-menu')?.textContent ?? '').includes('SETTINGS'),
+        undefined,
+        { timeout: 15_000 },
+      );
+
+      /*
+       * § 3.5, through the door: nothing remembers which world had the page, so a reload lands on
+       * Everyday Mode's main menu — from the Engineer side, which is the case a `startScreen` prop
+       * in `localStorage` clothing would fail. It is asserted here rather than argued in a docstring
+       * because the argument is exactly the one that has been made and then quietly broken before.
+       */
+      await enterEngineerStage(page);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(
+        () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
+        undefined,
+        { timeout: 30_000 },
+      );
+      const reloaded = await page.evaluate(() => ({
+        tiles: document.querySelectorAll('.everyday-mode').length,
+        visibility: document.querySelector<HTMLElement>('.everyday')?.style.visibility,
+        engineerInert: document.querySelector<HTMLElement>('.shell')?.inert,
+        subline: document.querySelector('.everyday-rail-menu')?.textContent ?? '',
+      }));
+      expect(reloaded.tiles).toBe(4);
+      expect(reloaded.visibility).toBe('');
+      expect(reloaded.engineerInert).toBe(true);
+      expect(reloaded.subline).toContain('YOU ARE HERE');
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
 });
