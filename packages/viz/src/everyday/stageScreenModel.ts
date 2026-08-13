@@ -464,6 +464,8 @@ export const STAGE_ABSENCES: readonly string[] = Object.freeze([
 
 /** What the § 3.3 refinement needs to know about the run. */
 export interface StageBarInput {
+  /** The open campaign tower's name, for § 3.3's `⟨building⟩` back cell. */
+  readonly buildingName?: string | undefined;
   readonly hasRun: boolean;
   readonly dayClosed: boolean;
   readonly recomputing: boolean;
@@ -479,7 +481,22 @@ export interface StageBarInput {
  * (`BarPrimary.inert`'s own contract).
  */
 export function stageBarModelOf(state: EverydayState, input: StageBarInput): ActionBarModel {
-  const base = actionBarFor(state);
+  const table = actionBarFor(state);
+  /*
+   * § 3.3's campaign stage row names its parent `⟨building⟩` — the guide's own state-dependent cell,
+   * carried verbatim by `actionBar.ts` on the rule that a `⟨…⟩` is never *drawn*. This is the
+   * substitution that rule requires, and it is here rather than in the shell because `back` is a
+   * cell a `bar()` owns.
+   *
+   * Found by `screens.test.ts`'s registry-wide placeholder guard rather than by a reader: no route
+   * in this build produces `ctx === 'campaign'` on the stage yet, so the cell is unreachable today
+   * and would have been drawn the moment it was reachable. The fallback names no building because
+   * with no open tower there is nothing true to put there.
+   */
+  const base =
+    table.back?.label.includes('⟨') === true
+      ? { ...table, back: { ...table.back, label: input.buildingName ?? 'the building' } }
+      : table;
   const refusal = !input.hasRun
     ? 'the day has not started yet — there is nothing to file'
     : input.recomputing

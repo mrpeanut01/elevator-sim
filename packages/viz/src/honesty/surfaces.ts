@@ -94,7 +94,7 @@ import {
   workshopLeversOf,
   WORKSHOP_COPY,
 } from '../everyday/workshopModel.js';
-import { briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
+import { briefBarModel, briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
@@ -8950,6 +8950,8 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
     'everyday/doorView.ts#DOOR_STEPS',
     'everyday/doorView.ts#SAME_FOR_EVERYONE',
     'everyday/briefView.ts#briefScreenViewOf',
+    'everyday/briefView.ts#briefBarModel',
+    'everyday/briefView.ts#BRIEF_NOTE_LEAD',
     'everyday/briefView.ts#GHOST_REFUSAL',
     'everyday/briefView.ts#lockedForScore',
     'everyday/weekView.ts#weekScreenViewOf',
@@ -9176,6 +9178,22 @@ const EVERYDAY_DAILY_LOOP: SurfaceAdapter = {
       seeds.push({ field: `door.step.${step.n}`, text: step.body, role: 'prose' });
     }
     seeds.push({ field: 'door.same', text: SAME_FOR_EVERYONE, role: 'prose' });
+    /*
+     * Both arms of § 3.3's brief note — the named one and the fallback. The fallback is seeded
+     * because it is what a bar drawn before the screen knows its driver says, and a sentence no
+     * case renders is a sentence the search has never read: this whole refinement exists because
+     * the *unrefined* row reached a player with a `⟨style⟩` marker in it for a whole wave.
+     */
+    seeds.push({
+      field: 'brief.bar.named',
+      text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), 'Steady hand').note ?? '',
+      role: 'label',
+    });
+    seeds.push({
+      field: 'brief.bar.unnamed',
+      text: briefBarModel(actionBarFor({ screen: 'brief', ctx: 'daily' }), undefined).note ?? '',
+      role: 'label',
+    });
     seeds.push({ field: 'brief.ghost.why', text: GHOST_REFUSAL.why, role: 'reason' });
     seeds.push({ field: 'brief.locked.why', text: lockedForScore().why, role: 'reason' });
 

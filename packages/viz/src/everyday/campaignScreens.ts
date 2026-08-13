@@ -566,9 +566,30 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
  * § 3.3's `towers` row: the primary is `Open ⟨building⟩` and the note counts what wants a decision.
  * Both cells are the guide's placeholders, substituted from the record rather than restated.
  */
+/**
+ * § 3.3's cells with no campaign behind them — the fallback both campaign bars need.
+ *
+ * `actionBar.ts` carries the guide's state-dependent cells verbatim inside `⟨…⟩` on the rule that
+ * **the frame never draws one**, and both bars below substitute them from the live career. When
+ * there is no career to read — the shell asking for a row before the screen has mounted, which
+ * `screens.test.ts`'s placeholder guard does deliberately — returning the table row unchanged put
+ * `Open ⟨building⟩` and `⟨N⟩ buildings want a decision.` in front of a reader.
+ *
+ * So the no-campaign arm says something smaller and true rather than a typesetting mark. It is the
+ * same correction the brief needed, found by the same guard in the same run.
+ */
+function withoutPlaceholders(base: ActionBarModel): ActionBarModel {
+  const strip = (cell: string, plain: string): string => (cell.includes('⟨') ? plain : cell);
+  return {
+    ...base,
+    primary: { ...base.primary, label: strip(base.primary.label, 'Open a building'), inert: true },
+    note: base.note === undefined ? undefined : strip(base.note, 'No campaign is open.'),
+  };
+}
+
 function towersBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
-  if (liveHost === undefined) return base;
+  if (liveHost === undefined) return withoutPlaceholders(base);
   const view = towersView(campaignInputOf(liveHost));
   const open = openTowerOf(liveHost.campaign()) ?? liveHost.campaign().towers[0];
   const wanting = view.rows.filter((row) => row.needsDecision).length;
@@ -1225,12 +1246,14 @@ function mountContract(hostEl: HTMLElement, context: EverydayScreenContext): Mou
  */
 function contractBar(state: EverydayState): ActionBarModel {
   const base = actionBarFor(state);
-  if (liveHost === undefined) return base;
+  if (liveHost === undefined) return withoutPlaceholders(base);
   const career = liveHost.campaign();
   const tower = openTowerOf(career);
   const view = contractView(campaignInputOf(liveHost));
   if (tower === undefined || view === undefined) {
-    return { ...base, primary: { ...base.primary, inert: true }, note: NO_TOWER };
+    // The label still carries § 3.3's `⟨N⟩`, and no day exists to put in it — see
+    // {@link withoutPlaceholders}.
+    return { ...withoutPlaceholders(base), note: NO_TOWER };
   }
   const [lockLabel, restartLabel] = base.primary.variants;
   const [nightsNote, overNote] = base.noteVariants ?? [];

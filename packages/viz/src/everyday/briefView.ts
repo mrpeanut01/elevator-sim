@@ -46,6 +46,7 @@
  * gate), so this card prints `ShiftGoal.label` and never a value.
  */
 
+import type { ActionBarModel } from './actionBar.js';
 import { isScreenBuilt, unbuiltReasonFor } from './screens.js';
 import type { TodayRecord } from './today.js';
 import type { EverydayScreen } from './types.js';
@@ -120,6 +121,35 @@ export interface BriefScreenView {
   /** § 3.3's brief note, with this run's dispatcher named: `Running the lifts: ⟨style⟩`. */
   readonly barNote: string;
 }
+
+/**
+ * § 3.3's brief row, resolved for the run this screen is describing — the `bar()` refinement
+ * `screens.ts` contracts, kept pure so the substitution is driven without a mount.
+ *
+ * ## The marker was reaching the player, and only a deployed page showed it
+ *
+ * `actionBar.ts` carries the guide's state-dependent cells verbatim inside `⟨…⟩` markers, on the
+ * stated rule that **the frame never draws one** — a screen's `bar()` substitutes it. `BRIEF_SCREEN`
+ * shipped without a `bar()` at all, so the shell drew the table row unrefined and the brief's note
+ * read `Running the lifts: ⟨style⟩` on every day. {@link BriefScreenView.barNote} had computed the
+ * right sentence all along; nothing carried it to the bar.
+ *
+ * It is § 16 rule 11's defect in the shape the rule does not name — not an engine identifier, but a
+ * *typesetting mark for one*, which is the same promise broken for the same reader. Every node and
+ * browser case passed: they assert the note the view computes, and the view was right.
+ *
+ * The fallback is a narrower true sentence rather than the marker: a bar asked for before the
+ * screen knows its driver says what is running without naming it, which is a smaller claim and not
+ * a placeholder.
+ */
+export function briefBarModel(base: ActionBarModel, driver: string | undefined): ActionBarModel {
+  const note =
+    driver === undefined ? 'Running the lifts.' : `${BRIEF_NOTE_LEAD}${driver}`;
+  return { ...base, note };
+}
+
+/** The § 3.3 note's fixed half — one home, so the view and the bar cannot word it differently. */
+export const BRIEF_NOTE_LEAD = 'Running the lifts: ';
 
 /** What {@link briefScreenViewOf} is computed from. */
 export interface BriefScreenInput {
@@ -256,6 +286,6 @@ export function briefScreenViewOf(input: BriefScreenInput): BriefScreenView {
     },
     ghost: GHOST_REFUSAL,
     locked: lockedForScore(),
-    barNote: `Running the lifts: ${today.driver}`,
+    barNote: `${BRIEF_NOTE_LEAD}${today.driver}`,
   };
 }

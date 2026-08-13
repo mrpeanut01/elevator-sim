@@ -48,7 +48,10 @@ import type { DeltaRowView, ReportView } from '../dev/reportPanel.js';
 import { NOTHING_FILED_YET, rotatedOn, type SheetContinuity } from '../dev/reportPanel.js';
 
 import { everydayReportViewOf, type EverydayReportView } from './reportView.js';
+import { openTowerOf } from '../campaign/career.js';
+import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
+import type { EverydayState } from './types.js';
 import {
   BODY,
   CARD,
@@ -112,6 +115,10 @@ function mountReportScreen(
 
   function render(): void {
     if (!alive) return;
+    // What § 3.3's campaign primary names — see {@link reportBuildingName}.
+    const open = openTowerOf(context.host.campaign());
+    reportBuildingName =
+      open === undefined ? undefined : context.host.buildingById(open.buildingId)?.name;
     const view = viewNow();
     root.replaceChildren();
     if (!view.filed) {
@@ -412,6 +419,7 @@ function mountReportScreen(
   return {
     unmount: () => {
       alive = false;
+      reportBuildingName = undefined;
       stopListening();
     },
     /* § 3.3's daily report primary is `Your week` — the quiet button, since a report inverts. */
@@ -422,7 +430,36 @@ function mountReportScreen(
 }
 
 /** The registry row — GAMEPLAY § 6.5's screen, mounted by `shell.ts` through `screens.ts`. */
+/**
+ * The open campaign tower's name, for § 3.3's `Back to ⟨building⟩` primary.
+ *
+ * Module scope for the reason `briefScreen.ts` and `fixitScreen.ts` keep theirs there: `bar()` is
+ * called by the shell outside the mount closure, with only the screen's state.
+ */
+let reportBuildingName: string | undefined;
+
+/**
+ * § 3.3's report row with the campaign primary's `⟨building⟩` substituted.
+ *
+ * The daily row carries no marker and comes back untouched. Found by `screens.test.ts`'s
+ * registry-wide placeholder guard, which was written after the brief drew `Running the lifts:
+ * ⟨style⟩` to a deployed page — this is the third cell the same run turned up, and the reason that
+ * guard walks every screen in every run context rather than the one that was reported.
+ */
+function reportBar(state: EverydayState): ActionBarModel {
+  const base = actionBarFor(state);
+  if (!base.primary.label.includes('⟨')) return base;
+  return {
+    ...base,
+    primary: {
+      ...base.primary,
+      label: base.primary.label.replace('⟨building⟩', reportBuildingName ?? 'the building'),
+    },
+  };
+}
+
 export const REPORT_SCREEN: EverydayScreenModule = {
   key: 'report',
   mount: mountReportScreen,
+  bar: reportBar,
 };

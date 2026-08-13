@@ -25,9 +25,16 @@ import type { ResolvedBuilding } from '@elevator-sim/core/browser';
 
 import { carsToDerate } from '../shift/incidents.js';
 
-import { briefScreenViewOf, type BriefRefusalCard, type BriefScreenView } from './briefView.js';
+import {
+  briefBarModel,
+  briefScreenViewOf,
+  type BriefRefusalCard,
+  type BriefScreenView,
+} from './briefView.js';
+import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import { dispatcherCardOf } from '../dev/rightRail.js';
 import type { EverydayScreenModule } from './screens.js';
+import type { EverydayState } from './types.js';
 import {
   BODY,
   CARD,
@@ -115,9 +122,13 @@ function mountBrief(
   function render(): void {
     if (!alive) return;
     const { today, view } = factsNow();
+    // What the § 3.3 note names — see {@link briefDriver}. Set on every draw, so a dispatcher
+    // changed on this screen moves the bar's sentence with the card the reader pressed.
+    briefDriver = today.driver;
     root.replaceChildren();
     root.append(leftColumn(view), rightColumn(view));
     drawElevation(canvas, context.host.resolvedBuilding(), today);
+    context.refreshBar();
   }
 
   /** The day card: elevation, out-of-service strip, five facts, load reading. */
@@ -404,6 +415,7 @@ function mountBrief(
   return {
     unmount: () => {
       alive = false;
+      briefDriver = undefined;
       stopListening();
       view?.removeEventListener('resize', onResize);
     },
@@ -565,7 +577,23 @@ function heldCountOf(today: TodayRecord): number {
 }
 
 /** The registry row — GAMEPLAY § 6.2's screen, mounted by `shell.ts` through `screens.ts`. */
+/**
+ * The driver the last draw described, for {@link briefBar}.
+ *
+ * Module scope for the reason `fixitScreen.ts` keeps its session map there: `bar()` is called by
+ * the shell **outside** the mount closure, with only the screen's state, so a screen whose bar
+ * depends on what it drew has to leave it somewhere the module can reach. Cleared on unmount, so a
+ * bar drawn after the screen is gone falls back rather than naming a stale dispatcher.
+ */
+let briefDriver: string | undefined;
+
+/** § 3.3's brief row with this run's dispatcher named — see {@link briefBarModel} for the defect. */
+function briefBar(state: EverydayState): ActionBarModel {
+  return briefBarModel(actionBarFor(state), briefDriver);
+}
+
 export const BRIEF_SCREEN: EverydayScreenModule = {
   key: 'brief',
   mount: mountBrief,
+  bar: briefBar,
 };

@@ -20,7 +20,8 @@ import {
   UNBUILT_REASONS,
   unbuiltReasonFor,
 } from './screens.js';
-import { EVERYDAY_SCREENS } from './types.js';
+import { actionBarFor } from './actionBar.js';
+import { EVERYDAY_SCREENS, RUN_CONTEXTS } from './types.js';
 
 describe('what this build has actually built', () => {
   it('is § 4’s whole inventory — the shell’s own menu and sixteen registered modules', () => {
@@ -183,6 +184,42 @@ describe('the router', () => {
     expect(EVERYDAY_SCREENS.filter((screen) => routeFor(screen) === 'refusal')).toEqual(
       EVERYDAY_SCREENS.filter((screen) => UNBUILT_REASONS[screen] !== undefined),
     );
+  });
+
+  it('draws no ⟨placeholder⟩ on any screen’s resolved bar — every marker is substituted', () => {
+    /*
+     * `actionBar.ts` carries the guide's state-dependent cells verbatim inside `⟨…⟩` on the stated
+     * rule that **the frame never draws one**: a screen's `bar()` substitutes it. Nothing checked
+     * the rule over the registry, and the brief shipped with no `bar()` at all for a wave, so the
+     * § 3.3 note read `Running the lifts: ⟨style⟩` on every day — found on a deployed page rather
+     * than by any tier, because the view computed the right sentence and every case asserted *that*.
+     *
+     * Over the registry rather than a list: a screen registered tomorrow with an unsubstituted
+     * marker fails here on the commit that registers it. The bar is asked for in each screen's own
+     * run context, because § 3.3's rows differ by context and a marker can hide in one of them.
+     *
+     * **The timeline is deliberately not checked here, and that is a boundary rather than a gap.**
+     * `TIMELINE_STEPS.campaign` carries `⟨building⟩` verbatim *by design* — the table is faithful to
+     * the guide — and no `bar()` can substitute it, because the shell reads the stops from the table
+     * rather than from the model. That substitution is `shell.ts#timelineLabel`'s, and asserting the
+     * table here would fail the convention for obeying itself. This case covers exactly the cells a
+     * `bar()` refinement owns; the run that found the original defect found that one too.
+     */
+    for (const screen of EVERYDAY_SCREENS) {
+      const module = screenModuleFor(screen);
+      for (const ctx of RUN_CONTEXTS) {
+        const model = module?.bar?.({ screen, ctx }) ?? actionBarFor({ screen, ctx });
+        const drawn = [
+          model.leave.label,
+          model.back?.label,
+          model.primary.label,
+          model.note,
+        ]
+          .filter((cell): cell is string => cell !== undefined)
+          .filter((cell) => /[⟨⟩]/.test(cell));
+        expect(drawn, `${screen} · ${ctx} draws an unsubstituted placeholder`).toEqual([]);
+      }
+    }
   });
 
   it('names every screen for a heading, in § 4’s words', () => {

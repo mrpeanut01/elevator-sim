@@ -58,6 +58,7 @@
  * `types.ts#ENGINEER_SWAP_NOTE` rather than leaving the player to find out by reloading.
  */
 
+import { openTowerOf } from '../campaign/career.js';
 import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { HOST_PENDING_REASON } from './host.js';
@@ -898,6 +899,32 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * primary is disabled and the note is the screen's own refusal sentence, because a filled
    * primary over a screen that does not exist is a control that silently does nothing.
    */
+  /**
+   * A timeline stop's drawn label, with § 3.3's one placeholder in that table substituted.
+   *
+   * `TIMELINE_STEPS.campaign` carries the guide's cell verbatim as `⟨building⟩`, and the frame's own
+   * rule is that **a `⟨…⟩` cell is never drawn** — a screen's `bar()` substitutes it. The timeline is
+   * the one place no `bar()` can reach, because the shell reads the stops from the table rather than
+   * from the model, so the substitution has to happen here.
+   *
+   * Found by `screens.test.ts`'s registry-wide placeholder guard, which was written after the brief
+   * shipped `Running the lifts: ⟨style⟩` to a deployed page for a wave. The brief was the instance a
+   * player met; this is the one the guard found next, and it is the reason the guard iterates the
+   * whole registry in every run context rather than the screen that was broken.
+   *
+   * The fallback names no building rather than drawing the marker: with no tower open there is
+   * nothing true to put here, and *the building* is a smaller claim than a typesetting mark.
+   */
+  function timelineLabel(label: string): string {
+    if (!label.includes('⟨')) return label;
+    const open = dataHost === undefined ? undefined : openTowerOf(dataHost.campaign());
+    const named =
+      open === undefined || dataHost === undefined
+        ? undefined
+        : dataHost.buildingById(open.buildingId)?.name;
+    return label.replace('⟨building⟩', named ?? 'The building');
+  }
+
   function drawBar(): void {
     confirmShowing = false;
     bar.replaceChildren();
@@ -937,7 +964,7 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       for (const [index, stop] of stops.entries()) {
         const reached = index + 1 <= model.timeline.step;
         const current = index + 1 === model.timeline.step;
-        const step = el(doc, 'button', undefined, `${String(index + 1)} ${stop.label}`);
+        const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.type = 'button';
         step.disabled = !reached || current;
         step.style.cssText = [
