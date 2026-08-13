@@ -1554,8 +1554,8 @@ describe('the header band speaks a player’s words in Casual — issue #100', (
     expect(censored).toContain('AWT suppressed');
     expect(censored).not.toContain('SATURATED — AWT suppressed');
 
-    // The default is the engineer's header, byte for byte — `OverlayInput.mode`'s rule, applied to
-    // the band above it, so an export or a describing caller gets the engineer's words.
+    // The default is the engineer's header, byte for byte — `overlayViewOf`'s rule, applied to the
+    // band above it, so an export or a describing caller gets the engineer's words.
     for (const recording of [RECORDING, refused('saturated'), refused('abandoned')]) {
       expect(textsOf(recording, atEnd())).toEqual(textsOf(recording, atEnd(), 'advanced'));
     }

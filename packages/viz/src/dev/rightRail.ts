@@ -18,13 +18,21 @@
  * reproduced. `docs/12` § 4.2 replaces every figure with one the recording actually produced, and
  * the consequence for this file is the rule stated in one line:
  *
- * > **A plate never computes a round trip. It reads one off the run, or it says there is no run.**
+ * > **A plate never computes a round trip *and passes it off as a measurement*. It reads one off
+ * > the run, or it says there is no run — and where it computes one, it says so.**
  *
- * So `handling capacity` and `achieved interval` appear **if and only if** a recording exists, and
- * before the first run the plate says so in a row of its own rather than quietly filling the space
- * with arithmetic the simulator did not do. The rest — floors, rise, population, shafts, car
- * capacity — comes off the *resolved* building, which is the grown one the day is actually being
- * run against.
+ * The second clause is `docs/21` § 3.7 (1) and it is a *widening with a label*, not a weakening.
+ * The rule's subject was always the prototype's defect: a nominal figure printed **beside** measured
+ * ones with nothing to tell them apart, inviting a comparison a single run cannot support. So
+ * `handling capacity` and `achieved interval` still appear **if and only if** a recording exists,
+ * and before the first run the plate still says so in a row of its own rather than quietly filling
+ * the space with arithmetic the simulator did not do. Underneath them, {@link closedFormRowsOf}
+ * draws the Barney/CIBSE closed form per bank — *a specification, not a measurement*, with its
+ * assumptions cited and its divergences named — because a specification needs no run and refuses to
+ * stand in for one. That is the correctness oracle on screen: under pure up-peak the two intervals
+ * should agree within a few percent, and a reader who can see them disagree has a defect report.
+ * The rest — floors, rise, population, shafts, car capacity — comes off the *resolved* building,
+ * which is the grown one the day is actually being run against.
  *
  * The dispatcher plate is read from `resolveDispatchConfig`, not from the profile as authored:
  * every one of `load sensor`, `pooling`, `zoning` and `parking` has a default that a profile
@@ -82,7 +90,10 @@ import {
   type ResolvedDispatchConfig,
 } from '@elevator-sim/core/browser';
 
+import { CLOSED_FORM_ASSUMPTIONS } from '@elevator-sim/core/browser';
+
 import { checkAccessCompatibility } from '../access/dispatcherCredentials.js';
+import { upPeakBanksOf } from '../authoring/buildingSpec.js';
 import { plainDescription, type MachineClass } from '../authoring/machineSpec.js';
 import {
   PEAK_ORDER_INFO,
@@ -846,21 +857,143 @@ export function trafficPlateOf(
  * -------------------------------------------------------------------------- */
 
 /**
+ * The specification rows — Barney/CIBSE closed form, per bank, **labelled as a specification**.
+ *
+ * ## The rule this obeys rather than breaks
+ *
+ * `docs/21` L-3 states the plate's governing rule: *a plate never computes a round trip; it reads
+ * one off the run, or it says there is no run.* This function computes a round trip. The rule
+ * survives because of what it was protecting against, which the sentence it replaces says in full:
+ * *"a nominal figure printed beside measured ones is an invitation to compare them, which is
+ * exactly the comparison a single run cannot support."*
+ *
+ * Three things keep that true here, and all three are structural rather than promised:
+ *
+ * 1. **The basis is on the row.** Every key below carries `closed form`, and the block opens with a
+ *    row whose value *is* the label — `a specification, not a measurement` — and whose help cites
+ *    `CLOSED_FORM_ASSUMPTIONS` by count and by name. A reader cannot meet one of these figures
+ *    without meeting its basis.
+ * 2. **It never substitutes for the measured arm.** {@link buildingPlateOf} draws `no run yet`
+ *    exactly as it always did, and these rows appear underneath it — a specification needs no run,
+ *    and saying so is not the same as filling the measured row's hole with an estimate.
+ * 3. **The two never share a cell or a tone.** Separate rows, separate keys, and the measured pair
+ *    is above the specification pair in reading order, so the headline stays the thing that
+ *    happened.
+ *
+ * ## What it puts on screen, which is the correctness oracle
+ *
+ * `CLAUDE.md` § Correctness oracle: *under pure up-peak, simulated interval and handling capacity
+ * must match the closed-form Barney/CIBSE round-trip-time calculation within a few percent.* That
+ * has been a test since Phase 2 and has never been visible. It is now the two rows directly under
+ * the two the run measured, on the same plate, on every building — so a divergence a reader can see
+ * is a defect report, per that rule, rather than something only the suite could have caught.
+ *
+ * ## Warnings are not optional here
+ *
+ * `authoring/buildingSpec.ts#upPeakAnalysisOf` states it: *a figure shown without its warning is
+ * this repository's named failure mode*, and the shipped buildings trip these — a second entrance
+ * on Midtown Office, an express zone on Vertical City. Every sentence the analysis produced is
+ * drawn, one row per warning, keyed to the bank it is about. None is summarised away.
+ *
+ * ## The engine is asked, never re-derived
+ *
+ * {@link upPeakBanksOf} is the existing seam — the same one the building editor's live readout uses
+ * (`authoring/buildingSpec.ts:2342`, the non-test caller this row was modelled on) — so the `tp`
+ * rule for building types the reference table has no row for, the per-code warning sentences and
+ * the quoted refusal all have exactly one author. This function chooses which rows they go in.
+ */
+export function closedFormRowsOf(
+  building: ResolvedBuilding,
+  specs: ElevatorSpecs,
+): readonly PlateEntry[] {
+  const banks = upPeakBanksOf(building, specs);
+  if (banks.length === 0) return [];
+  const rows: PlateEntry[] = [
+    {
+      k: 'closed form',
+      v: 'a specification, not a measurement',
+      help:
+        `Barney/CIBSE up-peak round trip, from the same \`analyzeUpPeak\` the correctness oracle ` +
+        `holds the simulator to. It predicts a mean interval and a handling capacity under pure ` +
+        `up-peak; it has no queueing model and no variance, so it cannot predict a wait at all. ` +
+        `${String(CLOSED_FORM_ASSUMPTIONS.length)} simplifications are declared in ` +
+        `\`CLOSED_FORM_ASSUMPTIONS\`, each with the direction it biases the round trip — the first ` +
+        `is \`${CLOSED_FORM_ASSUMPTIONS[0]?.id ?? ''}\`. The rows above are what the run did.`,
+    },
+  ];
+  const named = banks.length > 1;
+  for (const bank of banks) {
+    const suffix = named ? ` · ${bank.bankId}` : '';
+    if (bank.figures === undefined) {
+      rows.push({
+        k: `closed form${suffix}`,
+        v: 'refused',
+        /* The thrown message verbatim — `bankAnalysisOf`'s own rule: it names the thing the model
+           cannot fit, and a softer sentence would name less. */
+        help: bank.refusal,
+      });
+      continue;
+    }
+    const figures = bank.figures;
+    rows.push({
+      k: `interval (closed form)${suffix}`,
+      v: `${figures.intervalS.toFixed(1)} s`,
+      help:
+        `RTT / L over ${String(bank.carCount)} car${bank.carCount === 1 ? '' : 's'}, from a ` +
+        `${figures.roundTripTimeS.toFixed(1)} s round trip ` +
+        `(${figures.travelTimeS.toFixed(1)} s travelling, ${figures.stopTimeS.toFixed(1)} s ` +
+        `stopping, ${figures.transferTimeS.toFixed(1)} s transferring). Compare it with the ` +
+        `achieved interval above: under pure up-peak the two should agree within a few percent, ` +
+        `and a visible divergence is a defect report rather than a curiosity.`,
+    });
+    rows.push({
+      k: `capacity (closed form)${suffix}`,
+      v:
+        `${figures.handlingCapacity5Min.toFixed(1)} persons / 5 min · ` +
+        `${figures.percentPopulation5Min.toFixed(1)}% of population`,
+      help:
+        `300·P/INT, against U = ${grouped(figures.servedPopulation)} — the population this bank ` +
+        `lifts, which is not always the building's. A specification for a crowd that all wants to ` +
+        `go up; the measured row above counts what the day's actual crowd got.`,
+    });
+    for (const [index, warning] of bank.warnings.entries()) {
+      rows.push({
+        k: `divergence${suffix}${bank.warnings.length > 1 ? ` ${String(index + 1)}` : ''}`,
+        v: 'this building strays from the model',
+        help: warning,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
  * The consultant's traffic-analysis schedule, derived from the building and the run.
  *
  * The design's version computes a nominal round trip and derives an interval and a handling
- * capacity from it. All three are dropped: this simulator *measures* the last two, and a nominal
- * figure printed beside measured ones is an invitation to compare them, which is exactly the
- * comparison a single run cannot support.
+ * capacity from it, **unlabelled and above the measured figures**. That is what is refused, and it
+ * is the whole of what is refused: this simulator *measures* the last two, and a nominal figure
+ * printed beside measured ones with nothing to tell them apart is an invitation to compare them as
+ * if they were the same kind of claim — which is exactly the comparison a single run cannot
+ * support.
  *
- * So the plate is in two halves. Above the line, five facts about the building as resolved — none
- * of which depends on a run. Below it, the two the run produced, and **when there is no run the
- * plate says so** rather than leaving the space or filling it.
+ * So the plate is in three halves, and the third is new (`docs/21` § 3.7 (1)). Above the line, five
+ * facts about the building as resolved — none of which depends on a run. Then the two the run
+ * produced, and **when there is no run the plate says so** rather than leaving the space or filling
+ * it. Then the closed form, per bank, labelled *a specification, not a measurement* and carrying
+ * its assumptions — see {@link closedFormRowsOf} for why that is L-3 preserved rather than L-3
+ * broken, and why the specification is below the measurement rather than beside it.
+ *
+ * `specs` is optional and its absence is a **narrower plate, never a wrong one**: a caller with no
+ * `ElevatorSpecs` in hand gets the two halves it always got. Optional rather than required because
+ * this is an exported pure function with callers outside the rail, and a required argument would
+ * have made every one of them find a copy of the machine library to draw a building fact.
  */
 export function buildingPlateOf(
   building: ResolvedBuilding,
   recording: VizRecording | undefined,
   mode: ViewMode = 'advanced',
+  specs?: ElevatorSpecs | undefined,
 ): readonly PlateEntry[] {
   /*
    * The plain-language lead — issue #71, and `mode/disclosure.ts`'s three rules applied to a plate
@@ -909,9 +1042,15 @@ export function buildingPlateOf(
       v: 'no run yet',
       help:
         'Handling capacity and interval are measured from a run, never computed from a nominal ' +
-        'round trip. Run a shift and both appear here.',
+        'round trip. Run a shift and both appear here. The closed-form rows below are a ' +
+        'specification and need no run, which is why they are there and this one is not.',
     });
-    return rows;
+    /*
+     * The specification survives the refusal, and that is the point of labelling it. `no run yet`
+     * is still the answer to *what did this building do*; the rows below answer *what was it sized
+     * for*, which is a different question with an answer available before anybody presses Run.
+     */
+    return [...rows, ...(specs === undefined ? [] : closedFormRowsOf(building, specs))];
   }
 
   const summary = recording.summary;
@@ -959,7 +1098,7 @@ export function buildingPlateOf(
       help: 'Too few departures from the terminal in the window to fit a gap.',
     });
   }
-  return rows;
+  return [...rows, ...(specs === undefined ? [] : closedFormRowsOf(building, specs))];
 }
 
 type ResolvedCars = ResolvedBuilding['banks'][number]['cars'];
@@ -1611,7 +1750,9 @@ export function mountRightRail(ui: RightRailElements, context: MountContext): Pa
           },
         ]);
       } else {
-        buildingPlate(buildingPlateOf(building, recording, state.mode));
+        buildingPlate(
+          buildingPlateOf(building, recording, state.mode, resources.elevatorSpecs),
+        );
       }
 
       /*

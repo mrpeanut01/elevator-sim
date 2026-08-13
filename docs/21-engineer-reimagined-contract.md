@@ -760,6 +760,26 @@ check on all eight buildings in both registers is the headline. **Non-test calle
 mounts; `buildingPlateOf` is already called by the shipped rail. **Risk:** the 60 Hz DOM path —
 issue #106's detached-button defect is the named hazard and `keyedFill` the named remedy.
 
+*What landed, where it differs from the plan above, and what the next lane inherits* —
+[§ D337](../DECISIONS.md):
+
+- **`Layout.overlay` is gone, not merely unused.** § 3.4 says *room no longer reserved*; leaving the
+  `Rect` behind would have been the dead-seam shape this repository counts. `overlayWidthPx`,
+  `MIN_OVERLAY_WIDTH_PX` and `dev/main.ts`'s overlay ladder rung went with it, and the plot is
+  **250 px wider at every width** — the beneficiary § D316 named, collected.
+- **Three § 1.2 carriers moved and are named in § D337's table.** The width contract's replacement is
+  the measured DOM check plus RS-03 stacking in CSS; the refusal's is `OverlayEstimate`'s refused
+  arm, which carries no `value` field at all.
+- **The headline check found a defect on its first run.** `auto-fit` holds a grid track at its
+  `minmax` floor when the container is narrower than the floor, so the card overflowed at 420 px —
+  issue #115 § 6's shape in CSS, on the card built to make it visible.
+- **§ 3.7 (1) widened L-3 with a label rather than breaking it**, and `dev/rightRail.ts`'s module
+  docstring moved with the rule (§ D227 binds a refusal as hard as a claim).
+- **§ 3.5's audit found `dev/ruleEditor.ts`'s scope note driven by nothing**, and recorded a second
+  wording for `next-run` rather than unifying it.
+- **Inherited by B5:** `honesty/surfaces.ts` gains `LIVE_METRICS`, appended last; the strings that
+  left `CANVAS`'s `drawOverlay` capture arrive there under named fields rather than `fillText[n]`.
+
 **B4 — Authoring the families** *(after B1 and after `fix/docs20-polish-six` merges)*
 Scope: `dev/dispatcherEditor.ts`, new `dev/familyControls.ts` (schema-driven control mounting,
 reusing `parameterForm.ts#instantiateControlNode`), honesty adapter `covers`.

@@ -1,30 +1,53 @@
 /**
- * The live metrics overlay, drawn.
+ * The live metrics panel, as a **view** rather than as a drawing — `docs/21` § 3.4.
  *
- * Its data comes from `src/frame/overlay.ts`, which is pure and tested on its own; this file
- * turns it into calls on a {@link Canvas2DLike}. The split is the same one `layout.ts`/`canvas.ts`
- * already make, and it exists for the same reason: `overlayAt` being right is not the same claim
- * as the panel *drawing what `overlayAt` returned*, and this package has already shipped a frame
- * seven of whose eight fields could be replaced by constants with the suite still green. So every
- * value below appears in exactly one `fillText`, and `overlay.render.test.ts` asserts each one
- * against a recomputation rather than against a literal.
+ * Its data comes from `src/frame/overlay.ts`, which is pure and tested on its own; this file turns
+ * it into the rows a renderer draws. The split is the same one `layout.ts`/`canvas.ts` already
+ * make, and it exists for the same reason: `overlayAt` being right is not the same claim as the
+ * panel *showing what `overlayAt` returned*, and this package has already shipped a frame seven of
+ * whose eight fields could be replaced by constants with the suite still green. So every value
+ * below appears in exactly one field of {@link OverlayView}, and `overlayRender.test.ts` asserts
+ * each one against a recomputation rather than against a literal.
+ *
+ * ## Why this stopped being a `fillText` loop — issue #115 § 6, and the half § D316 left open
+ *
+ * The panel was drawn into the stage's bitmap. § D316 closed the *clipping* — `render/layout.ts`
+ * refused to hand over a panel narrower than its own longest mandatory line — but it could not
+ * close the thing that let the clipping ship for a wave: **no DOM check could see the panel at
+ * all**. Four strings overhung the border on the viewer's own canvas and every automated tier was
+ * green, because a string inside a bitmap has no `scrollWidth`.
+ *
+ * `docs/21` § 2.3 states the rule this file now answers to: *the picture of the building stays
+ * canvas; words about the run prefer DOM.* So the panel is a **view model** here and a card in
+ * `dev/main.ts#drawLiveMetrics` there, and the overflow question is asked of a real browser over
+ * all eight shipped buildings in both registers (`dev/liveMetrics.browser.test.ts`) rather than
+ * computed from an assumed character advance. That is a stronger check than the arithmetic it
+ * replaces, which is the only ground on which § D316's `MIN_OVERLAY_WIDTH_PX` was allowed to go.
+ *
+ * ## What the move deliberately does *not* change
+ *
+ * Both registers survive, word for word ({@link ENGINEER_WORDS}, {@link CASUAL_WORDS}), and so
+ * does every refusal. § D299's test binds: a change to Engineer may make it easier to use, it may
+ * not make it say less. What it does drop is the three pieces of arithmetic that only a fixed-size
+ * bitmap needed — the row allocator, the greedy wrap and the *showing 3 of 12 banks* line — and
+ * each of those is a **truncation** disappearing, never a fact.
  *
  * ## The rule the panel enforces
  *
  * A suppressed statistic is **replaced by its reason**, never by a dash and never by a number.
  * `CLAUDE.md` says not to report a mean for a system whose queues grow without bound;
- * `UX.md` `RV-T5`/`RV-06` add that the running figure must never be labelled "AWT". Both are
- * structural here: the estimate rows read from {@link OverlayMetrics.rollingMeanWaitS}, which is
- * already `undefined` when `recording.summary` says so, and the label is "rolling mean wait
- * (last N s)" — a different phrase from the summary's "AWT" on purpose.
+ * `UX.md` `RV-T5`/`RV-06` add that the running figure must never be labelled "AWT". Both are now
+ * structural in the **type**: {@link OverlayEstimate}'s refused arm carries no `value` field, so a
+ * renderer cannot draw a number beside a refusal even by mistake — the drawn version enforced that
+ * by which branch it took, which is a promise rather than a shape.
  */
 
 import type { OverlayMetrics } from '../frame/overlay.js';
-import type { Frame, VizRecording } from '../contract/types.js';
+import type { Frame } from '../contract/types.js';
 import { casualRefusalFor, SUPPRESSION_REASON_PENDING } from '../mode/disclosure.js';
 import type { ViewMode } from '../mode/types.js';
-import type { Canvas2DLike, Theme } from './canvas.js';
-import type { Layout } from './layout.js';
+import type { WaitBandBasis } from '../live/types.js';
+import type { Theme } from './canvas.js';
 
 /** Load factor at which a car is "full" — CLAUDE.md's 80 % fill rule, not a limit. */
 export const LOAD_FULL = 0.8;
@@ -42,115 +65,40 @@ export function loadTrackMax(cars: readonly { readonly loadFactor: number }[]): 
   return cars.reduce((max, car) => Math.max(max, car.loadFactor), LOAD_ALARM);
 }
 
-const FONT = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-const FONT_SMALL = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-const LINE = 16;
-
-/**
- * Measured advance of one character at the two faces above — GitHub issue #115 § 6.
- *
- * `Canvas2DLike` has no `measureText`, for `render/canvas.ts#CHAR_ADVANCE_PX`'s stated reason, so
- * every horizontal budget in this file is arithmetic against these two numbers. The 12 px figure
- * is the same one `canvas.ts` uses and is stated there; 6.6 px is the same face at 11 px.
- *
- * {@link wrap} used **6.0** for the small face, which is not a rounding: it is 9 % narrow, so a
- * reason wrapped to the panel's width overhung it by three characters on every line. The one
- * number in this file that was measured rather than assumed is the one that was wrong.
- */
-const ADVANCE_PX = 7.2;
-const ADVANCE_SMALL_PX = 6.6;
-
-/** Inset from each edge of the panel — the `+ 10` the rows are drawn at, on both sides. */
-const PANEL_INSET_PX = 10;
-
-/**
- * The longest of `candidates` that fits `widthPx`, or the last one clipped to it.
- *
- * The same shape `render/canvas.ts#drawNotices` uses for `RS-05`'s notice, and for the same
- * reason: a sentence that has to lose words should lose the ones the reader can do least with,
- * chosen here, rather than whichever ones happen to fall past the panel's edge. The fallback
- * clips, because a clipped string is still better than one drawn over the panel border — but
- * every caller below supplies a last candidate that fits {@link MIN_OVERLAY_WIDTH_PX}, so the
- * fallback is a guard rather than a plan.
- */
-function longestThatFits(
-  candidates: readonly string[],
-  widthPx: number,
-  advancePx: number,
-): string {
-  const found = candidates.find((candidate) => candidate.length * advancePx <= widthPx);
-  if (found !== undefined) return found;
-  const last = candidates[candidates.length - 1] ?? '';
-  const budget = Math.max(1, Math.floor(widthPx / advancePx));
-  return last.length <= budget ? last : `${last.slice(0, Math.max(1, budget - 1))}…`;
-}
-/** Lines of suppression reason the panel will spend before deferring to the status line. */
-const REASON_LINES = 4;
-/**
- * Below this, the panel is not drawn at all.
- *
- * Its mandatory content — the title, the window, the three observations and the estimate block —
- * is about 190 px. Squeezing that into 120 px does not degrade gracefully; it draws over the
- * bottom edge. The same answer as `RS-03` gives a narrow viewport: no panel, and the header
- * counters, which are always on screen, carry the headline numbers.
- */
-const MIN_PANEL_HEIGHT_PX = 200;
-
-export interface OverlayInput {
-  readonly recording: VizRecording;
-  readonly frame: Frame;
-  readonly metrics: OverlayMetrics;
-  readonly layout: Layout;
-  readonly theme: Theme;
-  /**
-   * The reader's disclosure level — GitHub issue
-   * [#100](https://github.com/mrpeanut01/elevator-sim/issues/100), whose first checklist item is
-   * this panel.
-   *
-   * Defaulting to `advanced`, so every caller that is describing a run rather than serving a reader
-   * — the honesty sweep, `overlayRender.test.ts`, an export — gets the engineer's words. That is
-   * `DayReportInput.showEnergyAxis`'s rule and the argument transfers: a default that quietly
-   * simplified would have the search measuring a panel the product does not draw.
-   *
-   * **It moves words and it does not move a refusal.** See {@link CASUAL_WORDS} and
-   * `mode/disclosure.ts#casualRefusalFor`: a suppressed statistic is still replaced by a refusal,
-   * still in `theme.warning`, still with no number beside it, in either mode and at either playhead.
-   */
-  readonly mode?: ViewMode | undefined;
-}
-
 /**
  * The panel's labels in the two registers — issue #100.
  *
  * ## Why this is a table and not four ternaries at the draw sites
  *
- * Every string here is drawn into a **fixed-width column**: the observation rows are
- * `label` padded out to a column the value starts in, and this file has no `measureText` (see
- * {@link ADVANCE_PX}). A wording change is therefore a *layout* change, and issue #115 § 6 is what
- * happens when this panel's widths are decided one draw site at a time — four strings overhanging
- * the border on the viewer's own canvas, invisible to every DOM check because the panel is drawn
- * into the bitmap.
+ * A reader of this file should be able to see the whole panel's vocabulary in one place, and a
+ * reviewer checking `docs/21` § 1.2's ledger row — *`LIVE METRICS` in two registers* — should be
+ * able to check it against one object rather than against nine call sites. `overlayRender.test.ts`
+ * asserts **every** string of both registers reaches the view, rather than the ones somebody
+ * remembered to check.
  *
- * So the two registers sit side by side where the padding can be read off them, and
- * `overlayRender.test.ts` asserts **every** Casual string fits {@link MIN_OVERLAY_WIDTH_PX}'s
- * content width rather than the ones somebody remembered to check.
+ * ## The labels used to be padded, and the padding is gone with the bitmap
+ *
+ * Each of the first three carried trailing spaces (`'waiting now     '`), because the panel drew
+ * `label + value` into a **fixed-width column** and this file had no `measureText`. That made a
+ * wording change a *layout* change, which is issue #115 § 6 in one sentence. The card is a grid
+ * now, so the column is the browser's job and the words are only words. Nothing else about them
+ * moved: this is the same nine strings in each register, trimmed.
  *
  * ## The one label that is the same in both, and the one that could have been made false
  *
- * `longest wait` is byte-identical in the two registers, and it is in this table anyway: a reader
- * of this file should be able to see the whole panel's vocabulary in one place, including the part
- * that needed no translating. Leaving it out would have made the table read as *the words that
- * differ*, which is a different and smaller claim than *the words the panel draws*.
+ * `longest wait` is byte-identical in the two registers, and it is in this table anyway: leaving
+ * it out would have made the table read as *the words that differ*, which is a different and
+ * smaller claim than *the words the panel draws*.
  *
  * `boarded (window)` is the one that could have been made plainer by making it wrong. It is a count
  * over the rolling window, so Casual keeps the basis — *(5min)* — rather than dropping it: a count
  * over five minutes drawn as a count over the day would be a false figure, not a friendlier one.
  * The same restraint decides the window caption below.
  */
-const CASUAL_WORDS = Object.freeze({
+export const CASUAL_WORDS = Object.freeze({
   title: 'RIGHT NOW',
-  waiting: 'people waiting  ',
-  longest: 'longest wait    ',
+  waiting: 'people waiting',
+  longest: 'longest wait',
   boarded: 'got a car (5min)',
   rollingMean: 'average wait so far',
   byBank: 'BY LIFT GROUP',
@@ -159,11 +107,11 @@ const CASUAL_WORDS = Object.freeze({
   nothingYet: 'nobody carried yet',
 });
 
-/** The same nine, as the engineer's panel has always drawn them. */
-const ENGINEER_WORDS = Object.freeze({
+/** The same nine, as the engineer's panel has always said them. */
+export const ENGINEER_WORDS = Object.freeze({
   title: 'LIVE METRICS',
-  waiting: 'waiting now     ',
-  longest: 'longest wait    ',
+  waiting: 'waiting now',
+  longest: 'longest wait',
   boarded: 'boarded (window)',
   rollingMean: 'rolling mean wait',
   byBank: 'BY BANK',
@@ -172,324 +120,221 @@ const ENGINEER_WORDS = Object.freeze({
   nothingYet: 'nothing served yet',
 });
 
+/** One label-and-value row of the observations block. Both halves are strings by the time they
+ * leave this file, so the renderer chooses no format and no rounding. */
+export interface OverlayRow {
+  readonly label: string;
+  /** `'—'` where there is nothing to count yet — never `''`, which `docs/10` R3 rejects. */
+  readonly value: string;
+}
 
 /**
- * Draw the panel into {@link Layout.overlay}. A no-op when no room was reserved.
+ * The estimate block, as three arms that cannot be confused for one another.
  *
- * Returning early rather than shrinking is deliberate: `RS-03` says the controls stack and the
- * canvas keeps its height on a narrow viewport, and a 240 px panel squeezed into 80 px is a
- * worse answer than no panel plus the header counters, which stay.
+ * This is `docs/10` § 1 R3 made structural rather than promised. The drawn panel took a branch and
+ * *then* was careful not to print a number in the refusing one; here the refusing arm **has no
+ * `value` field**, so a renderer that wanted to draw a figure beside `SUPPRESSED` would not compile.
+ * `docs/21` L-5's three kinds of absence are the three arms: a figure, a figure with no sample
+ * (`—`), and a figure the run refuses.
  */
-export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
-  const { layout, theme, metrics, frame } = input;
-  const panel = layout.overlay;
-  if (panel === undefined || panel.height < MIN_PANEL_HEIGHT_PX) return;
+export type OverlayEstimate =
+  | { readonly kind: 'figure'; readonly label: string; readonly value: string }
+  | { readonly kind: 'no-sample'; readonly label: string; readonly value: string }
+  | {
+      readonly kind: 'refused';
+      readonly label: string;
+      /** `SUPPRESSED`, or Casual's *no average* head — never softer. */
+      readonly head: string;
+      /** The run's own reason, or the pending sentence before the day has finished. */
+      readonly reason: string;
+      /**
+       * Which window the two strings above fold — `docs/20` defect 3, copied from the producer.
+       *
+       * Carried onto the view rather than re-derived, for `OverlayMetrics.suppressionBasis`'s own
+       * stated reason: the renderer gates on the declaration and the honesty search reads it.
+       */
+      readonly basis: WaitBandBasis;
+    };
 
-  ctx.fillStyle = theme.panel;
-  ctx.fillRect(panel.x, panel.y, panel.width, panel.height);
-  ctx.strokeStyle = theme.shaftEdge;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
+/** One bank's row. `mean` is the register's refusal word when the run refuses one. */
+export interface OverlayBankRow {
+  readonly bankId: string;
+  readonly boarded: string;
+  readonly mean: string;
+  /** Whether {@link mean} is a refusal rather than a figure — KB-15's second signal. */
+  readonly refused: boolean;
+}
 
-  const left = panel.x + PANEL_INSET_PX;
-  /**
-   * The room a row actually has — the panel less both insets.
-   *
-   * Nothing in this file had one before, which is issue #115 § 6 in one sentence: the panel
-   * checked its own **height** and drew whatever width it liked. `render/layout.ts` now refuses
-   * to hand over a panel narrower than `MIN_OVERLAY_WIDTH_PX`; this is the other half of the same
-   * agreement, and it is what makes an *authored* bank id — the one string here whose length
-   * nobody chose — unable to overhang the border.
-   */
-  const contentWidth = Math.max(1, panel.width - 2 * PANEL_INSET_PX);
-  let y = panel.y + 12;
-  const line = (text: string, style: string, font = FONT): void => {
-    ctx.font = font;
-    ctx.fillStyle = style;
-    ctx.fillText(text, left, y);
-    y += LINE;
-  };
+/** One car's row: its label, its load as a figure, and the two fractions the bar is drawn from. */
+export interface OverlayCarRow {
+  readonly carId: string;
+  readonly label: string;
+  /** `0.82`, and `0.82 !` above the alarm — KB-15b's glyph, in the string itself. */
+  readonly load: string;
+  readonly loadFactor: number;
+  readonly tone: LoadTone;
+  readonly overloaded: boolean;
+  /** Share of the track the fill occupies, `0…1`. */
+  readonly fillFraction: number;
+  /** Where 100 % of rated load sits on a track that extends past it — `RV-14`. */
+  readonly fullMarkFraction: number;
+}
 
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+/** Everything the live metrics card draws, in one register. */
+export interface OverlayView {
+  readonly title: string;
+  /** The window, in each register's own way of saying the same span. */
+  readonly window: string;
+  readonly observations: readonly OverlayRow[];
+  readonly estimate: OverlayEstimate;
+  readonly bankHeading: string;
+  readonly banks: readonly OverlayBankRow[];
+  /** Drawn in place of the bank rows when nobody has been carried yet. */
+  readonly banksEmpty: string | undefined;
+  readonly carHeading: string;
+  readonly cars: readonly OverlayCarRow[];
+}
 
-  /* Issue #100. One lookup, at the top, so no draw site below chooses a register of its own. */
-  const casual = (input.mode ?? 'advanced') === 'basic';
+/**
+ * The panel, as rows.
+ *
+ * `mode` defaults to `advanced`, so every caller that is describing a run rather than serving a
+ * reader — the honesty sweep, `overlayRender.test.ts`, an export — gets the engineer's words. That
+ * is `DayReportInput.showEnergyAxis`'s rule and the argument transfers: a default that quietly
+ * simplified would have the search measuring a panel the product does not draw.
+ *
+ * **The mode moves words and it does not move a refusal.** See {@link CASUAL_WORDS} and
+ * `mode/disclosure.ts#casualRefusalFor`: a suppressed statistic is still replaced by a refusal,
+ * still with no number beside it, in either mode and at either playhead.
+ *
+ * Pure, and no `Theme`: the card is DOM and takes its colours from the custom properties § 2.2 (2)
+ * re-pointed, so a restyle moves the panel with the shell and no code here changes. {@link tone}
+ * is the one visual decision that is a *judgement* — the four load bands — and it is carried as a
+ * name rather than as a colour for exactly that reason.
+ */
+export function overlayViewOf(
+  metrics: OverlayMetrics,
+  frame: Frame,
+  mode: ViewMode = 'advanced',
+): OverlayView {
+  /* Issue #100. One lookup, at the top, so no row below chooses a register of its own. */
+  const casual = mode === 'basic';
   const words = casual ? CASUAL_WORDS : ENGINEER_WORDS;
+  const trackMax = loadTrackMax(frame.cars);
 
-  line(words.title, theme.text);
-  /*
-   * The window, in each register's own way of saying the same span.
-   *
-   * Engineer gets the bounds — `window 358–658 s` — because a bound is what a reader checks a
-   * figure against. Casual gets the **length**, which is the same fact said the way a person asks
-   * it, and it is subtracted rather than assumed: the window is `[max(startedAt, t − windowS), t]`,
-   * so early in a run it is genuinely shorter than `windowS` and printing *the last 300 s* there
-   * would be a caption describing a window the panel is not showing.
-   */
-  line(
-    casual
+  return {
+    title: words.title,
+    /*
+     * The window, in each register's own way of saying the same span.
+     *
+     * Engineer gets the bounds — `window 358–658 s` — because a bound is what a reader checks a
+     * figure against. Casual gets the **length**, which is the same fact said the way a person asks
+     * it, and it is subtracted rather than assumed: the window is `[max(startedAt, t − windowS), t]`,
+     * so early in a run it is genuinely shorter than `windowS` and printing *the last 300 s* there
+     * would be a caption describing a window the panel is not showing.
+     */
+    window: casual
       ? `the last ${(metrics.simTimeS - metrics.windowStartS).toFixed(0)} s`
       : `window ${formatSpan(metrics.windowStartS, metrics.simTimeS)}`,
-    theme.textDim,
-    FONT_SMALL,
-  );
-  y += 4;
+    /* Observations. Facts about the recording, shown on every run including a saturated one —
+       they are how a reader *sees* a queue diverging. */
+    observations: [
+      { label: words.waiting, value: String(metrics.waitingNow) },
+      {
+        label: words.longest,
+        value:
+          metrics.longestCurrentWaitS === undefined
+            ? '—'
+            : `${metrics.longestCurrentWaitS.toFixed(0)} s`,
+      },
+      { label: words.boarded, value: `${String(metrics.boardedInWindow)} legs` },
+    ],
+    estimate: estimateOf(metrics, words.rollingMean, casual),
+    bankHeading: words.byBank,
+    banks: metrics.banks.map((bank) => ({
+      bankId: bank.bankId,
+      boarded: `${String(bank.boardedInWindow)} legs`,
+      mean: bank.meanWaitS === undefined ? words.bankSuppressed : `${bank.meanWaitS.toFixed(1)} s`,
+      refused: bank.meanWaitS === undefined,
+    })),
+    banksEmpty: metrics.banks.length === 0 ? words.nothingYet : undefined,
+    carHeading: words.carLoad,
+    /* Per-car load. The one place `RV-14`'s "does not silently clip at 1" is testable: the track
+       is scaled past the alarm, so an overloaded car draws past the full mark rather than at it. */
+    cars: frame.cars.map((car) => ({
+      carId: car.carId,
+      label: car.label,
+      load: `${car.loadFactor.toFixed(2)}${car.loadFactor >= LOAD_ALARM ? ' !' : ''}`,
+      loadFactor: car.loadFactor,
+      tone: loadTone(car.loadFactor),
+      overloaded: car.loadFactor >= LOAD_ALARM,
+      fillFraction: Math.min(1, car.loadFactor / trackMax),
+      fullMarkFraction: 1 / trackMax,
+    })),
+  };
+}
 
-  /* Observations. Facts about the recording, shown on every run including a saturated one —
-     they are how a reader *sees* a queue diverging. */
-  line(`${words.waiting} ${String(metrics.waitingNow)}`, theme.text);
-  line(
-    `${words.longest} ${metrics.longestCurrentWaitS === undefined ? '—' : `${metrics.longestCurrentWaitS.toFixed(0)} s`}`,
-    theme.text,
-  );
-  line(`${words.boarded} ${String(metrics.boardedInWindow)} legs`, theme.text);
-  y += 4;
-
-  /*
-   * What is left of the panel is allocated **before** anything else is drawn, in the order a
-   * reader loses least by losing: the prose reason first (it is repeated verbatim on the status
-   * line under the canvas), then bank rows, then car rows. The `SUPPRESSED` line itself is never
-   * spent.
-   *
-   * Three measurements in the browser produced this, each one fixing the previous rule:
-   *
-   * | Panel | Rule at the time | Symptom |
-   * |---|---|---|
-   * | 400 px, midtown-office | a fixed reservation for the car section | "showing 0 of 1 banks", "showing 0 of 4 cars" |
-   * | 340 px, vertical-city | 50/50 split of what remained | the reason ate the room before the split happened |
-   * | 340 px, mixed-use-high-rise | reserve cars, banks take the rest | "showing 0 of 16 cars" — the overload alarm drawn as nothing |
-   *
-   * The lesson of the third is why this is arithmetic rather than a limit checked inside each
-   * loop: a limit is off by whatever the headings and gaps cost, and correcting it by eye is how
-   * the first two rules were produced.
-   */
-  const bottom = panel.y + panel.height;
-  const CAR_ROW = 14;
-  const GAP = 6;
-  /** Car rows the panel keeps back before the banks are given anything. */
-  const CAR_ROWS_RESERVED = 4;
-
-  const cars = frame.cars.length;
-  const banks = metrics.banks.length;
-
-  /** Rows of each list, decided once. `truncated` drives the "showing N of M" lines. */
-  function allocate(spare: number): { readonly carRows: number; readonly bankRows: number } {
-    // Two headings, the two inter-section gaps, and one line of slack. The slack is not a
-    // fudge for arithmetic nobody checked: `overlayRender.test.ts` asserts that **no** call
-    // lands below the panel, and a text baseline sits at the *top* of its line box, so the
-    // last row of a full panel would otherwise extend one line past the edge it was measured
-    // against. Costing one row is the right trade for a hard bound.
-    let budget = Math.max(0, spare - 2 * LINE - 2 * GAP);
-    let carRows = Math.min(cars, CAR_ROWS_RESERVED, Math.floor(budget / CAR_ROW));
-    budget -= carRows * CAR_ROW;
-    if (cars > carRows) budget = Math.max(0, budget - LINE);
-    let bankRows = Math.min(banks, Math.floor(budget / LINE));
-    if (banks > bankRows && bankRows > 0) bankRows -= 1;
-    budget -= bankRows * LINE;
-    if (banks > bankRows) budget = Math.max(0, budget - LINE);
-    carRows = Math.min(cars, carRows + Math.floor(budget / CAR_ROW));
-    return { carRows, bankRows };
-  }
-
+/**
+ * The estimate row's three arms — and the one that may never carry a figure.
+ *
+ * **What Casual says where the engineer's panel says `SUPPRESSED`** — and the three things it may
+ * not be.
+ *
+ * It may not be **softer**. `SATURATED` is not jargon to be smoothed away; it is the run telling a
+ * reader the building could not cope, and *a busy day* is a different and weaker claim. Every
+ * candidate `casualRefusalFor` offers says there is **no average**, in those words, before it says
+ * anything else.
+ *
+ * It may not be **narrower than the ground**. `awtIsValid` has five grounds and only one of them is
+ * saturation — an empty window and an abandonment rate above 2 % refuse a mean on a run that coped
+ * perfectly well — so a line reading *the building could not cope* would be false on three of the
+ * five. Both arms are ground-free by construction, and the ground-specific sentence is the one the
+ * status line under the canvas carries (`dev/main.ts#transportStatusOf`, which is already
+ * mode-aware and already reads `mode/disclosure.ts`'s per-ground wording).
+ *
+ * And — `docs/20` defect 3 — it may not be **dated wrong**. `NO AVERAGE — A RESULT` is a verdict
+ * about the finished day, and it was drawn at every playhead: at 14 % of a Midtown run it sat under
+ * a label reading *average wait so far*, over a building whose queues had not formed yet. The
+ * register comes from `metrics.suppressionBasis` — the producer's own reading of its clock, never a
+ * comparison made here — and the panel withholds exactly as hard in both.
+ *
+ * The words are **imported, not spelled**, which is GitHub issue #100's argument. `NO_AVERAGE_LEAD`
+ * is `render/canvas.ts`'s banner head as well; with two registers to keep in step a local copy is
+ * two copies of two sentences.
+ *
+ * The head is `heads[0]` now rather than *the longest that fits a 210 px panel*. That choice was a
+ * bitmap's — three candidate wordings, picked by character arithmetic — and the card has no such
+ * budget: it wraps. The remaining candidates are still the vocabulary `casualRefusalFor` owns, and
+ * the first is the fullest, so what a Casual reader gets is the **longest** of the three at every
+ * width instead of the longest that happened to fit.
+ */
+function estimateOf(
+  metrics: OverlayMetrics,
+  label: string,
+  casual: boolean,
+): OverlayEstimate {
   if (metrics.suppressed) {
-    line(words.rollingMean, theme.textDim);
-    /*
-     * **What Casual says where the engineer's panel says `SUPPRESSED`** — and the three things it
-     * may not be.
-     *
-     * It may not be **softer**. `SATURATED` is not jargon to be smoothed away; it is the run telling
-     * a reader the building could not cope, and *a busy day* is a different and weaker claim. Every
-     * candidate `casualRefusalFor` offers says there is **no average**, in those words, before it
-     * says anything else.
-     *
-     * It may not be **narrower than the ground**. `awtIsValid` has five grounds and only one of them
-     * is saturation — an empty window and an abandonment rate above 2 % refuse a mean on a run that
-     * coped perfectly well — so a line reading *the building could not cope* would be false on three
-     * of the five. Both arms are ground-free by construction, and the ground-specific sentence is
-     * the one the status line under the canvas carries (`dev/main.ts#transportStatusOf`, which is
-     * already mode-aware and already reads `mode/disclosure.ts`'s per-ground wording).
-     *
-     * And — `docs/20` defect 3 — it may not be **dated wrong**. `NO AVERAGE — A RESULT` is a verdict
-     * about the finished day, and it was drawn at every playhead: at 14 % of a Midtown run it sat
-     * under a label reading *average wait so far*, over a building whose queues had not formed yet.
-     * The register comes from `metrics.suppressionBasis` — the producer's own reading of its clock,
-     * never a comparison made here — and the panel withholds exactly as hard in both.
-     *
-     * The words are **imported, not spelled**, which is GitHub issue #100's argument extended by one
-     * wave. The head used to be written out here and moved to `NO_AVERAGE_LEAD` because
-     * `render/canvas.ts`'s banner says it one row up on the same bitmap; the reason paragraph
-     * follows it now, because with two registers to keep in step a local copy is two copies of two
-     * sentences. Chosen by width rather than fixed, because this panel can be 210 px wide and a
-     * clipped refusal is the one string on the screen that may not be clipped.
-     */
     const refusal = casualRefusalFor(metrics.suppressionBasis === 'whole-run');
-    line(
-      casual ? longestThatFits(refusal.heads, contentWidth, ADVANCE_PX) : 'SUPPRESSED',
-      theme.warning,
-    );
-    /*
-     * The engineer's arm of the same gate. `core`'s `awtInvalidReason` is a whole-run verdict in
-     * past tense, and it was printed here at every playhead exactly as Casual's was — see
-     * `mode/disclosure.ts#SUPPRESSION_REASON_PENDING` for why fixing one register and not the other
-     * would leave the search green on half a screen.
-     */
-    const reason = wrap(
-      casual
+    return {
+      kind: 'refused',
+      label,
+      head: casual ? (refusal.heads[0] ?? '') : 'SUPPRESSED',
+      /*
+       * The engineer's arm of the same gate. `core`'s `awtInvalidReason` is a whole-run verdict in
+       * past tense, and it was printed at every playhead exactly as Casual's was — see
+       * `mode/disclosure.ts#SUPPRESSION_REASON_PENDING` for why fixing one register and not the
+       * other would leave the search green on half a screen.
+       */
+      reason: casual
         ? refusal.reason
         : refusal.basis === 'whole-run'
           ? (metrics.suppressionReason ?? 'no reason given')
           : SUPPRESSION_REASON_PENDING,
-      contentWidth,
-      ADVANCE_SMALL_PX,
-    );
-    // Whatever is left once both lists have had their reserved rows. May be zero on a very short
-    // panel; the pointer line below still says where the full text is.
-    const forLists = 2 * LINE + 2 * GAP + Math.min(cars, CAR_ROWS_RESERVED) * CAR_ROW + Math.min(banks, 2) * LINE;
-    const budget = Math.max(
-      0,
-      Math.min(REASON_LINES, Math.floor((bottom - y - forLists - LINE) / LINE)),
-    );
-    for (const chunk of reason.slice(0, budget)) {
-      line(chunk, theme.textDim, FONT_SMALL);
-    }
-    if (reason.length > budget) {
-      // The pointer must survive: it is the only thing telling a reader the reason continues.
-      line(
-        longestThatFits(
-          ['… (full reason below the canvas)', '… (full reason below)', '… (more below)'],
-          contentWidth,
-          ADVANCE_SMALL_PX,
-        ),
-        theme.textDim,
-        FONT_SMALL,
-      );
-    }
-  } else {
-    line(
-      `${words.rollingMean}${metrics.rollingMeanWaitS === undefined ? '  —' : ''}`,
-      theme.textDim,
-    );
-    if (metrics.rollingMeanWaitS !== undefined) {
-      line(`${metrics.rollingMeanWaitS.toFixed(1)} s`, theme.text);
-    }
+      basis: refusal.basis,
+    };
   }
-  y += GAP;
-
-  const { carRows, bankRows } = allocate(bottom - y);
-
-  /*
-   * A section that cannot show even one row is collapsed to a single line naming what it holds.
-   *
-   * A heading followed by "showing 0 of 12 banks" is two lines that say nothing and look like a
-   * bug; one line that says there are twelve banks and no room for them says the same thing
-   * honestly and leaves the room for the other section. Measured on a 340 px panel with twelve
-   * banks and thirty-five cars, where both sections wanted more than the panel had.
-   */
-  if (banks > 0 && bankRows === 0) {
-    /*
-     * *lift group* rather than *bank* in Casual, and the count keeps the same noun as the heading
-     * — a collapsed section that named a different thing from the one it is collapsing would be
-     * two vocabularies on one line, which is worse than either.
-     */
-    const noun = casual ? 'lift group' : 'bank';
-    const count = `${String(banks)} ${noun}${banks === 1 ? '' : 's'}`;
-    line(
-      longestThatFits(
-        [
-          `${words.byBank}  ${count} — no room here`,
-          `${words.byBank}  ${count} — no room`,
-          `${words.byBank}  ${count}`,
-        ],
-        contentWidth,
-        ADVANCE_SMALL_PX,
-      ),
-      theme.warning,
-      FONT_SMALL,
-    );
-  } else {
-    line(words.byBank, theme.textDim, FONT_SMALL);
-    if (banks === 0) {
-      line(words.nothingYet, theme.textDim, FONT_SMALL);
-    }
-    for (const bank of metrics.banks.slice(0, bankRows)) {
-      const mean =
-        bank.meanWaitS === undefined ? words.bankSuppressed : `${bank.meanWaitS.toFixed(1)} s`;
-      /*
-       * The **id** yields, never the figures beside it.
-       *
-       * `bankId` is authored in `data/buildings/`, so its length is the one thing on this panel
-       * nobody here chose — `zone-1-local` is twelve characters and Mixed-Use's `office-low-rise`
-       * is fifteen. Clipping the row as a whole would have taken the leg count or the word
-       * `suppressed` off the end, which is a suppression notice disappearing because a building
-       * has long names. The id is the part a reader can identify from its neighbours; the figures
-       * are not.
-       */
-      const tail = `  ${String(bank.boardedInWindow)} legs  ${mean}`;
-      const idBudget = Math.max(1, contentWidth - tail.length * ADVANCE_SMALL_PX);
-      const id = longestThatFits([bank.bankId], idBudget, ADVANCE_SMALL_PX);
-      line(`${id}${tail}`, theme.text, FONT_SMALL);
-    }
-    if (bankRows < banks) {
-      line(
-        `showing ${String(bankRows)} of ${String(banks)} ${casual ? 'groups' : 'banks'}`,
-        theme.warning,
-        FONT_SMALL,
-      );
-    }
-  }
-  y += GAP;
-
-  /* Per-car load. The one place `RV-14`'s "does not silently clip at 1" is testable: the track
-     is scaled past the alarm, so an overloaded car draws past the full mark rather than at it. */
-  /*
-   * There is no "no room for any car" branch, and its absence is deliberate.
-   *
-   * One was written, by symmetry with the bank list. The mutation harness then showed it could be
-   * replaced by a bare heading with the suite still green — and the reason turned out to be that
-   * **no panel can reach it**: with {@link MIN_PANEL_HEIGHT_PX} at 200 there is always room for at
-   * least one car row, and below 200 the panel is not drawn at all. It was unreachable code with a
-   * plausible-looking test, which is this repository's signature defect, so it was deleted rather
-   * than given a test that constructed a panel the layout never produces.
-   *
-   * The bank list keeps its collapsed line because that one **is** reachable, and was seen on
-   * screen on Mixed-Use High-Rise and Midtown Office.
-   */
-  line(words.carLoad, theme.textDim, FONT_SMALL);
-  const trackMax = loadTrackMax(frame.cars);
-  const trackWidth = Math.max(20, panel.width - 90);
-  const shown = carRows;
-  for (const car of frame.cars.slice(0, shown)) {
-    ctx.font = FONT_SMALL;
-    ctx.fillStyle = theme.textDim;
-    ctx.fillText(car.label, left, y);
-
-    const barX = left + 34;
-    ctx.fillStyle = theme.shaft;
-    ctx.fillRect(barX, y + 2, trackWidth, 8);
-    ctx.fillStyle = loadColour(car.loadFactor, theme);
-    ctx.fillRect(barX, y + 2, (trackWidth * car.loadFactor) / trackMax, 8);
-    // The full mark: where 100 % of rated load sits on a track that extends past it.
-    ctx.fillStyle = theme.textDim;
-    ctx.fillRect(barX + trackWidth / trackMax, y + 1, 1, 10);
-
-    ctx.fillStyle = car.loadFactor >= LOAD_ALARM ? theme.carOverload : theme.textDim;
-    ctx.fillText(
-      `${car.loadFactor.toFixed(2)}${car.loadFactor >= LOAD_ALARM ? ' !' : ''}`,
-      barX + trackWidth + 6,
-      y,
-    );
-    y += CAR_ROW;
-  }
-  if (shown < frame.cars.length) {
-    ctx.font = FONT_SMALL;
-    ctx.fillStyle = theme.warning;
-    ctx.fillText(
-      `showing ${String(shown)} of ${String(frame.cars.length)} cars`,
-      left,
-      y,
-    );
-  }
+  if (metrics.rollingMeanWaitS === undefined) return { kind: 'no-sample', label, value: '—' };
+  return { kind: 'figure', label, value: `${metrics.rollingMeanWaitS.toFixed(1)} s` };
 }
 
 /**
@@ -516,10 +361,39 @@ export function drawOverlay(ctx: Canvas2DLike, input: OverlayInput): void {
  * it now reads as *working* rather than as *empty*.
  */
 export function loadColour(loadFactor: number, theme: Theme): string {
-  if (loadFactor >= LOAD_ALARM) return theme.carOverload;
-  if (loadFactor >= LOAD_FULL) return theme.carHeavy;
-  if (loadFactor > LOAD_OCCUPIED) return theme.car;
-  return theme.carLight;
+  switch (loadTone(loadFactor)) {
+    case 'overloaded':
+      return theme.carOverload;
+    case 'at-design-load':
+      return theme.carHeavy;
+    case 'carrying':
+      return theme.car;
+    case 'room':
+      return theme.carLight;
+  }
+}
+
+/**
+ * The four bands, as **names** — the half of {@link loadColour} the DOM card needs.
+ *
+ * Two renderers now draw a car's load: the stage, which wants a `Theme` colour, and the live
+ * metrics card, which wants a custom property so that § 2.2 (2)'s indirection restyles it with no
+ * code change. Duplicating the four comparisons would have been a second answer to *when is a car
+ * full*, on a boundary this repository has already argued about once (`LOAD_ALARM` against the
+ * handoff's 0.95). So the **judgement** is here, once, and each renderer maps the name it gets.
+ *
+ * The names are the words `index.html`'s stage key already draws beside the four swatches — *car
+ * with room*, *carrying a load*, *at design load*, *overloaded* — so the card, the stage and the
+ * key cannot disagree about which band a car is in.
+ */
+export type LoadTone = 'room' | 'carrying' | 'at-design-load' | 'overloaded';
+
+/** Which band a load factor falls in. See {@link loadColour} for why the boundaries are these. */
+export function loadTone(loadFactor: number): LoadTone {
+  if (loadFactor >= LOAD_ALARM) return 'overloaded';
+  if (loadFactor >= LOAD_FULL) return 'at-design-load';
+  if (loadFactor > LOAD_OCCUPIED) return 'carrying';
+  return 'room';
 }
 
 /**
@@ -531,28 +405,4 @@ export const LOAD_OCCUPIED = 0.25;
 
 function formatSpan(fromS: number, toS: number): string {
   return `${fromS.toFixed(0)}–${toS.toFixed(0)} s`;
-}
-
-/**
- * Greedy word wrap at an approximate monospace advance.
- *
- * `Canvas2DLike` has no `measureText` on purpose — it is the subset the renderer uses, and adding
- * a measurement method would mean every test stub had to implement font metrics. At 11 px
- * monospace an advance is about 6.2 px, which is close enough for a reason string.
- */
-function wrap(text: string, widthPx: number, advancePx: number): readonly string[] {
-  const perLine = Math.max(8, Math.floor(widthPx / advancePx));
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    if (current === '') current = word;
-    else if (current.length + 1 + word.length <= perLine) current += ` ${word}`;
-    else {
-      lines.push(current);
-      current = word;
-    }
-  }
-  if (current !== '') lines.push(current);
-  return lines;
 }
