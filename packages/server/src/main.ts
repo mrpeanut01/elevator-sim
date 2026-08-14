@@ -173,6 +173,42 @@ export function siteOriginFrom(viewerOrigin: string, allowOrigin: string): strin
 }
 
 /**
+ * How many trusted reverse proxies sit in front of this process, from the environment.
+ *
+ * Zero unless an operator says otherwise, and **`ELEVATOR_SIM_TRUST_PROXY` is refused outright**
+ * rather than ignored. That variable used to mean *"read the left-most `x-forwarded-for` entry"*,
+ * which `clientIpOf` now records as the caller's own text rather than any hop's observation — so an
+ * environment still setting it is asking for a behaviour that no longer exists, and the two ways to
+ * answer that are to stop the server or to quietly do something else. A server that boots having
+ * silently discarded a security setting is the worse of those by a distance.
+ *
+ * The value is validated as a small non-negative integer, and `Number()` is not used for it:
+ * `Number(' 1 ')` is `1`, `Number('')` is `0`, and `Number('1e1')` is `10`. A hop count is a written
+ * digit or it is a mistake.
+ */
+export function trustedHopsFrom(env: Readonly<Record<string, string | undefined>>): number {
+  if (env['ELEVATOR_SIM_TRUST_PROXY'] !== undefined) {
+    throw new Error(
+      'ELEVATOR_SIM_TRUST_PROXY is no longer read. It meant "believe the left-most ' +
+        'x-forwarded-for entry", which is the entry the caller writes rather than the one a proxy ' +
+        'observed — so it made the per-caller budget forgeable rather than trustworthy. Set ' +
+        'ELEVATOR_SIM_TRUSTED_HOPS to the number of trusted reverse proxies in front of this ' +
+        'process instead: 0 for none, 1 behind exactly one. See DECISIONS.md § D242.',
+    );
+  }
+
+  const raw = env['ELEVATOR_SIM_TRUSTED_HOPS'];
+  if (raw === undefined || raw.trim().length === 0) return 0;
+  if (!/^\d{1,2}$/u.test(raw.trim())) {
+    throw new Error(
+      `ELEVATOR_SIM_TRUSTED_HOPS is ${JSON.stringify(raw)}. It is a count of trusted reverse ` +
+        'proxies — a plain non-negative integer, 0 for none.',
+    );
+  }
+  return Number.parseInt(raw.trim(), 10);
+}
+
+/**
  * Read the environment, boot, listen.
  *
  * Exported and takes its environment as an argument so the wiring is testable without spawning a
@@ -185,6 +221,10 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
   // configuration mistake that surfaces after a database connection and a `data/` load is one the
   // reader meets several seconds and one stack frame away from its cause.
   const allowOrigin = allowOriginFrom(env, viewerOrigin);
+  // Read with the origins, before anything is opened, because a refused `ELEVATOR_SIM_TRUST_PROXY`
+  // is a configuration mistake and those belong next to their cause rather than a database
+  // connection away from it.
+  const trustedHops = trustedHopsFrom(env);
   const server = await bootstrap({
     dataDir: env['ELEVATOR_SIM_DATA'] ?? fileURLToPath(new URL('../../../data/', import.meta.url)),
     sql: new PgSql(requireDatabaseUrl(env)),
@@ -203,11 +243,10 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
     // than the convenient one — and when the viewer is served from this same origin, as it is in
     // the shipped container, there is no cross-origin request to permit.
     allowOrigin,
-    // Off unless an operator says there is a proxy in front, because `x-forwarded-for` is a request
-    // header and believing it by default would hand every caller a free rate-limit key. § D242 and
-    // `serve.ts`'s own note say what it costs either way. It is `'true'` and not "any non-empty
-    // value", so `ELEVATOR_SIM_TRUST_PROXY=false` means what a reader thinks it means.
-    trustProxy: env['ELEVATOR_SIM_TRUST_PROXY']?.trim().toLowerCase() === 'true',
+    // Zero unless an operator counts the proxies in front, because `x-forwarded-for` is a request
+    // header and reading it from the wrong end would hand every caller a free rate-limit key.
+    // § D242 and `clientIpOf`'s own note say what each value costs.
+    trustedHops,
     static: viewer,
     // Set only in a split deployment, where it takes precedence over `static` for every page
     // request. Both are passed rather than one, because the bundle is still what this origin serves

@@ -21,8 +21,10 @@ import type { AddressInfo } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { IncomingMessage } from 'node:http';
+
 import type { Api } from './api.js';
-import { serve, type ServeOptions } from './serve.js';
+import { clientIpOf, serve, type ServeOptions } from './serve.js';
 import type { StaticAsset, StaticBundle } from './static.js';
 
 const SITE = 'https://yellow-glacier.example';
@@ -254,6 +256,74 @@ describe('a request target that is not a URL is answered, not dropped', () => {
 
     expect(answer).toMatch(/^HTTP\/1\.1 400 /u);
     expect(answer).toContain('bad-request');
+  });
+});
+
+describe('who the caller is, when a proxy is in front', () => {
+  /**
+   * The two fields {@link clientIpOf} reads, and nothing else.
+   *
+   * `THE_INGRESS` is the socket peer in every case here, because that is what a process behind a
+   * reverse proxy actually sees — and the reason § D242's per-caller budget is one shared bucket at
+   * zero hops rather than a per-caller one.
+   */
+  const THE_INGRESS = '10.0.0.1';
+
+  function arriving(forwardedFor?: string | string[]): IncomingMessage {
+    return {
+      headers: forwardedFor === undefined ? {} : { 'x-forwarded-for': forwardedFor },
+      socket: { remoteAddress: THE_INGRESS },
+    } as unknown as IncomingMessage;
+  }
+
+  it('reads the socket peer at zero hops, whatever the caller claims', () => {
+    // The shipped default, and the one answer no caller can write.
+    expect(clientIpOf(arriving('1.2.3.4'), 0)).toBe(THE_INGRESS);
+    expect(clientIpOf(arriving(), 0)).toBe(THE_INGRESS);
+  });
+
+  it('reads what the single trusted hop saw at one hop', () => {
+    // One proxy, honest caller: the proxy appended the peer it saw, and that is the right-most.
+    expect(clientIpOf(arriving('203.0.113.7'), 1)).toBe('203.0.113.7');
+  });
+
+  it('cannot be forged by a caller who sends their own header — the whole point', () => {
+    // The attack § D242 § 2 names and its own next sentence left open. A caller prepends whatever
+    // they like; the ingress appends what it saw. Counting from the right steps over every entry
+    // the caller could write, however many they write.
+    const forged = clientIpOf(arriving('9.9.9.9, 8.8.8.8, 7.7.7.7, 203.0.113.7'), 1);
+    expect(forged).toBe('203.0.113.7');
+    expect(forged).not.toBe('9.9.9.9');
+  });
+
+  it('gives a caller no fresh budget however much they prepend', () => {
+    // The property under the case above, stated as the limiter sees it: vary the header all you
+    // like and the key does not move. That is what makes it a budget.
+    const keys = new Set(
+      ['a', 'b', 'c', 'd'].map((noise) => clientIpOf(arriving(`${noise}, 203.0.113.7`), 1)),
+    );
+    expect(keys).toEqual(new Set(['203.0.113.7']));
+  });
+
+  it('counts one entry per hop, so two proxies read one further left', () => {
+    expect(clientIpOf(arriving('9.9.9.9, 203.0.113.7, 10.0.0.9'), 2)).toBe('203.0.113.7');
+  });
+
+  it('falls back to the socket peer when the chain is shorter than the count', () => {
+    // A request that did not arrive through the configured topology. The left-most entry is the one
+    // answer that must never come out of here, because it is the caller's own text.
+    expect(clientIpOf(arriving('9.9.9.9'), 3)).toBe(THE_INGRESS);
+    expect(clientIpOf(arriving(), 1)).toBe(THE_INGRESS);
+  });
+
+  it('joins a repeated header rather than reading only the first of them', () => {
+    // Node hands back `string[]` when the header appears more than once. Taking `header[0]` — which
+    // the previous implementation did — would read one caller-supplied line and ignore the hop's.
+    expect(clientIpOf(arriving(['9.9.9.9', '203.0.113.7']), 1)).toBe('203.0.113.7');
+  });
+
+  it('ignores blank entries rather than counting them as hops', () => {
+    expect(clientIpOf(arriving('9.9.9.9, , 203.0.113.7'), 1)).toBe('203.0.113.7');
   });
 });
 

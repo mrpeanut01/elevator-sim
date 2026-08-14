@@ -13,7 +13,13 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { NO_CROSS_ORIGIN, allowOriginFrom, siteOriginFrom, viewerOriginFrom } from '../main.js';
+import {
+  NO_CROSS_ORIGIN,
+  allowOriginFrom,
+  siteOriginFrom,
+  trustedHopsFrom,
+  viewerOriginFrom,
+} from '../main.js';
 import {
   API_ORIGIN_META_NAME,
   SAME_ORIGIN_API,
@@ -522,6 +528,27 @@ describe('which origin may call this API', () => {
     // nothing else. `allowOriginFrom` has already refused the case where they disagree, which is
     // what makes a non-`null` CORS value *mean* "the page is served at `viewerOrigin`".
     expect(siteOriginFrom('https://viz.example', 'https://viz.example')).toBe('https://viz.example');
+  });
+
+  it('refuses ELEVATOR_SIM_TRUST_PROXY rather than ignoring it', () => {
+    // It used to mean "read the left-most x-forwarded-for entry", which is the entry the caller
+    // writes. An environment still setting it is asking for a behaviour that no longer exists, and
+    // booting while silently discarding a security setting is the worse of the two ways to answer.
+    expect(() => trustedHopsFrom({ ELEVATOR_SIM_TRUST_PROXY: 'true' })).toThrow(
+      /ELEVATOR_SIM_TRUSTED_HOPS/u,
+    );
+    // Including when it says `false`. The name is gone, not its value.
+    expect(() => trustedHopsFrom({ ELEVATOR_SIM_TRUST_PROXY: 'false' })).toThrow(/no longer read/u);
+  });
+
+  it('counts hops, and refuses anything that is not a written integer', () => {
+    expect(trustedHopsFrom({})).toBe(0);
+    expect(trustedHopsFrom({ ELEVATOR_SIM_TRUSTED_HOPS: '' })).toBe(0);
+    expect(trustedHopsFrom({ ELEVATOR_SIM_TRUSTED_HOPS: '1' })).toBe(1);
+    // `Number('1e1')` is 10 and `Number(' ')` is 0. A hop count is a written digit or a mistake.
+    expect(() => trustedHopsFrom({ ELEVATOR_SIM_TRUSTED_HOPS: '1e1' })).toThrow(/trusted reverse/u);
+    expect(() => trustedHopsFrom({ ELEVATOR_SIM_TRUSTED_HOPS: '-1' })).toThrow(/trusted reverse/u);
+    expect(() => trustedHopsFrom({ ELEVATOR_SIM_TRUSTED_HOPS: 'true' })).toThrow(/trusted reverse/u);
   });
 
   it('leaves a same-origin deployment serving its own page', () => {
