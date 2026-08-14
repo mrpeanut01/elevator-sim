@@ -23740,3 +23740,121 @@ meanwhile"* fails on the base and after this change, deterministically, in both.
 one-frame `Running the day` relabel that the synchronous pair of runs has already replaced. Nothing
 in this lane is on that path; it is filed rather than folded in, because a lane that quietly fixes an
 unrelated red is a lane whose own evidence is harder to read.
+
+---
+
+## D339 — the API stops having an opinion about what the page looks like
+
+### The state this closes, and it was live for five days
+
+§ D257 split the deployment: the page to a CDN, the API to the Container App, because the app runs
+at `minReplicas: 0` and a cold first page load was **32.2 s** with no app on screen to apologise.
+That split was armed on 2026-08-08 and it worked.
+
+What it did not do is stop the Container App serving a page. `serve.ts` serves everything outside
+`/api/` from the bundle baked into the image, the image is deployed **by hand**, and nothing
+rebuilds it on a push to `main`. So from 2026-08-08 to 2026-08-13 the API's hostname answered `GET /`
+with a **complete, working viewer built from commit `53be9c8`** — 238 commits back, four days older
+than Everyday Mode — while the CDN served the current one.
+
+The failure has the shape this repository keeps meeting and it is worth naming precisely:
+
+- **Nothing was misconfigured.** `ELEVATOR_SIM_ORIGIN` and `ELEVATOR_SIM_ALLOW_ORIGIN` both named
+  the site, `deploy-viz.yml` was armed and green, the CDN was current, and the artifact assertions
+  all passed. Every part was correct.
+- **Nothing failed.** Two hostnames, two `200`s, two different products. No status code anywhere
+  distinguishes a current page from a page from before the last wave.
+- **It was found by a player**, who reported the old main menu and said they did not know how to
+  reach the new one. Not by a test, not by a check, not by the deploy.
+
+It is § D243's silent misconfiguration with the polarity reversed. There: a page that could not find
+its API. Here: an API serving a page nobody asked it for.
+
+### The fix is not "rebuild the image"
+
+Rebuilding fixes today and reintroduces the defect on the next wave, because the cause is not that
+the bundle was old — it is that **a second copy of the page existed at all**. Two copies of a page on
+two hostnames, one of which redeploys automatically and one of which does not, can only ever drift;
+the question is how far, not whether.
+
+So in a split deployment the API now refuses to be a page. Every `GET`/`HEAD` outside `/api/` is a
+**302** to the site, carrying path and query, and `ServeOptions.static` is never consulted for them.
+The stale copy becomes unreachable rather than merely out of date, and a lagging image stops being
+able to show anyone the previous product.
+
+### It is derived from what a split deployment already sets, not configured
+
+`main.ts#siteOriginFrom` is a function of `viewerOrigin` and `allowOrigin` and of nothing else.
+§ D257's whole stated cost is that three values have to agree; a fourth that could disagree with
+them would be that cost again, failing the same silent way — a container redirecting to a host that
+is not the site looks, from every request you can make by hand, exactly like one that is.
+
+The derivation is the definition rather than a proxy for it: `allowOriginFrom` returns
+`NO_CROSS_ORIGIN` unless an operator has named an origin that may call this API from a browser, and
+it has **already refused** the case where that origin is not the viewer's. So a value other than
+`null` *is* the statement "the page is served somewhere else, and that somewhere is `viewerOrigin`".
+Nothing else can produce one. Local runs and the shipped same-origin container are untouched.
+
+It deliberately does not consult `loadViewer`. A redirect that appeared only when the bundle happened
+to be missing would make the correct behaviour depend on a build artifact, and the point is that the
+artifact is *present and wrong*.
+
+### 302, and a loop that cannot happen
+
+**Not 301.** A permanent redirect is cached by the browser and outlives the deployment that issued
+it, so undoing this would mean undoing it in strangers' browsers. 302 costs a request and is revoked
+by redeploying — the same property `gh variable delete AZURE_SWA_NAME` has for the other half of
+§ D257.
+
+**Not unconditional.** A request whose `Host` is already the target's host is served locally. An
+operator setting both origin variables to this app's own hostname is redundant rather than wrong —
+`main.bicep`'s `customDomainHint` invites that shape — and would otherwise get an infinite redirect
+from a container that looks perfectly healthy. The guard is on `Host` because the server does not
+know its own public origin and cannot be told one without adding the seventh value this seam exists
+to avoid.
+
+### `serve.ts` gets a sixth decision and its first bound port
+
+The file's docstring said the tests do not drive it, and that was true and deliberate for five of its
+decisions: `api.test.ts` calls `handle()` directly, which is a fair test exactly because the
+transport contains nothing. A 302 to another origin is not a value `handle()` can return, so
+`serve.test.ts` binds a real socket. Thirteen cases, including the front door, the query a real
+bookmark carries, HEAD, `/index.html` (a redirect covering only `/` would leave the stale page one
+URL away), and the API being untouched.
+
+**The open-redirect row is four cases and the docstring under it was corrected by running them.**
+The first draft claimed the location is safe *because* it is built by concatenation rather than
+`new URL(path, origin)`. Measured, that is not the mechanism: `respond` has already parsed the target
+against `http://localhost`, which puts `evil.example` in `url.host` — a field the redirect never
+reads. `//evil.example/` arrives as pathname `/`, `//evil.example/assets/x.js` as `/assets/x.js`,
+`/\evil.example/` as `/`, and absolute-form `http://evil.example/steal` as `/steal`. The property is
+**only `pathname` and `search` are read**; the concatenation makes it visible at the point of use.
+A stated mechanism goes stale the same way a figure does, and this one was wrong within the hour.
+
+### A pre-existing hang, found one line above the new code
+
+`GET //` is a well-formed request line whose target the WHATWG parser refuses outright — an authority
+with no host. `respond` is invoked as `void respond(...)`, so the throw was an **unhandled
+rejection**: nothing was written, and the socket stayed open until it timed out. Unauthenticated, one
+line, repeatable, and a connection leak with a 400's worth of cause. Confirmed against a server
+mimicking the prologue exactly — zero bytes received — and now answered `400 bad-request`. It
+predates this change and is fixed here because the redirect reads the same `url`.
+
+### `deploy.sh status` reports the distance, and measures rather than asserts
+
+The tag was never the missing information — `status` printed it all along. What nobody had was the
+**distance**: `commit 53be9c8` gives a reader no reason to look, and
+`commit 53be9c8 — 238 commits behind this checkout's HEAD` does.
+
+The `pages` line is printed as two facts, not one, because they can disagree: **configured**, read
+from the app's environment, and **observed**, read by asking the deployed app for `/` and reporting
+what came back. The redirect ships inside the image and the image is deployed by hand, so an image
+built before it serves its own page however the environment is set — which is this same defect one
+layer up. Run against the live deployment before the redeploy, `observed` says exactly that, and
+names the command that fixes it. A `status` that printed only the configuration would have been this
+script asserting a behaviour it had not checked.
+
+Its header paragraph was also corrected. It read *"Only the Container App. `provision.sh` has never
+been run, no Static Web App exists, and the deploy workflow is unarmed"* — every clause false since
+2026-08-08, and still on the page five days later. § D227's rule, again, and in the file whose whole
+job is to say what is deployed.

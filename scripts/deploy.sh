@@ -30,10 +30,28 @@
 #
 # ## Which of these is live right now
 #
-# **Only the Container App.** `provision.sh` has never been run, no Static Web App exists, and the
-# deploy workflow is unarmed (`vars.AZURE_SWA_NAME` is unset, and every deploying job is guarded on
-# it). So the page is still served by the container, and the 32.2 s cold load above is still real.
-# `status` is the command that tells you this rather than this comment going stale — run it.
+# **Both, and the split above is the deployment rather than the plan.** This paragraph said the
+# opposite — *"Only the Container App. `provision.sh` has never been run, no Static Web App exists,
+# and the deploy workflow is unarmed"* — and every clause of it stopped being true on 2026-08-08,
+# the day `provision.sh` ran and `AZURE_SWA_NAME` was set. It went on saying it for five days.
+#
+#     the page  ->  https://yellow-glacier-0ff81230f.7.azurestaticapps.net   (SWA Free, redeploys
+#                                                                            on every push to main)
+#     the API   ->  https://elevsim-app.salmonstone-4576d6f7.eastus2.azurecontainerapps.io
+#
+# **What that staleness cost is the reason the redirect below exists.** The container kept serving
+# its own `dist-web` at `/`, and nothing redeploys that image automatically — so a visitor to the
+# API's hostname got a complete, working viewer built from whatever commit was last deployed by
+# hand, while the CDN served the current one. Two 200s, two different products, no failing status
+# code anywhere. It ran that way from 2026-08-08 to 2026-08-13, across the whole Everyday Mode wave.
+#
+# The container no longer has an opinion about what the page looks like: in a split deployment
+# `main.ts` derives `siteOrigin` from the two origin variables it already sets, and every non-`/api/`
+# GET is a 302 to the site. So the stale copy is unreachable rather than merely out of date, and it
+# cannot come back the next time an image lags behind `main` — which it will.
+#
+# `status` is the command that tells you what is actually deployed rather than this comment going
+# stale a second time — run it. This paragraph is not evidence.
 #
 # ## What each subcommand delegates to
 #
@@ -68,9 +86,62 @@ status() {
     echo "  image     ${image}"
     # The tag IS the record of what is running — `deploy-azure.sh` tags with the commit SHA and
     # refuses a dirty tree so the tag cannot name a commit that does not contain the code.
-    echo "  commit    $(printf '%s' "${image##*:}" | sed 's/-amd64$//')"
+    local tag behind
+    tag="$(printf '%s' "${image##*:}" | sed 's/-amd64$//')"
+    # **How far behind, not just which commit.** The tag alone was never the missing information —
+    # `status` printed it all along. What nobody had was the distance: this image sat 238 commits
+    # back for five days, serving a viewer from before Everyday Mode existed, and a bare SHA gives a
+    # reader no reason to look. A commit that is not in this clone is said to be unknown rather than
+    # counted as zero, because "0 behind" is exactly the wrong thing to print about an image nobody
+    # can locate.
+    if git cat-file -e "${tag}^{commit}" 2>/dev/null; then
+      behind="$(git rev-list --count "${tag}..HEAD" 2>/dev/null || echo '?')"
+      if [ "$behind" = "0" ]; then
+        echo "  commit    ${tag} — current with this checkout"
+      else
+        echo "  commit    ${tag} — ${behind} commits behind this checkout's HEAD"
+      fi
+    else
+      echo "  commit    ${tag} — not a commit in this clone; cannot say how far behind"
+    fi
     echo "  revision  ${revision}"
     echo "  url       https://${fqdn}"
+    # What this origin does with a page request, which is the whole of the § D257 split from a
+    # visitor's point of view and is invisible from every other line above.
+    #
+    # **Configured and observed are printed separately, and they can disagree.** The redirect ships
+    # inside the image and the image is deployed by hand, so an image built before it serves its own
+    # page however the environment is set — which is the same shape of defect as the tag above:
+    # correct configuration, stale artifact, no failing status code anywhere. Printing only the
+    # configuration would be this script asserting a behaviour it has not checked.
+    local allow observed
+    allow="$(az containerapp show -g "$GROUP" -n "$APP" \
+      --query 'properties.template.containers[0].env[?name==`ELEVATOR_SIM_ALLOW_ORIGIN`].value | [0]' \
+      -o tsv 2>/dev/null || true)"
+    if [ -n "$allow" ] && [ "$allow" != "null" ]; then
+      echo "  pages     configured to 302 -> ${allow}"
+    else
+      echo "  pages     configured to serve its own bundle (same-origin deployment)"
+    fi
+    # `--max-time` because the app is `minReplicas: 0` and a cold start was measured at 32.2 s.
+    # A slow `status` would get this line skipped by whoever runs it, so it reports "asleep"
+    # instead of waiting — an unmeasured answer said out loud beats a measured one nobody waits for.
+    observed="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 12 \
+      "https://${fqdn}/" 2>/dev/null || true)"
+    case "$observed" in
+      302*|301*|307*|308*) echo "  observed  ${observed}" ;;
+      200*)
+        if [ -n "$allow" ] && [ "$allow" != "null" ]; then
+          echo "  observed  200 — it is serving a page of its own, against the line above."
+          echo "            The running image predates the redirect; its bundle is as old as the"
+          echo "            commit named above. Fix: ./scripts/deploy.sh api --apply"
+        else
+          echo "  observed  200 — serving its own page, as configured"
+        fi
+        ;;
+      ''|000*) echo "  observed  no answer in 12 s — asleep at minReplicas: 0, or unreachable" ;;
+      *) echo "  observed  ${observed}" ;;
+    esac
   fi
 
   echo
