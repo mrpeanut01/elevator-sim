@@ -325,6 +325,42 @@ describe('who the caller is, when a proxy is in front', () => {
   it('ignores blank entries rather than counting them as hops', () => {
     expect(clientIpOf(arriving('9.9.9.9, , 203.0.113.7'), 1)).toBe('203.0.113.7');
   });
+
+  /**
+   * The header values Azure Container Apps' ingress actually produced, byte for byte.
+   *
+   * Measured on 2026-08-14 against this deployment's own environment (`elevsim-env`) with a
+   * throwaway echo app, deleted after — § D341. The caller was at `143.105.1.202` and forged the
+   * left of the header; the ingress **appended** what it saw in every case.
+   *
+   * These are here rather than in prose because `ELEVATOR_SIM_TRUSTED_HOPS: '1'` in
+   * `infra/azure/main.bicep` is only correct if this shape holds. If a future platform change makes
+   * the ingress *replace* the header instead, the fourth case below starts returning the forged
+   * address and this test goes red — which is the only warning anybody would get, since a forged
+   * key looks exactly like an honest one from every other angle.
+   */
+  describe('against the header the real ingress produced', () => {
+    const CALLER = '143.105.1.202';
+
+    it.each([
+      ['sent nothing', CALLER, CALLER],
+      ['sent one address', `9.9.9.9,${CALLER}`, CALLER],
+      ['sent three', `9.9.9.9, 8.8.8.8, 7.7.7.7,${CALLER}`, CALLER],
+      ['sent the header twice', `9.9.9.9,8.8.8.8,${CALLER}`, CALLER],
+      ['sent a trailing comma', `9.9.9.9,,${CALLER}`, CALLER],
+    ])('reads the caller, not the forgery: %s', (_case, header, expected) => {
+      expect(clientIpOf(arriving(header), 1)).toBe(expected);
+    });
+
+    it('would have read the forgery under the rule this replaced', () => {
+      // Not a hypothetical: `ELEVATOR_SIM_TRUST_PROXY=true` plus the left-most read was one
+      // environment variable away, and it is the obvious fix for the shared-bucket problem that
+      // the hop count actually solves. This is what that combination would have keyed on.
+      const leftMost = `9.9.9.9, 8.8.8.8, 7.7.7.7,${CALLER}`.split(',')[0]?.trim();
+      expect(leftMost).toBe('9.9.9.9');
+      expect(clientIpOf(arriving(`9.9.9.9, 8.8.8.8, 7.7.7.7,${CALLER}`), 1)).not.toBe(leftMost);
+    });
+  });
 });
 
 describe('a same-origin deployment is untouched', () => {
