@@ -23858,3 +23858,68 @@ Its header paragraph was also corrected. It read *"Only the Container App. `prov
 been run, no Static Web App exists, and the deploy workflow is unarmed"* — every clause false since
 2026-08-08, and still on the page five days later. § D227's rule, again, and in the file whose whole
 job is to say what is deployed.
+
+---
+
+## D340 — a deploy parameter nobody passes is not "leave it alone"
+
+### What happened, and it was caused by the deploy that was meant to fix § D339
+
+`deploy-azure.sh` reads the token-signing secret back off the running app so that a re-deploy does
+not rotate it and invalidate every confirmation link in flight. That care was real, it was
+documented at the top of the file, and it covered **one** value.
+
+`main.bicep` declares `param viewerOrigin string = ''`, and empty does not mean *leave it as it is*
+— it means *same-origin*: `ELEVATOR_SIM_ORIGIN` is pointed at the app's own FQDN and
+`ELEVATOR_SIM_ALLOW_ORIGIN` is set to nothing. The script never passed the parameter, so every
+re-deploy of a split deployment silently reverted it.
+
+Deploying § D339's redirect is what discovered this, by doing it:
+
+| | before | after the deploy |
+|---|---|---|
+| `ELEVATOR_SIM_ORIGIN` | the site | **the API's own FQDN** |
+| `ELEVATOR_SIM_ALLOW_ORIGIN` | the site | **empty** |
+| the site's API calls | permitted | **`access-control-allow-origin: null`** |
+| sign-in links | to the site | **to the API's hostname** |
+| § D339's redirect | — | **inactive** |
+
+Revision 11 held it for **five minutes and forty-one seconds** (02:33:44 → 02:39:25 UTC) before
+revision 12 restored it.
+
+### Why nothing caught it
+
+**The deploy succeeded.** `az deployment group create` returned zero, the script's own
+`verified: /api/boards returned 200` passed, `curl` got 200s, and the app was healthy by every check
+that exists. The failure is **browser-only** — a CORS header is not a status code — which is exactly
+what `docs/16` § 3 warns about and exactly what play-tester issues #21, #28, #29, #30, #32 and #34
+cost the first time. § D243's sentence about a wrong answer that looks like a working one was
+written about the value; this is the same defect one layer up, about the *absence* of the value.
+
+The third consequence is the one worth keeping: it **disabled § D339's redirect**, because
+`siteOriginFrom` derives that from the same two variables. The deploy whose entire purpose was to
+stop the container serving its own copy of the page put it back to serving one — and reported
+success. A feature derived from configuration inherits every way that configuration can be lost.
+
+### The fix, and the shape of it
+
+`viewerOrigin` is read back off the running app exactly as the secret is, and
+`ELEVATOR_SIM_ALLOW_ORIGIN` **is** that parameter — `main.bicep` sets it from that and nothing else
+— so this reads the parameter rather than inferring it. `ELEVSIM_VIEWER_ORIGIN` overrides, because
+a value that can only be preserved can never be set or moved. The parameter is now **always passed,
+including empty**, so the template's default never gets to decide; and it is **echoed on every
+run**, because a parameter whose wrong value no non-browser check can see must at least be visible
+to the person running the command.
+
+### The rule this generalises to
+
+A template default is a decision, and passing nothing is choosing it. Any deploy script that reads
+*one* value back off a running system is asserting that the others are safe to reset — so either
+read them all back, or say per value why resetting it is correct. `deploy-azure.sh` now does the
+first for the two that carry state and states the second for the database password, which is
+regenerated every deploy on purpose because the template resets the server's password and builds the
+connection string from the same parameter in the same deployment.
+
+Verified after the restoring deploy rather than argued: `/` → `302` to the site, the query preserved
+across it, `access-control-allow-origin` naming the site again, and the browser landing on the
+Everyday shell from the old bookmark.
