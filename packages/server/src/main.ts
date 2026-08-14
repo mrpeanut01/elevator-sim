@@ -144,6 +144,35 @@ export function allowOriginFrom(
 }
 
 /**
+ * Where the page is, when this process is not serving it — or `undefined` when it is.
+ *
+ * **Derived from the two values above rather than read from a seventh.** § D257's whole cost is
+ * that three values have to agree; a fourth that could disagree with them would be that cost again,
+ * and it would fail the same silent way — a container redirecting to a host that is not the site
+ * looks, from every request you can make by hand, exactly like one that is.
+ *
+ * The derivation is the definition of a split deployment, not a proxy for it. `allowOriginFrom`
+ * returns {@link NO_CROSS_ORIGIN} unless an operator has named an origin that may call this API
+ * from a browser, and has already refused the case where that origin is not the viewer's — so a
+ * value other than `null` **is** the statement *"the page is served somewhere else, and that
+ * somewhere is `viewerOrigin`"*. Nothing else can produce one.
+ *
+ * What this closes is a defect the deployment had for five days and no check could see: the image's
+ * own `dist-web` answered `/` with the viewer as it stood when the image was built, while the CDN
+ * served the current one. Both were 200s. The stale copy is not a bug in the bundle, in the build,
+ * or in the workflow — every one of those was correct — it is that **a second copy of the page
+ * existed at all**, and the only durable fix is for this origin to stop having an opinion about
+ * what the page looks like. See `ServeOptions.siteOrigin`.
+ *
+ * It deliberately does **not** consult {@link loadViewer}. A redirect that appeared only when the
+ * bundle happened to be missing would make the correct behaviour depend on a build artifact, and
+ * the point is that the artifact is *present and wrong*.
+ */
+export function siteOriginFrom(viewerOrigin: string, allowOrigin: string): string | undefined {
+  return allowOrigin === NO_CROSS_ORIGIN ? undefined : viewerOrigin;
+}
+
+/**
  * Read the environment, boot, listen.
  *
  * Exported and takes its environment as an argument so the wiring is testable without spawning a
@@ -164,6 +193,7 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
   });
 
   const viewer = await loadViewer(env);
+  const siteOrigin = siteOriginFrom(viewerOrigin, allowOrigin);
 
   serve({
     api: server.api,
@@ -179,15 +209,29 @@ export async function main(env: Readonly<Record<string, string | undefined>>): P
     // value", so `ELEVATOR_SIM_TRUST_PROXY=false` means what a reader thinks it means.
     trustProxy: env['ELEVATOR_SIM_TRUST_PROXY']?.trim().toLowerCase() === 'true',
     static: viewer,
+    // Set only in a split deployment, where it takes precedence over `static` for every page
+    // request. Both are passed rather than one, because the bundle is still what this origin serves
+    // when it *is* the viewer — locally, and in the shipped same-origin container.
+    siteOrigin,
   });
+
+  // What this process answers a page request with, which since `siteOrigin` is three things rather
+  // than two. A bundle that is loaded and then never served is worth saying out loud: it is the
+  // state the stale container was in for five days, and the line that would have named it.
+  const pageRole =
+    siteOrigin !== undefined
+      ? `redirecting pages to ${siteOrigin}${viewer === undefined ? '' : ', its own bundle loaded and unused'}`
+      : viewer === undefined
+        ? 'no page — API only'
+        : 'serving its own page';
 
   // eslint-disable-next-line no-console -- a server's one line of startup output.
   console.log(
-    `elevator-sim ${viewer === undefined ? 'API' : 'viewer and API'} listening on ${String(port)} ` +
+    `elevator-sim listening on ${String(port)} — ${pageRole}; ` +
       // Both origins, because since § D257 they can differ and the difference is invisible from
       // outside: a split deployment and a same-origin one answer identically to every request you
       // can make by hand, and disagree only in a browser. This is the line that tells them apart.
-      `— viewer origin ${viewerOrigin}, cross-origin callers ` +
+      `viewer origin ${viewerOrigin}, cross-origin callers ` +
       `${allowOrigin === NO_CROSS_ORIGIN ? 'none' : allowOrigin}`,
   );
 }

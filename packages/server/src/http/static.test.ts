@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { NO_CROSS_ORIGIN, allowOriginFrom, viewerOriginFrom } from '../main.js';
+import { NO_CROSS_ORIGIN, allowOriginFrom, siteOriginFrom, viewerOriginFrom } from '../main.js';
 import {
   API_ORIGIN_META_NAME,
   SAME_ORIGIN_API,
@@ -514,5 +514,19 @@ describe('which origin may call this API', () => {
     expect(() => viewerOriginFrom({ ELEVATOR_SIM_ORIGIN: 'https://viz.example/' }, 8787)).toThrow(
       /ELEVATOR_SIM_ORIGIN/u,
     );
+  });
+
+  it('derives where the page is rather than reading a fourth value for it', () => {
+    // § D257's cost is that three values have to agree. A fourth would be that cost again, and it
+    // would fail the same silent way, so `siteOriginFrom` is a function of the two above and of
+    // nothing else. `allowOriginFrom` has already refused the case where they disagree, which is
+    // what makes a non-`null` CORS value *mean* "the page is served at `viewerOrigin`".
+    expect(siteOriginFrom('https://viz.example', 'https://viz.example')).toBe('https://viz.example');
+  });
+
+  it('leaves a same-origin deployment serving its own page', () => {
+    // The shipped container and every local run. Nothing to redirect to, and the bundle is the
+    // viewer rather than a second copy of it.
+    expect(siteOriginFrom('http://localhost:8787', NO_CROSS_ORIGIN)).toBeUndefined();
   });
 });

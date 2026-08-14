@@ -3,9 +3,16 @@
  *
  * It is deliberately thin and deliberately dull, because it is the one piece the tests do not
  * drive through the API: `api.test.ts` calls `handle()` directly with no port bound, which is only
- * a fair test if this file contains no decisions. So it contains five — a body-size cap, a JSON
- * parse, a bearer-token read, a CORS answer and **who the caller is** — and each is stated here
- * rather than left implicit.
+ * a fair test if this file contains no decisions. So it contains six — a body-size cap, a JSON
+ * parse, a bearer-token read, a CORS answer, **who the caller is**, and **whether this origin
+ * serves the page at all** — and each is stated here rather than left implicit.
+ *
+ * The sixth is the newest and it is the one with a port bound over it: `serve.test.ts` listens on a
+ * real socket, because a redirect is the one behaviour in this file that cannot be observed by
+ * calling `handle()`. It exists because the split deployment (§ D257) leaves **two** copies of the
+ * page on the internet — the CDN's, which redeploys on every push to `main`, and this image's,
+ * which redeploys when someone remembers — and the second one answered `/` for five days with a
+ * viewer four days older than the one that had shipped.
  */
 
 import { createServer, type IncomingMessage, type Server as NodeServer, type ServerResponse } from 'node:http';
@@ -49,6 +56,38 @@ export interface ServeOptions {
    */
   readonly static?: StaticBundle | undefined;
   /**
+   * Where the page actually is, when it is not here. Absent, this origin serves its own bundle.
+   *
+   * Set, every `GET`/`HEAD` outside `/api/` is a **302** to this origin carrying the same path and
+   * query, and {@link ServeOptions.static} is never consulted for them. The API is untouched, which
+   * is the whole point: in a split deployment this process is the API, and the bundle baked into
+   * its image is a *second* copy of the page whose only possible relationship to the first is being
+   * older than it.
+   *
+   * That is not a hypothetical. The container answered `/` with a viewer built four days before the
+   * one on the CDN, for as long as nobody rebuilt the image — the page loaded, drew, and was simply
+   * the previous product, with no failing status code anywhere to say so. It is § D243's silent
+   * misconfiguration with the polarity reversed: there, a page that could not find its API; here, an
+   * API serving a page nobody asked it for.
+   *
+   * **This is derived, not configured.** `main.ts` reads it off the two origin variables that a
+   * split deployment already sets, so there is no seventh value to keep in agreement with the other
+   * three — see `siteOriginFrom`.
+   *
+   * Two things it deliberately is not:
+   *
+   * - **Not a 301.** A permanent redirect is cached by the browser and outlives the deployment that
+   *   issued it, so undoing this would mean undoing it in strangers' browsers. 302 costs a request
+   *   and is revocable by redeploying, which is the same property `gh variable delete
+   *   AZURE_SWA_NAME` has for the other half of § D257.
+   * - **Not unconditional.** A request whose `Host` is already this origin's target is served
+   *   locally rather than redirected — see `redirectTargetFor`. An operator who sets both origin
+   *   variables to this app's own hostname (which the template's `customDomainHint` invites, and
+   *   which is redundant rather than wrong) would otherwise get an infinite redirect, and a
+   *   configuration mistake must not be able to turn the server into a loop.
+   */
+  readonly siteOrigin?: string | undefined;
+  /**
    * Whether `x-forwarded-for` may be believed. **Default `false`.**
    *
    * § D242's per-caller budget is only a budget if the key cannot be chosen by the caller, and
@@ -90,7 +129,43 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
     return;
   }
 
-  const url = new URL(incoming.url ?? '/', 'http://localhost');
+  // The request target. **This parse can fail**, which is not obvious and was not handled: `GET //`
+  // is a well-formed request line, Node hands it over as `'//'`, and the WHATWG parser refuses it
+  // outright — an authority with no host. Thrown from here the rejection was unhandled (`respond`
+  // is called as `void respond(...)`), so the caller received **no bytes at all** and the socket
+  // stayed open until it timed out. One line, unauthenticated, and repeatable: a connection leak
+  // with a 400's worth of cause. Found while adding the redirect below, which reads `url` too.
+  let url: URL;
+  try {
+    url = new URL(incoming.url ?? '/', 'http://localhost');
+  } catch {
+    response.writeHead(400, headers);
+    response.end(
+      JSON.stringify({ error: 'bad-request', detail: 'the request target is not a URL' }),
+    );
+    return;
+  }
+
+  // The page is somewhere else, so say so instead of answering with a copy of it. Ahead of the
+  // static branch, because when both are set this one wins — an image's own bundle is exactly what
+  // must stop being served. The `/api/` guard is inside `redirectTargetFor` rather than here, for
+  // the reason the static branch states below: the prefix is the routing rule, and no deployment
+  // parameter may be able to move an endpoint.
+  if (incoming.method === 'GET' || incoming.method === 'HEAD') {
+    const location = redirectTargetFor(options.siteOrigin, incoming.headers.host, url);
+    if (location !== undefined) {
+      response.writeHead(302, {
+        location,
+        // The redirect is a deployment's current opinion about where its page lives, not a fact
+        // about the URL. Caching it would outlive the deployment, which is the property that makes
+        // a 301 wrong here (see `ServeOptions.siteOrigin`) and would make a cached 302 wrong too.
+        'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff',
+      });
+      response.end();
+      return;
+    }
+  }
 
   // The viewer, before the API and only outside `/api/`. The prefix is the whole routing rule:
   // every route `api.ts` answers begins with it, so nothing here can shadow an endpoint, and a
@@ -151,6 +226,69 @@ async function respond(options: ServeOptions, incoming: IncomingMessage, respons
 
   response.writeHead(result.status, headers);
   response.end(JSON.stringify(result.body));
+}
+
+/**
+ * Where a non-API `GET` should be sent, or `undefined` to answer it here.
+ *
+ * Module-private on purpose: it is one branch of {@link respond} and has no caller outside this
+ * file, so exporting it would put a function in the package's public surface whose only non-test
+ * caller is twelve lines up. `serve.test.ts` drives it through a bound socket instead, which is
+ * also the only way to observe the header it exists to produce.
+ *
+ * Three refusals, in order, and each one is a thing that has gone wrong somewhere:
+ *
+ * 1. **No site origin** — the same-origin deployment and every local run. Nothing to redirect to.
+ * 2. **`/api/`** — never. The API is what this origin is *for* in a split deployment, and a
+ *    deployment parameter that could move an endpoint would be a parameter that can break the
+ *    product from outside the product.
+ * 3. **The caller is already at the target** — the loop guard. Compared on `Host` rather than on
+ *    configuration, because the server does not know its own public origin and cannot be told one
+ *    without adding the seventh value this whole seam is written to avoid.
+ *
+ * **Why this cannot be turned into an open redirect**, stated as the mechanism that actually holds
+ * rather than the one it is tempting to claim. The obvious worry is a protocol-relative target —
+ * `GET //evil.example/` — because `new URL('//evil.example/', 'https://site')` really does resolve
+ * to `https://evil.example/`. It cannot happen here, and *not* because of how the location is
+ * concatenated: by the time this function runs, `respond` has already parsed the target against
+ * `http://localhost`, and that parse puts `evil.example` in `url.host` — a field this function never
+ * reads. Every hostile form collapses the same way, measured rather than assumed:
+ *
+ * | request target | `url.pathname` | location |
+ * |---|---|---|
+ * | `//evil.example/` | `/` | `<site>/` |
+ * | `//evil.example/assets/x.js` | `/assets/x.js` | `<site>/assets/x.js` |
+ * | `/\evil.example/` | `/` | `<site>/` |
+ * | `http://evil.example/steal` | `/steal` | `<site>/steal` |
+ *
+ * So the property is **only `pathname` and `search` are read**, and the concatenation is what makes
+ * that property visible at the point of use — `new URL(url.pathname, siteOrigin)` would be equally
+ * safe today and would put the reader one refactor away from thinking an authority could survive.
+ * `serve.test.ts` pins all four rows.
+ */
+function redirectTargetFor(
+  siteOrigin: string | undefined,
+  host: string | undefined,
+  url: URL,
+): string | undefined {
+  if (siteOrigin === undefined) return undefined;
+  if (url.pathname.startsWith('/api/')) return undefined;
+  if (host !== undefined && host.trim().toLowerCase() === hostOf(siteOrigin)) return undefined;
+  // `url` came from the WHATWG parser, which percent-encodes control characters — so neither half
+  // can carry the CR/LF that would make this a header injection rather than a redirect.
+  return `${siteOrigin}${url.pathname}${url.search}`;
+}
+
+/** The `host:port` of an origin, lowercased, for comparison against a request's `Host` header. */
+function hostOf(origin: string): string {
+  try {
+    return new URL(origin).host.toLowerCase();
+  } catch {
+    // Unreachable from `main.ts`, which validates the origin at boot with `requireOrigin`. A test
+    // or a future caller handing this a non-URL gets no loop guard rather than a crash in the one
+    // branch whose job is to keep a misconfiguration from becoming an infinite redirect.
+    return '';
+  }
 }
 
 /** Read and parse the body, refusing anything over {@link MAX_BODY_BYTES}. */

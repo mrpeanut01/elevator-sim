@@ -313,14 +313,41 @@ export interface ErrorEmitter {
  *
  * Exit `0`: the reader went away, which is not this program's failure. Anything that is not a
  * broken pipe is rethrown, because a genuinely failing stdout should still be loud.
+ *
+ * ## Three codes, because one condition has three names
+ *
+ * `EPIPE` is the one this guard was written for and the one it is named after. The other two are
+ * the same event wearing a different errno:
+ *
+ * - `ERR_STREAM_DESTROYED` — the stream was torn down between the write being queued and dispatched.
+ * - `ENOTCONN` — **macOS**, when stdout is a socket rather than a pipe. The peer is gone and the
+ *   write cannot be delivered, which is the definition of a broken pipe; the platform simply
+ *   reports "not connected" instead of "broken pipe".
+ *
+ * The third was found by CI, on a run that had nothing to do with this file. `ci.yml` pins
+ * `node-version: '26'`, which floats — the macOS leg moved from Node 26.5.0 to 26.7.0 and
+ * `elevator-sim run | head` began failing with `write ENOTCONN` and the twenty-line stack this
+ * guard exists to prevent, while the same test passed on 26.5.0 and on every Linux leg. So the
+ * defect was real and shipped, and the thing that changed was only whether anything noticed.
+ *
+ * That is also why {@link BROKEN_PIPE_CODES} is a named set with a unit test firing each member:
+ * the integration test above can only observe whichever code the runner's platform and Node happen
+ * to produce, so it cannot pin the other two. A guard whose coverage depends on which machine ran
+ * it is not a guard.
  */
+export const BROKEN_PIPE_CODES: ReadonlySet<string> = new Set([
+  'EPIPE',
+  'ERR_STREAM_DESTROYED',
+  'ENOTCONN',
+]);
+
 export function guardBrokenPipe(
   streams: readonly ErrorEmitter[],
   exit: (code: number) => void,
 ): void {
   for (const stream of streams) {
     stream.on('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EPIPE' || error.code === 'ERR_STREAM_DESTROYED') {
+      if (error.code !== undefined && BROKEN_PIPE_CODES.has(error.code)) {
         exit(0);
         return;
       }

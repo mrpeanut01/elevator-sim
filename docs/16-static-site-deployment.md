@@ -27,6 +27,24 @@ What is true now:
 | The app's `viewerOrigin` | set to the site; `ELEVATOR_SIM_ORIGIN` and `ELEVATOR_SIM_ALLOW_ORIGIN` both name it |
 | The six repository variables | set, `AZURE_SWA_NAME` last |
 | Production deploys | from `main` only, enforced by the `viz-production` environment's branch policy |
+| The API's own page requests | **302 to the site** since [§ D339](../DECISIONS.md) — see below |
+
+**The split left a second copy of the page on the internet, and it served the previous product for
+five days.** Arming this moved the page to the CDN; it did not stop the Container App serving one.
+`serve.ts` serves everything outside `/api/` from the bundle baked into the image, that image is
+deployed by hand, and nothing rebuilds it on a push to `main` — so the API's hostname answered `GET /`
+with a working viewer from commit `53be9c8`, 238 commits and four days behind, while the CDN served
+the current one. Two hostnames, two `200`s, two different products, and no status code anywhere that
+distinguishes them. **It was found by a player**, who reported the old main menu and asked how to
+reach the new one.
+
+The fix is not a rebuild — that fixes today and reintroduces it on the next wave, because the cause
+is not that the bundle was old but that a second copy existed at all. In a split deployment the API
+now refuses to be a page: every non-`/api/` `GET` is a 302 to the site, carrying path and query, and
+the bundle in the image is never consulted. It is **derived** from the two origin variables this
+document's § 3 already requires, so it is not a fourth value that can disagree with the other three.
+[§ D339](../DECISIONS.md) has the whole account, including the loop guard, why it is a 302 rather
+than a 301, and the unauthenticated request hang found one line above it.
 
 **Arming it found two defects that reading it had not**, both in the provisioning path and both
 fatal: two federated credentials cannot be written concurrently under one managed identity, and the

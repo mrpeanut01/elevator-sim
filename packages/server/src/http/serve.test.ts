@@ -1,0 +1,281 @@
+/**
+ * **The socket, over a real socket.** The one test in this package that binds a port.
+ *
+ * `serve.ts`'s own docstring says the tests do not drive it, and that was true and deliberate for
+ * five of its six decisions: `api.test.ts` calls `handle()` directly, which is a fair test exactly
+ * because the transport contains nothing. The sixth broke the arrangement. A **302 to another
+ * origin** is not a value `handle()` can return — it is a status line and a `Location` header
+ * written by the transport, and the only honest way to assert it is to ask a listening server for a
+ * page and read what comes back.
+ *
+ * What it is protecting, stated plainly, because it is not a hypothesis: for five days the deployed
+ * Container App answered `GET /` with a **complete, working, four-day-old viewer** while the CDN
+ * served the current one. Two 200s, two different products, no failing status code anywhere. The
+ * image was built on 2026-08-08; Everyday Mode landed on 2026-08-12; the bundle in the image knew
+ * nothing about it and said nothing about not knowing. See § D257 for why the split exists and
+ * `ServeOptions.siteOrigin` for why the fix is a redirect rather than a rebuild.
+ */
+
+import { request as httpRequest, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+import type { Api } from './api.js';
+import { serve, type ServeOptions } from './serve.js';
+import type { StaticAsset, StaticBundle } from './static.js';
+
+const SITE = 'https://yellow-glacier.example';
+
+/** A page that is unmistakably *this* server's copy, so a 200 can never be read as a redirect. */
+const OWN_PAGE = '<!doctype html><title>the copy in this image</title>';
+
+const BUNDLE: StaticBundle = new Map<string, StaticAsset>([
+  [
+    '/index.html',
+    { body: Buffer.from(OWN_PAGE), contentType: 'text/html; charset=utf-8', immutable: false },
+  ],
+]);
+
+/** Answers anything, distinguishably. The API is the half a redirect must never touch. */
+const API: Api = (incoming) =>
+  Promise.resolve({ status: 200, body: { reached: 'the api', path: incoming.path } });
+
+let running: Server | undefined;
+
+afterEach(async () => {
+  const server = running;
+  running = undefined;
+  if (server !== undefined) {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
+  }
+});
+
+/**
+ * Bind an ephemeral port and return it.
+ *
+ * Port 0 so concurrent test files never collide, and the `listening` event is awaited rather than
+ * assumed: `listen()` binds asynchronously, so `address()` is null for a tick and a test that read
+ * it straight away would be flaky in exactly the way that gets a suite mistrusted.
+ */
+async function listening(options: Omit<ServeOptions, 'api' | 'port'>): Promise<number> {
+  const server = serve({ api: API, port: 0, ...options });
+  running = server;
+  if (!server.listening) {
+    await new Promise<void>((resolve, reject) => {
+      server.once('listening', resolve);
+      server.once('error', reject);
+    });
+  }
+  return (server.address() as AddressInfo).port;
+}
+
+interface Answer {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+  readonly body: string;
+}
+
+/**
+ * One request, no redirect following, and `Host` under the caller's control.
+ *
+ * `node:http` rather than `fetch`, for two reasons that are both about this file's subject.
+ * `fetch` follows redirects by default — a test that followed one would leave the suite asking the
+ * real internet for a page — and `Host` is a forbidden header there, which is the one header the
+ * loop guard reads.
+ */
+async function ask(
+  port: number,
+  path: string,
+  options: { readonly method?: string; readonly host?: string } = {},
+): Promise<Answer> {
+  return new Promise<Answer>((resolve, reject) => {
+    const call = httpRequest(
+      {
+        host: '127.0.0.1',
+        port,
+        path,
+        method: options.method ?? 'GET',
+        ...(options.host === undefined ? {} : { headers: { host: options.host } }),
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => {
+          resolve({
+            status: response.statusCode ?? 0,
+            headers: response.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+    call.on('error', reject);
+    call.end();
+  });
+}
+
+/**
+ * One request written as bytes, and everything the server writes back before it closes.
+ *
+ * Below `node:http` on purpose: the case this exists for is a request *target* a client library
+ * would be entitled to normalise away, and the failure it is checking for is a server that writes
+ * nothing at all — so the test has to be able to see an empty answer rather than hang waiting for
+ * a parsed one. The timeout is the assertion's other half: without it a regression here would
+ * present as a test run that never finishes.
+ */
+async function rawRequest(port: number, bytes: string): Promise<string> {
+  const { connect } = await import('node:net');
+  return new Promise<string>((resolve, reject) => {
+    const socket = connect(port, '127.0.0.1', () => socket.write(bytes));
+    let received = '';
+    const stop = setTimeout(() => {
+      socket.destroy();
+      resolve(received);
+    }, 2_000);
+    socket.on('data', (chunk: Buffer) => (received += chunk.toString('utf8')));
+    socket.on('close', () => {
+      clearTimeout(stop);
+      resolve(received);
+    });
+    socket.on('error', (error) => {
+      clearTimeout(stop);
+      reject(error);
+    });
+  });
+}
+
+describe('a split deployment does not serve a second copy of the page', () => {
+  const split = { allowOrigin: SITE, siteOrigin: SITE, static: BUNDLE } as const;
+
+  it('redirects the front door to the site', async () => {
+    const port = await listening(split);
+
+    const answer = await ask(port, '/');
+
+    expect(answer.status).toBe(302);
+    expect(answer.headers['location']).toBe(`${SITE}/`);
+    // Not cached, so this is revocable by redeploying rather than by reaching into browsers.
+    expect(answer.headers['cache-control']).toBe('no-store');
+    expect(answer.body).toBe('');
+  });
+
+  it('carries the path and the query across, which is the shape a real bookmark has', async () => {
+    const port = await listening(split);
+
+    // The exact URL the old viewer rewrites itself to on load, and therefore the exact URL that is
+    // in somebody's history. Dropping the query would send a returning player to a different run.
+    const answer = await ask(port, '/?building=secure-tower&seed=252119022713829');
+
+    expect(answer.headers['location']).toBe(`${SITE}/?building=secure-tower&seed=252119022713829`);
+  });
+
+  it('never redirects the API, which is what this origin is for', async () => {
+    const port = await listening(split);
+
+    const answer = await ask(port, '/api/challenges');
+
+    expect(answer.status).toBe(200);
+    expect(JSON.parse(answer.body)).toEqual({ reached: 'the api', path: '/api/challenges' });
+  });
+
+  it('serves no asset from its own bundle, not just no index', async () => {
+    // The bundle is *present* — that is the whole defect. A redirect that covered `/` and left
+    // `/index.html` reachable would leave the stale page one URL away.
+    const port = await listening(split);
+
+    const answer = await ask(port, '/index.html');
+
+    expect(answer.status).toBe(302);
+    expect(answer.headers['location']).toBe(`${SITE}/index.html`);
+  });
+
+  it('answers HEAD the same way, because that is what a link checker sends', async () => {
+    const port = await listening(split);
+
+    const answer = await ask(port, '/', { method: 'HEAD' });
+
+    expect(answer.status).toBe(302);
+    expect(answer.headers['location']).toBe(`${SITE}/`);
+  });
+
+  it.each([
+    ['//evil.example/', `${SITE}/`],
+    ['//evil.example/assets/x.js', `${SITE}/assets/x.js`],
+    ['/\\evil.example/', `${SITE}/`],
+    ['http://evil.example/steal', `${SITE}/steal`],
+  ])('cannot be talked into redirecting to somebody else: %s', async (target, expected) => {
+    // A redirector that will send a caller anywhere they name is a phishing primitive, and this is
+    // the shape it would take: a protocol-relative or absolute-form request target, since
+    // `new URL('//evil.example/', 'https://site')` genuinely does resolve to `https://evil.example/`.
+    //
+    // The four rows are the mechanism rather than a sample. `respond` parses the target against
+    // `http://localhost` before this branch runs, which puts `evil.example` in `url.host` — and only
+    // `pathname` and `search` are ever read. The authority is gone before the header is built.
+    const port = await listening(split);
+
+    const answer = await ask(port, target);
+
+    const location = String(answer.headers['location']);
+    expect(location).toBe(expected);
+    // The claim under the string comparison, in the terms that actually matter.
+    expect(new URL(location).host).toBe(new URL(SITE).host);
+  });
+
+  it('will not loop when the caller is already at the origin it would be sent to', async () => {
+    // An operator setting both origin variables to this app's own hostname is redundant rather than
+    // wrong — `main.bicep`'s `customDomainHint` invites exactly that shape — and without the `Host`
+    // guard it is an infinite redirect served by a container that looks perfectly healthy.
+    const port = await listening(split);
+
+    const answer = await ask(port, '/', { host: 'yellow-glacier.example' });
+
+    expect(answer.status).toBe(200);
+    expect(answer.body).toBe(OWN_PAGE);
+  });
+});
+
+describe('a request target that is not a URL is answered, not dropped', () => {
+  // Found while adding the redirect above, and it predates it: `GET //` is a well-formed request
+  // line whose target the WHATWG parser refuses — an authority with no host. `respond` is invoked
+  // as `void respond(...)`, so the throw became an **unhandled rejection**, nothing was ever
+  // written, and the socket sat open until it timed out. Unauthenticated, one line, repeatable.
+  //
+  // Raw `net` rather than `http`, because a client library is entitled to normalise the target and
+  // this test is specifically about the byte sequence that reaches the server.
+  it('answers 400 rather than leaving the socket open forever', async () => {
+    const port = await listening({ allowOrigin: 'null', static: BUNDLE });
+
+    const answer = await rawRequest(port, 'GET // HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n');
+
+    expect(answer).toMatch(/^HTTP\/1\.1 400 /u);
+    expect(answer).toContain('bad-request');
+  });
+});
+
+describe('a same-origin deployment is untouched', () => {
+  const sameOrigin = { allowOrigin: 'null', static: BUNDLE } as const;
+
+  it('serves its own page when no site origin is set, which is the shipped container', async () => {
+    const port = await listening(sameOrigin);
+
+    const answer = await ask(port, '/');
+
+    expect(answer.status).toBe(200);
+    expect(answer.body).toBe(OWN_PAGE);
+  });
+
+  it('still 404s an unknown path through the API rather than rewriting it to the page', async () => {
+    // `assetFor` has deliberately no catch-all, and the redirect must not have become one.
+    const port = await listening(sameOrigin);
+
+    const answer = await ask(port, '/no-such-asset');
+
+    expect(answer.status).toBe(200);
+    expect(JSON.parse(answer.body)).toEqual({ reached: 'the api', path: '/no-such-asset' });
+  });
+});

@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { guardBrokenPipe, type ErrorEmitter } from './index.js';
+import { BROKEN_PIPE_CODES, guardBrokenPipe, type ErrorEmitter } from './index.js';
 
 const CLI = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const REPO = fileURLToPath(new URL('../../..', import.meta.url));
@@ -134,6 +134,31 @@ describe('guardBrokenPipe', () => {
     guardBrokenPipe([stream], (code) => codes.push(code));
     stream.fire(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
     expect(codes).toEqual([0]);
+  });
+
+  // Every member of the set, fired individually — because the integration cases above can only
+  // observe whichever code this runner's platform and Node version happen to raise. `ENOTCONN` is
+  // in the set precisely because no machine anyone had run it on produced one: CI's floating
+  // `node-version: '26'` moved to 26.7.0, the macOS leg started reporting `ENOTCONN` for a closed
+  // stdout where 26.5.0 reported `EPIPE`, and `elevator-sim run | head` began crashing with the
+  // stack this guard exists to prevent. A guard whose coverage depends on which machine ran it is
+  // not a guard, so the set is asserted rather than the platform's opinion of it.
+  it.each([...BROKEN_PIPE_CODES])('exits 0 on %s, whichever name the platform gives it', (code) => {
+    const stream = fakeStream();
+    const codes: number[] = [];
+    guardBrokenPipe([stream], (exitCode) => codes.push(exitCode));
+    stream.fire(Object.assign(new Error(`write ${code}`), { code }));
+    expect(codes).toEqual([0]);
+  });
+
+  it('treats an error with no code at all as a real failure', () => {
+    // `error.code` is optional on `ErrnoException`, and a `Set.has(undefined)` would be a type
+    // error rather than a decision. This is the decision: no code is not a broken pipe.
+    const stream = fakeStream();
+    guardBrokenPipe([stream], () => {
+      throw new Error('exit must not be called');
+    });
+    expect(() => stream.fire(new Error('something went wrong'))).toThrow('something went wrong');
   });
 
   it('rethrows anything that is not a broken pipe, so a real stdout failure stays loud', () => {
