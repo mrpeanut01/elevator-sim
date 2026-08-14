@@ -173,6 +173,33 @@ DB_PASSWORD="$(az containerapp show --name elevsim-app --resource-group "$GROUP"
 # after the image had already been pushed.
 DB_PASSWORD="$(openssl rand -base64 24)"
 
+# **Where the viewer is, read back for exactly the reason the signing secret above is** — and this
+# paragraph is a scar rather than a precaution.
+#
+# `main.bicep` defaults `viewerOrigin` to `''`, and an empty value means *same-origin*: it points
+# `ELEVATOR_SIM_ORIGIN` at the app's own FQDN and sets `ELEVATOR_SIM_ALLOW_ORIGIN` to nothing. That
+# is the correct default for a first deploy and **catastrophic for a re-deploy of a split
+# deployment**, because a parameter nobody passes is not "leave it alone" — it is "set it back".
+#
+# It happened. A re-deploy on 2026-08-13 reverted a split deployment that had been correct since
+# 2026-08-08: sign-in links began pointing at the API's hostname instead of the site, and the site's
+# every account, leaderboard and challenge call started failing CORS with
+# `access-control-allow-origin: null`. The deploy reported success, `/api/boards` returned 200 to
+# `curl`, and nothing was visibly wrong — the failure is browser-only, which is precisely what
+# `docs/16` § 3 warns about and what issues #21, #28, #29, #30, #32 and #34 already cost once.
+#
+# So it is read back off the running app, like the secret. `ELEVATOR_SIM_ALLOW_ORIGIN` **is**
+# `viewerOrigin` — `main.bicep` sets it from that parameter and from nothing else — so reading it is
+# reading the parameter, not inferring it. `ELEVSIM_VIEWER_ORIGIN` overrides, which is how the value
+# is set the first time or moved to a new host; without it there would be no way to change the
+# answer, only to preserve a wrong one.
+VIEWER_ORIGIN="${ELEVSIM_VIEWER_ORIGIN:-$(az containerapp show --name elevsim-app --resource-group "$GROUP" \
+  --query "properties.template.containers[0].env[?name=='ELEVATOR_SIM_ALLOW_ORIGIN'].value | [0]" \
+  -o tsv 2>/dev/null || true)}"
+# `az` prints the literal string `None`/`null` for an absent value depending on version, and either
+# one passed to the template would be an origin named "null" rather than an absent one.
+case "$VIEWER_ORIGIN" in None|null) VIEWER_ORIGIN="" ;; esac
+
 FIRST_DEPLOY=false
 if [ -z "$APP_SECRET" ]; then
   FIRST_DEPLOY=true
@@ -200,7 +227,19 @@ ARGS=(
     # created in one region would otherwise silently place every resource there — which is how the
     # app and its database end up a region apart without anybody choosing it.
     location="$LOCATION"
+    # Always passed, including when empty. Omitting it lets the template's `''` default decide, and
+    # that default silently converts a split deployment back to same-origin — see above.
+    viewerOrigin="$VIEWER_ORIGIN"
 )
+
+# Said out loud on every run, because this is the parameter whose wrong value is invisible: the
+# deploy succeeds, `curl` gets a 200, and only a browser can tell. An operator who sees the wrong
+# host here has one line to read instead of six issues to reopen.
+if [ -n "$VIEWER_ORIGIN" ]; then
+  echo "viewer origin : ${VIEWER_ORIGIN}  (split deployment — this app redirects pages there)"
+else
+  echo "viewer origin : this app itself (same-origin deployment — it serves the page)"
+fi
 
 if [ "$APPLY" = false ]; then
   echo "what-if (nothing is being changed — re-run with --apply to deploy):"
