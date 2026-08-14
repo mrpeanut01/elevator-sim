@@ -10,7 +10,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { actionBarFor } from './actionBar.js';
+import { routeFor } from './screens.js';
 import { WAIT_BANDS } from '../live/bands.js';
+import { clockAt } from '../live/timeline.js';
 import {
   arrivalsPerMinute,
   climbPerWavePct,
@@ -197,6 +199,54 @@ describe('what the screen refuses, and where the refusal sits', () => {
     expect(RUSH_ABSENCES.length).toBeGreaterThanOrEqual(3);
     for (const absence of RUSH_ABSENCES) expect(absence.trim().length).toBeGreaterThan(20);
     expect(RUSH_PRIMARY_REFUSAL).toMatch(/not built/);
+  });
+
+  /*
+   * The three cases below replace a check that asserted only that every entry was longer than
+   * twenty characters. That check passed for two waves over an entry whose subject had expired —
+   * see {@link RUSH_ABSENCES}' docstring — which is the same failure the driving-line case at the
+   * bottom of this file already records: a case that pins a refusal's *form* keeps passing for
+   * exactly as long as its *subject* is wrong. So these pin the subject, and derive it.
+   */
+
+  it('names § 7’s stage as what a run plays on, because that is what the registry routes', () => {
+    const stage = RUSH_ABSENCES.find((absence) => absence.includes('9.2'));
+    expect(stage).toBeDefined();
+    /*
+     * Derived, not remembered. `routeFor` answering `'screen'` *is* the fact that § D335's hand-off
+     * is retired and `stage` is an ordinary registered Everyday screen — so the moment that is true,
+     * a register calling the Engineer surface the thing a player watches is making a false statement
+     * about this build. The assertion is conditioned on the registry rather than asserted beside it,
+     * so a future lane that genuinely hands the stage back off does not fail this case for the wrong
+     * reason.
+     */
+    expect(routeFor('stage')).toBe('screen');
+    expect(stage).not.toMatch(/Engineer/);
+    expect(stage).toMatch(/§ 7’s stage/);
+  });
+
+  it('claims an absence the seam it names actually has — the clock reads the hour', () => {
+    /*
+     * The other half of a register entry: having named the right screen, it must also be right about
+     * what that screen lacks. § 9.2 wants *held time*, and `stageScreenModel.ts#stageHeaderOf` builds
+     * its clock from `clockAt`, which answers a time of day. Forty-two minutes into a run is `06:42`
+     * on the fallback start — an hour, not a duration — so the entry's claim is true of the seam it
+     * cites rather than merely plausible.
+     */
+    expect(clockAt(42 * 60, undefined)).toBe('06:42');
+    const stage = RUSH_ABSENCES.find((absence) => absence.includes('9.2'));
+    expect(stage).toMatch(/clockAt/);
+    expect(stage).toMatch(/held time/);
+  });
+
+  it('does not let any entry name the Engineer surface as an Everyday run’s stage', () => {
+    /*
+     * The register-wide form of the case above. Every § 4 key the shell routes to a module is drawn
+     * in the Everyday screen region, so no entry on any Everyday register may describe a run as
+     * playing on the other shell. Kept over the whole array rather than the one entry that was wrong,
+     * because the next stale subject will not be in the same row.
+     */
+    for (const absence of RUSH_ABSENCES) expect(absence).not.toMatch(/Engineer surface/);
   });
 
   it('withholds the two facts no run in this build has produced, and computes the third', () => {

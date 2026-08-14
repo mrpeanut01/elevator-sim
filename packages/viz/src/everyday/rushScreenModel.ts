@@ -243,10 +243,32 @@ export function rushGeneratedRangeLine(): string {
  * On screen, and read by {@link rushBarModel} for the primary's refusal, so the disabled control
  * and the register cannot say different things. Each entry names the missing seam rather than the
  * feeling of one — `docs/18`'s register style, and `shell.ts`'s.
+ *
+ * ## § 9.2's entry had gone half-stale, which is the shape this register is least able to survive
+ *
+ * It read *"the run a player would watch is **the Engineer surface**, which has no held-time clock
+ * and no wave pill"*. That named the right absence about the wrong screen: § D335's hand-off is
+ * retired, `everyday/screens.ts` routes `stage` to `everyday/stageScreen.ts`, and § 7's stage is an
+ * ordinary registered screen. So the *subject* expired on the merge that landed that screen while
+ * the *absence* stayed exactly as true as it was — `stageScreenModel.ts` builds its clock from
+ * `clockAt` (the hour) and its pill from `phaseAt` (the demand segment), and § 9.2 asks for held
+ * time and the wave.
+ *
+ * `shell.ts`'s own register names this shape and it is the reason the entry was narrowed rather
+ * than deleted: *"a row that has become half wrong is the most dangerous shape in a register — it
+ * reads as verified and is not"*. A reader who checked the claim against the Engineer surface would
+ * have found a real missing clock there too, and concluded the row was fine.
+ *
+ * **It survived because the test over this array pinned every entry's *length*.** That is the
+ * failure {@link rushDrivingLine}'s own docstring records one screen down, reproduced here on the
+ * neighbouring constant: a case that holds a refusal's *form* keeps passing for exactly as long as
+ * its *subject* is wrong. `rushScreenModel.test.ts` now asserts this entry against the screen
+ * `screens.ts` actually routes `stage` to, so the next retirement of a stage fails a test instead of
+ * quietly re-writing history on a player-facing surface.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   'the climbing stream — no demand template in data/ ramps without a ceiling, so § 3.2’s ninety minutes cannot be generated yet',
-  '§ 9.2’s stage — the run a player would watch is the Engineer surface, which has no held-time clock and no wave pill',
+  '§ 9.2’s stage — § 7’s stage screen is what a run plays on, and its clock reads the hour while its pill reads the demand phase (`live/timeline.ts`’s `clockAt` and `phaseAt`); § 9.2 wants held time and the wave, and neither is derived anywhere',
   '§ 9.3’s result — a rush that has not run has no furthest wave, and a screen that answered anyway would be inventing one',
   'the standings — the five entries below are the handoff’s own fixtures, not runs this build measured',
 ]);
