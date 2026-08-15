@@ -23923,3 +23923,96 @@ connection string from the same parameter in the same deployment.
 Verified after the restoring deploy rather than argued: `/` → `302` to the site, the query preserved
 across it, `access-control-allow-origin` naming the site again, and the browser landing on the
 Everyday shell from the old bookmark.
+
+---
+
+## D341 — the per-caller key was read from the end the caller writes
+
+**Date: 2026-08-14 · Written after the measurement, and the measurement is the point.**
+
+### The sentence that was wrong, and it was wrong in good faith
+
+§ D242 § 2 reads:
+
+> `ServeOptions.trustProxy` defaults to **false** and only an operator setting
+> `ELEVATOR_SIM_TRUST_PROXY=true` makes the header readable — and then only its left-most entry, the
+> address the first trusted hop saw.
+
+The second clause does not describe the first. `x-forwarded-for` grows by **appending** — each hop
+adds the peer *it* saw — so the left-most entry is not what any hop observed. It is whatever the
+original caller typed. § D242's own first sentence names the attack exactly (*"a sender who varies
+the header gets a fresh budget per request while looking like a hundred people"*) and its second
+sentence then leaves it open.
+
+**It was never exploitable, and that is luck rather than a control.** `ELEVATOR_SIM_TRUST_PROXY` is
+set nowhere in `infra/`, `scripts/`, `compose.yaml` or the `Dockerfile` — the only references in the
+tree are `main.ts` reading it and DECISIONS.md describing it — so it defaulted to `false` and the
+socket address was used. The trap is that the flag is *also* the obvious fix for the other half of
+this problem, below: the first operator to reach for it would have turned the budget off by turning
+it on.
+
+### The other half, which is live today
+
+At zero hops the key is the socket peer, and a process behind Container Apps ingress sees **the
+ingress** as its peer — the same address for every caller on the internet. So § D242's per-caller
+budget has been one shared bucket for the whole internet since the day it deployed, with
+`POST /api/auth/request-link` on it: one abuser exhausts the sign-in budget for every real user.
+That is a denial-of-service surface on a shared budget rather than an escape from it, which is the
+weaker of the two failures and is why it is the one that was shipped.
+
+### The measurement
+
+A throwaway Container App in this deployment's own environment (`elevsim-env`), running a public
+echo image, queried from a caller at `143.105.1.202`, and **deleted immediately afterwards**. Not
+inferred from Envoy's documentation, because what is deployed is what matters:
+
+| the caller sent | the app received as `x-forwarded-for` |
+|---|---|
+| *nothing* | `143.105.1.202` |
+| `9.9.9.9` | `9.9.9.9,143.105.1.202` |
+| `9.9.9.9, 8.8.8.8, 7.7.7.7` | `9.9.9.9, 8.8.8.8, 7.7.7.7,143.105.1.202` |
+| the header **twice** (`9.9.9.9`, `8.8.8.8`) | `9.9.9.9,8.8.8.8,143.105.1.202` |
+| `9.9.9.9,` (trailing comma) | `9.9.9.9,,143.105.1.202` |
+
+Three findings, only the first of which was in question:
+
+1. **The ingress appends.** The real client is the **right-most** entry; everything to its left is
+   the caller's own text. So the left-most read would have been *fully forgeable on this
+   deployment* — this is measured, not argued.
+2. **Repeated headers are coalesced into one comma-joined value** before the app sees them, so
+   Node's `string[]` case does not arise here. `clientIpOf` still joins rather than taking
+   `header[0]`, because the old code's `header[0]` would have read one caller-supplied line and
+   ignored the hop's, and the app must not depend on a platform detail it cannot enforce.
+3. **`x-envoy-external-address` is overwritten, not appended** — a forged one arrived as
+   `143.105.1.202`. It is therefore also trustworthy here, and is deliberately **not** used:
+   `x-forwarded-for` with a hop count is the portable answer, and a second source of truth is a
+   second thing to keep right.
+
+### What changed
+
+`ServeOptions.trustProxy: boolean` becomes `trustedHops: number`. The chain is
+`[...x-forwarded-for, socketPeer]` and the client is the entry `trustedHops` places from its **right**
+end — `0` is the socket peer and the default, `1` is correct behind exactly one trusted proxy. A
+caller can only prepend, so an answer counted from the right is one they cannot reach. A chain
+shorter than the count falls back to the socket peer, never the left-most entry.
+
+**Over-counting is still exploitable and no code can fix it**: two hops configured behind one real
+proxy reads a caller-supplied address as the client. So the count is never inferred, never derived
+from anything observable at run time, and never defaulted to a guess — and
+`ELEVATOR_SIM_TRUST_PROXY` is now a **hard boot failure** naming its replacement rather than a
+setting silently discarded, because a server that starts having dropped a security setting is the
+worse of the two ways to answer.
+
+`infra/azure/main.bicep` sets `ELEVATOR_SIM_TRUSTED_HOPS: '1'` as a **literal, not a parameter**.
+That is § D340's lesson applied on the day it was learned: a template default is a decision and
+passing nothing chooses it, so a value with no parameter has nothing to omit. It is correct for
+every deployment this template produces, because the template *is* the ingress it was measured
+against.
+
+### What is pinned, and what it would catch
+
+`serve.test.ts` asserts the five measured header strings byte for byte, plus the negative — that the
+rule this replaced would have returned `9.9.9.9`. If a future platform change makes the ingress
+*replace* the header rather than append to it, the hop count becomes wrong and those cases go red.
+That is the only warning anyone would get: a forged key looks exactly like an honest one from every
+other angle, which is the property that let the original sentence stand for nine days.

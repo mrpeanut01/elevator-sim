@@ -392,6 +392,28 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             // it is the same `viewerOrigin` that set `ELEVATOR_SIM_ORIGIN` above — the server
             // cross-checks the two and refuses a deployment where they have drifted apart.
             { name: 'ELEVATOR_SIM_ALLOW_ORIGIN', value: viewerOrigin }
+            // **One trusted hop: this environment's ingress, and nothing else.** § D242's
+            // per-caller budget keys on the caller's address, and a process behind Container Apps
+            // sees the ingress as its socket peer — so at zero hops every caller on the internet
+            // shares one bucket and one abuser exhausts the sign-in budget for everybody.
+            //
+            // `1` rather than a guess. Measured against this environment's own ingress on
+            // 2026-08-14 with a throwaway app (§ D341), which **appends** the peer it saw to
+            // whatever the caller sent:
+            //
+            //     sent nothing              ->  x-forwarded-for: 143.105.1.202
+            //     sent "9.9.9.9"            ->  x-forwarded-for: 9.9.9.9,143.105.1.202
+            //     sent three addresses      ->  x-forwarded-for: 9.9.9.9, 8.8.8.8, 7.7.7.7,143.105.1.202
+            //
+            // so the real client is the **right-most** entry and everything left of it is the
+            // caller's own text. `serve.ts#clientIpOf` counts from the right for that reason.
+            //
+            // **A literal, deliberately — not a parameter.** § D340 is the defect where a deploy
+            // that passed no `viewerOrigin` silently reset a split deployment to same-origin,
+            // because a template default is a decision and passing nothing chooses it. A value with
+            // no parameter has nothing to omit. It is also correct for every deployment this
+            // template produces, since the template *is* the one ingress it is measured against.
+            { name: 'ELEVATOR_SIM_TRUSTED_HOPS', value: '1' }
             // The identity the ACS SDK's DefaultAzureCredential must choose. Without it, a
             // container carrying exactly one user-assigned identity still has to be told which.
             { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
