@@ -180,6 +180,28 @@ These have collided before:
   discrepancy as a correction, which manufactured a defect rather than recording one — the retraction
   is kept because the mistake is more instructive than the number.
 - `data/*.json` — content changes serialize against each other and against the pins.
+- **`packages/viz/src/honesty/surfaces.ts`** — added 2026-08-24, and it is now the tightest of these.
+  Every lane that builds or renames a player surface must register it here, so the three M2 lanes
+  below all write this one file. It has no interface to lock first: an adapter is the surface.
+
+### The M2 order this forces, and the consolidation it revealed
+
+1. **#207** — the absence registers. Writes `everyday/shell.ts`, `settingsView.ts`,
+   `stageScreenModel.ts`, `designerModel.ts`, `rushScreenModel.ts`, `campaign/career.ts` and
+   `honesty/surfaces.ts`. **Running now, alone in `everyday/`.**
+2. **#212 + [§ D347](DECISIONS.md), as one lane.** They were scheduled as two and are one piece of
+   work: both write `everyday/stageScreen.ts` and `honesty/surfaces.ts`, and **#212's own AC5 already
+   asks for what § D347 requires** — *"any string this work touches enters the corpus"*. Splitting
+   them would have two lanes fight over the same file to satisfy the same criterion. The stage's
+   words need the pure/DOM split this directory already has; the door-fill inversion is in the same
+   renderer.
+3. **The rest of M2** — #208, #210, #217, then the #218 slice review.
+
+**#212 was very nearly scheduled in parallel with #207 on the belief that its defects were in
+`render/canvas.ts`.** They are not: the issue puts that file explicitly out of scope as the Engineer
+arm, and both defects are in `everyday/stageScreen.ts`. That would have been two lanes in the
+highest-collision directory at once — the exact hazard this section exists to name — and it was
+caught by re-reading the issue rather than trusting a note about it.
 
 Safe to parallelize: documentation and specification tasks in M0 and M1, verification tasks,
 independent journey tests, content authoring in different files, read-only analysis.
