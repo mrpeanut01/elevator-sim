@@ -199,7 +199,8 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 **This is the entry that matters**, for three reasons. It is the only title in the set whose subject
 is *this* subject. It is the one a stranger is most likely to confuse this product with. And it is
 the only one whose behaviour could be verified rather than described, because it is MIT-licensed and
-its model, its challenge ladder and its app loop are **625 lines of JavaScript across three files**.
+its model, its challenge ladder and its app loop are **625 lines of JavaScript across three files**,
+plus the page that displays them.
 
 Everything in this section marked **[source]** was read on 2026-08-24 from
 `raw.githubusercontent.com/magwo/elevatorsaga/master/` — `challenges.js`, `world.js`, `index.html`,
@@ -213,7 +214,7 @@ so nothing about how it *feels* to play is claimed here.
 | **What it refuses to do** | Almost everything else. The entire configurable surface of a challenge is **four fields** — `floorCount`, `elevatorCount`, `spawnRate`, `elevatorCapacities` **[source: `challenges.js:63-86`]**. No building editor, no traffic pattern, no access or service zoning, no physics beyond a fixed speed, no comparison of two programs against the same crowd |
 | **How it teaches** | An 18-rung parameter ladder and one API page. The ladder runs 3 floors / 1 elevator / spawn 0.3 up to 21 floors / 8 elevators / spawn 1.5, and the *goal type* changes under the player three times — transport-within-time (8 challenges), transport-with-max-wait (7), transport-within-moves (2), one combined, plus a perpetual demo **[source: `challenges.js:63-86`]**. That is teaching by making the objective function move, which is a good idea and is noted as such below |
 | **How it shows failure** | Binary, immediate, and with no diagnosis. `evaluate(world)` returns `true`, `false`, or `null` for undecided **[source: `challenges.js:1-60`]**; on `false` the screen reads **"Challenge failed" / "Maybe your program needs an improvement?"** **[source: `app.js:189`]**. The player is told the run failed and is not told what about the run failed |
-| **Session length** | The scored challenges are **60–80 simulated seconds**, except one at **1 800 s** **[source: `challenges.js:63-86`]**. Wall-clock session length is dominated by writing and re-running code and was not measured **[unverified]** |
+| **Session length** | Where a challenge names a time limit it is **60–80 simulated seconds**, except one at **1 800 s**; the max-wait and move-limit challenges name no clock and run until the target count is reached or the constraint is broken **[source: `challenges.js:1-86`]**. Wall-clock session length is dominated by writing and re-running code and was not measured **[unverified]** |
 
 ### 5.1 Adopt — and the adoption is a compliment this project should accept
 
@@ -232,12 +233,15 @@ which is exactly what `longestCurrentWaitS` is in `packages/viz/src/frame/overla
 half. Seven of the eighteen scored challenges are decided on it, and an eighth on it together with a
 time limit **[source: `challenges.js:63-86`]**.
 
-**Adopt: the moving objective.** The ladder changes *what is being optimised* — time, then worst-case
-wait, then elevator moves — rather than only turning the demand up. This project has the same three
-axes already and calls them AWT, WT95 and the energy proxy, and it already forbids collapsing them
-([§ D106](../DECISIONS.md), `CLAUDE.md` § *Tuning discipline*: *do not scalarize too early*). A case
-ladder whose *objective* moves is a way to teach the Pareto front without ever naming it. Cost: it is
-a content-authoring decision for the Fix-a-building case set, not a code change.
+**Adopt: the moving objective.** The ladder changes *what is being optimised* — throughput against a
+clock, then worst-case wait, then elevator moves — rather than only turning the demand up. This
+project carries three axes of its own, and they line up close enough to be useful: achieved handling
+capacity, the wait metrics (AWT and WT95), and the energy proxy — the same three
+`CLAUDE.md` § *Tuning discipline* forbids collapsing (*do not scalarize too early*;
+[§ D106](../DECISIONS.md)). A case ladder whose *objective* moves is a way to teach the Pareto front
+without ever naming it, and it is the only content idea in this teardown that comes from the one
+title whose behaviour was verified. Cost: a content-authoring decision for the Fix-a-building case
+set, not a code change.
 
 ### 5.2 Refuse — three, all read out of the source
 
@@ -260,18 +264,27 @@ Refused by **R1**, **R3** (*suppression replaces the number, it never hides it*)
 defect being imputed to a competitor: it is the arithmetic, on line 102, of the closest comparator
 this product has.
 
-**2. There is no seed.** Arrivals, passenger weight, origin floor, destination floor and even the
+**2. There is no seed.** Passenger weight, display type, origin floor, destination floor and even the
 iteration order over elevators are drawn from the ambient `_.random`
-**[source: `world.js:32,34,36,46,47,51,54,55,133`]**. Nothing seeds it, nothing stores it, nothing
+**[source: `world.js:32,34,36,47,51,54,55,133`]**. Nothing seeds it, nothing stores it, nothing
 displays it. A player who passes a challenge cannot replay the crowd they passed it against, and two
 players comparing programs are comparing them on different traffic.
+
+**One thing here is *not* random, and it is worth stating because it cuts the other way.** Arrival
+*timing* is deterministic: a rider spawns every `1.0 / spawnRate` seconds exactly, from a
+fixed-interval accumulator **[source: `world.js:156,162-166`]**. One rider at a time, evenly spaced.
+That is the modelling assumption `CLAUDE.md` § *Modeling rules that are easy to get wrong* names
+outright — *passengers arrive in batches, not one at a time* — and it is why this teardown's third
+refusal rests on the origin/destination draws and the car iteration order rather than on the arrival
+process. The system is still stochastic; the randomness is in *who goes where*, not in *when*.
 
 Refused by `CLAUDE.md` **invariant 2** (*no global RNG*) and **invariant 5** (*every persisted run
 record carries its seed*), and by **R7** (*the seed stays visible and copyable in every mode*).
 Elevator Saga is, quite precisely, invariant 2 shipped as a product.
 
 **3. A pass/fail verdict is named from one replication of a stochastic system.** Combine (1) and (2):
-`spawnRate` drives random arrivals, one run decides, and the screen says *"Challenge completed"*.
+every rider's origin and destination is a fresh unseeded draw, one run decides, and the screen says
+*"Challenge completed"*.
 Refused by **R2** (*a score is a property of a run, never of a dispatcher*) and **R12** (*a goal
 judged on one run must have its across-seed variance measured and published, or it is a batch
 goal*). `docs/10` § 1's **M7** is the measurement that makes this concrete on this project's own
