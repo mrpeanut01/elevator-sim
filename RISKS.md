@@ -1,12 +1,177 @@
-# RISKS
+# RISKS — the project register
+
+**What this file is.** The project-level risk register: the ways *this project* produces a confident
+number that is wrong, a screen that says something false, or quiet damage nobody notices. Each row
+carries a likelihood, an impact, a named owner, a mitigation, and an **escalation trigger** — the
+observable event that says the risk has stopped being hypothetical. A risk becoming real should be a
+*recognised event*, not a surprise.
+
+**It survives waves.** A wave, a delivery or a milestone may close; these rows do not close with it.
+A row leaves the live table in exactly two ways — **discharged**, with the thing that discharged it
+named, or **retired**, with the reason — and either way it stays in this file under its own id.
+Nothing is deleted. **Wave-scoped risks do not belong here**: they belong in the wave's own plan,
+and § 2 records what it cost the last time that rule was inverted.
+
+**It is reviewed at every milestone gate.** [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md)'s
+definition of done requires that *"remaining risks are documented and **accepted by a human**"*.
+That acceptance is a review of this file, and it happens at **each gate** rather than once at the
+end. The orchestrator brings the live table to the gate; the reviewer decides, row by row, which are
+accepted as they stand, which need a mitigation before the next milestone opens, and which have
+become real. A gate that closes without this file being read has not been closed.
+
+---
+
+## 1. How to read a row
+
+- **Ids are names, not positions.** R1 is *the dead-seam class* and will be for as long as this
+  repository exists. [`docs/05-roadmap.md`](docs/05-roadmap.md) states outright that renumbering
+  breaks every reference; **never renumber**. New rows take the next number above the highest ever
+  issued. The highest issued to date is **R39**.
+- **Three states, and only three.** **Live** — the risk is open. **Discharged** — the thing that
+  closes it has happened and is named. **Retired** — the risk no longer applies, with the reason.
+  A row with no state is a drafting error.
+- **A discharged row is not a deleted row.** Six ids in this register are cited from eleven places
+  outside it; a reader following one must land on the row and its disposition, not on a gap.
+- **Every state change names its evidence.** A run, a commit, a decision number — not another
+  sentence. This register's own history is the argument for that rule.
+
+---
+
+## 2. What happened to this file, and why the rules above are rules
+
+**Commit `1b7a2f1` (2026-08-12) replaced this register with a wave board.** 123 lines out, 12 in,
+**no note left saying the project register had been dropped**. Everything was recoverable the whole
+time (`git show 1b7a2f1^:RISKS.md`), and nothing in the repository noticed for twelve days.
+
+**The loss was not three rows — it was all 29.** Issue #193 names R24, R25 and R26 because those are
+the ids that dangle from wave plans. The same commit also took **R1, R5, R7 and R10**, which the
+file itself declared *"still live and permanent"*, and **R27, R28 and R29**, which it declared
+project-level for wave 13. **Six ids dangle across eleven sites** — R9, R17, R22, R24, R25, R26 —
+and the worst of them is R9: the opening sentence of
+[`docs/09-destination-dispatch-contract.md`](docs/09-destination-dispatch-contract.md) justifies that
+document's existence by a register row that had stopped existing.
+
+**And the defect is a class with four members.** The same commit, in one sitting:
+
+| file | before | after | state now |
+|---|---|---|---|
+| [`AGENT_STATUS.md`](AGENT_STATUS.md) | 1 047 lines | 17 | rebuilt as an append-only board; the lost history is still in `1b7a2f1^` |
+| [`TEST_MATRIX.md`](TEST_MATRIX.md) | 383 | 28 | **not recovered** — the current file is a narrower document with the same name |
+| `MULTI_AGENT_PLAN.md` | 375 | 82 | restored byte-identical at [`MULTI_AGENT_PLAN-waves-1-4.md`](MULTI_AGENT_PLAN-waves-1-4.md) |
+| `RISKS.md` | 123 | 12 | **this rebuild** |
+
+That class is now **R37**, because a project that loses its own registers to a wave-opening commit
+will do it again, and the mitigation belongs in the register rather than in the memory of whoever
+noticed. Evidence for all of the above is
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § P.
+
+---
+
+## 3. The live register
+
+| ID | Risk | Likelihood | Impact | Owner | Mitigation | Escalation trigger |
+|---|---|---|---|---|---|---|
+| **R1** | **A behaviour that is configurable, unit-tested in isolation and called from no shipped path ships anyway.** It passes every other check this repository runs. **Realised thirteen times** — eleven in code, twice in `data/` — and the instructive ones are the whole of `tuning/` (its own docstring said so and the roadmap called the phase green), the entire deck API on `model/bank.ts` (the configuration was right, the validation was right, and nothing consulted either), and `patternSwitching` (loaded, calibrated, resolved, and writable by nothing in the viewer) | High — it is the project's dominant failure mode | Critical. Invalidates every number the feature is supposed to produce | orchestrator | **Name the non-test caller.** A barrel re-export and a `{@link}` tag look exactly like a caller and are not one. Seven mechanical `deadCode.test.ts` audits now derive their module sets from disk (`core/src/dispatch`, `viz/src`, `server/src`, and `experiments/src/`'s `runner`, `teaching`, `tuning`, `fuzz`). For a **control**, the test is [§ D177](DECISIONS.md)'s: move it and require the run to change, compared on the legs | A task reports "wired" without an instrumented run or a trajectory-difference assertion; a new directory acquires exports before it acquires an audit |
+| **R5** | **Statistical nonsense is reported** — the failure mode [`CLAUDE.md`](CLAUDE.md) opens by naming. The literature's own example is *increasing lift speed appearing to increase average waiting time* | Medium | Critical | every lane | No comparison without a paired-t interval excluding zero; no conclusion from overlapping intervals; common random numbers across arms; 50–200 replications; saturated configurations suppressed; and an interval excluding zero is **not** a win when the effect is below the apparatus's measured resolution limit at that cell | Any report claims a win below the measured resolution limit, or compares two intervals instead of the pairs |
+| **R7** | **An agent reports a green suite that is red.** Has happened in this repository more than once, in both directions — including a suite figure that was correct on one machine and exactly inverted on another ([§ D201](DECISIONS.md)) | Medium | High. A gate that does not gate | orchestrator | The orchestrator re-runs `tsc -b` and the suite itself after every merge, serially, on an idle machine; reviewers are instructed to run, not read. A suite figure is a claim about a **machine** as well as a commit, and must name both | A lane's claimed result cannot be reproduced by the orchestrator, or a suite figure is quoted without its platform |
+| **R10** | **Scope pressure produces a weakened acceptance criterion** | Medium | Critical — it is how this project fails quietly | orchestrator, and the human at the gate | [`CLAUDE.md`](CLAUDE.md): raise a criterion, never lower it. A phase that cannot meet its gate is recorded as not meeting it. **Realised once**, by the orchestrator, inside a decision whose stated purpose was to *strengthen* a gate ([§ D99](DECISIONS.md)); closed by measuring the dropped clause ([§ D100](DECISIONS.md)), not by arguing it away. Phase 8 was recorded partial rather than accepted and then closed by doing the work ([§ D108](DECISIONS.md)); Phase 6c has been refused three times against a criterion dated before the code | Any proposal to relax a stated criterion — including "the issue's acceptance criterion says so", which is how a criterion gets lowered from outside |
+| **R24** | **A search tool that fails silently makes every negative finding unreliable, including the ones already written down.** `grep` here wrapped `ugrep -I`, which skips a file it deems binary by printing *nothing* — exit 1, indistinguishable from a genuine miss. Five source files carried raw NUL bytes, among them two pin guards | Medium. The **cause** is closed (`f78dc42`); the class is not | High. A false negative that reaches a register is planned against | every lane | A negative result from a search tool is evidence about **the tool** as well as the tree. Confirm *"nothing does X"* by driving, by types, or by a reader that fails loudly on unreadable input — never by a silent grep alone | Any register or findings entry whose only evidence is a search that found nothing |
+| **R25** | **File-level lane ownership partitions *editing* and does not partition *committing*.** `git add -A` stages the whole repository regardless of who owns what | Medium | Medium. Nothing is lost, but the commit stops being evidence of what landed together | orchestrator | One worktree per concurrent lane, one branch per worktree, one agent per branch; every `git add` names explicit paths. **Realised once** — `ae6750b` described one lane and contained three ([§ D182](DECISIONS.md)) — and answered structurally from the open of wave 13 rather than as a correction | Any commit whose diff touches a file its message does not mention |
+| **R26** | **A test suite built entirely from fixtures cannot distinguish *the mechanism is correct* from *the mechanism is reached*** | Medium | High | every lane | At least one case per surface must originate in a **real run**. Realised in `mode/disclosure.test.ts`, green for a whole commit while the shipped screen rendered the ground-free lead ([§ D185](DECISIONS.md)). This is R1's distinction arriving through a fixture instead of a barrel re-export | A suite that would stay green with the production wiring removed |
+| **R28** | **A variance component that leaks outside the shared trace destroys the power common random numbers buy.** The paired standard error rises, every interval widens, and every test still passes | Medium for each new component | High. It costs 5–20× in run count and announces nothing | whoever adds the component | Any new source of run-to-run variation declares whether it is inside or outside the shared trace, and the decision is **measured on the trace digest**, not argued. Its first instance is discharged: `dayVariation` measured shared-against-leaked at SE ratios 3.3–8.3 across four seed sets ([§ D208](DECISIONS.md)), with the pin in `sim/dayVariationSeam.test.ts` | Paired SE rising when a variance control is enabled; or a new variance control shipping with no statement of which side of the trace it is drawn on |
+| **R29** | **Two traffic models is a fork that never converges.** `v1` exists so 981 pins keep reproducing; the failure is that it outlives that reason and every later feature is written twice — or worse, once, on the branch nobody measures | **Live.** `v1` is still `TRAFFIC_DEFAULTS.trafficModel`, both versions ship, and no re-derivation has been published | Medium now, High the moment a feature lands on one branch only | whoever owns `traffic/` | `v1` is deleted when the last figure depending on it has been re-derived under `v2` **and the re-derivation published as a comparison** — not before, because the pins' whole value is the sentence *"this figure has not moved since Phase 5"* | A third model version, or any feature available on only one branch |
+| **R30** | **The engine is mature and the game is not, and the gap is wide enough to be mistaken for a schedule rather than a risk.** Phases 0–5 and 7–9 are accepted, Phase 6 is partial, the fuzz campaign is green at 2 000 cases and the honesty corpus sweeps 706 094 strings — while the product has **no first-run experience of any kind** (no `onboarding`, `coach` or `firstRun` module exists; *How to play* is three navigations deep inside the surface a new player is kept off), and all **twenty-one** journey rows in [`TEST_MATRIX.md`](TEST_MATRIX.md) read `planned`. **Judgement, on measured supports** | Certain — it is the current state | High. Engineering effort flows to the half that already has instruments, because that half can prove it moved | product owner | Milestones are the control: M1–M2 buy the game side specifications and a vertical slice before M3 freezes features. The register's job is to keep the asymmetry visible at each gate, so "the engine is in excellent shape" is never read as "the product is" | A milestone exits on engine evidence alone; or a wave lands with no player-facing journey moving from `planned` |
+| **R31** | **No player is measured, so five of the ten success criteria cannot be evaluated at all.** [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) makes *"telemetry shows S1 through S5 met on a recruited cohort"* an M4 exit gate. There is **no telemetry or analytics module anywhere in the tree** — no directory, no file, no import — and no playtest programme; the specifications for both are M1 issues, three unopened milestones away. Compounding it: the S-list itself lives only in the kickoff charter, which **nothing in this tree adopts** | Certain until telemetry ships | Critical. A success criterion that cannot be evaluated is not a criterion; it is a hope with a number on it | product owner | Telemetry schema and KPI set (#201) and the playtest programme (#205) are M1 deliverables and gate M4; privacy posture (#202) lands **before** any telemetry ships, because that order is not recoverable. Until then, every S1–S5 claim is recorded as **unevaluated**, never as met | Any milestone claims an S1–S5 criterion met without cohort data; or telemetry ships before #202 |
+| **R32** | **The competitive layer is built server-side and dark client-side, so it can look finished from either end alone.** `packages/server/src` ships `accounts`, `leaderboard`, `challenge`, `mail` and `store`; the **only** non-test caller of `store.recordEntry` is the submission endpoint in `http/api.ts`, so a fresh deployment has genuinely zero entries — correct behaviour that is indistinguishable from a broken board. The client half was verified (2026-08-07) to latch its fetch at mount, so a successful post does not appear; **that half is not re-measured on this tree** and is recorded as such | Realised on the server half; unverified-here on the client half | Medium | whoever owns `packages/server` and `viz/src/dev` | A competitive surface is judged by a **round trip** — post, refetch, render — never by either end in isolation. Seeding boards is a product decision, not a fix. Evidence: [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § H | A board defect is closed by a server-side test alone, or a client-side one; or an empty board is diagnosed without checking whether anything has ever written to it |
+| **R33** | **Content is thin against a game-shaped roadmap, and the thing that would deepen it is four milestones away.** Eight shipped buildings, ten campaign stages, one traffic-realism programme (#235) sitting in M4. The measured hazard is already visible: the published *"four of seven stages clear from the dispatcher dropdown alone"* figure is **stale in both halves** — the tree ships ten stages, and two of the four named clearers have flipped since. **Partly measured, partly judgement** | High | Medium. It is recoverable content work, but it is the difference between a demo and a game | product owner | Content plan (#199) and difficulty curve (#200) are M1; the balance work is M4. **S5's instrument must be an automated sweep over all dispatchers per stage**, derived from the categorical rather than hand-counted — no test derives that count today, which is why the figure went stale twice without failing anything | A content or balance claim is published as a count that no test derives |
+| **R34** | **Two shells stand over one engine, and they share mutable state that neither owns.** `everyday/` and `dev/` both write `inert`, both hold canvases that size from their laid-out box, and the door between them ([§ D338](DECISIONS.md)) closes an import cycle that already produced this directory's last module-init `undefined` | Medium | High. The failure mode is a blank page or a hung renderer — total, not partial | whoever owns `packages/viz/src` | [§ D335](DECISIONS.md)'s stated rules, which are not optional: the outer cover wins while it is up, and `inert` is read before it is written; **both roots are covered and neither is ever hidden**, because `visibility:hidden` keeps the box and `display:none` does not; the browser tier reaches the Engineer surface through the **player's own path**, not by taking the cover off. A screen that is not in the honesty corpus is a screen the search has never read | Any blank-page render in a browser test; any canvas measured while its world does not have the page; a browser helper going stale while the product works |
+| **R35** | **Inbound feedback has a measured error rate, and acting on an issue as written can ship a defect.** In the wave just completed, of thirteen issues: **two were refuted at their central premise**, **eight carried at least one false or materially misleading clause**, and **three would have shipped a new defect, reversed a product decision, or produced a wasted edit** if actioned literally. One quoted a dated audit as live status for a defect fixed thirteen days before it was filed; one's proposed answer contradicted a standing product decision six contract sections rest on; one P0 asked for a renderer rebuild where the real defect is a door-fill inversion | **Measured**, and it held across the wave | High. An issue's acceptance criterion is a criterion this register did not write and R10 does not otherwise cover | orchestrator | **Verify before scheduling.** Every issue's central premise is traced to file and line or measured by a run *before* a lane opens on it, and refuted claims are recorded as prominently as confirmed ones. An issue's stated criterion may be **widened** at the gate when verification shows the real surface is larger — #193 is the worked example | A lane opens on an unverified premise; or an issue's acceptance criterion is met literally in a way that violates a stated non-goal |
+| **R36** | **Key-person continuity on a large tree.** 914 TypeScript files and roughly 415 000 lines across five packages, 500 of 655 commits from a single human author, and a body of reasoning that lives in `DECISIONS.md`'s 334 entries and the docstrings rather than in anyone's head. **Judgement; the counts are measured** | Medium | Critical if realised. The tree is legible only because the reasoning was written down; the failure mode is that a successor can run it and cannot decide anything | product owner | The practice that already mitigates it is the one to protect: record the decision where the next reader will meet it, name the mechanism or say it is unmeasured, and keep the resume brief current. [`docs/07-handoff.md`](docs/07-handoff.md) is the entry point and must stay one | A decision lands only in a commit message; the handoff brief goes a milestone without being updated |
+| **R37** | **A project-level register is replaced by a wave-scoped board, and nothing notices.** **Realised four times in one commit** — this file, [`AGENT_STATUS.md`](AGENT_STATUS.md), [`TEST_MATRIX.md`](TEST_MATRIX.md) and the waves 1–4 plan — with no note left in any of them. Twelve days passed. Two of the four are still not recovered in place | Medium, and it recurs at exactly one moment: the opening of a wave | High. A register that replaces its own history is a register nobody can audit, and the rows most likely to be cut are the permanent ones, because they are the ones that look like they belong to a finished delivery | orchestrator | A project-level file is **appended to, never overwritten**. A wave board goes in the wave's own plan, or in a clearly-marked section of the project file that says which wave it belongs to. If a project file must be re-scoped, the previous body is restored at a dated path in the same commit — [`MULTI_AGENT_PLAN-waves-1-4.md`](MULTI_AGENT_PLAN-waves-1-4.md) is the pattern. Recovering [`TEST_MATRIX.md`](TEST_MATRIX.md)'s lost ledger is outstanding | Any commit that reduces a project-level register by more than half without restoring the prior body at a named path in the same commit |
+| **R38** | **A count published in prose drifts, and no test re-derives it.** [`CLAUDE.md`](CLAUDE.md) has now recorded this same lesson **four times** about one row: the honesty-corpus figures went stale twice before anybody looked, and three lanes in one wave each measured the corpus on a different base and reported three different pairs of numbers, every one correct where it was taken and none correct at integration. The stage-clearance figure went stale in numerator *and* denominator | Certain if a count is published without a deriver | Medium — but it is the mechanism behind several higher-impact rows, because a stale count is what a plan is built on | whoever publishes the count | **Measure once, after integration, or not at all** — a figure re-measured per branch is stale the moment the branch merges. Where a count matters, derive it from the artefact rather than transcribing it, and say beside it what was measured, when, and on which tree. Published study intervals already have a guard that re-derives them; prose counts do not | A count is published from a branch measurement; a figure is quoted with no measurement date or tree |
+| **R39** | **Identifier namespaces collide across documents, and no guard checks them.** `R1`–`R13` are the experience-layer rules in [`docs/10-experience-layer-contract.md`](docs/10-experience-layer-contract.md) **and** the first thirteen rows of this register — the honesty corpus's *"one R13 violation"* means the former, not the latter. `S1`–`S10` are the change-scope rules in [`docs/16-change-scope-contract.md`](docs/16-change-scope-contract.md), chosen *"to avoid collision with `docs/10`'s R1–R13"* — **and** the charter's ten success criteria, which then collided anyway | Realised twice | Medium. It costs a reader a wrong lookup, and it costs a guard the ability to check the citation at all | orchestrator | `validation/citations.test.ts` resolves `§ D<n>` and cited paths; it cannot resolve a bare `R13` or `S5`, and widening it is not the cheap fix. **The cheap fix is the prefix**: cite a row of this file as `RISKS.md R<n>`, a rule of `docs/10` as `docs/10 R<n>`, a scope rule as `docs/16 S<n>`, and a success criterion as `charter S<n>`. Every one of the eleven existing citations to this file already does this — the convention exists and is unenforced | A new numbered series is opened in a governing document without checking the letter against the ones in use; or a bare `R<n>` or `S<n>` is written with no document beside it |
+
+---
+
+## 4. Discharged and retired
+
+**These rows do not come back, and they are not deleted.** Six of the ids below are cited from
+outside this file; a reader following one lands here.
+
+| ID | State | What it said | What closed it |
+|---|---|---|---|
+| **R9** | ✅ **Discharged** | **Phase 6 changes the passenger model fundamentally** — destination known at call time — and breaks the assumptions Phases 0–5 were built on. Its escalation trigger was *"Phase 6 implementation starts without a locked passenger-model contract"* | The contract was written **before** the implementation and is [`docs/09-destination-dispatch-contract.md`](docs/09-destination-dispatch-contract.md), whose opening sentence cites this row as its reason for existing; the comparison was made on **TTD** rather than AWT, as the mitigation required. 6a and 6b are accepted against a raised criterion on the building that criterion names ([§ D100](DECISIONS.md), [§ D333](DECISIONS.md)). **Phase 6's partial status is a roadmap fact, not this risk** — 6c stands refused against a criterion dated before the code ([§ D139](DECISIONS.md), [§ D145](DECISIONS.md), [§ D156](DECISIONS.md)) |
+| **R17** | ✅ **Discharged** | **`activeWhen` is an unfalsifiable escape hatch.** The liveness sweep imposed a proof obligation on `DECLARED_INERT` entries and **none** on `activeWhen`-gated regions, so a gate hiding a *live* dimension passed every test. Measured: `idle.predictorHorizonS` was live at `predictorCycleS` 3600 on `secure-tower` while the gate declared it dead | The sweep was extended: `sim/searchSpaceLiveness.test.ts` now requires **every** gate to assert that its gated-**off** region is flat, and probes it by writing a violating gate value. `predictorHorizonS` is ungated and allowlisted, executing rather than declared. The rule outlived its instance and is still applied — [§ D155](DECISIONS.md) refused a proposed `stopCount` gate by citing this row, because the gate would have hidden a live dimension from the call type of 10 of 12 shipped profiles. **That is what a discharged control looks like when it keeps working** |
+| **R22** | ✅ **Discharged** | **An open Phase 8 property violation is closed by weakening the property rather than by fixing the simulator.** `fuzz-1000384` trips `deadlockIdleBoundS`, a single number that makes the red go away when moved | Fixed in `sim/`. **The bound is untouched at 600 s, `PROPERTY_BOUNDS` is unchanged line for line, the case was not filtered out of the corpus, and the property gained no exemption** — whatever fired before still fires ([§ D108](DECISIONS.md), and [`docs/05-roadmap.md`](docs/05-roadmap.md) § Phase 8, both of which cite this row by name) |
+| **R27** | ✅ **Discharged** | **Abandonment flatters average waiting time by construction.** A passenger who gives up leaves the sample, and the ones who give up are the ones who waited longest. A configuration that abandons 30 % of its riders posts a superb AWT and has served nobody | Wave 13 shipped the **fifth `awtIsValid` ground**: `DEFAULT_MAX_ABANDONMENT_FRACTION = 0.02`, above which the mean is suppressed outright, ordered **above** censoring rather than below it because the first run that abandoned anyone reported *"too many arrivals were never served"* about a window whose queue had drained perfectly. Abandonment and stairs uptake are published **beside** AWT and never folded into it, on the footing [§ D106](DECISIONS.md) gives energy. Contract: [`docs/14-building-behaviour-contract.md`](docs/14-building-behaviour-contract.md) § 3.1 |
+| **R2, R3, R4, R6, R8, R11–R16, R18–R21, R23** | ✅ **Closed at the waves 1–4 gate, 2026-07-28** | The delivery-scoped rows. Eight of the twenty-three were realised, which is the register working. Full text: `git show 1b7a2f1^:RISKS.md`. One-line dispositions in § 5 | Each closed against its own named trigger at that gate; two of them left standing rules this project still runs on — see § 5 |
+
+**Nothing is retired.** No row in this register has been found not to apply. The state exists so
+that the first one can be recorded honestly rather than deleted.
+
+---
+
+## 5. Closed at the waves 1–4 gate (2026-07-28)
+
+Kept at one line each so the ids resolve and the numbering space is intact. The full rows, with
+their mitigations and triggers, are in `git show 1b7a2f1^:RISKS.md`.
+
+| ID | What it said | Disposition |
+|---|---|---|
+| **R2** | A quantile fix (z → t past n=25) silently invalidates published results by widening every interval at the 50–200 budget | Closed — every moved number enumerated and re-derived rather than copied |
+| **R3** | Fixes to inert tunables change simulator behaviour and invalidate the benchmark numbers being documented | Closed — merge order serialised the three lanes; behaviour changes reported with regenerated numbers |
+| **R4** | Removing a dead dimension is mistaken for a fix, silently narrowing the model | Closed — each inert dimension got an explicit implement-vs-delete-vs-gate decision |
+| **R6** | Merge conflicts on shared files across five concurrent worktrees | Closed — disjoint ownership map, fixed merge order, `--no-ff`. Superseded in practice by **R25** |
+| **R8** | Phase 4 UI is built without a UX cycle and ships confusing flows | Closed — contract and role/task/flow inventory locked before UI fan-out |
+| **R11** | `package-lock.json` stale against `packages/viz`'s `vite` devDependency, so `npm ci` fails on a clean clone while local `npm install` development works | Closed at the wave-1 gate |
+| **R12** | Instrumentation perturbs the run it visualizes — five monkey-patched `Car` methods | Closed — byte-identity of `RunRecord` and `PassengerTrace` against an uninstrumented run, asserted and independently re-tested |
+| **R13** | A published number is transcribed from a document that reconstructed it from **rounded** inputs; 4 of 4 spot-checked values were wrong in the last digit | **Realised**, caught by review before transcription. Closed by regenerating from full-precision re-runs and labelling anything not re-measured. Live descendant: **R38** |
+| **R14** | The seventh dead-seam instance, *created by a fix* — `halfWidthQuantile` left with no non-test caller while its docstring named callers that do not exist | **Realised.** Closed as one change. Live parent: **R1** |
+| **R15** | A safety argument is believed rather than checked — *"widening is one-way, so no claim gets stronger"* is false on the Pareto path | **Realised.** Argument retracted and qualified; the path checked rather than assumed |
+| **R16** | A knob's published cost is an artefact of its own implementation bug — a courtesy hold re-granting whole-cohort dwell for one late passenger made a +59.1 % AWT figure a fiction | **Realised**, caught by review. Re-measured from scratch with a bound on granted dwell |
+| **R18** | Published benchmark numbers the code does not produce, with nothing in the suite able to fail on it — three known instances | **Realised, 3 instances.** Closed by a guard that re-derives every published study interval and fails on drift, verified by reintroducing all three. **This is why [`CLAUDE.md`](CLAUDE.md) says: if you publish a number, pin it to the run that produced it.** Live descendant for *prose* counts, which that guard does not cover: **R38** |
+| **R19** | A study might not be deterministic from its seed, breaking invariants 2 and 4 | Closed by measurement — 263 figures across five studies hash identically within and across processes. Never a reproducibility failure |
+| **R20** | The orchestrator introduces drift when merging work whose author could not edit the file that must change | **Realised once**, caught immediately. Closed by documentation guards that fail on the drift, and by actioning handbacks *in* the merge |
+| **R21** | A timing-based gate goes red under normal concurrent load, training everyone to ignore red | **Realised.** Closed **without** a third threshold loosening ([§ D91](DECISIONS.md)): the always-on tier asserts only simulation outputs; wall-clock fit-quality gates moved to the opt-in deep tier |
+| **R23** | A refuted mechanism is re-asserted because nothing pins the correction — seven places independently wrote the same comfortable, false sentence about destination dispatch under access control | Closed — `validation/documentation.test.ts` pins all seven sites four ways, each watched failing. **This is why [`CLAUDE.md`](CLAUDE.md) says: if you write a sentence about *why* something performs better, either measure it or say it is unmeasured.** The second half of that correction was itself withdrawn rather than replaced ([§ D256](DECISIONS.md), [§ D279](DECISIONS.md)), because a second plausible sentence would be the same defect in new wording |
+
+---
+
+## 6. Appendix — the wave board this file carried, 2026-08-12 to 2026-08-24
+
+**Kept, not deleted, because deleting it is the defect this rebuild exists to correct.** These eight
+rows are the Everyday-and-Engineer wave's own risks. They are **wave-scoped**, which is why they are
+here in an appendix rather than in § 3: the wave they belong to has landed, and its board is
+[`AGENT_STATUS.md`](AGENT_STATUS.md). A future wave's risks go in that wave's plan.
+
+**Two of them were project-level wearing a wave's clothes and have been promoted**, keeping their
+substance under new ids: *two shells write shared attributes* → **R34**, and *corpus figures
+re-measured per branch go stale on merge* → **R38**.
 
 | Risk | Likelihood | Impact | Owner | Mitigation | Escalation trigger |
 |---|---|---|---|---|---|
-| Sixteen screens is more surface than one wave can finish to the honesty bar | high | medium | orchestrator | slices are independently shippable; land finished lanes, register honest absences for the rest (the § D335 pattern) | a lane misses two review cycles |
-| Two shells write shared attributes (`inert`) and shared canvases | medium | high | A0 | § D335's stated rule: the outer cover wins; read before writing `inert`; canvases never measured while hidden | any blank-page render in a browser test |
-| Corpus figures re-measured per branch go stale on merge | certain if attempted | medium | orchestrator | measure once, after integration — WS-I only | any lane reporting corpus counts |
-| Lever/term collapse (A1) changes dispatch defaults and shifts published pins | medium | high | A1 | levers are *views*: identical vector in = identical decisions; assert bit-identical runs on default settings before/after | any published interval moving |
+| Sixteen screens is more surface than one wave can finish to the honesty bar | high | medium | orchestrator | slices are independently shippable; land finished lanes, register honest absences for the rest (the [§ D335](DECISIONS.md) pattern) | a lane misses two review cycles |
+| Two shells write shared attributes (`inert`) and shared canvases — **promoted to R34** | medium | high | A0 | [§ D335](DECISIONS.md)'s stated rule: the outer cover wins; read before writing `inert`; canvases never measured while hidden | any blank-page render in a browser test |
+| Corpus figures re-measured per branch go stale on merge — **promoted to R38** | certain if attempted | medium | orchestrator | measure once, after integration | any lane reporting corpus counts |
+| Lever/term collapse changes dispatch defaults and shifts published pins | medium | high | A1 | levers are *views*: identical vector in = identical decisions; assert bit-identical runs on default settings before/after | any published interval moving |
 | Intervention re-simulation blocks the frame on big buildings | medium | medium | A2 | contract § 1.4 budget: sync under ~400 ms else `recomputing` beat | stage jank in driven test |
-| Engineer restyle accidentally "says less" (§ D299 breach) | medium | high | B0 | contract lists every figure/qualifier on the current surface; reviewer greps for their survival | any removed figure, basis or refusal |
+| Engineer restyle accidentally "says less" ([§ D299](DECISIONS.md) breach) | medium | high | B0 | contract lists every figure/qualifier on the current surface; reviewer greps for their survival | any removed figure, basis or refusal |
 | Prototype copy diverges from build (two-vocabularies defect) | medium | medium | all | copy comes from the vendored prototype; guide § 2 words in identifiers; review greps | reviewer finds paraphrased copy |
 | Parallel lanes collide in `everyday/` | medium | medium | orchestrator | A0 lands the frame first; screen lanes own disjoint files; integration in dependency order | overlapping-file merge conflict |
+
+---
+
+## Sources and neighbours
+
+- [`CLAUDE.md`](CLAUDE.md) — the eight invariants, the statistical discipline, the standing
+  requirement behind **R1**. Binding on every agent.
+- [`docs/05-roadmap.md`](docs/05-roadmap.md) — phase status, acceptance verdicts, and the
+  *Standing requirement* the dead-seam count is kept against.
+- [`GAPS.md`](GAPS.md) — what the project **does not do**, cannot yet say, or says with a caveat.
+  A gap is a known absence; a risk is a way of being wrong. Items move from here to there when a
+  risk is realised and becomes a standing limitation.
+- [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) — the milestones and their gates. This file is read
+  at each one.
+- [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) — the evidence behind **R32**,
+  **R33**, **R35** and **R37**, and § P is the record of what happened to this file.
+- [`DECISIONS.md`](DECISIONS.md) — every `§ D<n>` cited above.

@@ -212,7 +212,7 @@ A milestone is done when its exit criteria in [`CHARTER_PROGRAMME.md`](CHARTER_P
 - **Move the control and require the run to change**, compared on the legs rather than on a window
   statistic. A control that fails this is deleted, not documented.
 - Every new rendered string is in the honesty corpus, and both tiers stay green.
-- The 981 pinned estimates are re-derived by tests, never retyped. A moved pin is a finding to
+- The **997** pinned estimates are re-derived by tests, never retyped. A moved pin is a finding to
   report, not a number to edit.
 - Byte-identity when unused: a new capability nobody has switched on leaves every pin and both
   identity digests unchanged, on **both** CI platforms.

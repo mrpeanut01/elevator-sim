@@ -86,10 +86,13 @@ refused and asked for the specification instead.
       **This criterion required no document to be written**, which is the whole value of having
       verified it first.
 - [ ] Every pillar and non-goal is stated in a form a reviewer can hold a pull request against.
-- [ ] The project-level risk register is restored (#193) — **scope widened at the gate**: not the
-      three ids the issue names but the **six that dangle across eleven sites** (R9, R17, R22, R24,
-      R25, R26), each recovered or **formally retired with a note saying so**, plus R1/R5/R7/R10,
-      which the old file declared permanent, and R27/R28/R29, which it declared project-level.
+- [x] **The project-level risk register is restored** (#193) — [`RISKS.md`](RISKS.md), rebuilt with
+      **all 39 ids present and none renumbered**. Scope was widened at the gate and the widened scope
+      is met: the **six ids that dangle across eleven sites** (R9, R17, R22, R24, R25, R26) all
+      resolve again, R1/R5/R7/R10 are back as live rows, R27 is recorded **discharged** by wave 13's
+      fifth `awtIsValid` ground, and R28/R29 are live. The wave board the file carried for twelve
+      days is kept in an appendix rather than deleted. **R37 is new and is the class itself** — a
+      project that loses its own registers to a wave-opening commit will do it again.
 
 **Review.** Direction review — one session, whole team, output is a decision record.
 
@@ -118,7 +121,7 @@ Two findings bear on the milestone directly:
   most transferable thing that delivery produced"* — with an 80-line wave board. That record is
   restored byte-identical at `MULTI_AGENT_PLAN-waves-1-4.md`. **#193's scope should be widened to
   the class**, and the sweep should ask which *other* project-level registers that commit touched.
-- **The charter is now written** — [`docs/22-charter.md`](docs/22-charter.md), 340 lines, covering
+- **The charter is now written** — [`docs/22-charter.md`](docs/22-charter.md), covering
   #186, #187 and #192. **It is drafted, not yet adopted:** adoption is the decision entry, which is
   allocated at integration, and the document carries no `§ D` citation of itself until that entry
   exists. Read its § 8 first — it is honest that **only pillar 3's wording is directly attested**
