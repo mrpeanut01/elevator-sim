@@ -83,7 +83,15 @@ S5's published figure being stale in both its numerator and its denominator.
 `c8fd6fa`, clean tree, Linux x86_64, **Node v22.22.2 against a package declaring `>=26`**
 (`engine-strict` is not set, so it runs). `npm run build` clean in 8.8 s.
 
-**Suite: 440 files / 440 passed · 8 688 passed, 11 skipped (8 699) · green**, 3 771 s wall clock.
+**CI, both platforms, green — and it took fifteen attempts to get one.** Commit `aadaaaf`:
+`suite (linux)` **success** (33 min) and `suite (macos)` **success** (56 min), plus `invariant
+gates`, `claude review`, `build site` and `deploy`. **This is the first uncancelled CI suite result
+on this branch.** The fourteen runs before it were all `cancelled` — by me, pushing faster than CI
+could report — so until this commit the branch had the evidentiary value of one with no CI at all,
+which is `RISKS.md` **R7** arriving from the direction nobody watches. It is green on the first
+commit carrying a **code** change, `#206`'s fix, which is where platform divergence would bite.
+
+**Local suite: 440 files / 440 passed · 8 688 passed, 11 skipped (8 699) · green**, 3 771 s wall clock.
 The browser tier **ran** — all 25 `*.browser.test.ts` files among the 440 — with
 `ELEVATOR_SIM_CHROMIUM` pointed at the container's pre-installed Chromium, because
 `playwright-core`'s pinned revision resolves to a browser this container does not carry. A gated
