@@ -19,14 +19,22 @@ defect fix needs no specification — and landed before M2 opened.
 
 | Lane | Task | Issue | Status |
 |---|---|---|---|
-| M2-GATE | The eighth honesty property: no `§`, filename or identifier on a player surface | M2 exit criterion 3 | running |
-| FIX-214 | The rail's streak is *unconditional*, not stale — give it the week it never had | #214 | running |
-| FIX-215 | Re-entering a closed stage silently re-runs a bit-identical day | #215 | running |
+| FIX-207 | Take the M2 gate's register from **19 to 0** — the absence registers off player surfaces | #207 | running |
 
-**M2-GATE is deliberately first.** The criterion it instruments *"is a mechanical check and is part
-of the gate"*, it has no instrument today, and it **fails today** — so it can be watched failing,
-which is the standard every test here is held to. A gate with an instrument is a gate; a gate with
-an opinion is a negotiation. It does **not** fix the violations; that is #207.
+**Next, in this order, and the order is forced.** `honesty/surfaces.ts` is now the tightest
+serialization hazard in the tree — every lane that builds or renames a player surface writes it, and
+unlike the other hazards it has no interface to lock first, because an adapter *is* the surface.
+
+1. **#212 + [§ D347](DECISIONS.md), as one lane** — they were scheduled as two and are one piece of
+   work. Both write `everyday/stageScreen.ts`, and #212's own AC5 already asks for what § D347
+   requires. **#212 was nearly run in parallel with #207** on the belief its defects were in
+   `render/canvas.ts`; they are not, and that would have put two lanes in `everyday/` at once.
+2. #208, #210, #217, then the #218 slice review.
+
+**M2-GATE was deliberately first, and it is landed.** The criterion it instruments *"is a mechanical
+check and is part of the gate"*, it had no instrument, and it **failed on its first run** — watched,
+at 49 of 49 always-on cases, before anything was registered. A gate with an instrument is a gate; a
+gate with an opinion is a negotiation. It does **not** fix the violations; that is FIX-207.
 
 ### Landed — M2
 
@@ -34,6 +42,22 @@ an opinion is a negotiation. It does **not** fix the violations; that is #207.
 |---|---|---|
 | FIX-206 | #206 | The daily and campaign loops close. Green on **both** CI platforms. Test watched failing by the integrator rather than taken on report |
 | FIX-216 | #216 | *"An ordinary Tuesday-shaped day"* → *"An ordinary day"*, plus a weekday rule swept over `SHIFT_EVENT_IDS` and derived from `WEEKDAYS` |
+| FIX-211/213 | #211, #213 | The report lays its small print out, and its lever button goes where it says |
+| FIX-214 | #214 | The rail's streak replaced by a career line with the week behind it |
+| FIX-215 | #215 | Re-entering a filed day stops silently re-running it |
+| M2-GATE | M2 exit criterion 3 | **The ninth honesty property, `internal-notation`.** Watched failing first — 49 of 49 always-on cases, 1 078 violation lines — then **19 findings registered**, 17 in both tiers and 2 the deep tier alone reaches. The gate now has a number: **19 → 0**. Green on **both** CI platforms |
+
+**Both tiers were run before it landed, in one sitting on one tree**: always-on 49 cases / 566 506
+strings / 606 simulations / 48 surfaces; deep 60 / 706 214 / 4 710 / 49. Cases, simulations and
+surfaces are unmoved from the published row; strings moved **+98** and **+120**, which is this wave's
+landed copy and not the property, which renders nothing. **`CLAUDE.md`'s canonical row is deliberately
+not updated** — [§ D343](DECISIONS.md) wants that measurement once after the wave integrates, and M2
+is still open.
+
+**CI, measured on `90ecd26`:** `suite (macos)` 35 min, `suite (linux)` 44 min, both green. That
+**inverts** the timings recorded earlier in this programme (linux 33, macos 56); the earlier pair was
+taken on one commit and so is this one, so neither is a rule. It is recorded because the earlier
+figure is what the *hold the push* tactic was sized against.
 
 ### Closed — M1's specification lanes
 
