@@ -123,7 +123,11 @@ const NO_EFFECT: EventEffect = Object.freeze({
 });
 
 /**
- * The five events, keyed by id. Names and notes are **verbatim** from `design.html` :1419–1426.
+ * The five events, keyed by id. Names and notes are the design's own (`design.html` :1419–1426),
+ * verbatim **except** where a caption named something the run does not contain: the fire drill's
+ * *"14:00"* (§ D175), the ordinary day's *"Tuesday"*, and the ordinary day's second person. Each
+ * deviation is argued at its own entry, and `events.test.ts` holds the weekday rule against every
+ * entry rather than against the one that broke it.
  *
  * A frozen record over every {@link ShiftEventId} rather than a lookup that may miss: a sixth
  * event added without an effect is a compile error, which is the only way the answer to *what does
@@ -195,7 +199,19 @@ export const SHIFT_EVENTS: Readonly<Record<ShiftEventId, ShiftEvent>> = Object.f
   }),
   ordinary: Object.freeze({
     id: 'ordinary',
-    name: 'An ordinary Tuesday-shaped day',
+    /*
+     * The design calls it *"An ordinary Tuesday-shaped day"*, and the weekday is dropped for the
+     * fire drill's reason one unit up (§ D175, two entries above). `eventFor` is keyed on
+     * `day % 5`, so day 1 — `openWeek`'s own `dayIdx: 0`, which `weekdayOf` names **Monday** — is
+     * an ordinary day; `everyday/today.ts#todayOf` builds `dayLabel` and `wrinkle` in one call, so
+     * the name put *MONDAY · DAY 1* and *Tuesday* into a single record, drawn on the front-door
+     * lede and again on the report header.
+     *
+     * It named no demand shape either, which is the part worth saying: this event's effect is
+     * `NO_EFFECT`, so *"Tuesday-shaped"* described nothing the engine reads. A caption naming a day
+     * the run does not contain is the same defect as one naming an hour it does not contain.
+     */
+    name: 'An ordinary day',
     /*
      * The handoff's sentence with its pronoun removed — `docs/20` defect 7, and the same deviation
      * `live/honesty.ts#casualTitle` argues at length. This note is drawn on the left rail's L5,
