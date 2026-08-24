@@ -93,9 +93,27 @@ session with the browser tier pointed at the container's pre-installed Chromium,
    Commit `52b2f69` restored `RISKS.md` — including **R25**, *"file-level lane ownership partitions
    editing and does not partition committing: `git add -A` stages the whole repository regardless of
    who owns what"* — and that same commit swept lane M0-B's `docs/23-audiences-and-core-loop.md` in
-   unreviewed and without the README row `documentation.test.ts` requires. **CI was red on the branch
-   between `52b2f69` and `245a49d`.** R25's escalation trigger is *"any commit whose diff touches a
-   file its message does not mention"*, and it fired exactly as written. The mitigation is R25's own:
+   unreviewed and without the README row `documentation.test.ts` requires. R25's escalation trigger is
+   *"any commit whose diff touches a file its message does not mention"*, and it fired exactly as
+   written.
+
+   **CORRECTION, and it is the more useful half.** `245a49d`'s message says *"CI was red on the
+   branch between `52b2f69` and this commit"*. **That was never observed.** Every CI run on this
+   branch before `553cf8d` was **cancelled** by the next push — `a796710`, `7a51391`, `aac8d17`,
+   `52b2f69`, `245a49d` and `6a7447a` all carry `conclusion: cancelled` on the `CI` workflow — so
+   **no suite result exists for any commit on this branch**, red or green. What is supportable is
+   narrower: the tree was in a state `documentation.test.ts` fails on **by construction**, because
+   its assertion requires every `docs/*.md` on disk to appear in README's table
+   (`documentation.test.ts:778-790`) and `docs/23` was on disk and absent from it. **"A test that
+   would fail" and "CI was red" are different claims**, and only the first had evidence. The
+   `Review` workflow — `invariant gates` and `claude review` — *did* complete green on every commit;
+   only the suite was cancelled.
+
+   **The process finding underneath it: I was pushing faster than CI could report.** Seven pushes in
+   nineteen minutes, each cancelling the previous run's suite. A branch that never lets its own
+   suite finish has the evidentiary value of one with no CI at all — which is **R7** arriving from
+   the direction nobody watches: not a false green, but **no observation at all**, presented as
+   though CI were covering the work. The mitigation is R25's own:
    explicit paths at every `git add` while lanes are running. **A restored register earned its keep
    inside ten minutes**, which is the argument for restoring the other two rather than a consolation
    for this mistake.
