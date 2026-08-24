@@ -47,7 +47,15 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Browser tier | gated on `ELEVATOR_SIM_CHROMIUM`; pointed at the pre-installed Chromium |
 | Next free decision number | D342 |
 
-**Two baseline caveats that must not be lost.** First, this container runs **Node 22 against a
+**The wall-clock figure is not comparable, and that is my error rather than a property of the tree.**
+The local suite was started before the verification lanes and ran concurrently with them and then with
+four document lanes, on a **4-core** container at load 4.36. [`GAPS.md`](GAPS.md)'s reference figure of
+1 918 s was *"measured serially on an idle machine with no lanes running"*, so the two cannot be
+compared. **The pass/fail/skip counts stay valid — only the wall clock is contaminated.** The clean
+measurement is CI's two-platform matrix, and that is the figure of record; the local run is reported
+beside it with this qualifier attached. Next time the baseline runs first, alone.
+
+**Two further baseline caveats that must not be lost.** First, this container runs **Node 22 against a
 package declaring Node ≥ 26**, and this repository has already recorded a case where the same pins
 failed in opposite directions on two machines ([§ D201](DECISIONS.md)) — so a suite figure here is a
 claim about *this* machine, and the two-platform CI matrix remains the judge. Second,
@@ -110,11 +118,13 @@ Two findings bear on the milestone directly:
   most transferable thing that delivery produced"* — with an 80-line wave board. That record is
   restored byte-identical at `MULTI_AGENT_PLAN-waves-1-4.md`. **#193's scope should be widened to
   the class**, and the sweep should ask which *other* project-level registers that commit touched.
-- **No charter document exists in `docs/`.** The kickoff names one at number 22; the tree has
-  nothing at that number. The charter is the document delivered with the programme kickoff, nothing
-  on this tree adopts it, and adoption is #186 and a human decision. (The path is named without
-  backticks on purpose — `validation/citations.test.ts` requires a backticked document path to
-  resolve, and citing a file that does not exist is precisely the defect it was written for.)
+- **The charter is now written** — [`docs/22-charter.md`](docs/22-charter.md), 340 lines, covering
+  #186, #187 and #192. **It is drafted, not yet adopted:** adoption is the decision entry, which is
+  allocated at integration, and the document carries no `§ D` citation of itself until that entry
+  exists. Read its § 8 first — it is honest that **only pillar 3's wording is directly attested**
+  (`MULTI_AGENT_PLAN.md:75`) and that the other four pillars are reconstruction, since the kickoff's
+  charter text is not in this tree. **Amending a pillar is a human decision** and belongs at the
+  direction review.
 
 ---
 

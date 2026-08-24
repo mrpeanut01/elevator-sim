@@ -251,6 +251,7 @@ you believe in, and each is scoped to arrive opt-in and off by default so no shi
 | Doc | Contents |
 |---|---|
 | [Project Brief](docs/00-project-brief.md) | Vision, scope, non-goals, success criteria |
+| [Project Charter](docs/22-charter.md) | The game layer's charter — vision, player promise, the five design pillars a player-facing pull request is held against, the two audiences and what each must get in the first session, success criteria **S1–S10** each written so it can fail, and the non-goals that are as load-bearing as the pillars. Complements [the project brief](docs/00-project-brief.md) rather than amending it: the brief is a research brief and uses the word *game* zero times, which is how playability came to be excluded from Phase 9's criterion as unfalsifiable. Carries its own corrections table, including one figure it withdrew rather than published — 194 KiB and 198 kB are the same file — and is explicit that only pillar 3's wording is directly attested |
 | [Architecture](docs/01-architecture.md) | Three-layer design, core interfaces, DES kernel, determinism strategy |
 | [Elevator Reference](docs/02-elevator-reference.md) | Elevator classes, speeds, capacities, door and motion timings |
 | [Traffic & Statistics](docs/03-traffic-and-statistics.md) | Demand profiles, RTT math, replication methodology, CRN, stopping rules |

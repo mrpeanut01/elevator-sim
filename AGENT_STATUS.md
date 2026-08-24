@@ -76,11 +76,16 @@ session with the browser tier pointed at the container's pre-installed Chromium,
    start by recovering the ledger, not by assuming the tree has no coverage record.
 4. **Seven `deadCode.test.ts` audits exist, not five.** Derived from disk: `core/src/dispatch`,
    `viz/src`, `server/src`, and `experiments/src/{runner,teaching,tuning,fuzz}`.
-5. **`packages/viz/index.html` is 194 KB**, not the 198 KB the kickoff states.
-6. **The charter carries at least three figures that do not reproduce from this tree**, and #186
+5. ~~**`packages/viz/index.html` is 194 KB**, not the 198 KB the kickoff states.~~ **RETRACTED —
+   this was not a finding.** The file is **198 182 bytes**: 193.5 KiB at 1024, 198.2 kB at 1000. The
+   kickoff's figure and mine are the same measurement in two unit conventions. Caught by lane M0-A
+   while writing the charter's corrections table, which is the reverse of the direction these
+   corrections usually run. **Recorded rather than deleted**, because a register that quietly drops
+   its own withdrawn entries is the thing this file exists to prevent.
+6. **The charter carries two figures that do not reproduce from this tree** (three were claimed; see the retraction above), and #186
    adopts the charter — so they are worth correcting *before* adoption rather than after. The pin
    count is **997**, not 981: `benchmark/published.ts` is the only pin table in the tree and it holds
-   997 `{ n, mean, standardError, lower, upper }` entries. With the two above, that is three. This is
+   997 `{ n, mean, standardError, lower, upper }` entries. With the audit count above, that is two. This is
    the repository's own *"a published number goes stale the same way"* rule applied to the document
    proposing to govern it, and the rule's remedy is the same — pin the number to the run, or to the
    command, that produces it.

@@ -41,12 +41,12 @@ Two halves, both load-bearing, and they are the tie-breakers for every disagreem
 
 ### Governing sources, in precedence order
 
-1. The charter delivered with the programme kickoff — vision, player promise, five pillars, two
-   audiences, ten success criteria S1–S10, the non-goals, the seven milestones. **Not yet adopted.**
-   The kickoff names a charter at number 22 in `docs/`; the tree has nothing at that number. The
-   path is named without backticks on purpose — `validation/citations.test.ts` requires a backticked
-   document path to resolve, and citing a file that does not exist is the defect it was written for.
-   Adopting the charter is issue #186, and it is a human decision rather than an orchestrator one.
+1. [`docs/22-charter.md`](docs/22-charter.md) — vision, player promise, five pillars, two audiences,
+   ten success criteria S1–S10, the non-goals. **Written in M0 and pending its decision number**,
+   which is allocated at integration; until that entry exists the charter is drafted rather than
+   adopted, and it says so on its own face. It is honest about its provenance: the kickoff's charter
+   text is not in this tree, so **only pillar 3's wording is directly attested** and the other four
+   are reconstruction open to amendment at the direction review.
 2. [`CLAUDE.md`](CLAUDE.md) — the eight non-negotiable invariants, the statistical discipline, the
    tuning discipline, the working agreements. Binding on every agent, unchanged by anything below.
 3. [`docs/05-roadmap.md`](docs/05-roadmap.md) § *Standing requirement* — the dead-seam guards.
@@ -173,9 +173,12 @@ These have collided before:
 - `packages/viz/src/persist/` — schema version and migrations.
 - `packages/viz/src/render/canvas.ts`.
 - `packages/viz/src/menu/`.
-- `packages/viz/index.html` — one **194 KB** file carrying markup and inline styles for **both**
-  shells. (The programme kickoff says 198 KB; measured on this tree it is 194 KB. Recorded because a
-  stale true statement is a defect here, and this one is harmless only until someone budgets from it.)
+- `packages/viz/index.html` — one **198 182-byte** file carrying markup and inline styles for
+  **both** shells. Stated in bytes on purpose: that is **193.5 KiB** at 1024 and **198.2 kB** at
+  1000, so the kickoff's *198 KB* and an earlier draft of this line's *194 KB* are the same
+  measurement in two unit conventions and **neither is wrong**. This line previously published the
+  discrepancy as a correction, which manufactured a defect rather than recording one — the retraction
+  is kept because the mistake is more instructive than the number.
 - `data/*.json` — content changes serialize against each other and against the pins.
 
 Safe to parallelize: documentation and specification tasks in M0 and M1, verification tasks,
