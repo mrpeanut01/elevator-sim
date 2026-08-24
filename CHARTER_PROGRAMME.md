@@ -278,11 +278,18 @@ programme's own rewrite of it**: the orchestrator repeated a stale docstring
 shipped default is **08:30**, ramping from its first second, so there is no empty opening on the
 common run at all. Corrected on the issue.
 
-**One of this milestone's own exit criteria is already measurably failing**, and the check for it is
-cheap: `EVERYDAY_SHELL_ABSENCES` is rendered to the player and carries section numbers, a source
-filename and two code identifiers. `honesty/surfaces.ts` already drives that array, so the mechanical
-no-identifiers check can be an eighth honesty property with no new plumbing. **Build the check
-before the fixes**, so the gate has an instrument rather than an opinion.
+**One of this milestone's own exit criteria was measurably failing when this milestone opened**, and
+the check for it was cheap: `EVERYDAY_SHELL_ABSENCES` was rendered to the player carrying section
+numbers, a source filename and two code identifiers. `honesty/surfaces.ts` already drove that array,
+so the mechanical no-identifiers check needed no new plumbing. **Build the check before the fixes**,
+so the gate has an instrument rather than an opinion.
+
+**Both halves have now happened, in that order.** The check is `internal-notation`, the **ninth**
+honesty property (not the eighth — `withheld-figure-published` had already landed). It was watched
+failing first, at 49 of 49 always-on cases, then **19 findings were registered**. #207 then took the
+register to **empty in both tiers**, and the registers themselves moved to a build-information panel
+in Settings that is a real non-test caller of all six arrays — so the dead-code audit that put them
+on player surfaces in the first place does not re-fire.
 
 ---
 

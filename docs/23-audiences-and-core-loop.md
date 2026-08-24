@@ -85,9 +85,11 @@ its own and is closest to **S8**; it is stated here because it is the clause a p
 fails first, and because it is cheap to mechanise.
 
 **A1 and A4 are already measurably failing**, and both are named here rather than softened.
-[`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M2 proposes the instrument for A4 — an eighth
-honesty property over `honesty/surfaces.ts`, which already drives `EVERYDAY_SHELL_ABSENCES` — so the
-gate gets a measurement rather than an opinion. **A1's instrument does not exist**: charter § 4
+[`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M2 proposed the instrument for A4 — a new
+honesty property over `honesty/surfaces.ts`, which already drove `EVERYDAY_SHELL_ABSENCES` — so the
+gate would get a measurement rather than an opinion. **That is built and A4 now passes**:
+`internal-notation` is the **ninth** property (the eighth had landed by the time it was written), it
+was watched failing at 49 of 49 cases, and #207 took its register to empty in both tiers. **A1's instrument does not exist**: charter § 4
 records that `grep -ril telemetry packages/*/src --include='*.ts'` returns **0 files**, so S1, S2,
 S3 and S4 have no funnel behind them. Every condition in § 1 is therefore also written to be
 checkable by a moderated playtest, so that M2's gate does not wait on M1's telemetry.

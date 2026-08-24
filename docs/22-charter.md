@@ -250,8 +250,12 @@ request against a non-goal exactly as against a pillar, and none of them may be 
 7. **No second engine and no second statistics.** The game layer consumes `packages/core/`; it does
    not approximate it for speed, for pacing, or for a smoother curve.
 8. **No section number, source filename or code identifier on a player surface.** This is a
-   mechanical check and it is part of the M2 gate. It currently **fails** — `EVERYDAY_SHELL_ABSENCES`
-   is rendered to the player carrying section numbers, a filename and two code identifiers.
+   mechanical check and it is part of the M2 gate. It failed when this was written —
+   `EVERYDAY_SHELL_ABSENCES` was rendered to the player carrying section numbers, a filename and two
+   code identifiers — and it is **mechanised and passing** now: `internal-notation`, the ninth
+   honesty property, found 19 violations and GitHub issue #207 took the register to empty in both
+   tiers. The gate has one named hole left, adjudicated and scheduled inside M2
+   ([§ D347](../DECISIONS.md)): the Everyday stage's own canvas words.
 9. **No development register on a player surface.** The registers are not deleted — **not a single
    claim is dropped** — they move to where a developer reads them.
 10. **No entry-screen override that survives a reload.** A remembered world is the override the

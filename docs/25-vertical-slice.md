@@ -388,9 +388,14 @@ property"*; **`withheld-figure-published` is the eighth and is named in no gover
 all** — not [`CLAUDE.md`](../CLAUDE.md), not [`DECISIONS.md`](../DECISIONS.md), not
 [`docs/22-charter.md`](22-charter.md), which is why the ordinal drifted without anybody noticing.
 That is `RISKS.md` R38 in miniature: **a count published in prose drifts, and no test re-derives
-it.** The scope claim underneath it is unaffected and is confirmed —
-`honesty/surfaces.ts:7271` already drives `EVERYDAY_SHELL_ABSENCES`, so the check needs no new
-plumbing.
+it.** The scope claim underneath it is unaffected and was confirmed — the corpus already drove
+`EVERYDAY_SHELL_ABSENCES`, so the check needed no new plumbing.
+
+**Both have since happened, and the arrangement moved.** The check is `internal-notation`, the ninth
+honesty property; it found 19 violations and GitHub issue #207 took the register to empty in both
+tiers. `EVERYDAY_SHELL_ABSENCES` now lives in `everyday/buildNotes.ts` rather than the shell, and is
+driven through that file's own adapter rather than the shell's — the line number this paragraph used
+to cite is another file's text today, which is why it cites neither a line nor a module now.
 
 **And it is red now.** `everyday/shell.ts:90-154` renders five entries to the player carrying
 `§ 6.1`, `§ 6.2`, `§ 14`, `§ 12.2`, `§ 6.5`, `§ 3.2`, `§ 9`, `§ 9.2`, `§ 9.3` and the identifier
