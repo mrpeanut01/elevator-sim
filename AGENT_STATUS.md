@@ -84,6 +84,11 @@ session with the browser tier pointed at the container's pre-installed Chromium,
    the repository's own *"a published number goes stale the same way"* rule applied to the document
    proposing to govern it, and the rule's remedy is the same — pin the number to the run, or to the
    command, that produces it.
+7. **[`GAPS.md`](GAPS.md) is 25 days stale, not the six weeks the kickoff states** — its header
+   reads *"As of: 2026-07-30, wave 12"*, and it still carries that date's suite figure of
+   **262 files / 4 883 tests / 10 skipped**. Six waves have landed since. The staleness is real and
+   the correction runs *towards* the document, which is worth saying only because this programme
+   corrects figures in both directions or it is not correcting them at all.
 
 ---
 

@@ -4,8 +4,8 @@
 criteria, the issues in it, the review that closes it, and its current state.
 
 **Opened:** 2026-08-24 · **Branch:** `claude/elevator-sim-charter-kickoff-rexfw8` ·
-**Programme state:** M0 **not yet open** — the gate is a human decision and has not been requested
-before this file was written.
+**Programme state:** **M0 is OPEN** — the product owner opened the gate on 2026-08-24, after the
+verification wave reported. M1–M6 are not open.
 
 The plan, the dependency map and the serialization hazards are in
 [`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md). The lane board is [`AGENT_STATUS.md`](AGENT_STATUS.md).
@@ -18,7 +18,7 @@ Evidence for every scheduled issue is in
 
 | milestone | issues | count | gate | state |
 |---|---|---|---|---|
-| [M0](#m0--concept-and-direction) Concept and direction | #186–#193 | 8 | Direction review | **closed — awaiting human decision to open** |
+| [M0](#m0--concept-and-direction) Concept and direction | #186–#193 | 8 | Direction review | **OPEN** (2026-08-24) |
 | [M1](#m1--pre-production) Pre-production | #194–#205 | 12 | Pre-production gate | not open |
 | [M2](#m2--vertical-slice) Vertical slice | #206–#218 | 13 | Vertical slice review | not open |
 | [M3](#m3--alpha-feature-complete) Alpha, feature complete | #219–#230 | 12 | Alpha gate + feature freeze | not open |
@@ -72,24 +72,30 @@ refused and asked for the specification instead.
 
 **Exit criteria.**
 - [ ] The charter is merged, with a decision number.
-- [ ] The positioning question (#190) is closed by a **written decision** in
-      [`DECISIONS.md`](DECISIONS.md), not by a document that restates the question.
+- [x] **The positioning question (#190) is closed by a written decision** in
+      [`DECISIONS.md`](DECISIONS.md) — [§ D299](DECISIONS.md), reaffirmed by the product owner on
+      2026-08-24 and recorded on the issue. Satisfied on entry rather than by work in this milestone.
+      **This criterion required no document to be written**, which is the whole value of having
+      verified it first.
 - [ ] Every pillar and non-goal is stated in a form a reviewer can hold a pull request against.
-- [ ] The project-level risk register is restored (#193), with R24–R26 either recovered or
-      **formally retired with a note saying so**.
+- [ ] The project-level risk register is restored (#193) — **scope widened at the gate**: not the
+      three ids the issue names but the **six that dangle across eleven sites** (R9, R17, R22, R24,
+      R25, R26), each recovered or **formally retired with a note saying so**, plus R1/R5/R7/R10,
+      which the old file declared permanent, and R27/R28/R29, which it declared project-level.
 
 **Review.** Direction review — one session, whole team, output is a decision record.
 
-**State: closed, awaiting a human decision to open.** **Verification of all eight issues is
-complete** — evidence in [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ O–R.
+**State: OPEN — the gate was opened by the product owner on 2026-08-24.** Verification of all eight issues is
+complete — evidence in [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ O–R.
 
-**One M0 issue is refuted outright and must be reframed before the gate opens.** #190 states the
-positioning question *"has never been answered in writing"*. It was answered on 2026-08-08 by
-[§ D299](DECISIONS.md), *"the positioning decision, taken by the product owner"* — and **#190's own
-proposed answer contradicts it**. Working #190 as written would silently reverse a product-owner
-decision that six sections of
+**#190 is CLOSED, and exit criterion 2 is already satisfied.** #190 stated the positioning question
+*"has never been answered in writing"*. It was answered on 2026-08-08 by [§ D299](DECISIONS.md),
+*"the positioning decision, taken by the product owner"* — and **#190's own proposed answer
+contradicted it**, so working it as written would have silently reversed a decision six sections of
 [`docs/21-engineer-reimagined-contract.md`](docs/21-engineer-reimagined-contract.md) are built on.
-**This is a human decision and it blocks M0's second exit criterion.**
+**The product owner ruled on 2026-08-24 that § D299 stands.** #190 was closed as `not_planned` with
+the refutation written into the issue rather than dropped. Superseding § D299 remains available as a
+separate, explicitly-scoped decision; nothing in this milestone does it by accident.
 
 Three more M0 issues need rescoping rather than refuting: **#188** (five roles are already defined in
 `packages/viz/UX.md`, not zero), **#189** (a cited four-title prior-art survey already exists; the
