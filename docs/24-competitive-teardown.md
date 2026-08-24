@@ -101,8 +101,8 @@ charter — vision, player promise, five pillars, two audiences, S1–S10, the n
 adopted** and is not in `docs/`. Binding a verdict to a pillar this tree does not carry would be a
 citation a reader cannot follow, which is precisely what
 `packages/experiments/src/validation/citations.test.ts` was written for. So every verdict below
-binds to a rule that exists **today**, and § 9 lists the two places where a verdict wants a pillar
-that #186 has yet to write.
+binds to a rule that exists **today**, and § 9 items 4 and 5 list the two places where a verdict
+wants a rule that #186 and M1 have yet to write.
 
 ---
 
@@ -110,8 +110,9 @@ that #186 has yet to write.
 
 **This container's network egress is restricted**, and that shaped what could be verified. Direct
 fetches of `play.elevatorsaga.com`, `dinopoloclub.com`, `en.wikipedia.org` and `shapezio.fandom.com`
-were refused by the egress proxy (`curl` to the same hosts returns `CONNECT tunnel failed, response
-403`). A search index and `github.com` / `raw.githubusercontent.com` were reachable. Every claim
+were refused; `curl https://en.wikipedia.org/...` returns `CONNECT tunnel failed, response 403`, so
+the block is at the proxy rather than in one tool. A search index and `github.com` /
+`raw.githubusercontent.com` were reachable. Every claim
 below therefore carries one of three marks, and **the marks are load-bearing** — this repository's
 position is that a confident wrong statement is worse than an absent one:
 
@@ -153,7 +154,7 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 | How it shows failure | See `docs/10` § 3.1 |
 | Session length | Not addressed by § 3, and not verified here **[unverified]** |
 | **Adopt** | **Already adopted.** § 3.1 adopts the overcrowding fail state as R4 and adopts its legibility warning as the requirement that the diverging queue be visually unmistakable well before the run ends (U4, `docs/10` § 6). This teardown adds nothing and says so |
-| **Refuse** | **The scalar that comes with it.** Mini Metro is understood to resolve a run to a delivered-passenger count and rank players on it **[unverified — not checked for this document]**. The refusal does not rest on that: `docs/21` § 6 non-goal 3 (*no scalar challenge score, ever*) and `docs/10` § 5.5 forbid the scalar whatever the source design does. What this teardown contributes is the **pattern**, and it recurs — in three of the nine entries a good fail state and a scalar score arrive as one package, and only the first half is adoptable |
+| **Refuse** | **The scalar that comes with it.** Mini Metro is understood to resolve a run to a delivered-passenger count and rank players on it **[unverified — not checked for this document]**. The refusal does not rest on that: `docs/21` § 6 non-goal 3 (*no scalar challenge score, ever*) and `docs/10` § 5.5 forbid the scalar whatever the source design does. What this teardown contributes is the **pattern**, and it recurs: in both Dinosaur Polo Club titles a good fail state and a scalar score arrive as one package, and only the first half is adoptable |
 
 ### 4.2 SimTower
 
