@@ -1793,3 +1793,54 @@ before the curve's obligations are built.**
 
 Decision numbers for **C6** (four stale sites the curve found) and **§ 1.5**. #208 is unblocked and is
 governed by docs/33 §§ 4.4 and 1.1.
+
+---
+
+## AD. "Twelve shipped profiles" is written in nine places and thirteen ship — and three of the nine must not be changed
+
+SPEC-200 reported one stale profile count. **Swept, it is at least nine sites across four packages**,
+and the instructive part is that a blanket correction would have introduced two defects.
+
+`data/dispatcher-profiles.json` ships **thirteen**: the twelve plus `destination-panel`.
+
+### Corrected — prose about sweeps that derive from the config
+
+| site | why it is safe |
+|---|---|
+| `campaign/campaign.test.ts` ×4 | its three sweeps iterate `config.dispatcherProfiles.profiles` (`:742`, `:792`, `:1024`), so they already covered thirteen; only the words lagged |
+| `campaign/failStates.ts:276` | prose about those sweeps |
+| `campaign/judge.test.ts:165` | prose about those sweeps |
+| `dev/rightRail.ts:146` | *"eight of the twelve carry a `role`"* — **re-measured**: 13 profiles, **8** carry one, so the ratio's numerator survives and only its denominator was wrong |
+
+### Reverted — because changing them would fabricate a measurement
+
+- **`controls/editedProfile.test.ts:75`** says *"measured: across all twelve shipped profiles the
+  merged and unmerged documents differ in exactly one field"*. The file contains **zero** references
+  to the profile list — it tests `collective` alone. That sentence records a **past manual
+  measurement**, and bumping it to thirteen asserts a measurement nobody took. I made that edit and
+  reverted it.
+- **`authoring/dispatcherSpec.ts:17`** — could not confirm `specRoundTrips` sweeps the list; reverted
+  on the same ground.
+
+### Must not be touched, for two different reasons
+
+- **`packages/core/src/sim/simulation.ts:4109`** and **`experiments/src/runner/types.ts:750`** —
+  *"all twelve run at `up-down-buttons` or `mobile-credential`"*. A claim about input kinds that needs
+  measuring, and the first is in `packages/core/`, which is an escalation rather than an edit.
+- **`experiments/src/benchmark/lunchTwoWaySelection.ts:32, 227`** — *"at the tuning seed 20260726,
+  200 replications, all twelve shipped"*. This is **the record of a run**. Twelve is what that run
+  measured; changing it would falsify the pin, which is the opposite of the rule.
+
+### The false positive that proves the point
+
+**`authoring/dispatcherSpec.ts:49` — *"The twelve term ids"* — is correct.** There are twelve **cost
+terms**, and thirteen **profiles**. The word *twelve* in this tree names two different sets, and
+`core/dispatch/deadCode.test.ts:276`'s *"all twelve cost terms"* is right for the same reason. A
+sweep-and-replace would have corrupted both.
+
+### The actual fix, which is not a number
+
+A hand-written count in prose is the *published number goes stale* class this repository already
+names. **The fix is to stop writing the count**, not to bump it: the derived sites should say *every
+shipped profile*, and the measured ones should say what was measured and when. Nine sites is a lane;
+the four above are done and the rest are inventoried here rather than half-corrected.

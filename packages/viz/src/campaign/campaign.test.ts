@@ -727,7 +727,7 @@ describe('stage 5, played — the credential is named, and the lesson is that it
    * This was stage 4's case — *a measured clear, from a profile `data/` already ships, inside the
    * dimensions the stage opens*. It has to live somewhere, because a campaign whose every stage is
    * unwinnable from the dropdown is a product claim nobody is re-deriving; and it has to live where
-   * the measurement puts it, not where it was written. Swept over the twelve shipped profiles at
+   * the measurement puts it, not where it was written. Swept over the thirteen shipped profiles at
    * the stage's own seeds, stage 4 now clears on **none** and stage 5 clears on **several**, so the
    * two cases swapped buildings. § D254 is what moved them: it changed what every conventional arm
    * on every access-zoned building does, and `beat-the-baseline` is a comparison against the
@@ -774,7 +774,7 @@ describe('stage 4, played — a setting that buys one thing by spending another'
    * **The other end of the `beat-the-baseline` clause, and § D265 moved it here from stage 5.**
    *
    * This describe used to be *"a stage that can actually be cleared"*. It is not one any more:
-   * swept over the twelve shipped profiles at the stage's own seeds, **not one clears stage 4** —
+   * swept over the thirteen shipped profiles at the stage's own seeds, **not one clears stage 4** —
    * `zoned-uppeak` comes closest at 2 metrics for and 1 against — and the measured clear has moved
    * to stage 5, where it is asserted. § D254 is what moved it, by changing what every conventional
    * arm on an access-zoned building does.
@@ -1005,10 +1005,10 @@ describe('stage 6, played — three goals survive the escalators, and the bars s
    * This case asserted that `destination-eta` clears stage 6, and it was true when it was written.
    * It is not true now, and the change is § D254's rather than § D265's: making this building
    * serviceable moved every conventional arm's numbers, and `beat-the-baseline` is a comparison
-   * against the stage's own starting profile. Swept over **all twelve shipped profiles** at the
+   * against the stage's own starting profile. Swept over **all thirteen shipped profiles** at the
    * stage's own seeds, not one of them resolves ahead on a metric without also resolving behind on
    * one — `zoned-uppeak` comes closest at 1 for and 4 against — so `beat-the-baseline` is met by
-   * none and `cleared` is `false` for all twelve.
+   * none and `cleared` is `false` for all thirteen.
    *
    * The claim is therefore **inverted rather than deleted**, which is the only honest option: a
    * case that stopped asking would leave the published *"three stages clear from the dropdown"*

@@ -143,7 +143,7 @@ export type RightRailElements = RailElements;
 /**
  * The family word beside a profile's name.
  *
- * `role` is the file's own word for it and eight of the twelve shipped profiles carry one. The
+ * `role` is the file's own word for it and eight of the thirteen shipped profiles carry one. The
  * other four are plain weighted-cost vectors with no role declared, and they get the engine's
  * name rather than an invented family: making one up here would be a taxonomy this repository
  * maintains in a renderer, which is where taxonomies go stale.

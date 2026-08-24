@@ -273,7 +273,7 @@ const PLAIN: Readonly<Record<FailState, string>> = {
    * the rider holds is not one the dispatcher can read, or the rider holds none at all"*, which
    * put the blame on the dispatcher and implied a dial. Since § D254 the runner asks the access
    * question with the rider's own credential under every call type, so a badge that does not open
-   * the destination is refused by all twelve shipped dispatchers and reading it changes nothing.
+   * the destination is refused by all thirteen shipped dispatchers and reading it changes nothing.
    * What is left is a statement about the rider and the building, which is what this now says.
    */
   'locked-out':
