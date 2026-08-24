@@ -267,6 +267,14 @@ configured* and says so.
 > buys access is a currency that measures progress, and a currency that measures progress is a score
 > with a wallet on it.
 
+**One shipped mechanic looks like a counterexample to all four and is not.** The career's
+`economy.ts#SLOTS` opens a second tower at standing 14, a third at 30, and so on to a sixth at 180.
+It survives `docs/32 GD4` and `docs/32 GD5` for reasons that are worth reading in full rather than
+summarising, and they are in § 3.4: standing is a tally of *completed turns* rather than a statistic
+over a run, it buys nothing, and what it opens is **how many contracts you may hold at once** rather
+than any capability. **A slot is a limit on attention. It is the one form of scarcity in this
+document that is not time, and § 3.4 is where it is admitted and bounded.**
+
 ### 2.3 What opens, when, and on what
 
 **Specified.** Column 3 is the trigger, and every trigger is a *completed turn of a named kind* per
@@ -394,8 +402,11 @@ runtime file in that directory can even import a reporting surface, and every pl
 it produces is scanned for comparative and scoring vocabulary. **Those prohibitions are adopted here
 verbatim for every currency in § 3.1, not just for capital**, and two more are added.
 
-> **GD12 — The five prohibitions on currency.**
-> 1. A currency may gate what can be **chosen**. (`commissioning/types.ts`, prohibition 1.)
+> **GD12 — The five clauses that govern a currency. Four are prohibitions; the first is the single
+> permission they bound.**
+> 1. A currency may gate what can be **chosen** — which shafts, which machine class, which works.
+>    (`commissioning/types.ts`, prohibition 1.) That is a limit on a *configuration*, never on a
+>    surface, which is what keeps clause 4 from contradicting it.
 > 2. It may **never** appear on a results page, be compared between players, or be folded into any
 >    verdict. (Prohibition 2.)
 > 3. Nothing may print *"you spent 82 % of budget"* beside a wait figure. (Prohibition 3.)

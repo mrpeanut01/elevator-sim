@@ -817,11 +817,14 @@ record on the point (§ 3.5).
 | **RESHAPED** | The observation is real; the stated cause is wrong or the surface is a different one | A ledger row carrying **both** the original claim and the corrected one, then an issue against the corrected surface |
 
 **RESHAPED needs its own name and this is why.** Filed as CONFIRMED, it ships a fix to the wrong
-place; filed as REFUTED, it loses a real defect. It is the most common outcome of verification here —
-*"eight carried at least one false or materially misleading clause"* describes claims that were
-mostly reshaped rather than refuted, and #212 is the worked example: a P0 asking for a renderer
-rebuild where the real defect is a door-fill inversion. The observation was true, the cause was
-wrong, and both facts had to survive.
+place; filed as REFUTED, it loses a real defect. **It is also where most of the measured error rate
+sits**, and that reading is an inference from `RISKS.md` R35's own numbers rather than a separate
+measurement: two of thirteen were refuted *at the central premise*, and eight carried a false or
+materially misleading clause on a premise that survived — which is this disposition, under a name
+that wave did not have. **#212 is the worked example**: a P0 asking for a renderer rebuild where the
+real defect is a door-fill inversion, recorded in
+[`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M2 as *largely refuted*. The observation was
+true, the cause was wrong, and both facts had to survive.
 
 **Verification may widen the scope, and often should.** `RISKS.md` R35's mitigation says a stated
 criterion *"may be widened at the gate when verification shows the real surface is larger"*. A tester
