@@ -1398,3 +1398,59 @@ policy answers `403` to `CONNECT` for that host, and Chromium cannot route throu
 at all. That belongs to #205's playtest protocol, and it is adjacent to open issue **#123**
 (*preview environments cannot reach the API, so the surfaces most likely to break are the ones a
 preview cannot test*) — the same shape from the other direction.
+
+---
+
+## Y. The M2 gate has a number, and the number is 19 → 0
+
+`CHARTER_PROGRAMME.md` § M2's third exit criterion said of itself that it *"is a mechanical check
+and it is part of the gate"* and had no mechanism. Landed in `24281ca` as the ninth honesty
+property, `internal-notation`.
+
+**It was watched failing before anything was registered** — 49 of 49 always-on cases, 1 078 reported
+violation lines — which is the only condition under which a new gate means anything. Nineteen
+findings are registered in `honesty.test.ts`'s `OUTSTANDING`: seventeen measured in both tiers, two
+only the deep tier reaches. **The criterion is met when that block is empty and at no earlier
+moment.**
+
+**The instrument agrees with § N's hand count on all seventeen sentences**, and the two counts never
+spoke to each other. That is the strongest available statement about a new instrument's calibration.
+The counts differ on *surfaces* and the search is right: § N's six are source files, four of which
+reach the player through three adapters.
+
+### Two coverage gaps, both measured today rather than assumed
+
+**1. The Everyday stage's canvas is outside the gate.** `PLAYER_FACING_SURFACES` resolves to 12 of
+49 adapters. `render/canvas.ts#drawScene` is not one of them, and it paints text on § 7's stage,
+which a player reads. So the gate can read zero while the stage canvas carries notation.
+
+**The fix is not a scope edit, and this is why the gap is being recorded rather than closed.**
+`drawScene` also paints the Engineer canvas. Adding `render/` to `PLAYER_FACING_DIRECTORIES` would
+manufacture exactly the false positives the property deliberately avoids — measured at 656 filename
+matches unscoped against 2 scoped, of which 572 are an Engineer panel naming code to an engineer,
+correctly. Closing it needs the canvas adapter to distinguish the two mounts. **That is a lane, not
+a line.**
+
+**2. Three register headings are still outside the corpus** — `shell.ts:1130`, `stageScreen.ts:563`,
+`campaignModel.ts:323`, as § N recorded. A heading the search has never read is a finding in its own
+right, and it pairs with the gap above: both are *surfaces the gate cannot see*, not strings the gate
+forgives.
+
+### What the derivation gets right, verified rather than trusted
+
+The scope is keyed on **where a string is read**, not which file authored it — and that was tested
+against a case from this wave. `shift/events.ts`'s day name, the string fixed for #216, is authored
+in neither player directory and **renders on `everyday/today.ts#todayOf` `[IN]`**. A string from an
+Engineer-side module is inside the gate when a player surface draws it. Measured over seven seeds.
+
+### The figures, and why CLAUDE.md's row was deliberately left alone
+
+Both tiers, one sitting, one tree: always-on **49 cases / 566 506 strings / 606 simulations /
+48 surfaces**; deep **60 / 706 214 / 4 710 / 49**. Cases, simulations and surfaces are unmoved from
+the published row; strings moved **+98** and **+120**, which is this wave's landed copy (#211, #213,
+#214, #216) and not the new property, which renders nothing.
+
+**CLAUDE.md's canonical row is not updated by this commit.** § D343 requires that measurement once
+after the wave integrates, and M2 is still open — #207 will move the strings again. A figure
+re-measured per lane is stale the moment the next lane merges, which this repository has now recorded
+five times. The row is updated when M2 integrates, not before.

@@ -229,7 +229,14 @@ because #210 builds against them.
 - [ ] **Ten testers who have never seen the game complete the slice.**
 - [ ] **Six of ten can state what went wrong and why their change helped.**
 - [ ] **Nothing on a player surface refers to a section number, a source filename or a code
-      identifier.** This is a mechanical check and it is part of the gate.
+      identifier.** This is a mechanical check and it is part of the gate. **It now has an
+      instrument, and a number: 19 → 0.** `internal-notation`, the ninth honesty property, landed on
+      2026-08-24 and was watched failing first — 49 of 49 always-on cases. Nineteen findings are
+      registered in `honesty.test.ts`'s `OUTSTANDING` (seventeen in both tiers, two the deep tier
+      alone reaches). **This box is ticked when that register is empty and at no earlier moment.**
+      The fix is #207. Two gaps the instrument cannot see are recorded in
+      [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Y: the Everyday stage's
+      canvas, and three register headings outside the corpus.
 - [ ] The slice runs on the target browser matrix from #203.
 - [ ] **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
       least six of ten. **Placed here at the 2026-08-24 review, and the placement is open to the
