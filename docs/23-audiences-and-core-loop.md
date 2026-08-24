@@ -5,6 +5,14 @@
 names.** Documents and decisions only — nothing here changes a `.ts` file, a `data/*.json` file, or
 a shipped string.
 
+**This is the sibling of [`docs/22-charter.md`](22-charter.md), and the charter delegates to it
+twice by name.** Charter § 3 carries a five-row summary of the two audiences and states that it *"is
+not the definition of record"*, naming this file as the full treatment and the reconciliation of the
+five roles as an M0 exit item. Charter pillar **P5** — *plain language is not less information* —
+ends by delegating *"the rule for how one figure is worded two ways"* here; it is § 1.4 below. **The
+charter governs; this document discharges two of its obligations and adds none of its own.** Where
+the two touch, the charter's wording wins and this file supplies the detail beneath it.
+
 **This document does not open on a blank page, and that is the first thing to know about it.** Both
 issues state that their subject has never been written down, and both premises are **partially
 false** — verification traced five existing role definitions and a per-mode loop table to file and
@@ -35,6 +43,11 @@ engine*. Casual and Engineer are two doors into one building, not one product wi
 and **Casual carries full capability**. Every definition below is written so that it cannot be read
 as licensing a capped Casual product, because § D299 § 2 forbids exactly that.
 
+**Also governed by, and not reopened:** [`docs/22-charter.md`](22-charter.md)'s five pillars and its
+ten success criteria S1–S10. Nothing below amends a pillar, adds a criterion, or restates one in
+different words. The conditions in § 1 are **numbered A1–A4 and B1–B4** precisely so they cannot be
+mistaken for charter criteria, and each names the charter criterion it serves.
+
 ---
 
 ## 1. The two audiences
@@ -64,10 +77,20 @@ longest anybody stood* are the two figures named as the game's spine
 | **A3** | Before they leave, they make **one change**, re-run **the same crowd**, and read a verdict they did not grant themselves | They change something and nothing tells them whether it worked | Journey test. Only **Fix a building** does all three without leaving the screen (`packages/viz/src/fixit/run.ts:285` `runFixitPair`) |
 | **A4** | **No string on a player surface names a section number, a source filename or a code identifier** | The player is shown the development team's notes and concludes the product is not for them | Mechanical. **Failing today**: `packages/viz/src/everyday/shell.ts:113-153` and `packages/viz/src/everyday/rushScreenModel.ts:269-278` carry `§ 6.1`, `§ 9.2`, `live/timeline.ts`, `dev/reportPanel.ts#LEVER_SURFACES` and `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL` on surfaces a player reads |
 
+**Which charter criterion each serves.** A1 is the audience-side reading of **S1** (*a building in
+visible trouble within 90 s*) and of the promise's first clause. A2 and A3 together are **S2** (*60 %
+of first sessions complete one diagnose–change–prove cycle*), with A2 additionally serving **S6**
+(*6 of 10 can state, unprompted, why the simulator refused a number*). A4 has no charter criterion of
+its own and is closest to **S8**; it is stated here because it is the clause a plain-language product
+fails first, and because it is cheap to mechanise.
+
 **A1 and A4 are already measurably failing**, and both are named here rather than softened.
 [`CHARTER_PROGRAMME.md`](../CHARTER_PROGRAMME.md) § M2 proposes the instrument for A4 — an eighth
 honesty property over `honesty/surfaces.ts`, which already drives `EVERYDAY_SHELL_ABSENCES` — so the
-gate gets a measurement rather than an opinion.
+gate gets a measurement rather than an opinion. **A1's instrument does not exist**: charter § 4
+records that `grep -ril telemetry packages/*/src --include='*.ts'` returns **0 files**, so S1, S2,
+S3 and S4 have no funnel behind them. Every condition in § 1 is therefore also written to be
+checkable by a moderated playtest, so that M2's gate does not wait on M1's telemetry.
 
 ### 1.2 The enthusiast or practising engineer
 
@@ -89,6 +112,12 @@ answers are worth anything.
 | **B3** | A **paired confidence interval** is *drawn*, not described in prose | They are shown a winner and no evidence, which is the thing they came to catch | `packages/viz/src/dev/suitePanel.ts:284-290` via `packages/viz/src/batch/intervalPlot.ts`; `elevator-sim compare` prints it — reproduced in [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § C |
 | **B4** | A **refused mean shows its ground** on every surface that would otherwise have printed it | One surface quietly prints a number the run will not stand behind, and the whole edifice is worthless | `packages/viz/src/frame/overlay.ts:170` `meansAreSuppressed`, asserted separately in the left rail, right rail, report, canvas, `live/` and the exported PNG ([`packages/viz/UX.md`](../packages/viz/UX.md) § 8) |
 
+**Which charter criterion each serves.** B1 and B4 together are **S7** (*lift-industry testers rate
+the model credible after inspecting it, not after being told about it*) — the inspection S7 names is
+B1 through B4, performed. B2 is the audience-side reading of `CLAUDE.md` invariant 5 and has no
+charter criterion; B3 has none either, and both are stated here because S7's interview cannot be run
+against a product where they are not reachable.
+
 **B4 is the condition this audience is actually testing**, and it is worth saying why it is stated as
 a first-session requirement rather than a quality bar. `CLAUDE.md` lists **five** grounds on which
 `awtIsValid` fails — saturation, an empty window, censoring above the unserved limit, a leg past the
@@ -99,7 +128,9 @@ any result could have told them.
 ### 1.3 What the two audiences share, and it is not a compromise
 
 **The same run, the same buildings, the same figures.** Not "the same engine underneath" — the same
-artefact.
+artefact. That sentence is charter pillar **P5**'s first line and is quoted rather than restated:
+*"The two audiences get the same run, the same buildings and the same figures. What differs is the
+wording."*
 
 The mechanical form of that claim already exists and is worth adopting verbatim rather than
 paraphrasing: [`docs/10-experience-layer-contract.md`](10-experience-layer-contract.md):725 states it
@@ -122,8 +153,9 @@ Three consequences, each of which forecloses a shortcut somebody will otherwise 
 
 ### 1.4 The restatement rule — how one figure is worded twice without being softened
 
-This is #188's fourth acceptance clause, and it is the clause most likely to be violated by somebody
-trying to be kind.
+This is #188's fourth acceptance clause and the rule charter pillar **P5** delegates here by name. It
+is the clause most likely to be violated by somebody trying to be kind, which is why P5's refusal
+test is phrased as a question about loss — *which figure did this wording lose?*
 
 > **A figure may be renamed, re-united, or restated as a natural frequency. It may not be
 > re-quantified, rounded into an adjective, or separated from its refusal.**
@@ -264,6 +296,14 @@ open, and a reader meeting § D299 does not conclude the byte-identity criterion
 | 4 | **Re-run the same crowd** | Common random numbers. This is the only reason beat 5 can be honest, and it is worth 5–20× in required run count (`CLAUDE.md` § Statistical discipline) |
 | 5 | **Read a verdict that is measured, not granted** | Including *too close to call*, and including *no answer at all* |
 
+**These five beats are charter pillar P4's three, opened out — they are not a competing loop.** P4
+states the loop as **diagnose → change one thing → prove it**. Beat 1 is the observation P4's
+*diagnose* is performed on, beat 2 is *diagnose*, beat 3 is *change one thing*, and beats 4 and 5
+together are *prove it* — which is split in two here because **beat 4 is where the honesty comes
+from and beat 5 is where the satisfaction does**, and a mode can serve one without serving the other.
+Endless rush is exactly that case (§ 3.4). Quote P4 when refusing a pull request; quote the five when
+asking a mode what it serves.
+
 **Two amendments to #191's proposed list**, both stated rather than made silently:
 
 1. #191's beat 2 is *"form a hypothesis about what is wrong"*. It is renamed **diagnose**, because
@@ -365,7 +405,7 @@ something the build has not finished; in the fifth the build quotes the handoff 
 | **1** | **The Fix a building tile's refusal sentence is stale on both of its clauses.** It reads *"the three cases run, but their Everyday screen is not built yet"*. `data/fixit-cases.json` holds **18** cases and the module's own docstring says eighteen; the screen is registered | `packages/viz/src/everyday/modes.ts:44` vs `:129` and `:134`; `data/fixit-cases.json` |
 | **2** | **Endless rush advertises a session shape for an engine that does not exist.** The tile opens, carrying *"~5 min · the run always ends; the question is when"*, onto a setup screen whose primary refuses | `packages/viz/src/everyday/modes.ts:108`; `packages/viz/src/everyday/rushScreenModel.ts:269-274` (four separate absences) and `:277-278` |
 | **3** | **Campaign's loop is *clear days*, and nothing clears one.** *"the month grid marks a day cleared or missed when the campaign day is filed, and nothing files one automatically"* | `packages/viz/src/campaign/career.ts:173` |
-| **4** | **Today's tower's score has no world to be placed in.** The handoff's front door opens on yesterday's world result and two histograms of other people's runs; the build has no server to post or verify them | `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 6.1; `packages/viz/src/everyday/shell.ts:123` |
+| **4** | **Today's tower's score has no world to be placed in.** The handoff's front door opens on yesterday's world result and two histograms of other people's runs; the build has no server to post or verify them | `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 6.1; `packages/viz/src/everyday/shell.ts:124` |
 | **5** | **The handoff's stage → report step dead-ends in the build**, in Today's tower and Campaign and **not** in Fix a building | `packages/viz/src/everyday/stageScreen.ts:878-882` files the day and does not navigate; `packages/viz/src/everyday/shell.ts:965-982` enables a breadcrumb stop by *position in the timeline* rather than by *whether the destination has anything to show*. Traced in [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § M (issue #206) |
 
 **Disagreement 1 is issue #217's third and fourth acceptance criteria, confirmed** — and it is worth
@@ -385,6 +425,13 @@ get to it.
 ---
 
 ## 5. What the player is doing at minute 1, minute 10 and hour 3
+
+**The first two are the charter's player promise, restated as behaviour rather than as an offer.**
+The promise reads: *"Ninety seconds from now you will understand why the lobby is backing up. Ten
+minutes from now you will have proved that your fix worked, and you will be able to hand that proof
+to someone else"* ([`docs/22-charter.md`](22-charter.md) § 1). Minute 1 is that first sentence from
+the inside; minute 10 is the second. **Hour 3 is not in the promise, and it is the one the product's
+retention depends on**, which is why it is here.
 
 **Minute 1 — watching, and being given something to notice.** The only demand on the player is to see
 that one floor is not draining while the others are. No control has been touched, no vocabulary has
@@ -421,7 +468,7 @@ verification. Nothing here is new information; what is new is reading it against
 |---|---|---|---|
 | **Endless rush** | **1** — the observation itself | No demand template ramps without a ceiling, so the climbing stream cannot be generated. § 9.2's held-time stage and § 9.3's result screen are unbuilt. The five standings shown are the handoff's fixtures, not runs this build measured | `packages/viz/src/everyday/rushScreenModel.ts:269-274`; `packages/viz/src/everyday/shell.ts:153` |
 | **Campaign** | **5** — twice over | The stage's primary does not navigate to the report (#206), *and* nothing files a day as cleared or missed, so the career cannot register the outcome | `packages/viz/src/campaign/career.ts:172-174`; [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § M |
-| **Today's tower** | **5** — the private half by #206, the public half by having no server | Same navigation defect as Campaign; and the world result the front door is built around needs a server to post and verify runs | `packages/viz/src/everyday/shell.ts:123`; [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § M |
+| **Today's tower** | **5** — the private half by #206, the public half by having no server | Same navigation defect as Campaign; and the world result the front door is built around needs a server to post and verify runs | `packages/viz/src/everyday/shell.ts:124`; [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § M |
 | **Today's tower** | **4** — no held crowd against a rival | No run in this build races a second dispatcher over the same crowd, so *Race against* states what it would be instead of offering it | `packages/viz/src/everyday/shell.ts:114` |
 | **Fix a building** | — | **All five beats work.** The gap is documentary: the tile's unreachable refusal sentence (§ 4.1 row 1) | `packages/viz/src/everyday/modes.ts:129,134` |
 
@@ -474,16 +521,25 @@ they may be denied.**
 - **The telemetry that would measure A2 and B-anything on a cohort.** That is #201's schema and M1's
   work. Every condition in § 1 is written to be measurable by playtest **without** telemetry, so that
   M2's gate does not wait on M1's instrument.
-- **Whether the charter's own S1–S10 and these conditions collide by name.** They may:
-  [`docs/16-change-scope-contract.md`](16-change-scope-contract.md):29 already numbers ten rules
-  **S1–S10**, chosen to avoid collision with `docs/10`'s R1–R13. The conditions above are numbered
-  **A1–A4** and **B1–B4** for exactly that reason, and adopting the charter should check the same
-  thing rather than assume it.
+- **The `S1`–`S10` token now names two different sets in `docs/`, and this document does not fix it.**
+  [`docs/22-charter.md`](22-charter.md) § 4 numbers the ten player-facing success criteria
+  **S1–S10**; [`docs/16-change-scope-contract.md`](16-change-scope-contract.md):22-30 already numbers
+  ten change-scope rules **S1–S10**, and says in its own text that it chose that letter *"to avoid
+  collision with `docs/10`'s R1–R13"*. Both sets are ten items long, both are cited as bare `S<n>`,
+  and neither knows about the other. **A bare `S5` is now ambiguous in this directory** — charter S5
+  is *no campaign stage clears from the dispatcher dropdown alone*, and `docs/16`'s S5 is *a run
+  offered for ranking may carry no state outside `between-games`*. Recorded rather than resolved:
+  renaming a set is an M0-A and human decision, and the conditions above are numbered **A1–A4** and
+  **B1–B4** so that this document adds no third claimant to the letter.
 
 ---
 
 ## Sources
 
+- [`docs/22-charter.md`](22-charter.md) — the charter this document is the sibling of. Its § 3
+  delegates the audience treatment and the five-role reconciliation here; its **P5** delegates the
+  restatement rule here; its **P4** is the loop this document opens out into five beats; its § 1
+  carries the player promise § 5 is written against; its § 4 carries S1–S10.
 - Issues **#188**, **#191**, **#217** — the briefs this document answers.
 - [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) §§ C, M, Q, S — the
   verification that established both issues' premises to be partially false, and the measurements
