@@ -564,8 +564,14 @@ describe('the stage’s own register of absences', () => {
   it('names the ghost lane, the campaign dock and the two unbuilt intervention arms', () => {
     const joined = STAGE_ABSENCES.join('\n');
     expect(joined).toMatch(/ghost/);
-    expect(joined).toMatch(/§ 7\.5/);
-    expect(joined).toMatch(/§ 7\.6/);
+    /*
+     * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
+     * every player-facing string, so `/§ 7\.5/` and `/§ 7\.6/` had nothing left to match. The two
+     * rows they identified are the campaign dock and the two unbuilt intervention arms, which is
+     * what this case's own name has always said it was checking.
+     */
+    expect(joined).toMatch(/no campaign dock/);
+    expect(joined).toMatch(/no decisions during a run/);
     for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
   });
 });

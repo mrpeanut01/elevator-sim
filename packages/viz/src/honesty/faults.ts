@@ -360,9 +360,20 @@ export const withheldFigureStale: TextFault = (texts) =>
  * every clause's quoting path is exercised — **and that is not the same as a guard per clause**,
  * which one fault cannot be: any one clause firing produces the violation, so a clause quietly
  * deleted would still leave this fault passing. Said plainly rather than implied, because a fault
- * that is believed to cover more than it does is the thing this file exists to prevent. Per-clause
- * coverage is `honesty.test.ts`'s register, whose nineteen findings between them are caught by the
- * section, filename, member-path, constant and code-voice clauses on real shipped strings.
+ * that is believed to cover more than it does is the thing this file exists to prevent.
+ *
+ * ## Per-clause coverage was the register's, and the register is empty
+ *
+ * This paragraph used to read *"per-clause coverage is `honesty.test.ts`'s register, whose nineteen
+ * findings between them are caught by the section, filename, member-path, constant and code-voice
+ * clauses on real shipped strings."* That was true and is not any more: GitHub issue #207 fixed all
+ * nineteen and the register emptied on the same commit, so **no clause is currently held up by a
+ * shipped string**, and this fault is the whole of what stands behind the property.
+ *
+ * That is a real reduction in what this file can vouch for, and it is stated rather than left for
+ * somebody to infer from an empty list. Closing it needs a fault per clause — five, each carrying
+ * exactly one of the criterion's forms — which is a change to the instrument rather than to the
+ * product and is not this lane's to make while the property it guards is the gate being measured.
  */
 export const notationOnPlayerSurface: TextFault = (texts) =>
   replaceFirst(

@@ -129,20 +129,22 @@ export interface SettingsScreenView {
     readonly heading: 'THIS DEVICE';
     readonly facts: readonly SettingsFactView[];
   };
-  readonly absences: {
-    readonly heading: string;
-    readonly entries: readonly string[];
-  };
 }
 
 /**
- * The rows this screen does not draw, each with its reason in one clause — the same drawn-register
- * shape as the shell's `EVERYDAY_SHELL_ABSENCES`, because a refusal only a docstring carries is
- * read by nobody who owns a mouse. The evidence for each is in the module docstring.
+ * The rows this screen does not draw, each with its reason in one clause.
+ *
+ * **Declared here and drawn on the build-information panel** (`everyday/buildNotes.ts`), which is
+ * itself reached from this screen. It lives beside the roster it is the complement of — the
+ * evidence for each row is in the module docstring above, and a register that drifted away from
+ * that evidence is a register that goes stale — while the *drawing* of it happens once, in one
+ * place, with the other five (GitHub issue #207). A refusal only a docstring carries is still read
+ * by nobody who owns a mouse, which is why the panel exists rather than the register simply going
+ * quiet.
  */
 export const SETTINGS_ABSENCES: readonly string[] = Object.freeze([
   'Sound — nothing in this build plays a sound, and a toggle that toggles nothing is a lie in a settings panel',
-  'Default speed — § 7’s stage has its own five speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built',
+  'Default speed — the stage has its own five speeds and resets to the same one on every run, so the preference this row would set is buildable now and is not built',
   'Units — nothing in the viewer reads a metres-or-feet preference, so there is nothing for the switch to switch',
   'Post runs to the board — the boards need a server this build has none of, and no posting path reads such a switch',
   'Sign out — nothing on this surface is signed in; the name and picture above live on this device',
@@ -241,10 +243,6 @@ export function settingsScreenViewOf(input: SettingsScreenInput): SettingsScreen
             'cannot be turned off, and it is why the boards are worth reading.',
         },
       ],
-    },
-    absences: {
-      heading: 'Not offered here yet',
-      entries: SETTINGS_ABSENCES,
     },
   };
 }

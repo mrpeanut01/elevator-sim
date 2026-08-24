@@ -17,8 +17,21 @@
  * uses a value § 19's scales do not carry (the 11 px row radius, the ochre figure colour) the
  * prototype literal is kept with a note, `tokens.ts`'s own convention for prototype-sourced
  * values.
+ *
+ * ## The fourth region, which is not the prototype's
+ *
+ * {@link buildNotesPanel} — the **build-information panel**, closed by default, carrying every
+ * register of what this build does not do yet. GitHub issue #207 moved six registers off six
+ * player screens and this is where they landed, because this is the screen a person opens when
+ * they want to know how the thing is put together. Its words are `everyday/buildNotes.ts`'s and
+ * none of them is authored here.
+ *
+ * This screen used to draw one of those six, its own, in a block of its own. That block is gone:
+ * `SETTINGS_ABSENCES` is a section of the panel now, so the six rows this screen does not draw are
+ * read in the same place as the twenty-one the rest of the build does not.
  */
 
+import { buildNotesSummaryOf, buildNotesViewOf } from './buildNotes.js';
 import { engineerSettings, onEngineerSettingsProvided } from './engineerBridge.js';
 import { DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { everydayProfileStore } from './profileStore.js';
@@ -48,6 +61,53 @@ function el<K extends keyof HTMLElementTagNameMap>(
   if (className !== undefined) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/**
+ * **The build-information panel** — every register of what this build does not do yet, drawn once.
+ *
+ * GitHub issue #207: those registers used to be drawn on six player screens, the longest of them
+ * under the front door's four mode tiles, so the first substantial block of text a new player met
+ * was a list of what was missing. They are all here now, behind a closed disclosure, on the screen
+ * a person opens when they want to know how the thing is set up.
+ *
+ * **Closed by default and never hidden.** A `<details>` is a control a player can leave shut, and
+ * a register nobody opens is still a register a curious reader can find — which is the whole
+ * distinction between moving these words and deleting them. The summary carries the count so the
+ * row says how much is behind it before it is opened.
+ *
+ * The words are `everyday/buildNotes.ts`'s, and every one of them is swept by the honesty search
+ * on every case of every run: nothing here may name a section of a design document, a source file
+ * or an identifier.
+ */
+function buildNotesPanel(doc: Document): HTMLElement {
+  const notes = buildNotesViewOf();
+  const panel = el(doc, 'details', 'everyday-settings-build-notes');
+  panel.style.cssText = `margin-top:26px;border:1px solid ${C.rule};border-radius:${String(ROW_RADIUS_PX)}px;background:${C.cardSunk};padding:13px 16px`;
+  const summary = doc.createElement('summary');
+  summary.className = 'everyday-settings-build-notes-summary';
+  summary.textContent = buildNotesSummaryOf(notes);
+  summary.style.cssText = 'cursor:pointer;font-size:13px;font-weight:600;list-style:revert';
+  panel.append(summary);
+
+  const lede = el(doc, 'p', 'everyday-settings-build-notes-lede', notes.lede);
+  lede.style.cssText = `margin:10px 0 0;font-size:12.5px;line-height:1.5;color:${C.warmGrey};max-width:74ch`;
+  panel.append(lede);
+
+  for (const section of notes.sections) {
+    const block = el(doc, 'section', 'everyday-settings-build-notes-section');
+    block.style.cssText = 'margin-top:18px';
+    const heading = el(doc, 'h3', undefined, section.heading);
+    heading.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 4px`;
+    const note = el(doc, 'p', undefined, section.note);
+    note.style.cssText = `margin:0 0 6px;font-size:12px;color:${C.warmGrey}`;
+    const list = el(doc, 'ul');
+    list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:12px;line-height:1.5;color:${C.warmGrey};max-width:80ch`;
+    for (const entry of section.entries) list.append(el(doc, 'li', undefined, entry));
+    block.append(heading, note, list);
+    panel.append(block);
+  }
+  return panel;
 }
 
 function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScreenHandle {
@@ -218,16 +278,8 @@ function mount(host: HTMLElement, _context: EverydayScreenContext): EverydayScre
   }
   root.append(deviceHeading, deviceRegion);
 
-  /* ---- the drawn register of what is not offered, and why ---- */
-  const absences = el(doc, 'section', 'everyday-settings-absences');
-  absences.style.cssText = 'margin-top:26px';
-  const absencesTitle = el(doc, 'h2', undefined, view.absences.heading);
-  absencesTitle.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 8px`;
-  const absencesList = el(doc, 'ul');
-  absencesList.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:${C.warmGrey}`;
-  for (const entry of view.absences.entries) absencesList.append(el(doc, 'li', undefined, entry));
-  absences.append(absencesTitle, absencesList);
-  root.append(absences);
+  /* ---- the build-information panel — all six registers, folded away ---- */
+  root.append(buildNotesPanel(doc));
 
   /* ---------------------------------------------------------------- *
    * The updates — targeted, so a keystroke never rebuilds the input

@@ -87,7 +87,6 @@ import {
   stageInterventionsOf,
   stageLegend,
   stageSpeedAt,
-  STAGE_ABSENCES,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
   STAGE_SPEEDS,
@@ -559,16 +558,15 @@ function mountStage(
   raceFooter.style.cssText = `margin:0;font-size:11.5px;color:${C.warmGrey}`;
   race.append(raceHead, laneWait.block, laneStanding.block, raceNote, raceFooter);
 
-  const absences = el(doc, 'section', 'everyday-stage-absences');
-  absences.style.cssText = 'max-width:70ch';
-  const absencesTitle = el(doc, 'h2', undefined, 'What this stage does not do yet');
-  absencesTitle.style.cssText = `${EYEBROW};font-size:10.5px;margin:0 0 6px`;
-  const absencesList = el(doc, 'ul');
-  absencesList.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:${C.warmGrey}`;
-  for (const absence of STAGE_ABSENCES) absencesList.append(el(doc, 'li', undefined, absence));
-  absences.append(absencesTitle, absencesList);
-
-  root.append(header, alarm, stageWrap, legend, interventions, race, absences);
+  /*
+   * **The stage's register of absences is not drawn here any more** — it is on the settings
+   * screen with the other five (`everyday/buildNotes.ts`), which is GitHub issue #207. The array
+   * has not moved and neither has any absence it names; three of its four rows were re-worded out
+   * of the design document's vocabulary and say the same thing they said. The
+   * one refusal a player still meets *here* is the ghost lane's, on the ghost lane's own card
+   * (`STAGE_NO_GHOST`, three blocks up) — a control that cannot act says so where the control is.
+   */
+  root.append(header, alarm, stageWrap, legend, interventions, race);
   region.append(root);
 
   /* ------------------------------------------------------------- behaviour */

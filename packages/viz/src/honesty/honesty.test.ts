@@ -347,17 +347,23 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Nineteen entries and one finding** —
- * `CHARTER_PROGRAMME.md` § M2's third exit criterion, failing on five player surfaces, recorded by
- * the property built to measure it and fixed by nobody in this lane (GitHub issue #207). Seventeen
- * are the absence registers the issue is about; **two are a stage verdict and a parameter
- * description that no issue names**, and only the deep tier can see them.
+ * What the search **found**, pinned in both directions. **The register is empty**, and both tiers
+ * are green with it: GitHub issue #207 closed the nineteen `internal-notation` entries that stood
+ * here — seventeen absence registers rewritten in place, a stage verdict's note reworded, and a
+ * parameter description filtered by `campaign/words.ts#playerSafeDescription` — and every one was
+ * deleted on the commit that made it stop reproducing.
+ *
+ * **Empty is a state that has to keep being checked, not a rule that can be deleted.** The
+ * machinery below stays exactly where it is: the second direction iterates nothing today, and the
+ * negative control exists precisely because an empty register makes both directions cheap. The next
+ * finding recorded rather than fixed arrives here, and `faults.test.ts`'s clean-run assertion has
+ * to move with it — neither may empty while the other still names something.
  *
  * An entry names the tier it was **measured** in, because the second direction below is asked per
- * tier and a finding recorded in one corpus is a ghost in the other. The seventeen were measured in
- * both.
+ * tier and a finding recorded in one corpus is a ghost in the other.
  *
- * It was two entries and one finding before that, and four entries and two findings before *that*,
+ * It was nineteen entries and one finding before that, two entries and one finding before *that*,
+ * and four entries and two findings before *that*,
  * until GitHub issue #137 closed R13 on the delta block in the product and § D332 moved the run the
  * R3 cue collision needed. Every one of those entries is gone; the argument for what each was and
  * what closed it stays below, as prose, on the same footing as every other closed finding in this
@@ -656,248 +662,82 @@ const OUTSTANDING: readonly {
    */
 
   /*
-   * ## 3. The charter's M2 gate — **nineteen findings, open, and this register is the gate's own
-   * progress bar**
-   *
-   * Seventeen below, measured in **both** tiers, and two more that only the deep tier can reach —
-   * those two are at the end of this block, with what each is.
+   * ## 3. The charter's M2 gate — **nineteen findings, all CLOSED, and the register is empty
+   * again**
    *
    * `CHARTER_PROGRAMME.md` § M2's third exit criterion is *"nothing on a player surface refers to a
    * section number, a source filename or a code identifier"*, and it says of itself that it *"is a
    * mechanical check and it is part of the gate"*. It had no instrument, so it would have been
-   * settled by review. `properties.ts#checkInternalNotation` is that instrument, and the seventeen
-   * rows below are what it found on its first run — **watched failing before anything was
-   * registered**: 49 of 49 always-on cases, 1 078 reported violation lines, 22 strings per case
-   * over four surfaces.
+   * settled by review. `properties.ts#checkInternalNotation` is that instrument; nineteen rows
+   * stood here from the run that watched it fail — seventeen in both tiers over four surfaces, two
+   * only the deep tier reaches — and **the criterion is met when this block is empty and at no
+   * earlier moment**, which is what it is now.
    *
-   * **Twenty-two strings, seventeen entries, and the gap is not a rounding.** The settings register's
-   * one notated row is drawn in six of that screen's states, so one authored sentence produces six
-   * violations. The register is keyed on the **sentence**, because the sentence is what somebody
-   * rewrites; a row per rendering would make the count a fact about the adapter.
+   * They are deleted **on the commit that made them stop reproducing** (GitHub issue #207), which
+   * is the rule the closed findings above were left here to state: deleting one any earlier or any
+   * later is the same defect twice. What follows is the record, because a register whose deletions
+   * are invisible is a register a reader cannot audit.
    *
-   * **Seventeen is exactly what `ISSUE_VERIFICATION_FINDINGS.md` § N counted by hand** — *"six
-   * surfaces, 27 register entries, 17 carrying a § or a code identifier"* — and the agreement is
-   * worth more than the number: a hand count and a search that never spoke to each other landed on
-   * the same seventeen sentences, which is the strongest thing available to say about a new
-   * instrument's calibration. The two counts do differ on **surfaces**, and the search is right:
-   * § N's six are source files, and four of them (`shell.ts`, `rushScreenModel.ts`,
-   * `designerModel.ts`, `settingsView.ts`) reach the player through three adapters. `career.ts`'s
-   * three entries carry no notation at all and are the counter-example that proves the fix is a
-   * rewrite rather than a mechanism change.
+   * ### What closed the seventeen: a rewrite, not a mechanism change
    *
-   * **These are recorded rather than fixed, and deliberately so.** The fix is GitHub issue #207 and
-   * a separate lane; this lane built the thing that measures it. § D307's precedent is exactly this:
-   * *"a corpus that grew an axis and stayed green is a different claim from one that had to be
-   * repaired first."* So the seventeen stand, and **the criterion is met when this block is empty
-   * and at no earlier moment** — an entry deleted on the commit that makes it stop reproducing,
-   * per the rule the closed findings above were left here to state.
+   * `ISSUE_VERIFICATION_FINDINGS.md` § N counted the same seventeen by hand and drew the
+   * conclusion this lane acted on — *"AC1 can be met by rewriting 17 strings without touching the
+   * mechanism or the guarantee"* — and the counter-example that proved it was already in the tree:
+   * `campaign/career.ts#CAMPAIGN_ABSENCES` is three entries of plain English with no notation in
+   * them at all. So every one of the seventeen was rewritten in place, in the array that owns it,
+   * saying the same absence for the same reason in the vocabulary of the screen rather than of the
+   * source. Nothing was deleted, nothing was softened, and no register lost a row.
    *
-   * **Marked `both` because both tiers were run**, not because the copy looked tier-independent.
-   * The four surfaces are static player copy drawn on every case, and the deep tier reports the
-   * same seventeen.
+   * The registers also **moved** — off six player screens onto one build-information panel reached
+   * from Settings (`everyday/buildNotes.ts`) — which is the rest of issue #207 and is not what
+   * closed these entries. Rewriting alone would have closed them; the move is why the front door no
+   * longer opens with a list of what is missing.
+   *
+   * **The move had a constraint worth recording**, because it is the standing requirement pointed
+   * at a fix: these registers were on player screens *because a dead-code audit flagged the first
+   * of them as an array no renderer touched*. `everyday/buildNotes.ts#buildNotesViewOf` is the
+   * non-test caller of all six now, and `settingsScreen.ts` is its non-test caller. Moving the
+   * drawing without giving the arrays a new reader would have put every one of them back into that
+   * audit — the defect moved rather than fixed.
+   *
+   * ### What closed the two the deep tier found
+   *
+   * 1. **`campaign/judge.ts#judgeStage`** named the file the bar is published in. The sentence was
+   *    doing something right — R12's point is that a goal ships with its measured rate and the bar
+   *    is not invented at judging time — and it said so in the wrong vocabulary for a person
+   *    reading a stage verdict. It now says *shipped with the stage and measured before you played
+   *    it*, which is the same claim without a path in it.
+   *
+   * 2. **`core`'s own description of `auction.aggregation`**, re-printed on the campaign brief's
+   *    editable-control list, cited a document by path. The remedy is the one the entry itself
+   *    named as the cheapest to overlook: `campaign/words.ts#playerSafeDescription` already exists
+   *    to make `core`'s words player-safe and already ran on this exact description, so it now
+   *    refuses a description carrying internal notation the same way it refuses one carrying a
+   *    probability word — naming the dial, keeping the Parameters tab whole, and hiding nothing.
+   *    `core` is untouched, which was the point: the Parameters tab is a schema surface and may
+   *    show it.
+   *
+   * ### One thing the nineteen did **not** close, and it is not in this register
+   *
+   * **The gate has a hole this lane did not fill, and it has already been adjudicated.**
+   * [§ D347](../../../../DECISIONS.md) rules that the Everyday stage's own canvas comes inside the
+   * gate's scope **before M2 exits**, as its own lane, sequenced after this one. What is uncovered
+   * is `everyday/stageScreen.ts#STAGE_SCREEN` — excluded from the corpus on the DOM mounts' shared
+   * ground, legitimately, because it needs a document, a canvas and an animation frame — and the
+   * hole is that the mount composes words of its own that no model carries, so no property reads
+   * them at all.
+   *
+   * It is stated here rather than registered because **there is no finding**: the search has never
+   * read those strings either way, and a register entry for a string nothing has measured would be
+   * a ghost. What holds the claim honest meanwhile is § D347 itself, which is dated before this
+   * commit and names the lane that closes it.
+   *
+   * The obvious short cut is the wrong one and is measured rather than argued: widening
+   * `PLAYER_FACING_DIRECTORIES` to reach a renderer would report 656 filename matches against the
+   * 2 the scoped property finds, 572 of them an Engineer panel naming code to an engineer,
+   * correctly. That is § D91's failure — a guard nobody believes — and it is why the scope is not
+   * simply widened.
    */
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/modes.ts#EVERYDAY_MODES',
-    tier: 'both',
-    contains: '§ 6.1’s replay',
-    finding: 'the front door’s register, row 1 of 5 — the replay a week strip does not stand back up.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/modes.ts#EVERYDAY_MODES',
-    tier: 'both',
-    contains: '§ 6.2’s ghost',
-    finding: 'row 2 of 5 — the ghost lane *Race against* describes instead of offering.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/modes.ts#EVERYDAY_MODES',
-    tier: 'both',
-    contains: '§ 14’s daily board',
-    finding: 'row 3 of 5, and it carries two section numbers — § 14 and § 12.2’s labelled unavailable state.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/modes.ts#EVERYDAY_MODES',
-    tier: 'both',
-    contains: '§ 6.5’s third lever',
-    finding: 'row 4 of 5, and the worst of the seventeen: a section number, a source filename and a constant’s identifier in one sentence — `dev/reportPanel.ts#LEVER_SURFACES`. All three of the criterion’s things, on the first screen the game opens on.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/modes.ts#EVERYDAY_MODES',
-    tier: 'both',
-    contains: '§ 9 Endless rush',
-    finding: 'row 5 of 5 — three section numbers, § 9, § 9.2 and § 9.3.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/settingsView.ts#settingsScreenViewOf',
-    tier: 'both',
-    contains: 'Default speed — § 7’s stage',
-    finding: 'the settings register’s one notated row of six, and the counter-example inside its own array: the other five are plain English. One entry, six violations, because the adapter draws the screen in six states and the row is in all of them.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/stageScreenModel.ts#stageHeaderOf',
-    tier: 'both',
-    contains: '§ 7.5’s campaign dock',
-    finding: 'the stage’s own register, 1 of the 3 entries that carry notation; its fourth sentence — `STAGE_NO_GHOST`, drawn first — is plain English and is deliberately not here.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/stageScreenModel.ts#stageHeaderOf',
-    tier: 'both',
-    contains: '§ 7.3’s camera',
-    finding: 'the stage’s register, 2 of 3.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/stageScreenModel.ts#stageHeaderOf',
-    tier: 'both',
-    contains: '§ 7.6’s second and third arms',
-    finding: 'the stage’s register, 3 of 3.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: 'so § 3.2’s ninety minutes',
-    finding: 'the rush setup’s register, 1 of 3 notated of 4. It also says *no demand template in data/*, which this property deliberately does not match — a bare directory is not a filename, and the under-match is named in `properties.ts#SOURCE_FILENAME` so the gate’s zero is read for what it is.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 9.2’s stage',
-    finding: 'the rush setup’s register, 2 of 3 — three section numbers, a source filename and two backticked identifiers: `live/timeline.ts`’s `clockAt` and `phaseAt`.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 9.3’s result',
-    finding: 'the rush setup’s register, 3 of 3.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 13.3’s per-shaft machine class',
-    finding: 'the drawing board’s register, 1 of 5 — and this array is 5 of 5 notated, the only register in the tree with no plain-English row.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 13.3’s access panel',
-    finding: 'the drawing board’s register, 2 of 5.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 13.2’s escalator rows',
-    finding: 'the drawing board’s register, 3 of 5 — the one entry whose identifier is the only thing the backtick clause catches it by if the section number is ever rewritten away: `SpecTransportMode`.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 13.3’s sky-lobby seeder',
-    finding: 'the drawing board’s register, 4 of 5.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'everyday/designerModel.ts#designerFigures',
-    tier: 'both',
-    contains: '§ 13.3’s collapsed document',
-    finding: 'the drawing board’s register, 5 of 5.',
-  },
-
-  /*
-   * ## 4. The same gate, **two findings the always-on tier cannot see** — and this is the deep tier
-   * earning its cost for the second time
-   *
-   * `campaign/judge.ts#judgeStage` is silent in the always-on tier by construction: `STANDARD_SPACE`
-   * sets `stageProbability: 0`, so no standard case draws a stage. Both of these were invisible to
-   * the run that watched the seventeen fail, and to `ISSUE_VERIFICATION_FINDINGS.md` § N, which
-   * counted registers of absences and had no reason to look at a stage verdict. **They are not in
-   * any issue.** The first run of the deep tier reported 35 violation lines over 24 of 60 cases.
-   *
-   * ### 1. The stage verdict's note — `campaign/judge.ts:268`
-   *
-   * > `published in data/scenario-goals.json — not a number chosen here. Both arms saw the same`
-   * > `passengers, so the two counts are paired.`
-   *
-   * One authored sentence, drawn once per per-replication goal row, so it reports on five goal kinds
-   * — `answer-the-demand`, `deliver-everyone`, `long-waits-under`, `nobody-abandoned`,
-   * `no-divergence`. **The sentence is doing something right**: R12's whole point is that a goal
-   * ships with its measured rate and the bar is not invented here, and naming where the bar comes
-   * from is that claim made checkable. It names it in the wrong vocabulary for the audience, which
-   * is what makes this the criterion's case rather than an argument against the sentence: *"the
-   * shipped setting's own measured count on this stage's tuning seeds"* says the same thing without
-   * a path in it.
-   *
-   * ### 2. `core`'s own parameter description, on the campaign brief —
-   * `briefing.editable.auction.aggregation.help`
-   *
-   * > `… which is what every group controller in the literature does; see docs/01-architecture.md.`
-   *
-   * This is a `SearchParameter.description` — `provenance: 'schema'`, text `core` wrote about its
-   * own dial — re-printed on the brief's list of controls a player may edit. **It is the case that
-   * decided this property's scoping, and it arrived after the decision rather than before it.**
-   * [§ D171](../../../../DECISIONS.md) narrowed R10 away from `schema` provenance because *"a
-   * description of what a dial does"* is not an interval being translated; `properties.ts` records
-   * that the argument is about **what R10 is for** and does not transfer, and scopes this property
-   * by surface instead. Had it copied R10's exemption out of symmetry, this string would have been
-   * exempt on the surface where it is a defect — and still swept on the Parameters tab, where it is
-   * not. A rule inherited is a rule nobody chose.
-   *
-   * Which makes the fix `core`'s rather than the viewer's — or `campaign/words.ts`'s, which already
-   * exists to make `core`'s words player-safe and **already runs on this exact description**:
-   * `playerSafeDescription(auction.aggregation)` is a string in this corpus, and the path survives
-   * it, because that filter is R10's and R10 is about probability words. A remedy that already
-   * touches the sentence and leaves the defect in it is the cheapest place to put the fix and the
-   * easiest one to overlook. That is somebody's decision, not a harness edit, so both are recorded
-   * here.
-   */
-  {
-    property: 'internal-notation',
-    surfaceId: 'campaign/judge.ts#judgeStage',
-    tier: 'deep',
-    contains: 'published in data/scenario-goals.json',
-    finding:
-      'the stage verdict’s note names the file the bar is published in. One authored sentence at ' +
-      '`judge.ts:268`, reported on every per-replication goal row a stage declares — five kinds ' +
-      'across the corpus. Deep tier only: `STANDARD_SPACE` sets `stageProbability: 0`.',
-  },
-  {
-    property: 'internal-notation',
-    surfaceId: 'campaign/judge.ts#judgeStage',
-    /*
-     * **Keyed on the field, and the reason is a fact about violations rather than about this
-     * string.** `properties.ts#QUOTE_LIMIT` truncates a quoted string at 220 characters, and
-     * `core`'s description of `auction.aggregation` opens *"Who aggregates the prices the one cost
-     * engine produces…"* and reaches `docs/01-architecture.md` well past that. A `contains` on the
-     * offending words matched nothing and the deep tier stayed red — **caught by running the tier
-     * rather than by reading the entry**, which is the second time in this lane that a claim about
-     * the deep corpus turned out to need the deep corpus.
-     *
-     * So the entry names the row, which is what `fieldContains` is for. It costs the sharper
-     * failure mode a `contains` would give — a reword that kept the path would not ghost here — and
-     * buys the one that matters: the day the path leaves the sentence, this field stops violating
-     * and the ghost check says so.
-     */
-    tier: 'deep',
-    fieldContains: 'briefing.editable.auction.aggregation.help',
-    finding:
-      '`core`’s own description of `auction.aggregation`, re-printed on the campaign brief’s ' +
-      'editable-control list, cites a document by path: *"…see docs/01-architecture.md"*. ' +
-      '`provenance: schema` on a player surface — the case that would have been exempt had this ' +
-      'property copied R10’s § D171 narrowing.',
-  },
 ]);
 
 interface FoundViolation {
@@ -996,10 +836,12 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
      * **The assertion that stops `OUTSTANDING` from quietly becoming a wildcard.** It was written
      * when the register was empty, because an empty register makes the two assertions above cheap
      * in opposite ways: the second iterates nothing, and the first would pass on a
-     * `matchesOutstanding` that matched everything. Neither reason has gone away now the register
-     * has two entries — a predicate that returned `true` for every violation would satisfy both
-     * directions at once. So a real violation is produced — by fault, on a real case over the
-     * shipped data, on a property and a surface **no** entry names — and asserted **not** matched.
+     * `matchesOutstanding` that matched everything. The register has been empty, then two entries,
+     * then nineteen, and is empty again — and neither reason has gone away at any point along the
+     * way, because a predicate that returned `true` for every violation would satisfy both
+     * directions at once whatever the register holds. So a real violation is produced — by fault,
+     * on a real case over the shipped data, on a property and a surface **no** entry names — and
+     * asserted **not** matched.
      */
     const faulted: HonestyResources = { ...resources, corruptTexts: FAULTS['probability-word'][0]?.fault };
     const outcome = evaluateCase(caseFromSeed(9013, { space: STANDARD_SPACE }), faulted);

@@ -34,7 +34,7 @@
  *   that record**, so the fourth test grades nothing and its *was* is `—` with the reason beside
  *   it. A stand-in there would be a figure with no source, which is the defect
  *   `shift/goals.ts#PENDING_DISPLAY` exists to avoid one layer down.
- * - **Offers on the table (§ 8.8).** Named in {@link CAMPAIGN_ABSENCES}' neighbour
+ * - **Offers on the table (§ 8.8).** Named in `campaign/career.ts#CAMPAIGN_ABSENCES`' neighbour
  *   {@link TOWERS_COPY.offersRefusal} rather than drawn empty: an offer is a contract on a building
  *   whose complexity § 8.5 publishes and whose acceptance switches a week, and neither the
  *   complexity table nor `shift/week.ts#switchWeek` is reached from these three screens yet.
@@ -96,7 +96,6 @@ import {
 import {
   BUILD_IDS,
   BUILD_LABELS,
-  CAMPAIGN_ABSENCES,
   careerIsOver,
   type BuildId,
   type CampaignCareer,
@@ -320,7 +319,14 @@ export const TOWERS_COPY = Object.freeze({
     'trip since the last service window raises how often one falls, so a tower you have run hard hands ' +
     'you more of them. A tower you have never mismanaged can still hand you a bad week — which is ' +
     'why a spare slot is worth more than a spare unit.',
-  absencesHeading: 'WHAT THIS BUILD DOES NOT DO',
+  /*
+   * **`absencesHeading` left this copy table on the merge that closed GitHub issue #207.**
+   *
+   * It read `WHAT THIS BUILD DOES NOT DO`, and it headed `CAMPAIGN_ABSENCES` on the triage screen.
+   * The register is drawn on the build-information panel now (`everyday/buildNotes.ts`), which
+   * writes its own section heading, so a second heading here would be a string with no renderer —
+   * the shape the dead-code audit exists to find. The array itself is unchanged.
+   */
 } as const);
 
 /** § 8.6's legend, one entry per mark the grid can draw. */
@@ -432,7 +438,6 @@ export interface TowersView {
   readonly offers: { readonly heading: string; readonly refusal: string };
   readonly lately: { readonly heading: string; readonly sub: string; readonly refusal: string };
   readonly oddsFootnote: string;
-  readonly absences: { readonly heading: string; readonly entries: readonly string[] };
 }
 
 /**
@@ -670,7 +675,6 @@ export function towersView(input: CampaignInput): TowersView {
       refusal: TOWERS_COPY.incidentsRefusal,
     },
     oddsFootnote: TOWERS_COPY.oddsFootnote,
-    absences: { heading: TOWERS_COPY.absencesHeading, entries: CAMPAIGN_ABSENCES },
   };
 }
 

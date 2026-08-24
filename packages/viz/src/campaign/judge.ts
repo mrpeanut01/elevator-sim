@@ -263,12 +263,22 @@ function judgeCountGoal(
       `${label}: your setting passed ${String(candidate.passes)} of ${String(candidate.n)} runs; ` +
       `the shipped setting passed ${String(target)} of ${String(publishedN)} on the same ` +
       `passenger populations. ${met ? 'The bar is reached.' : 'The bar is not reached.'}`,
+    /*
+     * **The path left this sentence with GitHub issue #207**, and what it was doing survives.
+     *
+     * It read *"published in data/scenario-goals.json — not a number chosen here"*, and naming the
+     * file was R12's claim made checkable: a goal ships with its measured rate, and the bar is not
+     * invented at judging time. That claim is still here, in the vocabulary of the person reading
+     * a stage verdict — *shipped with the stage, measured before you played it*. The file is where
+     * an engineer looks it up, and an engineer is not who this sentence is for.
+     */
     note:
-      'The bar is the shipped setting’s own measured count on this stage’s tuning seeds, ' +
-      'published in data/scenario-goals.json — not a number chosen here. Both arms saw the same ' +
-      'passengers, so the two counts are paired. A count is not an interval: a couple of runs ' +
-      'either way is inside what a batch of this size scatters by, and the goal that answers ' +
-      '“is it actually better” is beat-the-baseline, which needs an interval that excludes zero.',
+      'The bar is the shipped setting’s own measured count on this stage’s tuning seeds — shipped ' +
+      'with the stage and measured before you played it, not a number chosen while judging you. ' +
+      'Both arms saw the same passengers, so the two counts are paired. A count is not an ' +
+      'interval: a couple of runs either way is inside what a batch of this size scatters by, and ' +
+      'the goal that answers “is it actually better” is beat-the-baseline, which needs an interval ' +
+      'that excludes zero.',
   };
 }
 

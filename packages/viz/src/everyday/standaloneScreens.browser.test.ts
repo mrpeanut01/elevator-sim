@@ -169,7 +169,17 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
     await page.close();
   });
 
-  it('says nothing here is scored, and names what the board does not do', async () => {
+  /**
+   * **The register moved, so this case follows it across the two screens.**
+   *
+   * It used to assert that the drawing board drew three or more register rows of its own. GitHub
+   * issue #207 draws every register on one build-information panel reached from Settings, so what
+   * a page can now prove is the pair: the board does **not** carry the block, and the panel that
+   * took it over really carries the board's rows. Asserting only the first half would pass just as
+   * well if the register had been deleted outright, which is the failure this pairing exists to
+   * make impossible.
+   */
+  it('says nothing here is scored, and leaves the register to the build-information panel', async () => {
     const page = await coldLoad();
     await railRow(page, 'Design a building');
     await page.waitForSelector('.everyday-designer');
@@ -177,9 +187,16 @@ describe.skipIf(!HAS_BROWSER)('Design a building', () => {
       'Nothing here is scored. It is a drawing board.',
     );
     expect(await page.textContent('.everyday-bar-primary')).toBe('Run a day in it');
-    expect(await page.$$eval('.everyday-designer-absences li', (items) => items.length)).toBeGreaterThan(
-      2,
+    expect(await page.$$eval('.everyday-designer-absences', (blocks) => blocks.length)).toBe(0);
+
+    /* The rail's bordered gear row — the one Settings destination, as `settingsScreen.browser.test.ts` reaches it. */
+    await page.click('.everyday-rail-settings');
+    await page.waitForSelector('.everyday-settings-build-notes');
+    const rows = await page.$$eval('.everyday-settings-build-notes li', (items) =>
+      items.map((item) => item.textContent ?? ''),
     );
+    expect(rows.length).toBeGreaterThan(20);
+    expect(rows.some((row) => row.includes('escalator rows'))).toBe(true);
     await page.close();
   });
 });
@@ -196,7 +213,8 @@ describe.skipIf(!HAS_BROWSER)('Tune the tower', () => {
    * it beside § 6.2's brief: the card is drawn and it navigates, so *no control opens it* is now the
    * § D227 defect rather than the honest reading, and the case that asserted it has been inverted
    * rather than deleted. What is still missing is the report's lever, and that half is named in
-   * `shell.ts`'s `EVERYDAY_SHELL_ABSENCES` rather than closed with the rail row this section forbids.
+   * the shell's register of absences (`everyday/buildNotes.ts`) rather than closed with the rail row
+   * this section forbids.
    *
    * So what is checked here is the rule in both directions: no rail row, no mode tile, and a working
    * card on the brief. The screen's own behaviour — the seven controls, what each writes, the

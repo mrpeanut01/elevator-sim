@@ -55,8 +55,8 @@
  * {@link STAGE_ABSENCES}. Two are structural — the § 7.4 ghost lane needs a second recording the
  * data host does not offer, and § 7.5's campaign dock needs a `ctx` no route in this build can
  * produce — and one is a control that exists behind a screen nobody has built. Each is a sentence a
- * player reads under the stage, on the shell's own precedent for `EVERYDAY_SHELL_ABSENCES`: a
- * register nothing renders is read by nobody.
+ * player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
+ * register's own precedent applied one screen down: a register nothing renders is read by nobody.
  */
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
@@ -444,18 +444,24 @@ export const STAGE_NO_GHOST =
  * -------------------------------------------------------------------------- */
 
 /**
- * What this stage does not do, drawn under the strip.
+ * What this stage does not do.
  *
- * Beside `shell.ts`'s {@link EVERYDAY_SHELL_ABSENCES} rather than inside it, and the split is by
- * owner: the shell's register is about the *shell* — screens it does not route to, a bar it does
- * not draw — and this one is about § 7's stage specifically. A reader on the stage sees this one;
- * a reader on the menu sees that one.
+ * Declared beside the stage and **drawn on the build-information panel** with the other five
+ * registers (`everyday/buildNotes.ts`, GitHub issue #207). The split from
+ * `EVERYDAY_SHELL_ABSENCES` is by *owner* and is unchanged: the shell's register is about the
+ * shell — screens it does not route to, a bar it does not draw — and this one is about § 7's stage
+ * specifically. What changed is that a reader meets both in one place instead of meeting each on
+ * the screen it is about.
+ *
+ * `STAGE_NO_GHOST` is the exception and the reason the exception is a rule: it is a **control's**
+ * refusal, drawn on the ghost lane's own card as well as being in this register, because a control
+ * that cannot act says so where the control is.
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
-  '§ 7.5’s campaign dock — a campaign day reaches this stage, and the money-and-incident dock beside it is not drawn',
-  '§ 7.3’s camera — the cutaway draws the whole building at once and there is nothing to pan',
-  '§ 7.6’s second and third arms — the run record carries a handover and an answered incident, and this screen offers neither: a handover needs a dispatcher chosen somewhere, and an incident needs the dock above',
+  'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
+  'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
+  'no decisions during a run — a day can carry a handover to another dispatcher and an answered incident, and this screen offers neither: a handover needs a dispatcher picked somewhere, and an incident needs the dock above',
 ]);
 
 /* -------------------------------------------------------------------------- *

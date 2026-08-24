@@ -47,6 +47,24 @@ export function probabilityWordIn(text: string): string | null {
 }
 
 /**
+ * Notation that belongs to the team and not to a player, in a sentence `core` wrote about a dial.
+ *
+ * The three shapes `CHARTER_PROGRAMME.md` § M2's third exit criterion names — a source filename, a
+ * member path, a section number — matched exactly as `honesty/properties.ts` matches them on a
+ * rendered string. Two copies of a rule is how a rule drifts, so this one is deliberately the
+ * narrower half: it is the *filter*, and the property is the *gate*. If this were ever wider than
+ * the gate it would be hiding strings from a search rather than fixing them.
+ *
+ * A **bare identifier is not matched**, for the reason the gate does not match one either: without
+ * this tree's own export list there is no way to tell `parkingStrategy` from an ordinary word an
+ * author capitalised, and a spelling rule that guessed would refuse descriptions that are perfectly
+ * readable. `estimateCost()` in the description this was written for is caught by the member-path
+ * clause's sibling — the filename beside it — rather than on its own.
+ */
+const INTERNAL_NOTATION =
+  /(?:§\s*\d|\b[A-Za-z0-9_$-]+(?:\/[A-Za-z0-9_$-]+)*\.(?:ts|tsx|js|mjs|cjs|json|html|css|md)\b|\b[A-Za-z_$][A-Za-z0-9_$]*(?:[./][A-Za-z0-9_$-]+)*#[A-Za-z_$][A-Za-z0-9_$]*)/u;
+
+/**
  * A schema's own `description`, made safe to print on a player-facing surface — or the refusal.
  *
  * **This exists because of a real finding, and the finding is `core`'s prose rather than this
@@ -85,6 +103,30 @@ export function probabilityWordIn(text: string): string | null {
  */
 export function playerSafeDescription(text: string | undefined): string | null {
   if (text === undefined) return null;
+  /*
+   * **The second refusal, and it is the same shape as the first for the same reason** (GitHub
+   * issue #207, and the finding the deep honesty tier recorded against this exact description).
+   *
+   * `auction.aggregation`'s description ends *"…which is exactly the comparison
+   * docs/01-architecture.md asks to be benchmarked rather than assumed"* and names two source files
+   * besides. It is correct, it is well written, and it is written for somebody who can open those
+   * files — and the campaign brief re-prints it on a list of controls a **player** may edit. That
+   * is § M2's criterion exactly: a note to the team, left on a player's screen, is a sentence they
+   * cannot follow up.
+   *
+   * The remedy is this function's rather than `core`'s, and the register that found it says why:
+   * this filter already exists to make `core`'s words player-safe, and it already runs on this
+   * description. A remedy that touches the sentence and leaves the defect in it is the cheapest
+   * thing to overlook. The Parameters tab is a schema surface, prints the text whole, and is
+   * unaffected — which is the same split the probability-word arm below already draws.
+   */
+  if (INTERNAL_NOTATION.test(text)) {
+    return (
+      "this dial's own description is not reproduced here, because it is written for somebody " +
+      'reading the source: it points at files and sections this screen cannot open. The ' +
+      'Parameters tab shows the schema text in full.'
+    );
+  }
   if (probabilityWordIn(text) === null) return text;
   /*
    * The refusal does **not** quote the offending word, and that was found by the test rather than

@@ -138,34 +138,33 @@ describe('every property fires when the thing it protects is broken', () => {
     const clean = evaluateCase(quotable, resources);
     const properties = new Set(clean.violations.map((found) => found.property));
     /*
-     * **It has been empty twice for two different reasons, and it is not empty now.** It emptied at
-     * § D171, which removed the R10 finding on the Parameters tab by narrowing the rule; it acquired
-     * one entry when the temporal axis found `render/describeFrame.ts` joining every `MoodDriver`
-     * ungated; and it emptied again because that join is now gated on `MoodDriver.basis` the way
-     * § D293 gated the rail's copy of it.
+     * **Empty for the third time, and this is the one the previous note predicted.**
      *
-     * **`internal-notation` is here because it is genuinely failing on a clean run**, which is what
-     * this line existing for is: *"a finding that is recorded rather than fixed has to be added here
-     * as well, which is what stops a register entry being written without anybody noticing the clean
-     * run had started failing."* `CHARTER_PROGRAMME.md` § M2's third exit criterion fails today on
-     * four player surfaces, GitHub issue #207 is the fix, and this lane built the instrument rather
-     * than the fix — so the clean run says so, here and in `honesty.test.ts`'s `OUTSTANDING`, and the
-     * two have to agree. **The day #207 lands, this goes back to `[]` on the same commit**, and the
-     * register empties with it.
+     * It emptied at § D171, which removed the R10 finding on the Parameters tab by narrowing the
+     * rule; it acquired one entry when the temporal axis found `render/describeFrame.ts` joining
+     * every `MoodDriver` ungated; it emptied again because that join is now gated on
+     * `MoodDriver.basis` the way § D293 gated the rail's copy of it; and it acquired
+     * `internal-notation` on four player surfaces the day `CHARTER_PROGRAMME.md` § M2's third exit
+     * criterion got an instrument, because the criterion was failing and the lane that built the
+     * instrument deliberately did not build the fix.
+     *
+     * That note ended: *"**The day #207 lands, this goes back to `[]` on the same commit**, and the
+     * register empties with it."* GitHub issue #207 has landed, both halves are `[]`, and
+     * `honesty.test.ts`'s `OUTSTANDING` is empty on the same commit. **The two agreeing is the
+     * whole point of this line existing** — a finding recorded rather than fixed has to be added
+     * here as well, which is what stops a register entry being written without anybody noticing the
+     * clean run had started failing, and it runs in reverse too: neither half may empty while the
+     * other still names something.
      *
      * The assertion is exact in both directions and must stay that way: a tenth property going off
-     * on a clean run is red, and so is this one going quiet while the register still names it. It is
-     * not `toContain`, and it must not become one. The surface list is in adapter order — the order
-     * `SURFACE_ADAPTERS` fixes and whose comments treat as load-bearing — and not sorted, because an
-     * order-sensitive list is the stronger claim.
+     * on a clean run is red, and so is a registered finding that this run cannot see. It is not
+     * `toContain`, and it must not become one. The surface list is asserted **empty rather than
+     * deleted**, because an empty list is a state that has to keep being checked rather than a rule
+     * that can be dropped — the same reason `screens.ts`'s `UNBUILT_REASONS` stays where it is now
+     * that every screen is built.
      */
-    expect([...properties].sort()).toEqual(['internal-notation']);
-    expect([...new Set(clean.violations.map((found) => found.surfaceId))]).toEqual([
-      'everyday/modes.ts#EVERYDAY_MODES',
-      'everyday/settingsView.ts#settingsScreenViewOf',
-      'everyday/stageScreenModel.ts#stageHeaderOf',
-      'everyday/designerModel.ts#designerFigures',
-    ]);
+    expect([...properties].sort()).toEqual([]);
+    expect([...new Set(clean.violations.map((found) => found.surfaceId))]).toEqual([]);
   });
 
   it('a fault survives shrinking, and the shrunk case is smaller', () => {

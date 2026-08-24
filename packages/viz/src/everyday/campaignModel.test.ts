@@ -159,7 +159,14 @@ describe('the triage screen (§ 8.1)', () => {
     const view = towersView(inputOf(twoTowers()));
     expect(view.offers.refusal.length).toBeGreaterThan(40);
     expect(view.lately.refusal.length).toBeGreaterThan(40);
-    expect(view.absences.entries.length).toBeGreaterThan(2);
+    /*
+     * The campaign's register of absences is no longer on this view: GitHub issue #207 draws all
+     * six registers on the build-information panel. What this screen still owes a player is the
+     * per-control refusal — a panel it cannot fill says so on its own face — which is the two
+     * assertions above. `CAMPAIGN_ABSENCES` itself is pinned in `career.test.ts` and its placement
+     * in `buildNotes.test.ts`.
+     */
+    expect(view).not.toHaveProperty('absences');
   });
 
   it('says which career snapshot it is showing, derived from the day', () => {

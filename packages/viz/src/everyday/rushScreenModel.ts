@@ -207,8 +207,13 @@ export const RUSH_SCREEN_COPY = Object.freeze({
   drivingNote:
     'The waves are identical for everyone, so a further run is a better dispatcher — or a luckier ' +
     'morning. The bench knows which.',
-  /** The register's heading. Not the prototype's: it has no absences to register. */
-  absencesEyebrow: 'WHAT THIS BUILD DOES NOT DO YET',
+  /*
+   * **`absencesEyebrow` left this table on the merge that closed GitHub issue #207.** It read
+   * `WHAT THIS BUILD DOES NOT DO YET` — literal shouted caps, in source — and headed
+   * {@link RUSH_ABSENCES} on this screen. The register is drawn on the build-information panel now
+   * (`everyday/buildNotes.ts`), which writes its own heading, so keeping this one would leave a
+   * string in the corpus that no renderer touches: a claim of coverage over a heading nobody sees.
+   */
   /** Drawn where a figure would be if a rush had ever run here. */
   noRun: '—',
 } as const);
@@ -267,9 +272,9 @@ export function rushGeneratedRangeLine(): string {
  * quietly re-writing history on a player-facing surface.
  */
 export const RUSH_ABSENCES: readonly string[] = Object.freeze([
-  'the climbing stream — no demand template in data/ ramps without a ceiling, so § 3.2’s ninety minutes cannot be generated yet',
-  '§ 9.2’s stage — § 7’s stage screen is what a run plays on, and its clock reads the hour while its pill reads the demand phase (`live/timeline.ts`’s `clockAt` and `phaseAt`); § 9.2 wants held time and the wave, and neither is derived anywhere',
-  '§ 9.3’s result — a rush that has not run has no furthest wave, and a screen that answered anyway would be inventing one',
+  'the climbing stream — no demand pattern this build ships ramps upward without a ceiling, so the ninety minutes a rush asks for cannot be generated yet',
+  'a rush stage of its own — a run plays on the ordinary stage screen, whose clock reads the time of day and whose pill reads the part of the day the crowd is in; a rush wants time held and a wave number, and nothing in this build works either of them out',
+  'a result screen of its own — a rush that has not run has no furthest wave, and a screen that answered anyway would be inventing one',
   'the standings — the five entries below are the handoff’s own fixtures, not runs this build measured',
 ]);
 

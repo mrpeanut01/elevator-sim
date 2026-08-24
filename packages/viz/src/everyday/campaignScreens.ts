@@ -533,14 +533,14 @@ function mountTowers(hostEl: HTMLElement, context: EverydayScreenContext): Mount
     root.append(panels);
     root.append(note(doc, view.oddsFootnote));
 
-    const absences = el(doc, 'section', 'everyday-towers-absences');
-    absences.style.cssText = `margin-top:${String(GAP.wide)}px`;
-    absences.append(eyebrow(doc, view.absences.heading, '0 0 8px'));
-    const list = el(doc, 'ul');
-    list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:12px;color:${C.warmGrey};line-height:1.5;max-width:80ch`;
-    for (const entry of view.absences.entries) list.append(el(doc, 'li', undefined, entry));
-    absences.append(list);
-    root.append(absences);
+    /*
+     * **The campaign's register of absences is on the settings screen now**, with the other five
+     * (`everyday/buildNotes.ts`, GitHub issue #207). `CAMPAIGN_ABSENCES` is unchanged — it was
+     * already three sentences of plain English with no notation in them, which is the
+     * counter-example that showed the fix was a rewrite of the other five rather than a change to
+     * the mechanism. What a player still meets here is the per-control refusal above: the offers
+     * panel says on its own face why it has no offers.
+     */
 
     shell.refreshBar?.();
   };
