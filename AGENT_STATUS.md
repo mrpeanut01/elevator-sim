@@ -89,7 +89,17 @@ session with the browser tier pointed at the container's pre-installed Chromium,
    the repository's own *"a published number goes stale the same way"* rule applied to the document
    proposing to govern it, and the rule's remedy is the same — pin the number to the run, or to the
    command, that produces it.
-7. **[`GAPS.md`](GAPS.md) is 25 days stale, not the six weeks the kickoff states** — its header
+8. **R25 was broken by the orchestrator minutes after being restored, and the register caught it.**
+   Commit `52b2f69` restored `RISKS.md` — including **R25**, *"file-level lane ownership partitions
+   editing and does not partition committing: `git add -A` stages the whole repository regardless of
+   who owns what"* — and that same commit swept lane M0-B's `docs/23-audiences-and-core-loop.md` in
+   unreviewed and without the README row `documentation.test.ts` requires. **CI was red on the branch
+   between `52b2f69` and `245a49d`.** R25's escalation trigger is *"any commit whose diff touches a
+   file its message does not mention"*, and it fired exactly as written. The mitigation is R25's own:
+   explicit paths at every `git add` while lanes are running. **A restored register earned its keep
+   inside ten minutes**, which is the argument for restoring the other two rather than a consolation
+   for this mistake.
+9. **[`GAPS.md`](GAPS.md) is 25 days stale, not the six weeks the kickoff states** — its header
    reads *"As of: 2026-07-30, wave 12"*, and it still carries that date's suite figure of
    **262 files / 4 883 tests / 10 skipped**. Six waves have landed since. The staleness is real and
    the correction runs *towards* the document, which is worth saying only because this programme
