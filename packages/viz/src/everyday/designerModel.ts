@@ -92,7 +92,12 @@ export const DESIGNER_COPY = Object.freeze({
   specNote:
     'A pure up-peak sizing calculation, not a simulation. It predicts an interval and a handling ' +
     'capacity; it has no queue in it, so it cannot tell you what anybody waited.',
-  absencesEyebrow: 'WHAT THIS DRAWING BOARD DOES NOT DO',
+  /*
+   * **`absencesEyebrow` left this table with GitHub issue #207**, for the reason its sibling in
+   * `rushScreenModel.ts` did: {@link DESIGNER_ABSENCES} is drawn on the build-information panel,
+   * which writes its own section heading, and a heading no renderer touches is the shape the
+   * dead-code audit exists to find.
+   */
   /** § 13's own sentence, and § 3.3's note for this row. Drawn where the figures are. */
   notScored: 'Nothing here is scored. It is a drawing board.',
   savedNothing: 'Not saved yet.',
@@ -104,15 +109,20 @@ export const DESIGNER_COPY = Object.freeze({
 /**
  * What § 13 asks for that this build does not draw, in the order a reader would miss them.
  *
- * On screen, so a player can see the shape of the missing half rather than infer it from a gap.
- * Each entry names the field or the surface rather than the feeling — `shell.ts`'s register style.
+ * On screen — on the build-information panel (`everyday/buildNotes.ts`) with the other five
+ * registers — so a player can see the shape of the missing half rather than infer it from a gap.
+ * Each entry names the thing that is missing rather than the feeling of missing it.
+ *
+ * **This was the one register in the tree with no plain-English row in it**: all five entries used
+ * to open with a section number of the design document and one named a type by its identifier.
+ * They say the same five things; GitHub issue #207 is why they say them in the screen's vocabulary.
  */
 export const DESIGNER_ABSENCES: readonly string[] = Object.freeze([
-  '§ 13.3’s per-shaft machine class — the authoring model carries one class, speed and load for the whole design, so a class picker per shaft would be five controls writing one field',
-  '§ 13.3’s access panel and § 13.2’s credential dots — a design’s access zones are carried through a save and are authored by the Engineer building editor, not here; the three kinds of zoning are distinct, and what this board writes is the service kind',
-  '§ 13.2’s escalator rows — `SpecTransportMode` is carried through a save, authored by nothing here',
-  '§ 13.3’s sky-lobby seeder and its five editable ride characteristics — the machine editor on the Engineer surface owns those',
-  '§ 13.3’s collapsed document — the specification block below is what it would print, without the disclosure',
+  'a machine class per shaft — a design carries one class, one rated speed and one rated load for the whole building, so a picker on each shaft would be five controls writing the same setting',
+  'the access panel and its credential dots — who is allowed where is saved with a design and is written in the simulator’s building editor, not here. What this board sets is which floors a lift physically serves, which is a different thing.',
+  'escalator rows — a design can carry escalators through a save, and nothing on this board writes them',
+  'the sky-lobby starter and the five ride characteristics it would let you edit — the machine editor on the simulator side owns those',
+  'the folded-up specification — the block below is what it would print, without the fold',
 ]);
 
 /* -------------------------------------------------------------------------- *

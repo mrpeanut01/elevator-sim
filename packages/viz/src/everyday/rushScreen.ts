@@ -23,7 +23,6 @@ import {
   rushGeneratedRangeLine,
   rushHoldLineFigure,
   rushOpeningLine,
-  RUSH_ABSENCES,
   RUSH_BESTS,
   RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY as COPY,
@@ -119,18 +118,19 @@ function mount(host: HTMLElement, context: EverydayScreenContext): EverydayScree
   bandsBlock.append(bandsEyebrow, bandsList, opening);
   paper.append(bandsBlock);
 
-  /* the register — what a rush needs that this build has not got */
-  const absences = el(doc, 'section', 'everyday-rush-absences');
-  absences.style.cssText = `margin-top:22px;border:1px solid ${C.rule};border-radius:${String(R.tile)}px;background:${C.cardSunk};padding:14px 16px;max-width:660px`;
-  const absencesTitle = el(doc, 'h2', undefined, COPY.absencesEyebrow);
-  absencesTitle.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 8px`;
-  const absencesList = el(doc, 'ul');
-  absencesList.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;line-height:1.5;color:${C.warmGrey}`;
-  for (const entry of RUSH_ABSENCES) absencesList.append(el(doc, 'li', undefined, entry));
+  /*
+   * **The primary's refusal stays; the register does not.**
+   *
+   * The block that used to sit here drew `RUSH_ABSENCES` above this sentence. Per GitHub issue
+   * #207 the register is on the settings screen with the other five
+   * (`everyday/buildNotes.ts`), and what is left on this screen is the one line that belongs to a
+   * control a player can press: the start button is disabled, and this says why, beside it. That
+   * is the rule the issue asks for in both directions — the reason is on the control, and it is
+   * not repeated anywhere else on this screen.
+   */
   const refusal = el(doc, 'p', 'everyday-rush-refusal', RUSH_PRIMARY_REFUSAL);
-  refusal.style.cssText = `font-size:12.5px;line-height:1.5;color:${C.terracotta};margin:9px 0 0`;
-  absences.append(absencesTitle, absencesList, refusal);
-  paper.append(absences);
+  refusal.style.cssText = `margin-top:22px;border:1px solid ${C.rule};border-radius:${String(R.tile)}px;background:${C.cardSunk};padding:14px 16px;max-width:660px;font-size:12.5px;line-height:1.5;color:${C.terracotta}`;
+  paper.append(refusal);
 
   /* ------------------------------------------------------------------ ink */
   const ink = el(doc, 'div', 'everyday-rush-aside');

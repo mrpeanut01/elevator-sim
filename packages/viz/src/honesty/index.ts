@@ -67,6 +67,7 @@ export type { HonestyShrinkResult, ShrinkOptions } from './shrink.js';
 
 export {
   coveredDeclarations,
+  PLAYER_FACING_SURFACES,
   renderAll,
   sampleTimes,
   suppressionOf,

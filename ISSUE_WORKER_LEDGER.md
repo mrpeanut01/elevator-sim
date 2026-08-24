@@ -225,3 +225,64 @@ of these would have caused wasted or harmful work**, and three would have shippe
 | **W18-4** | ~80 more legs tests across 23 files run real simulations at vitest's default 5 s | #144 fixed the three known sites. The general static check is **not honestly buildable** — a name-level call graph gave **1 881** false positives, and even a correct one asks the wrong question, since most simulations run at module scope. The total alternative is `testTimeout` on the `viz` project, a repo-wide config decision |
 | **W18-5** | `PROVISIONED_FALLBACK` points at a path that exists on no machine this repo has been measured on | Kept, with its status stated as documentation rather than a usable default |
 | **W18-6** | Two `.primary` buttons in one `.editor-actions` row, so the run verb must be located by exclusion | Left alone — giving it an id is a product change, and this was a test-repair lane |
+
+---
+
+# Charter programme — wave 1 dispositions (#186–#193, #206–#218)
+
+**Snapshot:** 2026-08-24, branch `claude/elevator-sim-charter-kickoff-rexfw8` at `c8fd6fa`.
+Evidence: [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ M–W.
+**No issue below is scheduled.** M0 and M1 are not open, and M2 is the first milestone that may
+contain code.
+
+**The wave's error rate held.** Of thirteen issues settled, **two are refuted at their central
+premise** (#190, #209), **eight carry at least one false or materially misleading clause**, and
+**three would have shipped a new defect, a reversed product decision, or a wasted edit if acted on
+as written** (#190, #213, #217).
+
+Legend — **Verified**: `code` traced to file:line · `run` reproduced by a recorded run.
+
+## Confirmed, schedulable once the gate opens
+
+| # | title (short) | P | verified | disposition | next action |
+|---|---|---|---|---|---|
+| **206** | Core loop dead-ends at filing | **P0** | **code** | **Fix — 3 claims corrected** | Two gaps, both needed: navigate from `stageScreen.ts:878` **on the confirmed file**, and change `shell.ts:969`'s enabling predicate. Step numbers are pinned by `actionBar.test.ts`; **do not raise them.** Campaign shares the path; **Fix a building does not** |
+| **216** | Monday called "Tuesday-shaped" | P3 | **code** | **Fix — cheapest in the set** | One string literal, `shift/events.ts:198`. Assert against `WEEKDAYS` so the test cannot go stale |
+| **214** | Rail contradicts the week screen | P1 | **code** | **Fix — "stale" → "unconditional"** | `drawRail` reads `dataHost.week()`, as `campaignRailOptions()` already does. The two-store split stays |
+| **215** | "ATTEMPT 4" after one run | P2 | **code** | **Fix — mechanism corrected** | Not navigation. Stop `stageScreen.ts:862` re-running a closed day, or extend `week.ts`'s `recordGrew` exemption to a bit-identical re-simulation |
+| **213** | Report advice is not actionable | P1 | **code** | **Fix — criterion must be narrowed** | The button already goes to the wrong screen (`reportScreen.ts:281`). **Only 2 of 4 levers may ever route**; routing the dispatcher pair off one replication is `docs/10` R2 |
+| **212** | Stage does not show the crowd | **P0** | **code** | **Rescope — largely refuted** | People, doors and queues **are drawn**. Real defects: door leaves paint over the whole car body at `doorFraction = 0` (`stageScreen.ts:268-273`), and the stage opens paused at 06:00 on an empty lobby |
+| **207** | Front door sells the absences | **P0** | **code** | **Fix — undercounted** | **Six** surfaces, not four; 27 entries, 17 carrying notation. A build-information panel must be a **real non-test caller of all six arrays** or `viz/src/deadCode.test.ts` re-fires |
+| **208** | First session presents no problem | **P0** | **run** | **Fix — slot decision, not data** | Measured over 100 seeds. Move stage 1 off Garden, or open it under a booked event, or stop drawing a random first seed. **Raising the arrival rate is barred** by the profile's declared max |
+| **210** | No first-run experience | **P0** | **code** | **Build** | Absence confirmed; one quoted phrase is in no document in this tree. Cannot close alone — its tester criterion is #218's |
+| **211** | Copy too long | P1 | **code** | **Fix — counts corrected** | **338 words**, not 400; stairs card **70**, not 120. Fix in the two views; `shaped.smallPrint` must survive **byte for byte** |
+| **193** | Rebuild the risk register | P1 | **code** | **Fix — widen the scope** | Four registers were overwritten by `1b7a2f1`, not one. **Six** dangling ids across **eleven** sites, not three. R1/R5/R7/R10 were declared permanent |
+
+## Refuted — close with the refutation written down
+
+| # | title (short) | verdict | why |
+|---|---|---|---|
+| **209** | Tutorial refuses both headline numbers | **REFUTED** | Fixed by `e6a1a3d` on **2026-08-11, 13 days before the issue was filed**. All four acceptance criteria already met; 0 of 100 seeds suppress. **Residual, and it needs its own issue:** `campaign/stageRun.ts` sets no `reportWindow` — 2 of 50 stage-1 seeds still suppress |
+| **190** | Close the positioning question | **REFUTED** | Answered 2026-08-08 by § D299, *"the positioning decision, taken by the product owner"*. **#190's proposed answer contradicts it.** Reframe as a supersede, or close. **Escalated** — superseding § D299 is a product-owner decision |
+
+## Rescope or reduce
+
+| # | title (short) | disposition | why |
+|---|---|---|---|
+| **218** | Define and hold the slice review | **Reduce to "execute the review"** | Duplicates [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) § M2's exit criteria almost verbatim, and is blocked on #198. **Its criterion 3 fails today** and the check is an eighth honesty property with no new plumbing |
+| **217** | Promote Fix a building | **Rescope — 2 criteria half wrong** | The "stale refusal" **never renders** (`modes.ts:30-32`). The **docstring is already correct**; the inline comment at `:126` is the stale one |
+| **189** | Competitive teardown | **Rescope** | A cited four-title prior-art survey exists at `docs/10:673-770`. The *teardown against a common template* is genuinely absent; the "no analysis exists" premise is not |
+| **191** | Core loop statement | **Rescope** | `README.md:14-24` and the design-canonical `GAMEPLAY_AND_NAVIGATION.md:249-254` both state a loop, the latter per-mode with lengths and lose-conditions. Must reconcile, not silently replace |
+| **188** | Define the two audiences | **Rescope** | `packages/viz/UX.md:757-764` and `:82-89` already define **five** roles. Two inventories neither superseding the other is the stale-statement class this repo exists to record |
+
+## New issues owed, from findings this wave
+
+| finding | where | why it needs its own issue |
+|---|---|---|
+| Lever button opens the wrong screen | `everyday/reportScreen.ts:281` | § D335 redefined the `stage` key under the call site. A label describing a feature that does not exist — a charter non-goal |
+| Register makes a false claim about `LEVER_SURFACES` | `everyday/shell.ts:152` | Says four levers each route; it is two, by decision. **Rendered to the player** |
+| Streak refusal is unconditional | `everyday/rail.ts:235` | No producer supplies `profile.streak`. A refusal nothing can retract |
+| False mechanism on a player surface | `everyday/settingsView.ts:236-243` | Asserts server-side replay verification two blocks below a register saying this build has no server |
+| Campaign path sets no `reportWindow` | `campaign/stageRun.ts:62-75, 110-125` | #209's live residual. **Closing it invalidates `data/scenario-goals.json`** and needs regeneration |
+| `## D63` is a duplicate heading | `DECISIONS.md:1888, 1904` | `citations.test.ts` asserts a `§ Dnnn` resolves, **not that it is unique** |
+| S5's figure has gone stale twice | `docs/10:1680-1694` | *"four of seven"* against ten shipped stages, and two named clearers have flipped. **No test derives the count across all ten** — which is why it went stale without failing anything |

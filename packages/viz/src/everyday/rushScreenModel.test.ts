@@ -209,8 +209,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
    * exactly as long as its *subject* is wrong. So these pin the subject, and derive it.
    */
 
-  it('names § 7’s stage as what a run plays on, because that is what the registry routes', () => {
-    const stage = RUSH_ABSENCES.find((absence) => absence.includes('9.2'));
+  it('names the ordinary stage as what a run plays on, because that is what the registry routes', () => {
+    /*
+     * **Keyed on the words rather than on a section number, and the re-keying is GitHub issue
+     * #207's doing.** This entry used to open *"§ 9.2's stage"* and this case found it by
+     * `includes('9.2')`. Nothing a player reads may carry a section number now, so the entry says
+     * what it is about in words and the case looks for the same subject in the same way: the row
+     * about the rush's own stage. The claim under test has not moved an inch.
+     */
+    const stage = RUSH_ABSENCES.find((absence) => absence.startsWith('a rush stage of its own'));
     expect(stage).toBeDefined();
     /*
      * Derived, not remembered. `routeFor` answering `'screen'` *is* the fact that § D335's hand-off
@@ -222,7 +229,7 @@ describe('what the screen refuses, and where the refusal sits', () => {
      */
     expect(routeFor('stage')).toBe('screen');
     expect(stage).not.toMatch(/Engineer/);
-    expect(stage).toMatch(/§ 7’s stage/);
+    expect(stage).toMatch(/the ordinary stage screen/);
   });
 
   it('claims an absence the seam it names actually has — the clock reads the hour', () => {
@@ -234,9 +241,15 @@ describe('what the screen refuses, and where the refusal sits', () => {
      * cites rather than merely plausible.
      */
     expect(clockAt(42 * 60, undefined)).toBe('06:42');
-    const stage = RUSH_ABSENCES.find((absence) => absence.includes('9.2'));
-    expect(stage).toMatch(/clockAt/);
-    expect(stage).toMatch(/held time/);
+    const stage = RUSH_ABSENCES.find((absence) => absence.startsWith('a rush stage of its own'));
+    /*
+     * The entry used to name `clockAt` outright. It may not now — a player surface carries no
+     * identifiers — so what is asserted is the *claim* the identifier was evidence for: the clock
+     * on that screen reads a time of day, which the line above measures, and the entry says so in
+     * words.
+     */
+    expect(stage).toMatch(/clock reads the time of day/);
+    expect(stage).toMatch(/time held/);
   });
 
   it('does not let any entry name the Engineer surface as an Everyday run’s stage', () => {

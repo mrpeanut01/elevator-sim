@@ -43,6 +43,39 @@
  * (`briefView.ts#GHOST_REFUSAL` carries the evidence). So the closing block keeps the half that is
  * about this run — the sheet's own small print, which says in more words what *inside the noise*
  * means — and does not manufacture an opponent to be level with.
+ *
+ * ## That closing block is layered rather than cut — GitHub issue #211
+ *
+ * It was **one paragraph of 335 words**, measured on a real Garden Apartments day: 215 from
+ * `shift/report.ts#smallPrintFor` with `mode/casualDay.ts`'s 84-word lead in front of it and its
+ * 36-word reach note behind. Every clause is true and worth knowing, and it was the longest
+ * player-facing block in the product. {@link EverydayReportView.honesty}`.parts` is that same
+ * string in {@link HonestyPart}s: one opened, the rest behind a disclosure the screen draws as a
+ * `<details>`.
+ *
+ * **Three rules bind the layering, and each one is a defect this repository has already paid for.**
+ *
+ * 1. **`body` does not move.** It is still the whole block as one value, byte for byte, because
+ *    `honesty/surfaces.ts` seeds it as a single `role: 'reason'` string — the longest refusal in
+ *    the product. A layering that replaced the field would have taken it out of the corpus without
+ *    failing anything.
+ * 2. **Nothing is deleted and nothing is re-ordered.** The parts, joined by one space, *are*
+ *    `body`; `reportView.test.ts` asserts that equality over a real sheet. Re-ordering is the
+ *    subtler half and it is forbidden for a stated reason: Casual's lead announces *"Two phrases
+ *    below are worth having before you read them"*, so hoisting the sheet's own refusal above it
+ *    would read better and make that sentence false about its own page — § D227's stale-position
+ *    defect, manufactured on purpose.
+ * 3. **The refusal is the part that stays open.** What is drawn without a press is
+ *    {@link sheetPartsOf}'s first paragraph — *this is one replication of one day on one seed, and
+ *    it cannot tell you that anything is better than anything*. Folding that and leaving the
+ *    translations open would be § D299's *a mode may make this easier to read and may not make it
+ *    say less*, dressed as tidying.
+ *
+ * The seam the parts are cut on is **derived, not matched**: `sheet.smallPrint` contains
+ * `report.smallPrint` byte for byte (`dev/reportPanel.ts:1466` is what guarantees it), so the two
+ * values this function already holds locate the mode's front and back matter without this file
+ * knowing one word of either. If that ever stops being true, {@link honestyPartsOf} lays the whole
+ * block out as one block rather than losing a sentence.
  */
 
 import type { ReportView } from '../dev/reportPanel.js';
@@ -67,6 +100,14 @@ export interface EverydayLeverCard {
    * picker on it: the restraint is about what a *sheet* may claim, not about which screen is handy.
    */
   readonly surface: TabName | undefined;
+  /**
+   * What the card's button says, or `undefined` on a card that has none — issue #213.
+   *
+   * `undefined` exactly when {@link surface} is, and `reportView.test.ts` asserts that pairing in
+   * both directions: a label with nowhere to go and a route with nothing on its face are the same
+   * defect from either end.
+   */
+  readonly goLabel: string | undefined;
   /** What the card says instead of offering a button, when it names no surface. */
   readonly noSurfaceNote: string | undefined;
 }
@@ -90,8 +131,18 @@ export interface EverydayReportView {
   /** § 6.5's closing honesty block. */
   readonly honesty: {
     readonly title: string;
-    /** The sheet's own small print, unedited — see the module docstring on what is *not* here. */
+    /**
+     * The sheet's own small print, unedited — see the module docstring on what is *not* here.
+     *
+     * **Still one value, and that is load-bearing.** `honesty/surfaces.ts` seeds this field as a
+     * single `role: 'reason'` string; {@link parts} is the same text laid out for reading, never a
+     * replacement for it.
+     */
     readonly body: string;
+    /**
+     * {@link body}, layered — issue #211. Joined by one space, in order, these *are* {@link body}.
+     */
+    readonly parts: readonly HonestyPart[];
     /** Where the question this sheet may not answer is answered, or `undefined` on an empty sheet. */
     readonly pointer: { readonly label: string; readonly why: string } | undefined;
   };
@@ -119,6 +170,16 @@ export interface EverydayReportInput {
   readonly overnight: TomorrowBriefing | undefined;
   /** Whether a run stands on the stage that this sheet is not an account of. */
   readonly newerRunOnStage: boolean;
+  /**
+   * The Engineer tab strip's own words, keyed by tab — for {@link EverydayLeverCard.goLabel}.
+   *
+   * Supplied by `reportScreen.ts`, which reads them off the page rather than tabulating them: a
+   * `Record<TabName, string>` in this repository would be a second copy of a label `index.html`
+   * owns, stale the day somebody renames a tab. **Optional because a caller without a document
+   * cannot honestly supply one** — the honesty corpus drives this function in Node — and a card
+   * whose panel is not named says the narrower true thing instead of guessing at a name.
+   */
+  readonly panelNames?: Readonly<Partial<Record<TabName, string>>>;
 }
 
 /**
@@ -135,6 +196,165 @@ const NO_SURFACE_NOTE =
 const EMPTY_LEDE =
   'No day has been closed yet, so there is nothing to report. Set up a day at the front door, ' +
   'watch it, and press Close the day — that is the only thing that writes this sheet.';
+
+/* -------------------------------------------------------------------------- *
+ * The closing block, layered — GitHub issue #211
+ * -------------------------------------------------------------------------- */
+
+/**
+ * One piece of § 6.5's closing block.
+ *
+ * `open` is drawn as a paragraph and is always read. `fold` is a disclosure: its {@link handle} is
+ * the layer's own first sentence — drawn always, and the thing a reader presses — and its
+ * {@link paragraphs} are what opens. **The handle is a sentence of the block rather than a label
+ * this screen wrote**, which is why the layering adds no string a player can read and the honesty
+ * corpus has nothing new to sweep.
+ */
+export type HonestyPart =
+  | { readonly kind: 'open'; readonly text: string }
+  | {
+      readonly kind: 'fold';
+      readonly handle: string;
+      /** Never empty — a fold with nothing behind it is a control that does nothing. */
+      readonly paragraphs: readonly string[];
+    };
+
+/**
+ * **The stated length budget for this copy slot** — issue #211's first acceptance criterion, for
+ * the one slot this lane owns.
+ *
+ * Both numbers are ceilings rather than targets, and they are held by a case in
+ * `reportView.test.ts` over a **real** sheet rather than a fixture — the whole point of a budget is
+ * that it is measured against the copy that actually ships.
+ *
+ * - `open` is every word drawn before a reader presses anything: the open paragraph plus each
+ *   fold's handle. On the measured day that is 91 of 335.
+ * - `paragraph` is the ceiling for any one block of prose, opened or folded. It is what stops the
+ *   fix from being *one shorter wall and one longer one*.
+ */
+export const SMALL_PRINT_BUDGET = Object.freeze({ open: 110, paragraph: 70 });
+
+/**
+ * Sentences, split on the space between them and on nothing else.
+ *
+ * The lookahead is what keeps `06:05–06:10:` and `“Riders waited twenty-five seconds on average”`
+ * inside their own sentences: a split needs a terminator behind it *and* a capital or an opening
+ * quote in front. Joined back with one space this is the input exactly, which is the property
+ * every case downstream of it rests on.
+ */
+function sentencesOf(text: string): string[] {
+  const trimmed = text.trim();
+  return trimmed === '' ? [] : trimmed.split(/(?<=[.!?][”’"']?) (?=[“"'(A-Z])/u);
+}
+
+const wordsIn = (text: string): number => text.split(/\s+/u).filter(Boolean).length;
+
+/** Sentences gathered into paragraphs, each under the budget unless one sentence exceeds it alone. */
+function grouped(sentences: readonly string[]): string[][] {
+  const groups: string[][] = [];
+  let current: string[] = [];
+  let words = 0;
+  for (const sentence of sentences) {
+    const length = wordsIn(sentence);
+    if (current.length > 0 && words + length > SMALL_PRINT_BUDGET.paragraph) {
+      groups.push(current);
+      current = [];
+      words = 0;
+    }
+    current.push(sentence);
+    words += length;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
+const paragraphed = (sentences: readonly string[]): string[] =>
+  grouped(sentences).map((group) => group.join(' '));
+
+/**
+ * A layer the mode wraps the sheet in, folded behind its own opening sentence.
+ *
+ * A single-sentence layer comes back `open`: a disclosure whose handle is the whole of its content
+ * is a control that reveals nothing, which is the *dead seam* shape one level down from where this
+ * repository usually finds it.
+ */
+function foldOf(text: string): HonestyPart | undefined {
+  const [handle, ...tail] = sentencesOf(text);
+  if (handle === undefined) return undefined;
+  if (tail.length === 0) return { kind: 'open', text: handle };
+  return { kind: 'fold', handle, paragraphs: paragraphed(tail) };
+}
+
+/**
+ * The sheet's own words: its opening paragraph drawn, the rest folded behind its next sentence.
+ *
+ * The opening paragraph is where the refusal lives, and it is the one part of this block that may
+ * not be behind a press — see the module docstring's rule 3.
+ */
+function sheetPartsOf(core: string): HonestyPart[] {
+  const groups = grouped(sentencesOf(core));
+  const lead = groups[0];
+  if (lead === undefined) return [];
+  const rest = groups.slice(1).flat();
+  const tail = foldOf(rest.join(' '));
+  return [{ kind: 'open', text: lead.join(' ') }, ...(tail === undefined ? [] : [tail])];
+}
+
+/**
+ * {@link EverydayReportView.honesty}`.body`, laid out — and the seam is derived rather than matched.
+ *
+ * `reportViewOf` composes Casual's block as `${lead} ${core} ${reach}` with `core` — the shaped
+ * sheet's own `smallPrint` — sitting between them **byte for byte**, which is § D299's rule and the
+ * thing `dev/reportPanel.ts:1461` exists to state. So `indexOf` finds the sheet's words inside the
+ * block and the two wings fall out of the slices, without this module knowing a word of either.
+ *
+ * When it is not found — the Engineer register, where the block *is* the core, or a mode that
+ * one day composes differently — the whole block is laid out as one block. That is the safe
+ * direction: fewer folds, never a lost sentence.
+ */
+function honestyPartsOf(body: string, core: string | undefined): HonestyPart[] {
+  const at = core === undefined || core.trim() === '' ? -1 : body.indexOf(core);
+  if (at < 0 || core === undefined) return sheetPartsOf(body);
+  const front = foldOf(body.slice(0, at));
+  const back = foldOf(body.slice(at + core.length));
+  return [
+    ...(front === undefined ? [] : [front]),
+    ...sheetPartsOf(core),
+    ...(back === undefined ? [] : [back]),
+  ];
+}
+
+/* -------------------------------------------------------------------------- *
+ * The lever hand-off — GitHub issue #213
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What a routed lever's button says — **authored here rather than in the mount, deliberately.**
+ *
+ * `honesty/derive.test.ts` excludes `everyday/reportScreen.ts#REPORT_SCREEN` from the sweep on the
+ * DOM mounts' shared ground, on the stated understanding that *what the four mounts author of their
+ * own is geometry, class names and floor labels*. This string is none of those: it is a claim about
+ * what pressing a button does, and it was being composed inside the one half of this screen no
+ * sweep reads. That is why issue #213's defect survived — a button promising *the Building panel*
+ * while its handler opened the Everyday day stage was swept by nothing.
+ *
+ * It reaches the view as {@link EverydayLeverCard.goLabel} rather than as an exported function of
+ * its own, which is not a style choice: a second exported text producer in this module would be a
+ * declaration `honesty/surfaces.ts` has to name in an adapter, and this lane may not edit that
+ * file — `derive.test.ts` fails on an unclassified producer, which is the guard working. On the
+ * card it is inside `everydayReportViewOf`, which that adapter already covers, so seeding it is one
+ * line in a loop `surfaces.ts` already walks.
+ *
+ * The panel's name is still **read from the Engineer tab button in the page** rather than tabulated
+ * (see `reportScreen.ts`' docstring), so it arrives as a string that may be absent; with no such
+ * button the label names the simulator without naming a panel, which is a narrower claim rather
+ * than a wrong one, and is exactly what the press then does.
+ */
+function leverButtonLabel(panel: string | undefined): string {
+  return panel === undefined || panel === ''
+    ? 'Open the simulator'
+    : `Open the simulator’s ${panel} panel`;
+}
 
 /** § 6.5, resolved. */
 export function everydayReportViewOf(input: EverydayReportInput): EverydayReportView {
@@ -168,11 +388,16 @@ export function everydayReportViewOf(input: EverydayReportInput): EverydayReport
       title: lever.title,
       body: lever.body,
       surface: lever.surface,
+      goLabel:
+        lever.surface === undefined
+          ? undefined
+          : leverButtonLabel(input.panelNames?.[lever.surface]),
       noSurfaceNote: lever.surface === undefined ? NO_SURFACE_NOTE : undefined,
     })),
     honesty: {
       title: 'This was one day',
       body: sheet.smallPrint,
+      parts: honestyPartsOf(sheet.smallPrint, input.report?.smallPrint),
       pointer:
         sheet.nextStep === undefined
           ? undefined

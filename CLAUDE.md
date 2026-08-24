@@ -84,8 +84,23 @@ verdict:
 
   | tier | cases | strings | simulations | surfaces | failing cases | verdict |
   |---|---|---|---|---|---|---|
-  | always-on | 49 | **566 408** | **606** | **48** | **0** | **green**, and on its own merits |
-  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **706 094** | **4 710** | **49** | **0** | **green**, and the register is still empty |
+  | always-on | 49 | **566 408** | **606** | **48** | **0** | **green**, with **17** findings registered |
+  | deep (`ELEVATOR_SIM_HONESTY=deep`) | 60 | **706 094** | **4 710** | **49** | **0** | **green**, with **19** findings registered |
+
+  **The verdict column has gone back to meaning what it was written to mean, and the row below
+  predicted it.** A ninth property landed on 2026-08-24 — `internal-notation`, the mechanical
+  instrument for `CHARTER_PROGRAMME.md` § M2's third exit criterion — and it **found nineteen
+  violations on player surfaces**: seventeen in both tiers, two only the deep tier reaches. They are
+  **recorded rather than fixed**, in `honesty.test.ts`'s `OUTSTANDING` with ghost checks holding
+  them, on § D307's precedent. So both tiers still pass and **neither register is empty**, which is
+  the distinction the column was kept for. The criterion is met when that block is empty and at no
+  earlier moment; the fix is GitHub issue #207.
+
+  **The strings and surfaces columns are unmoved by that commit and are nonetheless stale** — the
+  property is a predicate over the existing corpus and renders nothing, but this wave's landed copy
+  has moved both tiers. Measured on the branch: 566 506 and 706 214. Those figures are **not
+  published here**, because M2 is still open and § D343 requires the measurement once after the wave
+  integrates. This row is re-measured then.
 
   **Re-measured 2026-08-13 on the integrated tree, both tiers, in one sitting** — the row above is
   that measurement, taken after every lane of the Everyday-and-Engineer wave had merged and never
@@ -116,7 +131,8 @@ verdict:
   been wrong at all. **This is the fourth time this file has recorded the same lesson**, which is why
   the sentence below it is the rule and not an observation.
 
-  **The deep tier's failing-case column is `0` for the first time, and the register is empty.** Both
+  **The deep tier's failing-case column reached `0` for the first time here, and the register was
+  briefly empty with it — the second half stopped being true on 2026-08-24, above.** Both
   entries in it named one collision — the M7 caveat's *"6 of 20 consecutive seeds"* against a refused
   mean of 19.65 — and § D332's deck fix moved that run: re-measured, `honesty-9100031` reports
   `awtIsValid: true` and a mean of **19.186**, so it neither suppresses nor rounds to 20. The entries
@@ -145,9 +161,11 @@ verdict:
   **The verdict column says *green* rather than *0 violations*, and the difference used to be
   deliberate.** It meant: both tiers pass, and every violation the search finds is in
   `honesty.test.ts`'s `OUTSTANDING` register with a ghost check holding it. **As of § D334 the two
-  now coincide — the register is empty and the search finds nothing**, which is the first time that
-  has been true of the deep tier. The distinction is kept in this row rather than deleted, because it
-  is what the column will mean again the next time a finding is recorded rather than fixed.
+  briefly coincided — the register was empty and the search found nothing**, which was the first
+  time that had been true of the deep tier. The distinction was kept in this row rather than deleted,
+  because it is what the column would mean again the next time a finding was recorded rather than
+  fixed. **That happened on 2026-08-24**, one property later, and the sentence is left standing
+  because a row that had predicted its own next state is worth more than a tidy one.
 
   - **`suppressed-mean` on `honesty-9100031` is closed, and not by anybody fixing it.** It was the
     cue-rule coincidence — the caveat says *"a quotable average on 6 of 20 consecutive seeds"* and

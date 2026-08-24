@@ -51,7 +51,6 @@ import {
   loadStepsFor,
   speedStepsFor,
   withMachineClass,
-  DESIGNER_ABSENCES,
   DESIGNER_COPY as COPY,
 } from './designerModel.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -175,16 +174,14 @@ function mount(host: HTMLElement, context: EverydayScreenShellContext): MountedE
   specBlock.style.cssText = cardStyle();
   root.append(specBlock);
 
-  /* the register */
-  const absences = el(doc, 'section', 'everyday-designer-absences');
-  absences.style.cssText = `border:1px solid ${C.rule};border-radius:${String(R.tile)}px;background:${C.cardSunk};padding:14px 16px`;
-  const absencesTitle = el(doc, 'h2', undefined, COPY.absencesEyebrow);
-  absencesTitle.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 8px`;
-  const absencesList = el(doc, 'ul');
-  absencesList.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;line-height:1.5;color:${C.warmGrey}`;
-  for (const entry of DESIGNER_ABSENCES) absencesList.append(el(doc, 'li', undefined, entry));
-  absences.append(absencesTitle, absencesList);
-  root.append(absences);
+  /*
+   * **The drawing board's register is not drawn here any more** — GitHub issue #207 puts all six
+   * registers on the settings screen (`everyday/buildNotes.ts`). `DESIGNER_ABSENCES` still names
+   * the same five absences; all five were re-worded out of the design document's vocabulary,
+   * because this was the one register in the tree with no plain-English row in it. The board keeps
+   * the refusal that belongs to a control, which is the specification block's own note about what
+   * the closed form cannot tell you.
+   */
 
   /* ---------------------------------------------------------------- wiring */
 

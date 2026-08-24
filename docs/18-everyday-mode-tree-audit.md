@@ -28,8 +28,10 @@
 > keeping: this audit was scoped to check whether §20's **controls** exist, and the thing missing was
 > the **screen they were supposed to live on**. It is closed by [§ D335](../DECISIONS.md) —
 > `packages/viz/src/everyday/` is now the page's entry point — and the shell's own remaining gaps are
-> `everyday/shell.ts#EVERYDAY_SHELL_ABSENCES`, kept beside the code and **drawn on the menu** rather
-> than listed here, so they cannot go stale the way a prose row in a plan did.
+> `EVERYDAY_SHELL_ABSENCES`, kept beside the code rather than listed here, so they cannot go stale
+> the way a prose row in a plan did. **It no longer lives in `shell.ts` and is no longer drawn on the
+> menu**: GitHub issue #207 moved the array to `everyday/buildNotes.ts` and the six registers to a
+> build-information panel in Settings, leaving the menu one sentence pointing at it.
 >
 > Nothing else below changes. Every finding about a control is still true of the tree, and the
 > controls still live where this audit found them.

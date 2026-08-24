@@ -150,15 +150,23 @@ const NOT_PLAYER_FACING: readonly { readonly reason: string; readonly ids: reado
          * GAMEPLAY § 7's stage screen, on the mounts' shared ground and on the same split: its
          * `mount` builds a canvas, sizes it from a bounding rect and drives a
          * `requestAnimationFrame` loop, none of which exists under Node. Every **word** it draws —
-         * the clock, the phase pill, the three § 7.1 figures with their counts and their two
-         * refusals, the alarm sentence, the four legend rungs, the intervention labels and stamp,
-         * all three intervention refusals, the § 3.3 primary's three, the ghost-lane absence and
-         * the screen's own register — is authored in `everyday/stageScreenModel.ts`, which the
-         * `EVERYDAY_STAGE` adapter drives at `sampleTimes`' playheads and over every state the
-         * model distinguishes. What the mount authors of its own is geometry, class names, and two
-         * transport captions (`▶ Play`, the paused-at-the-start line), which reach only the static
-         * sweep below — weaker than driving them, and stated as a limitation rather than presented
-         * as coverage.
+         * the clock, the phase pill, the next-stretch pill, the three § 7.1 figures with their
+         * counts and their two refusals, the alarm sentence, the four legend rungs, the intervention
+         * labels and stamp, all three intervention refusals, the § 3.3 primary's three, the
+         * ghost-lane absence and the screen's own register — is authored in
+         * `everyday/stageScreenModel.ts`, which the `EVERYDAY_STAGE` adapter drives at
+         * `sampleTimes`' playheads and over every state the model distinguishes.
+         *
+         * **Three of those words were the mount's own until § D347**, and one of them was a live
+         * figure: the cutaway's out-of-service caption, its `▲`/`▼` glyph and the car's
+         * `riders/capacity` readout were composed here, where no property could read them. They are
+         * the model's now, and so are the overlay's three sentences. What the mount authors of its
+         * own is geometry, class names and its **chrome** — the two transport captions, the `Start`
+         * button, the strip's title and its two lane captions — which reaches only the static sweep
+         * below, weaker than driving it and stated as a limitation rather than presented as
+         * coverage. That sweep is also the difference the three moved strings turned on: ordinary
+         * DOM text reaches it, and a `fillText` argument composed from two numbers is prose to
+         * nobody, so those three were read by nothing at all.
          */
         'everyday/stageScreen.ts#STAGE_SCREEN',
         'dev/buildingEditor.ts#mountBuildingEditor',

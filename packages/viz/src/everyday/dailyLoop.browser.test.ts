@@ -161,10 +161,17 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
       /*
-       * Close the day, then come back through Your week — which is the loop's tail as this build
-       * has it: the rail's `WORLD` row opens the week, today's card opens the account of it, and
-       * the report's own § 3.3 primary goes back to the week. See {@link closeDay} for the one
-       * press that has no Everyday home yet.
+       * Close the day, then come back through Your week — the loop's tail **by the rail**: the
+       * `WORLD` row opens the week, today's card opens the account of it, and the report's own
+       * § 3.3 primary goes back to the week.
+       *
+       * This used to say *"the one press that has no Everyday home yet"*, and it had gone stale in
+       * the same file that refutes it: the press has a home (`closeDay`'s own docstring says so
+       * three blocks up), and the last case in this suite walks it — § 3.3's primary on the stage,
+       * landing on the report, with no rail detour. What {@link closeDay} buys **here** is that
+       * the close is one deterministic step rather than a press whose timing depends on the
+       * stage's mount, because these cases are about what a *closed* day does to the other three
+       * screens. That is a reason to keep the call, not an absence to record.
        */
       await waitForOwnRun(page);
       await closeDay(page);
@@ -404,6 +411,48 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
         { timeout: 15_000 },
       );
       expect(await page.textContent('.everyday-bar-primary')).toBe('Set up today');
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
+
+  /**
+   * **GitHub issue #206 — the loop's tail, on the loop's own press.**
+   *
+   * The case above walks the tail *around* the defect: it closes the day through the host, then
+   * reaches the report by the rail's `WORLD` row and today's week card. That route is real and
+   * stays tested, and it is a **sidestep** — § 3.3's daily timeline says the report is step 4 of
+   * this flow, reached from the day.
+   *
+   * So this case presses what a player presses and nothing else: `Close the day`, on the shell's
+   * own bar, and then reads the screen it lands on. No rail row, no week card, no `page.evaluate`
+   * into the host — the four presses `enterEverydayStage` walks, then the fifth.
+   *
+   * It fails on the tree that reported #206: `everyday/stageScreen.ts`'s primary pauses the
+   * playback and files the day and does not navigate, so the fifth press leaves the player on the
+   * stage with the report written and no way to it.
+   */
+  it('files the day on § 3.3’s own primary and lands on the report — no rail detour', async () => {
+    const page = await coldLoad();
+    try {
+      // menu tile → front door → brief → stage, on § 3.3's primary at each step.
+      await enterEverydayStage(page);
+      await waitForOwnRun(page);
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
+
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+
+      // The filed sheet, not the empty one — the press that navigated is the press that filed.
+      expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+      expect(
+        await page.locator('.everyday-report-figures .everyday-figure').count(),
+      ).toBeGreaterThan(0);
+      // § 3.3's daily report row, which is how the shell says which screen this is.
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Your week');
+      // And step 4 of four is where the player now stands: the timeline's last stop is `current`,
+      // which is the one state the shell draws neither faint nor pressable.
+      expect(await page.textContent('.everyday-bar-timeline')).toContain('4 How it went');
     } finally {
       await page.close();
     }

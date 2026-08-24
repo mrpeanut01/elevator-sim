@@ -39,7 +39,7 @@ import {
   shiftRunPatch,
 } from './events.js';
 import { serviceEventsFor, type Incident } from './incidents.js';
-import { SHIFT_EVENT_IDS, type ShiftEventId } from './types.js';
+import { SHIFT_EVENT_IDS, WEEKDAYS, type ShiftEventId } from './types.js';
 
 const BUILDING_ID = 'midtown-office';
 const DURATION_S = 600;
@@ -171,6 +171,48 @@ describe('the schedule is the design’s own', () => {
 
   it('gives every id an entry, and every entry the id it is filed under', () => {
     for (const id of SHIFT_EVENT_IDS) expect(SHIFT_EVENTS[id].id).toBe(id);
+  });
+});
+
+describe('no event caption names a day the run does not have', () => {
+  /*
+   * § D175 stripped *"14:00"* from the fire drill because a shift runs 06:00 to 06:30 and *a
+   * caption naming an hour the run does not contain is the thing the honesty card exists to
+   * prevent*. A weekday is that same defect one unit up, and the schedule above is what makes it
+   * bite: `eventFor(1, 0)` is `ordinary`, `weekdayOf(0)` is `Monday`, and
+   * `everyday/today.ts#todayOf` builds `dayLabel` and `wrinkle` in **one call** — so an event name
+   * carrying its own weekday puts *MONDAY · DAY 1* and a different day into a single record, drawn
+   * on the front-door lede and again on the report header.
+   *
+   * No event may name one, because no event *has* one: `ShiftEvent` has no weekday field and
+   * `eventFor` is keyed on `day % 5`, not on the calendar. The list is derived from `WEEKDAYS`
+   * rather than written out here, so a renamed weekday cannot slip past this, and the sweep is over
+   * `SHIFT_EVENT_IDS`, so a sixth event cannot either.
+   */
+  const weekdaysNamedIn = (text: string): readonly string[] =>
+    WEEKDAYS.filter((weekday) => text.toLowerCase().includes(weekday.toLowerCase()));
+
+  it('detects one when there is one, so a green run above means something', () => {
+    // The detector's own fixture, and deliberately the exact string this rule was written for. A
+    // predicate nobody has watched return non-empty is a test that cannot fail — five of those have
+    // shipped in this repository.
+    expect(weekdaysNamedIn('An ordinary Tuesday-shaped day')).toEqual(['Tuesday']);
+    expect(WEEKDAYS.length).toBeGreaterThan(0);
+    // `Weekend goods run` is the near miss the substring rule has to let through: "weekend" is not
+    // a weekday, and `Saturday`/`Sunday` are.
+    expect(weekdaysNamedIn('Weekend goods run')).toEqual([]);
+  });
+
+  it.each(SHIFT_EVENT_IDS)('%s names no weekday, in its name or its note', (id) => {
+    for (const field of ['name', 'note'] as const) {
+      const text = SHIFT_EVENTS[id][field];
+      const named = weekdaysNamedIn(text);
+      expect(
+        named,
+        `SHIFT_EVENTS[${JSON.stringify(id)}].${field} names ${named.join(', ')} — ` +
+          `the run has no weekday to be that day. Offending string: ${JSON.stringify(text)}`,
+      ).toEqual([]);
+    }
   });
 });
 

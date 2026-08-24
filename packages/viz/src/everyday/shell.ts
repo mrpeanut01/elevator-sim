@@ -20,9 +20,9 @@
  * geometry to draw.
  *
  * Retiring it left the Engineer surface **booting, running, covered, and unreachable**: for one
- * wave nothing in the shipped page opened it, which was the second entry of
- * {@link EVERYDAY_SHELL_ABSENCES}. § 3.2's footer row is the door, and it is built now — see
- * {@link enterEngineer} and {@link returnToEveryday}, which are the whole of it.
+ * wave nothing in the shipped page opened it, which was the second entry of the shell's register
+ * of absences (`everyday/buildNotes.ts`). § 3.2's footer row is the door, and it is built now —
+ * see {@link enterEngineer} and {@link returnToEveryday}, which are the whole of it.
  *
  * **Both worlds are covered, never hidden, and the symmetry is the design rather than a
  * coincidence.** `div.shell` holds canvases that size themselves from their laid-out box, a
@@ -59,8 +59,10 @@
  */
 
 import { openTowerOf } from '../campaign/career.js';
+import type { WeekState } from '../shift/types.js';
 import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
+import { BUILD_NOTES_POINTER } from './buildNotes.js';
 import { HOST_PENDING_REASON } from './host.js';
 import type { EverydayHost, EverydayHostSlot } from './host.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
@@ -81,79 +83,6 @@ import type { EverydayMode, EverydayScreen, EverydayState, RunContext } from './
 import { EVERYDAY_ROOT, EVERYDAY_ROOT_CLASS } from './types.js';
 
 /**
- * What this shell does not yet do, in one place.
- *
- * `docs/18`'s register of honest absences does not name the shell, because the build plan's § 0
- * recorded it as already existing. This is the entry that was missing, kept next to the code so it
- * cannot go stale the way a prose row in a plan did.
- */
-export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
-  /*
-   * **Four rows left this register on the merge that brought § 6's daily loop in beside § 7's
-   * stage, and every one of them left because its screen landed rather than because anybody
-   * tidied.** Written down because a register whose deletions are invisible is a register a reader
-   * cannot audit, and because two of the four were deleted by the *other* lane's work:
-   *
-   * - *"§ 6.1 front door and § 6.2 brief — Today's tower opens the day directly"* — both are
-   *   registered screens now and the tile routes through them (`modes.ts` says so in the tile's
-   *   own comment);
-   * - *"§ 7's Everyday stage — the stage shown is the Engineer surface with Casual copy"* —
-   *   `everyday/stageScreen.ts` is § 7's stage, mounted in the screen region like any other;
-   * - *"§ 3.3's action bar is not drawn over the handed-off stage"*, with its consequence that
-   *   *Close the day* had no home — the hand-off retired with the stage becoming a screen, so the
-   *   bar is drawn under it and `actionBar.ts` gives that row the primary the note promises
-   *   (`stageScreenModel.test.ts` pins the label);
-   * - *"§ 14 boards and § 12.2 ladder — both need a server"* — true of the daily board and never
-   *   true of the ladder, which is measured on this device. It is replaced below by the half that
-   *   is still an absence.
-   *
-   * A register that kept naming any of them would be § D227's stale refusal — the defect this
-   * register exists to prevent — reproduced by the register itself.
-   */
-  '§ 6.1’s replay — a past day can be read from the front door’s week strip, not re-opened: a week moves forward and nothing here stands it back up',
-  '§ 6.2’s ghost — no run in this build races a second dispatcher over the same crowd, so *Race against* states what it would be instead of offering it',
-  /*
-   * **A fifth row left on the very next merge, and it is the one this register existed to make
-   * findable.** It read: *"the Engineer surface still boots and runs behind this shell, and nothing
-   * here opens it — the rail's Switch to Engineer row is that door and it is not built"*. That row
-   * is built (see {@link enterEngineer}), so the entry goes on the commit that closes it — the same
-   * direction `screens.ts`'s refusal table is keyed both ways to enforce one level down. A register
-   * is worth the number of people who read it, and an entry naming a closed absence is how one
-   * stops being read.
-   */
-  '§ 14’s daily board — a ranking of other people’s runs needs a server to post and verify them, and this build has none: the board screen opens on § 12.2’s labelled unavailable state for that tab, the ladder beside it is live because a rating is measured on this device, and Your week states what a board would be keyed on rather than drawing an empty one',
-  /*
-   * **A sixth row left on the merge that registered § 9.1's rush setup, § 13's drawing board and
-   * § 3.3's tuner — and it left because this merge closed it, which is the one case this register
-   * has not recorded before.**
-   *
-   * It read: *"§ 3.3's Tune the tower is registered and routable, and no shipped control opens it:
-   * § 3.2 forbids a rail row (*a thing you do to a day, not a place you live*) and names its two
-   * doors as the brief's *Take it to the sandbox* and the report's third lever, neither of which is
-   * built"*. That was true on the lane that wrote it and false the moment it met a tree carrying
-   * § 6.2's brief: the first of those two doors exists here, and `briefView.ts#lockedForScore` now
-   * carries the route through it. § 3.2's rail-row prohibition is unchanged and still asserted
-   * (`rail.test.ts`), so the screen is reached the way the guide says and by no other way.
-   *
-   * **What is left of it is the second door, and it is a row below rather than a deletion.** The
-   * report draws four § 6.5 lever cards and every one of them routes to the Engineer panel that
-   * carries out a fabric change; none is the sandbox lever. One door out of two is not the absence
-   * this row named, so the row is rewritten to the half that is still true rather than kept for the
-   * half that is not.
-   *
-   * **And the § 9 row below was rewritten on the same merge, in the other direction.** It read
-   * *"§ 9 Endless rush — no held time, no setup screen"*; the setup screen landed, so half of that
-   * sentence became false while the other half stayed exactly as true as it was. A row that has
-   * become half wrong is the most dangerous shape in a register — it reads as verified and is not —
-   * so it is narrowed to what remains missing, and where the refusal moved to (the screen's own
-   * § 3.3 primary, `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`) is named rather than left for a reader
-   * to discover.
-   */
-  '§ 6.5’s third lever does not open the tuner — the report’s four lever cards each route to the Engineer panel that carries the advice out, which is what `dev/reportPanel.ts#LEVER_SURFACES` names, and § 3.2 gives the tuner two doors of which only the brief’s *Take it to the sandbox* is drawn here',
-  '§ 9 Endless rush — the setup screen draws, and the climbing stream behind it does not exist, so its primary refuses; § 9.2’s held-time stage and § 9.3’s own result screen are unbuilt',
-]);
-
-/**
  * What the shell actually hands a screen's `mount` — the registry's contract plus the one seam
  * only the shell can provide: **the § 3.3 bar is the shell's element**, so a screen whose state
  * changes one of its cells (the fixit primary going `Run the day → Run it again`, the solved
@@ -169,6 +98,19 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
 export interface EverydayScreenShellContext extends EverydayScreenContext {
   /** Redraw the § 3.3 row for the current state, through the mounted module's `bar()`. */
   refreshBar(): void;
+  /**
+   * § 3.2's *Switch to Engineer*, as a call — {@link EverydayShell.enterEngineer}, unchanged.
+   *
+   * Here rather than in `screens.ts`' {@link EverydayScreenContext} for that interface's own stated
+   * reason: the swap is the shell's, not the registry's, and there is exactly one implementation of
+   * it. It is **not a second door** — the rail's footer row calls the same function, both are
+   * idempotent, and neither writes `inert` itself.
+   *
+   * Its one non-test caller is `everyday/reportScreen.ts`'s lever button (GitHub issue #213). That
+   * button's label names an Engineer panel, and until this seam existed its handler navigated
+   * *inside* this shell, so it named a surface it did not open.
+   */
+  enterEngineer(): void;
 }
 
 /**
@@ -636,11 +578,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     };
   }
 
+  /**
+   * § 3.2's career line, from the week the host holds — issue #214.
+   *
+   * The same shape as {@link campaignRailOptions} and for the same reason: the week is a fact about
+   * the *host*, so it is read at draw time and no host answers `{}`. What made #214 worth a lane is
+   * that the card was not reading a stale week — it was reading the **profile store**, which holds
+   * a name and a colour and has no day count to hold, so its refusal was unconditional. The two
+   * stores stay two (`profile.ts` argues why the profile is not a fourth key in `persist/`'s
+   * envelope); the card now asks the one that keeps days.
+   *
+   * `dayClosed` travels with it because *Close the day* alone sets it and a restored week can carry
+   * today's outcome without it — the same authority § 14's own cards answer to.
+   */
+  function weekRailOptions(): { week?: WeekState; dayClosed?: boolean } {
+    if (dataHost === undefined) return {};
+    return { week: dataHost.week(), dayClosed: dataHost.runState().dayClosed };
+  }
+
   function drawRail(): void {
     rail.replaceChildren();
     const stored = profileStore.current();
     const model: RailModel = railModel(state, {
       ...campaignRailOptions(),
+      ...weekRailOptions(),
       ...(stored === undefined
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
@@ -925,6 +886,34 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     return label.replace('⟨building⟩', named ?? 'The building');
   }
 
+  /**
+   * Whether the stop **one past** the current step already holds something to read.
+   *
+   * § 3.3's strip was drawn from the row's own step alone, so every stop past the current screen
+   * was faint and carried no listener. On the daily stage that made *4 How it went* evaluate
+   * `4 <= 3` and be inert **in every state, by construction**, which is half of GitHub issue #206:
+   * the day was filed, the sheet was written, and the one control naming it could not be pressed.
+   *
+   * Two bounds, and both are what keep this from becoming a shortcut through the flow.
+   *
+   * **The next stop only.** A stop two ahead is a screen the player has not produced yet, and a
+   * lit one would offer a way past the step that produces it. Only the immediately-next stop is
+   * ever asked about, which is why a `report` five steps along a campaign the player has not opened
+   * cannot light because a *daily* day happens to be filed — the campaign stage runs its own day on
+   * the way in, so the two flows cannot lend each other a sheet.
+   *
+   * **The report only, and only for the run on the stage.** It is the one stop whose screen can be
+   * full before the flow arrives at it, because § 6.4 step 5 writes the sheet at the close rather
+   * than on arrival; every other stop is a screen the player has yet to fill in. `dayClosed` is a
+   * fact about the recording currently loaded, so this lights for the day in front of the player
+   * and never for a sheet left standing from an earlier one — a lit *How it went* over an
+   * unfinished day would be § 16 rule 4, *a button does what it says*, read the wrong way round.
+   */
+  function nextStopIsLive(screen: EverydayScreen): boolean {
+    if (screen !== 'report' || dataHost === undefined) return false;
+    return dataHost.runState().dayClosed && dataHost.lastReport() !== undefined;
+  }
+
   function drawBar(): void {
     confirmShowing = false;
     bar.replaceChildren();
@@ -964,18 +953,27 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       for (const [index, stop] of stops.entries()) {
         const reached = index + 1 <= model.timeline.step;
         const current = index + 1 === model.timeline.step;
+        /*
+         * **Position in the flow is not the whole of it** — GitHub issue #206. The stop one past
+         * the current step is live when the screen behind it already holds something to read; see
+         * {@link nextStopIsLive}, which is the only reason a stop past the current step is ever
+         * pressable. Everything else is unchanged: the current stop is where you are and never a
+         * button, and a reached stop goes back.
+         */
+        const live =
+          !current && (reached || (index === model.timeline.step && nextStopIsLive(stop.screen)));
         const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.type = 'button';
-        step.disabled = !reached || current;
+        step.disabled = !live;
         step.style.cssText = [
           'border:0',
           'background:transparent',
           `font:500 10.5px ${TYPE.mono}`,
           'padding:2px 3px',
-          `color:${current ? C.ink : reached ? C.label : C.ruleMid}`,
-          'cursor:' + (reached && !current ? 'pointer' : 'default'),
+          `color:${current ? C.ink : live ? C.label : C.ruleMid}`,
+          'cursor:' + (live ? 'pointer' : 'default'),
         ].join(';');
-        if (reached && !current) {
+        if (live) {
           step.addEventListener('click', () => {
             go(stop.screen);
           });
@@ -1112,28 +1110,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     const list = el(doc, 'div');
     list.style.cssText = `display:flex;flex-direction:column;gap:${String(GAP.row + 2)}px;max-width:640px`;
     for (const mode of EVERYDAY_MODES) list.append(modeTile(mode));
-    screenRegion.append(list, absencesBlock());
+    screenRegion.append(list, buildNotesPointer());
   }
 
   /**
-   * {@link EVERYDAY_SHELL_ABSENCES}, on the screen.
+   * One line under the tiles saying where the build's own list of missing things is.
    *
-   * **Drawn rather than only declared, and that is the whole point of it.** A register of what a
-   * build does not do is worth exactly as much as the number of people who read it, and a constant
-   * no renderer touches is read by nobody — which is the shape `packages/viz/src/deadCode.test.ts`
-   * caught this array in on its first run, before this function existed. Putting it under the tiles
-   * makes the list a thing a player sees and a thing a stale entry gets noticed in.
+   * **This replaces the register itself, and the replacement is the whole of GitHub issue #207.**
+   * The front door used to draw all five of the shell's absences here — **under** the tiles, not
+   * above them, and measured rather than guessed: at roughly 1 120 characters against the four
+   * tiles' 490 it was the largest single block of text on the screen, written in the team's
+   * vocabulary, for a player who had not asked what was missing. The register is not deleted: it
+   * is on the settings screen with the other five, where a reader who wants it goes to find it
+   * (`everyday/buildNotes.ts`).
+   *
+   * **A pointer rather than nothing, deliberately.** A register is worth the number of people who
+   * read it, and a panel nobody can find is a constant no renderer touches wearing a screen. One
+   * sentence naming where it is costs the front door a line and keeps the list reachable from the
+   * first thing anybody sees.
    */
-  function absencesBlock(): HTMLElement {
-    const block = el(doc, 'section');
-    block.style.cssText = `margin-top:${String(GAP.wide)}px;max-width:640px`;
-    const title = el(doc, 'h2', undefined, 'What this build does not do yet');
-    title.style.cssText = `${EYEBROW};font-size:11px;margin:0 0 8px`;
-    const list = el(doc, 'ul');
-    list.style.cssText = `margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:${C.warmGrey}`;
-    for (const absence of EVERYDAY_SHELL_ABSENCES) list.append(el(doc, 'li', undefined, absence));
-    block.append(title, list);
-    return block;
+  function buildNotesPointer(): HTMLElement {
+    const note = el(doc, 'p', 'everyday-menu-build-note', BUILD_NOTES_POINTER);
+    note.style.cssText = `margin:${String(GAP.wide)}px 0 0;max-width:640px;font-size:12px;color:${C.warmGrey}`;
+    return note;
   }
 
   function modeTile(mode: EverydayMode): HTMLElement {
@@ -1251,6 +1250,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           refreshBar: () => {
             if (!confirmShowing) drawBar();
           },
+          /* § 3.2's swap, handed to the screen unchanged — see the interface's own docstring. */
+          enterEngineer,
         };
         mounted = module.mount(screenRegion, context);
         /*

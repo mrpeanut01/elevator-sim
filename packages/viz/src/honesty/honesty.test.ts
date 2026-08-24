@@ -38,6 +38,7 @@ import {
   formatHonestyStats,
   HONESTY_MODES,
   HONESTY_PROPERTIES,
+  PLAYER_FACING_SURFACES,
   runHonestyCampaign,
   STANDARD_CORPUS,
   STANDARD_SPACE,
@@ -213,6 +214,60 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
     expect(Object.keys(standard.stats.modes).sort()).toEqual([...HONESTY_MODES].sort());
   });
 
+  it('the charter gate has a scope, and it is derived from the adapters rather than listed', () => {
+    /*
+     * **The false-negative shape this property has and the other eight do not.** Eight of the nine
+     * are asked about every string in the corpus; `internal-notation` is asked only about strings on
+     * `PLAYER_FACING_SURFACES`, so an edit that emptied that set — or narrowed it to the wrong
+     * spelling — would turn `CHARTER_PROGRAMME.md` § M2's gate green while every offending sentence
+     * stayed on the screen. That is a search certifying nothing, which is what this whole describe
+     * block exists to refuse, so the scope is asserted in **both** directions.
+     */
+    for (const surface of PLAYER_FACING_SURFACES) {
+      expect(SURFACE_ADAPTERS.map((adapter) => adapter.id), surface).toContain(surface);
+    }
+    // Non-empty, and big enough that a set trimmed to one lucky surface is red.
+    expect(PLAYER_FACING_SURFACES.size).toBeGreaterThanOrEqual(10);
+
+    // In: every surface the register's findings live on, plus the campaign's stage verdict.
+    for (const surface of [
+      'everyday/modes.ts#EVERYDAY_MODES',
+      'everyday/settingsView.ts#settingsScreenViewOf',
+      'everyday/stageScreenModel.ts#stageHeaderOf',
+      'everyday/designerModel.ts#designerFigures',
+      'campaign/judge.ts#judgeStage',
+    ]) {
+      expect(PLAYER_FACING_SURFACES.has(surface), surface).toBe(true);
+    }
+
+    /*
+     * **In, and its id is in neither player directory** — this is the assertion that pins the
+     * derivation to `covers` rather than to the adapter's own id. `gauntlet/ladder.ts#ladderRowsOf`
+     * draws `everyday/boardScreen.ts#BOARD_SCREEN_COPY` and `#DAILY_BOARD_ABSENCE`, so a rule keyed
+     * on the id would leave the board screen's own register of absences — the exact shape of string
+     * this gate is about — outside the gate while looking complete.
+     */
+    expect(PLAYER_FACING_SURFACES.has('gauntlet/ladder.ts#ladderRowsOf')).toBe(true);
+
+    /*
+     * **Out, and each of these is a measurement rather than an opinion.** Over the 27 049 distinct
+     * strings a seven-seed sample of this corpus renders, a filename match on every surface reports
+     * 656; 572 are `familyControlsViewOf` drawing
+     * *"Read by `dispatch/policy.ts#resolveDispatchConfig`"* — an Engineer panel naming the code that
+     * reads a field, correctly, to an engineer. A gate that fired there would be § D91's failure: a
+     * guard that cries about legitimate cases trains people to ignore it.
+     */
+    for (const surface of [
+      'dev/familyControls.ts#familyControlsViewOf',
+      'dev/buildingEditor.ts#specRowsOf',
+      'dev/rightRail.ts#buildingPlateOf',
+      'controls/controls.ts#controlsFor',
+      'live/bands.ts#moodAt',
+    ]) {
+      expect(PLAYER_FACING_SURFACES.has(surface), surface).toBe(false);
+    }
+  });
+
   it('every property can fire — asserted here, and demonstrated in faults.test.ts', () => {
     // The list is derived from the fault table rather than restated, so a property added without
     // a fault is red here as well as there.
@@ -292,13 +347,27 @@ describe('a counterexample shrinks', () => {
 });
 
 /**
- * What the search **found**, pinned in both directions. **Two entries and one finding** — entered
- * once per tier it reproduces in, because the second direction below is asked per tier and a
- * finding recorded in one corpus is a ghost in the other.
+ * What the search **found**, pinned in both directions. **The register is empty**, and both tiers
+ * are green with it: GitHub issue #207 closed the nineteen `internal-notation` entries that stood
+ * here — seventeen absence registers rewritten in place, a stage verdict's note reworded, and a
+ * parameter description filtered by `campaign/words.ts#playerSafeDescription` — and every one was
+ * deleted on the commit that made it stop reproducing.
  *
- * It was four entries and two findings until GitHub issue #137 closed R13 on the delta block in the
- * product. Both of that finding's entries are gone; the argument for what it was and what closed it
- * stays below, as prose, on the same footing as every other closed finding in this file.
+ * **Empty is a state that has to keep being checked, not a rule that can be deleted.** The
+ * machinery below stays exactly where it is: the second direction iterates nothing today, and the
+ * negative control exists precisely because an empty register makes both directions cheap. The next
+ * finding recorded rather than fixed arrives here, and `faults.test.ts`'s clean-run assertion has
+ * to move with it — neither may empty while the other still names something.
+ *
+ * An entry names the tier it was **measured** in, because the second direction below is asked per
+ * tier and a finding recorded in one corpus is a ghost in the other.
+ *
+ * It was nineteen entries and one finding before that, two entries and one finding before *that*,
+ * and four entries and two findings before *that*,
+ * until GitHub issue #137 closed R13 on the delta block in the product and § D332 moved the run the
+ * R3 cue collision needed. Every one of those entries is gone; the argument for what each was and
+ * what closed it stays below, as prose, on the same footing as every other closed finding in this
+ * file.
  *
  * A found violation is a result before it is a patch, so a finding is recorded here rather than
  * quietly fixed, and the register is asserted **both ways**, which is what stops it becoming a
@@ -386,8 +455,19 @@ describe('a counterexample shrinks', () => {
 const OUTSTANDING: readonly {
   readonly property: string;
   readonly surfaceId: string;
-  /** The corpus this finding reproduces in, and where its ghost check runs. See above. */
-  readonly tier: 'standard' | 'deep';
+  /**
+   * The corpus this finding reproduces in, and where its ghost check runs. See above.
+   *
+   * **`'both'` is not a convenience, and it replaces a duplicate row rather than excusing one.**
+   * The R13 finding above stood as two entries, one per tier, because the second direction is asked
+   * per tier and a row marked `standard` is unwatched in the deep corpus. That is right, and it has
+   * a failure mode of its own: seventeen findings on copy that renders in both tiers would be
+   * thirty-four rows, deleted in two places on the day each is fixed, and a half-deletion is exactly
+   * the ghost this register exists to catch. So a finding measured in both corpora says so once, and
+   * {@link expectStillFound} watches it in both. The word is a claim about a **measurement**: mark it
+   * only after running the tier, never because a surface looks tier-independent.
+   */
+  readonly tier: 'standard' | 'deep' | 'both';
   /** A fragment of the offending **string**, when the finding is about particular words. */
   readonly contains?: string;
   /**
@@ -580,6 +660,84 @@ const OUTSTANDING: readonly {
    * and it will arrive unregistered — which is the correct state for a finding nothing currently
    * reproduces.
    */
+
+  /*
+   * ## 3. The charter's M2 gate — **nineteen findings, all CLOSED, and the register is empty
+   * again**
+   *
+   * `CHARTER_PROGRAMME.md` § M2's third exit criterion is *"nothing on a player surface refers to a
+   * section number, a source filename or a code identifier"*, and it says of itself that it *"is a
+   * mechanical check and it is part of the gate"*. It had no instrument, so it would have been
+   * settled by review. `properties.ts#checkInternalNotation` is that instrument; nineteen rows
+   * stood here from the run that watched it fail — seventeen in both tiers over four surfaces, two
+   * only the deep tier reaches — and **the criterion is met when this block is empty and at no
+   * earlier moment**, which is what it is now.
+   *
+   * They are deleted **on the commit that made them stop reproducing** (GitHub issue #207), which
+   * is the rule the closed findings above were left here to state: deleting one any earlier or any
+   * later is the same defect twice. What follows is the record, because a register whose deletions
+   * are invisible is a register a reader cannot audit.
+   *
+   * ### What closed the seventeen: a rewrite, not a mechanism change
+   *
+   * `ISSUE_VERIFICATION_FINDINGS.md` § N counted the same seventeen by hand and drew the
+   * conclusion this lane acted on — *"AC1 can be met by rewriting 17 strings without touching the
+   * mechanism or the guarantee"* — and the counter-example that proved it was already in the tree:
+   * `campaign/career.ts#CAMPAIGN_ABSENCES` is three entries of plain English with no notation in
+   * them at all. So every one of the seventeen was rewritten in place, in the array that owns it,
+   * saying the same absence for the same reason in the vocabulary of the screen rather than of the
+   * source. Nothing was deleted, nothing was softened, and no register lost a row.
+   *
+   * The registers also **moved** — off six player screens onto one build-information panel reached
+   * from Settings (`everyday/buildNotes.ts`) — which is the rest of issue #207 and is not what
+   * closed these entries. Rewriting alone would have closed them; the move is why the front door no
+   * longer opens with a list of what is missing.
+   *
+   * **The move had a constraint worth recording**, because it is the standing requirement pointed
+   * at a fix: these registers were on player screens *because a dead-code audit flagged the first
+   * of them as an array no renderer touched*. `everyday/buildNotes.ts#buildNotesViewOf` is the
+   * non-test caller of all six now, and `settingsScreen.ts` is its non-test caller. Moving the
+   * drawing without giving the arrays a new reader would have put every one of them back into that
+   * audit — the defect moved rather than fixed.
+   *
+   * ### What closed the two the deep tier found
+   *
+   * 1. **`campaign/judge.ts#judgeStage`** named the file the bar is published in. The sentence was
+   *    doing something right — R12's point is that a goal ships with its measured rate and the bar
+   *    is not invented at judging time — and it said so in the wrong vocabulary for a person
+   *    reading a stage verdict. It now says *shipped with the stage and measured before you played
+   *    it*, which is the same claim without a path in it.
+   *
+   * 2. **`core`'s own description of `auction.aggregation`**, re-printed on the campaign brief's
+   *    editable-control list, cited a document by path. The remedy is the one the entry itself
+   *    named as the cheapest to overlook: `campaign/words.ts#playerSafeDescription` already exists
+   *    to make `core`'s words player-safe and already ran on this exact description, so it now
+   *    refuses a description carrying internal notation the same way it refuses one carrying a
+   *    probability word — naming the dial, keeping the Parameters tab whole, and hiding nothing.
+   *    `core` is untouched, which was the point: the Parameters tab is a schema surface and may
+   *    show it.
+   *
+   * ### One thing the nineteen did **not** close, and it is not in this register
+   *
+   * **The gate has a hole this lane did not fill, and it has already been adjudicated.**
+   * [§ D347](../../../../DECISIONS.md) rules that the Everyday stage's own canvas comes inside the
+   * gate's scope **before M2 exits**, as its own lane, sequenced after this one. What is uncovered
+   * is `everyday/stageScreen.ts#STAGE_SCREEN` — excluded from the corpus on the DOM mounts' shared
+   * ground, legitimately, because it needs a document, a canvas and an animation frame — and the
+   * hole is that the mount composes words of its own that no model carries, so no property reads
+   * them at all.
+   *
+   * It is stated here rather than registered because **there is no finding**: the search has never
+   * read those strings either way, and a register entry for a string nothing has measured would be
+   * a ghost. What holds the claim honest meanwhile is § D347 itself, which is dated before this
+   * commit and names the lane that closes it.
+   *
+   * The obvious short cut is the wrong one and is measured rather than argued: widening
+   * `PLAYER_FACING_DIRECTORIES` to reach a renderer would report 656 filename matches against the
+   * 2 the scoped property finds, 572 of them an Engineer panel naming code to an engineer,
+   * correctly. That is § D91's failure — a guard nobody believes — and it is why the scope is not
+   * simply widened.
+   */
 ]);
 
 interface FoundViolation {
@@ -643,7 +801,7 @@ function violationsOf(failure: HonestyShrinkResult): readonly FoundViolation[] {
  * for why the marker exists at all.
  */
 function expectStillFound(tier: 'standard' | 'deep', seen: readonly FoundViolation[]): void {
-  for (const known of OUTSTANDING.filter((entry) => entry.tier === tier)) {
+  for (const known of OUTSTANDING.filter((entry) => entry.tier === tier || entry.tier === 'both')) {
     expect(
       seen.some((found) => entryMatches(known, found)),
       `the ${tier} search no longer finds ${known.property} on ${known.surfaceId}. If it was ` +
@@ -678,10 +836,12 @@ describe('§ D163 clause 1 — no player-facing string asserts what the run refu
      * **The assertion that stops `OUTSTANDING` from quietly becoming a wildcard.** It was written
      * when the register was empty, because an empty register makes the two assertions above cheap
      * in opposite ways: the second iterates nothing, and the first would pass on a
-     * `matchesOutstanding` that matched everything. Neither reason has gone away now the register
-     * has two entries — a predicate that returned `true` for every violation would satisfy both
-     * directions at once. So a real violation is produced — by fault, on a real case over the
-     * shipped data, on a property and a surface **no** entry names — and asserted **not** matched.
+     * `matchesOutstanding` that matched everything. The register has been empty, then two entries,
+     * then nineteen, and is empty again — and neither reason has gone away at any point along the
+     * way, because a predicate that returned `true` for every violation would satisfy both
+     * directions at once whatever the register holds. So a real violation is produced — by fault,
+     * on a real case over the shipped data, on a property and a surface **no** entry names — and
+     * asserted **not** matched.
      */
     const faulted: HonestyResources = { ...resources, corruptTexts: FAULTS['probability-word'][0]?.fault };
     const outcome = evaluateCase(caseFromSeed(9013, { space: STANDARD_SPACE }), faulted);

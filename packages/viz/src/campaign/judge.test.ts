@@ -162,7 +162,7 @@ describe('the headline is a tally of verdicts, not a goal claim', () => {
 
     /*
      * A **measured** clear, and it is stage 5 rather than stage 4 since § D265 — see
-     * `campaign.test.ts` § *stage 5, played*, which sweeps the twelve shipped profiles and records
+     * `campaign.test.ts` § *stage 5, played*, which sweeps the thirteen shipped profiles and records
      * that the clear moved buildings when § D254 changed what every conventional arm on an
      * access-zoned building does.
      *

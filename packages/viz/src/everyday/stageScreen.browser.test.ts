@@ -56,6 +56,7 @@ import {
   enterEverydayStage,
 } from '../dev/browserTier.test-helper.js';
 import { ACTION_BAR_ROWS } from './actionBar.js';
+import { EVERYDAY_COLORS } from './tokens.js';
 
 /**
  * § 3.3's own cell, imported rather than transcribed.
@@ -93,16 +94,85 @@ afterAll(async () => {
   await server?.close();
 });
 
-/** A cold load, settled: `dev/main.ts` has booted and its own menu has been dismissed. */
-async function coldLoad(): Promise<Page> {
+/**
+ * A cold load, settled: `dev/main.ts` has booted and its own menu has been dismissed.
+ *
+ * The building is a parameter because the cutaway's geometry is a function of it — `vertical-city`
+ * draws a car roughly nine times narrower than `garden-apartments` does, which is the size range
+ * `docs/28-art-direction.md` § 5.2 names as the one where the door has to be checked. Every case
+ * that does not care takes the default, which is what they all took before it was a parameter.
+ */
+async function coldLoad(buildingId = 'garden-apartments'): Promise<Page> {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
+  await page.goto(`${origin}?building=${buildingId}&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
     undefined,
     { timeout: 30_000 },
   );
   return page;
+}
+
+/**
+ * The stage canvas's own pixels, counted by colour — GitHub issue **#212**.
+ *
+ * `canvasHasPaint` below answers *did anything get drawn*. This answers *what*, and it is the only
+ * instrument in this repository that can settle #212's first defect: whether a shut car reads as a
+ * dark box with an amber doorway or as a solid amber block. Every other check in the tree looks at
+ * the plan; this looks at the bitmap the plan produced, through a real 2D context, on the page a
+ * player loads.
+ *
+ * Two readings, both structural rather than positional — nothing here needs to know where a car is:
+ *
+ * - **`count`**, exact-match pixels of each colour. Antialiased edges are blends and are counted as
+ *   neither, which is the conservative direction: it under-counts both sides equally.
+ * - **`tallestRun`**, the longest unbroken vertical run of each colour anywhere on the canvas. That
+ *   is the **shape** reading, and it is what tells a shut door from a shut car: the defect painted
+ *   amber over the car's whole interior height, and the fix confines it to a band under half of it.
+ */
+async function canvasInk(
+  page: Page,
+  colors: readonly string[],
+): Promise<readonly { readonly count: number; readonly tallestRun: number }[]> {
+  return page.evaluate((wanted) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.everyday-stage-canvas');
+    const ctx = canvas?.getContext('2d') ?? null;
+    if (canvas === null || ctx === null || canvas.width === 0) {
+      return wanted.map(() => ({ count: 0, tallestRun: 0 }));
+    }
+    const { width, height } = canvas;
+    const data = ctx.getImageData(0, 0, width, height).data;
+    const targets = wanted.map((hex) => [
+      Number.parseInt(hex.slice(1, 3), 16),
+      Number.parseInt(hex.slice(3, 5), 16),
+      Number.parseInt(hex.slice(5, 7), 16),
+    ]);
+    const counts = targets.map(() => 0);
+    const tallest = targets.map(() => 0);
+    const runs = targets.map(() => new Array<number>(width).fill(0));
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const at = (y * width + x) * 4;
+        for (const [index, target] of targets.entries()) {
+          const hit =
+            data[at] === target[0] && data[at + 1] === target[1] && data[at + 2] === target[2];
+          const column = runs[index] ?? [];
+          if (hit) {
+            counts[index] = (counts[index] ?? 0) + 1;
+            const run = (column[x] ?? 0) + 1;
+            column[x] = run;
+            if (run > (tallest[index] ?? 0)) tallest[index] = run;
+          } else {
+            column[x] = 0;
+          }
+        }
+      }
+    }
+    return targets.map((_unused, index) => ({
+      count: counts[index] ?? 0,
+      tallestRun: tallest[index] ?? 0,
+    }));
+  }, colors);
 }
 
 /** Whether the canvas's backing store holds any non-transparent pixel. */
@@ -118,6 +188,95 @@ async function canvasHasPaint(page: Page): Promise<boolean> {
     }
     return false;
   });
+}
+
+/**
+ * The Everyday data host, reached from inside the page — `dailyLoop.browser.test.ts`'s idiom.
+ *
+ * Only the readings GitHub issue #215 is about: whether a run is on the stage, whether it is filed,
+ * and which attempt at the day the week is counting. All three come off the product's own façade
+ * rather than off a rendered string, because the sheet that prints the count is on another screen
+ * and the claim is about the count itself.
+ */
+interface HostWindow {
+  readonly __everydayHost?: {
+    current():
+      | {
+          runState(): { readonly hasRun: boolean; readonly dayClosed: boolean };
+          week(): { readonly attempt: number };
+        }
+      | undefined;
+  };
+}
+
+/**
+ * A token the #215 case parks on its document, so a page that was replaced under it says so.
+ *
+ * Named here rather than inlined because it is written in one place and read in another, and the
+ * whole value of it is that the two spellings cannot drift.
+ */
+const ALIVE = '__stageCaseAlive';
+
+/** One reading of {@link HostWindow}, or `null` while the shell has published no host. */
+interface HostFacts {
+  readonly hasRun: boolean;
+  readonly dayClosed: boolean;
+  readonly attempt: number;
+}
+
+/**
+ * Read the host, publishing the handle first if this document has not got one.
+ *
+ * The re-publish is not belt: `dev/main.ts` rewrites the address bar with `replaceState` on every
+ * state change, and a handle parked on `window` by a single `evaluate` is one page-level surprise
+ * away from being gone — which is a **timeout with no facts in it**, the least useful failure a
+ * browser case can produce. Asking for it every time costs one resolved module import.
+ */
+async function hostFacts(page: Page): Promise<HostFacts | null> {
+  try {
+    await page.evaluate(
+      "window.__everydayHost ? true : import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+    );
+    return await page.evaluate(() => {
+      const current = (window as unknown as HostWindow).__everydayHost?.current();
+      if (current === undefined) return null;
+      const run = current.runState();
+      return { hasRun: run.hasRun, dayClosed: run.dayClosed, attempt: current.week().attempt };
+    });
+  } catch {
+    /*
+     * *Execution context was destroyed* — the dev server reloading the page under the poll, which
+     * is `docs/…` § D220's *"the one tier that can fail for reasons that are not about this
+     * repository"* arriving as an exception in the middle of a reading. It is a **missing** reading,
+     * not a false one, so it is reported as one and the caller polls again; a genuinely reloaded
+     * page never satisfies {@link untilHost} and fails on its last reading instead of here.
+     */
+    return null;
+  }
+}
+
+/**
+ * Poll {@link hostFacts} until `wanted` holds, and hand back the last reading either way.
+ *
+ * `page.waitForFunction` would do the waiting and report a bare `TimeoutError`. The case below
+ * waits **for a defect** as well as for a state, so both outcomes are ordinary results rather than
+ * exceptions, and the reading that was actually on the page travels into the assertion message.
+ */
+async function untilHost(
+  page: Page,
+  wanted: (facts: HostFacts) => boolean,
+  timeoutMs: number,
+): Promise<{ readonly held: boolean; readonly last: HostFacts | null }> {
+  const deadline = Date.now() + timeoutMs;
+  let last: HostFacts | null = null;
+  for (;;) {
+    last = await hostFacts(page);
+    if (last !== null && wanted(last)) return { held: true, last };
+    if (Date.now() >= deadline) return { held: false, last };
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
+    });
+  }
 }
 
 describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
@@ -204,6 +363,69 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.close();
   });
 
+  /**
+   * **GitHub issue #212, defect 1 — settled on the pixels rather than on the plan.**
+   *
+   * The stage opens paused with every car standing and its doors shut, which is the state #212 is
+   * about and the state a car is in for most of a run. The mount drew the two door leaves as
+   * `((width − 3) / 2) × (1 − doorFraction)` from the body's outer edges, so at `doorFraction = 0`
+   * each leaf was **half the body**, the pair covered the car completely, and the nine `paper`
+   * occupancy marks then sat on `sun` at 1.83:1 — the ratio § D336 measured and refused for text on
+   * this palette. *A shut car was a solid amber block.*
+   *
+   * Watched failing before it landed: on the tree that reported the issue, `garden-apartments`
+   * opened with **more amber than ink** on the canvas and the tallest unbroken amber run was the
+   * car's whole interior height. Both readings invert here, and both are needed —
+   *
+   * - the **counts**, because a fix that shrank the leaves without moving them would still leave
+   *   the car mostly amber;
+   * - the **runs**, because a fix that simply stopped drawing doors would pass a count test while
+   *   removing the thing § 7.2 asks the picture to say. `sun` must still be on the canvas.
+   *
+   * Neither reading needs to know where a car is, which is why this case survives a geometry
+   * change. What it asserts is the read: *dark boxes with amber doors*, not amber boxes.
+   *
+   * Driven on **two** buildings, because § 5.2's acceptance names the size range rather than a
+   * building: `vertical-city` puts 35 cars across seven banks and draws a car roughly nine times
+   * narrower than `garden-apartments` does, which is where an area-only difference would stop being
+   * visible and where the plan's hairline branches live.
+   */
+  it.each(['garden-apartments', 'vertical-city'])(
+    'draws a shut car on %s as a dark box with an amber doorway, not as a block of door',
+    async (buildingId) => {
+      const page = await coldLoad(buildingId);
+      try {
+        await enterEverydayStage(page);
+        /* The opening frame, before `Start`: every car standing, every door shut. */
+        expect(await page.isVisible('.everyday-stage-start')).toBe(true);
+        expect(await canvasHasPaint(page)).toBe(true);
+
+        const [ink, sun] = await canvasInk(page, [EVERYDAY_COLORS.ink, EVERYDAY_COLORS.sun]);
+        if (ink === undefined || sun === undefined) throw new Error('two readings expected');
+        /* Measured either side of the fix on `garden-apartments`, so the margins below are read as
+           margins rather than as thresholds somebody chose: the defect drew **7 040** amber against
+           **892** ink with the amber running the car's full 17 px interior; the fix draws **1 904**
+           amber against **6 640** ink, with amber running 7 px against ink's 20. `vertical-city`'s
+           whole picture is smaller — 220 amber against 1 338 ink, 2 px against 7 — which is the
+           point of driving it: the same claim, three times less room to make it in. */
+
+        /* The doors are drawn. A stage that had stopped drawing them would pass everything below. */
+        expect(sun.count, 'the door leaves are still painted').toBeGreaterThan(0);
+        /* The car's identity is its body: ink dominates the picture the cars are in. AD-S1. */
+        expect(sun.count * 2, `${String(sun.count)} amber against ${String(ink.count)} ink`)
+          .toBeLessThan(ink.count);
+        /* And the amber is a band inside the car rather than its full height. AD-S2 / AD-S3. */
+        expect(sun.tallestRun).toBeGreaterThan(0);
+        expect(
+          sun.tallestRun,
+          `amber runs ${String(sun.tallestRun)} px against ink's ${String(ink.tallestRun)} px`,
+        ).toBeLessThan(ink.tallestRun);
+      } finally {
+        await page.close();
+      }
+    },
+  );
+
   it('plays, and the clock moves', async () => {
     const page = await coldLoad();
     await enterEverydayStage(page);
@@ -271,14 +493,15 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.click('.everyday-bar-confirm-stay');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
 
-    /* § 3.3's primary files the run; the latch disarms with it, because a filed day is not open. */
+    /*
+     * § 3.3's primary files the run; the latch disarms with it, because a filed day is not open.
+     *
+     * **And it opens the sheet it wrote** — GitHub issue #206 — so what stands after the press is
+     * the report, not the stage. The two claims this case made about the *stage* after a file are
+     * unchanged and are made in the case below, which files the day the other way it is filed.
+     */
     await page.click('.everyday-bar-primary');
-    await page.waitForFunction(
-      () => document.querySelector('.everyday-stage-intervene')?.hasAttribute('disabled') === true,
-      undefined,
-      { timeout: 30_000 },
-    );
-    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain('filed');
+    await page.waitForSelector('.everyday-report', { timeout: 30_000 });
 
     await page.click('.everyday-bar-leave');
     /* No strip: a report is already after the fact, and warning about it would be theatre. */
@@ -289,4 +512,229 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.waitForSelector('.everyday-mode[data-screen="door"]');
     await page.close();
   });
+
+  /**
+   * The stage's own filed state — which the § 3.3 press no longer stops on.
+   *
+   * Since GitHub issue #206 the primary opens the report, so a day filed *by pressing it* leaves
+   * this screen. The state is neither gone nor invented: `dev/main.ts`'s tick files a day whose
+   * playhead has run out, and that file arrives while the player is still watching. So it is driven
+   * here through the data host — `dailyLoop.browser.test.ts#closeDay`'s idiom, for its stated
+   * reason: one deterministic step rather than a press whose timing depends on the mount.
+   *
+   * Both assertions were the case above's before the fix, and neither is weakened: an intervention
+   * on a filed day is refused **and says so**, and § 3.4 does not warn about leaving one.
+   */
+  it('refuses an intervention on a day filed under it, and does not warn about leaving that', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    await page.click('.everyday-stage-play');
+
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-stage-intervene')?.hasAttribute('disabled') === true,
+      undefined,
+      { timeout: 30_000 },
+    );
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain('filed');
+    /* Still the stage: only the § 3.3 press navigates, and this was not it. */
+    expect(await page.locator('.everyday-stage-canvas').count()).toBe(1);
+
+    await page.click('.everyday-bar-leave');
+    expect(await page.locator('.everyday-bar-confirm-stay').count()).toBe(0);
+    await page.waitForSelector('.everyday-mode[data-screen="door"]');
+    await page.close();
+  });
+
+  /**
+   * **#206's other half, in the one state that still shows it.**
+   *
+   * The daily strip's fourth stop is the report, and on a stage at step 3 it evaluated `4 <= 3`:
+   * faint, `disabled` and carrying **no listener at all**, in every state, by construction. A day
+   * filed under the player — `dev/main.ts` files one whose playhead has run out — is the state in
+   * which that stop has a written sheet behind it and is still not the step the flow has reached.
+   * It is now the next stop with something to read, so it is a way to the account of the day, and
+   * filed this way it is the only way to it from here.
+   */
+  it('lights the report stop once the day behind it is filed, and it goes there', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    const stop = page.locator('.everyday-bar-timeline button').nth(3);
+    expect(await stop.textContent()).toBe('4 How it went');
+    /* Unfiled: the sheet does not exist yet, so the stop is faint and inert — unchanged. */
+    expect(await stop.isDisabled()).toBe(true);
+
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelectorAll('.everyday-bar-timeline button')[3]
+          ?.hasAttribute('disabled') === false,
+      undefined,
+      { timeout: 30_000 },
+    );
+
+    await stop.click();
+    await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+    expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+    await page.close();
+  });
+
+  /**
+   * **A filed day is not silently re-run by walking back onto its stage** — GitHub issue **#215**.
+   *
+   * The sheet read *"attempt 4 at this day"* to a player who had pressed *Run* once. The issue
+   * blamed navigation; navigation is not it — § D232 closed that path, and `dev/main.ts:3386`
+   * guards the report tab with a `closeShift` that returns early on `filedRunId`. The count
+   * increments in exactly one place (`shift/week.ts#closeDay`) and it is honest about what it
+   * counts: **closes**. What was dishonest is the run underneath it.
+   *
+   * `mount` asked for a day whenever `runState().open` was false, and a filed day is not open — so
+   * re-entering the stage after a close started a **new** run. `dev/state.ts` does not re-roll the
+   * seed, so that run is bit-identical to the one just filed; `adopt` clears `filedRunId`, which
+   * re-arms the filing gate; and `dev/main.ts`'s tick files it when its playhead runs out, behind
+   * the Everyday cover. Report → *‹ The day* → wait is *attempt 2* with the player having asked
+   * for nothing and nothing having changed. A bit-identical re-simulation is not an attempt.
+   *
+   * ## Nothing below presses *Close the day* twice, and that is the point
+   *
+   * A player who presses the primary a second time **has** made a second attempt — § D223's own
+   * correction, which `week.test.ts` pins. The walk below is navigation only: file once, go to the
+   * sheet, come back on `‹ The day`, and wait. Everything the count does after that, it does with
+   * nobody asking.
+   *
+   * ## The second wait is a wait for a defect, and it is meant to run out
+   *
+   * There is no event for *a run that was never started*, so the green path is the absence of one.
+   * Timing out is the pass, and the assertion is on the last reading rather than on the timeout, so
+   * a red run says which fact was wrong instead of only that a clock expired.
+   */
+  it('does not re-run a filed day when the stage is re-entered, so the attempt count holds', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+
+    /*
+     * File the day through the data host — the idiom two cases above this one use, for their stated
+     * reason: one deterministic step rather than a press whose timing depends on the mount. It is
+     * also the call `dev/main.ts`'s tick makes when a playhead runs out under a watching player,
+     * and the attempt it books is 1 by either route.
+     *
+     * This case drove the ×60 transport to the end of the day instead while it was being written,
+     * which is the route the reporter walked and which reproduces the same way. It is not what
+     * shipped: sixty seconds of real playback per run is sixty seconds in which the dev server can
+     * reload the page underneath the poll, and the finding here is about re-**entry**, not about
+     * how the day came to be filed.
+     */
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    const filed = await untilHost(page, (facts) => facts.dayClosed, 60_000);
+    expect(filed.last, 'the day never filed').toEqual({
+      hasRun: true,
+      dayClosed: true,
+      attempt: 1,
+    });
+
+    await page.evaluate(`window.${ALIVE} = true`);
+
+    /* The daily strip's fourth stop, lit by the file above — #206's route to the sheet. */
+    await page.locator('.everyday-bar-timeline button').nth(3).click();
+    await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+
+    /* § 3.3's report row names its linear parent `‹ The day`, and #206 made that cell a second way
+       onto this mount. It is the route the reporter walked. */
+    expect(await page.textContent('.everyday-bar-back')).toBe('‹ The day');
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+
+    /*
+     * The wait for the defect, and it is meant to run out. `dayClosed` going false is `adopt`
+     * taking on a run nobody asked for, and it is the whole mechanism at its first observable
+     * instant — the re-simulation is off a worker and lands in a second or two, so thirty is a
+     * window with an order of magnitude in hand rather than a guess.
+     *
+     * `attempt` is polled beside it and is the count the sheet prints. It moves one step later than
+     * `dayClosed` does and by a different hand — the re-armed gate is what lets a **second close**
+     * count, whether that close is the tick's or a player pressing a primary that has quietly
+     * become pressable again. Asserting both says which half is broken when this goes red.
+     */
+    const reRan = await untilHost(page, (facts) => !facts.dayClosed || facts.attempt >= 2, 15_000);
+
+    /*
+     * A reload takes {@link ALIVE} with it, and would otherwise satisfy the poll above by the back
+     * door: a freshly booted page has an unfiled run on it, which reads exactly like the defect.
+     * Vite full-reloads every connected page when anything under `packages/viz` is written, so this
+     * is a live hazard in a shared tree rather than a theoretical one — and it must fail as *the
+     * page was replaced*, never as *the product re-ran a filed day*.
+     */
+    expect(
+      await page.evaluate(`window.${ALIVE} === true`),
+      'the page reloaded under this case — the reading below is from a different sitting',
+    ).toBe(true);
+    expect(reRan.last, 're-entering a filed day started a run nobody asked for').toEqual({
+      hasRun: true,
+      dayClosed: true,
+      attempt: 1,
+    });
+    expect(reRan.held).toBe(false);
+
+    /*
+     * And what the player sees, which is the other half of the same fact: § 3.3's primary stays
+     * inert over a filed day, saying so. Pre-fix it came back to life as a pressable *Close the
+     * day* over a bit-identical re-simulation — which is how a count that means *attempts* reaches
+     * four on a day that was run once.
+     */
+    expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(true);
+    expect(await page.textContent('.everyday-bar-note')).toBe(
+      'the day is filed — its report is written',
+    );
+    await page.close();
+  }, 300_000);
+
+  /**
+   * **The other flow that files** — GitHub issue #206's second half of the blast radius.
+   *
+   * `screens.ts` routes one `STAGE_SCREEN` and its `primary` is one function, so a campaign day is
+   * filed by the very code the daily case drives. That is exactly why it is driven rather than
+   * argued: the press's destination is decided per run context, and a rule that answered *report*
+   * for `daily` because it was written for `daily` would be a rule that passes its own test.
+   *
+   * The walk is the player's: Campaign tile → the triage row's building → the contract desk → *Lock
+   * it in and run day N*, which is `runCampaignDay` and `go('stage')`. `campaignScreens.browser.
+   * test.ts` walks the first three of those and stops at the desk; this carries on to the end.
+   */
+  it('files a campaign day on the same primary and lands on the campaign report', async () => {
+    const page = await coldLoad();
+    await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+    await page.waitForSelector('.everyday-towers');
+    const building = await page.textContent('.everyday-towers-name');
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building');
+    await page.click('.everyday-building-to-contract');
+    await page.waitForSelector('.everyday-contract');
+
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-bar-primary')?.textContent === 'Close the day',
+      undefined,
+      { timeout: 120_000 },
+    );
+    /* § 3.3's campaign stage row is step 4 of five, which is how this case knows the context is
+       the campaign's and not the daily one it shares a screen with. */
+    expect(await page.textContent('.everyday-bar-timeline')).toContain('4 The day');
+
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-report', { timeout: 30_000 });
+    expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+    /* § 3.3's campaign report row: step 5 of five, and the primary that names the building the
+       triage row opened. */
+    expect(await page.textContent('.everyday-bar-timeline')).toContain('5 How it went');
+    expect(await page.textContent('.everyday-bar-primary')).toBe(`Back to ${building ?? ''}`);
+    await page.close();
+  }, 240_000);
 });

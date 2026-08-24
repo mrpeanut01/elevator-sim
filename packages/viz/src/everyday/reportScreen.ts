@@ -24,14 +24,31 @@
  * the surface that can carry its advice out. **Every card that has one is a change to the building
  * document**: `LEVER_SURFACES` names exactly two, *add a car* and *zone the tower*, and both are the
  * Engineer building editor's — a car is a `CarConfig`, zoning is a bank's `servesFloors`. So a card
- * with a surface routes to the shell's `stage` key — the hand-off `enterEngineerStage` performs,
- * which is the player's own path onto that surface — and the button's label carries the
- * **panel's own tab text, read from the tab button in the page**. Read rather than tabulated: a
- * `Record<TabName, string>` here would be a second copy of a label `index.html` owns, going stale
- * the day somebody renames a tab, and § 16 rule 11's neighbouring argument applies (a lookup table
- * in a screen mapping ids to prose is the screen being the wrong owner). With no such button in the
- * document the label falls back to naming the simulator without naming a panel, which is a
- * narrower claim rather than a wrong one.
+ * with a surface performs § 3.2's swap — `context.enterEngineer()`, the same call the rail's footer
+ * row makes — and then presses the Engineer surface's **own tab button** for that panel. The
+ * button's label carries the **panel's own tab text, read from that same button**. Read rather than
+ * tabulated: a `Record<TabName, string>` here would be a second copy of a label `index.html` owns,
+ * going stale the day somebody renames a tab, and § 16 rule 11's neighbouring argument applies (a
+ * lookup table in a screen mapping ids to prose is the screen being the wrong owner). With no such
+ * button in the document the label falls back to naming the simulator without naming a panel
+ * (`reportView.ts#leverButtonLabel`), which is a narrower claim rather than a wrong one — and it is
+ * then exactly what the press does, because there is no tab button to press either.
+ *
+ * **It routed to the shell's `stage` key until issue #213, and that is the defect to read before
+ * changing any of this.** The sentence this paragraph replaces was true when it was written: `stage`
+ * *was* the hand-off, the route that uncovered the Engineer surface and inset it beside the rail. §
+ * D335 made `stage` § 7's Everyday day stage and **this call site did not move**, so the button went
+ * on saying *Open the simulator's Building panel* and opened a screen where neither a car nor a zone
+ * can be edited — a label describing a feature that does not exist, which is a charter non-goal. It
+ * survived because the composed label was authored in this mount, and `honesty/derive.test.ts`
+ * excludes the four daily-loop mounts from the sweep as *geometry, class names and floor labels*. It
+ * is `reportView.ts`' string now, for that reason.
+ *
+ * **The press is the Engineer tab's own, rather than a second way to select a panel.** `dev/main.ts`
+ * wires every tab button to `context.openTab`, which reveals a contextual tab and selects it; a
+ * bespoke seam into that state would be a second producer of one fact, and the two would eventually
+ * disagree. Pressing the button a player would press is the same argument
+ * `dev/browserTier.test-helper.ts#enterEngineerStage` makes about routes, applied to a control.
  *
  * **An Everyday dispatcher workshop exists now, and it changes nothing here** — which is worth
  * stating because the sentence this paragraph replaces gave *"the workshop screen is unbuilt"* as
@@ -44,10 +61,16 @@
  * workshop route would be that refusal undone by the back door.
  */
 
+import type { TabName } from '../dev/elementMap.js';
 import type { DeltaRowView, ReportView } from '../dev/reportPanel.js';
-import { NOTHING_FILED_YET, rotatedOn, type SheetContinuity } from '../dev/reportPanel.js';
+import {
+  LEVER_SURFACES,
+  NOTHING_FILED_YET,
+  rotatedOn,
+  type SheetContinuity,
+} from '../dev/reportPanel.js';
 
-import { everydayReportViewOf, type EverydayReportView } from './reportView.js';
+import { everydayReportViewOf, type EverydayReportView, type HonestyPart } from './reportView.js';
 import { openTowerOf } from '../campaign/career.js';
 import { actionBarFor, type ActionBarModel } from './actionBar.js';
 import type { EverydayScreenModule } from './screens.js';
@@ -81,10 +104,20 @@ import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.
  */
 let continuity: SheetContinuity = NOTHING_FILED_YET;
 
-/** The tab button's own words, or `undefined` when this document has no such button. */
-function tabLabelOf(doc: Document, tab: string): string | undefined {
-  const text = doc.getElementById(`tab-${tab}`)?.textContent?.trim();
-  return text === undefined || text === '' ? undefined : text;
+/**
+ * The Engineer tab strip's own words for the panels a lever can route to.
+ *
+ * Keyed over `LEVER_SURFACES`' **values** rather than over every tab, so this walks exactly the
+ * panels a card can name and acquires a fifth the day that table does. A tab with no button in
+ * this document is simply absent, and {@link EverydayLeverCard.goLabel} then claims less.
+ */
+function panelNamesOf(doc: Document): Partial<Record<TabName, string>> {
+  const names: Partial<Record<TabName, string>> = {};
+  for (const tab of new Set(Object.values(LEVER_SURFACES))) {
+    const text = doc.getElementById(`tab-${tab}`)?.textContent?.trim();
+    if (text !== undefined && text !== '') names[tab] = text;
+  }
+  return names;
 }
 
 function mountReportScreen(
@@ -110,6 +143,7 @@ function mountReportScreen(
       previous: continuity.previous,
       overnight: data.tomorrowBriefing(),
       newerRunOnStage: report !== undefined && run.hasRun && !run.dayClosed,
+      panelNames: panelNamesOf(doc),
     });
   }
 
@@ -252,20 +286,20 @@ function mountReportScreen(
         const body = el(doc, 'p', undefined, lever.body);
         body.style.cssText = `${QUIET};margin:0`;
         card.append(title_, body);
-        if (lever.surface === undefined) {
+        const surface = lever.surface;
+        const goLabel = lever.goLabel;
+        /*
+         * The two are `undefined` together — `reportView.ts` decides both from one branch and
+         * `reportView.test.ts` asserts the pairing. Read as a conjunction here rather than
+         * asserted, because a screen that threw on the impossible arm would be a screen that goes
+         * blank on a defect a note could survive.
+         */
+        if (surface === undefined || goLabel === undefined) {
           const note = el(doc, 'p', 'everyday-report-lever-note', lever.noSurfaceNote ?? '');
           note.style.cssText = `${QUIET};margin:0;color:${C.terracotta}`;
           card.append(note);
         } else {
-          const panel = tabLabelOf(doc, lever.surface);
-          const button = el(
-            doc,
-            'button',
-            'everyday-report-lever-go',
-            panel === undefined
-              ? 'Open the simulator'
-              : `Open the simulator’s ${panel} panel`,
-          );
+          const button = el(doc, 'button', 'everyday-report-lever-go', goLabel);
           button.type = 'button';
           button.style.cssText = [
             'cursor:pointer',
@@ -278,7 +312,14 @@ function mountReportScreen(
             'font-size:12.5px',
           ].join(';');
           button.addEventListener('click', () => {
-            context.go('stage');
+            /*
+             * § 3.2's swap first, then the panel — in that order and in one turn. `enterEngineer`
+             * uncovers the Engineer surface and clears the `inert` this shell holds over it, so the
+             * tab press below lands on a live control rather than on a covered one. It is
+             * idempotent, which matters because a queued second click must not toggle the world.
+             */
+            context.enterEngineer();
+            doc.getElementById(`tab-${surface}`)?.click();
           });
           card.append(button);
         }
@@ -330,9 +371,8 @@ function mountReportScreen(
     honesty.style.cssText = `${CARD};margin-top:26px;background:${C.cardSunk}`;
     const honestyTitle = el(doc, 'div', undefined, view.honesty.title);
     honestyTitle.style.cssText = `font:700 16px ${TYPE.heading}`;
-    const honestyBody = el(doc, 'p', 'everyday-report-smallprint', view.honesty.body);
-    honestyBody.style.cssText = `${BODY};margin:8px 0 0;max-width:74ch`;
-    honesty.append(honestyTitle, honestyBody);
+    honesty.append(honestyTitle);
+    for (const part of view.honesty.parts) honesty.append(honestyPart(part));
     if (view.honesty.pointer !== undefined) {
       const pointer = el(doc, 'p', 'everyday-report-pointer', view.honesty.pointer.why);
       pointer.style.cssText = `${QUIET};margin:8px 0 0;max-width:74ch`;
@@ -365,6 +405,42 @@ function mountReportScreen(
       onward.append(button, note);
       root.append(onward);
     }
+  }
+
+  /** One paragraph of the closing block, styled the one way every paragraph in it is styled. */
+  function smallPrintParagraph(text: string): HTMLElement {
+    const node = el(doc, 'p', 'everyday-report-smallprint', text);
+    node.style.cssText = `${BODY};margin:8px 0 0;max-width:74ch`;
+    return node;
+  }
+
+  /**
+   * One layer of § 6.5's closing block — issue #211.
+   *
+   * A `fold` is a native `<details>`, for two properties this screen would otherwise have to build
+   * and get wrong: its content is **in the document whether or not it is open**, which is what
+   * *every claim remains reachable* means for a reader searching the page or listening to it, and
+   * it opens on <kbd>Enter</kbd> as well as on a click. The handle keeps the paragraph class as
+   * well as its own, so a selector that reads the block's prose finds all of it.
+   *
+   * No `open` attribute is set: the fold is closed on arrival, which is the whole of the fix. The
+   * part that must be read without a press is the `open` part, and `reportView.ts` decides which
+   * one that is.
+   */
+  function honestyPart(part: HonestyPart): HTMLElement {
+    if (part.kind === 'open') return smallPrintParagraph(part.text);
+    const fold = el(doc, 'details', 'everyday-report-smallprint-more');
+    fold.style.cssText = 'margin:8px 0 0';
+    const handle = el(
+      doc,
+      'summary',
+      'everyday-report-smallprint everyday-report-smallprint-handle',
+      part.handle,
+    );
+    handle.style.cssText = `${BODY};margin:0;max-width:74ch;cursor:pointer`;
+    fold.append(handle);
+    for (const paragraph of part.paragraphs) fold.append(smallPrintParagraph(paragraph));
+    return fold;
   }
 
   /** *What moved since the run before this one* — rows, refusal and note, in that order. */

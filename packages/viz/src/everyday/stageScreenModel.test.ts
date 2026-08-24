@@ -20,11 +20,14 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { VizRecording } from '../contract/types.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { syntheticRecording, servedLeg, waitingLeg } from '../live/synthetic.test-helper.js';
 import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js';
+import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_COLORS } from './tokens.js';
+import { RUN_CONTEXTS } from './types.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
   MAX_CAR_RIDERS,
@@ -32,12 +35,17 @@ import {
   stageAlarmOf,
   stageBandOf,
   stageBarModelOf,
+  stageCarPaintOf,
+  stageCarReadoutOf,
   stageCrowdCapOf,
+  stageFilingLandsOn,
   stageGeometryOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageNextStretchOf,
+  stageOpeningLineOf,
   stageSpeedAt,
   STAGE_ABSENCES,
   STAGE_ALARM_STANDING,
@@ -405,6 +413,61 @@ describe('§ 3.3 — the stage row, refined', () => {
 });
 
 /* -------------------------------------------------------------------------- *
+ * § 6.4 / issue #206 — where the press lands
+ * -------------------------------------------------------------------------- */
+
+describe('§ 6.4 — where *Close the day* leaves the player', () => {
+  const filed = { dayClosed: true, hasReport: true } as const;
+
+  it('opens the report in the two flows whose report § 3.3 numbers, and in no other', () => {
+    /*
+     * Every context the product has, from the value the tree derives its sweeps from — a fifth
+     * added to `RUN_CONTEXTS` arrives here rather than being quietly omitted. `rush` presses this
+     * same primary under the label *End the rush* and § 3.3 gives its report no timeline; a watched
+     * day is somebody else's and § 14.1 forbids closing it at all.
+     */
+    const landing = Object.fromEntries(
+      RUN_CONTEXTS.map((ctx) => [ctx, stageFilingLandsOn(ctx, filed)]),
+    );
+    expect(landing).toEqual({
+      daily: 'report',
+      campaign: 'report',
+      rush: undefined,
+      watch: undefined,
+    });
+  });
+
+  it('stays put on every outcome that is not a filed day with a sheet behind it', () => {
+    /*
+     * `closeShift`'s three silent early returns — a run nobody started, a run this shell did not
+     * simulate, an already-filed one — all return normally having written nothing, so a press that
+     * navigated on *having been pressed* would send the player to an empty sheet. These are the
+     * outcomes those returns leave on the host.
+     */
+    for (const outcome of [
+      { dayClosed: false, hasReport: false },
+      { dayClosed: false, hasReport: true },
+      { dayClosed: true, hasReport: false },
+    ]) {
+      for (const ctx of RUN_CONTEXTS) {
+        expect(stageFilingLandsOn(ctx, outcome), `${ctx} ${JSON.stringify(outcome)}`).toBeUndefined();
+      }
+    }
+  });
+
+  it('asks § 3.3’s table rather than a list of context names kept beside it', () => {
+    /*
+     * The derivation, asserted rather than described: the answer is exactly *does this context's
+     * report row carry a timeline*. If the two ever disagree, the copy that is wrong is this one.
+     */
+    for (const ctx of RUN_CONTEXTS) {
+      const numbered = actionBarFor({ screen: 'report', ctx }).timeline !== undefined;
+      expect(stageFilingLandsOn(ctx, filed) === 'report', ctx).toBe(numbered);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
  * § 14 — the caps, and the cutaway's arithmetic
  * -------------------------------------------------------------------------- */
 
@@ -506,8 +569,318 @@ describe('the stage’s own register of absences', () => {
   it('names the ghost lane, the campaign dock and the two unbuilt intervention arms', () => {
     const joined = STAGE_ABSENCES.join('\n');
     expect(joined).toMatch(/ghost/);
-    expect(joined).toMatch(/§ 7\.5/);
-    expect(joined).toMatch(/§ 7\.6/);
+    /*
+     * **Keyed on subjects rather than on section numbers** — GitHub issue #207 took the numbers off
+     * every player-facing string, so `/§ 7\.5/` and `/§ 7\.6/` had nothing left to match. The two
+     * rows they identified are the campaign dock and the two unbuilt intervention arms, which is
+     * what this case's own name has always said it was checking.
+     */
+    expect(joined).toMatch(/no campaign dock/);
+    expect(joined).toMatch(/no decisions during a run/);
     for (const absence of STAGE_ABSENCES) expect(absence.length).toBeGreaterThan(20);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 7.2 — the car, and the door that reads as a seam rather than a wash
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **GitHub issue #212's first defect, as three properties** — `docs/28-art-direction.md` AD-S1 to
+ * AD-S3, which is where they are stated and where the acceptance is written:
+ *
+ * > `stageScreenModel.ts` gains the doorway arithmetic — a pure function from
+ * > `(bodyWidth, carHeight, doorFraction)` to the leaf rectangles — so all three rules are
+ * > checkable without a canvas: assert that the ink margin is non-zero at `doorFraction` 0, 0.5 and
+ * > 1; assert that the leaf rectangles at 0 and at 1 differ in shape and not only in area; assert
+ * > that the mark grid and the doorway do not intersect.
+ *
+ * The sizes below are **measured**, not invented: they are what `stageGeometryOf` produces for the
+ * shipped buildings at the stage's own 340 px canvas across the viewport range the shell allows.
+ * `garden-apartments` is the widest car (222 px), `secure-tower` the shortest (9 px), and
+ * `vertical-city` — 35 cars across seven banks — is the only shipped building that reaches the two
+ * hairline branches. A rule that held at 222 px and failed at 5 px would be a rule that held on the
+ * building nobody has trouble reading.
+ */
+describe('§ 7.2 — a car with shut doors reads as a car', () => {
+  /** `[bodyWidth, carHeight]` — see the suite docstring for where each pair comes from. */
+  const SHIPPED_SIZES: readonly (readonly [number, number])[] = [
+    [222, 20], // garden-apartments, wide viewport
+    [109.6, 12.2], // midtown-office
+    [72.1, 13.4], // chancery-house
+    [47, 9], // secure-tower, narrow viewport — the shortest car that ships
+    [25.2, 20], // mixed-use-high-rise
+    [9.9, 20], // vertical-city, wide viewport — the narrowest car with a doorway
+    [5.6, 20], // vertical-city, mid viewport — the seam branch
+    [2.4, 20], // vertical-city, narrow viewport — no amber at all
+  ];
+  const FRACTIONS = [0, 0.25, 0.5, 0.75, 1] as const;
+
+  const paintAt = (bodyWidth: number, carHeight: number, doorFraction: number, occupants = 9) =>
+    stageCarPaintOf({ bodyWidth, carHeight, doorFraction, occupants });
+
+  /**
+   * **The defect itself, as a number.**
+   *
+   * The old arithmetic was `leaf = ((width − 3) / 2) × (1 − doorFraction)` from each outer edge, so
+   * at `doorFraction = 0` the two leaves covered the whole body: the amber share was **100 %** of
+   * the car, less the 1.5 px inset — and a car is shut for most of a run. Anything that leaves the
+   * car mostly amber is that defect back, so the assertion is on the share rather than on the
+   * geometry that produces it.
+   */
+  it('paints at most a fifth of a shut car amber, at every size that ships', () => {
+    for (const [bodyWidth, carHeight] of SHIPPED_SIZES) {
+      const paint = paintAt(bodyWidth, carHeight, 0);
+      const share = paint.amberAreaPx / (bodyWidth * carHeight);
+      expect(share, `${String(bodyWidth)}×${String(carHeight)} shut`).toBeLessThan(0.25);
+      /* And the old formula's own answer, so the case cannot pass by drawing nothing anywhere. */
+      const wasAmber = ((bodyWidth / 2) * 1) * 2 * (carHeight - 3);
+      expect(paint.amberAreaPx).toBeLessThan(wasAmber / 3);
+    }
+  });
+
+  /** AD-S1 — *the car's identity is its body, never its door.* Amber is a doorway, never a face. */
+  it('keeps an ink margin on all four sides of the amber at every door fraction', () => {
+    for (const [bodyWidth, carHeight] of SHIPPED_SIZES) {
+      for (const fraction of FRACTIONS) {
+        const paint = paintAt(bodyWidth, carHeight, fraction);
+        if (paint.leaves.length === 0) continue;
+        expect(
+          paint.inkMarginPx,
+          `${String(bodyWidth)}×${String(carHeight)} at ${String(fraction)}`,
+        ).toBeGreaterThanOrEqual(1);
+        /* And the margin is a fact about the rectangles, not a number the plan asserts of itself. */
+        for (const leaf of paint.leaves) {
+          expect(leaf.x).toBeGreaterThanOrEqual(paint.inkMarginPx - 1e-9);
+          expect(leaf.y).toBeGreaterThanOrEqual(paint.inkMarginPx - 1e-9);
+          expect(bodyWidth - (leaf.x + leaf.width)).toBeGreaterThanOrEqual(paint.inkMarginPx - 1e-9);
+          expect(carHeight - (leaf.y + leaf.height)).toBeGreaterThanOrEqual(
+            paint.inkMarginPx - 1e-9,
+          );
+        }
+      }
+    }
+  });
+
+  /**
+   * AD-S2 — *shut is a seam; open is a gap*, and the difference is **shape**.
+   *
+   * The rule names its own reason: `vertical-city` draws a car roughly nine times narrower than
+   * `midtown-office` does, and at that end an area-only difference is a difference nobody can see.
+   * So the measured quantity is the width of the **ink channel between the leaves** — one pixel
+   * when the doors are shut, the whole doorway when they are open.
+   */
+  it('changes the shape of the gap between the leaves, not only the amber area', () => {
+    for (const [bodyWidth, carHeight] of SHIPPED_SIZES) {
+      const shut = paintAt(bodyWidth, carHeight, 0);
+      const open = paintAt(bodyWidth, carHeight, 1);
+      const doorway = shut.doorway;
+      if (doorway === undefined) {
+        /* The hairline branches: the seam is drawn shut and omitted open, which is the shape. */
+        expect(open.leaves).toHaveLength(0);
+        continue;
+      }
+      expect(shut.leaves).toHaveLength(2);
+      const [left, right] = shut.leaves;
+      if (left === undefined || right === undefined) throw new Error('two leaves expected');
+      const shutGap = right.x - (left.x + left.width);
+      expect(shutGap).toBeCloseTo(1, 6);
+      /* Wide open, the interior is the whole doorway: nothing of it is amber. */
+      expect(open.leaves).toHaveLength(0);
+      expect(shutGap).toBeLessThan(doorway.width / 2);
+    }
+  });
+
+  /** AD-S3 — *nothing that must be counted sits on amber.* Met by the band split, not by a clamp. */
+  it('never lets an occupancy mark overlap a door leaf, at any fraction or size', () => {
+    for (const [bodyWidth, carHeight] of SHIPPED_SIZES) {
+      for (const fraction of FRACTIONS) {
+        const paint = paintAt(bodyWidth, carHeight, fraction);
+        for (const mark of paint.marks) {
+          for (const leaf of [...paint.leaves, ...(paint.doorway === undefined ? [] : [paint.doorway])]) {
+            const overlaps =
+              mark.x < leaf.x + leaf.width - 1e-9 &&
+              leaf.x < mark.x + mark.width - 1e-9 &&
+              mark.y < leaf.y + leaf.height - 1e-9 &&
+              leaf.y < mark.y + mark.height - 1e-9;
+            expect(
+              overlaps,
+              `${String(bodyWidth)}×${String(carHeight)} at ${String(fraction)}`,
+            ).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('draws every mark inside the car, and never more than the guide’s nine', () => {
+    for (const [bodyWidth, carHeight] of SHIPPED_SIZES) {
+      const paint = paintAt(bodyWidth, carHeight, 0, 40);
+      expect(paint.marks.length).toBeLessThanOrEqual(MAX_CAR_RIDERS);
+      for (const mark of paint.marks) {
+        expect(mark.x).toBeGreaterThanOrEqual(0);
+        expect(mark.y).toBeGreaterThanOrEqual(0);
+        expect(mark.x + mark.width).toBeLessThanOrEqual(bodyWidth + 1e-9);
+        expect(mark.y + mark.height).toBeLessThanOrEqual(carHeight + 1e-9);
+      }
+      expect(paintAt(bodyWidth, carHeight, 0, 0).marks).toHaveLength(0);
+      /*
+       * One mark per rider, up to the cap — **on every car that can hold a mark at all**. The
+       * 2.4 px car cannot: a mark that fitted inside it would be under a pixel wide, so the plan
+       * draws none rather than one nobody can see hanging over the body's edge. Asserted as its own
+       * branch below rather than excused by a loosened bound here.
+       */
+      if (paint.marks.length > 0) {
+        expect(paintAt(bodyWidth, carHeight, 0, 4).marks).toHaveLength(4);
+      }
+    }
+  });
+
+  it('drops the marks rather than hanging them off a car too narrow to hold one', () => {
+    /* `vertical-city` on a narrow viewport: 35 cars across seven banks, 2.4 px of body each. */
+    expect(paintAt(2.4, 20, 0, 9).marks).toHaveLength(0);
+    expect(paintAt(2.4, 20, 0, 9).leaves).toHaveLength(0);
+    /* And the size directly above it still draws all nine — the cliff is where it says it is. */
+    expect(paintAt(5.6, 20, 0, 9).marks).toHaveLength(MAX_CAR_RIDERS);
+  });
+
+  /**
+   * **Move the control and require the drawing to change** — the standing requirement, pointed at
+   * the one input this function exists to be a function of.
+   *
+   * Compared on the rectangles rather than on a summary of them: a plan that answered the same
+   * rectangles at 0 and at 1 would satisfy every area assertion above by drawing the same thing
+   * twice.
+   */
+  it('answers a different plan at every door fraction a car passes through', () => {
+    const plans = FRACTIONS.map((fraction) => JSON.stringify(paintAt(72.1, 13.4, fraction).leaves));
+    expect(new Set(plans).size).toBe(FRACTIONS.length);
+  });
+
+  it('never produces a rectangle with a negative or infinite side', () => {
+    for (const [bodyWidth, carHeight] of [...SHIPPED_SIZES, [0, 0], [3, 3], [-4, 12]] as const) {
+      for (const fraction of [-1, 0, 0.5, 1, 2]) {
+        const paint = paintAt(bodyWidth, carHeight, fraction);
+        for (const rect of [...paint.leaves, ...paint.marks, paint.body]) {
+          expect(Number.isFinite(rect.x + rect.y + rect.width + rect.height)).toBe(true);
+          expect(rect.width).toBeGreaterThanOrEqual(0);
+          expect(rect.height).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The three strings the mount used to compose — § D347
+ * -------------------------------------------------------------------------- */
+
+describe('the words the cutaway says about a car', () => {
+  it('publishes the head count over the shaft’s own capacity', () => {
+    expect(stageCarReadoutOf({ occupants: 4, capacityPersons: 10, direction: 0 })).toEqual({
+      occupancy: '4/10',
+      direction: undefined,
+    });
+  });
+
+  /* A ratio with half a denominator is worse than a count: `4/` says the capacity is unknown by
+     looking like a typo. `VizShaft.capacityPersons` is legally absent on a restored recording. */
+  it('falls back to the bare count when the record carries no capacity', () => {
+    expect(stageCarReadoutOf({ occupants: 4, direction: 0 }).occupancy).toBe('4');
+  });
+
+  it('shows an arrow only while the car is travelling', () => {
+    expect(stageCarReadoutOf({ occupants: 0, direction: 1 }).direction).toBe('▲');
+    expect(stageCarReadoutOf({ occupants: 0, direction: -1 }).direction).toBe('▼');
+    expect(stageCarReadoutOf({ occupants: 0, direction: 0 }).direction).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * AD-S4 / AD-S5 — what the opening frame says, and where it gets it
+ * -------------------------------------------------------------------------- */
+
+describe('what the stage says the day is about to do', () => {
+  const scheduled = (): VizRecording =>
+    syntheticRecording({
+      startedAt: 0,
+      endedAt: 1800,
+      demandPhases: [
+        {
+          id: '0-flat',
+          kind: 'flat',
+          label: 'QUIET',
+          startS: 0,
+          endS: 300,
+          startIntensity: 0,
+          endIntensity: 0,
+          ratePctPop5min: null,
+          inReportWindow: false,
+        },
+        {
+          id: '1-ramp-up',
+          kind: 'ramp-up',
+          label: 'FILLING',
+          startS: 300,
+          endS: 1800,
+          startIntensity: 0,
+          endIntensity: 1,
+          ratePctPop5min: 8.2,
+          inReportWindow: true,
+        },
+      ],
+    });
+
+  /**
+   * AD-S4, and the half of #212 that survived its own rewrite.
+   *
+   * The playhead does not move; what the header gains is the **schedule's** next move. It is an
+   * input to the run — the resolved template's own phases, on the record before a passenger was
+   * generated — so it is not R6's *outcome evaluated early*.
+   */
+  it('names the next stretch of the schedule and the hour it starts', () => {
+    /* 08:30 is `rise-and-fall`'s declared hour, and the shipped default's. */
+    expect(stageNextStretchOf(scheduled(), 0, 8.5 * 3600)).toBe('FILLING from 08:35');
+  });
+
+  it('says nothing once the playhead is inside the last stretch', () => {
+    expect(stageNextStretchOf(scheduled(), 1200, 8.5 * 3600)).toBeUndefined();
+  });
+
+  /* A record with no schedule draws one unlabelled band, so there is no next stretch to name.
+     Inventing one from the clock is the claim `STAGE_NO_PHASE` exists to refuse, one segment on. */
+  it('says nothing at all about a record that carries no schedule', () => {
+    expect(stageNextStretchOf(syntheticRecording({}), 0)).toBeUndefined();
+  });
+
+  /** AD-S5 — the difference between an empty screen and an empty screen that says it is early. */
+  it('opens on the run’s own hour and what happens next, never on a constant', () => {
+    const line = stageOpeningLineOf({ recording: scheduled(), simTimeS: 0, dayStartS: 8.5 * 3600 });
+    expect(line).toBe(
+      'Paused at 08:30, the start of the day. Nothing has happened yet — FILLING from 08:35.',
+    );
+    /* The stale claim this screen carried for two waves: `06:00` is the fallback, not the hour. */
+    expect(line).not.toContain('06:00');
+  });
+
+  it('still says where the playhead is when the schedule has nothing after it', () => {
+    expect(stageOpeningLineOf({ recording: syntheticRecording({}), simTimeS: 0 })).toBe(
+      'Paused at 06:00, the start of the day. Nothing has happened yet.',
+    );
+  });
+
+  it('is the same fact the header pill draws, not a second derivation', () => {
+    const recording = scheduled();
+    const head = stageHeaderOf({
+      simTimeS: 0,
+      recording,
+      observations: observationsAt(recording, 0),
+      dayStartS: 8.5 * 3600,
+      driverName: 'the plain baseline',
+    });
+    expect(head.next).toBe(stageNextStretchOf(recording, 0, 8.5 * 3600));
+    expect(stageOpeningLineOf({ recording, simTimeS: 0, dayStartS: 8.5 * 3600 })).toContain(
+      head.next ?? 'nothing',
+    );
   });
 });

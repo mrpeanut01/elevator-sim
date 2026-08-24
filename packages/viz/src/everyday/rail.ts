@@ -19,12 +19,23 @@
  *    `screens.ts` — built keys open, unbuilt keys carry that key's one refusal sentence — so a
  *    lane that registers a screen opens its rail row on the same commit, and a row can never
  *    refuse a screen that works (§ D227's defect) or open one that does not exist.
+ * 4. **The `PLAYING AS` card's career line comes from the week, and the absence stays reachable.**
+ *    Issue #214: it came from a `profile` field no producer ever wrote, so *"no days saved yet"*
+ *    was not stale — it was the **only** string that line could render, beside a week screen
+ *    reading *1 day running*. The gate is {@link WeekState.history} rather than `streak`, because a
+ *    player who missed every day has still saved days; today's figure waits on `dayClosed` for
+ *    `weekView.ts`'s reason; and with an empty week the honest absence is still what is drawn —
+ *    a fix that made the refusal unreachable would be the same defect facing the other way.
  *
  * And one rule about what is *absent*: **Tune the tower is not a rail item.** It is reached from
  * the brief and from the report's third lever. The guide notes an earlier draft listed it here and
  * calls that wrong, so its absence is deliberate and is asserted.
  */
 
+import type { WeekState } from '../shift/types.js';
+import { HISTORY_DAYS } from '../shift/week.js';
+
+import { EM_DASH, percentFigure } from './figures.js';
 import { avatarInitialOf, DEFAULT_EVERYDAY_PROFILE } from './profile.js';
 import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { ENGINEER_SWAP_NOTE } from './types.js';
@@ -61,7 +72,11 @@ export interface RailFooter {
     readonly initial: string;
     /** The disc behind the letter — § 15.1's curated colour, sun until the player picks. */
     readonly avatarColor: string;
-    /** The streak line under the name — or, with no profile, an honest absence. */
+    /**
+     * The career line under the name — the **week's** two figures (`3 days running · best 84%`),
+     * or an honest absence when no day has been closed. Never the profile's: see
+     * {@link RailOptions.week}, and issue #214 for what it said before it had one.
+     */
     readonly streak: string;
   };
   readonly settings: RailItem & { readonly hint: string };
@@ -100,17 +115,42 @@ export interface RailOptions {
   readonly openBuilding?: string | undefined;
   /**
    * The player's identity — `everyday/profileStore.ts`'s stored name and avatar colour, once the
-   * settings screen has written one. `streak` stays optional because the profile store holds no
-   * career: with none given the card keeps its honest absence line rather than inventing a run of
-   * days (§ 20.11).
+   * settings screen has written one.
+   *
+   * **It carries no `streak`, and that absence is issue #214's fix.** It held one, optional,
+   * described as *"the profile store holds no career"* — and no producer in the tree ever supplied
+   * it, so the `??` under it was the only string the card's third line could ever render. The
+   * career is {@link RailOptions.week}'s, which is a different store on purpose
+   * (`profile.ts`'s docstring argues why the profile is not a fourth key in `persist/`'s envelope);
+   * what was wrong was the rail reading the career off the store that does not hold one.
    */
   readonly profile?:
     | {
         readonly name: string;
-        readonly streak?: string | undefined;
         readonly avatarColor?: string | undefined;
       }
     | undefined;
+  /**
+   * The week the host holds — `EverydayHost.week()`, read at draw time like
+   * {@link RailOptions.inCampaign} rather than latched, because a career that had to be threaded
+   * separately is a career that goes stale by a frame.
+   *
+   * With none — a cold load, or a build with no host — the card keeps its honest absence, which is
+   * the state that used to be the only one.
+   */
+  readonly week?: WeekState | undefined;
+  /**
+   * Whether **today's** run has been filed — `EverydayHost.runState().dayClosed`.
+   *
+   * Load-bearing rather than decorative, for `weekView.ts`'s reason: a week restored from storage
+   * can carry today's outcome while the stage holds no filed run, and *Close the day* alone sets
+   * this. Publishing `bestMinutePct` on the week alone would put a figure for a day this sitting
+   * has not finished onto the rail — the cell § 14's card withholds two hundred pixels away.
+   *
+   * **Defaults to `false`, which is the withholding arm**: a caller that hands over a week and
+   * forgets the flag under-reports rather than publishing something no run produced.
+   */
+  readonly dayClosed?: boolean | undefined;
 }
 
 /**
@@ -222,17 +262,70 @@ export function railGroups(
 }
 
 /**
+ * The card's third line when no day has been closed — issue #214's other half.
+ *
+ * It read *"no days saved yet — this build keeps no career"*, and the second clause is a statement
+ * about the **build** rather than about the week. The build keeps a career now (the week screen has
+ * been drawing one from `persist/`'s session all along), so that clause became false in every state
+ * the moment the card could read it — § D227's stale refusal, arriving through the sentence a fix
+ * left behind rather than through a control. What replaces it says only what is true with an empty
+ * history, and says it with no digit in it: § 20.11's forbidden thing is a fixture presented as a
+ * player, and a zero here would be one.
+ *
+ * Module-private on purpose. Exporting it would put a second text producer under
+ * `everyday/rail.ts` for `honesty/derive.ts` to classify, for a string the sweep already reaches
+ * through {@link railFooter}.
+ */
+const NO_CAREER_YET = 'no days saved yet — close a day and it lands here';
+
+/**
+ * The `PLAYING AS` card's third line — the week's own two figures, or the absence.
+ *
+ * ## Why the gate is *a day was closed* and not *the streak is non-zero*
+ *
+ * A player who missed every day has still saved days, and `streak` is `0` for them. Gating on the
+ * streak would tell them nothing was saved — the same false statement #214 reports, with its sign
+ * flipped — so the gate is {@link WeekState.history}, which is what `closeDay` appends to.
+ *
+ * ## Why this composes the line rather than calling `weekView.ts`'s
+ *
+ * `weekView.ts#streakLineOf` is module-private to the pure half of § 14's screen, and this is the
+ * pure half of § 3.2's rail. What keeps the two from drifting is not an import: `rail.test.ts`
+ * asserts the two strings are **identical** for every week that holds a closed day, which is the
+ * claim a reader of both surfaces on one frame is entitled to. The two figures come from one place
+ * either way — {@link WeekState} — and the formatting from a second, `figures.ts#percentFigure`.
+ *
+ * The `—` arm is that file's rule reached through this one: `bestMinutePct` is `0` before the first
+ * day closes *and* on a day where nobody got away inside a minute, so the zero cannot carry the
+ * absence and the em dash does. The window is `HISTORY_DAYS`, the week's own bound, because
+ * § 14 draws exactly that many cards and a card outside it is a figure with nothing to check it
+ * against.
+ */
+function careerLineOf(week: WeekState | undefined, dayClosed: boolean): string {
+  if (week === undefined || week.history.length === 0) return NO_CAREER_YET;
+  const oldest = week.day - (HISTORY_DAYS - 1);
+  const publishable = week.history.some(
+    (day) => day.day >= oldest && (day.day < week.day || dayClosed),
+  );
+  const days = week.streak === 1 ? '1 day running' : `${String(week.streak)} days running`;
+  return `${days} · best ${publishable ? percentFigure(week.bestMinutePct) : EM_DASH}`;
+}
+
+/**
  * § 3.2's footer.
  *
  * The identity is `everyday/profileStore.ts`'s, handed in through {@link RailOptions.profile};
  * with nothing stored the card does not invent one — the name falls back to
- * `DEFAULT_EVERYDAY_PROFILE`'s `you` on sun, and the streak line says plainly that nothing is
- * saved. An authored fixture presented as a player is exactly what the handoff's § 20.11 forbids,
- * which is also why the streak never comes from the profile: the store holds no days to count.
+ * `DEFAULT_EVERYDAY_PROFILE`'s `you` on sun. **The career line is the week's**, through
+ * {@link RailOptions.week}, and never the profile's: the two stores are separate for the reason
+ * `profile.ts` gives at length, and the defect that made this file worth reading twice was the card
+ * asking the store that holds no days how many days there were. An authored fixture presented as a
+ * player is what the handoff's § 20.11 forbids, so with no week the line is
+ * {@link NO_CAREER_YET} — still reachable, no longer the only thing reachable.
  */
 export function railFooter(state: EverydayState, options: RailOptions = {}): RailFooter {
   const name = options.profile?.name ?? DEFAULT_EVERYDAY_PROFILE.name;
-  const streak = options.profile?.streak ?? 'no days saved yet — this build keeps no career';
+  const streak = careerLineOf(options.week, options.dayClosed ?? false);
   return {
     identity: {
       heading: 'PLAYING AS',

@@ -50,13 +50,24 @@
  * pins the fallback; the browser case pins the shape and the property that matters, which is that the
  * playhead is at the start of the day and time only ever moves forward from it.
  *
+ * ## Three of the cutaway's five `fillText` sites arrived here late — § D347
+ *
+ * The split above was a claim about this file before it was a fact about it. The cutaway draws five
+ * `fillText` sites and until GitHub issue **#212** three were composed in the mount: the
+ * out-of-service caption, the `▲`/`▼` glyph, and the car's `riders/capacity` readout — **a live
+ * figure on the vertical slice's centrepiece, read by no honesty property at all**, because the
+ * mount needs a document and is excluded from the corpus for that reason. {@link stageCarReadoutOf}
+ * and {@link STAGE_OUT_OF_SERVICE} are that gap closed, and {@link stageCarPaintOf} is the same
+ * move for the geometry beside them: the door-fill inversion #212 reports was arithmetic nothing
+ * could check without a canvas, and it is three assertable rules now.
+ *
  * ## What the stage does not have, and why the absences are named rather than mimed
  *
  * {@link STAGE_ABSENCES}. Two are structural — the § 7.4 ghost lane needs a second recording the
  * data host does not offer, and § 7.5's campaign dock needs a `ctx` no route in this build can
  * produce — and one is a control that exists behind a screen nobody has built. Each is a sentence a
- * player reads under the stage, on the shell's own precedent for `EVERYDAY_SHELL_ABSENCES`: a
- * register nothing renders is read by nobody.
+ * player reads on the build-information panel (`everyday/buildNotes.ts`), which is the shell
+ * register's own precedent applied one screen down: a register nothing renders is read by nobody.
  */
 
 import type { RunInterventionConfig } from '@elevator-sim/core/browser';
@@ -64,12 +75,12 @@ import type { RunInterventionConfig } from '@elevator-sim/core/browser';
 import type { VizFloor, VizRecording, VizShaft } from '../contract/types.js';
 import { WAIT_BANDS } from '../live/bands.js';
 import { interventionStampOf, PARK_CARS_LOBBY_LABEL } from '../live/interventions.js';
-import { clockAt, phaseAt } from '../live/timeline.js';
+import { clockAt, phaseAt, timelineOf } from '../live/timeline.js';
 import type { LiveObservations, WaitBandId } from '../live/types.js';
 import { actionBarFor } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { EVERYDAY_COLORS as C } from './tokens.js';
-import type { EverydayState } from './types.js';
+import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * § 4.6 — the transport
@@ -204,6 +215,16 @@ export interface StageHeaderView {
   readonly clock: string;
   /** The phase pill: the run's own demand segment at `t`, or the honest absence. */
   readonly phase: string;
+  /**
+   * What the demand schedule does **next**, and when — `FILLING from 08:32`.
+   *
+   * `undefined` once the playhead is inside the last segment, and on a record that carries no
+   * schedule at all: there is then nothing after this to name, and inventing one would be the
+   * defect {@link STAGE_NO_PHASE} exists to prevent, one segment along.
+   *
+   * See {@link stageNextStretchOf} for why naming a *future* segment is not an R6 violation.
+   */
+  readonly next: string | undefined;
   /** `DRIVING`'s eyebrow and the dispatcher's name. */
   readonly drivingLabel: string;
   readonly driverName: string;
@@ -233,6 +254,60 @@ export interface StageHeaderInput {
 export const STAGE_NO_PHASE = 'no named phase';
 
 /**
+ * The next stretch of the demand schedule, named from the **schedule** and never from the outcome —
+ * `docs/28-art-direction.md` AD-S4, and the half of GitHub issue **#212** that survived its own
+ * rewrite.
+ *
+ * ## What the issue asked for, and why the obvious fix is refused
+ *
+ * #212's second defect was filed as *"the stage opens paused at 06:00, on an empty building"*, and
+ * both halves of that turned out to be wrong. The hour is the **run's own**: six of the seven
+ * shipped demand templates declare one and the shipped default opens at 08:30, so 06:00 is
+ * `live/timeline.ts`'s fallback rather than the stage's hour. And the shipped default's intensity
+ * ramps from its first second, so there is no quiet head on the most common run at all; the measured
+ * quiet belongs to one template and lasts about a minute of real time.
+ *
+ * So the playhead does **not** move. AD-S4's grounds for that are worth carrying here because they
+ * are the ones a later lane will be tempted to reverse: choosing a livelier opening frame is the
+ * camera answering *name the run this came from* with *the one that looked best*, and captioning
+ * that frame — *opening at the morning peak* — is a statement about the whole run at a playhead
+ * short of its end, which is exactly R6. An **un**captioned jump is worse, because the player is
+ * shown a moment and not told which.
+ *
+ * ## Why this is not that
+ *
+ * `VizRecording.demandPhases` is the resolved template's own schedule — an **input** to the run, on
+ * the record before a single passenger was generated. Saying *the schedule fills from 08:32* claims
+ * nothing about what the building did; it is the same fact the transport's own segmented bar draws
+ * in full. R6 forbids publishing an outcome early. It does not forbid reading the timetable.
+ *
+ * The segment's own label is used rather than a second vocabulary, for `STAGE_BAND_INK`'s reason one
+ * screen over: the pill beside this one already draws `FILLING` and `PEAK`, and a plain-words
+ * paraphrase here would be a second name for one thing, drawn a centimetre away from the first.
+ */
+export function stageNextStretchOf(
+  recording: VizRecording,
+  simTimeS: number,
+  dayStartS?: number | undefined,
+): string | undefined {
+  const options = dayStartS === undefined ? {} : { dayStartS };
+  const upcoming = timelineOf(recording, options).find((segment) => segment.startS > simTimeS);
+  if (upcoming === undefined) return undefined;
+  const label = upcoming.label.trim();
+  const clock = clockAt(upcoming.startS, dayStartS);
+  return label === '' ? `the next stretch starts at ${clock}` : `${label} from ${clock}`;
+}
+
+/**
+ * § 7.1's eyebrow over the dispatcher's name.
+ *
+ * A constant rather than a literal in two places: the mount draws it before the first recording
+ * lands, {@link stageHeaderOf} republishes it on every draw, and the corpus sweeps the second. One
+ * word with two sources is one word with one of them checked.
+ */
+export const STAGE_DRIVING_LABEL = 'DRIVING';
+
+/**
  * § 7.1's header at a playhead.
  *
  * Every figure is `observations`', which is folded at `t` — see the module docstring for why that
@@ -247,10 +322,45 @@ export function stageHeaderOf(input: StageHeaderInput): StageHeaderView {
   return {
     clock: clockAt(input.simTimeS, input.dayStartS),
     phase: phaseLabel === undefined || phaseLabel === '' ? STAGE_NO_PHASE : phaseLabel,
-    drivingLabel: 'DRIVING',
+    next: stageNextStretchOf(input.recording, input.simTimeS, input.dayStartS),
+    drivingLabel: STAGE_DRIVING_LABEL,
     driverName: input.driverName,
     figures: [awayInsideOf(o), standingNowOf(o), longestSoFarOf(o)],
   };
+}
+
+/**
+ * What the overlay says while the day is still being simulated.
+ *
+ * Mount-authored until [§ D347](../../../../DECISIONS.md), which is the whole of why it is here:
+ * a sentence composed in `everyday/stageScreen.ts` reached the static prose sweep and no honesty
+ * property at all.
+ */
+export const STAGE_AWAITING_RUN = 'simulating today’s day — the stage draws the moment it lands';
+
+/**
+ * The sentence under § 7.3's single centred `Start` — `docs/28-art-direction.md` AD-S5.
+ *
+ * *"The centred `Start` is the moment to say the day's shape once, because it is the last moment the
+ * player is not watching anything."* It used to read *"Paused at the start of the day. Nothing has
+ * happened yet."* — true, and the whole of what an empty opening frame told a player. What it now
+ * adds is the **schedule's** next move, through {@link stageNextStretchOf}, so the difference is
+ * between an empty screen and an empty screen that says it is early.
+ *
+ * The clock is the run's own hour rather than a constant: the stale claim this screen carried was
+ * that it opens at 06:00, and six of the seven shipped templates declare otherwise.
+ *
+ * Its one non-test caller is `everyday/stageScreen.ts`'s `syncTransport`.
+ */
+export function stageOpeningLineOf(input: {
+  readonly recording: VizRecording;
+  readonly simTimeS: number;
+  readonly dayStartS?: number | undefined;
+}): string {
+  const clock = clockAt(input.simTimeS, input.dayStartS);
+  const next = stageNextStretchOf(input.recording, input.simTimeS, input.dayStartS);
+  const opening = `Paused at ${clock}, the start of the day. Nothing has happened yet`;
+  return next === undefined ? `${opening}.` : `${opening} — ${next}.`;
 }
 
 /**
@@ -444,18 +554,24 @@ export const STAGE_NO_GHOST =
  * -------------------------------------------------------------------------- */
 
 /**
- * What this stage does not do, drawn under the strip.
+ * What this stage does not do.
  *
- * Beside `shell.ts`'s {@link EVERYDAY_SHELL_ABSENCES} rather than inside it, and the split is by
- * owner: the shell's register is about the *shell* — screens it does not route to, a bar it does
- * not draw — and this one is about § 7's stage specifically. A reader on the stage sees this one;
- * a reader on the menu sees that one.
+ * Declared beside the stage and **drawn on the build-information panel** with the other five
+ * registers (`everyday/buildNotes.ts`, GitHub issue #207). The split from
+ * `EVERYDAY_SHELL_ABSENCES` is by *owner* and is unchanged: the shell's register is about the
+ * shell — screens it does not route to, a bar it does not draw — and this one is about § 7's stage
+ * specifically. What changed is that a reader meets both in one place instead of meeting each on
+ * the screen it is about.
+ *
+ * `STAGE_NO_GHOST` is the exception and the reason the exception is a rule: it is a **control's**
+ * refusal, drawn on the ghost lane's own card as well as being in this register, because a control
+ * that cannot act says so where the control is.
  */
 export const STAGE_ABSENCES: readonly string[] = Object.freeze([
   STAGE_NO_GHOST,
-  '§ 7.5’s campaign dock — a campaign day reaches this stage, and the money-and-incident dock beside it is not drawn',
-  '§ 7.3’s camera — the cutaway draws the whole building at once and there is nothing to pan',
-  '§ 7.6’s second and third arms — the run record carries a handover and an answered incident, and this screen offers neither: a handover needs a dispatcher chosen somewhere, and an incident needs the dock above',
+  'no campaign dock — a campaign day reaches this stage, and the money-and-incident panel that belongs beside it is not drawn',
+  'no camera — the cutaway draws the whole building at once, so there is nothing to pan and nothing to follow',
+  'no decisions during a run — a day can carry a handover to another dispatcher and an answered incident, and this screen offers neither: a handover needs a dispatcher picked somewhere, and an incident needs the dock above',
 ]);
 
 /* -------------------------------------------------------------------------- *
@@ -511,6 +627,52 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
     primary: { ...base.primary, inert: true },
     note: refusal,
   };
+}
+
+/** What the press actually did, read back off the host after the call — never predicted. */
+export interface StageFilingOutcome {
+  /** `EverydayHost.runState().dayClosed` — the run on the stage is filed. */
+  readonly dayClosed: boolean;
+  /** `EverydayHost.lastReport() !== undefined` — § 6.4 step 5 wrote a sheet. */
+  readonly hasReport: boolean;
+}
+
+/**
+ * Where § 3.3's stage primary leaves the player once it has pressed — GitHub issue **#206**.
+ *
+ * `Close the day` *stops the clock and writes the report*, and until this function existed it wrote
+ * the report and left the player standing on the stage with no route to it: the daily timeline's
+ * fourth stop is drawn from the row's own step, so on a stage at step 3 it evaluated `4 <= 3` and
+ * was faint and listener-less in every state. The loop did not close. The auto-open is the
+ * handoff's own behaviour — `dev/main.ts` has done it into `ViewerState.tab` since the Engineer
+ * shell was the only reader — so this is the Everyday shell acquiring the half it never had.
+ *
+ * ## Two questions, and the order matters
+ *
+ * **The outcome, not the press.** `closeShift` has three silent early returns — a run nobody
+ * started (§ D232's `playerHasChosen` gate), a run this shell did not simulate
+ * (`shift/banking.ts#bankingRefusalFor`), and an already-filed one — and every one of them files
+ * nothing while returning normally. Navigating on the press would turn each into a player sent to
+ * an empty sheet by a button that promised a written one. So both facts are read **back off the
+ * host after the call**: a day that is closed, and a report that exists.
+ *
+ * **The flow, not the screen.** The stage is one component with four run contexts, and the primary
+ * is one function for all four. A `rush` day's primary is *End the rush* and § 3.3 gives its report
+ * no timeline; a `watch` day is somebody else's and cannot be closed at all. Only the two flows
+ * whose report is a numbered step land there — and *which those are* is asked of § 3.3's own table
+ * (does this context's report row carry a timeline?) rather than of a pair of context names kept
+ * here. A fifth run context answers by being in the table; it cannot answer by omission.
+ *
+ * `undefined` means *stay where you are*, which is what a refused close must look like.
+ *
+ * Non-test caller: `everyday/stageScreen.ts`'s `primary` handle, the § 3.3 press itself.
+ */
+export function stageFilingLandsOn(
+  ctx: RunContext,
+  outcome: StageFilingOutcome,
+): EverydayScreen | undefined {
+  if (!outcome.dayClosed || !outcome.hasReport) return undefined;
+  return actionBarFor({ screen: 'report', ctx }).timeline === undefined ? undefined : 'report';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -680,4 +842,291 @@ export function stageCrowdCapOf(total: number, cap: number = MAX_LANDING_FIGURES
 } {
   if (total <= cap) return { drawn: Math.max(0, total), overflow: undefined };
   return { drawn: cap, overflow: `+${String(total - cap)}` };
+}
+
+/* -------------------------------------------------------------------------- *
+ * § 7.2 — the car: a body, a doorway, and marks that stay countable
+ * -------------------------------------------------------------------------- */
+
+/**
+ * What a well says when its car is held out of service for the whole run.
+ *
+ * § 7.2's dashed, empty, labelled shaft. **Authored here rather than in the mount**, which is where
+ * it was until [§ D347](../../../../DECISIONS.md): the cutaway draws five `fillText` sites and three
+ * of them were composed in `everyday/stageScreen.ts`, so no honesty property could read them — not
+ * the charter's M2 gate, not R6's temporal axis. The pure/DOM split this directory keeps exists so
+ * that the words are drivable without a document, and a word the mount authors is a word outside it.
+ */
+export const STAGE_OUT_OF_SERVICE = 'OUT OF SERVICE';
+
+/** The two things a car says about itself: how full it is, and which way it is going. */
+export interface StageCarReadout {
+  /**
+   * `4/10` — the head count over the shaft's rated persons.
+   *
+   * The bare head count when the record carries no capacity for that shaft, because `4/` with
+   * nothing after it is a ratio with half a denominator. Both are counts **at the playhead**, folded
+   * by `frame/frameAt.ts`; neither is a whole-run figure, which is the rule this screen is built
+   * around (see the module docstring).
+   */
+  readonly occupancy: string;
+  /** `▲` or `▼` while the car is travelling, `undefined` while it stands. */
+  readonly direction: string | undefined;
+}
+
+/** What {@link stageCarReadoutOf} needs — one car, at one instant. */
+export interface StageCarReadoutInput {
+  readonly occupants: number;
+  /** `VizShaft.capacityPersons`, or `undefined` for a record that does not carry one. */
+  readonly capacityPersons?: number | undefined;
+  /** `Frame.direction`: `+1` up, `-1` down, `0` standing. */
+  readonly direction: number;
+}
+
+/** The occupancy readout and the direction arrow a car draws over itself. */
+export function stageCarReadoutOf(input: StageCarReadoutInput): StageCarReadout {
+  const occupants = Math.max(0, Math.round(input.occupants));
+  const capacity = input.capacityPersons;
+  return {
+    occupancy:
+      capacity === undefined ? String(occupants) : `${String(occupants)}/${String(capacity)}`,
+    direction: input.direction === 0 ? undefined : input.direction > 0 ? '▲' : '▼',
+  };
+}
+
+/**
+ * One rectangle of a car's paint, in the **body's own** coordinates — `(0, 0)` is its top-left.
+ *
+ * Body-relative rather than canvas-relative so the arithmetic is checkable without a canvas, which
+ * is `docs/28-art-direction.md` § 5.2's stated acceptance for this function.
+ */
+export type StageCarRect = StageRect;
+
+/** Everything painted inside one car, decided before anything is drawn. */
+export interface StageCarPaint {
+  /** The car's own box. `(0, 0, bodyWidth, carHeight)`, restated so an area rule has a divisor. */
+  readonly body: StageCarRect;
+  /**
+   * The opening the leaves slide across, or `undefined` on a car too narrow to carry one.
+   *
+   * Never painted itself — it is the region the leaves live in, and the ink under it is the car's
+   * interior showing through as they retract.
+   */
+  readonly doorway: StageCarRect | undefined;
+  /** The amber leaves, left then right. Empty once the doors are open, or on a hairline car. */
+  readonly leaves: readonly StageCarRect[];
+  /** The occupancy marks, capped at {@link MAX_CAR_RIDERS} — § 14. */
+  readonly marks: readonly StageCarRect[];
+  /** The narrowest ink margin between the amber and the outside world. AD-S1 asks for at least 1. */
+  readonly inkMarginPx: number;
+  /** How much of the car is amber. AD-S2's *seam, not wash* is a claim about this over `body`. */
+  readonly amberAreaPx: number;
+}
+
+/** What {@link stageCarPaintOf} needs. Four numbers; no canvas, no recording, no clock. */
+export interface StageCarPaintInput {
+  /** The ink body's width in device-independent pixels — the column's width less its inset. */
+  readonly bodyWidth: number;
+  readonly carHeight: number;
+  /** `Frame.doorFraction`: `0` shut, `1` wide open. Exact between events. */
+  readonly doorFraction: number;
+  /** How many people are aboard. Capped here, not by the caller. */
+  readonly occupants: number;
+}
+
+/** The mark grid is three across; nine marks is § 14's cap, so three down. */
+const MARK_COLUMNS = 3;
+/** One mark, square, in device-independent pixels. */
+const MARK_PX = 2;
+/** The gap between two marks when the car is wide enough to give them one. */
+const MARK_GAP_PX = 1;
+/** The amber seam a hairline car draws instead of a doorway. */
+const SEAM_PX = 1;
+/**
+ * The narrowest body that can carry a doorway — `docs/28` § 5.2's *"a pitch under roughly 8 px"*.
+ *
+ * Below it the doorway would be under 5 px wide and its two leaves under 2 px each, which is not a
+ * door anybody can see opening; the seam branch draws the only signal that survives at that size.
+ */
+const MIN_DOORWAY_BODY_PX = 8;
+/**
+ * The narrowest body that can carry even the seam.
+ *
+ * A 1 px seam needs 1 px of ink on **both** sides for AD-S1 to hold, so a body under 3 px draws no
+ * amber at all. `vertical-city` reaches that regime on a narrow viewport — 35 cars across seven
+ * banks put a car at roughly 2.4 px there — and an amber wash on a 2.4 px car is the defect this
+ * function exists to remove, at the one size where nothing can be drawn instead.
+ */
+const MIN_SEAM_BODY_PX = 3;
+/** The doorway's share of the body's width — `docs/28` § 5.2's conforming geometry. */
+const DOORWAY_WIDTH_SHARE = 0.62;
+/** The doorway's share of the car's inner height. The rest is the marks' band, above it. */
+const DOORWAY_HEIGHT_SHARE = 0.45;
+
+/**
+ * **The car's paint plan** — `docs/28-art-direction.md` § 5.2, and GitHub issue **#212**'s first
+ * defect.
+ *
+ * ## The defect this replaces
+ *
+ * The mount drew `leaf = ((width − 3) / 2) × (1 − doorFraction)` twice, from the body's two outer
+ * edges. At `doorFraction = 0` each leaf was **half the body**, the two abutted on the centre line,
+ * and together they covered the car completely. A shut car was a solid amber block, and a car is
+ * shut for most of a run. The polarity was backwards from the read § 7.2 asks for — *"cars as dark
+ * boxes with amber doors that split as they open"* — because the car's identity colour was the rare
+ * state and the accent was the default.
+ *
+ * It had a measured second consequence, which is what decides the geometry rather than taste: the
+ * nine occupancy marks are drawn **after** the leaves, in `paper`. On an open car that is `paper` on
+ * `ink` at **14.54:1**; on a shut one it was `paper` on `sun` at **1.83:1**, the ratio
+ * [§ D336](../../../../DECISIONS.md) measured and refused for text on this palette. *The occupancy
+ * of a car was least legible in the state the car is in most of the time.*
+ *
+ * ## The three rules, and where each one is met
+ *
+ * - **AD-S1 — the car's identity is its body, never its door.** The doorway is inset on all four
+ *   sides, so {@link StageCarPaint.inkMarginPx} is at least 1 at every `doorFraction`. Amber is a
+ *   doorway, never a face.
+ * - **AD-S2 — shut is a seam; open is a gap.** The two leaves are anchored at the doorway's *outer*
+ *   edges and retract toward them as the fraction rises, so what changes is the **shape** of the ink
+ *   channel between them: {@link SEAM_PX} wide when shut, the whole doorway when open. An area-only
+ *   difference would be invisible on `vertical-city`, which draws a car roughly nine times narrower
+ *   than `midtown-office` does.
+ * - **AD-S3 — nothing that must be counted sits on amber.** The marks are laid out in the band
+ *   **above** the doorway rather than over the whole body, so the two cannot intersect at any
+ *   `doorFraction`. That is the rule met by construction rather than by a clamp, which is why the
+ *   test can assert it as a property over the whole range.
+ *
+ * ## The two degenerate branches, one of which shipped buildings reach
+ *
+ * Under {@link MIN_DOORWAY_BODY_PX} there is no doorway: the amber is a 1 px seam in the same lower
+ * band, drawn while the doors are more shut than open and omitted while they are more open than
+ * shut. `vertical-city` — 35 cars across seven banks — is there on any viewport under about 900 px.
+ *
+ * Under {@link MIN_SEAM_BODY_PX}, or where the car is too short to hold a band of ink above the
+ * amber, there is no amber at all. A seam with no ink beside it is the wash again at a smaller
+ * scale, so AD-S1 is answered by drawing nothing rather than by shaving the margin.
+ *
+ * Pure, and exported so all three rules are checkable without a canvas — § 5.2's own acceptance.
+ * Its one non-test caller is `everyday/stageScreen.ts#drawCutaway`, which paints the plan and
+ * decides nothing about it.
+ */
+export function stageCarPaintOf(input: StageCarPaintInput): StageCarPaint {
+  const bodyWidth = Math.max(0, input.bodyWidth);
+  const carHeight = Math.max(0, input.carHeight);
+  const fraction = Math.min(1, Math.max(0, input.doorFraction));
+  const body: StageCarRect = { x: 0, y: 0, width: bodyWidth, height: carHeight };
+  /* The ink frame: 1 px is AD-S1's floor, 2 px is as much as a 20 px car can spare. */
+  const frame = Math.max(1, Math.min(2, carHeight * 0.12));
+  const innerHeight = carHeight - 2 * frame;
+  /*
+   * The split every branch shares, and the whole of how AD-S3 is met: the amber lives in
+   * the car's lower band and the marks in the band above it, so no mark can sit on amber at any
+   * `doorFraction` and no clamp has to keep them apart.
+   */
+  const doorwayHeight = Math.max(1, innerHeight * DOORWAY_HEIGHT_SHARE);
+  const doorwayY = carHeight - frame - doorwayHeight;
+  const bandHeight = doorwayY - frame;
+  const marks = markGrid(bodyWidth, frame, frame, bandHeight, input.occupants);
+
+  /* No room for a band of ink above the amber is no room for amber. AD-S1 before anything else. */
+  if (bandHeight < 1 || bodyWidth < MIN_SEAM_BODY_PX) {
+    return { body, doorway: undefined, leaves: [], marks, inkMarginPx: bodyWidth / 2, amberAreaPx: 0 };
+  }
+
+  if (bodyWidth < MIN_DOORWAY_BODY_PX) {
+    /* `docs/28` § 5.2's hairline branch: the seam is the only door signal that survives here. */
+    const shut = fraction < 0.5;
+    const leaves: readonly StageCarRect[] = shut
+      ? [{ x: (bodyWidth - SEAM_PX) / 2, y: doorwayY, width: SEAM_PX, height: doorwayHeight }]
+      : [];
+    return {
+      body,
+      doorway: undefined,
+      leaves,
+      marks,
+      inkMarginPx: shut ? Math.min((bodyWidth - SEAM_PX) / 2, frame, bandHeight) : bodyWidth / 2,
+      amberAreaPx: shut ? SEAM_PX * doorwayHeight : 0,
+    };
+  }
+
+  const doorwayWidth = bodyWidth * DOORWAY_WIDTH_SHARE;
+  const doorwayX = (bodyWidth - doorwayWidth) / 2;
+  const doorway: StageCarRect = {
+    x: doorwayX,
+    y: doorwayY,
+    width: doorwayWidth,
+    height: doorwayHeight,
+  };
+  /*
+   * Anchored at the doorway's outer edges, retracting toward them. `SEAM_PX` is taken out of the
+   * pair rather than off one side, so the ink channel is centred on the car and the two leaves stay
+   * equal — a lift door read in elevation, which is what § 7.2 asks the picture to say.
+   */
+  const leafWidth = Math.max(0, ((doorwayWidth - SEAM_PX) / 2) * (1 - fraction));
+  const leaves: readonly StageCarRect[] =
+    leafWidth <= 0
+      ? []
+      : [
+          { x: doorwayX, y: doorwayY, width: leafWidth, height: doorwayHeight },
+          {
+            x: doorwayX + doorwayWidth - leafWidth,
+            y: doorwayY,
+            width: leafWidth,
+            height: doorwayHeight,
+          },
+        ];
+  return {
+    body,
+    doorway,
+    leaves,
+    marks,
+    /* Left and right of the doorway, the frame under it, and the marks' band over it — all ink. */
+    inkMarginPx: Math.min(doorwayX, frame, bandHeight),
+    amberAreaPx: leaves.reduce((total, leaf) => total + leaf.width * leaf.height, 0),
+  };
+}
+
+/**
+ * The occupancy marks, laid out inside one band of the car's interior.
+ *
+ * A **cluster** rather than three marks spread to the corners: at 222 px — `garden-apartments`' two
+ * cars on a wide viewport — a grid stretched across the body reads as three unrelated dots, and what
+ * § 7.2 asks for is *people inside the car*. The pitch collapses toward zero on a narrow car, which
+ * is the same degradation the old layout had and is stated rather than clamped away: at that size a
+ * reader counts nothing and the cluster is a smudge that says *somebody is aboard*.
+ *
+ * The band it is given is the caller's, and it is always the band **above** the doorway, which is
+ * the whole of how AD-S3 is met — see {@link stageCarPaintOf}. Nothing here needs to know that,
+ * which is the point: a layout that had to avoid the amber would be one clamp away from not.
+ */
+function markGrid(
+  bodyWidth: number,
+  frame: number,
+  bandTop: number,
+  bandHeight: number,
+  occupants: number,
+): readonly StageCarRect[] {
+  const aboard = Math.min(Math.max(0, Math.round(occupants)), MAX_CAR_RIDERS);
+  const acrossRoom = Math.max(0, bodyWidth - 2 * frame);
+  /* A mark never leaves the body: on a hairline car it shrinks, and then it stops being drawn. */
+  const size = Math.min(MARK_PX, acrossRoom, Math.max(0, bandHeight));
+  if (aboard === 0 || size <= 0) return [];
+  const rows = Math.ceil(MAX_CAR_RIDERS / MARK_COLUMNS);
+  const acrossPitch = Math.min(size + MARK_GAP_PX, (acrossRoom - size) / Math.max(1, MARK_COLUMNS - 1));
+  const downPitch = Math.min(size + MARK_GAP_PX, Math.max(0, bandHeight - size) / Math.max(1, rows - 1));
+  /* Centred over the doorway below it rather than pushed into a corner: on a 222 px car — the two
+     `garden-apartments` cars on a wide viewport — a cluster at the left edge reads as a smudge
+     beside the lift rather than as the people in it. On a narrow car this is `frame` again. */
+  const left = Math.max(frame, (bodyWidth - ((MARK_COLUMNS - 1) * acrossPitch + size)) / 2);
+  const marks: StageCarRect[] = [];
+  for (let index = 0; index < aboard; index += 1) {
+    marks.push({
+      x: left + (index % MARK_COLUMNS) * acrossPitch,
+      y: bandTop + Math.floor(index / MARK_COLUMNS) * downPitch,
+      width: size,
+      height: size,
+    });
+  }
+  return marks;
 }

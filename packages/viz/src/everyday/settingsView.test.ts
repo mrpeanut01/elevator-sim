@@ -108,7 +108,7 @@ describe('Playing — one wired row, never a dead toggle (§ 20.12)', () => {
   });
 });
 
-describe('This device — statements of fact, and the drawn register of refusals', () => {
+describe('This device — statements of fact, and the register of refusals beside them', () => {
   it('states where progress lives and that replay verification is always on', () => {
     const facts = settingsScreenViewOf(BASE).device.facts;
     expect(facts.map((fact) => fact.label)).toEqual([
@@ -120,9 +120,18 @@ describe('This device — statements of fact, and the drawn register of refusals
     expect(facts[1]?.note).toContain('re-simulated by the server');
   });
 
+  /**
+   * The register is not on this view any more, and the case follows it rather than being deleted.
+   *
+   * GitHub issue #207 moved all six registers onto one build-information panel, so
+   * `settingsScreenViewOf` no longer carries them — `everyday/buildNotes.ts` draws them, reached
+   * from this screen. What is asserted is unchanged: every refused row, named, with its reason in
+   * one clause. The half that went away is the *placement*, and the case that pins the placement is
+   * `buildNotes.test.ts`'s, which asserts this array reaches the panel.
+   */
   it('names every refused row with its reason, one clause each', () => {
-    const entries = settingsScreenViewOf(BASE).absences.entries;
-    expect(entries).toBe(SETTINGS_ABSENCES);
+    const entries = SETTINGS_ABSENCES;
+    expect(settingsScreenViewOf(BASE)).not.toHaveProperty('absences');
     for (const label of [
       'Sound',
       'Default speed',

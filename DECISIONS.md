@@ -24016,3 +24016,418 @@ rule this replaced would have returned `9.9.9.9`. If a future platform change ma
 *replace* the header rather than append to it, the hop count becomes wrong and those cases go red.
 That is the only warning anyone would get: a forged key looks exactly like an honest one from every
 other angle, which is the property that let the original sentence stand for nine days.
+
+---
+
+## D342 — the charter is adopted, and four of its five pillars are reconstruction
+
+**Date: 2026-08-24 · Owner: product owner · Milestone: M0, exit criterion 1**
+
+**Decision.** [`docs/22-charter.md`](docs/22-charter.md) is **adopted** as the charter for the game
+layer. It governs the game layer only; where it and [`CLAUDE.md`](CLAUDE.md) disagree, `CLAUDE.md`
+wins. It amends nothing in [`docs/00-project-brief.md`](docs/00-project-brief.md), which remains the
+research brief.
+
+**Context.** The project has never had a charter. `docs/00-project-brief.md` is a research brief and
+says so; it uses the word *game* **zero** times, and all five of its success criteria are
+engineering criteria. Every document downstream inherited that omission — which is how Phase 9 could
+be accepted while [§ D163](DECISIONS.md) excluded playability from its criterion **as
+unfalsifiable**. The charter is the half that was missing, not a replacement for the half that
+exists.
+
+**The provenance caveat is part of the decision, not a footnote to it.** The charter text delivered
+with the programme kickoff is **not in this tree**. § 1's vision and promise, § 3's audiences and
+§ 4's ten criteria are reconstructed from the bodies of issues #186, #187, #188 and #192, which
+restate them. § 2's pillars are reconstructed from the plan and from the standing rules this
+repository already enforces — and **only pillar P3's wording is directly attested**
+(`MULTI_AGENT_PLAN.md:75`). **P1, P2, P4 and P5 are this document's construction.** They are adopted
+as they stand and remain amendable at the direction review; amending one is a human decision, and
+P3's ordinal is fixed by prior citation.
+
+That caveat is recorded here rather than only in the charter because a reader who disagrees with a
+pillar needs to know, at the point of disagreement, whether they are arguing with a decision or with
+a reconstruction.
+
+**Alternatives considered.** (a) Adopt as drafted. (b) Review P1/P2/P4/P5's wording before
+allocating a number. (c) Adopt with those four marked provisional so no reviewer could refuse a pull
+request against them. (b) was rejected as a round trip that changes nothing a later amendment cannot;
+(c) was rejected because a pillar nobody may cite is not a pillar, and the provenance note already
+tells a reviewer which ones are reconstruction.
+
+**What this does not do.** It does not reopen the positioning question. [§ D299](DECISIONS.md)
+answered that on 2026-08-08 — two products over one engine — and issue **#190**, which asserted the
+question had never been answered in writing and proposed an answer contradicting it, was closed with
+the refutation recorded rather than dropped. The charter is written downstream of § D299, not across
+it.
+
+**Three figures were corrected before adoption, and one was withdrawn.** The pin count is **997**,
+not 981; there are **seven** `deadCode.test.ts` audits, not five. The third — `packages/viz/index.html`
+at *198 KB* versus *194 KB* — **was not a correction at all**: the file is 198 182 bytes, which is
+193.5 KiB at 1024 and 198.2 kB at 1000, so both figures were right in different unit conventions and
+publishing the difference as a defect manufactured one. The charter states bytes. The withdrawal is
+recorded because a register that drops its own retracted entries is worth less than one that keeps
+them.
+
+---
+
+## D343 — a numbered series is cited with its document, because S1–S10 now names two sets
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `RISKS.md` R39**
+
+**Decision.** A reference to a numbered series in a governing document **carries the document**:
+`charter S5`, `docs/16 S5`, `docs/10 R13`, `RISKS.md R13`. A bare `S5` or `R13` is a drafting error.
+**Nothing is renumbered.**
+
+**Context.** `S1`–`S10` now names two different ten-item sets — the charter's success criteria and
+[`docs/16-change-scope-contract.md`](docs/16-change-scope-contract.md)'s change-scope rules. The
+irony is load-bearing: `docs/16` chose the letter **S** *"to avoid collision with `docs/10`'s
+R1–R13"*, and the charter then collided with it anyway. Separately, `R1`–`R13` already names both
+`docs/10`'s experience-layer rules and the first thirteen rows of [`RISKS.md`](RISKS.md) — the
+honesty corpus's *"one R13 violation"* means the former.
+
+**Alternatives considered.** (a) The prefix convention. (b) Rename the charter's set to C1–C10.
+(c) Rename `docs/16`'s rules. (a) was chosen because it breaks no reference and requires no
+renumbering, and because [`docs/05-roadmap.md`](docs/05-roadmap.md) states outright that ordinals
+are **names** and renumbering breaks every reference for the sake of a tidier total. (b) and (c) both
+buy uniqueness at exactly that cost, and the charter's S1–S10 is already cited from the issue
+tracker, which this repository cannot rewrite.
+
+**Why this is not mechanised.** `validation/citations.test.ts` resolves `§ D<n>` and cited paths; it
+cannot resolve a bare `R13` or `S5` to a series, and widening it to try would flag every legitimate
+prose use of a capital letter and a number. **The convention is unenforced and is recorded as such**
+— nine of the eleven existing citations to `RISKS.md` already follow it, so it is a convention being
+written down rather than imposed. R39 stays **live** for that reason: an unenforced convention is a
+mitigation, not a discharge.
+
+---
+
+## D344 — sound ships, and the speed ladder is what has to change first
+
+**Date: 2026-08-24 · Owner: product owner · Overrules the recommendation in `docs/29-audio-direction.md`**
+
+**Decision.** **Audio ships.** The M1 lane recommended a written cut; the owner overruled it. The
+shipped design is **speed-tiered**: discrete 1:1 cues where the clock can carry them, a continuous
+bed where it cannot, and the chime demoted to background and occasional rather than removed.
+
+**The lane's evidence stands; only its conclusion is overruled.** Its central measurement is
+correct and is the reason the ruling takes the shape it does: at the shipped speeds a recorded chime
+outlasts the door cycle it announces. What the lane treated as a reason to cut, the owner treats as
+a reason to **fix the speed ladder** — which is the right reading, because the same measurement is a
+defect report about `STAGE_SPEEDS` whether or not audio ever ships.
+
+### The first finding is that the labels lie
+
+`stageScreenModel.ts:98-104`:
+
+| label | `simPerRealS` | actual |
+|---|---|---|
+| `½×` | 8 | **8× real time** |
+| `1×` | 30 | **30× real time** |
+| `4×` | 90 | 90× |
+| `12×` | 240 | 240× |
+| `30×` | 600 | 600× |
+
+**There is no 1:1 speed, and the control that says `1×` is thirty times faster than one.** A player
+who slows the stage all the way down is still watching an eight-times-compressed building. That is a
+label describing a thing it is not — a charter non-goal — and it is independent of audio.
+
+### The determination the owner asked for
+
+Two limits bind, and **neither is a single speed**.
+
+**Limit A — a cue must fit inside the event it announces.** A centre-opening hall-call door cycle is
+`1.8 open + 5 dwell + 3.0 close = 9.8` simulated seconds (`data/elevator-specs.json`). The shortest
+identifiable discrete cue is about **250 ms**. So `9.8 / S ≥ 0.25`:
+
+> **Discrete cues need `S ≤ 39`.** They survive `½×` (8) and `1×` (30); they are already impossible
+> at `4×` (90), where the cycle is 109 ms.
+
+**Limit B — transients must not fuse — and the owner's second instruction dissolves it.** Below
+roughly **100 ms** apart, door events stop being countable and become texture. Chiming *every* door
+cycle at *every* floor, spacing is `stopInterval / (cars × S)` and the budget is `cars × S ≤ 300` —
+which `vertical-city` fails at the slowest speed the build offers. Thirty-five cars chiming on every
+floor is a lobby, not a sequence, and no speed ladder makes it one.
+
+**Model only lobby chimes** (owner, 2026-08-24) and the event rate collapses to one per car per
+**round trip** rather than one per stop. Round-trip time is a quantity this project already computes
+in closed form — `core/analytical`, the Barney/CIBSE oracle — so the budget stops being an estimate:
+
+| building | cars | RTT (closed form) | highest S that stays discrete |
+|---|---|---|---|
+| `garden-apartments` | 2 | 113.6 s | 568 |
+| `midtown-office` | 4 | 149.5 s | 374 |
+| `crown-hotel` | 5 | 182.4 s | 365 |
+| `st-jude-hospital` | 5 | 204.7 s | 409 |
+| `chancery-house` | 6 | 138.3 s | 231 |
+
+**Every one of those is far above Limit A's 39.** So with lobby-only chimes, **Limit B stops binding
+altogether** and the constraint reduces to a single number:
+
+> **Discrete cues need `S ≤ 39`, and nothing else.**
+
+That makes fixing the speed ladder both **necessary and sufficient** for 1:1 audio, which is the
+result the owner's two instructions together produce and neither produces alone.
+
+**Three caveats, stated rather than buried.** The closed form **refuses multi-bank buildings** — it
+is a single-group up-peak model, and `secure-tower`, `mixed-use-high-rise` and `vertical-city` raise
+it as a warning rather than returning a figure. Scaling per bank puts `vertical-city` near `S ≤ 57`,
+still above 39, but that number is **an estimate and not a measurement**. The 250 ms and 100 ms
+figures are standard psychoacoustic thresholds, not facts about this tree. And `midtown-office`'s
+149.5 s reproduces `analytical/index.ts`'s own worked example of 149.54 s, which is why the method is
+quoted rather than merely asserted.
+
+**Two inputs are assumptions and are labelled as such.** `STOP = 30` simulated seconds per car per
+stop is an estimate, not a measurement — it should be replaced by a measured distribution from real
+runs, and the table above moves if it is wrong. The 250 ms and 100 ms figures are standard
+psychoacoustic thresholds, not facts about this tree.
+
+### What ships
+
+1. **A real 1:1 speed**, and labels that mean what they say. Without it the top tier of the design
+   has nowhere to play.
+2. **Discrete cues inside the budget**: doors, arrival chime, the things a lift actually does.
+3. **A continuous bed outside it**: lobby noise, crowd, voices — density tracking the waiting
+   population, which is a *continuous function of state* and therefore smooths under compression
+   rather than shattering. This is the one pro-audio argument the lane itself identified as
+   surviving, and it is now the design.
+4. **Chimes at the lobby only** (owner, 2026-08-24) — not at every floor. This is the instruction
+   that makes the rest work: it cuts the chime rate from one per stop to one per **round trip**, and
+   it is also what real installations do, so the reduction costs no realism.
+5. **The chime demoted, not deleted**: background level, occasional rather than per-event, and
+   explicitly *not annoying* — a texture that says *a lift is working* rather than a per-door alarm.
+
+### What this does not change
+
+**`docs/29`'s accessibility clause stands: no cue conveys information the screen does not also
+convey.** Audio is never pillar P3's visible antecedent, and shipping it does not discharge P3.
+Nothing here weakens a refusal, and the bed must not encode a figure the stage may not draw
+([`docs/10`](docs/10-experience-layer-contract.md) R6 applies to a sound as much as to a banner).
+
+**And the Settings row changes direction.** Under the cut it would have been deleted; under this
+ruling it **gains a consumer** and becomes a live control. `settingsView.ts:187`'s lede — *"how the
+game looks and sounds to you"* — stops being a false promise and becomes true, which is the one
+outcome that needed no correction at all. **`#170`'s Sound half closes by being built rather than by
+being cancelled; its Units half is untouched and stays open.**
+
+---
+
+## D345 — difficulty may raise the stakes and may not move the bar
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `docs/32-game-design.md` GD18 · Amends: charter § 5 non-goal 6**
+
+**Decision.** Charter non-goal 6 is amended. Difficulty may vary **what the building faces** and
+**what a miss costs you**. It may **not** vary **the threshold a run is judged against**.
+
+Concretely, of the four axes `campaign/economy.ts`'s `DIFFICULTIES` moves today:
+
+| axis | example | verdict |
+|---|---|---|
+| `rates` | `[6,7,8,9]` on Easy vs `[3,4,5,6]` on Standard | **allowed** — this is demand, exactly what the clause always permitted |
+| `purse` | 16 units vs 8 | **allowed** — a stake, not a metric |
+| `miss` | 6 missed days vs 3 | **allowed** — a stake |
+| `tests` | `worstS: 240` on Easy vs `180` on Standard | **FORBIDDEN** |
+
+**Context.** The GDD found the shipped tiers move three things that are neither traffic nor
+building fabric, and asked whether the clause or the code was wrong. The clause's own second
+sentence decides it: *"it is never a fudge factor on a metric."* A tier that judges an Easy player's
+worst wait against **240 s** and a Standard player's against **180 s** is a fudge factor on a
+metric, and it is the one axis of the four that is.
+
+**Why the other two survive the same test.** `purse` and `miss` never touch a figure the simulator
+publishes. They change what a player can buy and how many bad days end the contract — the
+consequences of a result, not the result. A player on Easy who posts a 200 s worst wait and a player
+on Standard who posts the same **read the same number and get the same verdict**; only what it costs
+them differs. That is the distinction the amended clause turns on, and it is testable: **take a run
+and a difficulty, and ask whether changing the difficulty changes any figure or verdict the run
+produces. If it does, it is forbidden.**
+
+**Alternatives considered.** (a) Adopt the GDD's GD18 wholesale, permitting stakes *and* bars on the
+argument that *a bar is not a metric*. (b) The literal reading — difficulty moves `rates` and
+nothing else. (c) This. (a) was rejected because a goal bar is the threshold a **published metric**
+is compared against, and moving it changes the verdict a given run receives, which is what the
+clause exists to forbid. (b) was rejected as stronger than the clause's own reasoning requires: it
+would forbid varying what a miss *costs*, which no sentence in the charter objects to and which is
+how difficulty works in every comparable product.
+
+**What this obliges.** `tests` must stop varying by difficulty — one bar per stage, whatever tier is
+selected. **This moves shipped behaviour**, so it is not a tidy-up: under `CLAUDE.md`, every goal
+that changes is a finding to report rather than a number to edit.
+
+> **CORRECTED 2026-08-24 — this clause named the wrong table, and the correction changes the
+> sequencing it recommended.** It said the fix moves `data/scenario-goals.json` and should therefore
+> be sequenced with **#255** and **#234** so that table is regenerated once. **It does not touch that
+> file.** `DIFFICULTIES.tests` lives in `campaign/economy.ts` and is read by
+> `everyday/campaignModel.ts`, which composes the Everyday campaign's four daily-test labels and
+> bars; `data/scenario-goals.json` is the **stage** campaign's published table, read through
+> `campaign/parse.ts` under [§ D160](#d160), and no difficulty tier touches it. `economy.ts`'s own
+> opening docstring already draws that distinction.
+>
+> So the `tests` fix is **independent** of #255 and #234 and need not queue behind them. What it does
+> move is what the Everyday campaign screen *says* a tier's bars are — which is player-facing copy in
+> the honesty corpus, not a published statistical table. Found by the SPEC-200 lane while measuring
+> the curve; the wrong version is kept visible because the sequencing it recommended would have held
+> a small independent fix behind two large ones.
+
+**The GDD's distinction is kept, and only its third clause is withdrawn.** *Difficulty is what the
+building faces; stakes are what a miss costs you* — both stand, and are the amended clause's own
+wording. *A bar is not a metric* does not.
+
+## D346 — a control's own write-disclosure is not internal notation
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `internal-notation`'s scope · Interprets: charter § M2 exit criterion 3**
+
+**Decision.** `CHARTER_PROGRAMME.md` § M2's third exit criterion — *"nothing on a player surface
+refers to a section number, a source filename or a code identifier"* — **does not reach a config
+path a control draws to say what it writes.** `idle.parkingStrategy: lobby` stays. The gate's number
+is **19**, not 56.
+
+**Context.** The property built to measure that criterion deliberately does not match un-backticked
+camelCase or dotted paths, and named the cost of that choice: **37 distinct player-facing strings**,
+most of them `everyday/workshopModel.ts#WORKSHOP_COPY` saying *"that wrote `idle.parkingStrategy:
+lobby`"*. The clause was written as an under-match with the number attached precisely so this ruling
+could be made against a measurement rather than a hunch.
+
+**Why.** [§ D227](#d227) is the stronger obligation, and it was written about this exact shape from
+the other side. The traffic editor drew *mean group size* as a refusal for every wave after the seam
+went live — **a control that lied about writing nothing** — and the lesson recorded there is that a
+control must state what it writes, pinned by a run rather than by another sentence. The config path
+**is** what the control writes. Paraphrasing it into prose makes the disclosure vaguer and re-opens
+the class § D227 closed; it trades a legible obligation for a cosmetic one.
+
+**The two rules are not actually in tension, and the criterion's own words say so.** A section number
+points at a document the player cannot open. A filename points at a file the player does not have. A
+config path points at **the thing the control in front of them just changed** — it is the only one of
+the three that names something inside the player's world. The criterion is about notes left for the
+team on the player's screen; this is not one.
+
+**Alternatives considered.** (a) Rule them in: widen the clause, register ~37 more findings, invent a
+plain-language pattern for write-disclosure. (b) Split by role — flag the path in prose, exempt it in
+a control's disclosure. (c) This. (a) was rejected as trading § D227's guarantee for the criterion's
+letter. (b) is the most faithful to both rules and was rejected as **unbuildable today**: separating
+`SpecTransportMode` from `parkingStrategy` needs this tree's own export list, which `properties.ts`
+may not read (`boundaries.test.ts` confines the filesystem to the test helpers), and a spelling rule
+that guessed would take the 37 with it.
+
+**What this obliges.** Nothing changes in code. The clause stays an under-match, its docstring keeps
+naming the 37, and **this decision is the reason rather than an oversight** — which is the difference
+between a gate that under-matches on purpose and one that was never finished. If the export list ever
+becomes readable from `properties.ts`, (b) is the option to revisit.
+
+## D347 — the M2 gate closes its own hole before it is claimed
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § Y · Scopes: M2**
+
+**Decision.** The Everyday stage's canvas is brought inside the M2 gate's scope **before M2 exits**,
+as its own lane, sequenced after #207.
+
+**Context.** `PLAYER_FACING_SURFACES` resolves to 12 of 49 adapters, and **no adapter drives the
+Everyday stage's own canvas text** — the vertical slice's centrepiece. So the gate can report zero
+while that stage carries internal notation.
+
+**The first draft of this decision named the wrong renderer, and the correction enlarges it.** It
+said the uncovered surface was `render/canvas.ts#drawScene` and that the fix was to teach its adapter
+to distinguish two mounts. `drawScene`'s only non-test caller is `dev/main.ts`; it paints the
+**Engineer** schematic alone, which `everyday/stageScreen.ts:13` states on its own face. They are two
+renderers, not one adapter with two mounts ([§ D299](#d299) § 3), so there was no split to make.
+
+**What is actually uncovered.** `everyday/stageScreen.ts#STAGE_SCREEN` is excluded from the corpus on
+the DOM mounts' shared ground — legitimately; it needs a document, a canvas and an animation frame.
+**The claim attached to that exclusion is what is wrong.** `honesty/surfaces.ts:8302` says the mount
+authors only *"geometry, class names and two static captions"*. It draws five `fillText` sites, and
+one of them is **a live figure**: `${occupants}/${capacity}` at `:297`, composed in the mount —
+neither identifier appears in the model — and therefore **read by no property at all**, neither this
+gate nor R6's temporal axis. (The `+N` overflow beside it *is* swept: `stageCrowdCapOf` composes it
+in the model. It was miscounted as uncovered once before this entry was right.)
+
+That makes this the **stale-refusal class** ([§ D227](#d227)) rather than a scoping question: a
+sentence describing what a seam says, gone wrong while the seam works.
+
+**Why it is a lane and not a line.** The fix is the split this directory already has — *the pure/DOM
+split in `everyday/` exists so that the words are drivable without one* — applied to the stage's
+words, so they can be driven with no document. Widening `PLAYER_FACING_DIRECTORIES` fixes nothing
+here and would cost plenty elsewhere: measured at **656** filename matches unscoped against **2**
+scoped, of which 572 are an Engineer panel naming code to an engineer, correctly. That is
+[§ D91](#d91)'s failure, and it is the reason the scope is not simply widened.
+
+**Why inside M2 rather than after.** A gate with a known hole is settled by review, which is the
+thing an instrument exists to replace. The zero would mean *zero on 12 of 49 adapters* rather than
+*zero where a player reads*, and the difference is invisible to everyone who did not read § Y.
+
+**Sequencing.** After #207, not before — both lanes write `honesty/surfaces.ts`, and #207 must also
+add its new build-information panel and three uncovered register headings to the corpus. Running them
+together is the collision this programme's serialization list exists to prevent.
+
+## D348 — the difficulty curve comes into M2, because a P0 cannot be governed from M4
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA · Amends: the M1 deferral**
+
+**Decision.** GitHub issue **#200** (the difficulty curve specification) is **pulled into M2**. The
+earlier deferral of #199, #200 and #204 to before M4 stands for #199 and #204 and is lifted for #200.
+
+**Context.** #208 is a P0 in M2 and says of itself that *"the difficulty specification governs it"*.
+That specification was #200, scheduled after the milestone the P0 sits in. Verified in § AA: the
+first contract is `garden-apartments`, 6 floors, 120 residents, 2 cars, an hour — and the contract's
+own brief says *"Nothing here is hard — it exists so the seven that follow have something to be
+different from."* So #208 does not report a defect; it asks to change a deliberate design decision,
+and the document that decides such things was not going to exist in time.
+
+**Alternatives considered.** (a) Build #208 now under stated assumptions, with
+[§ D345](#d345) constraining the main axis and #200 confirming or overturning later. (b) Move #208
+out of M2 and let the slice review run on the gentle first session. (c) This. (a) was the
+orchestrator's recommendation and was rejected: the assumptions would be about *the shape of the
+whole curve*, which is exactly what a specification is for, and a P0 rebuilt after the fact is worse
+than a P0 specified first. (b) was rejected because the slice review's testers would be reacting to
+the first session #208 says teaches nothing — the one thing that review most needs to be right.
+
+**What this obliges.** #200 is specification work inside the first **code** milestone, which is the
+shape M1 existed to prevent, and it is accepted here with that named. It is bounded by § D345: the
+curve may vary what the building faces and what a miss costs, and may **not** vary the threshold a
+run is judged against. #208 does not start until #200 lands.
+
+## D349 — M2's gate is two halves, tracked separately, and neither is ticked by the other
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA · Scopes: M2**
+
+**Decision.** M2's exit criteria are split into a **code half** and a **tester half**, tracked
+separately. The orchestrator drives the code half to done and reports it as *code-complete, playtest
+pending*. **The milestone stays formally open** until the tester half is measured by a human running
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md)'s tier ladder.
+
+**Context.** Six separate gates require first-time testers: three of M2's own exit criteria
+(ten testers complete the slice; six of ten state what went wrong; `charter S6` at six of ten with
+**tier-0 answers only**), plus #208's AC4, #210's AC5 and #218's recorded sessions. **No agent lane
+can produce a first-time tester**, and the build such testers would use is not reachable from the
+programme's container either — § X measured the preview answering `403` to `CONNECT` through the
+agent proxy.
+
+**Why the split is written down rather than assumed.** The failure this prevents is quiet: a
+milestone whose issues are all closed *looks* finished, and the tester criteria would be ticked by
+proximity rather than by measurement. Naming the halves means a reader can see which one is done.
+
+**What it explicitly does not do.** It does **not** exit M2 on the code half. That option was on the
+table and was rejected as what it is — weakening an acceptance criterion to make a milestone pass,
+which the charter forbids and which would need a recorded amendment rather than a scheduling choice.
+
+## D350 — #217 is split: the cleanup is code, the position is a decision
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA**
+
+**Decision.** #217's **AC3 and AC4** — the stale refusal and the wrong count in
+`everyday/modes.ts` — are landed as a small lane. **AC1 and AC2** — where *Fix a building* sits in
+the mode hierarchy, and any front-door restructure that follows — are held for the product owner.
+
+**Context.** AC1 asks for *"a decision recorded on Fix a building's position"*, which is not code and
+collides with [§ D299](#d299)'s positioning answer and [§ D335](#d335)'s four-tile front door. The
+cleanup is independent of where the mode ends up.
+
+**And AC3's framing is corrected in the doing.** It says the refusal *"still reads"*, implying a
+player sees it. It does not: `modes.ts#unlessBuilt` returns `undefined` once every named screen is
+built, and `screens.ts#UNBUILT_REASONS` is empty, so **all four mode refusals are dead branches**.
+The defect is a stale *comment* beside dead code — `:129` says *"three authored cases"* while `:44`
+in the same file says *"eighteen"* — which is [§ D227](#d227)'s class in a code path, exactly as that
+file's own comment at `:60` predicted it would be.
+
+**Worth stating once, because it bounds what the M2 gate proves.** `internal-notation` checks
+**notation, not truth**. *"the three cases run, but their Everyday screen is not built yet"* carries
+no section number, no filename and no identifier, so it passes the gate while being false. The two
+defect classes are disjoint and nothing in this repository reads the second.

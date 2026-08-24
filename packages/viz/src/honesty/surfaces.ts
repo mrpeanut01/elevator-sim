@@ -97,6 +97,12 @@ import {
 import { briefBarModel, briefScreenViewOf, GHOST_REFUSAL, lockedForScore } from '../everyday/briefView.js';
 import { doorScreenViewOf, DAY_OFFSET_MIN, DOOR_STEPS, SAME_FOR_EVERYONE } from '../everyday/doorView.js';
 import { HOST_PENDING_REASON } from '../everyday/host.js';
+import {
+  BUILD_NOTES_POINTER,
+  buildNotesSummaryOf,
+  buildNotesViewOf,
+  EVERYDAY_SHELL_ABSENCES,
+} from '../everyday/buildNotes.js';
 import { EVERYDAY_MODES } from '../everyday/modes.js';
 import { AVATAR_SWATCHES } from '../everyday/profile.js';
 import {
@@ -136,19 +142,22 @@ import {
 } from '../everyday/tunerModel.js';
 import { SCREEN_NAMES, UNBUILT_REASONS } from '../everyday/screens.js';
 import { everydayReportViewOf } from '../everyday/reportView.js';
-import { settingsScreenViewOf } from '../everyday/settingsView.js';
-import { EVERYDAY_SHELL_ABSENCES } from '../everyday/shell.js';
+import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsView.js';
 import {
   stageAlarmOf,
   stageBarModelOf,
+  stageCarReadoutOf,
   stageCrowdCapOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageOpeningLineOf,
   STAGE_ABSENCES,
+  STAGE_AWAITING_RUN,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
+  STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
@@ -164,6 +173,7 @@ import type { GoalObservations } from '../shift/types.js';
 import { buildingView, contractView, towersView } from '../everyday/campaignModel.js';
 import {
   applyCampaignAction,
+  CAMPAIGN_ABSENCES,
   freshTower,
   openingCareer,
   type CampaignCareer,
@@ -7268,7 +7278,15 @@ const EVERYDAY_MENU: SurfaceAdapter = {
      * directions on its own; nobody has to remember.
      */
     'everyday/screens.ts#SCREEN_NAMES',
-    'everyday/shell.ts#EVERYDAY_SHELL_ABSENCES',
+    /*
+     * **`everyday/shell.ts#EVERYDAY_SHELL_ABSENCES` left this list on the merge that closed GitHub
+     * issue #207, and it left because the front door stopped drawing it.** The register is not
+     * gone: it is declared in `everyday/buildNotes.ts` now — the shell could not keep it without
+     * closing an import ring through `screens.ts` — and it is rendered by the
+     * {@link EVERYDAY_BUILD_NOTES} adapter, which drives the one panel all six registers are drawn
+     * on. A `covers` entry here would be this adapter claiming strings it no longer produces,
+     * which is the stale-coverage direction `derive.test.ts` guards.
+     */
     'everyday/host.ts#HOST_PENDING_REASON',
   ],
   render(context) {
@@ -7424,10 +7442,6 @@ const EVERYDAY_MENU: SurfaceAdapter = {
       }
     }
 
-    for (const [index, absence] of EVERYDAY_SHELL_ABSENCES.entries()) {
-      seeds.push({ field: `absence.${String(index)}`, text: absence, role: 'reason' });
-    }
-
     /*
      * The shell's one boot-order sentence: a registered screen entered before `dev/main.ts` has
      * published the data host. A refusal about a screen, so the role the rules give a refusal —
@@ -7475,7 +7489,13 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
   id: 'everyday/designerModel.ts#designerFigures',
   covers: [
     'everyday/rushScreenModel.ts#RUSH_SCREEN_COPY',
-    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
+    /*
+     * `#RUSH_ABSENCES` and `#DESIGNER_ABSENCES` are the {@link EVERYDAY_BUILD_NOTES} adapter's
+     * since GitHub issue #207 moved both registers off these two screens. `#RUSH_PRIMARY_REFUSAL`
+     * stays here, and the split is the issue's own rule: a refusal that belongs to a control a
+     * player can press is drawn on that control, and a register of what the build does not do is
+     * drawn once, somewhere a reader goes looking.
+     */
     'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
@@ -7486,7 +7506,6 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
     'everyday/rushScreenModel.ts#rushGeneratedRangeLine',
     'everyday/rushScreenModel.ts#rushOpeningLine',
     'everyday/designerModel.ts#DESIGNER_COPY',
-    'everyday/designerModel.ts#DESIGNER_ABSENCES',
     'everyday/designerModel.ts#designerFigures',
     'everyday/designerModel.ts#designerWarnings',
     'everyday/designerModel.ts#designerPlateRows',
@@ -7517,9 +7536,6 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text,
         role: key === 'holdLine' || key === 'lede' || key === 'drivingNote' ? 'prose' : 'label',
       });
-    }
-    for (const [index, absence] of RUSH_ABSENCES.entries()) {
-      seeds.push({ field: `rush.absence.${String(index)}`, text: absence, role: 'reason' });
     }
     seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
@@ -7563,9 +7579,6 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
         text,
         role: key === 'specNote' || key === 'lede' || key === 'notScored' ? 'prose' : 'label',
       });
-    }
-    for (const [index, absence] of DESIGNER_ABSENCES.entries()) {
-      seeds.push({ field: `designer.absence.${String(index)}`, text: absence, role: 'reason' });
     }
 
     const specs = context.elevatorSpecs;
@@ -7699,11 +7712,15 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
   id: 'everyday/settingsView.ts#settingsScreenViewOf',
   covers: [
     'everyday/settingsView.ts#settingsScreenViewOf',
-    'everyday/settingsView.ts#SETTINGS_ABSENCES',
     /*
      * `everyday/types.ts#ENGINEER_SWAP_REFUSAL` used to be claimed here, reached through the
-     * register above. The row it refused about is built, so the refusal is deleted and the register
-     * is six entries rather than seven; the swap's words are the `ENGINEER_DOOR` adapter's now.
+     * register this screen drew. The row it refused about is built, so the refusal is deleted and
+     * the register is six entries rather than seven; the swap's words are the `ENGINEER_DOOR`
+     * adapter's now.
+     *
+     * `#SETTINGS_ABSENCES` left on the merge that closed GitHub issue #207: the six rows are drawn
+     * on the build-information panel this screen opens, so they are {@link EVERYDAY_BUILD_NOTES}'s
+     * to render and no longer reachable through `settingsScreenViewOf`.
      */
   ],
   render(context) {
@@ -7764,15 +7781,6 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
         seeds.push({ field: `${at}.value`, text: fact.value, role: 'label' });
         seeds.push({ field: `${at}.note`, text: fact.note, role: 'prose' });
       }
-
-      seeds.push({
-        field: `${label}.absences.heading`,
-        text: view.absences.heading,
-        role: 'label',
-      });
-      for (const [index, entry] of view.absences.entries.entries()) {
-        seeds.push({ field: `${label}.absence.${String(index)}`, text: entry, role: 'reason' });
-      }
     }
 
     return singleRun(this.id, seeds);
@@ -7796,7 +7804,10 @@ const EVERYDAY_SETTINGS: SurfaceAdapter = {
  * budget's *was* figure, which this simulator does not record, and § 8.8's offers, which need a
  * complexity the contract publishes for six buildings and a week switch these screens do not reach.
  * A refusal nothing sweeps is the sentence that goes stale the day somebody wires the seam it
- * refuses about — which is § D227, and is why `CAMPAIGN_ABSENCES` is here too.
+ * refuses about — which is § D227. `CAMPAIGN_ABSENCES` used to be swept here for that reason and
+ * is now swept by {@link EVERYDAY_BUILD_NOTES}, on the panel that draws it: GitHub issue #207 took
+ * the register off the triage screen and left the per-control refusals — the offers panel's and
+ * the incident feed's, both above — exactly where they were.
  *
  * ## The states, iterated rather than picked
  *
@@ -7848,7 +7859,6 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
     'campaign/career.ts#BUILD_IDS',
     'campaign/career.ts#applyCampaignAction',
     /* The record and its decisions — every option the desk offers is authored here. */
-    'campaign/career.ts#CAMPAIGN_ABSENCES',
     'campaign/career.ts#needOf',
     'campaign/career.ts#nextLineOf',
     'campaign/career.ts#BUILD_LABELS',
@@ -7984,9 +7994,6 @@ const EVERYDAY_CAMPAIGN: SurfaceAdapter = {
       seeds.push({ field: `${label}.towers.lately`, text: towers.lately.refusal, role: 'reason' });
       seeds.push({ field: `${label}.towers.lately.sub`, text: towers.lately.sub, role: 'prose' });
       seeds.push({ field: `${label}.towers.footnote`, text: towers.oddsFootnote, role: 'prose' });
-      for (const [index, entry] of towers.absences.entries.entries()) {
-        seeds.push({ field: `${label}.towers.absence.${String(index)}`, text: entry, role: 'reason' });
-      }
 
       const desk = buildingView(input);
       if (desk !== undefined) {
@@ -8297,10 +8304,42 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * reads both. What a reader reads off the ramp is the legend's four plain-words rungs, and those are
  * `live/bands.ts`' own `legendLabel`s, driven here for the first time on a paper-mode surface.
  *
+ * ## The mount is excluded, and that used to leave a live figure outside every property
+ *
  * `everyday/stageScreen.ts#STAGE_SCREEN` is **not** driven and is excluded in `derive.test.ts` on
- * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. The split
- * is the point: everything the screen *says* is here, and what the mount authors of its own is
- * geometry, class names and two static captions.
+ * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. **The
+ * exclusion was right and the sentence that used to follow it was wrong**, and both halves are
+ * worth keeping because the wrong half is the class this repository keeps re-finding.
+ *
+ * It said *"everything the screen says is here, and what the mount authors of its own is geometry,
+ * class names and two static captions."* Measured, the cutaway draws five `fillText` sites and
+ * **three** of them were the mount's own: the out-of-service caption, the `▲`/`▼` glyph, and — the
+ * one that made this a gap rather than an inaccuracy — the car's occupancy readout, a **live
+ * figure** on the vertical slice's centrepiece, composed where neither identifier appeared in this
+ * model and therefore read by **no property at all**: not the charter's M2 gate, not R6's temporal
+ * axis. A sentence describing what a seam says, gone wrong while the seam worked; § D227's class,
+ * one directory over.
+ *
+ * [§ D347](../../../../DECISIONS.md) closed it the way this directory closes everything — by the
+ * pure/DOM split, not by widening a scope. `#STAGE_OUT_OF_SERVICE` and `#stageCarReadoutOf` are
+ * this model's now and are seeded below, per car and at every sampled playhead — the readout
+ * without a `covers` entry, for the reason stated on the list itself; `#stageCarPaintOf` took the
+ * cutaway's geometry with them but composes no words and is **not** claimed here.
+ *
+ * What the mount still authors is its **chrome**, and it is named rather than rounded down: the two
+ * transport captions, the `Start` button, the strip's title and its two lane captions. Those are
+ * ordinary DOM text and reach `derive.test.ts`'s static prose sweep, which the three canvas strings
+ * did **not** — a `fillText` argument composed from two numbers is prose to nobody. That is the
+ * difference between a stated limitation and a gap, and it is why this lane moved the cutaway's
+ * three and left the chrome where it is.
+ *
+ * The overlay's three sentences came with it: {@link STAGE_AWAITING_RUN}, `#STAGE_RECOMPUTING` —
+ * which the mount had re-typed as a literal beside the constant it already had — and
+ * `#stageOpeningLineOf`, `docs/28-art-direction.md` AD-S4's answer to the *other* half of GitHub
+ * issue #212. That one names a **future** segment of the demand schedule, which is an input to the
+ * run rather than an outcome of it, so it is seeded on the temporal axis rather than kept off it:
+ * the property that would catch a schedule line turning into a preview is the one that has to see
+ * it.
  */
 const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
@@ -8313,11 +8352,28 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#stageLegend',
     'everyday/stageScreenModel.ts#stageInkFor',
     'everyday/stageScreenModel.ts#STAGE_BAND_INK',
-    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    /*
+     * `#STAGE_ABSENCES` is {@link EVERYDAY_BUILD_NOTES}'s since GitHub issue #207 took the stage's
+     * register off the stage. `#STAGE_NO_GHOST` stays here and is the reason the split is a rule
+     * rather than a tidy-up: it is the ghost lane's own refusal, drawn on the ghost lane's card,
+     * and a refusal that belongs to a control is read where the control is.
+     */
     'everyday/stageScreenModel.ts#STAGE_INTERVENTIONS',
     'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+    /*
+     * § D347's, and `#stageCarReadoutOf` is deliberately **absent** from the list while being
+     * driven below. `derive.test.ts` derives a text producer from *prose* — two adjacent alphabetic
+     * words — and the readout's whole output is `4/10` and `▲`, which is not prose and is exactly
+     * the figure the gap was about. Listing it would be claiming a declaration the derivation does
+     * not find, which the ledger's own guard refuses; it is named here instead, so the coverage is
+     * recorded where a reader looks without the guard being loosened to make room for it.
+     */
+    'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
+    'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    'everyday/stageScreenModel.ts#stageOpeningLineOf',
+    'everyday/stageScreenModel.ts#stageNextStretchOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -8329,9 +8385,6 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: `stage.legend.${rung.id}`, text: rung.label, role: 'label' });
       /* Covered, not seeded — a hex is not a sentence. Called so the claim in `covers` is true. */
       void stageInkFor(rung.id === 'breezy' ? 1 : 200);
-    }
-    for (const absence of STAGE_ABSENCES) {
-      seeds.push({ field: 'stage.absence', text: absence, role: 'reason' });
     }
     for (const arm of STAGE_INTERVENTIONS) {
       seeds.push({
@@ -8353,6 +8406,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: 'stage.landing.overflow', text: capped.overflow, role: 'label' });
     }
 
+    /* § 7.2's dashed well, and the overlay's two states that have no run to be early against. */
+    seeds.push({ field: 'stage.well.outOfService', text: STAGE_OUT_OF_SERVICE, role: 'label' });
+    seeds.push({ field: 'stage.overlay.awaitingRun', text: STAGE_AWAITING_RUN, role: 'prose' });
+    /*
+     * AD-S5's opening sentence, at the one playhead it is ever drawn at — the overlay is up before
+     * the first press and gone after it, so `startedAt` is not a sample among five here, it is the
+     * whole of when this string exists.
+     */
+    seeds.push({
+      field: 'stage.overlay.opening',
+      text: stageOpeningLineOf({ recording, simTimeS: recording.startedAt }),
+      role: 'prose',
+      playhead: atPlayhead(recording, recording.startedAt),
+    });
+
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
       const observations = observationsAt(recording, at);
@@ -8369,7 +8437,47 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         playhead: atPlayhead(recording, at),
       });
       seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
+      /*
+       * AD-S4's pill. On the temporal axis deliberately: it is the one string on this screen that
+       * names an instant **after** the playhead, and a rule that let the schedule turn into a
+       * preview of the outcome would be R6's own defect wearing a timetable.
+       */
+      if (head.next !== undefined) {
+        seeds.push({
+          field: `stage(@${stamp}s).next`,
+          text: head.next,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+      }
       seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      /*
+       * The car readouts — § D347's live figure, one per car. Counts at the playhead, both of
+       * them: `frameAt` folds the occupancy and the shaft carries the capacity, so the pair is
+       * seeded with a playhead and never with a basis, which is what a fold at `t` looks like.
+       */
+      for (const car of context.bundleAt(at).frame.cars) {
+        const shaft = recording.shafts.find((candidate) => candidate.carId === car.carId);
+        const readout = stageCarReadoutOf({
+          occupants: car.occupants,
+          capacityPersons: shaft?.capacityPersons,
+          direction: car.direction,
+        });
+        seeds.push({
+          field: `stage(@${stamp}s).car(${car.carId}).occupancy`,
+          text: readout.occupancy,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+        if (readout.direction !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).car(${car.carId}).direction`,
+            text: readout.direction,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+      }
       for (const figure of head.figures) {
         seeds.push({ field: `stage(@${stamp}s).figure.label`, text: figure.label, role: 'label' });
         seeds.push({
@@ -9649,6 +9757,99 @@ const EVERYDAY_BENCH: SurfaceAdapter = {
   },
 };
 
+/* -------------------------------------------------------------------------- *
+ * The build-information panel — every register of absences, in one place
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **The build-information panel** — every register of what this build does not do yet, on the one
+ * surface that draws them (`everyday/settingsScreen.ts`'s disclosure, opened from Settings).
+ *
+ * ## Why this adapter exists at all
+ *
+ * Until GitHub issue #207 these six registers were drawn on six different player screens, and each
+ * was swept by whichever adapter drove that screen. They are drawn once now, so they are swept
+ * once, here — and the entries that moved were **removed** from the adapters that used to claim
+ * them rather than left in both places. A declaration covered twice is two claims about one string
+ * and a violation reported twice; `derive.test.ts` would not have caught it, because its guard is
+ * about declarations nothing covers rather than declarations two things do.
+ *
+ * ## Why every heading is seeded and not only the entries
+ *
+ * `ISSUE_VERIFICATION_FINDINGS.md` § N's corpus note is the reason: every register's *entries* were
+ * already swept, and **three of the register headings were not** — the shell's, the stage's and the
+ * campaign's were literals inside DOM mounts and copy tables that nothing rendered into the corpus.
+ * A heading the search has never read is a finding in its own right, and it was the heading that
+ * shouted `WHAT THIS BUILD DOES NOT DO YET` at a player on the front door. The panel authors its
+ * own headings, and all of them are seeded below.
+ *
+ * ## The roles
+ *
+ * Entries are `role: 'reason'` — they are refusals, and a refusal has to be allowed to name the
+ * figure it is refusing (R3's exemption). That exemption is about **numbers**: the ninth property,
+ * which is what this whole panel exists to satisfy, exempts no role at all, because naming a
+ * section of a design document is not a thing refusing requires.
+ *
+ * The panel is static — it reads six frozen arrays and nothing from the run — so it is seeded once
+ * per case rather than per state, the same shape `EVERYDAY_MENU` uses for the § 3.3 table.
+ */
+const EVERYDAY_BUILD_NOTES: SurfaceAdapter = {
+  id: 'everyday/buildNotes.ts#buildNotesViewOf',
+  covers: [
+    'everyday/buildNotes.ts#buildNotesViewOf',
+    'everyday/buildNotes.ts#buildNotesSummaryOf',
+    'everyday/buildNotes.ts#BUILD_NOTES_POINTER',
+    'everyday/buildNotes.ts#EVERYDAY_SHELL_ABSENCES',
+    'everyday/settingsView.ts#SETTINGS_ABSENCES',
+    'everyday/stageScreenModel.ts#STAGE_ABSENCES',
+    'everyday/rushScreenModel.ts#RUSH_ABSENCES',
+    'everyday/designerModel.ts#DESIGNER_ABSENCES',
+    'campaign/career.ts#CAMPAIGN_ABSENCES',
+  ],
+  render(context) {
+    void context;
+    const seeds: TextSeed[] = [];
+    const view = buildNotesViewOf();
+
+    seeds.push({ field: 'buildNotes.heading', text: view.heading, role: 'label' });
+    seeds.push({ field: 'buildNotes.summary', text: buildNotesSummaryOf(view), role: 'label' });
+    seeds.push({ field: 'buildNotes.lede', text: view.lede, role: 'prose' });
+    /*
+     * The front door's one remaining sentence about all this. It is drawn on the menu rather than
+     * on the panel, and it is seeded here because it is the panel's constant and the menu is a DOM
+     * mount the search cannot drive.
+     */
+    seeds.push({ field: 'buildNotes.pointer', text: BUILD_NOTES_POINTER, role: 'prose' });
+
+    for (const [index, section] of view.sections.entries()) {
+      const at = `buildNotes.section.${String(index)}`;
+      seeds.push({ field: `${at}.heading`, text: section.heading, role: 'label' });
+      seeds.push({ field: `${at}.note`, text: section.note, role: 'prose' });
+      for (const [row, entry] of section.entries.entries()) {
+        seeds.push({ field: `${at}.entry.${String(row)}`, text: entry, role: 'reason' });
+      }
+    }
+
+    /*
+     * The six arrays are reached through the view above, which is the whole point of the panel —
+     * but `covers` claims each of them by name, and a claim is worth what it is checked against.
+     * Touching them here makes the claim true in the direction `derive.test.ts` cannot see: if a
+     * register ever stops reaching the panel, this reference is what still compiles while the
+     * seeded strings above quietly stop appearing.
+     */
+    void [
+      EVERYDAY_SHELL_ABSENCES,
+      SETTINGS_ABSENCES,
+      STAGE_ABSENCES,
+      RUSH_ABSENCES,
+      DESIGNER_ABSENCES,
+      CAMPAIGN_ABSENCES,
+    ].length;
+
+    return singleRun(this.id, seeds);
+  },
+};
+
 export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   RUN_SUMMARY,
   DESCRIBE_FRAME,
@@ -9800,7 +10001,58 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
    * is not evidence that it was: this position was chosen, not inherited.
    */
   EVERYDAY_STANDALONE_SCREENS,
+  /*
+   * Appended last, per the fault-ordering rule stated at SHIFT_REPORT — and here the rule costs
+   * nothing to obey, because this adapter renders six frozen registers and no figure, no verdict
+   * and no band. There is no wording it could take a fault off another surface for.
+   */
+  EVERYDAY_BUILD_NOTES,
 ]);
+
+/* -------------------------------------------------------------------------- *
+ * Which surfaces a **player** reads
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The module directories that are the player's product rather than the engineer's tool.
+ *
+ * `everyday/` is Everyday Mode — the page opens on it ([§ D335](../../../../DECISIONS.md)), and
+ * `CHARTER_PROGRAMME.md` § M2's gate is about the vertical slice that lives there. `campaign/` is
+ * the other half of the same audience: it is the directory `words.ts#playerSafeDescription` exists
+ * in, which is as plain a statement as a tree makes about who reads it.
+ *
+ * **Everything else is deliberately out**, and the reason is measured rather than asserted. Over
+ * the 27 049 **distinct** strings a seven-seed sample of the standard corpus renders, a filename
+ * match on every surface reports **656**, of which **572** are `dev/familyControls.ts#familyControlsViewOf` drawing rows that read *"Read by
+ * `dispatch/policy.ts#resolveDispatchConfig`, from `dev/state.ts#shiftRunConfigOf`"* — an Engineer
+ * panel whose entire job is to name the code that reads a field, correctly, to an engineer. A gate
+ * that fired there would be [§ D91](../../../../DECISIONS.md)'s failure exactly — *"a threshold
+ * loosened three times asserts nothing"*, reached by way of a guard that cries about legitimate
+ * cases until somebody loosens it to stop the noise.
+ */
+const PLAYER_FACING_DIRECTORIES: readonly string[] = Object.freeze(['everyday/', 'campaign/']);
+
+/**
+ * The surface ids whose strings a player reads — **derived from the adapters, never listed.**
+ *
+ * An adapter is player-facing when **any declaration it drives** lives in a player directory, not
+ * merely when its own id does. That distinction is load-bearing and was found by measurement:
+ * `gauntlet/ladder.ts#ladderRowsOf` drives `everyday/boardScreen.ts#BOARD_SCREEN_COPY` and
+ * `#DAILY_BOARD_ABSENCE`, so a rule keyed on the id alone would have left the board screen's own
+ * register of absences — the exact shape of string this gate is about — outside the gate while
+ * looking complete. A hand-written list has the same defect one merge later, which is why this one
+ * is computed from `covers` and re-computed on every run.
+ *
+ * It follows that a new player screen enters the gate on the merge that registers its adapter, and
+ * a new Engineer panel does not. That is the direction the staleness has to run in.
+ */
+export const PLAYER_FACING_SURFACES: ReadonlySet<string> = new Set(
+  SURFACE_ADAPTERS.filter((adapter) =>
+    [adapter.id, ...adapter.covers].some((declaration) =>
+      PLAYER_FACING_DIRECTORIES.some((directory) => declaration.startsWith(directory)),
+    ),
+  ).map((adapter) => adapter.id),
+);
 
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
 export function coveredDeclarations(): ReadonlySet<string> {
