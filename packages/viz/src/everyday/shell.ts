@@ -150,7 +150,7 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
    * § 3.3 primary, `rushScreenModel.ts#RUSH_PRIMARY_REFUSAL`) is named rather than left for a reader
    * to discover.
    */
-  '§ 6.5’s third lever does not open the tuner — the report’s four lever cards each route to the Engineer panel that carries the advice out, which is what `dev/reportPanel.ts#LEVER_SURFACES` names, and § 3.2 gives the tuner two doors of which only the brief’s *Take it to the sandbox* is drawn here',
+  '§ 6.5’s third lever does not open the tuner — two of the report’s four lever cards route to the Engineer panel that carries the advice out, which is the two `dev/reportPanel.ts#LEVER_SURFACES` names, the other two are a dispatcher recommendation a single day may not make and say so on the card, and § 3.2 gives the tuner two doors of which only the brief’s *Take it to the sandbox* is drawn here',
   '§ 9 Endless rush — the setup screen draws, and the climbing stream behind it does not exist, so its primary refuses; § 9.2’s held-time stage and § 9.3’s own result screen are unbuilt',
 ]);
 
@@ -170,6 +170,19 @@ export const EVERYDAY_SHELL_ABSENCES: readonly string[] = Object.freeze([
 export interface EverydayScreenShellContext extends EverydayScreenContext {
   /** Redraw the § 3.3 row for the current state, through the mounted module's `bar()`. */
   refreshBar(): void;
+  /**
+   * § 3.2's *Switch to Engineer*, as a call — {@link EverydayShell.enterEngineer}, unchanged.
+   *
+   * Here rather than in `screens.ts`' {@link EverydayScreenContext} for that interface's own stated
+   * reason: the swap is the shell's, not the registry's, and there is exactly one implementation of
+   * it. It is **not a second door** — the rail's footer row calls the same function, both are
+   * idempotent, and neither writes `inert` itself.
+   *
+   * Its one non-test caller is `everyday/reportScreen.ts`'s lever button (GitHub issue #213). That
+   * button's label names an Engineer panel, and until this seam existed its handler navigated
+   * *inside* this shell, so it named a surface it did not open.
+   */
+  enterEngineer(): void;
 }
 
 /**
@@ -1308,6 +1321,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
           refreshBar: () => {
             if (!confirmShowing) drawBar();
           },
+          /* § 3.2's swap, handed to the screen unchanged — see the interface's own docstring. */
+          enterEngineer,
         };
         mounted = module.mount(screenRegion, context);
         /*
