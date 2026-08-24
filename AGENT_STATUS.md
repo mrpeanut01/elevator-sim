@@ -19,7 +19,13 @@ defect fix needs no specification — and landed before M2 opened.
 
 | Lane | Task | Issue | Status |
 |---|---|---|---|
-| *(none)* | — | — | the next lane is #212 + [§ D347](DECISIONS.md), below |
+| FIX-212 | The stage's shut car reads as a car, and its words enter the corpus | #212 + [§ D347](DECISIONS.md) | running |
+| SPEC-200 | The difficulty curve specification — docs/33 | #200 | running |
+
+**These two run in parallel because they share no file.** FIX-212 owns `everyday/` and `honesty/`;
+SPEC-200 writes the difficulty-curve document at docs/33 and one README row, and is forbidden both
+directories. (Its path is named here without backticks on purpose: the citation guard requires a
+backticked document path to exist, and this one does not until that lane lands.)
 
 **Next, in this order, and the order is forced.** `honesty/surfaces.ts` is now the tightest
 serialization hazard in the tree — every lane that builds or renames a player surface writes it, and
@@ -30,7 +36,15 @@ unlike the other hazards it has no interface to lock first, because an adapter *
    requires. **#212 was nearly run in parallel with #207** on the belief its defects were in
    `render/canvas.ts`; they are not, and that would have put two lanes in `everyday/` at once.
    It is now the **only** thing standing between the M2 gate and a ticked box.
-2. #208, #210, #217, then the #218 slice review.
+2. **#217's cleanup only** — AC3 and AC4, the stale comment and the wrong count in
+   `everyday/modes.ts`. AC1 and AC2 are held for the product owner ([§ D350](DECISIONS.md)).
+3. **#208**, which cannot start until SPEC-200 lands ([§ D348](DECISIONS.md)), then #210, then the
+   #218 slice review.
+
+**And the milestone does not end when that list does.** [§ D349](DECISIONS.md) splits M2's exit into
+a code half and a **tester half**: six gates need first-time testers, no lane can produce one, and
+the preview build is unreachable from this container. The code half reports as *code-complete,
+playtest pending* and ticks nothing in the tester half.
 
 **M2-GATE was deliberately first, and it is landed.** The criterion it instruments *"is a mechanical
 check and is part of the gate"*, it had no instrument, and it **failed on its first run** — watched,
