@@ -222,6 +222,25 @@ counts stand; the duration does not. The clean measurement is CI's two-platform 
    had not yet explained is a commit whose message is a summary of what the integrator noticed. The
    lane's own report caught it. Recorded rather than amended, because the history is accurate even
    where the message was incomplete.
+12. **The orchestrator shipped a dead seam, and no existing guard could have caught it.** `d6e00a2`
+   committed `rail.ts`'s new `week` option and left `shell.ts`'s `weekRailOptions()` — its only
+   supplier — uncommitted, so the rail read a field nothing passed and the shipped card kept
+   rendering the refusal the fix retired. Measured on that commit: **one reader, zero suppliers.**
+   Closed by `a667957`.
+
+   **The transferable part is why nothing would have flagged it.** `viz/src/deadCode.test.ts` audits
+   **exports** — 1 017 of them over 19 directories — and `week` is a **property on an interface**,
+   not an export, so the scanner is structurally blind to it. `seam.test.ts` is behavioural but
+   scoped to `core`. And `rail.test.ts` passed all 23 cases because it constructs `RailOptions`
+   directly: **a fixture proves the mechanism is correct and cannot prove it is reached**, which is
+   `RISKS.md` **R26** verbatim.
+
+   So the guard family catches *an exported symbol nobody imports* and misses *an option nobody
+   supplies*. For a view option the analogous instrument is not a static audit at all — it is a
+   **driven test of the real shell with a real host**, which is what [`TEST_MATRIX.md`](TEST_MATRIX.md)'s
+   journey rows are for, and why all twenty-one reading `planned` is the largest testing gap here.
+   Worth stating plainly: the reviewer's question *name the non-test caller*, asked of my own commit,
+   caught this. **No test would have.**
 
 ---
 
