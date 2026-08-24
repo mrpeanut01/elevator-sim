@@ -1547,3 +1547,88 @@ file currently contradicts itself in two directions.
 Not fixed in this sitting because `packages/viz/src/everyday/` is serialized to the #207 lane. It is
 a one-line comment and it is the § D227 class: a sentence describing a seam, gone stale while the
 seam works.
+
+---
+
+## AA. #208, #210 and #217 verified — and M2 cannot exit on code alone
+
+Verified 2026-08-24, before scheduling any of the three.
+
+### #208 — CONFIRMED, and confirmed by the code's own mouth
+
+Every factual claim checks out: `shift/contracts.ts:71` makes `garden-apartments` the first contract;
+the building is **6 floors, 120 residents, 2 cars**; `shiftLengthS: 3600` is an hour and the only
+contract that names one.
+
+**The unusual part is that the issue is not reporting a defect.** Contract `c1`'s own brief reads:
+
+> *"Six floors, two hydraulic cars at 0.63 m/s, and a gentle trickle of residents. **Nothing here is
+> hard — it exists so the seven that follow have something to be different from.**"*
+
+So #208 argues against a **deliberate design decision**, exactly as #207 did. Its own docstring
+already measured the consequence: over twelve seeds the median is **18 calls in thirty minutes**, and
+seven of twelve fall under the `WAKE_UP_ARRIVALS` line — which is why `shiftLengthS` was authored on
+this contract at all.
+
+**It is also blocked, and by a deferral the programme itself made.** #208 says *"the difficulty
+specification governs it"*. That specification is **#200**, which the product owner deferred to
+before M4. A P0 in M2 cannot be governed by a spec scheduled after M2. **This needs a
+product-owner decision**: unblock #200 for M2, or let #208 proceed under a stated assumption, or move
+#208.
+
+### #210 — CONFIRMED
+
+*"A 'How to play' page exists in the Engineer menu, which a new player never reaches"* — true.
+It lives in `menu/screens.ts:1029` and `dev/menuPanel.ts`, both Engineer surfaces. Nothing under
+`everyday/` carries onboarding, a coach mark or a guided day. *"Never reaches"* is now slightly
+strong — [§ D338](DECISIONS.md) built a door — but no new player would find it, and the substance
+holds.
+
+### #217 — CONFIRMED in substance, **WRONG in its framing, and the difference matters**
+
+AC3 says the stale refusal *"still reads 'the three cases run, but their Everyday screen is not built
+yet'"*. The string is in `everyday/modes.ts:134`. **It is never drawn to a player.**
+
+`modes.ts:31` — `unlessBuilt(refusal, ...screens)` returns `undefined` when `screens.every(isScreenBuilt)`.
+`screens.ts:224`'s `UNBUILT_REASONS` is **empty**: every § 4 key is registered. So all four mode
+refusals — Today's tower, Campaign, Rush, Fix a building — are **dead branches**.
+
+So the defect is a stale **comment** beside a dead branch, not a live player-facing lie:
+`modes.ts:129` still says *"Three authored cases exist and § 10's Everyday screen is not built"*
+while `:44` in the same file says *"ships all **eighteen**"*. The file contradicts itself, and the
+comment at `:60` had already named this exact risk — *"the comment claiming they do not would be
+§ D227's stale refusal in a code path."*
+
+**AC3 and AC4 are worth doing; the sentence describing them should not claim the player sees it.**
+
+### The finding that changes M2's schedule
+
+**The M2 gate cannot be closed by any agent lane, and three separate things say so.**
+
+| gate | what it requires |
+|---|---|
+| M2 exit criterion 1 | *ten testers who have never seen the game complete the slice* |
+| M2 exit criterion 2 | *six of ten can state what went wrong and why their change helped* |
+| M2 exit criterion `charter S6` | six of ten, **tier-0 answers only** |
+| #208 AC4 | ten first-time testers, 6 of 10 |
+| #210 AC5 | ten first-time testers |
+| #218 | the slice review, with recorded sessions |
+
+**No lane can produce a first-time tester.** And the one surface those testers would use is not
+reachable from here: § X recorded that the Azure preview answers `403` to `CONNECT` through the
+agent proxy, so the deployed build cannot even be driven from this container.
+
+This is not a reason to slow the code work — #207 landed, #212 + § D347 is running, and #217's
+cleanup is small. It is a reason to say plainly that **M2's remaining path is a human one**, and to
+stop treating the milestone as if finishing the issues finishes the milestone. `docs/30`'s tier
+ladder is the protocol; somebody has to run it.
+
+### Two notes for whoever picks these up
+
+- **The M2 gate's property cannot see a stale refusal.** `internal-notation` checks *notation*, not
+  *truth*: `'the three cases run…'` carries no `§`, no filename and no identifier, so it passes the
+  gate while being false. The two defect classes are disjoint, and nothing in this suite reads the
+  second.
+- **#217's AC1 is a decision, not code** — *"a decision recorded on Fix a building's position in the
+  mode hierarchy"* — and it collides with [§ D299](DECISIONS.md)'s positioning answer and § D335's
+  front door. It belongs to the product owner before any lane starts.
