@@ -1438,17 +1438,23 @@ a document, a canvas and an animation frame. The exclusion is legitimate; **the 
 is not.** `surfaces.ts:8302` says what the mount authors of its own is *"geometry, class names and
 two static captions"*. It draws **five** `fillText` sites, and three of them are none of those things:
 
-| site | what a player reads |
-|---|---|
-| `stageScreen.ts:202` | the floor label, from `floorLabelOf` |
-| `:221` | `OUT OF SERVICE` |
-| `:254` | `cap.overflow` — the `+N` waiting-rider count, **a figure** |
-| `:297` | `${occupants}/${capacity}` — **a live figure**, composed in the mount |
-| `:307` | the `▲`/`▼` direction glyph |
+| site | what a player reads | composed where | swept? |
+|---|---|---|---|
+| `stageScreen.ts:202` | the floor label | injected `floorLabelOf` | via its source |
+| `:221` | `OUT OF SERVICE` | **mount** — the literal appears nowhere else | **no** |
+| `:254` | `+N`, the waiting-rider overflow | `stageScreenModel.ts:728`, a **covered** declaration | **yes** |
+| `:297` | `${occupants}/${capacity}` | **mount** — neither identifier appears in the model | **no** |
+| `:307` | the `▲`/`▼` direction glyph | mount | **no** |
 
-So this is the **stale-refusal class**, not a scoping question: a sentence describing what a seam
-says, gone wrong while the seam works. Two live figures on the slice's centrepiece are read by no
-property — not the M2 gate, and not R6's temporal axis either.
+**Counted twice before it was right, so the number is stated carefully.** `+N` looked like an
+uncovered figure and is not — `stageCrowdCapOf` composes it in the model and the adapter drives it.
+What survives is **one live figure**, `${occupants}/${capacity}`, composed in the mount and read by
+**no property at all**: not the M2 gate, not R6's temporal axis. `OUT OF SERVICE` is plausibly one of
+the *"two static captions"* the docstring means; a live occupancy figure is not, and that is the part
+of the sentence that is wrong.
+
+So this is the **stale-refusal class** rather than a scoping question: a sentence describing what a
+seam says, gone wrong while the seam works.
 
 **The fix follows the split this directory already has.** `CLAUDE.md`: *"the pure/DOM split in
 `everyday/` exists so that the words are drivable without one."* The stage's words need that same

@@ -24322,9 +24322,11 @@ renderers, not one adapter with two mounts ([§ D299](#d299) § 3), so there was
 **What is actually uncovered.** `everyday/stageScreen.ts#STAGE_SCREEN` is excluded from the corpus on
 the DOM mounts' shared ground — legitimately; it needs a document, a canvas and an animation frame.
 **The claim attached to that exclusion is what is wrong.** `honesty/surfaces.ts:8302` says the mount
-authors only *"geometry, class names and two static captions"*; it draws five `fillText` sites,
-including `cap.overflow` (the `+N` waiting count) and `${occupants}/${capacity}` — **two live figures
-composed in the mount and read by no property at all**, neither this gate nor R6's temporal axis.
+authors only *"geometry, class names and two static captions"*. It draws five `fillText` sites, and
+one of them is **a live figure**: `${occupants}/${capacity}` at `:297`, composed in the mount —
+neither identifier appears in the model — and therefore **read by no property at all**, neither this
+gate nor R6's temporal axis. (The `+N` overflow beside it *is* swept: `stageCrowdCapOf` composes it
+in the model. It was miscounted as uncovered once before this entry was right.)
 
 That makes this the **stale-refusal class** ([§ D227](#d227)) rather than a scoping question: a
 sentence describing what a seam says, gone wrong while the seam works.
