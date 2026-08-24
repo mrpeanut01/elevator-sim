@@ -32,7 +32,7 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 5203, strictPort: false },
+    server: { port: 5212, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();

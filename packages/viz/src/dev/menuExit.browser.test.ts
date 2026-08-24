@@ -56,7 +56,7 @@ beforeAll(async () => {
     root: fileURLToPath(new URL('../..', import.meta.url)),
     // A port of its own, `strictPort: false` — `keyboard.browser.test.ts`'s reasoning, and files in
     // one project run concurrently.
-    server: { port: 5191, strictPort: false },
+    server: { port: 5200, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();

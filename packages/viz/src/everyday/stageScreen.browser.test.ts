@@ -80,7 +80,7 @@ beforeAll(async () => {
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
     // A port of its own, `strictPort: false` — files in one project run concurrently.
-    server: { port: 5201, strictPort: false },
+    server: { port: 5210, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
