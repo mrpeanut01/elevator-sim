@@ -11,15 +11,17 @@
  * § D227). So *Endless rush is not built* is checked against the tree rather than believed.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { DATA_DIR } from '../fixtures.test-helper.js';
 import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_MODES, isPlayable } from './modes.js';
 import { rushBarModel, RUSH_PRIMARY_REFUSAL } from './rushScreenModel.js';
-import { isScreenBuilt } from './screens.js';
+import { isScreenBuilt, UNBUILT_REASONS } from './screens.js';
 import { EVERYDAY_SCREENS, MODE_PICKS } from './types.js';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
@@ -180,5 +182,115 @@ describe('the availability flags describe this tree, not a remembered one', () =
     expect(existsSync(`${SRC}everyday/fixitScreen.ts`)).toBe(true);
     const mode = EVERYDAY_MODES.find((candidate) => candidate.screen === 'fixit');
     expect(mode?.unavailable).toBeUndefined();
+  });
+});
+
+/**
+ * **The sentences no runtime can reach** — issue #217's AC3 and AC4, § D350.
+ *
+ * Every tile is playable, so `unlessBuilt` returns `undefined` on all four rows and **not one
+ * refusal literal in `modes.ts` is ever evaluated**. That is why this block reads the file as text
+ * instead of asserting over `EVERYDAY_MODES`: a string on a branch that does not run cannot be
+ * inspected through the module's exports, and the suite above — which asserts exactly that the
+ * branch does not run — is therefore blind to what the branch *says*.
+ *
+ * The blindness had already cost something when this block was written. `modes.ts`' Fix-a-building
+ * row carried *"the three cases run, but their Everyday screen is not built yet"* beside a comment
+ * repeating the same three, for every wave after the fifteen other cases were authored and after
+ * the screen was registered — while the table's own docstring said **eighteen** further up.
+ * The file contradicted itself and every check in the repository passed, because availability is
+ * derived (so the tile was correctly open) and the contradiction lived in prose nothing read.
+ *
+ * **This is § D227's class with the sting drawn, and the distinction is worth keeping.** A stale
+ * refusal a *player* can read tells them not to touch a control that works. A stale refusal on a
+ * dead branch misleads only a reader of the file — about whether a screen exists, which is the
+ * one question this file is the authority on. #217 reported it as the former; it was the latter,
+ * and `ISSUE_VERIFICATION_FINDINGS.md` § AA is where that correction was made.
+ *
+ * So the three cases below are the honesty this file can no longer supply by hand: the spelled
+ * count is checked against `data/`, the refusal literals are checked for carrying a count at all,
+ * and the unreachability that makes both necessary is itself pinned rather than assumed.
+ */
+describe('modes.ts’ prose is checked against the tree, not against a reader’s diligence', () => {
+  const MODES_SOURCE = readFileSync(`${SRC}everyday/modes.ts`, 'utf8');
+
+  /**
+   * The authored cases, straight from the shipped file. `fixit/cases.test.ts` is what proves all
+   * of these parse, run and reproduce their quoted figures; this suite only needs how many there
+   * are, so it counts the authored entries rather than standing up the whole parser and its four
+   * `data/` dependencies to learn a length.
+   */
+  const AUTHORED_CASE_COUNT = (
+    JSON.parse(readFileSync(join(DATA_DIR, 'fixit-cases.json'), 'utf8')) as {
+      readonly cases: readonly unknown[];
+    }
+  ).cases.length;
+
+  /**
+   * How the docstring is entitled to spell it. Deliberately a small table that throws rather than
+   * a general number-to-words routine: if a nineteenth case is authored, somebody should have to
+   * come here, and a helper that silently spelled any integer would let the docstring and `data/`
+   * drift apart in the one direction this suite exists to close.
+   */
+  const NUMERALS: Readonly<Record<number, string>> = Object.freeze({
+    15: 'fifteen',
+    16: 'sixteen',
+    17: 'seventeen',
+    18: 'eighteen',
+    19: 'nineteen',
+    20: 'twenty',
+  });
+
+  it('spells the Fix-a-building count the way data/fixit-cases.json counts it', () => {
+    const spelled = NUMERALS[AUTHORED_CASE_COUNT];
+    expect(
+      spelled,
+      `${AUTHORED_CASE_COUNT} authored cases and no spelling for it — add one to NUMERALS`,
+    ).toBeDefined();
+    expect(
+      MODES_SOURCE,
+      `the docstring must spell it "${spelled ?? '?'}" — ` +
+        `data/fixit-cases.json holds ${AUTHORED_CASE_COUNT}`,
+    ).toContain(`ships all **${spelled ?? '?'}** § 10.5 cases`);
+  });
+
+  it('keeps every refusal literal free of a count, because no test can read one at runtime', () => {
+    /*
+     * The rule the Fix-a-building row now states: a refusal sentence names the screen that is
+     * missing and never the things behind it, so it carries no number. A count inside a refusal is
+     * a second copy of a figure — and the worst possible place for one, since the branch never
+     * evaluates and no assertion over the module's exports can see it go wrong.
+     *
+     * Read from source for that reason. The literals are matched off the `unlessBuilt(` calls
+     * themselves rather than off a hand-kept list, so a fifth tile is covered on the commit that
+     * adds it.
+     */
+    const literals = [...MODES_SOURCE.matchAll(/unlessBuilt\(\s*'([^']*)'/g)].map(
+      (match) => match[1] ?? '',
+    );
+    expect(literals, 'one refusal literal per tile').toHaveLength(EVERYDAY_MODES.length);
+    const WORDS = [
+      'one|two|three|four|five|six|seven|eight|nine|ten',
+      'eleven|twelve|thirteen|fourteen|fifteen',
+      'sixteen|seventeen|eighteen|nineteen|twenty',
+    ].join('|');
+    const counting = new RegExp(String.raw`\b(\d+|${WORDS})\b`, 'i');
+    for (const literal of literals) {
+      expect(literal, `"${literal}" carries a count a stale build would keep`).not.toMatch(
+        counting,
+      );
+    }
+  });
+
+  it('confirms the refusals are unreachable, from both ends', () => {
+    /*
+     * Both halves of the reason this block reads text. From the tiles: nothing carries a sentence.
+     * From the registry: `UNBUILT_REASONS` is keyed over nothing, so no screen key anywhere in the
+     * shell has a refusal to draw either. If either flips, the literals above become live copy and
+     * the case above stops being the only thing checking them — which is the good direction.
+     */
+    expect(EVERYDAY_MODES.filter((mode) => mode.unavailable !== undefined)).toEqual([]);
+    expect(Object.keys(UNBUILT_REASONS)).toEqual([]);
+    expect(isScreenBuilt('fixit')).toBe(true);
   });
 });
