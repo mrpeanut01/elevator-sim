@@ -149,11 +149,11 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 |---|---|
 | What the player does | See `docs/10` § 3.1 |
 | What it refuses to do | Not addressed by § 3. It refuses to let the player move a train, route a passenger, or see a number: the whole state of the network is conveyed by the drawing **[unverified]** |
-| How it teaches | See `docs/10` § 3.1 — and its cited **warning**, that minimalism made the overcrowding indicator itself hard to read |
-| How it shows failure | See `docs/10` § 3.1. A station that stays overcrowded too long shuts the network down |
+| How it teaches | See `docs/10` § 3.1, including the cited legibility **warning** it carries |
+| How it shows failure | See `docs/10` § 3.1 |
 | Session length | Not addressed by § 3, and not verified here **[unverified]** |
 | **Adopt** | **Already adopted.** § 3.1 adopts the overcrowding fail state as R4 and adopts its legibility warning as the requirement that the diverging queue be visually unmistakable well before the run ends (U4, `docs/10` § 6). This teardown adds nothing and says so |
-| **Refuse** | **The scalar.** Mini Metro resolves a run to *passengers delivered* and ranks players on it. Refused by `docs/21` § 6 non-goal 3 (*no scalar challenge score, ever*) and by `docs/10` § 5.5. The fail state transfers; the score does not, and the two arrive together in the source design |
+| **Refuse** | **The scalar that comes with it.** Mini Metro is understood to resolve a run to a delivered-passenger count and rank players on it **[unverified — not checked for this document]**. The refusal does not rest on that: `docs/21` § 6 non-goal 3 (*no scalar challenge score, ever*) and `docs/10` § 5.5 forbid the scalar whatever the source design does. What this teardown contributes is the **pattern**, and it recurs — in three of the nine entries a good fail state and a scalar score arrive as one package, and only the first half is adoptable |
 
 ### 4.2 SimTower
 
@@ -172,7 +172,7 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 | field | |
 |---|---|
 | What the player does | See `docs/10` § 3.2 |
-| What it refuses to do | See `docs/10` § 3.2 — it refuses to simulate the elevators, which is the entire point of the citation |
+| What it refuses to do | See `docs/10` § 3.2 — the designed absence *is* the citation |
 | How it teaches | Not addressed by § 3, and not verified here **[unverified]** |
 | How it shows failure | Not addressed by § 3, and not verified here **[unverified]** |
 | Session length | Not addressed by § 3, and not verified here **[unverified]** |
@@ -185,7 +185,7 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 |---|---|
 | What the player does | See `docs/10` § 3.5 |
 | What it refuses to do | Not addressed by § 3, and not verified here **[unverified]** |
-| How it teaches | See `docs/10` § 3.5 — by making the bottleneck physically visible, so the constraint is read off the screen rather than off a number |
+| How it teaches | See `docs/10` § 3.5 |
 | How it shows failure | Not addressed by § 3, and not verified here **[unverified]** |
 | Session length | Not addressed by § 3, and not verified here **[unverified]** |
 | **Adopt** | **Already adopted, and already costed.** § 3.5 identifies the elevator equivalent — offered demand against handling capacity, `offeredPer5Min` beside `personsPer5Min`, two observations rather than any estimate — and calls it *"the highest-value single addition in the whole of Phase 9"* (`docs/10` § 11.W2). This teardown adds no new adoption and does not re-argue the priority |
@@ -198,7 +198,7 @@ adds is the **Refuse** row, which § 3 never wrote, and the verdict form.
 **This is the entry that matters**, for three reasons. It is the only title in the set whose subject
 is *this* subject. It is the one a stranger is most likely to confuse this product with. And it is
 the only one whose behaviour could be verified rather than described, because it is MIT-licensed and
-its whole model is 826 lines of JavaScript.
+its model, its challenge ladder and its app loop are **625 lines of JavaScript across three files**.
 
 Everything in this section marked **[source]** was read on 2026-08-24 from
 `raw.githubusercontent.com/magwo/elevatorsaga/master/` — `challenges.js`, `world.js`, `index.html`,
@@ -211,7 +211,7 @@ so nothing about how it *feels* to play is claimed here.
 | **What the player does** | Writes JavaScript. The player supplies an object with `init(elevators, floors)` and `update(dt, elevators, floors)`, subscribes to `"up_button_pressed"` / `"down_button_pressed"` on floors and `"idle"` / `"floor_button_pressed"` / `"passing_floor"` / `"stopped_at_floor"` on elevators, and drives cars with `goToFloor`, `stop`, `destinationQueue`, `loadFactor()`, `maxPassengerCount()` **[source: `documentation.html`]** |
 | **What it refuses to do** | Almost everything else. The entire configurable surface of a challenge is **four fields** — `floorCount`, `elevatorCount`, `spawnRate`, `elevatorCapacities` **[source: `challenges.js:63-86`]**. No building editor, no traffic pattern, no access or service zoning, no physics beyond a fixed speed, no comparison of two programs against the same crowd |
 | **How it teaches** | An 18-rung parameter ladder and one API page. The ladder runs 3 floors / 1 elevator / spawn 0.3 up to 21 floors / 8 elevators / spawn 1.5, and the *goal type* changes under the player three times — transport-within-time (8 challenges), transport-with-max-wait (7), transport-within-moves (2), one combined, plus a perpetual demo **[source: `challenges.js:63-86`]**. That is teaching by making the objective function move, which is a good idea and is noted as such below |
-| **How it shows failure** | Binary, immediate, and with no diagnosis. `evaluate(world)` returns `true`, `false`, or `null` for undecided; on `false` the screen reads **"Challenge failed" / "Maybe your program needs an improvement?"** **[source: `app.js:189`]**. The player is told the run failed and is not told what about the run failed |
+| **How it shows failure** | Binary, immediate, and with no diagnosis. `evaluate(world)` returns `true`, `false`, or `null` for undecided **[source: `challenges.js:1-60`]**; on `false` the screen reads **"Challenge failed" / "Maybe your program needs an improvement?"** **[source: `app.js:189`]**. The player is told the run failed and is not told what about the run failed |
 | **Session length** | The scored challenges are **60–80 simulated seconds**, except one at **1 800 s** **[source: `challenges.js:63-86`]**. Wall-clock session length is dominated by writing and re-running code and was not measured **[unverified]** |
 
 ### 5.1 Adopt — and the adoption is a compliment this project should accept
@@ -228,7 +228,8 @@ when they need a pass/fail rule that holds up.
 loop over **every user currently present**, not only over users who have been delivered
 **[source: `world.js:178`]**. The longest wait therefore includes the person still standing there,
 which is exactly what `longestCurrentWaitS` is in `packages/viz/src/frame/overlay.ts`'s observation
-half. Seven of eighteen challenges are decided on it.
+half. Seven of the eighteen scored challenges are decided on it, and an eighth on it together with a
+time limit **[source: `challenges.js:63-86`]**.
 
 **Adopt: the moving objective.** The ladder changes *what is being optimised* — time, then worst-case
 wait, then elevator moves — rather than only turning the demand up. This project has the same three
@@ -251,7 +252,7 @@ The denominator is `transportedCounter`. **Riders still waiting are not in the s
 queues are diverging therefore reports an average waiting time computed over exactly the people the
 system managed to serve — the population that, by construction, waited least — and the panel prints
 it beside five honest observations with no qualification at all: *Transported, Elapsed time,
-Transported/s, **Avg waiting time**, Max waiting time, Moves* **[source: `index.html:158-163`]**.
+Transported/s, **Avg waiting time**, Max waiting time, Moves* **[source: `index.html:158-164`]**.
 
 Refused by **R1**, **R3** (*suppression replaces the number, it never hides it*) and by
 `awtIsValid`'s censoring ground in `CLAUDE.md` § *Statistical discipline*. This is not a hypothetical
@@ -310,7 +311,7 @@ answered by this document.
 
 | field | |
 |---|---|
-| **What the player does** | Draws roads connecting houses to destinations of the same colour, so cars can make trips **[secondary: [Mini Motorways Wiki](https://mini-motorways.fandom.com/wiki/Mini_Motorways)]**. Later infrastructure — traffic lights, roundabouts, motorways, bridges — is awarded rather than bought **[secondary: [autoevolution](https://www.autoevolution.com/news/mini-motorways-review-ios-apple-arcade-become-the-ultimate-road-network-planner-167032.html)]** |
+| **What the player does** | Draws roads connecting houses to destinations of the same colour, so cars can make trips; each completed round trip is one point **[secondary: [Mini Motorways Wiki](https://mini-motorways.fandom.com/wiki/Mini_Motorways)]**. Further infrastructure — traffic lights, roundabouts, motorways, bridges — is part of the vocabulary **[secondary: [autoevolution](https://www.autoevolution.com/news/mini-motorways-review-ios-apple-arcade-become-the-ultimate-road-network-planner-167032.html)]**; how it is acquired in a run was not verified here **[unverified]** |
 | **What it refuses to do** | **The player never touches a vehicle.** Every input is an edit to the network; the cars route themselves. This is a designed absence in a game entirely about traffic **[secondary: as above]** |
 | **How it teaches** | By the backlog being visible where it is caused. Pins accumulate on a destination and are removed one per visiting car, so an under-served destination is legible as a pile at that building **[secondary: [Mini Motorways Wiki](https://mini-motorways.fandom.com/wiki/Mini_Motorways), [The Scientific Gamer](https://scientificgamer.com/thoughts-mini-motorways/)]** |
 | **How it shows failure** | A destination whose pins overflow starts a **timer**; if the count is not brought down before it expires the city shuts down and the run ends **[secondary: [Steam discussion](https://steamcommunity.com/app/1127500/discussions/0/3191359376161705321/)]** |
@@ -496,7 +497,7 @@ search index and could not be opened here.
 - https://raw.githubusercontent.com/magwo/elevatorsaga/master/world.js — `avgWaitTime` at
   `:99-102`, `maxWaitTime` at `:178`, `_.random` throughout **[source]**
 - https://raw.githubusercontent.com/magwo/elevatorsaga/master/index.html — the six-row stats panel
-  at `:158-163` **[source]**
+  at `:158-164` **[source]**
 - https://raw.githubusercontent.com/magwo/elevatorsaga/master/app.js — the failure feedback string
   at `:189` **[source]**
 - https://raw.githubusercontent.com/magwo/elevatorsaga/master/documentation.html — the `init` /
