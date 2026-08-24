@@ -77,3 +77,69 @@ describe('the stage’s entry rule', () => {
     expect(source).not.toContain('if (!host.runState().open) host.startRun();');
   });
 });
+
+/**
+ * **The cutaway paints the plan, and the inverted arithmetic is gone** — GitHub issue **#212**.
+ *
+ * The same hinge the entry rule above is pinned by, for the same reason: `stageCarPaintOf` and
+ * `stageCarReadoutOf` are pure and are driven hard in `stageScreenModel.test.ts`, and a mount that
+ * stopped asking them would leave those rules passing their own tests while the product did the old
+ * thing. `stageScreen.browser.test.ts` reads the pixels the mount actually paints; this asserts the
+ * call sites, because a pixel case that never ran — no Chromium on the machine — is a silent skip.
+ */
+describe('what the cutaway paints', () => {
+  const source = readFileSync(fileURLToPath(new URL('./stageScreen.ts', import.meta.url)), 'utf8');
+
+  it('asks the model for the car’s rectangles rather than computing leaves itself', () => {
+    expect(source).toContain('stageCarPaintOf({');
+    expect(source).toContain('for (const leaf of paint.leaves)');
+    expect(source).toContain('for (const mark of paint.marks)');
+    /*
+     * The defect, by its own text: two leaves half the body wide, painted from the outer edges, so
+     * a shut car was a solid amber block. Both halves are asserted — the new call site and the
+     * absence of the old formula — because either alone passes over a file that does both.
+     */
+    expect(source).not.toContain('const leaf = ((column.width - 3) / 2) * (1 - car.doorFraction)');
+    expect(source).not.toContain('ctx.fillRect(column.x + 1.5, y + 1.5, leaf, carH - 3)');
+  });
+
+  it('asks the model for every word the cutaway says, and composes none of them', () => {
+    expect(source).toContain('ctx.fillText(STAGE_OUT_OF_SERVICE, 0, 0)');
+    expect(source).toContain('stageCarReadoutOf({');
+    expect(source).toContain('ctx.fillText(readout.occupancy,');
+    expect(source).toContain('ctx.fillText(readout.direction,');
+    /* § D347's three: the caption, the live figure and the glyph, none of them composed here. */
+    expect(source).not.toContain("'OUT OF SERVICE'");
+    expect(source).not.toContain('`${String(car.occupants)}/${String(capacity)}`');
+    expect(source).not.toContain("car.direction > 0 ? '▲' : '▼'");
+  });
+
+  it('draws the driving eyebrow from the model rather than from a second literal', () => {
+    expect(source).toContain('drivingEyebrow.textContent = head.drivingLabel;');
+    expect(source).toContain('STAGE_DRIVING_LABEL');
+    /* `stageHeaderOf` already publishes this word and the corpus already sweeps it. */
+    expect(source).not.toContain("el(doc, 'span', undefined, 'DRIVING')");
+  });
+
+  it('takes the overlay’s three sentences from the model too', () => {
+    expect(source).toContain('stageOpeningLineOf({');
+    expect(source).toContain('STAGE_RECOMPUTING');
+    expect(source).toContain('STAGE_AWAITING_RUN');
+    /* The mount had re-typed this one as a literal beside the constant it already imported. */
+    expect(source).not.toContain("'recomputing the day from the start…'");
+    expect(source).not.toContain("'Paused at the start of the day. Nothing has happened yet.'");
+  });
+
+  /**
+   * **The stale claim this file's own screen carried into an issue body.**
+   *
+   * `adopt`'s docstring said the transport opens *"at `recording.startedAt`, which is 06:00 on the
+   * clock"*. It is the run's own hour — six of the seven shipped templates declare one and the
+   * default opens at 08:30 — and the sentence was quoted out of here and filed as #212's second
+   * defect before anybody measured it. Pinned so the correction cannot be tidied back out.
+   */
+  it('does not tell a reader the stage opens at 06:00', () => {
+    expect(source).not.toContain('which is 06:00 on the clock');
+    expect(source).toContain("the hour is the run's own");
+  });
+});

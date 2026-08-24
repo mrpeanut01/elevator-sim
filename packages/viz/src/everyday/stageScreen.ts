@@ -76,9 +76,10 @@ import type { EverydayScreenModule } from './screens.js';
 import type { EverydayScreenShellContext, MountedEverydayScreen } from './shell.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
-  MAX_CAR_RIDERS,
   stageAlarmOf,
   stageBarModelOf,
+  stageCarPaintOf,
+  stageCarReadoutOf,
   stageCrowdCapOf,
   stageFilingLandsOn,
   stageGeometryOf,
@@ -86,9 +87,14 @@ import {
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageOpeningLineOf,
   stageSpeedAt,
+  STAGE_AWAITING_RUN,
+  STAGE_DRIVING_LABEL,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
+  STAGE_OUT_OF_SERVICE,
+  STAGE_RECOMPUTING,
   STAGE_SPEEDS,
   type StageFigure,
   type StageGeometry,
@@ -178,6 +184,19 @@ interface CutawayInput {
  *
  * The colour is `stageScreenModel.ts#stageInkFor`, which reads `live/bands.ts`' boundaries — so a
  * capsule on this screen and the mood card in the Engineer rail are two paints of one banding.
+ *
+ * ## Every word and every rectangle in here is decided elsewhere
+ *
+ * This function draws five `fillText` sites, and until GitHub issue **#212** three of them were
+ * composed **here**: the out-of-service caption, the `riders/capacity` readout and the direction
+ * glyph. A string composed in a mount is a string no honesty property can read — the mount needs a
+ * document, a canvas and an animation frame, so `derive.test.ts` excludes it, correctly. One of the
+ * three was a **live figure** drawn on the vertical slice's centrepiece and swept by nothing.
+ *
+ * They are `stageScreenModel.ts#STAGE_OUT_OF_SERVICE` and `#stageCarReadoutOf` now, and the car's
+ * geometry is `#stageCarPaintOf` for the same reason one layer down: the door-fill inversion #212
+ * reports was arithmetic nothing could check without a canvas. What is left here is where a
+ * rectangle lands on the page and which colour the brush is.
  */
 function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
   const { geometry: g, frame, recording } = input;
@@ -217,7 +236,7 @@ function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
       ctx.font = `500 9px ${TYPE.mono}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('OUT OF SERVICE', 0, 0);
+      ctx.fillText(STAGE_OUT_OF_SERVICE, 0, 0);
       ctx.restore();
       continue;
     }
@@ -261,49 +280,50 @@ function drawCutaway(ctx: CanvasRenderingContext2D, input: CutawayInput): void {
     if (column === undefined || column.outOfService) continue;
     const shaft = recording.shafts.find((candidate) => candidate.carId === car.carId);
     const y = g.yForHeight(car.heightM) - carH;
+    const bodyX = column.x + 1.5;
+    const bodyWidth = column.width - 3;
     ctx.fillStyle = C.ink;
-    roundedRect(ctx, column.x + 1.5, y, column.width - 3, carH, 3);
+    roundedRect(ctx, bodyX, y, bodyWidth, carH, 3);
     ctx.fill();
 
-    /* Doors: two amber leaves that split as they open. `doorFraction` is exact between events. */
-    const leaf = ((column.width - 3) / 2) * (1 - car.doorFraction);
-    if (leaf > 0.4) {
-      ctx.fillStyle = C.sun;
-      ctx.fillRect(column.x + 1.5, y + 1.5, leaf, carH - 3);
-      ctx.fillRect(column.x + column.width - 1.5 - leaf, y + 1.5, leaf, carH - 3);
+    /*
+     * Everything inside the car is `stageScreenModel.ts#stageCarPaintOf`'s — GitHub issue **#212**.
+     * The doorway, the two leaves and the mark grid used to be arithmetic here, and the arithmetic
+     * was inverted: at `doorFraction = 0` each leaf was half the body, so a shut car was a solid
+     * amber block and the `paper` marks sat on it at 1.83:1. Nothing about that could be checked
+     * without a canvas. It is a plan now, and this loop paints it.
+     */
+    const paint = stageCarPaintOf({
+      bodyWidth,
+      carHeight: carH,
+      doorFraction: car.doorFraction,
+      occupants: car.occupants,
+    });
+    ctx.fillStyle = C.sun;
+    for (const leaf of paint.leaves) {
+      ctx.fillRect(bodyX + leaf.x, y + leaf.y, leaf.width, leaf.height);
     }
-
     /* Riders aboard, capped at nine — § 14. A tenth mark says nothing a reader can count. */
-    const aboard = Math.min(car.occupants, MAX_CAR_RIDERS);
-    for (let index = 0; index < aboard; index += 1) {
-      const across = index % 3;
-      const down = Math.floor(index / 3);
-      ctx.fillStyle = C.paper;
-      ctx.fillRect(
-        column.x + 4 + across * ((column.width - 8) / 3),
-        y + 3 + down * ((carH - 6) / 3),
-        2,
-        2,
-      );
+    ctx.fillStyle = C.paper;
+    for (const mark of paint.marks) {
+      ctx.fillRect(bodyX + mark.x, y + mark.y, mark.width, mark.height);
     }
 
     /* `riders/capacity`, and the direction arrow while it travels. */
+    const readout = stageCarReadoutOf({
+      occupants: car.occupants,
+      capacityPersons: shaft?.capacityPersons,
+      direction: car.direction,
+    });
     ctx.fillStyle = C.warmGrey;
     ctx.font = `500 8.5px ${TYPE.mono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    const capacity = shaft?.capacityPersons;
-    ctx.fillText(
-      capacity === undefined
-        ? String(car.occupants)
-        : `${String(car.occupants)}/${String(capacity)}`,
-      column.centreX,
-      y - 1.5,
-    );
-    if (car.direction !== 0) {
+    ctx.fillText(readout.occupancy, column.centreX, y - 1.5);
+    if (readout.direction !== undefined) {
       ctx.fillStyle = C.terracotta;
       ctx.font = `600 9px ${TYPE.mono}`;
-      ctx.fillText(car.direction > 0 ? '▲' : '▼', column.centreX, y - 10);
+      ctx.fillText(readout.direction, column.centreX, y - 10);
     }
   }
 }
@@ -390,9 +410,29 @@ function mountStage(
     `color:${C.ink}`,
   ].join(';');
 
+  /*
+   * AD-S4's addition, and the whole of what GitHub issue #212's second defect turned into: the pill
+   * above says which stretch of the demand schedule the playhead is in, and this one says when the
+   * next one starts. It is drawn from `demandPhases` — the run's **input** — so it describes the
+   * timetable rather than previewing an outcome, which is the line R6 draws.
+   */
+  const nextPhase = el(doc, 'span', 'everyday-stage-next');
+  nextPhase.style.cssText = [
+    `border:1px dashed ${C.rule}`,
+    `border-radius:${String(R.pill)}px`,
+    'padding:3px 10px',
+    `font:500 10px ${TYPE.mono}`,
+    'letter-spacing:.08em',
+    `color:${C.warmGrey}`,
+    /* Up only once it has a stretch to name — an empty dashed pill is a control saying nothing. */
+    'display:none',
+  ].join(';');
+
   const driving = el(doc, 'span', 'everyday-stage-driving');
   driving.style.cssText = 'display:flex;align-items:center;gap:6px';
-  const drivingEyebrow = el(doc, 'span', undefined, 'DRIVING');
+  /* The model's own word, here and on every draw from `stageHeaderOf`'s `drivingLabel` — the corpus
+     sweeps that one, so a literal here was one word with two sources and one of them checked. */
+  const drivingEyebrow = el(doc, 'span', undefined, STAGE_DRIVING_LABEL);
   drivingEyebrow.style.cssText = EYEBROW;
   const drivingDot = el(doc, 'span');
   drivingDot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${C.terracotta};flex:none`;
@@ -432,7 +472,7 @@ function mountStage(
   });
   speeds.append(...speedButtons);
 
-  header.append(clock, phase, driving, figures, playButton, speeds);
+  header.append(clock, phase, nextPhase, driving, figures, playButton, speeds);
 
   const alarm = el(doc, 'div', 'everyday-stage-alarm');
   alarm.setAttribute('role', 'status');
@@ -633,8 +673,15 @@ function mountStage(
    *
    * **Speed resets here and nowhere else** — § 4.6 and § 7.3: *a day must never vanish in three
    * seconds because the previous one ended at 30×*. The transport opens **paused** at
-   * `recording.startedAt`, which is 06:00 on the clock, with the first frame drawn by the
-   * {@link requestFrame} below.
+   * `recording.startedAt`, with the first frame drawn by the {@link requestFrame} below.
+   *
+   * **This paragraph used to say that instant is 06:00, and it was wrong** — GitHub issue #212,
+   * where the claim was quoted out of here and filed as a defect before anybody measured it. In
+   * fact the hour is the run's own: `clockAt` takes `dayStartS` from the demand template the
+   * day was built from, six of the seven shipped templates declare one, and the **default** opens at
+   * 08:30. `DAY_START_S` (06:00) is the fallback for the one template that declares none. A stated
+   * mechanism goes stale the same way a published number does, and this one propagated into an issue
+   * body; it is corrected here rather than deleted, so the next reader meets the correction.
    *
    * A re-simulated day is the exception the § 1.4 mechanism requires: playback resumes at the same
    * playhead, so the picture does not jump — the prefix is bit-identical, so the instant the player
@@ -700,21 +747,25 @@ function mountStage(
      */
     if (adopted === undefined) {
       statusText.textContent =
-        recomputingOver !== undefined
-          ? 'recomputing the day from the start…'
-          : 'simulating today’s day — the stage draws the moment it lands';
+        recomputingOver !== undefined ? STAGE_RECOMPUTING : STAGE_AWAITING_RUN;
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
     }
     if (recomputingOver !== undefined) {
-      statusText.textContent = 'recomputing the day from the start…';
+      statusText.textContent = STAGE_RECOMPUTING;
       startButton.style.display = 'none';
       status.style.display = 'flex';
       return;
     }
     if (!started) {
-      statusText.textContent = 'Paused at the start of the day. Nothing has happened yet.';
+      /* AD-S5: the last moment the player is not watching anything is the moment to say what the
+         schedule is about to do. `stageOpeningLineOf` composes it; nothing is authored here. */
+      statusText.textContent = stageOpeningLineOf({
+        recording: adopted,
+        simTimeS: playback?.simTimeS ?? adopted.startedAt,
+        dayStartS: host.dayStartS(),
+      });
       startButton.style.display = '';
       status.style.display = 'flex';
       return;
@@ -740,7 +791,11 @@ function mountStage(
         host.dispatcherById(recording.dispatcherProfileId)?.name ?? recording.dispatcherProfileId,
     });
     clock.textContent = head.clock;
+    drivingEyebrow.textContent = head.drivingLabel;
     phase.textContent = head.phase;
+    /* Nothing rather than a placeholder: inside the last stretch there is no next one to name. */
+    nextPhase.textContent = head.next ?? '';
+    nextPhase.style.display = head.next === undefined ? 'none' : '';
     drivingName.textContent = head.driverName;
     drawFigures(head.figures);
 

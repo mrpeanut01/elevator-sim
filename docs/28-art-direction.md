@@ -88,7 +88,15 @@ for the whole perception:
    car spends most of its time in.
 
 **This is a door-fill inversion and an opening-playhead decision, not a renderer rebuild**, and this
-document specifies both rather than authorising the rebuild. That distinction is the single most
+document specifies both rather than authorising the rebuild.
+
+> **Both are now landed** — § 5.2 (AD-S1 to AD-S3) and § 5.3 (AD-S4, AD-S5), each with a note at the
+> section saying what shipped and where it deviated. Cause 1 was refuted a second time on the way:
+> the stage opens on the **run's own** hour, not 06:00, and the shipped default ramps from its first
+> second, so the quiet head belongs to one template and lasts about a minute. **The playhead did not
+> move**; what the opening frame gained is the schedule's next stretch, which is an input rather than
+> an outcome. The paragraphs above are left as they were written, because they are the diagnosis the
+> fix was scoped from. That distinction is the single most
 valuable thing in here: it converts a P0 rewrite of a 954-line canvas module into two bounded
 changes with acceptance tests.
 
@@ -355,6 +363,26 @@ floors excepted.
 
 ### 5.2 A shut door — the fill inversion, specified
 
+> **LANDED (GitHub issue #212).** The three rules below are met by
+> `everyday/stageScreenModel.ts#stageCarPaintOf`, a pure function from
+> `(bodyWidth, carHeight, doorFraction, occupants)` to the car's rectangles, which
+> `everyday/stageScreen.ts#drawCutaway` paints and decides nothing about. **The defect described in
+> the present tense below is history**, and it is left in the present tense because it is the
+> argument for the geometry rather than a report on the code: a reader who deletes it loses the
+> reason the doorway is inset and the marks moved.
+>
+> The geometry that shipped keeps § 5.2's shape and differs from the sketch on one point, stated so
+> the deviation is not silent: the doorway is the car's **lower band** rather than its full inner
+> height, and the marks sit in the band above it. The sketch's *"marks in the body's upper band above
+> the doorway"* needs a doorway shorter than `carHeight − 6` to be reachable at all. A shipped car is
+> **9–20 px tall** and anywhere from **2 px to 222 px wide** — wide and flat at one end, a hairline at
+> the other — so the marks and the doorway cannot be separated horizontally at every size, and the
+> vertical split is the one that holds across the range. Measured either side of the change on the
+> page: `garden-apartments` opened with
+> **7 040** amber pixels against **892** ink and is now **1 904** against **6 640**, with the tallest
+> unbroken amber run down from the car's whole interior to 7 px against ink's 20
+> (`stageScreen.browser.test.ts`, driven on `garden-apartments` and `vertical-city`).
+
 **The defect, exactly.** The car body is filled `ink` at `x + 1.5` for `width − 3`. The doors are
 then drawn as `leaf = ((width − 3) / 2) × (1 − doorFraction)`, twice — once from the left edge, once
 inset from the right. At `doorFraction = 0` the two `sun` leaves are each **half the body**, they
@@ -437,6 +465,12 @@ it is wrong twice over:
 
 **What is specified instead — the empty stretch is a transport problem and is fixed with the
 transport.**
+
+> **LANDED (GitHub issue #212).** AD-S4 is `stageScreenModel.ts#stageNextStretchOf`, drawn as a
+> second header pill beside the phase pill and seeded into the honesty corpus on the temporal axis —
+> the property that would catch a schedule line turning into a preview is the one that has to see it.
+> AD-S5 is `#stageOpeningLineOf`, which is the overlay's sentence under the centred `Start`. **The
+> playhead did not move**, and the two paragraphs above are why.
 
 - **AD-S4 — the opening frame states what the day is about to do, from the schedule and never from
   the outcome.** `demandPhases` is the resolved template's own schedule (§ 4.3), so the stage may say

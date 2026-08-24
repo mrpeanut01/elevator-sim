@@ -146,14 +146,18 @@ import { SETTINGS_ABSENCES, settingsScreenViewOf } from '../everyday/settingsVie
 import {
   stageAlarmOf,
   stageBarModelOf,
+  stageCarReadoutOf,
   stageCrowdCapOf,
   stageHeaderOf,
   stageInkFor,
   stageInterventionsOf,
   stageLegend,
+  stageOpeningLineOf,
   STAGE_ABSENCES,
+  STAGE_AWAITING_RUN,
   STAGE_INTERVENTIONS,
   STAGE_NO_GHOST,
+  STAGE_OUT_OF_SERVICE,
   STAGE_RECOMPUTING,
 } from '../everyday/stageScreenModel.js';
 import { todayOf } from '../everyday/today.js';
@@ -8300,22 +8304,42 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * reads both. What a reader reads off the ramp is the legend's four plain-words rungs, and those are
  * `live/bands.ts`' own `legendLabel`s, driven here for the first time on a paper-mode surface.
  *
+ * ## The mount is excluded, and that used to leave a live figure outside every property
+ *
  * `everyday/stageScreen.ts#STAGE_SCREEN` is **not** driven and is excluded in `derive.test.ts` on
  * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. **The
- * exclusion is right and the sentence that used to follow it was wrong.**
+ * exclusion was right and the sentence that used to follow it was wrong**, and both halves are
+ * worth keeping because the wrong half is the class this repository keeps re-finding.
  *
  * It said *"everything the screen says is here, and what the mount authors of its own is geometry,
- * class names and two static captions."* Measured, the mount draws five `fillText` sites, and one of
- * them is **a live figure**: `${occupants}/${capacity}` at `stageScreen.ts:297`, composed in the
- * mount — neither identifier appears in this model — and therefore read by **no property at all**,
- * neither the M2 gate nor R6's temporal axis. (`OUT OF SERVICE` beside it is plausibly one of the
- * two captions meant; the `+N` overflow *is* swept, because `stageCrowdCapOf` composes it here.)
+ * class names and two static captions."* Measured, the cutaway draws five `fillText` sites and
+ * **three** of them were the mount's own: the out-of-service caption, the `▲`/`▼` glyph, and — the
+ * one that made this a gap rather than an inaccuracy — the car's occupancy readout, a **live
+ * figure** on the vertical slice's centrepiece, composed where neither identifier appeared in this
+ * model and therefore read by **no property at all**: not the charter's M2 gate, not R6's temporal
+ * axis. A sentence describing what a seam says, gone wrong while the seam worked; § D227's class,
+ * one directory over.
  *
- * So this is the stale-refusal class rather than a scoping question — a sentence describing what a
- * seam says, gone wrong while the seam works. [§ D347](../../../../DECISIONS.md) rules that the
- * stage's words come inside the corpus before M2 exits, by the pure/DOM split this directory already
- * has, as its own lane. **Until that lands, this docstring is a description of a known gap rather
- * than a claim of coverage.**
+ * [§ D347](../../../../DECISIONS.md) closed it the way this directory closes everything — by the
+ * pure/DOM split, not by widening a scope. `#STAGE_OUT_OF_SERVICE` and `#stageCarReadoutOf` are
+ * this model's now and are seeded below, per car and at every sampled playhead — the readout
+ * without a `covers` entry, for the reason stated on the list itself; `#stageCarPaintOf` took the
+ * cutaway's geometry with them but composes no words and is **not** claimed here.
+ *
+ * What the mount still authors is its **chrome**, and it is named rather than rounded down: the two
+ * transport captions, the `Start` button, the strip's title and its two lane captions. Those are
+ * ordinary DOM text and reach `derive.test.ts`'s static prose sweep, which the three canvas strings
+ * did **not** — a `fillText` argument composed from two numbers is prose to nobody. That is the
+ * difference between a stated limitation and a gap, and it is why this lane moved the cutaway's
+ * three and left the chrome where it is.
+ *
+ * The overlay's three sentences came with it: {@link STAGE_AWAITING_RUN}, `#STAGE_RECOMPUTING` —
+ * which the mount had re-typed as a literal beside the constant it already had — and
+ * `#stageOpeningLineOf`, `docs/28-art-direction.md` AD-S4's answer to the *other* half of GitHub
+ * issue #212. That one names a **future** segment of the demand schedule, which is an input to the
+ * run rather than an outcome of it, so it is seeded on the temporal axis rather than kept off it:
+ * the property that would catch a schedule line turning into a preview is the one that has to see
+ * it.
  */
 const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',
@@ -8338,6 +8362,18 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
     'everyday/stageScreenModel.ts#STAGE_NO_GHOST',
     'everyday/stageScreenModel.ts#STAGE_NO_PHASE',
     'everyday/stageScreenModel.ts#STAGE_RECOMPUTING',
+    /*
+     * § D347's, and `#stageCarReadoutOf` is deliberately **absent** from the list while being
+     * driven below. `derive.test.ts` derives a text producer from *prose* — two adjacent alphabetic
+     * words — and the readout's whole output is `4/10` and `▲`, which is not prose and is exactly
+     * the figure the gap was about. Listing it would be claiming a declaration the derivation does
+     * not find, which the ledger's own guard refuses; it is named here instead, so the coverage is
+     * recorded where a reader looks without the guard being loosened to make room for it.
+     */
+    'everyday/stageScreenModel.ts#STAGE_OUT_OF_SERVICE',
+    'everyday/stageScreenModel.ts#STAGE_AWAITING_RUN',
+    'everyday/stageScreenModel.ts#stageOpeningLineOf',
+    'everyday/stageScreenModel.ts#stageNextStretchOf',
   ],
   render(context) {
     const seeds: TextSeed[] = [];
@@ -8370,6 +8406,21 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
       seeds.push({ field: 'stage.landing.overflow', text: capped.overflow, role: 'label' });
     }
 
+    /* § 7.2's dashed well, and the overlay's two states that have no run to be early against. */
+    seeds.push({ field: 'stage.well.outOfService', text: STAGE_OUT_OF_SERVICE, role: 'label' });
+    seeds.push({ field: 'stage.overlay.awaitingRun', text: STAGE_AWAITING_RUN, role: 'prose' });
+    /*
+     * AD-S5's opening sentence, at the one playhead it is ever drawn at — the overlay is up before
+     * the first press and gone after it, so `startedAt` is not a sample among five here, it is the
+     * whole of when this string exists.
+     */
+    seeds.push({
+      field: 'stage.overlay.opening',
+      text: stageOpeningLineOf({ recording, simTimeS: recording.startedAt }),
+      role: 'prose',
+      playhead: atPlayhead(recording, recording.startedAt),
+    });
+
     for (const at of sampleTimes(recording)) {
       const stamp = at.toFixed(0);
       const observations = observationsAt(recording, at);
@@ -8386,7 +8437,47 @@ const EVERYDAY_STAGE: SurfaceAdapter = {
         playhead: atPlayhead(recording, at),
       });
       seeds.push({ field: `stage(@${stamp}s).phase`, text: head.phase, role: 'label' });
+      /*
+       * AD-S4's pill. On the temporal axis deliberately: it is the one string on this screen that
+       * names an instant **after** the playhead, and a rule that let the schedule turn into a
+       * preview of the outcome would be R6's own defect wearing a timetable.
+       */
+      if (head.next !== undefined) {
+        seeds.push({
+          field: `stage(@${stamp}s).next`,
+          text: head.next,
+          role: 'label',
+          playhead: atPlayhead(recording, at),
+        });
+      }
       seeds.push({ field: `stage(@${stamp}s).driving`, text: head.drivingLabel, role: 'label' });
+      /*
+       * The car readouts — § D347's live figure, one per car. Counts at the playhead, both of
+       * them: `frameAt` folds the occupancy and the shaft carries the capacity, so the pair is
+       * seeded with a playhead and never with a basis, which is what a fold at `t` looks like.
+       */
+      for (const car of context.bundleAt(at).frame.cars) {
+        const shaft = recording.shafts.find((candidate) => candidate.carId === car.carId);
+        const readout = stageCarReadoutOf({
+          occupants: car.occupants,
+          capacityPersons: shaft?.capacityPersons,
+          direction: car.direction,
+        });
+        seeds.push({
+          field: `stage(@${stamp}s).car(${car.carId}).occupancy`,
+          text: readout.occupancy,
+          role: 'observation',
+          playhead: atPlayhead(recording, at),
+        });
+        if (readout.direction !== undefined) {
+          seeds.push({
+            field: `stage(@${stamp}s).car(${car.carId}).direction`,
+            text: readout.direction,
+            role: 'label',
+            playhead: atPlayhead(recording, at),
+          });
+        }
+      }
       for (const figure of head.figures) {
         seeds.push({ field: `stage(@${stamp}s).figure.label`, text: figure.label, role: 'label' });
         seeds.push({

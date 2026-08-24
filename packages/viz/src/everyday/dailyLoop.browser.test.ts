@@ -161,10 +161,17 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
 
       /*
-       * Close the day, then come back through Your week — which is the loop's tail as this build
-       * has it: the rail's `WORLD` row opens the week, today's card opens the account of it, and
-       * the report's own § 3.3 primary goes back to the week. See {@link closeDay} for the one
-       * press that has no Everyday home yet.
+       * Close the day, then come back through Your week — the loop's tail **by the rail**: the
+       * `WORLD` row opens the week, today's card opens the account of it, and the report's own
+       * § 3.3 primary goes back to the week.
+       *
+       * This used to say *"the one press that has no Everyday home yet"*, and it had gone stale in
+       * the same file that refutes it: the press has a home (`closeDay`'s own docstring says so
+       * three blocks up), and the last case in this suite walks it — § 3.3's primary on the stage,
+       * landing on the report, with no rail detour. What {@link closeDay} buys **here** is that
+       * the close is one deterministic step rather than a press whose timing depends on the
+       * stage's mount, because these cases are about what a *closed* day does to the other three
+       * screens. That is a reason to keep the call, not an absence to record.
        */
       await waitForOwnRun(page);
       await closeDay(page);
