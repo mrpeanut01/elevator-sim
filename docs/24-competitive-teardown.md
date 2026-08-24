@@ -434,14 +434,20 @@ nearest comparator publishes a censored mean, and this product refuses to.* File
 
 ## 9. What this teardown changes
 
-**It changes none of the refusals, and that is a result rather than an absence.** Every one of the
-nine refusals in § 7 was already forbidden by a rule on this tree before the teardown was written.
+**It changes none of the refusals, and that is a result rather than an absence.** **Eight** of the
+nine refusals in § 7 were already forbidden by a rule on this tree before the teardown was written.
 No non-goal is weakened, none is added under pressure, and nothing in the adjacent set suggested a
 practice this project has forbidden and should not have. A teardown whose conclusion is *we were
-right* is legitimate, and this one's is — for the refusals.
+right* is legitimate, and this one's is — for those eight.
+
+**The ninth is the exception and is not smuggled past.** SimTower's per-car micromanagement (§ 4.2)
+is refused against a rule that **does not exist on this tree**, and item 4 below is the request that
+#186 write it. Until it does, that refusal is a proposal wearing a verdict's clothes, and the tally
+marks it as one.
 
 **It changes five things, all of them specifications or evidence, none of them code.** M0 writes no
-code.
+code. (§ 7 counts *six adoptions*; these are the five **changes** those adoptions produce — the three
+content-sequencing ideas land as one change, to the content plan.)
 
 1. **#186 gains a precedent for its hardest non-goal.** *No scalar score, ever* is normally defended
    by argument against the objection that a mass audience needs one number. Opus Magnum is a shipped
@@ -479,17 +485,23 @@ struck before the issue closes; its first acceptance criterion is not met as wri
 
 Following `docs/21` § 7's convention. Each is a request, not an edit.
 
-⬜ **`README.md`** — the Documentation table wants a row for this file. Owned by the integrator.
+✅ **`README.md`** — **done at integration** (the row is in the Documentation table). It was
+required because **the suite is red without it**: `packages/experiments/src/validation/documentation.test.ts` § *README.md § Documentation*
+asserts that every `docs/*.md` on disk is linked from that table, matching on the literal string
+`docs/24-competitive-teardown.md`. Owned by the integrator, not by this lane.
 
-⬜ **`README.md`** — § 8 claim 3: *"where most tower sims quietly cheat"* is broader than any evidence
+✅ **`README.md`** — **done at integration**; the sentence is narrowed to the verified instance and
+carries a note saying what it used to claim. § 8 claim 3: *"where most tower sims quietly cheat"* was broader than any evidence
 on this tree supports. Either narrow it to the verified instance, or mark it as an unmeasured
 assertion. This repository's own standing rule applies to its own front page: *if you write a
 sentence about why something performs better, either measure it or say it is unmeasured*
 ([§ D280](../DECISIONS.md)).
 
 ⬜ **GitHub issue #189** — strike the premise *"`docs/10` observes … without saying which lesson or
-where"* (refuted, § 1), and record that acceptance criterion 1 is met by a source read and a
-documented-behaviour survey rather than by play (§ 3).
+where"* (refuted, § 1), and record that acceptance criterion 1 — *at least six titles **played*** —
+is **not met as written**: what was done is a source read, a documented-behaviour survey and a
+search pass (§ 3). Closing the issue without recording that would leave a claim in the tracker that
+the deliverable does not support.
 
 ⬜ **[`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) § Q** — the claim that all
 five titles *"appear nowhere in the tree"* is wrong by one: Two Point Hospital appears at

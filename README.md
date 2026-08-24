@@ -21,7 +21,16 @@ one. **It plays like a game and it measures like an instrument.**
 5. **Race them** — the same passengers, to the second, against both configurations. The simulator
    tells you whether the difference is real or whether you are looking at noise.
 
-Step 5 is the whole point, and it is where most tower sims quietly cheat.
+Step 5 is the whole point. The nearest comparator this project has examined at source —
+[Elevator Saga](docs/24-competitive-teardown.md) — publishes an average wait computed only over
+riders who were **delivered**, unconditionally, from a single unseeded run. This simulator will not
+publish that figure: `censored` is one of the **five** grounds on which it suppresses a mean
+outright (`packages/core/src/metrics/awtValidity.ts`), and it will not name a winner from one
+replication.
+
+*(That sentence used to read "it is where most tower sims quietly cheat". No tower sim was ever
+checked for it — the one verified instance is a programming toy — so the claim was narrowed to
+what the evidence supports. The teardown that found it is `docs/24-competitive-teardown.md` § 8.)*
 
 ## Why it is a hard game to build honestly
 
