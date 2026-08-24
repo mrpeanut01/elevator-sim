@@ -120,6 +120,95 @@ async function canvasHasPaint(page: Page): Promise<boolean> {
   });
 }
 
+/**
+ * The Everyday data host, reached from inside the page — `dailyLoop.browser.test.ts`'s idiom.
+ *
+ * Only the readings GitHub issue #215 is about: whether a run is on the stage, whether it is filed,
+ * and which attempt at the day the week is counting. All three come off the product's own façade
+ * rather than off a rendered string, because the sheet that prints the count is on another screen
+ * and the claim is about the count itself.
+ */
+interface HostWindow {
+  readonly __everydayHost?: {
+    current():
+      | {
+          runState(): { readonly hasRun: boolean; readonly dayClosed: boolean };
+          week(): { readonly attempt: number };
+        }
+      | undefined;
+  };
+}
+
+/**
+ * A token the #215 case parks on its document, so a page that was replaced under it says so.
+ *
+ * Named here rather than inlined because it is written in one place and read in another, and the
+ * whole value of it is that the two spellings cannot drift.
+ */
+const ALIVE = '__stageCaseAlive';
+
+/** One reading of {@link HostWindow}, or `null` while the shell has published no host. */
+interface HostFacts {
+  readonly hasRun: boolean;
+  readonly dayClosed: boolean;
+  readonly attempt: number;
+}
+
+/**
+ * Read the host, publishing the handle first if this document has not got one.
+ *
+ * The re-publish is not belt: `dev/main.ts` rewrites the address bar with `replaceState` on every
+ * state change, and a handle parked on `window` by a single `evaluate` is one page-level surprise
+ * away from being gone — which is a **timeout with no facts in it**, the least useful failure a
+ * browser case can produce. Asking for it every time costs one resolved module import.
+ */
+async function hostFacts(page: Page): Promise<HostFacts | null> {
+  try {
+    await page.evaluate(
+      "window.__everydayHost ? true : import('/src/everyday/host.ts').then((module) => { window.__everydayHost = module.EVERYDAY_HOST; return true; })",
+    );
+    return await page.evaluate(() => {
+      const current = (window as unknown as HostWindow).__everydayHost?.current();
+      if (current === undefined) return null;
+      const run = current.runState();
+      return { hasRun: run.hasRun, dayClosed: run.dayClosed, attempt: current.week().attempt };
+    });
+  } catch {
+    /*
+     * *Execution context was destroyed* — the dev server reloading the page under the poll, which
+     * is `docs/…` § D220's *"the one tier that can fail for reasons that are not about this
+     * repository"* arriving as an exception in the middle of a reading. It is a **missing** reading,
+     * not a false one, so it is reported as one and the caller polls again; a genuinely reloaded
+     * page never satisfies {@link untilHost} and fails on its last reading instead of here.
+     */
+    return null;
+  }
+}
+
+/**
+ * Poll {@link hostFacts} until `wanted` holds, and hand back the last reading either way.
+ *
+ * `page.waitForFunction` would do the waiting and report a bare `TimeoutError`. The case below
+ * waits **for a defect** as well as for a state, so both outcomes are ordinary results rather than
+ * exceptions, and the reading that was actually on the page travels into the assertion message.
+ */
+async function untilHost(
+  page: Page,
+  wanted: (facts: HostFacts) => boolean,
+  timeoutMs: number,
+): Promise<{ readonly held: boolean; readonly last: HostFacts | null }> {
+  const deadline = Date.now() + timeoutMs;
+  let last: HostFacts | null = null;
+  for (;;) {
+    last = await hostFacts(page);
+    if (last !== null && wanted(last)) return { held: true, last };
+    if (Date.now() >= deadline) return { held: false, last };
+    await new Promise((resolve) => {
+      setTimeout(resolve, 500);
+    });
+  }
+}
+
 describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   it('opens as a screen, with the Engineer surface still covered behind it', async () => {
     const page = await coldLoad();
@@ -361,6 +450,117 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     expect(await page.locator('.everyday-report-empty').count()).toBe(0);
     await page.close();
   });
+
+  /**
+   * **A filed day is not silently re-run by walking back onto its stage** — GitHub issue **#215**.
+   *
+   * The sheet read *"attempt 4 at this day"* to a player who had pressed *Run* once. The issue
+   * blamed navigation; navigation is not it — § D232 closed that path, and `dev/main.ts:3386`
+   * guards the report tab with a `closeShift` that returns early on `filedRunId`. The count
+   * increments in exactly one place (`shift/week.ts#closeDay`) and it is honest about what it
+   * counts: **closes**. What was dishonest is the run underneath it.
+   *
+   * `mount` asked for a day whenever `runState().open` was false, and a filed day is not open — so
+   * re-entering the stage after a close started a **new** run. `dev/state.ts` does not re-roll the
+   * seed, so that run is bit-identical to the one just filed; `adopt` clears `filedRunId`, which
+   * re-arms the filing gate; and `dev/main.ts`'s tick files it when its playhead runs out, behind
+   * the Everyday cover. Report → *‹ The day* → wait is *attempt 2* with the player having asked
+   * for nothing and nothing having changed. A bit-identical re-simulation is not an attempt.
+   *
+   * ## Nothing below presses *Close the day* twice, and that is the point
+   *
+   * A player who presses the primary a second time **has** made a second attempt — § D223's own
+   * correction, which `week.test.ts` pins. The walk below is navigation only: file once, go to the
+   * sheet, come back on `‹ The day`, and wait. Everything the count does after that, it does with
+   * nobody asking.
+   *
+   * ## The second wait is a wait for a defect, and it is meant to run out
+   *
+   * There is no event for *a run that was never started*, so the green path is the absence of one.
+   * Timing out is the pass, and the assertion is on the last reading rather than on the timeout, so
+   * a red run says which fact was wrong instead of only that a clock expired.
+   */
+  it('does not re-run a filed day when the stage is re-entered, so the attempt count holds', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+
+    /*
+     * File the day through the data host — the idiom two cases above this one use, for their stated
+     * reason: one deterministic step rather than a press whose timing depends on the mount. It is
+     * also the call `dev/main.ts`'s tick makes when a playhead runs out under a watching player,
+     * and the attempt it books is 1 by either route.
+     *
+     * This case drove the ×60 transport to the end of the day instead while it was being written,
+     * which is the route the reporter walked and which reproduces the same way. It is not what
+     * shipped: sixty seconds of real playback per run is sixty seconds in which the dev server can
+     * reload the page underneath the poll, and the finding here is about re-**entry**, not about
+     * how the day came to be filed.
+     */
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    const filed = await untilHost(page, (facts) => facts.dayClosed, 60_000);
+    expect(filed.last, 'the day never filed').toEqual({
+      hasRun: true,
+      dayClosed: true,
+      attempt: 1,
+    });
+
+    await page.evaluate(`window.${ALIVE} = true`);
+
+    /* The daily strip's fourth stop, lit by the file above — #206's route to the sheet. */
+    await page.locator('.everyday-bar-timeline button').nth(3).click();
+    await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+
+    /* § 3.3's report row names its linear parent `‹ The day`, and #206 made that cell a second way
+       onto this mount. It is the route the reporter walked. */
+    expect(await page.textContent('.everyday-bar-back')).toBe('‹ The day');
+    await page.click('.everyday-bar-back');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 15_000 });
+
+    /*
+     * The wait for the defect, and it is meant to run out. `dayClosed` going false is `adopt`
+     * taking on a run nobody asked for, and it is the whole mechanism at its first observable
+     * instant — the re-simulation is off a worker and lands in a second or two, so thirty is a
+     * window with an order of magnitude in hand rather than a guess.
+     *
+     * `attempt` is polled beside it and is the count the sheet prints. It moves one step later than
+     * `dayClosed` does and by a different hand — the re-armed gate is what lets a **second close**
+     * count, whether that close is the tick's or a player pressing a primary that has quietly
+     * become pressable again. Asserting both says which half is broken when this goes red.
+     */
+    const reRan = await untilHost(page, (facts) => !facts.dayClosed || facts.attempt >= 2, 15_000);
+
+    /*
+     * A reload takes {@link ALIVE} with it, and would otherwise satisfy the poll above by the back
+     * door: a freshly booted page has an unfiled run on it, which reads exactly like the defect.
+     * Vite full-reloads every connected page when anything under `packages/viz` is written, so this
+     * is a live hazard in a shared tree rather than a theoretical one — and it must fail as *the
+     * page was replaced*, never as *the product re-ran a filed day*.
+     */
+    expect(
+      await page.evaluate(`window.${ALIVE} === true`),
+      'the page reloaded under this case — the reading below is from a different sitting',
+    ).toBe(true);
+    expect(reRan.last, 're-entering a filed day started a run nobody asked for').toEqual({
+      hasRun: true,
+      dayClosed: true,
+      attempt: 1,
+    });
+    expect(reRan.held).toBe(false);
+
+    /*
+     * And what the player sees, which is the other half of the same fact: § 3.3's primary stays
+     * inert over a filed day, saying so. Pre-fix it came back to life as a pressable *Close the
+     * day* over a bit-identical re-simulation — which is how a count that means *attempts* reaches
+     * four on a day that was run once.
+     */
+    expect(await page.locator('.everyday-bar-primary').isDisabled()).toBe(true);
+    expect(await page.textContent('.everyday-bar-note')).toBe(
+      'the day is filed — its report is written',
+    );
+    await page.close();
+  }, 300_000);
 
   /**
    * **The other flow that files** — GitHub issue #206's second half of the blast radius.

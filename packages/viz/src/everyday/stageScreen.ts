@@ -855,12 +855,7 @@ function mountStage(
   };
   view?.addEventListener('resize', onResize);
 
-  /*
-   * § 7.3: entering the stage is entering *the player's* day. `open` is false for boot's own demo
-   * run (§ D232 — nobody chose it), for a watched or file-loaded run, and for a filed one, so this
-   * asks for a day exactly when the player has not got one of their own on the stage.
-   */
-  if (!host.runState().open) host.startRun();
+  if (stageEntryStartsARun(host.runState())) host.startRun();
   onHostChange();
 
   return {
@@ -895,6 +890,60 @@ function mountStage(
       if (landing !== undefined) context.go(landing);
     },
   };
+}
+
+/**
+ * Whether walking onto the stage should ask the host for a day — § 7.3, and **GitHub issue #215**.
+ *
+ * § 7.3: entering the stage is entering *the player's* day, so the mount asks for one exactly when
+ * the player has not got one of their own standing on it. `runState().open` is most of that
+ * question already: it is false for boot's own demo run (§ D232 — nobody chose it) and for a
+ * watched or file-loaded run, both of which are somebody else's day and should be replaced by the
+ * player's.
+ *
+ * ## The clause that had to be taken back out of `open`
+ *
+ * `open` is **also** false for a day that has been **filed**, and this line used to read
+ * `if (!host.runState().open)` — so re-entering the stage after a close silently started a run.
+ * Every step after that is automatic and correct on its own terms: `dev/state.ts#startRun` does not
+ * re-roll the seed, so the new recording is bit-identical to the one just filed; `dev/main.ts`'s
+ * `adopt` clears `filedRunId`, which re-arms the filing gate; and the next close — the tick's, or a
+ * player pressing a § 3.3 primary that has quietly become pressable again over a day they already
+ * finished — counts an attempt. The sheet then read *"attempt 4 at this day"* to somebody who had
+ * pressed *Run* once. **A bit-identical re-simulation is not an attempt**, which is the sentence
+ * `shift/week.ts#closeDay`'s `recordGrew` already makes about the intervention case.
+ *
+ * The count itself is not the defect and is not touched: `closeDay` increments once per close and
+ * is honest about that. What was dishonest was a close of a run nobody asked for.
+ *
+ * ## Why a filed day is refused here rather than exempted at the count
+ *
+ * The alternative was to widen `recordGrew` so a re-close of an identical `{seed, config}` does not
+ * count. `closeDay`'s own docstring refuses that, and `week.test.ts` pins the refusal: *"a retry of
+ * an unchanged selection reproduces the same `{seed, config}` too … so intent is the only
+ * discriminator there is"*, and a player who presses *Run* again on an unchanged selection **is** on
+ * attempt 2 (`week.test.ts`'s *"does not bank a second clean shift for the same day"* and the
+ * negative control beside the `recordGrew` case both assert exactly that). An identity test cannot
+ * tell those two apart, so it would buy this fix by making a real retry stop counting. Refusing the
+ * run is narrower: nothing that a player asked for changes.
+ *
+ * What the stage shows instead is a state `stageScreenModel.ts` already draws and could not
+ * previously stay in for more than a frame — the § 3.3 primary inert under *"the day is filed — its
+ * report is written"*, and the intervention rows refusing under *"the day is filed — its record is
+ * closed, and tomorrow starts a new one"*. Tomorrow is what starts the next run
+ * (`EverydayHost.openTomorrow`, which calls `startRun` itself), and *Run* is what re-runs today.
+ *
+ * Pure, and exported so the decision is drivable in the node tier: this file's mount needs a
+ * document and `stageScreen.test.ts` does not. Its one non-test caller is {@link mountStage}, on the
+ * statement after the `resize` listener, and `stageScreen.test.ts` asserts that call site by source
+ * as well as the rule by value — a rule the mount has stopped asking passes its own test while the
+ * product does the old thing.
+ */
+export function stageEntryStartsARun(run: {
+  readonly open: boolean;
+  readonly dayClosed: boolean;
+}): boolean {
+  return !run.open && !run.dayClosed;
 }
 
 /** One lane of § 7.4's strip: a caption, a dashed marker and your line. */
