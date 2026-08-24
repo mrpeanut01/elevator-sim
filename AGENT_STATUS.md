@@ -20,12 +20,10 @@ defect fix needs no specification — and landed before M2 opened.
 | Lane | Task | Issue | Status |
 |---|---|---|---|
 | FIX-212 | The stage's shut car reads as a car, and its words enter the corpus | #212 + [§ D347](DECISIONS.md) | running |
-| SPEC-200 | The difficulty curve specification — docs/33 | #200 | running |
 
-**These two run in parallel because they share no file.** FIX-212 owns `everyday/` and `honesty/`;
-SPEC-200 writes the difficulty-curve document at docs/33 and one README row, and is forbidden both
-directories. (Its path is named here without backticks on purpose: the citation guard requires a
-backticked document path to exist, and this one does not until that lane lands.)
+**They ran in parallel because they shared no file.** FIX-212 owns `everyday/` and `honesty/`;
+SPEC-200 wrote [`docs/33-difficulty-curve.md`](docs/33-difficulty-curve.md) and one README row and
+was forbidden both directories. That is the only condition under which this programme parallelizes.
 
 **Next, in this order, and the order is forced.** `honesty/surfaces.ts` is now the tightest
 serialization hazard in the tree — every lane that builds or renames a player surface writes it, and
@@ -60,6 +58,7 @@ gate with an opinion is a negotiation. It does **not** fix the violations; that 
 | FIX-211/213 | #211, #213 | The report lays its small print out, and its lever button goes where it says |
 | FIX-214 | #214 | The rail's streak replaced by a career line with the week behind it |
 | FIX-215 | #215 | Re-entering a filed day stops silently re-running it |
+| SPEC-200 | #200 | **The difficulty curve specification, and six refuted claims.** #200's own central figure — *four of ten stages clear from the dropdown* — is **three of ten**, measured over 77 admitted cells at 50 replications under CRN. Nine named rules, each with a testable form; the sweep specified rather than built. **#208 is unblocked** |
 | FIX-207 | #207 | **The M2 gate's register went 19 → 0, in both tiers.** The six registers moved to a build-information panel in Settings — a real non-test caller of all six arrays, so the audit that put them on player surfaces does not re-fire — and **no register lost a row**: 27 entries in, 27 out. The front door keeps one sentence pointing at it. Two deep-tier findings closed in the product, `packages/core/` untouched |
 | M2-GATE | M2 exit criterion 3 | **The ninth honesty property, `internal-notation`.** Watched failing first — 49 of 49 always-on cases, 1 078 violation lines — then **19 findings registered**, 17 in both tiers and 2 the deep tier alone reaches. The gate now has a number: **19 → 0**. Green on **both** CI platforms |
 
