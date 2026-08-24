@@ -20,9 +20,9 @@ grounds: it is a defect fix rather than a feature, so it needs no specification.
 | Lane | Task | Issues | Milestone | Status | Next action |
 |---|---|---|---|---|---|
 | FIX-206 | Close the core loop; journey test watched failing first | #206 | M2, **fast-tracked** | running | integrator review, then merge |
-| M1-SLICE | `docs/25-vertical-slice.md` — scope, quality bar, failable exits | #198 | M1 | running | gates every M2 build issue |
-| M1-TELEMETRY | `docs/26-telemetry-and-privacy.md` — privacy first | #201, #202 | M1 | running | unblocks charter S1–S5 |
-| M1-FLOWS | `docs/27-flow-maps.md` — five states per flow | #197 | M1 | running | gates #210; feeds `TEST_MATRIX.md` |
+| M1-SLICE | docs/25-vertical-slice.md — scope, quality bar, failable exits | #198 | M1 | running | gates every M2 build issue |
+| M1-TELEMETRY | [`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) — privacy first | #201, #202 | M1 | **landed** | unblocks charter S1–S4 |
+| M1-FLOWS | docs/27-flow-maps.md — five states per flow | #197 | M1 | running | gates #210; feeds [`TEST_MATRIX.md`](TEST_MATRIX.md) |
 
 ### Closed — the verification wave
 
@@ -44,6 +44,12 @@ grounds: it is a defect fix rather than a feature, so it needs no specification.
 
 **M0 exited 2026-08-24; all eight of its issues are closed on GitHub** (#190 closed as refuted).
 **M1 is open.** The open-issue count went **101 → 93**.
+
+> **A lane's in-flight deliverable is named here without backticks, and that is deliberate.**
+> `validation/citations.test.ts` requires every backticked path containing `/` and ending `.md` to
+> exist on disk. This board named three of them while two were still unwritten, and **that broke the
+> guard on commit `eb765cc`** — the orchestrator writing the same defect it had put in all four lane
+> briefs as a rule. A path becomes a link when its file exists, and not before.
 
 All four lanes were read-only and none modified a file. **#206's mechanism was additionally
 re-verified by the orchestrator directly** rather than accepted from a single lane, because it is
