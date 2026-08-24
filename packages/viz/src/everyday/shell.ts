@@ -59,6 +59,7 @@
  */
 
 import { openTowerOf } from '../campaign/career.js';
+import type { WeekState } from '../shift/types.js';
 import { actionBarFor, confirmStripFor, TIMELINE_STEPS } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { HOST_PENDING_REASON } from './host.js';
@@ -636,11 +637,30 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     };
   }
 
+  /**
+   * § 3.2's career line, from the week the host holds — issue #214.
+   *
+   * The same shape as {@link campaignRailOptions} and for the same reason: the week is a fact about
+   * the *host*, so it is read at draw time and no host answers `{}`. What made #214 worth a lane is
+   * that the card was not reading a stale week — it was reading the **profile store**, which holds
+   * a name and a colour and has no day count to hold, so its refusal was unconditional. The two
+   * stores stay two (`profile.ts` argues why the profile is not a fourth key in `persist/`'s
+   * envelope); the card now asks the one that keeps days.
+   *
+   * `dayClosed` travels with it because *Close the day* alone sets it and a restored week can carry
+   * today's outcome without it — the same authority § 14's own cards answer to.
+   */
+  function weekRailOptions(): { week?: WeekState; dayClosed?: boolean } {
+    if (dataHost === undefined) return {};
+    return { week: dataHost.week(), dayClosed: dataHost.runState().dayClosed };
+  }
+
   function drawRail(): void {
     rail.replaceChildren();
     const stored = profileStore.current();
     const model: RailModel = railModel(state, {
       ...campaignRailOptions(),
+      ...weekRailOptions(),
       ...(stored === undefined
         ? {}
         : { profile: { name: stored.name, avatarColor: stored.avatarColor } }),
