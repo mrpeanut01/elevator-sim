@@ -337,3 +337,71 @@ Named on screen in the products' own registers rather than only here:
 - **§ 7.4's ghost lane** is not drawn: the host exposes no second recording.
 - **B2 and B5 of `docs/21`** (Compare/report surfaces, the six engineering briefs) are specified and
   unbuilt.
+
+---
+
+## Where a new agent picks up — written 2026-08-24, end of the charter session
+
+Read [`CHARTER_PROGRAMME.md`](CHARTER_PROGRAMME.md) first, then this section, then
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ Y–AD.
+
+### State
+
+**M0 and M1 exited; M2 is open.** Landed in M2: **#206, #211, #213, #214, #215, #216, #207, #200**,
+plus the M2 gate instrument. All pushed to `claude/elevator-sim-charter-kickoff-rexfw8` (PR **#253**).
+
+**The M2 gate has an instrument and a number.** `internal-notation` is the ninth honesty property.
+It found 19 violations, #207 took the register to **empty in both tiers**, and the box is **still not
+ticked** — [§ D347](DECISIONS.md)'s canvas gap is the one thing left.
+
+### Decisions taken this session, and what each obliges
+
+| decision | what it obliges |
+|---|---|
+| [§ D346](DECISIONS.md) | a control's write-disclosure is **not** internal notation — the gate's number is 19, not 56. Do not widen that clause. |
+| [§ D347](DECISIONS.md) | the Everyday stage's words come inside the corpus **before M2 exits**. In flight as FIX-212. |
+| [§ D348](DECISIONS.md) | #200 pulled into M2. **Landed.** #208 is unblocked and governed by docs/33 §§ 4.4 and 1.1. |
+| [§ D349](DECISIONS.md) | **M2's gate is two halves.** The code half reports *code-complete, playtest pending* and ticks nothing in the tester half. |
+| [§ D350](DECISIONS.md) | #217 is split — AC3/AC4 are a small lane, AC1/AC2 are the owner's. |
+
+### The queue, in the order the hazards force
+
+`packages/viz/src/honesty/surfaces.ts` is the tightest serialization hazard in the tree: every lane
+that adds a player surface writes it, and it has **no interface to lock first** — an adapter *is* the
+surface. `packages/viz/src/everyday/` is the second.
+
+1. **FIX-212** (#212 + § D347) — in flight at the time of writing. **Verify before trusting**: diff
+   `packages/viz/src/honesty/properties.ts` against the commit that landed it; a lane asked to keep a
+   gate at zero can do it by fixing strings or by moving the gate.
+2. **#217 cleanup** — AC3/AC4 only, per § D350. Touches `everyday/modes.ts`.
+3. **The longer day** — product owner ruled: point the Everyday loop at `office-day`'s ten hours and
+   fix the speed ladder per § D344. See § AB. **`DEFAULT_SHIFT_LENGTH_S` need not move**; what moves
+   is `shift/goals.ts#goalsForDay`.
+4. **#208**, then **#210**, then **#218**.
+
+### Owed, and not done
+
+- **Decision numbers** for docs/33's **C6** and **§ 1.5**.
+- **O7 — the one to settle first.** Every curve rule judges a stage on the same seeds the player
+  tunes against, so *tune until the judged seeds clear* is invisible to all nine, and the one existing
+  witness takes it. That is `CLAUDE.md`'s hold-out-seeds discipline unenforced at the campaign layer.
+  Closing it changes `judge.ts` and what every published count counts — **a product-owner call**.
+- **`CLAUDE.md`'s corpus row is stale and deliberately so.** [§ D343](DECISIONS.md) wants that
+  measurement **once, after M2 integrates**. Do not re-measure per branch; this file has recorded that
+  lesson five times.
+- **§ AD's remaining count sites** — five left, three of which must **not** be changed.
+- **`TEST_MATRIX.md`** — T1 is `passing`; the other 21 rows have not been re-verified, and T1 turned
+  out to be stale-by-omission.
+- **§ N's adjacent finding**, in no issue: `settingsView.ts` tells the player runs are *"re-simulated
+  by the server"* on a build whose own register says there is no server. No property reads that role.
+
+### Traps this session actually hit
+
+- **I broke `citations.test.ts` three times**, always the same way: backticking a `.md` path that did
+  not exist yet. Run it before every commit that touches a document.
+- **A lane's uncommitted work is not yours to commit.** `d6e00a2` shipped a dead seam by committing a
+  reader while its only supplier sat uncommitted, with all 23 unit tests green.
+- **Never re-measure the honesty corpus on a branch.** Three lanes in one wave produced three correct
+  numbers, none of which was correct after integration.
+- **Verify the issue before scheduling it.** This session refuted #200's central figure (four of ten →
+  **three of ten**), #206's AC4 premise, #217's framing, and two claims of my own.
