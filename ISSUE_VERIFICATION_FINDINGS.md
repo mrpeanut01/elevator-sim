@@ -1632,3 +1632,88 @@ ladder is the protocol; somebody has to run it.
 - **#217's AC1 is a decision, not code** — *"a decision recorded on Fix a building's position in the
   mode hierarchy"* — and it collides with [§ D299](DECISIONS.md)'s positioning answer and § D335's
   front door. It belongs to the product owner before any lane starts.
+
+---
+
+## AB. The day is a thirty-minute morning slice, and a ten-hour day already ships
+
+Raised by the product owner 2026-08-24: *the day appears to clock only one hour in the morning, not a
+full cycle, and should be resolved together with the speed settings.* **Verified. The observation is
+right, and the diagnosis is sharper than the report.**
+
+### What the day actually is
+
+| where | value |
+|---|---|
+| `dev/state.ts:137` | `DEFAULT_SHIFT_LENGTH_S = 1800` — **thirty minutes** |
+| `shift/contracts.ts` c1 | `shiftLengthS: 3600` — an hour, and *"the only contract that names one"* |
+| `rise-and-fall` | `durationMin: 30`, `startOfDayMin: 510` (08:30) |
+
+Every other shipped template is a slice too: `lunch-two-way` 30 min, `shift-change` 30 min,
+`office-down-peak` 30 min, `evening-egress` 20 min, `constant-iso` 120 min.
+
+### The finding: a full day exists and the player cannot reach it
+
+**`office-day` ships today — `durationMin: 600`, `startOfDayMin: 480`, seventeen phases.** Ten hours,
+authored, loaded, schema-valid.
+
+`dev/state.ts:175` resolves the day's template as
+`state.freePlay?.demandTemplateId ?? fromPattern`. The Everyday player never writes
+`state.freePlay`, so they always get the building's pattern template — a slice — and **`office-day`
+is reachable only through Free Play's select on the Engineer side.** `menu/types.ts:177` says as
+much in its own words: *"when the slice control lands, this entry stops being the only way to reach
+`office-day`."*
+
+This is not a dead seam — `office-day` has a real non-test caller in Free Play — but it is the same
+shape one level up: **the content exists, and the audience the charter cares about cannot get to
+it.**
+
+### The speed half is already a decided defect
+
+[§ D344](DECISIONS.md) measured `stageScreenModel.ts:98-104` and found the labels lie:
+
+| label | `simPerRealS` | actual |
+|---|---|---|
+| `½×` | 8 | **8× real time** |
+| `1×` | 30 | **30× real time** |
+| `4×` | 90 | 90× |
+| `12×` | 240 | 240× |
+| `30×` | 600 | 600× |
+
+*"There is no 1:1 speed, and the control that says `1×` is thirty times faster than one."* § D344
+already rules that the ladder is to be fixed. **So the owner's instinct to lump the two is right, and
+one of the two is already decided** — the ladder is what makes a ten-hour day watchable at all: at
+600× it is one real minute; at the honest `1×` it would be ten real hours.
+
+### What this would cost, and the cheap path
+
+**The published pins need not move.** `DEFAULT_SHIFT_LENGTH_S` is *"the horizon every number in
+`docs/05-roadmap.md` was measured over"*, and moving it is a § 12 escalation. **It does not have to
+move**: a contract already declares its own length (c1 overrides it to 3600), so the Everyday day can
+be lengthened per contract and template while the default — and every figure measured over it —
+stays exactly where it is.
+
+**What does move is every scenario goal.** A goal measured over thirty minutes is not a goal over ten
+hours. Under `CLAUDE.md` a goal that changes is *"a finding to report, not a number to edit"*, and
+`campaign/judge.ts` refuses to judge when the baseline arm does not reproduce its published count.
+So this work regenerates `data/scenario-goals.json` — **which is already owed three times over**:
+[§ D345](DECISIONS.md) obliges `tests` to stop varying by difficulty, and sequences that with **#255**
+and **#234** precisely so the table is regenerated once rather than three times. **This is the fourth
+rider on that same regeneration, and it should join it rather than start a fifth.**
+
+**And simulation cost scales with it.** A ten-hour day is roughly twenty times the trips of a
+thirty-minute one, per replication, everywhere the day length is inherited.
+
+### Sequencing
+
+It **collides with FIX-212**, which owns `everyday/stageScreen.ts` — the clock and the transport —
+right now. Nothing starts here until that lands.
+
+### One piece of history any lane must read first
+
+[§ D286](DECISIONS.md) **removed** the length controls: `SHIFT_LENGTHS`' four narrative options
+(*Short shift — 15 min* … *Full period — 2 h*) and Free Play's five numeric *Run length* options, both
+writing the same field (issue #82). They were replaced by `partsOfDay`, derived from the loaded
+records' own hours — *"a part's length is the period it names and its label is its clock"* — and
+`menu/partsOfDay.ts` records **why a length control could not be relabelled into an honest one**. A
+lane that adds a fresh day-length control without reading that will re-introduce what § D286 deleted.
