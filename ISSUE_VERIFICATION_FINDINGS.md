@@ -1246,6 +1246,24 @@ behind the cover (`main.ts:4153`). Report → stage → report yields *attempt 2
 asked for nothing and nothing having changed. `week.ts:288-304` already has the right exemption
 (`recordGrew`) for exactly this class and it is not applied here.
 
+> **CORRECTED 2026-08-24, by the lane that fixed it.** Step 5 above — *the Engineer's tick auto-files
+> it behind the cover* — is **wrong**. `dev/main.ts`'s `tick` files only while `state.tab === 'run'`,
+> and the first file switches that tab to `report`. The lane polled the host for **150 s** after
+> re-entry and never saw `attempt` reach 2, with `dayClosed` false throughout and the second playback
+> long past its end. **The count climbs by the other half of the same defect**: the silent re-run
+> makes § 3.3's primary pressable again over a day already finished, so *"attempt 4"* is **four
+> presses of *Close the day* against one press of *Run***.
+>
+> Same root cause, same fix, wrong intermediate step — and it is recorded because a verification that
+> quietly drops its wrong steps is worth less than one that keeps them. The chain was traced
+> statically and read plausibly; it took driving the product for 150 s to find that one link does not
+> hold. **That is the verification wave's own rule turned on the verification wave.**
+>
+> The fix chosen was **not** `recordGrew`. That exemption is refuted by pins that already exist:
+> `week.test.ts:576` is a deliberate negative control asserting a re-close of a byte-identical
+> `DayOutcome` **does** count, and `closeDay`'s docstring says why — *a retry of an unchanged
+> selection reproduces the same `{seed, config}` too, so intent is the only discriminator there is.*
+
 **#216 — CONFIRMED exactly.** `shift/events.ts:196-199` hard-codes
 `name: 'An ordinary Tuesday-shaped day'`; `:234-241` maps day 1 → slot 1 → `ordinary`;
 `shift/types.ts:76-84` makes day 1 **Monday**. Both strings come from **one function call**
