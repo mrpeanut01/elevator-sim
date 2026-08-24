@@ -10,6 +10,12 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { goalsForDay, readGoals } from '../shift/goals.js';
+import type { DayOutcome, GoalObservations, WeekState } from '../shift/types.js';
+import { openWeek, outcomeOf } from '../shift/week.js';
+import type { WatchRecord } from '../watch/types.js';
+
+import { EM_DASH } from './figures.js';
 import { railFooter, railGroups, railModel, sublineFor } from './rail.js';
 import { EVERYDAY_SCREENS_BUILT, UNBUILT_REASONS } from './screens.js';
 import {
@@ -19,6 +25,7 @@ import {
   type EverydayScreen,
   type RunContext,
 } from './types.js';
+import { weekScreenViewOf } from './weekView.js';
 
 const titlesOf = (ctx: RunContext, inCampaign: boolean): readonly string[] =>
   railGroups(ctx, inCampaign).map((group) => group.title);
@@ -169,13 +176,21 @@ describe('the footer', () => {
     expect(footer.identity.streak).not.toMatch(/\d/);
   });
 
-  it('shows a given profile instead of the fallback', () => {
+  it('shows a given profile instead of the fallback, and takes no career from it', () => {
     const footer = railFooter(
       { screen: 'menu', ctx: 'daily' },
-      { profile: { name: 'Nadia R.', streak: '4 days running · best 81%' } },
+      { profile: { name: 'Nadia R.' } },
     );
     expect(footer.identity.name).toBe('Nadia R.');
     expect(footer.identity.initial).toBe('N');
+    /*
+     * The input this case used to carry was `streak: '4 days running · best 81%'` — a field of
+     * `RailOptions.profile` that **no producer in the tree ever wrote**, which is why the line
+     * under the name was unconditional (issue #214). The field is gone rather than left as an
+     * override nothing uses; a named player with no week is still a player with no days, and the
+     * career comes from the week alone, asserted below.
+     */
+    expect(footer.identity.streak).toContain('no days saved');
   });
 
   it('colours the disc from the profile, sun until the player picks — § 20.15’s one place', () => {
@@ -218,6 +233,136 @@ describe('the footer', () => {
     expect(swap.note).toContain('this visit only');
     // The stale-refusal guard proper: no wording of "not built" may come back onto this row.
     expect(swap.note).not.toMatch(/not built/);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The career line — issue #214
+ * -------------------------------------------------------------------------- */
+
+const MET: GoalObservations = {
+  arrived: 400,
+  carryPct: 100,
+  minutePct: 84,
+  peakQueue: 2,
+  abandoned: 0,
+  worstWaitS: 30,
+  worstWaitIsCensored: false,
+};
+
+/** Missed: the same arrivals, a carried share no bar accepts. */
+const MISSED: GoalObservations = { ...MET, carryPct: 40, minutePct: 31, worstWaitS: 400 };
+
+/** One closed day, built exactly as `weekView.test.ts` builds one — one fixture rule, two readers. */
+function dayOf(day: number, observed: GoalObservations): DayOutcome {
+  return outcomeOf({
+    day,
+    dayIdx: (day - 1) % 7,
+    eventId: 'ordinary',
+    arrived: observed.arrived,
+    carried: observed.arrived,
+    minutePct: observed.minutePct,
+    readings: readGoals(goalsForDay(day), observed),
+    record: { buildingId: 'chancery-house' } as unknown as WatchRecord,
+    recordRefusal: null,
+  });
+}
+
+const weekWith = (day: number, history: readonly DayOutcome[]): WeekState => ({
+  ...openWeek(),
+  day,
+  dayIdx: (day - 1) % 7,
+  bestMinutePct: Math.max(0, ...history.map((entry) => entry.minutePct)),
+  streak: history.filter((entry) => entry.allMet).length,
+  history,
+});
+
+const cardLineOf = (week: WeekState, dayClosed: boolean): string =>
+  railFooter({ screen: 'menu', ctx: 'daily' }, { week, dayClosed }).identity.streak;
+
+/** Your week's own line for the same week, drawn on the same frame — issue #214's other half. */
+const weekLineOf = (week: WeekState, dayClosed: boolean): string =>
+  weekScreenViewOf({ week, towerToday: 'Chancery House', dayClosed, sheetStanding: dayClosed })
+    .streakLine;
+
+describe('the PLAYING AS card reports the week the host holds — issue #214', () => {
+  it('says the days that were actually closed, not the refusal', () => {
+    /*
+     * The assertion this file was opened for. The line read
+     * *"no days saved yet — this build keeps no career"* **unconditionally**: `streak` came from a
+     * profile field no producer in the tree ever wrote, so no input could make it say anything
+     * else, and it kept saying it beside a week screen showing a day closed.
+     */
+    const week = weekWith(3, [dayOf(1, MET), dayOf(2, MET)]);
+    expect(cardLineOf(week, false)).toBe('2 days running · best 84%');
+    expect(cardLineOf(week, false)).not.toContain('no days saved');
+  });
+
+  it('agrees with Your week, which is drawn on the same frame', () => {
+    /*
+     * Not a second opinion about one week. The rail card and § 14's header are two surfaces a
+     * player reads at once, and #214 *is* the two disagreeing — so wherever the week holds a
+     * closed day the two lines are the same string, asserted rather than kept in step by hand.
+     */
+    for (const [week, dayClosed] of [
+      [weekWith(3, [dayOf(1, MET), dayOf(2, MET)]), false],
+      [weekWith(3, [dayOf(1, MET), dayOf(2, MISSED)]), false],
+      [weekWith(3, [dayOf(1, MISSED), dayOf(2, MISSED)]), true],
+      [weekWith(3, [dayOf(1, MET), dayOf(2, MET), dayOf(3, MET)]), true],
+      [weekWith(1, [dayOf(1, MET)]), true],
+    ] as const) {
+      expect(cardLineOf(week, dayClosed), `day ${String(week.day)}`).toBe(
+        weekLineOf(week, dayClosed),
+      );
+    }
+  });
+
+  it('counts closed days rather than clean ones — a missed week is still a week that was played', () => {
+    // The gate is *has a day been closed*, never *is the streak non-zero*: a player who missed
+    // every day has saved days, and telling them nothing is saved is the same false statement
+    // with the sign flipped.
+    const week = weekWith(3, [dayOf(1, MISSED), dayOf(2, MISSED)]);
+    expect(week.streak).toBe(0);
+    expect(cardLineOf(week, false)).not.toContain('no days saved');
+    expect(cardLineOf(week, false)).toBe('0 days running · best 31%');
+  });
+
+  it('withholds today’s figure until the day is filed, and does so by default', () => {
+    /*
+     * § 16 rule 1, reached through the card: a restored week can hold today's outcome while the
+     * stage holds no filed run, and `dayClosed` — which *Close the day* alone sets — is the
+     * authority. The default is the withholding one, so a caller that hands over a week and
+     * forgets the flag under-reports rather than publishing a figure this sitting did not produce.
+     */
+    const week = weekWith(1, [dayOf(1, MET)]);
+    expect(cardLineOf(week, false)).toBe(`1 day running · best ${EM_DASH}`);
+    expect(cardLineOf(week, true)).toBe('1 day running · best 84%');
+    expect(railFooter({ screen: 'menu', ctx: 'daily' }, { week }).identity.streak).toBe(
+      cardLineOf(week, false),
+    );
+  });
+
+  it('keeps the honest absence reachable, with no career claimed and no figure invented', () => {
+    /*
+     * The refusal stops being the only reachable state; it does not stop being reachable. With no
+     * week at all (a cold load, no host) and with a week nobody has closed a day in, the card
+     * still says so — and says it without a digit, because § 20.11's forbidden thing is a fixture
+     * presented as a player.
+     */
+    for (const line of [
+      railFooter({ screen: 'menu', ctx: 'daily' }).identity.streak,
+      cardLineOf(openWeek(), false),
+      cardLineOf(openWeek(), true),
+    ]) {
+      expect(line).toContain('no days saved');
+      expect(line).not.toMatch(/\d/);
+      /*
+       * § D227 in the direction that bites after this fix lands: the sentence used to end
+       * *"this build keeps no career"*, and the build keeps one now. A refusal may name what it is
+       * refusing; it may not make a false statement about the product to do it.
+       */
+      expect(line).not.toMatch(/keeps no career/);
+    }
   });
 });
 
