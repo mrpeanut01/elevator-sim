@@ -1475,8 +1475,17 @@ Engineer-side module is inside the gate when a player surface draws it. Measured
 
 ### The figures, and why CLAUDE.md's row was deliberately left alone
 
-Both tiers, one sitting, one tree: always-on **49 cases / 566 506 strings / 606 simulations /
-48 surfaces**; deep **60 / 706 214 / 4 710 / 49**. Cases, simulations and surfaces are unmoved from
+> **These figures are superseded and are left standing as a dated measurement.** They were taken
+> before #207 and § D347's lane landed. Measured since, on the committed tree: **#207 alone** moved
+> the always-on tier to **49 surfaces / 564 987 strings** — so the surfaces column below was already
+> wrong by one, and the strings column moved *down* — and § D347's lane then took it to **49 / 569 184**
+> always-on and **50 / 710 100** deep. **None of these is published in `CLAUDE.md`**, per § D343: that
+> row is re-measured once, after M2 integrates. The point of leaving the stale pair here is that it
+> is the fifth time this repository has caught a corpus figure going stale between one lane and the
+> next.
+
+Both tiers, one sitting, one tree, **as measured on 2026-08-24 before #207**: always-on **49 cases /
+566 506 strings / 606 simulations / 48 surfaces**; deep **60 / 706 214 / 4 710 / 49**. Cases, simulations and surfaces are unmoved from
 the published row; strings moved **+98** and **+120**, which is this wave's landed copy (#211, #213,
 #214, #216) and not the new property, which renders nothing.
 
@@ -1844,3 +1853,37 @@ A hand-written count in prose is the *published number goes stale* class this re
 names. **The fix is to stop writing the count**, not to bump it: the derived sites should say *every
 shipped profile*, and the measured ones should say what was measured and when. Nine sites is a lane;
 the four above are done and the rest are inventoried here rather than half-corrected.
+
+---
+
+## AE. #212's second defect is refuted, and I passed it on unchecked
+
+**#212's Defect 2** — *"the stage opens paused at 06:00, on an empty building"* — **is false**, and I
+repeated it in the lane brief without measuring it.
+
+`startOfDayMin` is per template. Measured:
+
+| template | opens |
+|---|---|
+| `rise-and-fall` (the shipped default) | **08:30**, and it ramps from its first second |
+| `office-day` | 08:00 |
+| `lunch-two-way` | 12:15 · `shift-change` 14:45 · `office-down-peak` 17:15 · `evening-egress` 22:24 |
+| `constant-iso` | the only one with no start-of-day at all |
+
+So the stage does **not** open on an empty lobby at dawn. The *"06:00"* in the issue came from a
+**stale docstring** at `everyday/stageScreen.ts:634-638`, which the lane corrected in place and pinned
+with a test. This is the stale-refusal class producing a **bug report** — a sentence in the tree
+going wrong, and a human reading it and filing what it said.
+
+**The lane refused the change I asked for and built the right thing instead**: rather than moving the
+playhead, it added what the schedule does *next* as a second header pill, plus an opening line, so the
+first frame says something true about a building that is genuinely quiet at 08:30.
+
+### Two more from the same lane
+
+- **A sixth mount-composed string my table missed.** `'DRIVING'` was a literal in the mount while
+  `stageHeaderOf` already published `drivingLabel`. One source now. My five-row table was otherwise
+  correct on every row, re-verified.
+- **`docs/28` § 5.2's *"one conforming geometry"* is not reachable as written.** Shipped cars run
+  9–20 px tall by 2–222 px wide; the sketch's marks-above-a-full-height-doorway does not hold across
+  that range. The deviation is recorded in the document beside its LANDED note rather than absorbed.
