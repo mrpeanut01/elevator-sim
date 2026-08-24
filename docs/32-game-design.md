@@ -640,7 +640,9 @@ demand.
 **`growth.ts` is the model of how a difficulty mechanism must be built**, and it says so in its own
 docstring: the handoff's version scales the header, and this one edits the building and reloads it
 through `core`'s own path, because *"a growth factor that only reached the tenant count in the header
-would be the twelfth dead seam, and it would be a lying one."* It is also linear rather than
+would be the twelfth dead seam, and it would be a lying one."* (That ordinal is the module's own at
+the time it was written; the running count is [`CLAUDE.md`](../CLAUDE.md)'s and is not restated
+here.) It is also linear rather than
 compounding for a stated reason — at day 20 the two differ by more than a factor of two, and Vertical
 City compounded would carry 35 000 people.
 
@@ -892,6 +894,18 @@ each states a prohibition in its own docstring that this document adopts rather 
 | `packages/viz/src/commissioning/types.ts` | Capital gates what may be **chosen**, never appears on a results page, is never compared between players, and never stands beside a wait figure — asserted three ways by `budget.test.ts` | `docs/32 GD13` clauses 1–3, widened from capital to every currency |
 | `packages/viz/src/shift/contracts.ts` | *Scenarios teach, they do not gate.* The design's own completion-based unlock ladder is deliberately not ported, and `contractStatus` has no `locked` | `docs/32 GD5` |
 | `packages/viz/src/gauntlet/rating.ts` | A rating **orders a ladder and is not a measured difference**; forty single-replication cases are under budget, so the module emits no verdict, no comparison and no winner | § 1.3, § 7.3, and `docs/10 R2` honoured in the one place it was easiest to break |
+| `packages/viz/src/fixit/engine.ts` | The `FIXED` badge is *a statement about the latest run, never a high-water mark*, and `WeekState.bestMinutePct` is the deliberate contrast because it is worded as an observation about history | `docs/32 GD16` |
+
+**And the decisions relied on, none reopened:**
+[§ D342](../DECISIONS.md) (the charter, adopted) and [§ D343](../DECISIONS.md) (cite the series with
+its document) govern the whole file; [§ D299](../DECISIONS.md) governs § 6 and is the parent of
+`docs/32 GD5`, `docs/32 GD13` clause 4 and `docs/32 GD18`'s third clause;
+[§ D335](../DECISIONS.md) and [§ D338](../DECISIONS.md) give § 6.4 the door and the rule that the
+swap is not remembered; [§ D106](../DECISIONS.md) is the argument § 3.3 reads one step earlier;
+[§ D227](../DECISIONS.md) is the class § 1.4's tile belongs to; [§ D300](../DECISIONS.md) E-3 is the
+board's verification and its labelled reference rows. **No decision above is amended, narrowed or
+re-argued here, and no new decision number is claimed by this document** — one is owed for its
+adoption and is allocated at integration.
 
 ---
 
