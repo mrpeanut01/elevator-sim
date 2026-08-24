@@ -43,9 +43,21 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | `npm run build` (`tsc -b`) | **clean**, 8.8 s |
 | Node | v22.22.2 — **below the declared `engines.node: >=26`** |
 | Platform | Linux x86_64, single container |
-| Test suite | measured this session; see [`AGENT_STATUS.md`](AGENT_STATUS.md) |
-| Browser tier | gated on `ELEVATOR_SIM_CHROMIUM`; pointed at the pre-installed Chromium |
+| Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
+| Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
+| Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
 | Next free decision number | D342 |
+
+**The skip count is 11, and it is the number this programme was told to watch.** All eleven are
+deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
+(`matrixCensus`, `collectiveAdoption`, `fuzz/deep`, `perfScaling`, `perfSweep`, `goldenRuns`,
+`oracle/deepCampaign`) — the tiers GitHub issue **#163** reports have never run in CI. **The browser
+tier did *not* skip**: 440 of 440 files on disk ran, all 25 `*.browser.test.ts` among them, because
+`HAS_BROWSER` is `existsSync(CHROMIUM)` and the variable named a real binary.
+[`GAPS.md`](GAPS.md) records **10** at wave 12 (2026-07-30) and says the number *"has not moved all
+wave"*. It has moved since, by one. **This session cannot have moved it** — nothing but markdown was
+edited — so when it moved is a question for #163, not a finding against this work, and it is stated
+here rather than quietly reconciled.
 
 **The wall-clock figure is not comparable, and that is my error rather than a property of the tree.**
 The local suite was started before the verification lanes and ran concurrently with them and then with

@@ -52,9 +52,25 @@ S5's published figure being stale in both its numerator and its denominator.
 ## Baseline recorded at programme open
 
 `c8fd6fa`, clean tree, Linux x86_64, **Node v22.22.2 against a package declaring `>=26`**
-(`engine-strict` is not set, so it runs). `npm run build` clean in 8.8 s. Suite measured this
-session with the browser tier pointed at the container's pre-installed Chromium, because
-`playwright-core`'s pinned revision resolves to a browser this container does not carry.
+(`engine-strict` is not set, so it runs). `npm run build` clean in 8.8 s.
+
+**Suite: 440 files / 440 passed · 8 688 passed, 11 skipped (8 699) · green**, 3 771 s wall clock.
+The browser tier **ran** — all 25 `*.browser.test.ts` files among the 440 — with
+`ELEVATOR_SIM_CHROMIUM` pointed at the container's pre-installed Chromium, because
+`playwright-core`'s pinned revision resolves to a browser this container does not carry. A gated
+tier that skips is a red run here, so this is stated as measured rather than assumed: 440 files
+exist on disk and 440 ran.
+
+**The skip count is 11.** All eleven are deep-tier opt-ins in `packages/experiments` behind
+`describe.skipIf(!DEEP)` / `!deepRequested()` — issue #163's *"the deep tiers have never run in
+CI"*. [`GAPS.md`](GAPS.md) records 10 at wave 12 and says it *"has not moved all wave"*; it has
+moved by one since. **Nothing in this session could have moved it** — only markdown was edited —
+so *when* it moved belongs to #163.
+
+**The wall clock is not comparable to `GAPS.md`'s 1 918 s** and the difference is my sequencing, not
+the tree: that figure was taken *"serially on an idle machine with no lanes running"*, while this
+ran alongside four verification lanes and then four document lanes on a **4-core** container. The
+counts stand; the duration does not. The clean measurement is CI's two-platform matrix.
 
 ## Findings from programme open, before any issue was scheduled
 
