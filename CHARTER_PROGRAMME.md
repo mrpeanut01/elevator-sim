@@ -236,7 +236,7 @@ measured the preview answering `403` to `CONNECT`.
 
 - [ ] **[tester]** **Ten testers who have never seen the game complete the slice.**
 - [ ] **[tester]** **Six of ten can state what went wrong and why their change helped.**
-- [ ] **Nothing on a player surface refers to a section number, a source filename or a code
+- [x] **MET — Nothing on a player surface refers to a section number, a source filename or a code
       identifier.** This is a mechanical check and it is part of the gate. **It now has an
       instrument, and a number: 19 → 0.** `internal-notation`, the ninth honesty property, landed on
       2026-08-24 and was watched failing first — 49 of 49 always-on cases. Nineteen findings are
@@ -248,10 +248,17 @@ measured the preview answering `403` to `CONNECT`.
       dead-code audit that put them on player surfaces does not re-fire, and **no register lost a
       row**. Two gaps the instrument cannot see are recorded in
       [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Y: the Everyday stage's
-      canvas, and three register headings outside the corpus. **The headings are closed** — by
-      construction rather than by adding them, since all three renderers are gone and the new panel's
-      own headings are seeded. **The canvas is the one thing left**, as its own lane
-      ([§ D347](DECISIONS.md)), and this box is not ticked until it lands. The criterion does **not** reach a control's own write-disclosure
+      canvas, and three register headings outside the corpus. **Both are now closed.** The headings
+      by construction — their renderers are gone and the new panel's own headings are seeded. The
+      canvas by [§ D347](DECISIONS.md)'s lane, which moved the Everyday stage's words out of the DOM
+      mount into a pure seam the corpus drives, including the live `riders/capacity` figure that no
+      property could read. **Ticked 2026-08-24**, register empty and both tiers green, verified by
+      the integrator on the committed tree.
+
+      **Two bounds a reader should carry.** The gate checks **notation, not truth**
+      ([§ D350](DECISIONS.md)): a false sentence carrying no notation passes it. And it is scoped to
+      the player-facing adapters, derived from `covers` — a screen that never registers an adapter is
+      a screen this criterion has never read. The criterion does **not** reach a control's own write-disclosure
       ([§ D346](DECISIONS.md)), which is why the number is 19 and not 56.
 - [ ] The slice runs on the target browser matrix from #203.
 - [ ] **[tester]** **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
