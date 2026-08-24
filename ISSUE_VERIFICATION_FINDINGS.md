@@ -1421,15 +1421,39 @@ reach the player through three adapters.
 ### Two coverage gaps, both measured today rather than assumed
 
 **1. The Everyday stage's canvas is outside the gate.** `PLAYER_FACING_SURFACES` resolves to 12 of
-49 adapters. `render/canvas.ts#drawScene` is not one of them, and it paints text on § 7's stage,
-which a player reads. So the gate can read zero while the stage canvas carries notation.
+49 adapters, and no adapter drives the Everyday stage's own canvas text.
 
-**The fix is not a scope edit, and this is why the gap is being recorded rather than closed.**
-`drawScene` also paints the Engineer canvas. Adding `render/` to `PLAYER_FACING_DIRECTORIES` would
-manufacture exactly the false positives the property deliberately avoids — measured at 656 filename
-matches unscoped against 2 scoped, of which 572 are an Engineer panel naming code to an engineer,
-correctly. Closing it needs the canvas adapter to distinguish the two mounts. **That is a lane, not
-a line.**
+> **CORRECTED, same day, before the lane was briefed.** This paragraph first said the uncovered
+> renderer was `render/canvas.ts#drawScene`, and that closing the gap meant teaching its adapter to
+> *"distinguish the two mounts"*. **Both halves were wrong.** `drawScene`'s only non-test caller is
+> `dev/main.ts` — it paints the **Engineer** schematic and nothing else — and
+> `everyday/stageScreen.ts:13` says so on its own face: *"`render/canvas.ts` draws the Engineer
+> schematic and keeps drawing it."* They are two separate renderers, per § D299 § 3, so there is no
+> shared adapter to split. The wrong version is kept visible because it would have sent a lane to
+> rebuild an adapter that was never the problem.
+
+**What is actually uncovered, measured.** `everyday/stageScreen.ts#STAGE_SCREEN` is the Everyday
+stage's own renderer and is **excluded from the corpus**, on the DOM mounts' shared ground — it needs
+a document, a canvas and an animation frame. The exclusion is legitimate; **the claim attached to it
+is not.** `surfaces.ts:8302` says what the mount authors of its own is *"geometry, class names and
+two static captions"*. It draws **five** `fillText` sites, and three of them are none of those things:
+
+| site | what a player reads |
+|---|---|
+| `stageScreen.ts:202` | the floor label, from `floorLabelOf` |
+| `:221` | `OUT OF SERVICE` |
+| `:254` | `cap.overflow` — the `+N` waiting-rider count, **a figure** |
+| `:297` | `${occupants}/${capacity}` — **a live figure**, composed in the mount |
+| `:307` | the `▲`/`▼` direction glyph |
+
+So this is the **stale-refusal class**, not a scoping question: a sentence describing what a seam
+says, gone wrong while the seam works. Two live figures on the slice's centrepiece are read by no
+property — not the M2 gate, and not R6's temporal axis either.
+
+**The fix follows the split this directory already has.** `CLAUDE.md`: *"the pure/DOM split in
+`everyday/` exists so that the words are drivable without one."* The stage's words need that same
+seam, which is why this is a lane and not a line — and it is a **larger** lane than the one first
+described here.
 
 **2. Three register headings are still outside the corpus** — `shell.ts:1130`, `stageScreen.ts:563`,
 `campaignModel.ts:323`, as § N recorded. A heading the search has never read is a finding in its own

@@ -24309,17 +24309,32 @@ becomes readable from `properties.ts`, (b) is the option to revisit.
 **Decision.** The Everyday stage's canvas is brought inside the M2 gate's scope **before M2 exits**,
 as its own lane, sequenced after #207.
 
-**Context.** `PLAYER_FACING_SURFACES` resolves to 12 of 49 adapters.
-`render/canvas.ts#drawScene` is not one of them, and it paints text on § 7's stage — the vertical
-slice's centrepiece — which a player reads. **So the gate can report zero while the stage canvas
-carries internal notation.**
+**Context.** `PLAYER_FACING_SURFACES` resolves to 12 of 49 adapters, and **no adapter drives the
+Everyday stage's own canvas text** — the vertical slice's centrepiece. So the gate can report zero
+while that stage carries internal notation.
 
-**Why it is a lane and not a line.** `drawScene` also paints the Engineer canvas. Adding `render/` to
-`PLAYER_FACING_DIRECTORIES` would manufacture exactly the false positives the property was scoped to
-avoid — measured at **656** filename matches unscoped against **2** scoped, of which 572 are an
-Engineer panel naming code to an engineer, correctly. That is [§ D91](#d91)'s failure: a guard that
-cries about legitimate cases trains people to ignore it. Closing the hole needs the canvas adapter to
-**distinguish the two mounts**, which is real work.
+**The first draft of this decision named the wrong renderer, and the correction enlarges it.** It
+said the uncovered surface was `render/canvas.ts#drawScene` and that the fix was to teach its adapter
+to distinguish two mounts. `drawScene`'s only non-test caller is `dev/main.ts`; it paints the
+**Engineer** schematic alone, which `everyday/stageScreen.ts:13` states on its own face. They are two
+renderers, not one adapter with two mounts ([§ D299](#d299) § 3), so there was no split to make.
+
+**What is actually uncovered.** `everyday/stageScreen.ts#STAGE_SCREEN` is excluded from the corpus on
+the DOM mounts' shared ground — legitimately; it needs a document, a canvas and an animation frame.
+**The claim attached to that exclusion is what is wrong.** `honesty/surfaces.ts:8302` says the mount
+authors only *"geometry, class names and two static captions"*; it draws five `fillText` sites,
+including `cap.overflow` (the `+N` waiting count) and `${occupants}/${capacity}` — **two live figures
+composed in the mount and read by no property at all**, neither this gate nor R6's temporal axis.
+
+That makes this the **stale-refusal class** ([§ D227](#d227)) rather than a scoping question: a
+sentence describing what a seam says, gone wrong while the seam works.
+
+**Why it is a lane and not a line.** The fix is the split this directory already has — *the pure/DOM
+split in `everyday/` exists so that the words are drivable without one* — applied to the stage's
+words, so they can be driven with no document. Widening `PLAYER_FACING_DIRECTORIES` fixes nothing
+here and would cost plenty elsewhere: measured at **656** filename matches unscoped against **2**
+scoped, of which 572 are an Engineer panel naming code to an engineer, correctly. That is
+[§ D91](#d91)'s failure, and it is the reason the scope is not simply widened.
 
 **Why inside M2 rather than after.** A gate with a known hole is settled by review, which is the
 thing an instrument exists to replace. The zero would mean *zero on 12 of 49 adapters* rather than
