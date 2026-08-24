@@ -267,12 +267,18 @@ CI · #239 accessibility sweep · #240 small-screen and touch layout.
 
 **Exit criteria.**
 - [ ] Content freeze, **recorded**.
-- [ ] Telemetry shows **S1 through S5 met on a recruited cohort**.
+- [ ] **`charter S1` through `charter S4` met on a recruited cohort, measured by telemetry** — and
+      **`charter S5` met by an automated sweep**, which is a different instrument. This line used to
+      read *"telemetry shows S1 through S5"*; charter § 4 assigns `charter S5` to a paired sweep over
+      every stage × dispatcher under common random numbers, so telemetry can never show it. Four are
+      telemetry's and the fifth is not. (Cite the series with its document — [§ D343](DECISIONS.md).)
 - [ ] **No open P0 or P1 defects.**
 - [ ] **All twenty-one journey rows in [`TEST_MATRIX.md`](TEST_MATRIX.md) read `passing`** — today
       all twenty-one read `planned`, which is the single largest testing gap in the repository.
-- [ ] #234's criterion is met by an **automated sweep over all dispatchers per stage** (S5), not by
-      a judgement.
+- [ ] #234's criterion is met by an **automated sweep over all dispatchers per stage**
+      (`charter S5`), not by a judgement — and **no test derives that count across all ten shipped
+      stages today**, which is why its published figure went stale twice without failing anything.
+      Building the sweep *is* the instrument.
 
 **Review.** Beta gate.
 
