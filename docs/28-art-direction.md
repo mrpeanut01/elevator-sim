@@ -409,13 +409,18 @@ branch is where this fails.
 
 **The playhead does not move, and this is the recommendation this document is most confident about.**
 
-The stage opens **paused at `recording.startedAt`**, which is the run's own day start — the demand
-template's declared hour, with `live/timeline.ts`'s `DAY_START_S` (06:00) as the fallback for a
-template that declares none. `garden-apartments` declares 08:30 and the stage opens there. `guide
-§ 7.3`'s literal *"paused, at 06:00"* is the **deviation**; the product is right, on the standing
-rule — forcing 06:00 over a building that opens at 08:30 would label one building with another's
-morning, and `stageScreen.browser.test.ts` found that by asserting the guide's literal against the
-product and failing.
+The stage opens **paused at `recording.startedAt`**, which is the run's own day start — **the demand
+template's declared hour**, with `live/timeline.ts`'s `DAY_START_S` (06:00) only as the fallback for a
+template that declares none. Six of the seven shipped templates declare one: `rise-and-fall` at
+**08:30**, `office-day` at 08:00, `lunch-two-way` at 12:15, `office-down-peak` at 17:15,
+`shift-change` at 14:45, `evening-egress` at 22:24; `constant-iso` declares none and is the only run
+that actually opens at 06:00.
+
+So `guide § 7.3`'s literal *"paused, at 06:00"* is the **deviation** and the product is right, on the
+standing rule. `stageScreen.browser.test.ts` established that by asserting the guide's literal against
+the product and failing: *"this build opens `garden-apartments` at 08:30 … forcing 06:00 over it would
+be labelling this building with another building's morning."* The property that case pins is the one
+to preserve — **the playhead is at the start of the day and time only ever moves forward from it.**
 
 **Why the playhead must not be moved to a livelier instant**, stated because it is the obvious fix and
 it is wrong twice over:
@@ -691,7 +696,7 @@ reason. **The simulator's accessibility floor outranks the prototype's greys** (
 A brief that proposed a colour on aesthetic grounds against a measured floor would be proposing to
 delete a passing test.
 
-### 7.2 The wait ramp is the product's least accessible element, and it is measured
+### 7.2 The wait ramp has the least contrast headroom of anything measured here
 
 The ramp is `guide § 7.2`'s *"core read"*, drawn as a 4.5 px capsule. Measured on the ground it is
 actually drawn against — the plot's `cardSunk` `#F5EFE3` well, not `paper`:
@@ -703,13 +708,16 @@ actually drawn against — the plot's `cardSunk` `#F5EFE3` well, not `paper`:
 | `checking-watch` | terracotta | `#B8462B` | 4.64:1 |
 | `taking-the-stairs` | warm grey | `#6E665A` | 4.94:1 |
 
-**The second band is at 1.78:1 against the surface it is drawn on** — below the ratio
-[§ D336](../DECISIONS.md) already measured at 1.83:1 and refused for text on this palette, and below
-any non-text floor anyone would pick. *The band that means "this is starting to go wrong" is the
-hardest one on the screen to see.*
+**Three of the four clear a 3:1 non-text floor; `tapping-foot` is at 1.78:1 against the surface it is
+drawn on.** That is below the 1.83:1 [§ D336](../DECISIONS.md) already measured for the same ink and
+refused for text on this palette, and below any non-text floor anyone would pick. *The band that
+means "this is starting to go wrong" is the hardest one on the screen to see.* Which floor actually
+applies is #204's to set; that this one value fails every candidate is not.
 
 The second measurement is worse, and it is the one a colour-blindness audit will find first. Band
-against band:
+against band — **a discriminability measure rather than a compliance one**, since no standard sets a
+ratio between two adjacent fills that mean different things, and 3:1 is only the conventional floor a
+designer would reach for:
 
 | pair | ratio |
 |---|---|
@@ -720,11 +728,12 @@ against band:
 | `tapping-foot` vs `checking-watch` | 2.61:1 |
 | `tapping-foot` vs `taking-the-stairs` | 2.77:1 |
 
-**Three of the six pairs are separated by essentially nothing but hue.** In greyscale, *checking
-watch* and *taking the stairs* — the third and fourth bands, the two that matter most — are the same
-value at 1.06:1. And *breezy* against *checking watch* at 1.30:1 is the calm end against the alarming
-end: a green-versus-red discrimination at near-equal luminance, which is the textbook
-red-green-confusion case.
+**Three of the six pairs are separated by essentially nothing but hue, and not one of the six clears
+3:1.** In greyscale, *checking watch* and *taking the stairs* — the ramp's two worst bands — are the
+same value at 1.06:1. And *breezy* against *checking watch* at 1.30:1 is the calm end against the
+alarming end: a green-versus-red discrimination at near-equal luminance, which is the textbook
+red-green-confusion case. **These marks are 4.5 px wide**, which is the size at which hue is the
+least reliable channel a screen has.
 
 **This is not an argument for changing § 19's four inks.** They are the guide's, they are the same
 four the Engineer mood card paints, and a second ramp is forbidden by AD-S15. It is an argument that

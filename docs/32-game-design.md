@@ -655,3 +655,267 @@ this product does not have:
 5. **Campaign stage 3.** The first thing that cannot be won, arriving after the player has won
    things. `docs/10` § 5.4: *"A game that cannot be lost teaches nothing, and this simulator's losing
    condition is real."*
+
+---
+
+## 6. One build, two audiences
+
+### 6.1 The positioning is settled and is not reopened here
+
+[§ D299](../DECISIONS.md) — *two products, one engine* — was taken by the product owner on
+2026-08-08 and is the parent of the whole #90–#119 backlog. Its two standing tests are quoted rather
+than paraphrased, because both are refusal tests a reviewer uses on a pull request:
+
+> **§ D299 § 1.** *A change to Engineer may make it **easier to use**. It may not make it **say
+> less**.*
+
+> **§ D299 § 2.** *Casual is a different door into the same building, not a smaller building* — every
+> parameter that can be edited is editable there, a Casual player can author and tune their own
+> dispatcher completely, and **named play styles are an entry point and never a ceiling**.
+
+**Everything in §§ 2–5 is written downstream of those two sentences.** `docs/32 GD4` (nothing is
+locked) is § D299 § 2 applied to progression; `docs/32 GD12` prohibition 4 (a currency may not buy
+access) is the same sentence applied to the economy; `docs/32 GD16`'s third clause (neither
+difficulty nor stakes may touch a measurement) is § D299 § 1 applied to a difficulty selector.
+
+### 6.2 Depth is disclosure, and the difference from a fork is mechanical
+
+> **GD19 — Depth is reached by opening, never by switching.** A simplified figure is a **collapsed
+> form of the full one on the same surface**, opened in place. The test is a negative and it is the
+> one to apply: **name a figure that is reachable in one product and not the other.** If such a
+> figure exists, the two products have forked and the change is refused.
+
+> **GD20 — Four things are identical across the two registers, and the list is closed.** The **run**,
+> the **buildings**, the **figures**, and the **refusals with their grounds**. What differs is the
+> **wording**, the **layout**, and the **order things are met in** — § D299 § 2's three, and no
+> fourth.
+
+**Both are already mechanised, which is why they are stated as rules rather than as aspirations.**
+
+1. **The run.** [`10-experience-layer-contract.md`](10-experience-layer-contract.md) § 3.3 carries the
+   acceptance criterion — *"for every scenario, the recording produced in Basic mode is
+   byte-identical to the recording produced in Advanced mode"* — with the test that makes it
+   falsifiable: **if a mode switch can change a run, it is not the same product.**
+   [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 1.3 adopts it and § 2.6 records
+   that it survives § D299 untouched, because it is a claim about *runs* rather than about products.
+2. **The figures and the refusals.** The honesty corpus is the instrument. Both the Day report and
+   the live-metrics panel are mode-aware, and **both adapters render both registers on every case**,
+   so a claim that exists in only one register is a string the search reads and the other does not
+   have. `charter S8` is the criterion; `packages/viz/src/honesty/` is the only one of the ten with a
+   working instrument today.
+3. **The wording.** [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 1.4 is the
+   restatement rule and it is not restated here. Its one-line form: *a figure may be renamed,
+   re-united, or restated as a natural frequency; it may not be re-quantified, rounded into an
+   adjective, or separated from its refusal.*
+
+### 6.3 The consequence for game design specifically
+
+The three sections above are contracts about *surfaces*. What they mean for a **game** is one rule,
+and it is the rule most likely to be broken by somebody designing a tutorial:
+
+> **GD21 — A game mechanic may not be a simplification.** Progression, economy, difficulty and
+> failure are the **same in both products**, because they are properties of the run and the record,
+> not of the register. There is no *casual campaign* and no *engineer campaign*; there is one
+> campaign, described twice. A proposal to give one audience an easier bar, a shorter contract, a
+> cheaper shop or a softer failure is a fork, and `docs/32 GD19` refuses it.
+
+**The convergence is real and it arrives at hour 3.**
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 5 states it: the engineer at hour
+3 and the curious player at hour 3 *"are doing the identical thing over the identical artefacts;
+only the labels differ."* That is why § 2.3's rows 4–8 — workshop, bench, ladder, tuner — are the
+**same eight introductions for both audiences in the same order**. The two audiences do not have two
+progressions that meet; they have one, entered through two doors.
+
+### 6.4 The door, and the one thing it may not remember
+
+Both worlds ship in one build and the door between them is
+[§ D338](../DECISIONS.md)'s: the Everyday rail's footer row crosses to Engineer, and the Engineer
+header carries the way back. **The swap is not remembered** — a reload lands on the Everyday main
+menu whichever world the player was in — because a remembered world is the entry-screen override the
+design guide forbids, whatever storage it wears ([§ D335](../DECISIONS.md),
+[§ D338](../DECISIONS.md)), and it is `charter` non-goal 10.
+
+> **GD22 — No progression state may become an entry-screen override.** A career in progress, an
+> unfinished contract, a case mid-retry and a saved dispatcher are all legitimate to persist and to
+> *offer*; none of them may change which screen the product opens on. `charter` non-goal 10 is a rule
+> about the front door, and progression is the most plausible reason somebody will eventually
+> propose breaking it.
+
+---
+
+## 7. Minute 1, minute 10, hour 3 — what §§ 2–5 add
+
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 5 states what the player is
+*doing* at each of the three, and it is not restated. **This section states what has been introduced
+by each**, which is the half § 5 does not carry and the half a progression schedule has to answer.
+
+### 7.1 Minute 1 — nothing from §§ 2–5 exists yet
+
+**No currency, no career, no record, no difficulty setting, no failure that costs anything.** The
+first minute is a building in trouble and nothing else, and every mechanism in this document is
+absent by design. `docs/32 GD5`'s trigger for the second introduction is *one Fix a building case
+completed*, so the earliest any of this can appear is minute 5.
+
+**This is also the structural fix for the condition that is currently failing.**
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 1.1's **A1** — a queue on screen
+inside 90 s that the building is visibly not draining — fails today because the day-one slot holds a
+seeded day on a building whose own file states that sparseness is its purpose, and 91 of 100
+consecutive seeds keep the worst wait under a minute. **A Fix a building case cannot be quiet.**
+`data/fixit-cases.json`'s eighteen cases are each an authored fault with a complaint, a named
+complainer, a scoped measure and a diagnosis — *"Every evening I finish up and wait an age on the sky
+lobby for a car down to the street"* — pinned by `fixit/cases.test.ts` against a real paired run. Row
+1 of § 2.3 is Fix a building **because a case is a building in trouble by construction and a seeded
+day is a building in trouble by luck.**
+
+That is an argument for issue #217's positioning change that #217 does not itself make, and it is a
+second one alongside the structural argument
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4.1 already records. **Neither
+document takes the decision** (§ 9, **Q1**).
+
+### 7.2 Minute 10 — two of eight introductions, and no economy
+
+By minute 10 the player has met rows 1 and 2 of § 2.3 and nothing else: **the loop, and the held
+day**. The schedule is built to `charter S3` (median first session ≥ 10 minutes) and `charter S2`
+(60 % of first sessions complete one diagnose–change–prove cycle) with the handoff's own session
+lengths as the arithmetic — ~5 minutes for a case and ~3 for a tower day puts the second
+introduction at about minute 8, inside the budget with a turn to spare.
+
+**Failure has been met exactly once and it cost nothing** — a Fix a building retry — which is the
+ordering § 4.2 argues for. **The economy has not appeared.** Introducing a currency inside the first
+ten minutes would put a wallet in front of a player who has not yet had a verdict, and the verdict is
+what the product is for.
+
+### 7.3 Hour 3 — the economy is the pacing device and the ladder is the placement
+
+[`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 5's hour-3 sentence — the unit of
+interest has moved from the run to the dispatcher — is what rows 4–8 of § 2.3 serve. Three additions
+this document makes to it:
+
+1. **The economy has become the pacing device.** A contract is twenty days, a perfect Standard month
+   pays 98 u against a shop worth 324 u, and works take the building apart before they help. So the
+   hour-3 session is no longer *how do I make this better* but *what do I buy, and when can I afford
+   to be worse for a week* — which is the same question a real building operator has, arrived at
+   without anybody explaining it.
+2. **The ladder is where a verdict is placed, not where it is decided.** `gauntlet/rating.ts` orders
+   forty fixed proof cases and emits no verdict, no comparison and no winner; the **bench** is where
+   two dispatchers are compared under CRN with an interval. A player at hour 3 is using both, and the
+   division between them is the product's whole honesty argument made into two screens.
+3. **Difficulty has stopped being a setting and become the calendar.** The building fills up at
+   `1 + 0.11 × (day − 1)`, the wear clock runs, and the twist changes each day. Nobody chose any of
+   it after day one.
+
+### 7.4 What brings them back — `charter S4`, and the one mechanism the product has for it
+
+`charter S4` asks for **25 % of day-one players returning within 7 days**, and its instrument does
+not exist. **The mechanism that would earn it is already designed and half-built**: Today's tower is
+*the same day for everybody*, which is the only thing in this product that is different tomorrow
+without the player doing anything. It needs the server the front door is built around
+([`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) § 4.1 row 4, § 6), and until that
+exists the board shows a world that has no runs in it. **No other mechanism in this document
+produces a reason to return on a specific day** — a career waits patiently, a case does not expire,
+and a ladder does not move on its own. That is stated as a finding, not as a request: § 9's **Q4**.
+
+---
+
+## 8. Contracts-touched register
+
+**This is the acceptance criterion *"every existing design contract it touches is referenced and
+left intact"* made checkable.** One row per contract, what this document takes from it, and the
+confirmation that nothing is weakened. **A cell reading *nothing* in the last column is the claim
+being made**; where this document creates a tension rather than a weakening, the row says so and
+points at § 9.
+
+| Contract | What this GDD takes | What it changes in that contract |
+|---|---|---|
+| [`22-charter.md`](22-charter.md) | Pillars **P1**–**P5** as refusal tests; criteria **S1**–**S4**, **S6**, **S8**, **S10** as the targets §§ 2, 4 and 7 are built to; non-goals **1**, **3**, **5**, **6**, **10** as prohibitions | **Nothing.** No pillar amended, no criterion added or restated, no non-goal relaxed. `charter` non-goal 6's *wording* is narrower than a shipped mechanic — recorded as **Q2**, not resolved here |
+| [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) | The core loop, the five beats and their numbering; the per-mode declaration table; the retry-cost ladder; **A1**–**A4**, **B1**–**B4**; § 1.4's restatement rule; § 3.4's Endless rush finding; § 5's minute-1/10/hour-3 behaviour | **Nothing.** No second loop statement (§ 0.1). `docs/32 GD1`'s two halves are a coarser handle on § 3.2's five beats, not a competing decomposition, and § 3.4's verdict on the rush is adopted whole |
+| [`10-experience-layer-contract.md`](10-experience-layer-contract.md) | **R2** (no leaderboard from single runs), **R12**, **R13**; § 3.3's byte-identity criterion; § 3.4's dual-presentation finding; § 5.3's four fail states; § 5.4's *progression by mechanism introduced*; § 5.5's whole prohibition list | **Nothing.** § 5.4's campaign ordering is cited and not re-specified, including its own measured correction that stage 1 is not *"winnable trivially"*. § 5.5 is the list of record and § 4.4 is an index into it |
+| [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) | § 4's challenges **E1**–**E6**, mapped onto the five beats (§ 1.5); § 6's non-goals **3** (no scalar challenge score, capital on no results page), **6**, **7** | **Nothing.** The mapping adds no challenge and reorders none |
+| [`14-building-behaviour-contract.md`](14-building-behaviour-contract.md) | § 0's opt-in / byte-identical-when-unused constraint; §§ 2.1–2.3's demand dials; § 3.1 patience and abandonment; § 3.2 crowding; § 3.3 stairs | **Nothing.** `docs/32 GD18` *narrows* what difficulty may use — patience is legitimate as a building property and refused as a difficulty knob — which is a restriction on this document, not on that contract |
+| [`12-design-handoff.md`](12-design-handoff.md) and `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` | The session-shapes table; the mode lengths and lose-conditions; the fixed vocabulary; § 10's cut guess-the-fault quiz; `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` § 8's economy formulas and published totals | **Nothing.** The handoff wins every disagreement about the interface. § 1.4's demotion of Endless rush is a **recommendation** flagged as **Q1**, because moving a tile is an interface change and the interface is the handoff's |
+| [`16-change-scope-contract.md`](16-change-scope-contract.md) and [`17-play-experience-audit.md`](17-play-experience-audit.md) | *There is no such thing as a mid-day change*; the retry as the product's verb; § 4.4's commissioning phase | **Nothing.** § 4.2's failure model is the retry-cost ladder, which is that fact read as a design consequence |
+| [`CLAUDE.md`](../CLAUDE.md) | The eight invariants; the statistical discipline; the **five** grounds on which a mean is suppressed; energy as an axis and never a score; the standing requirement (*name the non-test caller*) | **Nothing.** Where this document and `CLAUDE.md` could disagree, `CLAUDE.md` wins by `22-charter.md` § 6, and no rule above needs that clause |
+| [`05-roadmap.md`](05-roadmap.md) | The standing requirement, applied to difficulty (`docs/32 GD17`) and to currency sinks (`docs/32 GD10`) | **Nothing.** No phase status touched; no phase row added |
+| [`25-vertical-slice.md`](25-vertical-slice.md) and [`13-phase-6c-handover.md`](13-phase-6c-handover.md) | Their `G1`–`G9` series, cited only to establish that the letter is taken twice and that this document therefore numbers `GD1`… (§ 0.2) | **Nothing.** No content taken from either |
+| [`04-test-buildings.md`](04-test-buildings.md) and `data/buildings/` | The building set as the fabric half of the difficulty substrate | **Nothing** |
+
+**Three shipped modules are treated as contracts in this register even though they are code**, because
+each states a prohibition in its own docstring that this document adopts rather than re-decides:
+
+| Module | What it decided | Adopted as |
+|---|---|---|
+| `packages/viz/src/commissioning/types.ts` | Capital gates what may be **chosen**, never appears on a results page, is never compared between players, and never stands beside a wait figure — asserted three ways by `budget.test.ts` | `docs/32 GD12` prohibitions 1–3, widened from capital to every currency |
+| `packages/viz/src/shift/contracts.ts` | *Scenarios teach, they do not gate.* The design's own completion-based unlock ladder is deliberately not ported, and `contractStatus` has no `locked` | `docs/32 GD4` |
+| `packages/viz/src/gauntlet/rating.ts` | A rating **orders a ladder and is not a measured difference**; forty single-replication cases are under budget, so the module emits no verdict, no comparison and no winner | § 1.3, § 7.3, and `docs/10 R2` honoured in the one place it was easiest to break |
+
+---
+
+## 9. Open questions, flagged rather than buried
+
+**Each of these is a decision this tree does not settle and that this document declines to take on
+its own authority.** They are stated with the reading this document would recommend, so that a
+product owner can agree or refuse rather than start from a blank page.
+
+| # | The question | What this document recommends, and why it does not decide it |
+|---|---|---|
+| **Q1** | **Is Endless rush a mode or an instrument?** (§ 1.4) | Recommend **demote to an instrument beside the bench**: it serves neither half of the loop, its output is a limit rather than a differential, and a limit is an hour-3 quantity. **Not taken here** — moving a tile off the front door is an interface change, and the interface is the handoff's. The separable half, which needs no positioning decision, is that its tile may not advertise a session shape the build cannot deliver |
+| **Q2** | **`charter` non-goal 6 forbids more than it means to.** (§ 5.1) | It permits difficulty to move *only* declared traffic parameters and building fabric; the shipped difficulty tiers move the purse, the rate ladder, the miss allowance and four goal bars, none of which is either. Recommend the charter's wording be **narrowed to name *stakes* separately** (`docs/32 GD16`), or the tiers be changed. **A charter clause is amended by its owner, not by a lane** |
+| **Q3** | **Should the campaign's failure odds be rolled?** (§ 3.6) | `failureOddsPct` computes a daily hazard that nothing rolls against, and `career.ts` publishes that refusal in its own words. Recommend building the seeded stream, because a wear clock that cannot bite makes every service booking a purely arithmetic decision. **It needs a seeded stream for a campaign day and an event calendar behind a contract, neither of which exists** |
+| **Q4** | **What is the day-2 return mechanism?** (§ 7.4) | The only candidate the product has is Today's tower being the same day for everybody, and it needs the server the front door is built around. Recommend it be treated as `charter S4`'s critical path. **Nothing else in this document produces a reason to return on a specific day**, and inventing one — a daily reward, a streak bonus, an expiring case — would be a currency that measures progress, which `docs/32 GD8` forbids |
+| **Q5** | **Where does the § 2.3 schedule live?** | The eight introductions are specified here and **implemented nowhere**: there is no progression state in the tree, and `docs/32 GD5`'s triggers (*a completed turn of a named kind*) need a record of completed turns that spans modes. Recommend it be built as one derived value over the existing records rather than as a new store, so it cannot disagree with them. **The store's shape is an M2 engineering decision** |
+| **Q6** | **Does the campaign day-goal bar belong to the difficulty tier or to the contract?** | Today it is the tier's (`DIFFICULTIES[].tests`). Under `docs/32 GD16` that is *stakes* and legitimate. **But a bar that moves with a setting and a bar that moves with a building are different games**, and the second is closer to `docs/10` § 5.4's *progression by mechanism introduced*. Recommend deciding it explicitly rather than letting the tier own it by default |
+
+### What this document could not support from the tree
+
+Stated because a specification that hides its unsupported parts is the defect this repository
+records:
+
+- **No first-session measurement exists**, so § 7's schedule is built to `charter S1`–`S3` and
+  cannot yet be tested against them. `charter` § 4 records the measurement: `grep -ril telemetry
+  packages/*/src --include='*.ts'` returns **0 files**.
+- **The § 2.3 ordering is derived, not measured.** Its three sources are named in § 2.3 and each is a
+  design argument rather than a playtest result. The first playtest that runs it may reorder rows
+  4–8; rows 1–3 are load-bearing and rest on the retry-cost ladder.
+- **`docs/32 GD11`'s reading of a unit as a cleared day is arithmetic, not an authored intent.** It
+  follows from the rate being per cleared day and the shop being priced in the same unit. If the
+  handoff intended a different meaning, the handoff wins.
+- **Nothing files a campaign day** (§ 3.6), so the economy specified in § 3 currently operates over a
+  record that play cannot write to. Every rule in § 3 is stated to be true of the economy once that
+  is closed.
+
+---
+
+## Sources
+
+- [`22-charter.md`](22-charter.md) — the charter this document is governed by: pillars, criteria
+  `charter S1`–`S10`, and the ten non-goals. Adopted by [§ D342](../DECISIONS.md); cited per
+  [§ D343](../DECISIONS.md).
+- [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) — the core loop, the five beats,
+  the per-mode declaration, the retry-cost ladder, the restatement rule, and the minute-1 / minute-10
+  / hour-3 behaviour this document's § 7 adds to rather than repeats.
+- [`10-experience-layer-contract.md`](10-experience-layer-contract.md) §§ 3.3, 3.4, 5.3, 5.4, 5.5 —
+  byte-identity, dual presentation, the four fail states, progression by mechanism introduced, and
+  what must never be built.
+- [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) §§ 4, 6 — the six
+  engineering challenges and the nine non-goals.
+- [`14-building-behaviour-contract.md`](14-building-behaviour-contract.md) §§ 0, 2, 3 — the
+  difficulty substrate and the opt-in constraint that governs it.
+- `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` and
+  `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` — canonical for the interface, and the
+  source of the session shapes and the campaign economy's formulas. **Not** canonical for numbers.
+- [§ D299](../DECISIONS.md) — two products, one engine, and the two standing tests § 6 is built on.
+  [§ D335](../DECISIONS.md) and [§ D338](../DECISIONS.md) — the two shells and the door between them.
+  [§ D106](../DECISIONS.md) — energy is an axis, never a score, which § 3.3 is the capital-side
+  reading of. [§ D227](../DECISIONS.md) — the stale-refusal class, which § 1.4's tile is an instance
+  of.
+- [`CLAUDE.md`](../CLAUDE.md) — the invariants, the statistical discipline, the five suppression
+  grounds, and the standing requirement that a behaviour must name its non-test caller.
+- The shipped modules that already decided something this document adopts:
+  `packages/viz/src/campaign/economy.ts`, `packages/viz/src/campaign/career.ts`,
+  `packages/viz/src/campaign/failStates.ts`, `packages/viz/src/commissioning/types.ts`,
+  `packages/viz/src/shift/contracts.ts`, `packages/viz/src/shift/goals.ts`,
+  `packages/viz/src/shift/growth.ts`, `packages/viz/src/shift/events.ts`,
+  `packages/viz/src/gauntlet/rating.ts`, `packages/viz/src/everyday/modes.ts`,
+  `packages/viz/src/everyday/screens.ts`, and `data/campaign.json`, `data/fixit-cases.json`.
+- [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) §§ M, Q, S — the verification
+  behind § 7.1's A1 measurement and § 1's mode findings.
