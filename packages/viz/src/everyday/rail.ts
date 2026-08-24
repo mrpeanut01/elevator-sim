@@ -19,6 +19,13 @@
  *    `screens.ts` — built keys open, unbuilt keys carry that key's one refusal sentence — so a
  *    lane that registers a screen opens its rail row on the same commit, and a row can never
  *    refuse a screen that works (§ D227's defect) or open one that does not exist.
+ * 4. **The `PLAYING AS` card's career line comes from the week, and the absence stays reachable.**
+ *    Issue #214: it came from a `profile` field no producer ever wrote, so *"no days saved yet"*
+ *    was not stale — it was the **only** string that line could render, beside a week screen
+ *    reading *1 day running*. The gate is {@link WeekState.history} rather than `streak`, because a
+ *    player who missed every day has still saved days; today's figure waits on `dayClosed` for
+ *    `weekView.ts`'s reason; and with an empty week the honest absence is still what is drawn —
+ *    a fix that made the refusal unreachable would be the same defect facing the other way.
  *
  * And one rule about what is *absent*: **Tune the tower is not a rail item.** It is reached from
  * the brief and from the report's third lever. The guide notes an earlier draft listed it here and
