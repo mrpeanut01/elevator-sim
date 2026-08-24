@@ -327,6 +327,42 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
   });
 
   /**
+   * **#206's other half, in the one state that still shows it.**
+   *
+   * The daily strip's fourth stop is the report, and on a stage at step 3 it evaluated `4 <= 3`:
+   * faint, `disabled` and carrying **no listener at all**, in every state, by construction. A day
+   * filed under the player — `dev/main.ts` files one whose playhead has run out — is the state in
+   * which that stop has a written sheet behind it and is still not the step the flow has reached.
+   * It is now the next stop with something to read, so it is a way to the account of the day, and
+   * filed this way it is the only way to it from here.
+   */
+  it('lights the report stop once the day behind it is filed, and it goes there', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    const stop = page.locator('.everyday-bar-timeline button').nth(3);
+    expect(await stop.textContent()).toBe('4 How it went');
+    /* Unfiled: the sheet does not exist yet, so the stop is faint and inert — unchanged. */
+    expect(await stop.isDisabled()).toBe(true);
+
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelectorAll('.everyday-bar-timeline button')[3]
+          ?.hasAttribute('disabled') === false,
+      undefined,
+      { timeout: 30_000 },
+    );
+
+    await stop.click();
+    await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+    expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+    await page.close();
+  });
+
+  /**
    * **The other flow that files** — GitHub issue #206's second half of the blast radius.
    *
    * `screens.ts` routes one `STAGE_SCREEN` and its `primary` is one function, so a campaign day is

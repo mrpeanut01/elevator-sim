@@ -73,17 +73,17 @@ grep -nE '^\s*(else )?(if.*)?go\(' packages/viz/src/everyday/shell.ts
 *reachable states* is `(screen × run context)`, not `screen` — the stage and the report are one
 component each with four contexts (`types.ts#RunContext`), and § 3.3 gives them different bars,
 different exits and different timelines per context. Mapping seventeen screens instead of
-sixty-eight `(screen, ctx)` pairs is how three of § 6's dead ends stayed invisible.
+sixty-eight `(screen, ctx)` pairs is how three of § 5.2's dead ends stayed invisible.
 
 ### 1.2 The six kinds of edge
 
 | Kind | Drawn by | Rule |
 |---|---|---|
 | **primary** | the bar's right-hand button | The shell's button (§ 3.1: no screen declares its own footer). A registered screen answers it through its mount handle's `primary()`; the menu and `settings` are answered by the shell itself |
-| **back** | the bar's `‹ label` cell | Present only where § 3.3 names a **linear parent** — five of them, held in the table, never a history stack (`types.ts#EverydayState` has no `history` and that is a rule) |
+| **back** | the bar's `‹ label` cell | Present only where § 3.3 names a **linear parent** — nine rows carry one, over seven distinct relations. Held in the table, never a history stack (`types.ts#EverydayState` has no `history`, and that is a rule rather than an omission). `types.ts` names five of the seven; the two it does not are the campaign and rush stage rows' own parents |
 | **breadcrumb** | the bar's timeline strip | Daily is four stops, campaign is five. A *reached* stop navigates back; the current stop is never a button; a *forward* stop is live only where `shell.ts#forwardStopIsLive` says the screen behind it already holds something ⟳ |
 | **leave** | the bar's left button, and the rail's *Main menu* row | Both land in `requestLeave`. Mid-run on the stage it becomes § 3.4's confirm strip; a `watch` run never warns; everywhere else it leaves at once. Leaving **clears the run context** |
-| **rail sidestep** | the rail's group rows and the Settings row | A navigation that preserves the run context. Not a flow step — see § 1.5 |
+| **rail sidestep** | the rail's group rows and the Settings row | A navigation that preserves the run context. Not a flow step — see § 1.7 |
 | **world swap** | the rail's footer row *Switch to Engineer* | **Not a navigation.** It hands the page to the other shell and leaves this one mounted behind it ([§ D338](../DECISIONS.md)). It has no screen key and must not gain one |
 
 ### 1.3 The frame's edges — present on every screen
@@ -97,7 +97,7 @@ sixty-eight `(screen, ctx)` pairs is how three of § 6's dead ends stayed invisi
 | Rail · Settings row | `go('settings')` | always; reads `HERE` when you are on it |
 | Rail · *Switch to Engineer* | `enterEngineer()` | always; no confirm strip, because the transition discards nothing |
 | Bar · leave | `requestLeave()` | always except the menu |
-| Bar · back | `go(row.back.screen)` | five rows only: `brief→door`, `stage/daily→brief`, `stage/campaign→building`, `stage/rush→rush`, `report/*→stage`, `building→towers`, `contract→towers` |
+| Bar · back | `go(row.back.screen)` | nine rows: `brief→door`, `stage/daily→brief`, `stage/campaign→building`, `stage/rush→rush`, `report/*→stage` (three rows, one relation), `building→towers`, `contract→towers` |
 | Bar · breadcrumb stop | `go(stop.screen)` | reached-and-not-current, **or** forward-and-live ⟳ |
 | Bar · way out (inverted rows only) | `ctx==='campaign' → go('towers')`; `ctx==='rush' → go('rush')`; else `doLeave()` | every report; a *solved* fix case |
 | Bar · primary on the menu | `go(pickedMode.screen)` | the pick the tiles set |
@@ -170,8 +170,9 @@ flowchart LR
 
 ### 1.7 The run context is a latch, and the graph above is only true inside one
 
-`shell.ts#go` preserves `ctx`; **only the mode tiles set it and only leaving clears it**
-(`shell.ts:289, 597, 613, 1183` — four writers, all in one file). The rail is drawn on every screen
+`shell.ts#go` preserves `ctx`; **only the mode tiles set it and only leaving clears it** — four
+writers, all in one file, all found by `grep -n 'ctx:' packages/viz/src/everyday/shell.ts`: the
+initial state, `requestLeave`'s watch branch, `doLeave`, and the mode tile. The rail is drawn on every screen
 in every context, so a sidestep carries the context with it, and several screen primaries then read
 a context that has nothing to do with the run they just started.
 
@@ -297,6 +298,12 @@ five beats.
 | **Restored** | **Nothing survives.** `sessions` is a module-scope `Map`, so every FIXED badge, every repair toggle and every outcome is lost on reload, and the screen re-opens on the first case as though nothing had been solved. Nothing says so. This is the only mode where a player can accumulate something over an hour and lose all of it silently |
 | **Unavailable** | `fixitScreen.ts` has a real data-load failure arm: *"The case file could not be loaded: …"*, drawn in alarm red |
 | **Recovery** | **None from the load failure.** `loadPromise ??=` caches the *rejected* promise, so leaving and re-entering redraws the same sentence and never retries. Only a reload recovers, and the screen does not say so. Everything else recovers: `⤺ Leave this building`, and nothing on the screen is clickable but the repairs, the editor and the primary |
+
+**And it has exactly one door.** `fixit` is in no rail group, so its only producer is the mode tile
+— a player who sidesteps to the workshop and wants to come back must leave to the menu and press
+the tile again, which is a full exit from the mode. `charter S10` asks that every shipped mode be
+completable *without leaving it*; this one is, but it cannot be **re-entered** without leaving
+something else. Worth settling before #217 promotes the mode up the tile order.
 
 ### F4 — Endless rush
 
@@ -546,7 +553,7 @@ should hold every future mode to:
 | `routeFor`'s `'refusal'` arm | Returns for no key on this build and **stays**, because its producer is live — it returns the moment a key has no module | `screens.ts`: *"A route with a live producer and no input today is not a dead seam"* |
 | `UNBUILT_REASONS`, empty | Every § 4 key is registered. The constant and its both-directions test stay | `screens.ts` |
 | The rush confirm strip | Can never be shown: it arms only on a stage with a run open, and the rush cannot start one | `actionBar.ts#confirmStripFor` |
-| `menu` in any context but `daily` | `doLeave` clears the context before landing | `shell.ts:611-613` |
+| `menu` in any context but `daily` | `doLeave` clears the context before landing | `shell.ts#doLeave` |
 | `towers` · `building` · `contract` outside `ctx: 'campaign'` | Their only producers are the campaign group, the campaign way-out and each other | `rail.ts#railGroups` |
 
 ### 5.2 Unreachable or dead **by defect**
@@ -562,7 +569,7 @@ should hold every future mode to:
 | **D7** | **A failed screen data-load never retries** (`fixit`, `board`): the rejected promise is cached at module scope | `fixitScreen.ts#ensureLoaded`, `boardScreen.ts#load` | **No** |
 | **D8** | **No keyboard exit anywhere in `everyday/`.** `grep -rn 'Escape\|keydown' packages/viz/src/everyday/*.ts` returns **one hit, and it is a docstring** saying the fix screen has no Escape-to-close. The shell has no key handler at all | `everyday/*.ts` | Partly — T20 is `planned` |
 | **D9** | The restore, library and save notices never reach an Everyday player | § 4.4 | **No** |
-| **D10** | `rail.ts:235`'s streak line is **unconditional** — no producer in the tree ever supplies `streak`, so the sentence is the only string that line can render | issue #214 | Yes (#214) |
+| **D10** | `rail.ts#railFooter`'s streak line is **unconditional** — no producer in the tree ever supplies `streak`, so the sentence is the only string that line can render | issue #214 | Yes (#214) |
 
 **D1 through D4 are one family**, and it is worth naming as such: **the § 3.3 bar resolves per
 `(screen, ctx)` and every screen's `primary()` is one function for all contexts.** Where the two
@@ -575,8 +582,9 @@ of the family, not four more labels.
 
 ## 6. Reachability, as a table
 
-Seventeen keys × four contexts = 68 nominal states. **Reachable: 34.** The `watch` column is empty
-by design; `menu` exists only in `daily`; the campaign screens exist only in `campaign`.
+Seventeen keys × four contexts = 68 nominal states. **Reachable: 39.** The `watch` column is empty
+by design; `menu` exists only in `daily`; the campaign screens exist only in `campaign`; `rush` and
+`fixit` exist only in the context their own tile sets, because **neither has a rail row**.
 
 | screen | daily | campaign | rush | watch |
 |---|---|---|---|---|
@@ -587,12 +595,18 @@ by design; `menu` exists only in `daily`; the campaign screens exist only in `ca
 | `report` | ✔ | ✔ ⚠ D2 | ✔ ⚠ D2 | — |
 | `towers` · `building` · `contract` | — | ✔ | — | — |
 | `rush` | — | — | ✔ | — |
-| `fixit` | ✔ | ✔ ⚠ | ✔ ⚠ | — |
+| `fixit` | ✔ | — | — | — |
 | `workshop` · `bench` · `designer` | ✔ | ✔ | ✔ | — |
 | `tuner` | ✔ | ✔ ⚠ | ✔ ⚠ | — |
 | `week` · `board` · `settings` | ✔ | ✔ | ✔ | — |
 
 ⚠ = reachable, and the bar or the flow says something that is not true of the run. Every ⚠ is § 1.7.
+
+**The `fixit` row's campaign and rush cells are the reason § 5's split matters.** Fix a building is reachable
+in one context only, and not because anything guards it: it has no rail row, and its tile is the
+only producer of `go('fixit')`. That is unreachable **by omission** rather than by design or by
+defect — a third category this map does not need a column for, and one worth checking before #217
+promotes the mode, since promoting a tile does not give a mode a way back into itself.
 
 ---
 

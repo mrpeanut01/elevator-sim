@@ -926,23 +926,29 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
   }
 
   /**
-   * Whether a **forward** timeline stop — one this flow has not reached — has something behind it.
+   * Whether the stop **one past** the current step already holds something to read.
    *
    * § 3.3's strip was drawn from the row's own step alone, so every stop past the current screen
    * was faint and carried no listener. On the daily stage that made *4 How it went* evaluate
    * `4 <= 3` and be inert **in every state, by construction**, which is half of GitHub issue #206:
    * the day was filed, the sheet was written, and the one control naming it could not be pressed.
    *
-   * The report is the one stop whose screen can be full before the flow arrives at it, because
-   * § 6.4 step 5 writes the sheet at the close rather than on arrival. Every other stop is a screen
-   * the player has yet to fill in — a brief for a day not set up is not a place to go — so this
-   * answers `false` for them and the strip is unchanged there.
+   * Two bounds, and both are what keep this from becoming a shortcut through the flow.
    *
-   * **A standing sheet is not enough**: the run on the stage must be the filed one. Yesterday's
-   * report is still standing while today is mid-morning, and a lit *How it went* over an unfinished
-   * day would be § 16 rule 4 — *a button does what it says* — read the wrong way round.
+   * **The next stop only.** A stop two ahead is a screen the player has not produced yet, and a
+   * lit one would offer a way past the step that produces it. Only the immediately-next stop is
+   * ever asked about, which is why a `report` five steps along a campaign the player has not opened
+   * cannot light because a *daily* day happens to be filed — the campaign stage runs its own day on
+   * the way in, so the two flows cannot lend each other a sheet.
+   *
+   * **The report only, and only for the run on the stage.** It is the one stop whose screen can be
+   * full before the flow arrives at it, because § 6.4 step 5 writes the sheet at the close rather
+   * than on arrival; every other stop is a screen the player has yet to fill in. `dayClosed` is a
+   * fact about the recording currently loaded, so this lights for the day in front of the player
+   * and never for a sheet left standing from an earlier one — a lit *How it went* over an
+   * unfinished day would be § 16 rule 4, *a button does what it says*, read the wrong way round.
    */
-  function forwardStopIsLive(screen: EverydayScreen): boolean {
+  function nextStopIsLive(screen: EverydayScreen): boolean {
     if (screen !== 'report' || dataHost === undefined) return false;
     return dataHost.runState().dayClosed && dataHost.lastReport() !== undefined;
   }
@@ -987,13 +993,14 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
         const reached = index + 1 <= model.timeline.step;
         const current = index + 1 === model.timeline.step;
         /*
-         * **Position in the flow is not the whole of it** — GitHub issue #206. A stop the flow has
-         * not reached is live when the screen behind it already holds something to read; see
-         * {@link forwardStopIsLive}, which is the only reason a stop past the current step is ever
+         * **Position in the flow is not the whole of it** — GitHub issue #206. The stop one past
+         * the current step is live when the screen behind it already holds something to read; see
+         * {@link nextStopIsLive}, which is the only reason a stop past the current step is ever
          * pressable. Everything else is unchanged: the current stop is where you are and never a
          * button, and a reached stop goes back.
          */
-        const live = !current && (reached || forwardStopIsLive(stop.screen));
+        const live =
+          !current && (reached || (index === model.timeline.step && nextStopIsLive(stop.screen)));
         const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.type = 'button';
         step.disabled = !live;

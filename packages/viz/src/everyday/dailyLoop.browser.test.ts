@@ -446,23 +446,6 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       // And step 4 of four is where the player now stands: the timeline's last stop is `current`,
       // which is the one state the shell draws neither faint nor pressable.
       expect(await page.textContent('.everyday-bar-timeline')).toContain('4 How it went');
-
-      /*
-       * **The second half of #206, and the reason the strip is a control rather than a caption.**
-       * Step back to the brief on the timeline's own stop — a reached one, which always worked —
-       * and the fourth stop is now **live from a screen that has not reached it**, because the day
-       * behind it is filed and its sheet is written. On the tree that reported the issue it was
-       * `4 <= 2`, faint, `disabled` and listener-less, exactly as it was on the stage.
-       */
-      const stopAt = (n: number) => page.locator('.everyday-bar-timeline button').nth(n - 1);
-      await stopAt(2).click();
-      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
-      expect(await stopAt(4).textContent()).toBe('4 How it went');
-      expect(await stopAt(4).isDisabled()).toBe(false);
-
-      await stopAt(4).click();
-      await page.waitForSelector('.everyday-report', { timeout: 15_000 });
-      expect(await page.locator('.everyday-report-empty').count()).toBe(0);
     } finally {
       await page.close();
     }
