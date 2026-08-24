@@ -301,16 +301,17 @@ states the loop as **diagnose → change one thing → prove it**. Beat 1 is the
 *diagnose* is performed on, beat 2 is *diagnose*, beat 3 is *change one thing*, and beats 4 and 5
 together are *prove it* — which is split in two here because **beat 4 is where the honesty comes
 from and beat 5 is where the satisfaction does**, and a mode can serve one without serving the other.
-Endless rush is exactly that case (§ 3.4). Quote P4 when refusing a pull request; quote the five when
-asking a mode what it serves.
+Today's tower is exactly that case: it gives you a score and a world to place it in, and withholds
+the held crowd, because the day does not come back. Quote P4 when refusing a pull request; quote the
+five when asking a mode what it serves.
 
 **Two amendments to #191's proposed list**, both stated rather than made silently:
 
 1. #191's beat 2 is *"form a hypothesis about what is wrong"*. It is renamed **diagnose**, because
    the modes differ most at this beat and one of them removes it deliberately (§ 3.4).
-2. #191's list stops at five beats and does not name the time budget. **One turn is three to five
-   minutes**, taken from the handoff's own session shapes for the two modes that contain a whole
-   turn: Fix a building at *~5 min a case*, Today's tower at *~3 min*
+2. #191's list names five beats and no time budget. **One turn is three to five minutes**, taken
+   from the handoff's own session shapes for the two modes that contain a whole turn:
+   Fix a building at *~5 min a case*, Today's tower at *~3 min*
    (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md`:249-254). A *session* is
    several turns; a *turn* is one pass through the five beats.
 
@@ -332,9 +333,15 @@ permit one at all.
 
 ### 3.4 The thesis test — *make diagnosis the game and the simulator the referee*
 
-The charter's strategic conclusion is that every container — the week, the campaign, the boards, the
-workshop — is a different way to deliver a diagnosis. Tested against the four shipped modes, **it
-holds for three and fails for one, and it needs one amendment before it holds for the three.**
+The programme kickoff's strategic conclusion is *make diagnosis the game and the simulator the
+referee* — every container, the week, the campaign, the boards and the workshop, being a different
+way to deliver a diagnosis. **Its provenance is the same as the charter's pillars P1, P2, P4 and
+P5: the kickoff text is not in this tree**, so it is tested here rather than quoted.
+[`docs/22-charter.md`](22-charter.md) § 2's closing provenance note states the same thing about its
+own pillars — only P3's wording is directly attested, and the other four are reconstruction.
+
+Tested against the four shipped modes, **it holds for three and fails for one, and it needs one
+amendment before it holds for the three.**
 
 **The amendment, and it comes from the mode the thesis fits best.** In Fix a building the diagnosis
 is **given to the player, printed plainly, before any decision is made**. The handoff says so and
