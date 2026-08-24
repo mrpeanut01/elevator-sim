@@ -222,11 +222,18 @@ nothing else worth measuring. It is two independent gaps, not one: the stage's p
 navigates, and the breadcrumb's enabling rule asks *position in the timeline* rather than *does the
 destination have anything to show*. Campaign shares the path; Fix a building does not.
 
-**Two of this milestone's five P0s changed shape under verification, and both got smaller.**
+**Three of this milestone's five P0s changed shape under verification, and all three got smaller.**
 **#209 is refuted** — fixed on 2026-08-11, thirteen days before it was filed, with all four of its
 acceptance criteria already met and 0 of 100 seeds suppressing. **#212 is largely refuted** — people,
 doors and queues are all drawn on the shipped stage; the real defect is that door leaves paint over
-the entire car body when shut, which is a fill inversion rather than a renderer rebuild.
+the entire car body when shut, which is a fill inversion rather than a renderer rebuild. **That fill
+is now measured**: the occupancy marks read `paper` on `ink` at 14.54:1 while the doors are open and
+`paper` on `sun` at **1.83:1** once they shut — exactly the ratio [§ D336](DECISIONS.md) measured and
+refused for text on this palette. **And #212's second defect was refuted in turn, by this
+programme's own rewrite of it**: the orchestrator repeated a stale docstring
+(`stageScreen.ts:634-638`, *"06:00 on the clock"*) as fact. `startOfDayMin` is per-template and the
+shipped default is **08:30**, ramping from its first second, so there is no empty opening on the
+common run at all. Corrected on the issue.
 
 **One of this milestone's own exit criteria is already measurably failing**, and the check for it is
 cheap: `EVERYDAY_SHELL_ABSENCES` is rendered to the player and carries section numbers, a source

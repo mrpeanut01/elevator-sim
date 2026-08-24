@@ -307,7 +307,7 @@ The amount is a product-owner decision.
 
 `charter S7` reads: *lift-industry testers rate the model credible **after inspecting it**, not after
 being told about it*, and it **fails when a majority of recruited practitioners name a modelling
-defect that changes their verdict.* Four things follow, and none of them is a scaled-down version of
+defect that changes their verdict.* Five things follow, and none of them is a scaled-down version of
 § 3.4.
 
 **1. The population is small, professional and busy.** There is no open call for lift engineers that
