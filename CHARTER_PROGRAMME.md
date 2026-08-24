@@ -234,11 +234,16 @@ because #210 builds against them.
       2026-08-24 and was watched failing first — 49 of 49 always-on cases. Nineteen findings are
       registered in `honesty.test.ts`'s `OUTSTANDING` (seventeen in both tiers, two the deep tier
       alone reaches). **This box is ticked when that register is empty and at no earlier moment.**
-      The fix is #207. Two gaps the instrument cannot see are recorded in
+      **#207 has landed and the register is empty in both tiers** — verified by the integrator on the
+      committed tree, always-on 68 passed and deep 25 passed. The six registers moved to a
+      build-information panel in Settings that is a real non-test caller of all six arrays, so the
+      dead-code audit that put them on player surfaces does not re-fire, and **no register lost a
+      row**. Two gaps the instrument cannot see are recorded in
       [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Y: the Everyday stage's
-      canvas, and three register headings outside the corpus. **Both close before this box is
-      ticked** — the headings with #207, the canvas as its own lane after it
-      ([§ D347](DECISIONS.md)). The criterion does **not** reach a control's own write-disclosure
+      canvas, and three register headings outside the corpus. **The headings are closed** — by
+      construction rather than by adding them, since all three renderers are gone and the new panel's
+      own headings are seeded. **The canvas is the one thing left**, as its own lane
+      ([§ D347](DECISIONS.md)), and this box is not ticked until it lands. The criterion does **not** reach a control's own write-disclosure
       ([§ D346](DECISIONS.md)), which is why the number is 19 and not 56.
 - [ ] The slice runs on the target browser matrix from #203.
 - [ ] **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at

@@ -19,7 +19,7 @@ defect fix needs no specification — and landed before M2 opened.
 
 | Lane | Task | Issue | Status |
 |---|---|---|---|
-| FIX-207 | Take the M2 gate's register from **19 to 0** — the absence registers off player surfaces | #207 | running |
+| *(none)* | — | — | the next lane is #212 + [§ D347](DECISIONS.md), below |
 
 **Next, in this order, and the order is forced.** `honesty/surfaces.ts` is now the tightest
 serialization hazard in the tree — every lane that builds or renames a player surface writes it, and
@@ -29,6 +29,7 @@ unlike the other hazards it has no interface to lock first, because an adapter *
    work. Both write `everyday/stageScreen.ts`, and #212's own AC5 already asks for what § D347
    requires. **#212 was nearly run in parallel with #207** on the belief its defects were in
    `render/canvas.ts`; they are not, and that would have put two lanes in `everyday/` at once.
+   It is now the **only** thing standing between the M2 gate and a ticked box.
 2. #208, #210, #217, then the #218 slice review.
 
 **M2-GATE was deliberately first, and it is landed.** The criterion it instruments *"is a mechanical
@@ -45,6 +46,7 @@ gate with an opinion is a negotiation. It does **not** fix the violations; that 
 | FIX-211/213 | #211, #213 | The report lays its small print out, and its lever button goes where it says |
 | FIX-214 | #214 | The rail's streak replaced by a career line with the week behind it |
 | FIX-215 | #215 | Re-entering a filed day stops silently re-running it |
+| FIX-207 | #207 | **The M2 gate's register went 19 → 0, in both tiers.** The six registers moved to a build-information panel in Settings — a real non-test caller of all six arrays, so the audit that put them on player surfaces does not re-fire — and **no register lost a row**: 27 entries in, 27 out. The front door keeps one sentence pointing at it. Two deep-tier findings closed in the product, `packages/core/` untouched |
 | M2-GATE | M2 exit criterion 3 | **The ninth honesty property, `internal-notation`.** Watched failing first — 49 of 49 always-on cases, 1 078 violation lines — then **19 findings registered**, 17 in both tiers and 2 the deep tier alone reaches. The gate now has a number: **19 → 0**. Green on **both** CI platforms |
 
 **Both tiers were run before it landed, in one sitting on one tree**: always-on 49 cases / 566 506
