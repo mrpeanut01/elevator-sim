@@ -11,18 +11,47 @@
 
 ## Charter programme — active lanes
 
-**Opened 2026-08-24.** **M0 has exited and M1 is open**, both by product-owner decision the same
-day. One M2 issue — **#206** — is fast-tracked ahead of milestone order on the charter's own § 7
-grounds: it is a defect fix rather than a feature, so it needs no specification.
+**Opened 2026-08-24.** **M0 and M1 have both exited and M2 is open**, all by product-owner decision
+the same day. #206 was fast-tracked ahead of milestone order on the charter's own § 7 grounds — a
+defect fix needs no specification — and landed before M2 opened.
 
-### Active
+### Active — M2
 
-| Lane | Task | Issues | Milestone | Status | Next action |
-|---|---|---|---|---|---|
-| FIX-206 | Close the core loop; journey test watched failing first | #206 | M2, **fast-tracked** | **fix pushed** (`c6b39ae`); lane still verifying | record the lane's test evidence |
-| M1-SLICE | docs/25-vertical-slice.md — scope, quality bar, failable exits | #198 | M1 | running | gates every M2 build issue |
-| M1-TELEMETRY | [`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) — privacy first | #201, #202 | M1 | **landed** | unblocks charter S1–S4 |
-| M1-FLOWS | [`docs/27-flow-maps.md`](docs/27-flow-maps.md) — five states per flow | #197 | M1 | **landed** | gates #210; feeds [`TEST_MATRIX.md`](TEST_MATRIX.md) |
+| Lane | Task | Issue | Status |
+|---|---|---|---|
+| M2-GATE | The eighth honesty property: no `§`, filename or identifier on a player surface | M2 exit criterion 3 | running |
+| FIX-214 | The rail's streak is *unconditional*, not stale — give it the week it never had | #214 | running |
+| FIX-215 | Re-entering a closed stage silently re-runs a bit-identical day | #215 | running |
+
+**M2-GATE is deliberately first.** The criterion it instruments *"is a mechanical check and is part
+of the gate"*, it has no instrument today, and it **fails today** — so it can be watched failing,
+which is the standard every test here is held to. A gate with an instrument is a gate; a gate with
+an opinion is a negotiation. It does **not** fix the violations; that is #207.
+
+### Landed — M2
+
+| Lane | Issue | What landed |
+|---|---|---|
+| FIX-206 | #206 | The daily and campaign loops close. Green on **both** CI platforms. Test watched failing by the integrator rather than taken on report |
+| FIX-216 | #216 | *"An ordinary Tuesday-shaped day"* → *"An ordinary day"*, plus a weekday rule swept over `SHIFT_EVENT_IDS` and derived from `WEEKDAYS` |
+
+### Closed — M1's specification lanes
+
+| Lane | Deliverable | Issues |
+|---|---|---|
+| M1-SLICE | [`docs/25-vertical-slice.md`](docs/25-vertical-slice.md) | #198 |
+| M1-TELEMETRY | [`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) | #201, #202 |
+| M1-FLOWS | [`docs/27-flow-maps.md`](docs/27-flow-maps.md) | #197 |
+| M1-ART | [`docs/28-art-direction.md`](docs/28-art-direction.md) | #195 |
+| M1-AUDIO | [`docs/29-audio-direction.md`](docs/29-audio-direction.md) | #196 — [§ D344](DECISIONS.md) |
+| M1-PLAYTEST | [`docs/30-playtest-programme.md`](docs/30-playtest-programme.md) | #205 |
+| M1-MATRIX | [`docs/31-support-matrix.md`](docs/31-support-matrix.md) | #203 |
+| M1-GDD | [`docs/32-game-design.md`](docs/32-game-design.md) | #194 |
+
+**M1 exited on nine of twelve**, with #199, #200 and #204 deferred to before M4 as a **named**
+deviation. M1-ART died on an API error after its research phase and before writing anything, and was
+relaunched with instructions to write early and extend — which is why its brief now says so, and
+why every brief since has.
 
 ### Closed — the verification wave
 
@@ -43,7 +72,8 @@ grounds: it is a defect fix rather than a feature, so it needs no specification.
 | M0-D | `docs/24-competitive-teardown.md` | #189 | landed |
 
 **M0 exited 2026-08-24; all eight of its issues are closed on GitHub** (#190 closed as refuted).
-**M1 is open.** The open-issue count went **101 → 93**.
+**M1 exited the same day. M2 is open.** #209 was closed as refuted and four issues were filed from
+findings — **#254**, **#255**, **#256**, **#257** — so the open count went **101 → 93 → 96**.
 
 > **A lane's in-flight deliverable is named here without backticks, and that is deliberate.**
 > `validation/citations.test.ts` requires every backticked path containing `/` and ending `.md` to
@@ -55,8 +85,9 @@ All four lanes were read-only and none modified a file. **#206's mechanism was a
 re-verified by the orchestrator directly** rather than accepted from a single lane, because it is
 the P0 every other M2 issue is sequenced behind.
 
-**No implementation lane is open, and none may open before M0 and M1 have exited.** M0 is documents
-and decisions only; M1 is specifications only.
+**Implementation lanes are open now, because M0 and M1 have exited.** They were not open before
+that: M0 was documents and decisions only, M1 specifications only, and the one exception — #206 —
+was an explicit product-owner fast-track recorded as such rather than a lane that slipped through.
 
 ## What the verification wave returned
 
