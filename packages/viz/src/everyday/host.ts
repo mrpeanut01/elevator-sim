@@ -693,8 +693,11 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
    * twenty-day contracts, purses and wear clocks are a second progression beside `state.week`, and
    * putting them on the persisted state would mean a schema, a migration and a reconciliation
    * between two records that both claim to know what day it is. `campaign/career.ts`'s docstring
-   * carries the argument and names the cost — this build keeps no career between sessions, which
-   * the rail already says.
+   * carries the argument and names the cost — the **campaign's** career is not written to this
+   * device, which `CAMPAIGN_ABSENCES`'s third entry says on the screens it applies to. It used to
+   * say *the rail already says it*; #214 pointed the rail's line at the persisted week instead, so
+   * that sentence stopped being true. The week and the campaign career are different records with
+   * different lifetimes, and conflating them here is what made the old wording plausible.
    *
    * Held in this closure rather than in a screen, because the three campaign screens mount and
    * unmount as the player moves between them and a record that lived in one of them would be lost

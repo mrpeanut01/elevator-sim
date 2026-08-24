@@ -44,7 +44,13 @@
  * Nothing here writes storage. `everyday/profileStore.ts` persists a name and a colour because
  * § 20.15 asks for it; a career would need a schema, a migration and a reconciliation with
  * `ViewerState.week`, and shipping one that silently disagreed with the week is the defect this
- * repository keeps a register of. The rail already tells the player this build keeps no career.
+ * repository keeps a register of. **{@link CAMPAIGN_ABSENCES}'s third entry is where the player
+ * reads it** — *“The career is this session's. Nothing on these three screens is written to this
+ * device.”* This used to point at the rail instead, and #214 took that away: the rail's career
+ * line now reads the persisted **week**, so it no longer says the build keeps no career, and it
+ * never spoke for the *campaign's* career anyway. The guarantee is unchanged; only the surface
+ * that discloses it moved, and a pointer at the wrong surface is how a disclosure quietly
+ * becomes nobody's.
  */
 
 import {
