@@ -11,16 +11,39 @@
 
 ## Charter programme — active lanes
 
-**Opened 2026-08-24.** M0 is **not open**, and opening it is a human decision the orchestrator has
-prepared evidence for rather than taken. The lanes below are verification only, which is the one
-kind of work that runs *ahead* of a gate rather than behind it.
+**Opened 2026-08-24.** **M0 has exited and M1 is open**, both by product-owner decision the same
+day. One M2 issue — **#206** — is fast-tracked ahead of milestone order on the charter's own § 7
+grounds: it is a defect fix rather than a feature, so it needs no specification.
 
-| Lane | Task | Issues | Branch / worktree | Status | Blockers | Next action |
-|---|---|---|---|---|---|---|
-| V1 | Verify the loop dead-end and the front door | #206, #207 | read-only, no branch | **reported** | — | recorded, findings § M–N |
-| V2 | Verify the first session and the refused headline numbers | #208, #209 | read-only, no branch | **reported** | — | recorded, findings § S–T |
-| V3 | Verify the nine remaining M2 issues | #210–#218 | read-only, no branch | **reported** | — | recorded, findings § U |
-| V4 | Verify the M0 premises | #186–#193 | read-only, no branch | **reported** | — | recorded, findings § O–R |
+### Active
+
+| Lane | Task | Issues | Milestone | Status | Next action |
+|---|---|---|---|---|---|
+| FIX-206 | Close the core loop; journey test watched failing first | #206 | M2, **fast-tracked** | running | integrator review, then merge |
+| M1-SLICE | `docs/25-vertical-slice.md` — scope, quality bar, failable exits | #198 | M1 | running | gates every M2 build issue |
+| M1-TELEMETRY | `docs/26-telemetry-and-privacy.md` — privacy first | #201, #202 | M1 | running | unblocks charter S1–S5 |
+| M1-FLOWS | `docs/27-flow-maps.md` — five states per flow | #197 | M1 | running | gates #210; feeds `TEST_MATRIX.md` |
+
+### Closed — the verification wave
+
+| Lane | Task | Issues | Status |
+|---|---|---|---|
+| V1 | The loop dead-end and the front door | #206, #207 | **reported**, findings § M–N |
+| V2 | The first session and the refused headline numbers | #208, #209 | **reported**, findings § S–T |
+| V3 | The nine remaining M2 issues | #210–#218 | **reported**, findings § U |
+| V4 | The M0 premises | #186–#193 | **reported**, findings § O–R |
+
+### Closed — M0's document lanes
+
+| Lane | Deliverable | Issues | Status |
+|---|---|---|---|
+| M0-A | `docs/22-charter.md` | #186, #187, #192 | **adopted**, § D342 |
+| M0-B | `docs/23-audiences-and-core-loop.md` | #188, #191 | landed |
+| M0-C | `RISKS.md` — 39 ids, none renumbered | #193 | landed |
+| M0-D | `docs/24-competitive-teardown.md` | #189 | landed |
+
+**M0 exited 2026-08-24; all eight of its issues are closed on GitHub** (#190 closed as refuted).
+**M1 is open.** The open-issue count went **101 → 93**.
 
 All four lanes were read-only and none modified a file. **#206's mechanism was additionally
 re-verified by the orchestrator directly** rather than accepted from a single lane, because it is
