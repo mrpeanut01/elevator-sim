@@ -236,8 +236,17 @@ request against a non-goal exactly as against a pillar, and none of them may be 
 5. **No control that writes nothing, and no silence about it.** Both polarities
    ([§ D219](../DECISIONS.md), [§ D227](../DECISIONS.md)): a dead control may not look live, and a
    live control may not claim to be dead.
-6. **No difficulty setting that changes anything other than declared traffic parameters and
-   building fabric.** Difficulty is demand and geometry. It is never a fudge factor on a metric.
+6. **No difficulty setting that moves the bar a run is judged against.** Difficulty may vary what
+   the building faces — declared traffic parameters and building fabric — and **what a miss costs
+   you**: the purse, the miss allowance, what a contract ends on. It may **not** vary the threshold
+   a result is compared to. Two players on different difficulties who post the same run read the
+   same figures and receive the same verdict; only the consequences differ.
+   **The test is mechanical**: take a run and a difficulty, and ask whether changing the difficulty
+   changes any figure or verdict the run produces. If it does, it is forbidden.
+   Amended by [§ D345](../DECISIONS.md) from *"nothing other than declared traffic parameters and
+   building fabric"*, which the shipped campaign had never satisfied — `campaign/economy.ts`'s
+   tiers vary the purse and the miss allowance, which this clause now permits, **and the goal bars,
+   which it does not**. It is never a fudge factor on a metric.
 7. **No second engine and no second statistics.** The game layer consumes `packages/core/`; it does
    not approximate it for speed, for pacing, or for a smoother curve.
 8. **No section number, source filename or code identifier on a player surface.** This is a

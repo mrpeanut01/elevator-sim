@@ -24208,3 +24208,55 @@ ruling it **gains a consumer** and becomes a live control. `settingsView.ts:187`
 game looks and sounds to you"* — stops being a false promise and becomes true, which is the one
 outcome that needed no correction at all. **`#170`'s Sound half closes by being built rather than by
 being cancelled; its Units half is untouched and stays open.**
+
+---
+
+## D345 — difficulty may raise the stakes and may not move the bar
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `docs/32-game-design.md` GD18 · Amends: charter § 5 non-goal 6**
+
+**Decision.** Charter non-goal 6 is amended. Difficulty may vary **what the building faces** and
+**what a miss costs you**. It may **not** vary **the threshold a run is judged against**.
+
+Concretely, of the four axes `campaign/economy.ts`'s `DIFFICULTIES` moves today:
+
+| axis | example | verdict |
+|---|---|---|
+| `rates` | `[6,7,8,9]` on Easy vs `[3,4,5,6]` on Standard | **allowed** — this is demand, exactly what the clause always permitted |
+| `purse` | 16 units vs 8 | **allowed** — a stake, not a metric |
+| `miss` | 6 missed days vs 3 | **allowed** — a stake |
+| `tests` | `worstS: 240` on Easy vs `180` on Standard | **FORBIDDEN** |
+
+**Context.** The GDD found the shipped tiers move three things that are neither traffic nor
+building fabric, and asked whether the clause or the code was wrong. The clause's own second
+sentence decides it: *"it is never a fudge factor on a metric."* A tier that judges an Easy player's
+worst wait against **240 s** and a Standard player's against **180 s** is a fudge factor on a
+metric, and it is the one axis of the four that is.
+
+**Why the other two survive the same test.** `purse` and `miss` never touch a figure the simulator
+publishes. They change what a player can buy and how many bad days end the contract — the
+consequences of a result, not the result. A player on Easy who posts a 200 s worst wait and a player
+on Standard who posts the same **read the same number and get the same verdict**; only what it costs
+them differs. That is the distinction the amended clause turns on, and it is testable: **take a run
+and a difficulty, and ask whether changing the difficulty changes any figure or verdict the run
+produces. If it does, it is forbidden.**
+
+**Alternatives considered.** (a) Adopt the GDD's GD18 wholesale, permitting stakes *and* bars on the
+argument that *a bar is not a metric*. (b) The literal reading — difficulty moves `rates` and
+nothing else. (c) This. (a) was rejected because a goal bar is the threshold a **published metric**
+is compared against, and moving it changes the verdict a given run receives, which is what the
+clause exists to forbid. (b) was rejected as stronger than the clause's own reasoning requires: it
+would forbid varying what a miss *costs*, which no sentence in the charter objects to and which is
+how difficulty works in every comparable product.
+
+**What this obliges.** `tests` must stop varying by difficulty — one bar per stage, whatever tier is
+selected. **This moves shipped behaviour and it moves published goal figures**, so it is not a
+tidy-up: under `CLAUDE.md`, every goal that changes is a finding to report rather than a number to
+edit, and `campaign/judge.ts` refuses to judge when the baseline arm does not reproduce its
+published count. It should be sequenced with **#255** (the campaign `reportWindow` residual) and
+**#234** (the campaign rebalance), all three of which move `data/scenario-goals.json`, rather than
+regenerating that table three times.
+
+**The GDD's distinction is kept, and only its third clause is withdrawn.** *Difficulty is what the
+building faces; stakes are what a miss costs you* — both stand, and are the amended clause's own
+wording. *A bar is not a metric* does not.

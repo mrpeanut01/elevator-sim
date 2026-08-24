@@ -4,9 +4,9 @@
 criteria, the issues in it, the review that closes it, and its current state.
 
 **Opened:** 2026-08-24 · **Branch:** `claude/elevator-sim-charter-kickoff-rexfw8` ·
-**Programme state:** **M0 EXITED and M1 is OPEN**, both on 2026-08-24. One M2 issue — **#206**, the
-core loop dead-end — is **fast-tracked ahead of milestone order** by product-owner decision, on the
-charter's own § 7 grounds. M2–M6 are otherwise not open.
+**Programme state:** **M0 and M1 have both EXITED and M2 is OPEN**, all on 2026-08-24. #206 was
+fast-tracked ahead of milestone order and has landed, green on both CI platforms. M3–M6 are not
+open.
 
 The plan, the dependency map and the serialization hazards are in
 [`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md). The lane board is [`AGENT_STATUS.md`](AGENT_STATUS.md).
@@ -20,8 +20,8 @@ Evidence for every scheduled issue is in
 | milestone | issues | count | gate | state |
 |---|---|---|---|---|
 | [M0](#m0--concept-and-direction) Concept and direction | #186–#193 | 8 | Direction review | ✅ **EXITED** (2026-08-24) |
-| [M1](#m1--pre-production) Pre-production | #194–#205 | 12 | Pre-production gate | **OPEN** (2026-08-24) |
-| [M2](#m2--vertical-slice) Vertical slice | #206–#218 | 13 | Vertical slice review | not open |
+| [M1](#m1--pre-production) Pre-production | #194–#205 | 12 | Pre-production gate | ✅ **EXITED** (2026-08-24) — 9 of 12, 3 deferred |
+| [M2](#m2--vertical-slice) Vertical slice | #206–#218 | 13 | Vertical slice review | **OPEN** (2026-08-24) |
 | [M3](#m3--alpha-feature-complete) Alpha, feature complete | #219–#230 | 12 | Alpha gate + feature freeze | not open |
 | [M4](#m4--beta-content-complete-and-balanced) Beta, content complete | #231–#240 | 10 | Beta gate + content freeze | not open |
 | [M5](#m5--launch) Launch | #241–#246 | 6 | Launch readiness review | not open |
@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D344** — D342 adopts the charter, D343 settles the series-citation rule |
+| Next free decision number | **D346** — D342 charter, D343 series citation, D344 audio ships, D345 difficulty |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
@@ -172,9 +172,37 @@ audio, art direction, telemetry, privacy, accessibility, support matrix, playtes
 - [ ] #202 (privacy posture) lands **before** any telemetry ships — it is a prerequisite for both
       telemetry and accounts, and shipping in the other order is not recoverable.
 
-**Review.** Pre-production gate — go or no-go on the vertical slice scope.
+**Review.** Pre-production gate — held 2026-08-24. **Go on the vertical slice scope.**
 
-**State: OPEN (2026-08-24).** Three lanes are running on the highest-leverage deliverables:
+**State: ✅ EXITED 2026-08-24, on nine of twelve issues, with three deferred as a named deviation.**
+
+**The exit test is the second criterion, not the first**: *no production issue can be opened without
+a specification it points at*. Every one of M2's thirteen issues now points at one — the slice
+definition, the flow maps, the art direction, and the audio decision between them cover the set.
+
+| landed | issue |
+|---|---|
+| [`docs/25-vertical-slice.md`](docs/25-vertical-slice.md) | #198 |
+| [`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) | #201, #202 |
+| [`docs/27-flow-maps.md`](docs/27-flow-maps.md) | #197 |
+| [`docs/28-art-direction.md`](docs/28-art-direction.md) | #195 |
+| [`docs/29-audio-direction.md`](docs/29-audio-direction.md) | #196 — decided, [§ D344](DECISIONS.md) |
+| [`docs/30-playtest-programme.md`](docs/30-playtest-programme.md) | #205 |
+| [`docs/31-support-matrix.md`](docs/31-support-matrix.md) | #203 |
+| [`docs/32-game-design.md`](docs/32-game-design.md) | #194 |
+
+**Deferred to before M4, by product-owner decision, and recorded here so the debt is not silent:**
+**#199** content plan, **#200** difficulty curve, **#204** accessibility standard. None of the three
+gates an M2 issue. #200 in particular now has a prerequisite it did not have this morning —
+[§ D345](DECISIONS.md) amended what difficulty is allowed to move, so the curve is specified against
+a settled clause rather than a contested one.
+
+**The milestone produced two decisions and four findings nobody had asked for**, which is the
+argument for having run it: [§ D344](DECISIONS.md) (audio ships, on a narrower palette than the
+issue proposed), [§ D345](DECISIONS.md) (difficulty may raise the stakes and may not move the bar),
+and issues **#254**, **#255**, **#256**, **#257**.
+
+**State at open (superseded):** Three lanes are running on the highest-leverage deliverables:
 **#198** the vertical-slice definition (it gates every M2 build issue), **#201 + #202** telemetry and
 privacy in one document with privacy first (that order is not recoverable, and `RISKS.md` R31 records
 that five of the ten criteria cannot be evaluated at all until it lands), and **#197** the flow maps
