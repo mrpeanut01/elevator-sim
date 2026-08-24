@@ -203,6 +203,11 @@ because #210 builds against them.
 - [ ] **Nothing on a player surface refers to a section number, a source filename or a code
       identifier.** This is a mechanical check and it is part of the gate.
 - [ ] The slice runs on the target browser matrix from #203.
+- [ ] **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
+      least six of ten. **Placed here at the 2026-08-24 review, and the placement is open to the
+      owner**: it was gated at no milestone at all until then (see the note below). Measured by
+      `docs/30-playtest-programme.md`'s tier ladder, where **only a tier-0 answer counts** — one the
+      tester reached with no word from the moderator naming the figure or the refusal.
 - [ ] T1 (menu → door → brief → stage → report → week) reads `passing` in
       [`TEST_MATRIX.md`](TEST_MATRIX.md) — it is the test that would have caught #206.
 
@@ -284,6 +289,12 @@ CI · #239 accessibility sweep · #240 small-screen and touch layout.
       read *"telemetry shows S1 through S5"*; charter § 4 assigns `charter S5` to a paired sweep over
       every stage × dispatcher under common random numbers, so telemetry can never show it. Four are
       telemetry's and the fifth is not. (Cite the series with its document — [§ D343](DECISIONS.md).)
+- [ ] **`charter S7` — an enthusiast rates the model credible after inspecting it**, a majority of
+      at least five recruited practitioners. **Placed here at the 2026-08-24 review, and the
+      placement is open to the owner.** *After inspecting it, not after being told about it* is a
+      structural constraint on the session, not a wording preference — `docs/30`'s cohort-B protocol
+      has no advocacy segment, and the moderator's only answer to *"is this right?"* is *"what would
+      you check?"*
 - [ ] **No open P0 or P1 defects.**
 - [ ] **All twenty-one journey rows in [`TEST_MATRIX.md`](TEST_MATRIX.md) read `passing`** — today
       all twenty-one read `planned`, which is the single largest testing gap in the repository.
@@ -333,6 +344,27 @@ reported issue's own claim to be wrong. A community loop that schedules from rep
 would industrialise that.
 
 **State: not open.**
+
+---
+
+## Two criteria were gated nowhere, and that was this page's defect
+
+**`charter S6` and `charter S7` appeared nowhere in this file until 2026-08-24.** M4 gated
+`charter S1`–`S5`, M5 gated `charter S9`, M3 and M4 gated `charter S10` — and the two that can only
+ever be met by a moderated playtest were checked at no gate at all. The programme's definition of
+done requires all ten *met and measured*, so two of them were binding in the charter and
+unreachable in the plan.
+
+Found by the `docs/30-playtest-programme.md` lane (#205) while mapping its protocol onto the gates
+that would consume it, and **recorded rather than quietly patched**, because a criterion that is
+absent from every gate fails in exactly the way a criterion is supposed to make impossible: nothing
+ever comes back to check it. The placements above are the lane's proposal, adopted at the review and
+open to the owner to move.
+
+**One measurement rule travels with them.** The six-of-ten bar is a *count*, never a rate: the
+Clopper–Pearson 95 % interval for 6/10 is **[26 %, 88 %]**. `docs/30` forbids publishing any rate
+from this programme with an interval, or generalising one to *players*. A gate that reads *six of
+ten testers* is a decision rule about ten people, and it is honest only while it stays that.
 
 ---
 
