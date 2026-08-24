@@ -24250,12 +24250,23 @@ would forbid varying what a miss *costs*, which no sentence in the charter objec
 how difficulty works in every comparable product.
 
 **What this obliges.** `tests` must stop varying by difficulty — one bar per stage, whatever tier is
-selected. **This moves shipped behaviour and it moves published goal figures**, so it is not a
-tidy-up: under `CLAUDE.md`, every goal that changes is a finding to report rather than a number to
-edit, and `campaign/judge.ts` refuses to judge when the baseline arm does not reproduce its
-published count. It should be sequenced with **#255** (the campaign `reportWindow` residual) and
-**#234** (the campaign rebalance), all three of which move `data/scenario-goals.json`, rather than
-regenerating that table three times.
+selected. **This moves shipped behaviour**, so it is not a tidy-up: under `CLAUDE.md`, every goal
+that changes is a finding to report rather than a number to edit.
+
+> **CORRECTED 2026-08-24 — this clause named the wrong table, and the correction changes the
+> sequencing it recommended.** It said the fix moves `data/scenario-goals.json` and should therefore
+> be sequenced with **#255** and **#234** so that table is regenerated once. **It does not touch that
+> file.** `DIFFICULTIES.tests` lives in `campaign/economy.ts` and is read by
+> `everyday/campaignModel.ts`, which composes the Everyday campaign's four daily-test labels and
+> bars; `data/scenario-goals.json` is the **stage** campaign's published table, read through
+> `campaign/parse.ts` under [§ D160](#d160), and no difficulty tier touches it. `economy.ts`'s own
+> opening docstring already draws that distinction.
+>
+> So the `tests` fix is **independent** of #255 and #234 and need not queue behind them. What it does
+> move is what the Everyday campaign screen *says* a tier's bars are — which is player-facing copy in
+> the honesty corpus, not a published statistical table. Found by the SPEC-200 lane while measuring
+> the curve; the wrong version is kept visible because the sequencing it recommended would have held
+> a small independent fix behind two large ones.
 
 **The GDD's distinction is kept, and only its third clause is withdrawn.** *Difficulty is what the
 building faces; stakes are what a miss costs you* — both stand, and are the amended clause's own

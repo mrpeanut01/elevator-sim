@@ -1693,13 +1693,25 @@ move**: a contract already declares its own length (c1 overrides it to 3600), so
 be lengthened per contract and template while the default — and every figure measured over it —
 stays exactly where it is.
 
-**What does move is every scenario goal.** A goal measured over thirty minutes is not a goal over ten
+**What does move is the day's goals.** A goal measured over thirty minutes is not a goal over ten
 hours. Under `CLAUDE.md` a goal that changes is *"a finding to report, not a number to edit"*, and
 `campaign/judge.ts` refuses to judge when the baseline arm does not reproduce its published count.
-So this work regenerates `data/scenario-goals.json` — **which is already owed three times over**:
-[§ D345](DECISIONS.md) obliges `tests` to stop varying by difficulty, and sequences that with **#255**
-and **#234** precisely so the table is regenerated once rather than three times. **This is the fourth
-rider on that same regeneration, and it should join it rather than start a fifth.**
+
+> **CORRECTED, same day.** This paragraph first said the work *"regenerates `data/scenario-goals.json`
+> — which is already owed three times over"* and called it *"the fourth rider"* on the regeneration
+> § D345 sequences with #255 and #234. **That was wrong twice**, and it was wrong by repeating
+> § D345's own error rather than checking it: `DIFFICULTIES.tests` never touches
+> `data/scenario-goals.json` (it lives in `campaign/economy.ts` and is read by
+> `everyday/campaignModel.ts`), so there is no three-way queue to be fourth in. § D345 is corrected.
+>
+> What a longer Everyday day actually moves is **the week's day goals**, `shift/goals.ts#goalsForDay`
+> — which docs/33 § 1.4 now specifies as the single post-fix bar's source. Whether the **stage**
+> campaign's published table moves at all depends on whether stage runs lengthen too, which is a
+> scoping question for the lane rather than a settled consequence.
+>
+> Found by the SPEC-200 lane measuring the curve, not by this note being re-read. A sequencing claim
+> inherited from a decision is still a claim; this one should have been checked before it was
+> repeated.
 
 **And simulation cost scales with it.** A ten-hour day is roughly twenty times the trips of a
 thirty-minute one, per replication, everywhere the day length is inherited.
@@ -1717,3 +1729,67 @@ writing the same field (issue #82). They were replaced by `partsOfDay`, derived 
 records' own hours — *"a part's length is the period it names and its label is its clock"* — and
 `menu/partsOfDay.ts` records **why a length control could not be relabelled into an honest one**. A
 lane that adds a fresh day-length control without reading that will re-introduce what § D286 deleted.
+
+---
+
+## AC. #200 landed, and its own central figure is refuted
+
+The SPEC-200 lane wrote `docs/33-difficulty-curve.md` and measured rather than inherited every number
+it needed. **Six claims came back wrong**, and one of them was mine.
+
+### #200's central figure
+
+*"Four of ten stages clear from the dispatcher dropdown alone."* **Measured: three of ten** — stage 3
+`fairness-first`, stage 5 `eta`, stage 7 `destination-panel`. Ten stages × thirteen profiles, 77
+admitted cells, two arms × 50 replications under common random numbers.
+
+**Its real home is `docs/10:1680-1694`, where it says four of *seven*** — so the issue restated a
+figure about a different denominator.
+
+### The rest
+
+1. **`docs/10:1683-1691`'s own correction is stale.** It says *"stage 6 clears under `destination-eta`
+   and `destination-panel`"*. Stage 6 clears under **nothing**. `campaign.test.ts` had already
+   inverted that case; `docs/10` was never re-read against it. A correction that went stale is the
+   same class this repository has now recorded five times.
+2. **Stage 5's clearer moved** — `destination-eta` → `eta`. `destination-eta` does not clear.
+3. **`campaign.test.ts`'s stage-6 docstring says *"all twelve shipped profiles"*.** There are
+   **thirteen**.
+4. **"Every rider away inside a minute"** — § S measured **9 of 100 seeds** over 60 s. #200's opening
+   figures are distribution properties stated as constants.
+5. **#200 conflates two products.** Campaign stage 1 *does* present a failure on `garden-apartments`
+   (`nearest-car` fails `answer-the-demand`); it is the **week's** day 1 on that building that does
+   not. The issue argues from one and asks for a change to the other.
+
+### And the sixth was mine
+
+**§ D345's sequencing note named the wrong table**, and § AB repeated it an hour later without
+checking. `DIFFICULTIES.tests` lives in `campaign/economy.ts` and is read by
+`everyday/campaignModel.ts`; `data/scenario-goals.json` is the **stage** campaign's table under
+§ D160 and no tier touches it. Both are corrected in place with the wrong version kept visible,
+because the sequencing that error recommended would have held a small independent fix behind two
+large ones.
+
+### What the measurements returned beyond the refutations
+
+- **Week** — 8 contracts × days {1, 5, 10, 20} × 30 seeds. Day-1 miss rate in shipped contract order:
+  **0, 30, 7, 24, 30, 1, 9, 0** of 30. The opening contract misses nothing at days 1, 5 *and* 10, and
+  the **last** contract ties the first for easiest day one. The shipped order is not a ramp.
+- **Fix cases** — doing nothing clears **0 of 18**; ten cases have exactly one affordable clearing
+  repair; the shipped order is not a ramp either.
+
+### The open question the lane refused to close, and it is the important one
+
+**O7: every rule judges a stage on the same seeds the player tunes against.** So *tune until the
+judged seeds clear* is a shortcut none of the nine rules can see — and the one existing witness takes
+it, clearing on tuning and being beaten on holdout on three measures. This is `CLAUDE.md`'s
+hold-out-traffic-seeds discipline, unenforced at the campaign layer.
+
+Closing it changes `judge.ts` and what every published count in `data/scenario-goals.json` counts.
+The lane correctly refused: that is not a specification lane's call. **It is the first thing to decide
+before the curve's obligations are built.**
+
+### Owed
+
+Decision numbers for **C6** (four stale sites the curve found) and **§ 1.5**. #208 is unblocked and is
+governed by docs/33 §§ 4.4 and 1.1.
