@@ -24345,3 +24345,78 @@ thing an instrument exists to replace. The zero would mean *zero on 12 of 49 ada
 **Sequencing.** After #207, not before — both lanes write `honesty/surfaces.ts`, and #207 must also
 add its new build-information panel and three uncovered register headings to the corpus. Running them
 together is the collision this programme's serialization list exists to prevent.
+
+## D348 — the difficulty curve comes into M2, because a P0 cannot be governed from M4
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA · Amends: the M1 deferral**
+
+**Decision.** GitHub issue **#200** (the difficulty curve specification) is **pulled into M2**. The
+earlier deferral of #199, #200 and #204 to before M4 stands for #199 and #204 and is lifted for #200.
+
+**Context.** #208 is a P0 in M2 and says of itself that *"the difficulty specification governs it"*.
+That specification was #200, scheduled after the milestone the P0 sits in. Verified in § AA: the
+first contract is `garden-apartments`, 6 floors, 120 residents, 2 cars, an hour — and the contract's
+own brief says *"Nothing here is hard — it exists so the seven that follow have something to be
+different from."* So #208 does not report a defect; it asks to change a deliberate design decision,
+and the document that decides such things was not going to exist in time.
+
+**Alternatives considered.** (a) Build #208 now under stated assumptions, with
+[§ D345](#d345) constraining the main axis and #200 confirming or overturning later. (b) Move #208
+out of M2 and let the slice review run on the gentle first session. (c) This. (a) was the
+orchestrator's recommendation and was rejected: the assumptions would be about *the shape of the
+whole curve*, which is exactly what a specification is for, and a P0 rebuilt after the fact is worse
+than a P0 specified first. (b) was rejected because the slice review's testers would be reacting to
+the first session #208 says teaches nothing — the one thing that review most needs to be right.
+
+**What this obliges.** #200 is specification work inside the first **code** milestone, which is the
+shape M1 existed to prevent, and it is accepted here with that named. It is bounded by § D345: the
+curve may vary what the building faces and what a miss costs, and may **not** vary the threshold a
+run is judged against. #208 does not start until #200 lands.
+
+## D349 — M2's gate is two halves, tracked separately, and neither is ticked by the other
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA · Scopes: M2**
+
+**Decision.** M2's exit criteria are split into a **code half** and a **tester half**, tracked
+separately. The orchestrator drives the code half to done and reports it as *code-complete, playtest
+pending*. **The milestone stays formally open** until the tester half is measured by a human running
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md)'s tier ladder.
+
+**Context.** Six separate gates require first-time testers: three of M2's own exit criteria
+(ten testers complete the slice; six of ten state what went wrong; `charter S6` at six of ten with
+**tier-0 answers only**), plus #208's AC4, #210's AC5 and #218's recorded sessions. **No agent lane
+can produce a first-time tester**, and the build such testers would use is not reachable from the
+programme's container either — § X measured the preview answering `403` to `CONNECT` through the
+agent proxy.
+
+**Why the split is written down rather than assumed.** The failure this prevents is quiet: a
+milestone whose issues are all closed *looks* finished, and the tester criteria would be ticked by
+proximity rather than by measurement. Naming the halves means a reader can see which one is done.
+
+**What it explicitly does not do.** It does **not** exit M2 on the code half. That option was on the
+table and was rejected as what it is — weakening an acceptance criterion to make a milestone pass,
+which the charter forbids and which would need a recorded amendment rather than a scheduling choice.
+
+## D350 — #217 is split: the cleanup is code, the position is a decision
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § AA**
+
+**Decision.** #217's **AC3 and AC4** — the stale refusal and the wrong count in
+`everyday/modes.ts` — are landed as a small lane. **AC1 and AC2** — where *Fix a building* sits in
+the mode hierarchy, and any front-door restructure that follows — are held for the product owner.
+
+**Context.** AC1 asks for *"a decision recorded on Fix a building's position"*, which is not code and
+collides with [§ D299](#d299)'s positioning answer and [§ D335](#d335)'s four-tile front door. The
+cleanup is independent of where the mode ends up.
+
+**And AC3's framing is corrected in the doing.** It says the refusal *"still reads"*, implying a
+player sees it. It does not: `modes.ts#unlessBuilt` returns `undefined` once every named screen is
+built, and `screens.ts#UNBUILT_REASONS` is empty, so **all four mode refusals are dead branches**.
+The defect is a stale *comment* beside dead code — `:129` says *"three authored cases"* while `:44`
+in the same file says *"eighteen"* — which is [§ D227](#d227)'s class in a code path, exactly as that
+file's own comment at `:60` predicted it would be.
+
+**Worth stating once, because it bounds what the M2 gate proves.** `internal-notation` checks
+**notation, not truth**. *"the three cases run, but their Everyday screen is not built yet"* carries
+no section number, no filename and no identifier, so it passes the gate while being false. The two
+defect classes are disjoint and nothing in this repository reads the second.

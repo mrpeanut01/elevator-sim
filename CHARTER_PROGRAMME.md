@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D348** — D342 charter, D343 series citation, D344 audio ships, D345 difficulty, D346 write-disclosure, D347 the gate's own hole |
+| Next free decision number | **D351** — D346 write-disclosure, D347 the gate's own hole, D348 #200 into M2, D349 M2's two halves, D350 #217 split |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
@@ -225,9 +225,17 @@ because #210 builds against them.
 
 **Character.** The first code milestone, and the first genuine go or no-go on the game.
 
-**Exit criteria — measured, not opined.**
-- [ ] **Ten testers who have never seen the game complete the slice.**
-- [ ] **Six of ten can state what went wrong and why their change helped.**
+**Exit criteria — measured, not opined. And they are two halves, not one list
+([§ D349](DECISIONS.md)):** a **code half** the orchestrator drives to done, and a **tester half**
+no agent lane can reach. The milestone stays formally open until a human runs
+[`docs/30-playtest-programme.md`](docs/30-playtest-programme.md)'s tier ladder — the code half being
+finished reports as *code-complete, playtest pending* and **ticks nothing below it**. Six gates need
+first-time testers: the three marked **[tester]**, plus #208's AC4, #210's AC5 and #218's recorded
+sessions. The build those testers would use is not reachable from this container either — § X
+measured the preview answering `403` to `CONNECT`.
+
+- [ ] **[tester]** **Ten testers who have never seen the game complete the slice.**
+- [ ] **[tester]** **Six of ten can state what went wrong and why their change helped.**
 - [ ] **Nothing on a player surface refers to a section number, a source filename or a code
       identifier.** This is a mechanical check and it is part of the gate. **It now has an
       instrument, and a number: 19 → 0.** `internal-notation`, the ninth honesty property, landed on
@@ -246,7 +254,7 @@ because #210 builds against them.
       ([§ D347](DECISIONS.md)), and this box is not ticked until it lands. The criterion does **not** reach a control's own write-disclosure
       ([§ D346](DECISIONS.md)), which is why the number is 19 and not 56.
 - [ ] The slice runs on the target browser matrix from #203.
-- [ ] **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
+- [ ] **[tester]** **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
       least six of ten. **Placed here at the 2026-08-24 review, and the placement is open to the
       owner**: it was gated at no milestone at all until then (see the note below). Measured by
       `docs/30-playtest-programme.md`'s tier ladder, where **only a tier-0 answer counts** — one the
