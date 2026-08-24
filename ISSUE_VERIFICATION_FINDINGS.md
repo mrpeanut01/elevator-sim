@@ -1324,3 +1324,59 @@ admits, run `batchRequestForStage` at 2 arms × 50 replications under CRN — an
 only**. **No test derives the count across all ten, which is why the published figure went stale
 twice without failing anything.** Deriving it from the categorical is the fix, and it is S5's
 instrument.
+
+
+---
+
+## X. #206 — the fix, and the test watched failing before it landed
+
+**Recorded by the orchestrator directly**, on 2026-08-24, because *a test nobody has watched fail is
+not yet a test* and this repository has already found six tests that could not fail, by five
+different mechanisms. The FIX-206 lane produced the fix and the tests; the failure and pass below
+were re-run and observed here rather than taken from its report.
+
+### Watched failing — the fixed sources reverted to `a1841fa`, the new tests kept
+
+```
+git checkout a1841fa -- packages/viz/src/everyday/{stageScreen,shell,stageScreenModel,actionBar}.ts
+ELEVATOR_SIM_CHROMIUM=/opt/pw-browsers/chromium npx vitest run --project viz-browser \
+  packages/viz/src/everyday/dailyLoop.browser.test.ts \
+  packages/viz/src/everyday/stageScreen.browser.test.ts
+```
+
+```
+× files the day on § 3.3's own primary and lands on the report — no rail detour
+× closes the day, and leaving afterwards does not warn
+× lights the report stop once the day behind it is filed, and it goes there
+× files a campaign day on the same primary and lands on the campaign report
+
+Test Files  2 failed (2)
+     Tests  4 failed | 10 passed (14)
+```
+
+### Watched passing — the same two files on the fix
+
+```
+Test Files  2 passed (2)
+     Tests  14 passed (14)
+```
+
+**Four cases fail without the fix and pass with it**, and the four are the right four: the daily
+primary landing on the report without the rail detour, the breadcrumb stop lighting *and*
+navigating, the campaign flow on the same primary, and the leave-warning behaviour that a naive fix
+would have broken. **The campaign case is the one that matters most**, because verification § M found
+that Campaign shares the defect exactly while Fix a building shares nothing — so a fix covering only
+the daily flow would have looked complete and left half the defect standing.
+
+**Ten cases passed in both runs**, which is the other half of the evidence: the tests are not
+failing because the suite is broken, and the fix did not disturb what already worked.
+
+**Both CI platforms are green on the commit carrying the fix** (`aadaaaf`): `suite (linux)` and
+`suite (macos)`, plus `invariant gates`, `claude review`, `build site` and `deploy`.
+
+**What is still not verified, and it is the last mile:** nobody has clicked this on the deployed
+build. The Azure preview environment is unreachable from the programme's container — the egress
+policy answers `403` to `CONNECT` for that host, and Chromium cannot route through the agent proxy
+at all. That belongs to #205's playtest protocol, and it is adjacent to open issue **#123**
+(*preview environments cannot reach the API, so the surfaces most likely to break are the ones a
+preview cannot test*) — the same shape from the other direction.
