@@ -355,7 +355,7 @@ answered by this document.
 | **How it shows failure** | There is no fail state on a puzzle. The only failure is a machine that does not produce the output **[secondary: as above]** |
 | **Session length** | Puzzle-length, then unbounded re-optimisation of a puzzle already passed **[secondary: as above]** |
 | **Adopt** | **The three-histogram result screen — and the fact that it shipped.** This is the single most valuable finding in the teardown. `CLAUDE.md` § *Tuning discipline* says *"Do not scalarize too early. Report the Pareto front over (AWT, energy, WT95); the energy-versus-wait tradeoff is the operator's call"*; [§ D106](../DECISIONS.md) says energy is an axis and never a score; `docs/21` § 6 non-goal 3 says *no scalar challenge score, ever*. Those are held here on principle, against the standard objection that a mass audience needs one number. **Opus Magnum is the counter-example to that objection**: a commercially released puzzle game presents three independent distributions and refuses to add them up. The adoption is not new code — it is that #186 may now justify its hardest non-goal with a precedent instead of an argument. Second, smaller adoption: **the shareable artefact.** Opus Magnum's is an exported GIF of the machine **[secondary: [Steam discussion](https://steamcommunity.com/app/558990/discussions/0/3110269850323895741/)]**; this product's already exists and is the seed line, which R7 keeps visible in every mode and which the design handoff already prints on the door (`docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 6) |
-| **Refuse** | **The histogram against other players, applied to a single run.** Opus Magnum's puzzles are **deterministic**: a solution's cycle count is exact and repeatable, so ranking one player's solution against a global distribution is honest there. This simulator's runs are **stochastic**, and the same screen over single runs is R2's defect in its most persuasive possible costume — `docs/10` § 5.5's *leaderboard ranking dispatchers from single runs*, with a histogram to make it look rigorous. Refused for a single run; permitted only over a replication batch at or above `MIN_REPLICATION_BUDGET`, where [§ D171](../DECISIONS.md) already governs what may be named. **The difference is determinism, not taste**, and any surface borrowing this idea must state which side of it the numbers came from |
+| **Refuse** | **The histogram against other players, applied to a single run.** Opus Magnum's puzzles are **deterministic**: a solution's cycle count is exact and repeatable, so ranking one player's solution against a global distribution is honest there **[inferred from the scoring design — a global histogram over a noisy number would not be meaningful — and not confirmed at source]**. This simulator's runs are **stochastic**, and the same screen over single runs is R2's defect in its most persuasive possible costume — `docs/10` § 5.5's *leaderboard ranking dispatchers from single runs*, with a histogram to make it look rigorous. Refused for a single run; permitted only over a replication batch at or above `MIN_REPLICATION_BUDGET`, where [§ D171](../DECISIONS.md) already governs what may be named. **The difference is determinism, not taste**, and any surface borrowing this idea must state which side of it the numbers came from |
 
 ### 6.4 Shapez
 
@@ -373,9 +373,9 @@ answered by this document.
 
 ## 7. The tally
 
-Nine entries, nine adopt verdicts, nine refuse verdicts. #189's criterion of *at least one concrete
-practice to adopt and one to refuse per entry* is met; its criterion of *at least six titles played*
-is not met as written (§ 3).
+Nine entries, each carrying at least one adopt verdict and at least one refuse verdict. #189's
+criterion of *at least one concrete practice to adopt and one to refuse per entry* is met; its
+criterion of *at least six titles played* is not met as written (§ 3).
 
 | entry | adopt | status of that adoption | refuse | the rule it protects |
 |---|---|---|---|---|
@@ -389,11 +389,17 @@ is not met as written (§ 3).
 | **Opus Magnum** | **three axes, three histograms, no combined score — shipped** | **new**, and it is the most valuable finding here | the same histogram over a single stochastic run | R2; `docs/10` § 5.5; [§ D171](../DECISIONS.md) |
 | Shapez | the unlock is tied to the goal that requires it | **new** as a content-sequencing rule | the no-fail posture | R4, R8 |
 
-**Four of the nine adoptions were already adopted before this teardown was written**, and that is
-the honest headline rather than a padding of the count. The teardown's actual yield is five: one
-content-authoring idea from Elevator Saga, one from Two Point Hospital, one from Shapez, one piece
-of external support from Mini Motorways for a position not yet written down, and one precedent from
-Opus Magnum for the non-goal that is hardest to defend.
+**Three of the nine adoptions were already adopted before this teardown was written**, and that is
+the honest headline rather than a padding of the count. The teardown's actual yield is six, and they
+are not all the same kind of thing:
+
+- **Three content-sequencing ideas**, none of which any existing rule covers: Elevator Saga's
+  *moving objective*, Two Point Hospital's *the mission that needs a mechanic introduces it*, and
+  Shapez's *the unlock is tied to the goal that requires it*.
+- **Two pieces of external support** for positions this tree already holds or wants to: Project
+  Highrise for U4's aggregation answer, Mini Motorways for a non-goal that has never been written
+  down.
+- **One precedent**, from Opus Magnum, for the non-goal that is hardest to defend.
 
 ---
 
@@ -419,10 +425,10 @@ answered here.
 confirmed by it.** `README.md` says *"Step 5 is the whole point, and it is where most tower sims
 quietly cheat."* This teardown verified **one** instance of quiet cheating, and it is not in a tower
 sim — Elevator Saga is a programming toy. None of SimTower, Project Highrise, Two Point Hospital,
-Mini Metro or Mini Motorways was checked for it, and three of them do not publish a comparable
-statistic at all. The narrower sentence the evidence supports is: *the nearest comparator publishes a
-censored mean, and this product refuses to.* Filed as a request in § 9, not edited — this document
-does not own `README.md`.
+Mini Metro or Mini Motorways was checked for it, and whether any of them publishes a comparable
+statistic at all was not established either. The narrower sentence the evidence supports is: *the
+nearest comparator publishes a censored mean, and this product refuses to.* Filed as a request in
+§ 10, not edited — this document does not own `README.md`.
 
 ---
 
