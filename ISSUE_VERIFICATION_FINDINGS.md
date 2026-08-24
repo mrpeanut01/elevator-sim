@@ -1454,3 +1454,66 @@ the published row; strings moved **+98** and **+120**, which is this wave's land
 after the wave integrates, and M2 is still open — #207 will move the strings again. A figure
 re-measured per lane is stale the moment the next lane merges, which this repository has now recorded
 five times. The row is updated when M2 integrates, not before.
+
+---
+
+## Z. #206's AC4 rests on a false premise, and T1 is passing on every leg
+
+Verified 2026-08-24 by running the browser tier, not by reading the matrix.
+
+### T1 is passing, in two tests rather than one
+
+`TEST_MATRIX.md` T1 — *menu → door → brief → stage → report → week* — read `planned`. **It is
+passing.** Watched: `packages/viz/src/everyday/dailyLoop.browser.test.ts`, **6 of 6, exit 0**, on
+the Chromium the tier defaults to.
+
+Every leg is driven, across two cases rather than one:
+
+| leg | where | how |
+|---|---|---|
+| menu → door | `enterEverydayStage` → `openEverydayDoor` | the mode tile, clicked |
+| door → brief → stage | both cases | § 3.3's primary at each step |
+| stage → file → report | the *no rail detour* case | the press that files is the press that navigates |
+| report → week | both cases | the report's own primary |
+
+**The split is worth stating rather than smoothing over.** No single case drives menu → week
+continuously; the seam is between the filing case and the week case. Every leg is covered and
+watched, which is why T1 moves to `passing` — but a reader who assumed one continuous drive would be
+wrong, and the row now says so.
+
+### #206's AC3 is met. **AC4 is not, and cannot be as written.**
+
+AC3 — *"a journey test covers menu, front door, brief, stage, file, report and asserts the report
+screen is reached"* — is met exactly by the *no rail detour* case, which starts at the mode tile and
+asserts a filed sheet with figures rather than the empty one.
+
+AC4 — *"the same check is applied to Campaign and Fix a building, **since both share the filing
+path**"* — **the premise is false.** Measured: `host.closeDay()` has exactly one non-test caller in
+the tree, `everyday/stageScreen.ts:884`. Nothing under `campaign/` or `fixit/` calls it or
+`closeShift`.
+
+- **Campaign cannot file a day at all in this build**, which this repository's own status has been
+  saying: *"no campaign day is filed yet from § 8's screens — running one is wired end to end, but
+  marking it cleared or missed needs `closeShift` to know which tower it belonged to."* There is no
+  filing path there to apply the check to.
+- **Fix a building has its own outcome route**, not the shared one — `fixit/engine.ts#classifyOutcome`
+  — and it *is* driven, at `fixitScreen.browser.test.ts:311` (*runs the day from the bar's primary,
+  holds it inert meanwhile, and draws the outcome*).
+
+**This is the fourth refuted claim on #206** and it is the load-bearing one: AC4 asks for a check on
+a path that does not exist. The nearest true thing is that fix-a-building's own outcome route is
+already covered, and campaign's filing path is unbuilt work rather than an untested one. **AC4 should
+be struck or rewritten against the campaign filing path when that is built** — closing #206 with AC4
+ticked as written would assert a shared mechanism this tree does not have, which is the stated-
+mechanism class § D280 exists about.
+
+### One stale refusal, found in passing and not fixed here
+
+`dailyLoop.browser.test.ts:166` says *"See {@link closeDay} for the one press that has no Everyday
+home yet."* **That press has a home**, and the case 280 lines below proves it by pressing it. The
+helper's own docstring was already corrected — it now reads *"and that button now exists"* — so the
+file currently contradicts itself in two directions.
+
+Not fixed in this sitting because `packages/viz/src/everyday/` is serialized to the #207 lane. It is
+a one-line comment and it is the § D227 class: a sentence describing a seam, gone stale while the
+seam works.

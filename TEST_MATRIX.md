@@ -5,7 +5,7 @@ Unit/property coverage colocates with source (`*.test.ts`); this matrix tracks t
 
 | # | Flow | Type | Scenario | Owner | Status |
 |---|---|---|---|---|---|
-| T1 | Menu → door → brief → stage → report → week | browser (driven) | happy path, day closed, figures consistent | A0 | planned |
+| T1 | Menu → door → brief → stage → report → week | browser (driven) | happy path, day closed, figures consistent | A0 | **passing** — `everyday/dailyLoop.browser.test.ts`, 6/6 watched 2026-08-24. Every leg driven, across **two** cases not one: the seam is between the filing case and the week case. See [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Z. |
 | T2 | Stage entry | browser | enters paused at 06:00, first frame drawn, speed = player default (never inherited) | A2 | planned |
 | T3 | Intervention | unit + browser | park-the-cars at 09:14: figures before identical, after changed; replay reproduces | A2 | planned |
 | T4 | Levers/terms | unit | lever moves its terms; term updates its lever; maths line prints the same vector | A1 | planned |
