@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | **D346** — D342 charter, D343 series citation, D344 audio ships, D345 difficulty |
+| Next free decision number | **D348** — D342 charter, D343 series citation, D344 audio ships, D345 difficulty, D346 write-disclosure, D347 the gate's own hole |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
@@ -236,7 +236,10 @@ because #210 builds against them.
       alone reaches). **This box is ticked when that register is empty and at no earlier moment.**
       The fix is #207. Two gaps the instrument cannot see are recorded in
       [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) § Y: the Everyday stage's
-      canvas, and three register headings outside the corpus.
+      canvas, and three register headings outside the corpus. **Both close before this box is
+      ticked** — the headings with #207, the canvas as its own lane after it
+      ([§ D347](DECISIONS.md)). The criterion does **not** reach a control's own write-disclosure
+      ([§ D346](DECISIONS.md)), which is why the number is 19 and not 56.
 - [ ] The slice runs on the target browser matrix from #203.
 - [ ] **`charter S6` — a player can state, unprompted, why the simulator refused a number**, on at
       least six of ten. **Placed here at the 2026-08-24 review, and the placement is open to the

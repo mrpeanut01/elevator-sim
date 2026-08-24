@@ -24260,3 +24260,71 @@ regenerating that table three times.
 **The GDD's distinction is kept, and only its third clause is withdrawn.** *Difficulty is what the
 building faces; stakes are what a miss costs you* — both stand, and are the amended clause's own
 wording. *A bar is not a metric* does not.
+
+## D346 — a control's own write-disclosure is not internal notation
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `internal-notation`'s scope · Interprets: charter § M2 exit criterion 3**
+
+**Decision.** `CHARTER_PROGRAMME.md` § M2's third exit criterion — *"nothing on a player surface
+refers to a section number, a source filename or a code identifier"* — **does not reach a config
+path a control draws to say what it writes.** `idle.parkingStrategy: lobby` stays. The gate's number
+is **19**, not 56.
+
+**Context.** The property built to measure that criterion deliberately does not match un-backticked
+camelCase or dotted paths, and named the cost of that choice: **37 distinct player-facing strings**,
+most of them `everyday/workshopModel.ts#WORKSHOP_COPY` saying *"that wrote `idle.parkingStrategy:
+lobby`"*. The clause was written as an under-match with the number attached precisely so this ruling
+could be made against a measurement rather than a hunch.
+
+**Why.** [§ D227](#d227) is the stronger obligation, and it was written about this exact shape from
+the other side. The traffic editor drew *mean group size* as a refusal for every wave after the seam
+went live — **a control that lied about writing nothing** — and the lesson recorded there is that a
+control must state what it writes, pinned by a run rather than by another sentence. The config path
+**is** what the control writes. Paraphrasing it into prose makes the disclosure vaguer and re-opens
+the class § D227 closed; it trades a legible obligation for a cosmetic one.
+
+**The two rules are not actually in tension, and the criterion's own words say so.** A section number
+points at a document the player cannot open. A filename points at a file the player does not have. A
+config path points at **the thing the control in front of them just changed** — it is the only one of
+the three that names something inside the player's world. The criterion is about notes left for the
+team on the player's screen; this is not one.
+
+**Alternatives considered.** (a) Rule them in: widen the clause, register ~37 more findings, invent a
+plain-language pattern for write-disclosure. (b) Split by role — flag the path in prose, exempt it in
+a control's disclosure. (c) This. (a) was rejected as trading § D227's guarantee for the criterion's
+letter. (b) is the most faithful to both rules and was rejected as **unbuildable today**: separating
+`SpecTransportMode` from `parkingStrategy` needs this tree's own export list, which `properties.ts`
+may not read (`boundaries.test.ts` confines the filesystem to the test helpers), and a spelling rule
+that guessed would take the 37 with it.
+
+**What this obliges.** Nothing changes in code. The clause stays an under-match, its docstring keeps
+naming the 37, and **this decision is the reason rather than an oversight** — which is the difference
+between a gate that under-matches on purpose and one that was never finished. If the export list ever
+becomes readable from `properties.ts`, (b) is the option to revisit.
+
+## D347 — the M2 gate closes its own hole before it is claimed
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `ISSUE_VERIFICATION_FINDINGS.md` § Y · Scopes: M2**
+
+**Decision.** The Everyday stage's canvas is brought inside the M2 gate's scope **before M2 exits**,
+as its own lane, sequenced after #207.
+
+**Context.** `PLAYER_FACING_SURFACES` resolves to 12 of 49 adapters.
+`render/canvas.ts#drawScene` is not one of them, and it paints text on § 7's stage — the vertical
+slice's centrepiece — which a player reads. **So the gate can report zero while the stage canvas
+carries internal notation.**
+
+**Why it is a lane and not a line.** `drawScene` also paints the Engineer canvas. Adding `render/` to
+`PLAYER_FACING_DIRECTORIES` would manufacture exactly the false positives the property was scoped to
+avoid — measured at **656** filename matches unscoped against **2** scoped, of which 572 are an
+Engineer panel naming code to an engineer, correctly. That is [§ D91](#d91)'s failure: a guard that
+cries about legitimate cases trains people to ignore it. Closing the hole needs the canvas adapter to
+**distinguish the two mounts**, which is real work.
+
+**Why inside M2 rather than after.** A gate with a known hole is settled by review, which is the
+thing an instrument exists to replace. The zero would mean *zero on 12 of 49 adapters* rather than
+*zero where a player reads*, and the difference is invisible to everyone who did not read § Y.
+
+**Sequencing.** After #207, not before — both lanes write `honesty/surfaces.ts`, and #207 must also
+add its new build-information panel and three uncovered register headings to the corpus. Running them
+together is the collision this programme's serialization list exists to prevent.
