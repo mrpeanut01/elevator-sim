@@ -47,7 +47,7 @@ Measured on this tree at `c8fd6fa`, before any charter work:
 | Test suite | **440 files / 440 passed · 8 688 passed, 11 skipped (8 699)** · green |
 | Browser tier | **ran** — 25 of the 440 files; `ELEVATOR_SIM_CHROMIUM` pointed at the container's Chromium |
 | Wall clock | 3 771 s (62 m 52 s) — **contended, not comparable**; see the caveat below |
-| Next free decision number | D342 |
+| Next free decision number | **D344** — D342 adopts the charter, D343 settles the series-citation rule |
 
 **The skip count is 11, and it is the number this programme was told to watch.** All eleven are
 deep-tier opt-ins behind `describe.skipIf(!DEEP)` / `!deepRequested()` in `packages/experiments`
@@ -114,8 +114,13 @@ refused and asked for the specification instead.
 **Review.** Direction review — held 2026-08-24. **Output: [§ D342](DECISIONS.md) and
 [§ D343](DECISIONS.md).**
 
-**State: OPEN — the gate was opened by the product owner on 2026-08-24.** Verification of all eight issues is
-complete — evidence in [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ O–R.
+**State: ✅ EXITED 2026-08-24.** Opened and exited the same day, by the product owner, with all four
+criteria met and every one of the eight issues closed on GitHub. Verification of all eight is in
+[`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ O–R.
+
+**The milestone's cheapest criterion was the one nobody had to work.** Exit criterion 2 was satisfied
+**on entry**, by a decision that already existed, and finding that out cost one verification lane an
+afternoon instead of costing a documentation lane a week.
 
 **#190 is CLOSED, and exit criterion 2 is already satisfied.** #190 stated the positioning question
 *"has never been answered in writing"*. It was answered on 2026-08-08 by [§ D299](DECISIONS.md),
