@@ -1,8 +1,17 @@
 # Project Charter — the game layer
 
-**Status: ADOPTED, 2026-08-24.** Supersedes nothing. Governs the game layer only.
-**A decision number is owed** — it is allocated at integration, never inside a lane, and this
-document carries no `§ D` citation of itself until that entry exists.
+**Status: ADOPTED, 2026-08-24, by the product owner — [§ D342](../DECISIONS.md).** Supersedes
+nothing. Governs the game layer only; where this document and [`CLAUDE.md`](../CLAUDE.md) disagree,
+`CLAUDE.md` wins.
+
+**Four of the five pillars are reconstruction, and § D342 adopts them knowing that.** Only **P3**'s
+wording is directly attested; P1, P2, P4 and P5 are this document's construction, adopted as they
+stand and amendable at the direction review. § 8 is the paragraph to read first if a pillar looks
+wrong.
+
+**Cite the criteria as `charter S1`…`charter S10`, never bare** — [§ D343](../DECISIONS.md).
+`docs/16-change-scope-contract.md` also numbers a set `S1`–`S10`, having chosen that letter to avoid
+colliding with `docs/10`'s `R1`–`R13`, and this document collided with it anyway.
 
 Satisfies issues **#186** (adopt a charter), **#187** (vision and player promise) and **#192**
 ("done", with criteria that can fail). The milestone pages are

@@ -24016,3 +24016,85 @@ rule this replaced would have returned `9.9.9.9`. If a future platform change ma
 *replace* the header rather than append to it, the hop count becomes wrong and those cases go red.
 That is the only warning anyone would get: a forged key looks exactly like an honest one from every
 other angle, which is the property that let the original sentence stand for nine days.
+
+---
+
+## D342 — the charter is adopted, and four of its five pillars are reconstruction
+
+**Date: 2026-08-24 · Owner: product owner · Milestone: M0, exit criterion 1**
+
+**Decision.** [`docs/22-charter.md`](docs/22-charter.md) is **adopted** as the charter for the game
+layer. It governs the game layer only; where it and [`CLAUDE.md`](CLAUDE.md) disagree, `CLAUDE.md`
+wins. It amends nothing in [`docs/00-project-brief.md`](docs/00-project-brief.md), which remains the
+research brief.
+
+**Context.** The project has never had a charter. `docs/00-project-brief.md` is a research brief and
+says so; it uses the word *game* **zero** times, and all five of its success criteria are
+engineering criteria. Every document downstream inherited that omission — which is how Phase 9 could
+be accepted while [§ D163](DECISIONS.md) excluded playability from its criterion **as
+unfalsifiable**. The charter is the half that was missing, not a replacement for the half that
+exists.
+
+**The provenance caveat is part of the decision, not a footnote to it.** The charter text delivered
+with the programme kickoff is **not in this tree**. § 1's vision and promise, § 3's audiences and
+§ 4's ten criteria are reconstructed from the bodies of issues #186, #187, #188 and #192, which
+restate them. § 2's pillars are reconstructed from the plan and from the standing rules this
+repository already enforces — and **only pillar P3's wording is directly attested**
+(`MULTI_AGENT_PLAN.md:75`). **P1, P2, P4 and P5 are this document's construction.** They are adopted
+as they stand and remain amendable at the direction review; amending one is a human decision, and
+P3's ordinal is fixed by prior citation.
+
+That caveat is recorded here rather than only in the charter because a reader who disagrees with a
+pillar needs to know, at the point of disagreement, whether they are arguing with a decision or with
+a reconstruction.
+
+**Alternatives considered.** (a) Adopt as drafted. (b) Review P1/P2/P4/P5's wording before
+allocating a number. (c) Adopt with those four marked provisional so no reviewer could refuse a pull
+request against them. (b) was rejected as a round trip that changes nothing a later amendment cannot;
+(c) was rejected because a pillar nobody may cite is not a pillar, and the provenance note already
+tells a reviewer which ones are reconstruction.
+
+**What this does not do.** It does not reopen the positioning question. [§ D299](DECISIONS.md)
+answered that on 2026-08-08 — two products over one engine — and issue **#190**, which asserted the
+question had never been answered in writing and proposed an answer contradicting it, was closed with
+the refutation recorded rather than dropped. The charter is written downstream of § D299, not across
+it.
+
+**Three figures were corrected before adoption, and one was withdrawn.** The pin count is **997**,
+not 981; there are **seven** `deadCode.test.ts` audits, not five. The third — `packages/viz/index.html`
+at *198 KB* versus *194 KB* — **was not a correction at all**: the file is 198 182 bytes, which is
+193.5 KiB at 1024 and 198.2 kB at 1000, so both figures were right in different unit conventions and
+publishing the difference as a defect manufactured one. The charter states bytes. The withdrawal is
+recorded because a register that drops its own retracted entries is worth less than one that keeps
+them.
+
+---
+
+## D343 — a numbered series is cited with its document, because S1–S10 now names two sets
+
+**Date: 2026-08-24 · Owner: product owner · Raised by: `RISKS.md` R39**
+
+**Decision.** A reference to a numbered series in a governing document **carries the document**:
+`charter S5`, `docs/16 S5`, `docs/10 R13`, `RISKS.md R13`. A bare `S5` or `R13` is a drafting error.
+**Nothing is renumbered.**
+
+**Context.** `S1`–`S10` now names two different ten-item sets — the charter's success criteria and
+[`docs/16-change-scope-contract.md`](docs/16-change-scope-contract.md)'s change-scope rules. The
+irony is load-bearing: `docs/16` chose the letter **S** *"to avoid collision with `docs/10`'s
+R1–R13"*, and the charter then collided with it anyway. Separately, `R1`–`R13` already names both
+`docs/10`'s experience-layer rules and the first thirteen rows of [`RISKS.md`](RISKS.md) — the
+honesty corpus's *"one R13 violation"* means the former.
+
+**Alternatives considered.** (a) The prefix convention. (b) Rename the charter's set to C1–C10.
+(c) Rename `docs/16`'s rules. (a) was chosen because it breaks no reference and requires no
+renumbering, and because [`docs/05-roadmap.md`](docs/05-roadmap.md) states outright that ordinals
+are **names** and renumbering breaks every reference for the sake of a tidier total. (b) and (c) both
+buy uniqueness at exactly that cost, and the charter's S1–S10 is already cited from the issue
+tracker, which this repository cannot rewrite.
+
+**Why this is not mechanised.** `validation/citations.test.ts` resolves `§ D<n>` and cited paths; it
+cannot resolve a bare `R13` or `S5` to a series, and widening it to try would flag every legitimate
+prose use of a capital letter and a number. **The convention is unenforced and is recorded as such**
+— nine of the eleven existing citations to `RISKS.md` already follow it, so it is a convention being
+written down rather than imposed. R39 stays **live** for that reason: an unenforced convention is a
+mitigation, not a discharge.

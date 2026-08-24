@@ -4,8 +4,9 @@
 criteria, the issues in it, the review that closes it, and its current state.
 
 **Opened:** 2026-08-24 · **Branch:** `claude/elevator-sim-charter-kickoff-rexfw8` ·
-**Programme state:** **M0 is OPEN** — the product owner opened the gate on 2026-08-24, after the
-verification wave reported. M1–M6 are not open.
+**Programme state:** **M0 EXITED and M1 is OPEN**, both on 2026-08-24. One M2 issue — **#206**, the
+core loop dead-end — is **fast-tracked ahead of milestone order** by product-owner decision, on the
+charter's own § 7 grounds. M2–M6 are otherwise not open.
 
 The plan, the dependency map and the serialization hazards are in
 [`MULTI_AGENT_PLAN.md`](MULTI_AGENT_PLAN.md). The lane board is [`AGENT_STATUS.md`](AGENT_STATUS.md).
@@ -18,8 +19,8 @@ Evidence for every scheduled issue is in
 
 | milestone | issues | count | gate | state |
 |---|---|---|---|---|
-| [M0](#m0--concept-and-direction) Concept and direction | #186–#193 | 8 | Direction review | **OPEN** (2026-08-24) |
-| [M1](#m1--pre-production) Pre-production | #194–#205 | 12 | Pre-production gate | not open |
+| [M0](#m0--concept-and-direction) Concept and direction | #186–#193 | 8 | Direction review | ✅ **EXITED** (2026-08-24) |
+| [M1](#m1--pre-production) Pre-production | #194–#205 | 12 | Pre-production gate | **OPEN** (2026-08-24) |
 | [M2](#m2--vertical-slice) Vertical slice | #206–#218 | 13 | Vertical slice review | not open |
 | [M3](#m3--alpha-feature-complete) Alpha, feature complete | #219–#230 | 12 | Alpha gate + feature freeze | not open |
 | [M4](#m4--beta-content-complete-and-balanced) Beta, content complete | #231–#240 | 10 | Beta gate + content freeze | not open |
@@ -91,13 +92,17 @@ No production code is written in this milestone.** An agent proposing an impleme
 refused and asked for the specification instead.
 
 **Exit criteria.**
-- [ ] The charter is merged, with a decision number.
+- [x] **The charter is merged, with a decision number** — [`docs/22-charter.md`](docs/22-charter.md),
+      adopted by the product owner as [§ D342](DECISIONS.md), which records in the decision itself
+      that four of the five pillars are reconstruction.
 - [x] **The positioning question (#190) is closed by a written decision** in
       [`DECISIONS.md`](DECISIONS.md) — [§ D299](DECISIONS.md), reaffirmed by the product owner on
       2026-08-24 and recorded on the issue. Satisfied on entry rather than by work in this milestone.
       **This criterion required no document to be written**, which is the whole value of having
       verified it first.
-- [ ] Every pillar and non-goal is stated in a form a reviewer can hold a pull request against.
+- [x] **Every pillar and non-goal is stated in a form a reviewer can hold a pull request against** —
+      charter § 2 gives each pillar an explicit refusal test, and § 5 indexes the non-goals to
+      `docs/10` § 5.5 and `docs/21` § 6 rather than restating them.
 - [x] **The project-level risk register is restored** (#193) — [`RISKS.md`](RISKS.md), rebuilt with
       **all 39 ids present and none renumbered**. Scope was widened at the gate and the widened scope
       is met: the **six ids that dangle across eleven sites** (R9, R17, R22, R24, R25, R26) all
@@ -106,7 +111,8 @@ refused and asked for the specification instead.
       days is kept in an appendix rather than deleted. **R37 is new and is the class itself** — a
       project that loses its own registers to a wave-opening commit will do it again.
 
-**Review.** Direction review — one session, whole team, output is a decision record.
+**Review.** Direction review — held 2026-08-24. **Output: [§ D342](DECISIONS.md) and
+[§ D343](DECISIONS.md).**
 
 **State: OPEN — the gate was opened by the product owner on 2026-08-24.** Verification of all eight issues is
 complete — evidence in [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ O–R.
@@ -150,7 +156,7 @@ Two findings bear on the milestone directly:
 #200 difficulty curve · #201 telemetry schema and KPI set · #202 privacy, consent and retention ·
 #203 platform and browser support matrix · #204 accessibility standard · #205 playtest programme.
 
-**Entry criteria.** M0 exited.
+**Entry criteria.** M0 exited — met 2026-08-24.
 
 **Character.** Still specification work. The disciplines that currently have no owner get one here:
 audio, art direction, telemetry, privacy, accessibility, support matrix, playtest recruitment.
@@ -163,7 +169,12 @@ audio, art direction, telemetry, privacy, accessibility, support matrix, playtes
 
 **Review.** Pre-production gate — go or no-go on the vertical slice scope.
 
-**State: not open.**
+**State: OPEN (2026-08-24).** Three lanes are running on the highest-leverage deliverables:
+**#198** the vertical-slice definition (it gates every M2 build issue), **#201 + #202** telemetry and
+privacy in one document with privacy first (that order is not recoverable, and `RISKS.md` R31 records
+that five of the ten criteria cannot be evaluated at all until it lands), and **#197** the flow maps
+(they gate #210 and are what `TEST_MATRIX.md`'s twenty-one `planned` rows should be derived from).
+The remaining nine issues are not yet scoped.
 
 ---
 
@@ -192,7 +203,12 @@ because #210 builds against them.
 
 **Review.** Vertical slice review, with recorded sessions.
 
-**State: not open. Verification of all thirteen issues is complete** — evidence in
+**State: not open — with one fast-tracked exception.** **#206 is being fixed now**, ahead of
+milestone order, by product-owner decision on 2026-08-24. The charter's own § 7 lists it as an
+immediate next action, it is a defect fix rather than a feature so it needs no specification, and
+every journey test written before it lands asserts a dead end. **No other M2 issue is open.**
+
+**Verification of all thirteen issues is complete** — evidence in
 [`ISSUE_VERIFICATION_FINDINGS.md`](ISSUE_VERIFICATION_FINDINGS.md) §§ M–N, S–U, and dispositions in
 [`ISSUE_WORKER_LEDGER.md`](ISSUE_WORKER_LEDGER.md).
 
