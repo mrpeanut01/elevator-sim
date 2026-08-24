@@ -1682,14 +1682,28 @@ U7.
 > because `beat-the-baseline` needs a paired interval excluding zero with nothing resolving the
 > other way, and no shipped profile achieves that there.
 >
-> **That count is now four, and the correction is the same shape as the sentence it corrects.**
-> Stage 6 clears under `destination-eta` and under `destination-panel`. It did **not** move because
-> the tall building got escalators — re-measured on the pre-escalator configuration it clears there
-> too — it moved when `long-waits-under` left stage 6's `goals` bucket, which is one fewer count
-> goal a candidate has to match. The claim above was measured before that and was never
-> re-measured, which is the failure this document names about numbers arriving at markdown: a
-> published figure with no tool re-deriving it. `packages/viz/src/campaign/campaign.test.ts` now
-> plays stage 6 at `destination-eta` and asserts the clear, so it cannot go stale silently again. **§ 5.4's *"winnable trivially"* is false
+> **That count went to four, and then back to three — and the correction went stale in exactly the
+> way it promised it could not.** It read: *"Stage 6 clears under `destination-eta` and under
+> `destination-panel` … `campaign.test.ts` now plays stage 6 at `destination-eta` and asserts the
+> clear, so it cannot go stale silently again."*
+>
+> **Stage 6 clears under nothing.** `campaign.test.ts` was inverted when the claim stopped holding —
+> its own docstring says *"This case asserted that `destination-eta` clears stage 6, and it was true
+> when it was written"* — and now sweeps every shipped profile asserting `cleared` is `false` for
+> all of them, naming `zoned-uppeak` as the closest at 1 metric for and 4 against. The cause is
+> [§ D254](../DECISIONS.md): making that building serviceable moved every conventional arm, and
+> `beat-the-baseline` compares against the stage's own starting profile.
+>
+> **The test did its job and this paragraph did not.** The sentence promising the figure could not
+> go stale silently was itself the figure that went stale, because a test inverting is not a
+> markdown file re-reading itself. That is the same failure one level up, and it is why the count
+> below is quoted from a measurement with its apparatus named rather than asserted here.
+>
+> **Measured 2026-08-24 over ten stages and thirteen profiles** — 77 admitted cells, two arms ×
+> 50 replications under common random numbers: **three of ten stages clear from the dispatcher
+> dropdown alone** — stage 3 by `fairness-first`, stage 5 by `eta`, stage 7 by `destination-panel`.
+> Stage 5's clearer also moved: `destination-eta` no longer clears it. The apparatus and the full
+> table are docs/33's § 6, and `ISSUE_VERIFICATION_FINDINGS.md` § AC records what this replaced. **§ 5.4's *"winnable trivially"* is false
 > of stage 1 under this bar**, and is corrected in place below. Clearing those four needs an
 > authored weight vector, which is invariant 7's own model of what a dispatcher is.
 >
