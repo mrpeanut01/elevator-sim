@@ -24098,3 +24098,113 @@ prose use of a capital letter and a number. **The convention is unenforced and i
 — nine of the eleven existing citations to `RISKS.md` already follow it, so it is a convention being
 written down rather than imposed. R39 stays **live** for that reason: an unenforced convention is a
 mitigation, not a discharge.
+
+---
+
+## D344 — sound ships, and the speed ladder is what has to change first
+
+**Date: 2026-08-24 · Owner: product owner · Overrules the recommendation in `docs/29-audio-direction.md`**
+
+**Decision.** **Audio ships.** The M1 lane recommended a written cut; the owner overruled it. The
+shipped design is **speed-tiered**: discrete 1:1 cues where the clock can carry them, a continuous
+bed where it cannot, and the chime demoted to background and occasional rather than removed.
+
+**The lane's evidence stands; only its conclusion is overruled.** Its central measurement is
+correct and is the reason the ruling takes the shape it does: at the shipped speeds a recorded chime
+outlasts the door cycle it announces. What the lane treated as a reason to cut, the owner treats as
+a reason to **fix the speed ladder** — which is the right reading, because the same measurement is a
+defect report about `STAGE_SPEEDS` whether or not audio ever ships.
+
+### The first finding is that the labels lie
+
+`stageScreenModel.ts:98-104`:
+
+| label | `simPerRealS` | actual |
+|---|---|---|
+| `½×` | 8 | **8× real time** |
+| `1×` | 30 | **30× real time** |
+| `4×` | 90 | 90× |
+| `12×` | 240 | 240× |
+| `30×` | 600 | 600× |
+
+**There is no 1:1 speed, and the control that says `1×` is thirty times faster than one.** A player
+who slows the stage all the way down is still watching an eight-times-compressed building. That is a
+label describing a thing it is not — a charter non-goal — and it is independent of audio.
+
+### The determination the owner asked for
+
+Two limits bind, and **neither is a single speed**.
+
+**Limit A — a cue must fit inside the event it announces.** A centre-opening hall-call door cycle is
+`1.8 open + 5 dwell + 3.0 close = 9.8` simulated seconds (`data/elevator-specs.json`). The shortest
+identifiable discrete cue is about **250 ms**. So `9.8 / S ≥ 0.25`:
+
+> **Discrete cues need `S ≤ 39`.** They survive `½×` (8) and `1×` (30); they are already impossible
+> at `4×` (90), where the cycle is 109 ms.
+
+**Limit B — transients must not fuse — and the owner's second instruction dissolves it.** Below
+roughly **100 ms** apart, door events stop being countable and become texture. Chiming *every* door
+cycle at *every* floor, spacing is `stopInterval / (cars × S)` and the budget is `cars × S ≤ 300` —
+which `vertical-city` fails at the slowest speed the build offers. Thirty-five cars chiming on every
+floor is a lobby, not a sequence, and no speed ladder makes it one.
+
+**Model only lobby chimes** (owner, 2026-08-24) and the event rate collapses to one per car per
+**round trip** rather than one per stop. Round-trip time is a quantity this project already computes
+in closed form — `core/analytical`, the Barney/CIBSE oracle — so the budget stops being an estimate:
+
+| building | cars | RTT (closed form) | highest S that stays discrete |
+|---|---|---|---|
+| `garden-apartments` | 2 | 113.6 s | 568 |
+| `midtown-office` | 4 | 149.5 s | 374 |
+| `crown-hotel` | 5 | 182.4 s | 365 |
+| `st-jude-hospital` | 5 | 204.7 s | 409 |
+| `chancery-house` | 6 | 138.3 s | 231 |
+
+**Every one of those is far above Limit A's 39.** So with lobby-only chimes, **Limit B stops binding
+altogether** and the constraint reduces to a single number:
+
+> **Discrete cues need `S ≤ 39`, and nothing else.**
+
+That makes fixing the speed ladder both **necessary and sufficient** for 1:1 audio, which is the
+result the owner's two instructions together produce and neither produces alone.
+
+**Three caveats, stated rather than buried.** The closed form **refuses multi-bank buildings** — it
+is a single-group up-peak model, and `secure-tower`, `mixed-use-high-rise` and `vertical-city` raise
+it as a warning rather than returning a figure. Scaling per bank puts `vertical-city` near `S ≤ 57`,
+still above 39, but that number is **an estimate and not a measurement**. The 250 ms and 100 ms
+figures are standard psychoacoustic thresholds, not facts about this tree. And `midtown-office`'s
+149.5 s reproduces `analytical/index.ts`'s own worked example of 149.54 s, which is why the method is
+quoted rather than merely asserted.
+
+**Two inputs are assumptions and are labelled as such.** `STOP = 30` simulated seconds per car per
+stop is an estimate, not a measurement — it should be replaced by a measured distribution from real
+runs, and the table above moves if it is wrong. The 250 ms and 100 ms figures are standard
+psychoacoustic thresholds, not facts about this tree.
+
+### What ships
+
+1. **A real 1:1 speed**, and labels that mean what they say. Without it the top tier of the design
+   has nowhere to play.
+2. **Discrete cues inside the budget**: doors, arrival chime, the things a lift actually does.
+3. **A continuous bed outside it**: lobby noise, crowd, voices — density tracking the waiting
+   population, which is a *continuous function of state* and therefore smooths under compression
+   rather than shattering. This is the one pro-audio argument the lane itself identified as
+   surviving, and it is now the design.
+4. **Chimes at the lobby only** (owner, 2026-08-24) — not at every floor. This is the instruction
+   that makes the rest work: it cuts the chime rate from one per stop to one per **round trip**, and
+   it is also what real installations do, so the reduction costs no realism.
+5. **The chime demoted, not deleted**: background level, occasional rather than per-event, and
+   explicitly *not annoying* — a texture that says *a lift is working* rather than a per-door alarm.
+
+### What this does not change
+
+**`docs/29`'s accessibility clause stands: no cue conveys information the screen does not also
+convey.** Audio is never pillar P3's visible antecedent, and shipping it does not discharge P3.
+Nothing here weakens a refusal, and the bed must not encode a figure the stage may not draw
+([`docs/10`](docs/10-experience-layer-contract.md) R6 applies to a sound as much as to a banner).
+
+**And the Settings row changes direction.** Under the cut it would have been deleted; under this
+ruling it **gains a consumer** and becomes a live control. `settingsView.ts:187`'s lede — *"how the
+game looks and sounds to you"* — stops being a false promise and becomes true, which is the one
+outcome that needed no correction at all. **`#170`'s Sound half closes by being built rather than by
+being cancelled; its Units half is untouched and stays open.**

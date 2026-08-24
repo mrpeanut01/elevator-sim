@@ -221,12 +221,25 @@ decision.
 [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) § 4 specifies six
 engineering challenges `E1`–`E6` (commission to the brief, design to the interval, diagnose the
 saturation, find what moved, meet the handling-capacity target, the Pareto trade study). **They are
-modes, they belong to the other product, and they are declared here for one reason only**: to record
-that they are the *same five beats in the technical register*, not a second loop. `docs/21 E3`
-(diagnose the saturation) is beats 1–2; `docs/21 E4` (find what moved) is beats 4–5; `docs/21 E1`
-and `E2` are beat 3 under a constraint. **A challenge that does not map onto the five beats is a
-finding to record, not a seventh challenge** — and the mapping is § 6's evidence that one loop
-serves both audiences.
+modes — of the other product — and they are declared here for one reason only**: to record that they
+are the *same five beats in the technical register*, not a second loop.
+
+| Challenge | Beats | Note |
+|---|---|---|
+| `docs/21 E1` — commission to the brief | **3**, under a declared capital constraint | The constraint the loop's beat 3 requires, priced |
+| `docs/21 E2` — design to the interval | **3–5** | The interval *is* beat 5, stated as the goal rather than as the outcome |
+| `docs/21 E3` — diagnose the saturation | **1–2** | The diagnostic half alone, and the only challenge that is |
+| `docs/21 E4` — find what moved | **4–5** | The adjudicative half alone. `docs/32 GD1`'s split, arriving as two separate briefs |
+| `docs/21 E5` — meet the handling-capacity target | **3–5**, against an analytic ceiling | The verdict is the judge's; the closed-form plate sits beside it, *"two bases, labelled, never merged"* |
+| `docs/21 E6` — the Pareto trade study | **Does not map, and that is the finding** | It varies more than one thing on purpose, so beat 3's *change one thing* does not hold. What it delivers is a **front**, not a verdict — which is § 1.4's *limit rather than differential* distinction arriving on the Engineer side |
+
+**`docs/21 E6` is the useful row.** Under this document's own rule — *a challenge that does not map
+onto the five beats is a finding to record, not a seventh challenge* — it is recorded rather than
+forced: a trade study is a **different question**, asked over a candidate set rather than over one
+change, and it is the second thing in this document (Endless rush is the first) that is legitimate,
+valuable and **not a turn of the loop**. Two of them, found independently on the two products, is
+the loop being a real constraint rather than a label. The other five rows are § 6's evidence that
+one loop serves both audiences.
 
 ---
 
@@ -880,7 +893,7 @@ points at § 9.
 | [`21-engineer-reimagined-contract.md`](21-engineer-reimagined-contract.md) | § 4's challenges **E1**–**E6**, mapped onto the five beats (§ 1.5); § 6's non-goals **3** (no scalar challenge score, capital on no results page), **6**, **7** | **Nothing.** The mapping adds no challenge and reorders none |
 | [`14-building-behaviour-contract.md`](14-building-behaviour-contract.md) | § 0's opt-in / byte-identical-when-unused constraint; §§ 2.1–2.3's demand dials; § 3.1 patience and abandonment; § 3.2 crowding; § 3.3 stairs | **Nothing.** `docs/32 GD20` *narrows* what difficulty may use — patience is legitimate as a building property and refused as a difficulty knob — which is a restriction on this document, not on that contract |
 | [`12-design-handoff.md`](12-design-handoff.md) and `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` | The session-shapes table; the mode lengths and lose-conditions; the fixed vocabulary; § 10's cut guess-the-fault quiz; `docs/design/design_handoff_casual_mode/ENGINE_CONTRACT.md` § 8's economy formulas and published totals | **Nothing.** The handoff wins every disagreement about the interface. § 1.4's demotion of Endless rush is a **recommendation** flagged as **Q1**, because moving a tile is an interface change and the interface is the handoff's |
-| [`16-change-scope-contract.md`](16-change-scope-contract.md) and [`17-play-experience-audit.md`](17-play-experience-audit.md) | *There is no such thing as a mid-day change*; the retry as the product's verb; § 4.4's commissioning phase | **Nothing.** § 4.2's failure model is the retry-cost ladder, which is that fact read as a design consequence |
+| [`16-change-scope-contract.md`](16-change-scope-contract.md) and [`17-play-experience-audit.md`](17-play-experience-audit.md) | *There is no such thing as a mid-day change*; the retry as the product's verb; `docs/17` § 4.4's commissioning phase | **Nothing.** § 4.2's failure model is the retry-cost ladder, which is that fact read as a design consequence |
 | [`CLAUDE.md`](../CLAUDE.md) | The eight invariants; the statistical discipline; the **five** grounds on which a mean is suppressed; energy as an axis and never a score; the standing requirement (*name the non-test caller*) | **Nothing.** Where this document and `CLAUDE.md` could disagree, `CLAUDE.md` wins by `22-charter.md` § 6, and no rule above needs that clause |
 | [`05-roadmap.md`](05-roadmap.md) | The standing requirement, applied to difficulty (`docs/32 GD19`) and to currency sinks (`docs/32 GD11`) | **Nothing.** No phase status touched; no phase row added |
 | [`25-vertical-slice.md`](25-vertical-slice.md) and [`13-phase-6c-handover.md`](13-phase-6c-handover.md) | Their `G1`–`G9` series, cited only to establish that the letter is taken twice and that this document therefore numbers `GD1`… (§ 0.2) | **Nothing.** No content taken from either |
