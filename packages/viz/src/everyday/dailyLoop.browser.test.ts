@@ -408,4 +408,63 @@ describe.skipIf(!HAS_BROWSER)('the daily loop is walkable end to end', () => {
       await page.close();
     }
   }, 180_000);
+
+  /**
+   * **GitHub issue #206 — the loop's tail, on the loop's own press.**
+   *
+   * The case above walks the tail *around* the defect: it closes the day through the host, then
+   * reaches the report by the rail's `WORLD` row and today's week card. That route is real and
+   * stays tested, and it is a **sidestep** — § 3.3's daily timeline says the report is step 4 of
+   * this flow, reached from the day.
+   *
+   * So this case presses what a player presses and nothing else: `Close the day`, on the shell's
+   * own bar, and then reads the screen it lands on. No rail row, no week card, no `page.evaluate`
+   * into the host — the four presses `enterEverydayStage` walks, then the fifth.
+   *
+   * It fails on the tree that reported #206: `everyday/stageScreen.ts`'s primary pauses the
+   * playback and files the day and does not navigate, so the fifth press leaves the player on the
+   * stage with the report written and no way to it.
+   */
+  it('files the day on § 3.3’s own primary and lands on the report — no rail detour', async () => {
+    const page = await coldLoad();
+    try {
+      // menu tile → front door → brief → stage, on § 3.3's primary at each step.
+      await enterEverydayStage(page);
+      await waitForOwnRun(page);
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
+
+      await page.locator('.everyday-bar-primary').click();
+      await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+
+      // The filed sheet, not the empty one — the press that navigated is the press that filed.
+      expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+      expect(
+        await page.locator('.everyday-report-figures .everyday-figure').count(),
+      ).toBeGreaterThan(0);
+      // § 3.3's daily report row, which is how the shell says which screen this is.
+      expect(await page.textContent('.everyday-bar-primary')).toBe('Your week');
+      // And step 4 of four is where the player now stands: the timeline's last stop is `current`,
+      // which is the one state the shell draws neither faint nor pressable.
+      expect(await page.textContent('.everyday-bar-timeline')).toContain('4 How it went');
+
+      /*
+       * **The second half of #206, and the reason the strip is a control rather than a caption.**
+       * Step back to the brief on the timeline's own stop — a reached one, which always worked —
+       * and the fourth stop is now **live from a screen that has not reached it**, because the day
+       * behind it is filed and its sheet is written. On the tree that reported the issue it was
+       * `4 <= 2`, faint, `disabled` and listener-less, exactly as it was on the stage.
+       */
+      const stopAt = (n: number) => page.locator('.everyday-bar-timeline button').nth(n - 1);
+      await stopAt(2).click();
+      await page.waitForSelector('.everyday-brief', { timeout: 15_000 });
+      expect(await stopAt(4).textContent()).toBe('4 How it went');
+      expect(await stopAt(4).isDisabled()).toBe(false);
+
+      await stopAt(4).click();
+      await page.waitForSelector('.everyday-report', { timeout: 15_000 });
+      expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+    } finally {
+      await page.close();
+    }
+  }, 180_000);
 });

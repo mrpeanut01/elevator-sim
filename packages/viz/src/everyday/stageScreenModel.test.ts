@@ -24,7 +24,9 @@ import { WAIT_BANDS } from '../live/bands.js';
 import { observationsAt } from '../live/observations.js';
 import { syntheticRecording, servedLeg, waitingLeg } from '../live/synthetic.test-helper.js';
 import { syntheticFloor, syntheticShaft } from '../live/synthetic.test-helper.js';
+import { actionBarFor } from './actionBar.js';
 import { EVERYDAY_COLORS } from './tokens.js';
+import { RUN_CONTEXTS } from './types.js';
 import {
   DEFAULT_STAGE_SPEED_INDEX,
   MAX_CAR_RIDERS,
@@ -33,6 +35,7 @@ import {
   stageBandOf,
   stageBarModelOf,
   stageCrowdCapOf,
+  stageFilingLandsOn,
   stageGeometryOf,
   stageHeaderOf,
   stageInkFor,
@@ -400,6 +403,61 @@ describe('§ 3.3 — the stage row, refined', () => {
       expect(bar.primary.inert, JSON.stringify(flags)).toBe(true);
       expect(bar.note, JSON.stringify(flags)).not.toBe('Stops the clock and writes the report.');
       expect((bar.note ?? '').length).toBeGreaterThan(10);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * § 6.4 / issue #206 — where the press lands
+ * -------------------------------------------------------------------------- */
+
+describe('§ 6.4 — where *Close the day* leaves the player', () => {
+  const filed = { dayClosed: true, hasReport: true } as const;
+
+  it('opens the report in the two flows whose report § 3.3 numbers, and in no other', () => {
+    /*
+     * Every context the product has, from the value the tree derives its sweeps from — a fifth
+     * added to `RUN_CONTEXTS` arrives here rather than being quietly omitted. `rush` presses this
+     * same primary under the label *End the rush* and § 3.3 gives its report no timeline; a watched
+     * day is somebody else's and § 14.1 forbids closing it at all.
+     */
+    const landing = Object.fromEntries(
+      RUN_CONTEXTS.map((ctx) => [ctx, stageFilingLandsOn(ctx, filed)]),
+    );
+    expect(landing).toEqual({
+      daily: 'report',
+      campaign: 'report',
+      rush: undefined,
+      watch: undefined,
+    });
+  });
+
+  it('stays put on every outcome that is not a filed day with a sheet behind it', () => {
+    /*
+     * `closeShift`'s three silent early returns — a run nobody started, a run this shell did not
+     * simulate, an already-filed one — all return normally having written nothing, so a press that
+     * navigated on *having been pressed* would send the player to an empty sheet. These are the
+     * outcomes those returns leave on the host.
+     */
+    for (const outcome of [
+      { dayClosed: false, hasReport: false },
+      { dayClosed: false, hasReport: true },
+      { dayClosed: true, hasReport: false },
+    ]) {
+      for (const ctx of RUN_CONTEXTS) {
+        expect(stageFilingLandsOn(ctx, outcome), `${ctx} ${JSON.stringify(outcome)}`).toBeUndefined();
+      }
+    }
+  });
+
+  it('asks § 3.3’s table rather than a list of context names kept beside it', () => {
+    /*
+     * The derivation, asserted rather than described: the answer is exactly *does this context's
+     * report row carry a timeline*. If the two ever disagree, the copy that is wrong is this one.
+     */
+    for (const ctx of RUN_CONTEXTS) {
+      const numbered = actionBarFor({ screen: 'report', ctx }).timeline !== undefined;
+      expect(stageFilingLandsOn(ctx, filed) === 'report', ctx).toBe(numbered);
     }
   });
 });

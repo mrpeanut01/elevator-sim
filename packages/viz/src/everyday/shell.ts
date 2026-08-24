@@ -925,6 +925,28 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     return label.replace('⟨building⟩', named ?? 'The building');
   }
 
+  /**
+   * Whether a **forward** timeline stop — one this flow has not reached — has something behind it.
+   *
+   * § 3.3's strip was drawn from the row's own step alone, so every stop past the current screen
+   * was faint and carried no listener. On the daily stage that made *4 How it went* evaluate
+   * `4 <= 3` and be inert **in every state, by construction**, which is half of GitHub issue #206:
+   * the day was filed, the sheet was written, and the one control naming it could not be pressed.
+   *
+   * The report is the one stop whose screen can be full before the flow arrives at it, because
+   * § 6.4 step 5 writes the sheet at the close rather than on arrival. Every other stop is a screen
+   * the player has yet to fill in — a brief for a day not set up is not a place to go — so this
+   * answers `false` for them and the strip is unchanged there.
+   *
+   * **A standing sheet is not enough**: the run on the stage must be the filed one. Yesterday's
+   * report is still standing while today is mid-morning, and a lit *How it went* over an unfinished
+   * day would be § 16 rule 4 — *a button does what it says* — read the wrong way round.
+   */
+  function forwardStopIsLive(screen: EverydayScreen): boolean {
+    if (screen !== 'report' || dataHost === undefined) return false;
+    return dataHost.runState().dayClosed && dataHost.lastReport() !== undefined;
+  }
+
   function drawBar(): void {
     confirmShowing = false;
     bar.replaceChildren();
@@ -964,18 +986,26 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
       for (const [index, stop] of stops.entries()) {
         const reached = index + 1 <= model.timeline.step;
         const current = index + 1 === model.timeline.step;
+        /*
+         * **Position in the flow is not the whole of it** — GitHub issue #206. A stop the flow has
+         * not reached is live when the screen behind it already holds something to read; see
+         * {@link forwardStopIsLive}, which is the only reason a stop past the current step is ever
+         * pressable. Everything else is unchanged: the current stop is where you are and never a
+         * button, and a reached stop goes back.
+         */
+        const live = !current && (reached || forwardStopIsLive(stop.screen));
         const step = el(doc, 'button', undefined, `${String(index + 1)} ${timelineLabel(stop.label)}`);
         step.type = 'button';
-        step.disabled = !reached || current;
+        step.disabled = !live;
         step.style.cssText = [
           'border:0',
           'background:transparent',
           `font:500 10.5px ${TYPE.mono}`,
           'padding:2px 3px',
-          `color:${current ? C.ink : reached ? C.label : C.ruleMid}`,
-          'cursor:' + (reached && !current ? 'pointer' : 'default'),
+          `color:${current ? C.ink : live ? C.label : C.ruleMid}`,
+          'cursor:' + (live ? 'pointer' : 'default'),
         ].join(';');
-        if (reached && !current) {
+        if (live) {
           step.addEventListener('click', () => {
             go(stop.screen);
           });

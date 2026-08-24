@@ -80,6 +80,7 @@ import {
   stageAlarmOf,
   stageBarModelOf,
   stageCrowdCapOf,
+  stageFilingLandsOn,
   stageGeometryOf,
   stageHeaderOf,
   stageInkFor,
@@ -874,11 +875,24 @@ function mountStage(
       playback = undefined;
       adopted = undefined;
     },
-    /** § 3.3's primary on the stage: *Close the day* — *stops the clock and writes the report*. */
+    /**
+     * § 3.3's primary on the stage: *Close the day* — *stops the clock and writes the report*.
+     *
+     * **And then opens it** (GitHub issue #206). The destination is
+     * `stageScreenModel.ts#stageFilingLandsOn`'s, asked *after* the call with what the host says
+     * happened rather than with what the press intended: `closeShift` returns normally from three
+     * gates that file nothing, and the rush and watch stages press this same function. Its
+     * docstring is the argument; what happens here is that it is asked.
+     */
     primary: () => {
       playback?.pause();
       host.closeDay();
       syncTransport();
+      const landing = stageFilingLandsOn(context.ctx, {
+        dayClosed: host.runState().dayClosed,
+        hasReport: host.lastReport() !== undefined,
+      });
+      if (landing !== undefined) context.go(landing);
     },
   };
 }

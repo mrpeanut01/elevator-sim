@@ -271,14 +271,15 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.click('.everyday-bar-confirm-stay');
     expect(await page.textContent('.everyday-bar-primary')).toBe('Close the day');
 
-    /* § 3.3's primary files the run; the latch disarms with it, because a filed day is not open. */
+    /*
+     * § 3.3's primary files the run; the latch disarms with it, because a filed day is not open.
+     *
+     * **And it opens the sheet it wrote** — GitHub issue #206 — so what stands after the press is
+     * the report, not the stage. The two claims this case made about the *stage* after a file are
+     * unchanged and are made in the case below, which files the day the other way it is filed.
+     */
     await page.click('.everyday-bar-primary');
-    await page.waitForFunction(
-      () => document.querySelector('.everyday-stage-intervene')?.hasAttribute('disabled') === true,
-      undefined,
-      { timeout: 30_000 },
-    );
-    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain('filed');
+    await page.waitForSelector('.everyday-report', { timeout: 30_000 });
 
     await page.click('.everyday-bar-leave');
     /* No strip: a report is already after the fact, and warning about it would be theatre. */
@@ -289,4 +290,82 @@ describe.skipIf(!HAS_BROWSER)('the Everyday stage', () => {
     await page.waitForSelector('.everyday-mode[data-screen="door"]');
     await page.close();
   });
+
+  /**
+   * The stage's own filed state — which the § 3.3 press no longer stops on.
+   *
+   * Since GitHub issue #206 the primary opens the report, so a day filed *by pressing it* leaves
+   * this screen. The state is neither gone nor invented: `dev/main.ts`'s tick files a day whose
+   * playhead has run out, and that file arrives while the player is still watching. So it is driven
+   * here through the data host — `dailyLoop.browser.test.ts#closeDay`'s idiom, for its stated
+   * reason: one deterministic step rather than a press whose timing depends on the mount.
+   *
+   * Both assertions were the case above's before the fix, and neither is weakened: an intervention
+   * on a filed day is refused **and says so**, and § 3.4 does not warn about leaving one.
+   */
+  it('refuses an intervention on a day filed under it, and does not warn about leaving that', async () => {
+    const page = await coldLoad();
+    await enterEverydayStage(page);
+    await page.click('.everyday-stage-play');
+
+    await page.evaluate(
+      "import('/src/everyday/host.ts').then((module) => { module.EVERYDAY_HOST.current()?.closeDay(); return true; })",
+    );
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-stage-intervene')?.hasAttribute('disabled') === true,
+      undefined,
+      { timeout: 30_000 },
+    );
+    expect(await page.textContent('.everyday-stage-intervene-refusal')).toContain('filed');
+    /* Still the stage: only the § 3.3 press navigates, and this was not it. */
+    expect(await page.locator('.everyday-stage-canvas').count()).toBe(1);
+
+    await page.click('.everyday-bar-leave');
+    expect(await page.locator('.everyday-bar-confirm-stay').count()).toBe(0);
+    await page.waitForSelector('.everyday-mode[data-screen="door"]');
+    await page.close();
+  });
+
+  /**
+   * **The other flow that files** — GitHub issue #206's second half of the blast radius.
+   *
+   * `screens.ts` routes one `STAGE_SCREEN` and its `primary` is one function, so a campaign day is
+   * filed by the very code the daily case drives. That is exactly why it is driven rather than
+   * argued: the press's destination is decided per run context, and a rule that answered *report*
+   * for `daily` because it was written for `daily` would be a rule that passes its own test.
+   *
+   * The walk is the player's: Campaign tile → the triage row's building → the contract desk → *Lock
+   * it in and run day N*, which is `runCampaignDay` and `go('stage')`. `campaignScreens.browser.
+   * test.ts` walks the first three of those and stops at the desk; this carries on to the end.
+   */
+  it('files a campaign day on the same primary and lands on the campaign report', async () => {
+    const page = await coldLoad();
+    await page.locator('.everyday-mode', { hasText: 'Campaign' }).first().click();
+    await page.waitForSelector('.everyday-towers');
+    const building = await page.textContent('.everyday-towers-name');
+    await page.click('.everyday-towers-open');
+    await page.waitForSelector('.everyday-building');
+    await page.click('.everyday-building-to-contract');
+    await page.waitForSelector('.everyday-contract');
+
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-stage-canvas', { timeout: 60_000 });
+    await page.waitForFunction(
+      () => document.querySelector('.everyday-bar-primary')?.textContent === 'Close the day',
+      undefined,
+      { timeout: 120_000 },
+    );
+    /* § 3.3's campaign stage row is step 4 of five, which is how this case knows the context is
+       the campaign's and not the daily one it shares a screen with. */
+    expect(await page.textContent('.everyday-bar-timeline')).toContain('4 The day');
+
+    await page.click('.everyday-bar-primary');
+    await page.waitForSelector('.everyday-report', { timeout: 30_000 });
+    expect(await page.locator('.everyday-report-empty').count()).toBe(0);
+    /* § 3.3's campaign report row: step 5 of five, and the primary that names the building the
+       triage row opened. */
+    expect(await page.textContent('.everyday-bar-timeline')).toContain('5 How it went');
+    expect(await page.textContent('.everyday-bar-primary')).toBe(`Back to ${building ?? ''}`);
+    await page.close();
+  }, 240_000);
 });

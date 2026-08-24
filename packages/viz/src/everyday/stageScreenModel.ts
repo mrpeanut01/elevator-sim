@@ -69,7 +69,7 @@ import type { LiveObservations, WaitBandId } from '../live/types.js';
 import { actionBarFor } from './actionBar.js';
 import type { ActionBarModel } from './actionBar.js';
 import { EVERYDAY_COLORS as C } from './tokens.js';
-import type { EverydayState } from './types.js';
+import type { EverydayScreen, EverydayState, RunContext } from './types.js';
 
 /* -------------------------------------------------------------------------- *
  * § 4.6 — the transport
@@ -511,6 +511,52 @@ export function stageBarModelOf(state: EverydayState, input: StageBarInput): Act
     primary: { ...base.primary, inert: true },
     note: refusal,
   };
+}
+
+/** What the press actually did, read back off the host after the call — never predicted. */
+export interface StageFilingOutcome {
+  /** `EverydayHost.runState().dayClosed` — the run on the stage is filed. */
+  readonly dayClosed: boolean;
+  /** `EverydayHost.lastReport() !== undefined` — § 6.4 step 5 wrote a sheet. */
+  readonly hasReport: boolean;
+}
+
+/**
+ * Where § 3.3's stage primary leaves the player once it has pressed — GitHub issue **#206**.
+ *
+ * `Close the day` *stops the clock and writes the report*, and until this function existed it wrote
+ * the report and left the player standing on the stage with no route to it: the daily timeline's
+ * fourth stop is drawn from the row's own step, so on a stage at step 3 it evaluated `4 <= 3` and
+ * was faint and listener-less in every state. The loop did not close. The auto-open is the
+ * handoff's own behaviour — `dev/main.ts` has done it into `ViewerState.tab` since the Engineer
+ * shell was the only reader — so this is the Everyday shell acquiring the half it never had.
+ *
+ * ## Two questions, and the order matters
+ *
+ * **The outcome, not the press.** `closeShift` has three silent early returns — a run nobody
+ * started (§ D232's `playerHasChosen` gate), a run this shell did not simulate
+ * (`shift/banking.ts#bankingRefusalFor`), and an already-filed one — and every one of them files
+ * nothing while returning normally. Navigating on the press would turn each into a player sent to
+ * an empty sheet by a button that promised a written one. So both facts are read **back off the
+ * host after the call**: a day that is closed, and a report that exists.
+ *
+ * **The flow, not the screen.** The stage is one component with four run contexts, and the primary
+ * is one function for all four. A `rush` day's primary is *End the rush* and § 3.3 gives its report
+ * no timeline; a `watch` day is somebody else's and cannot be closed at all. Only the two flows
+ * whose report is a numbered step land there — and *which those are* is asked of § 3.3's own table
+ * (does this context's report row carry a timeline?) rather than of a pair of context names kept
+ * here. A fifth run context answers by being in the table; it cannot answer by omission.
+ *
+ * `undefined` means *stay where you are*, which is what a refused close must look like.
+ *
+ * Non-test caller: `everyday/stageScreen.ts`'s `primary` handle, the § 3.3 press itself.
+ */
+export function stageFilingLandsOn(
+  ctx: RunContext,
+  outcome: StageFilingOutcome,
+): EverydayScreen | undefined {
+  if (!outcome.dayClosed || !outcome.hasReport) return undefined;
+  return actionBarFor({ screen: 'report', ctx }).timeline === undefined ? undefined : 'report';
 }
 
 /* -------------------------------------------------------------------------- *
