@@ -11,7 +11,7 @@
  * Every fault runs on a **real case over the shipped `data/`**. Nothing is mocked and nothing
  * about the run changes: the recording, the batch and the statistics every property consults are
  * the real ones, and only what a surface *said* is corrupted. A property that merely echoed the
- * statistics would sail past all nine faults below.
+ * statistics would sail past all ten faults below.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -81,6 +81,13 @@ const FIXTURE_FOR: Readonly<Record<HonestyProperty, 'quotable' | 'suppressed'>> 
    * `quotable` for the same reason as the two above — it is the fixture with more surfaces speaking.
    */
   'withheld-figure-published': 'quotable',
+  /*
+   * The charter's M2 gate needs neither fixture: it judges words, not figures, and the player
+   * surfaces it is scoped to draw their copy on every case whatever the summary decided.
+   * `quotable` for the reason the three above take it — it is the fixture with more surfaces
+   * speaking, so `replaceFirst` has a `label` string to land on.
+   */
+  'internal-notation': 'quotable',
 });
 
 describe('every property fires when the thing it protects is broken', () => {
@@ -131,20 +138,34 @@ describe('every property fires when the thing it protects is broken', () => {
     const clean = evaluateCase(quotable, resources);
     const properties = new Set(clean.violations.map((found) => found.property));
     /*
-     * **Empty, and it has been empty twice for two different reasons.** It emptied at § D171, which
-     * removed the R10 finding on the Parameters tab by narrowing the rule; it acquired one entry
-     * when the temporal axis found `render/describeFrame.ts` joining every `MoodDriver` ungated;
-     * and it is empty again because that join is now gated on `MoodDriver.basis` the way § D293
-     * gated the rail's copy of it. The register in `honesty.test.ts`'s `OUTSTANDING` says the same
-     * thing from the other side, and is empty for the same reason.
+     * **It has been empty twice for two different reasons, and it is not empty now.** It emptied at
+     * § D171, which removed the R10 finding on the Parameters tab by narrowing the rule; it acquired
+     * one entry when the temporal axis found `render/describeFrame.ts` joining every `MoodDriver`
+     * ungated; and it emptied again because that join is now gated on `MoodDriver.basis` the way
+     * § D293 gated the rail's copy of it.
      *
-     * The assertion is exact in both directions and must stay that way: an eighth property going
-     * off on a clean run is red, and a finding that is *recorded* rather than fixed has to be added
-     * here as well, which is what stops a register entry being written without anybody noticing the
-     * clean run had started failing. It is not `toContain`, and it must not become one.
+     * **`internal-notation` is here because it is genuinely failing on a clean run**, which is what
+     * this line existing for is: *"a finding that is recorded rather than fixed has to be added here
+     * as well, which is what stops a register entry being written without anybody noticing the clean
+     * run had started failing."* `CHARTER_PROGRAMME.md` § M2's third exit criterion fails today on
+     * four player surfaces, GitHub issue #207 is the fix, and this lane built the instrument rather
+     * than the fix — so the clean run says so, here and in `honesty.test.ts`'s `OUTSTANDING`, and the
+     * two have to agree. **The day #207 lands, this goes back to `[]` on the same commit**, and the
+     * register empties with it.
+     *
+     * The assertion is exact in both directions and must stay that way: a tenth property going off
+     * on a clean run is red, and so is this one going quiet while the register still names it. It is
+     * not `toContain`, and it must not become one. The surface list is in adapter order — the order
+     * `SURFACE_ADAPTERS` fixes and whose comments treat as load-bearing — and not sorted, because an
+     * order-sensitive list is the stronger claim.
      */
-    expect([...properties].sort()).toEqual([]);
-    expect([...new Set(clean.violations.map((found) => found.surfaceId))]).toEqual([]);
+    expect([...properties].sort()).toEqual(['internal-notation']);
+    expect([...new Set(clean.violations.map((found) => found.surfaceId))]).toEqual([
+      'everyday/modes.ts#EVERYDAY_MODES',
+      'everyday/settingsView.ts#settingsScreenViewOf',
+      'everyday/stageScreenModel.ts#stageHeaderOf',
+      'everyday/designerModel.ts#designerFigures',
+    ]);
   });
 
   it('a fault survives shrinking, and the shrunk case is smaller', () => {

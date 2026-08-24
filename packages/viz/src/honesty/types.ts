@@ -45,7 +45,23 @@ import type { WaitBandBasis } from '../live/types.js';
 /**
  * The six properties § D163 clause 1 enumerates, each named by the rule of
  * [`docs/10`](../../../../docs/10-experience-layer-contract.md) § 1 it derives from — **and a
- * seventh, which is about *when* a string was said rather than about what it said.**
+ * seventh, which is about *when* a string was said rather than about what it said, an eighth about
+ * a cell a figure may not stand in, and a ninth about what a string is written *in*.**
+ *
+ * ## Why the ninth is here and not in a lint rule
+ *
+ * `CHARTER_PROGRAMME.md` § M2's third exit criterion is *"nothing on a player surface refers to a
+ * section number, a source filename or a code identifier"*, and it says of itself that it *"is a
+ * mechanical check and it is part of the gate"*. A gate with an instrument is a gate; a gate with
+ * an opinion is a negotiation — and this one **fails today**: `ISSUE_VERIFICATION_FINDINGS.md` § N
+ * counts six source files carrying it, which reach the player through **four** of this corpus's
+ * surfaces. That is why the check is built before the strings are fixed rather than after — a gate
+ * nobody has watched fail is a gate nobody has watched.
+ *
+ * It belongs in this corpus rather than in a source lint because the defect is about what a
+ * **player reads**, not about what a file contains: the same sentence is fine in a docstring and
+ * wrong on a screen, and the only list of what reaches a screen is `surfaces.ts`. A grep over
+ * `src/` cannot tell those apart; this search already knows.
  *
  * Ordered as the decision lists them. Each is checked by one function in `properties.ts`, and
  * each has a fault in `faults.ts` that makes it fail.
@@ -88,6 +104,8 @@ export const HONESTY_PROPERTIES = [
   'whole-run-figure-early',
   /** § 12.2 / § 16 rules 1 and 15 — a withheld cell reads `—` or a label, never a zero or a leak. */
   'withheld-figure-published',
+  /** The charter's M2 gate — no section number, source filename or code identifier where a player reads. */
+  'internal-notation',
 ] as const;
 
 export type HonestyProperty = (typeof HONESTY_PROPERTIES)[number];

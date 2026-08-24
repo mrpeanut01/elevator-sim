@@ -9802,6 +9802,51 @@ export const SURFACE_ADAPTERS: readonly SurfaceAdapter[] = Object.freeze([
   EVERYDAY_STANDALONE_SCREENS,
 ]);
 
+/* -------------------------------------------------------------------------- *
+ * Which surfaces a **player** reads
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The module directories that are the player's product rather than the engineer's tool.
+ *
+ * `everyday/` is Everyday Mode — the page opens on it ([§ D335](../../../../DECISIONS.md)), and
+ * `CHARTER_PROGRAMME.md` § M2's gate is about the vertical slice that lives there. `campaign/` is
+ * the other half of the same audience: it is the directory `words.ts#playerSafeDescription` exists
+ * in, which is as plain a statement as a tree makes about who reads it.
+ *
+ * **Everything else is deliberately out**, and the reason is measured rather than asserted. Over
+ * the 27 049 **distinct** strings a seven-seed sample of the standard corpus renders, a filename
+ * match on every surface reports **656**, of which **572** are `dev/familyControls.ts#familyControlsViewOf` drawing rows that read *"Read by
+ * `dispatch/policy.ts#resolveDispatchConfig`, from `dev/state.ts#shiftRunConfigOf`"* — an Engineer
+ * panel whose entire job is to name the code that reads a field, correctly, to an engineer. A gate
+ * that fired there would be [§ D91](../../../../DECISIONS.md)'s failure exactly — *"a threshold
+ * loosened three times asserts nothing"*, reached by way of a guard that cries about legitimate
+ * cases until somebody loosens it to stop the noise.
+ */
+const PLAYER_FACING_DIRECTORIES: readonly string[] = Object.freeze(['everyday/', 'campaign/']);
+
+/**
+ * The surface ids whose strings a player reads — **derived from the adapters, never listed.**
+ *
+ * An adapter is player-facing when **any declaration it drives** lives in a player directory, not
+ * merely when its own id does. That distinction is load-bearing and was found by measurement:
+ * `gauntlet/ladder.ts#ladderRowsOf` drives `everyday/boardScreen.ts#BOARD_SCREEN_COPY` and
+ * `#DAILY_BOARD_ABSENCE`, so a rule keyed on the id alone would have left the board screen's own
+ * register of absences — the exact shape of string this gate is about — outside the gate while
+ * looking complete. A hand-written list has the same defect one merge later, which is why this one
+ * is computed from `covers` and re-computed on every run.
+ *
+ * It follows that a new player screen enters the gate on the merge that registers its adapter, and
+ * a new Engineer panel does not. That is the direction the staleness has to run in.
+ */
+export const PLAYER_FACING_SURFACES: ReadonlySet<string> = new Set(
+  SURFACE_ADAPTERS.filter((adapter) =>
+    [adapter.id, ...adapter.covers].some((declaration) =>
+      PLAYER_FACING_DIRECTORIES.some((directory) => declaration.startsWith(directory)),
+    ),
+  ).map((adapter) => adapter.id),
+);
+
 /** Every declaration the adapter set claims to drive, as `<module>#<export>`. */
 export function coveredDeclarations(): ReadonlySet<string> {
   const covered = new Set<string>();

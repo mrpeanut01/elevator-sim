@@ -1,9 +1,15 @@
 /**
- * The seven properties, as predicates over rendered strings and the run's own statistics.
+ * The nine properties, as predicates over rendered strings and the run's own statistics.
  *
  * Each derives from a rule in [`docs/10`](../../../../docs/10-experience-layer-contract.md) § 1
  * and is quoted from it here rather than paraphrased, because a property that restates a rule
  * loosely is a property that passes for the wrong reason.
+ *
+ * **The ninth is the exception, and it is quoted the same way.** `internal-notation` derives from
+ * `CHARTER_PROGRAMME.md` § M2's third exit criterion rather than from `docs/10`, because it is a
+ * gate on a milestone rather than a rule of the experience layer — the first property here whose
+ * source is the programme. It obeys every convention below regardless: it is a predicate over
+ * rendered strings, it re-implements nothing, and it has a fault in `faults.ts`.
  *
  * ## The rule every check below obeys
  *
@@ -32,7 +38,7 @@ import { observationsAt } from '../live/observations.js';
 import type { LiveObservations } from '../live/types.js';
 import { GOAL_JUDGEMENT, GOAL_KINDS } from '../scenario/goals.js';
 import { MIN_SEEDS_PER_GOAL } from '../scenario/published.js';
-import type { HonestyContext } from './surfaces.js';
+import { PLAYER_FACING_SURFACES, type HonestyContext } from './surfaces.js';
 import type {
   HonestyProperty,
   HonestyViolation,
@@ -1222,6 +1228,206 @@ function checkWithheldFigure(
 }
 
 /* -------------------------------------------------------------------------- *
+ * The charter's M2 gate — no internal notation where a player reads
+ * -------------------------------------------------------------------------- */
+
+/**
+ * A reference to a numbered section of a design document — `§ 6.5`, `§ 12.2`, `§ 9`.
+ *
+ * The digit is required. A bare `§` is a typographic mark and could be prose about a clause of
+ * something real; a `§` with a number after it is this repository's own cross-reference notation
+ * and nothing else. Measured over the 27 049 distinct strings a seven-seed sample of the standard
+ * corpus renders: **22** match, every one of them a register entry on a player surface, and **not
+ * one string on any other surface matches** — Engineer panels included. So this clause would have
+ * needed no scoping at all; the four below it would, which is why the scope is applied to the
+ * property rather than clause by clause.
+ *
+ * Deliberately not matched: *"section 6.5"* spelled out in words. Nothing in the tree writes it
+ * that way, and a rule for a form nobody uses is a rule nobody can watch fail.
+ */
+const SECTION_REFERENCE = /§\s*\d/u;
+
+/**
+ * A source filename, with or without its path — `dev/reportPanel.ts`, `data/scenario-goals.json`.
+ *
+ * Extensions are enumerated rather than generalised to *"a dot and some letters"*, because English
+ * prose is full of a dot followed by letters and this rule must not fire on a sentence. The list is
+ * every extension this tree's sources actually carry.
+ *
+ * **A bare directory is deliberately not matched.** `RUSH_ABSENCES[0]` says *"no demand template in
+ * `data/` ramps without a ceiling"*, and `data/` on its own is not a filename — it is under-matched
+ * on purpose, and it is named here so that the gate's zero is read for what it is: `data/` is
+ * internal jargon that this property does not judge. Widening to a bare `word/` would match
+ * *and/or*, which is the cry-wolf direction.
+ */
+const SOURCE_FILENAME = /\b[A-Za-z0-9_$-]+(?:\/[A-Za-z0-9_$-]+)*\.(?:ts|tsx|js|mjs|cjs|json|html|css|md)\b/u;
+
+/**
+ * A constant's identifier — `LEVER_SURFACES`, `RUSH_PRIMARY_REFUSAL`.
+ *
+ * At least one underscore is required, so this cannot fire on an ordinary capitalised word or on
+ * the design's shouted eyebrows (`WHAT THIS BUILD DOES NOT DO YET` is spaced, not joined).
+ */
+const CONSTANT_IDENTIFIER = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/u;
+
+/**
+ * A member path — `bank.ts#deckAt`, `dev/reportPanel.ts#LEVER_SURFACES`.
+ *
+ * `#` between two identifier tokens is this tree's own spelling for *"this export of that module"*
+ * and has no other meaning in prose. The digit case (`#4`) is excluded by requiring a letter or
+ * `_`/`$` after the hash, so a numbered item is not a code reference.
+ *
+ * The left side swallows the path and the extension when they are there, so the violation **quotes
+ * the whole reference** rather than the `ts#LEVER_SURFACES` tail a reader would have to reconstruct.
+ * It is never the only clause that sees such a string — {@link SOURCE_FILENAME} catches it too —
+ * which is exactly why this one is free to be strict: it exists for the form with no extension.
+ */
+const MEMBER_PATH = /\b[A-Za-z_$][A-Za-z0-9_$]*(?:[./][A-Za-z0-9_$-]+)*#[A-Za-z_$][A-Za-z0-9_$]*/u;
+
+/** Spans the author marked as code. The delimiter is the claim; {@link isCodeToken} tests the content. */
+const CODE_VOICE = /`([^`]{1,120})`/gu;
+
+/**
+ * Whether a backticked span is a bare code identifier rather than a quoted phrase.
+ *
+ * One token — no spaces — carrying an underscore or an interior capital. That is `SpecTransportMode`,
+ * `clockAt`, `phaseAt`; it is not `` `Race against` `` and not `` `lobby` ``.
+ */
+function isCodeToken(span: string): boolean {
+  if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(span)) return false;
+  return span.includes('_') || /[A-Z]/u.test(span.slice(1));
+}
+
+/**
+ * Everything in the string that the criterion names, **not the first thing**.
+ *
+ * A violation is read by whoever is going to rewrite the sentence, and *"§ 6.5's third lever … which
+ * is what `dev/reportPanel.ts#LEVER_SURFACES` names"* carries all three of the criterion's things at
+ * once. Reporting only the section number would send a rewriter back for the other two, and a second
+ * pass on the same sentence is how the seventeen become sixteen-and-a-half.
+ *
+ * One example per clause: the point is to say *what kind of thing is in here*, not to enumerate
+ * every occurrence, which the quoted string already does.
+ */
+function notationIn(text: string): readonly { readonly kind: string; readonly quote: string }[] {
+  const found: { kind: string; quote: string }[] = [];
+  const section = SECTION_REFERENCE.exec(text);
+  if (section !== null) found.push({ kind: 'a section reference', quote: section[0] });
+  const filename = SOURCE_FILENAME.exec(text);
+  if (filename !== null) found.push({ kind: 'a source filename', quote: filename[0] });
+  const member = MEMBER_PATH.exec(text);
+  if (member !== null) found.push({ kind: 'a member path', quote: member[0] });
+  const constant = CONSTANT_IDENTIFIER.exec(text);
+  if (constant !== null) found.push({ kind: "a constant's identifier", quote: constant[0] });
+  for (const marked of text.matchAll(CODE_VOICE)) {
+    const span = marked[1] ?? '';
+    if (isCodeToken(span)) {
+      found.push({ kind: 'an identifier in code voice', quote: `\`${span}\`` });
+      break;
+    }
+  }
+  return found;
+}
+
+/**
+ * `CHARTER_PROGRAMME.md` § M2, third exit criterion — **nothing on a player surface refers to a
+ * section number, a source filename or a code identifier.**
+ *
+ * The criterion says of itself that it *"is a mechanical check and it is part of the gate"*, and it
+ * **fails today**. `ISSUE_VERIFICATION_FINDINGS.md` § N counted it by hand first — six source files,
+ * 27 register entries, 17 of them carrying notation — and this check agrees on all seventeen and
+ * **adds two the hand count had no reason to look at**, on a campaign stage the always-on tier never
+ * draws. Nineteen.
+ *
+ * This is the instrument, not the fix (GitHub issue #207). Every finding is in `honesty.test.ts`'s
+ * `OUTSTANDING` register, one entry per offending **sentence**, so that **deleting entries is how
+ * the gate's progress is read**: the criterion is met when the register is empty, and at no earlier
+ * moment.
+ *
+ * ## Which strings are judged — **every role, and that is the point**
+ *
+ * Every one of the seventeen register entries is `role: 'reason'` — the one role R3 **exempts**.
+ * That exemption is R3's and it is about numbers: a refusal has to be allowed to name the figure it
+ * is refusing, or it cannot refuse anything. There is no analogous licence here. A refusal may name
+ * a number; naming a *section of a design document* is not a thing refusing requires, and a section
+ * number in a reason is on the player's screen exactly as much as one in a heading. So no role is
+ * exempt, and a property that adopted R3's exemption list out of symmetry would have been unable to
+ * see the entire defect it was written for.
+ *
+ * `provenance` is not scoped either, for the same reason and one more: [§ D171](../../../../DECISIONS.md)
+ * narrowed R10 away from `schema` because *"a description of what a dial does"* is not an interval
+ * being translated — an argument about **what R10 is for**, which does not transfer. A
+ * `SearchParameter.description` that named a filename on a player screen would be the defect, and
+ * `core` writing it would not make it less so.
+ *
+ * **That was a prediction when it was written and is a measurement now.** `schema` prose mostly
+ * reaches the Parameters tab, which is an Engineer surface — but the deep tier found
+ * `auction.aggregation`'s description, *"…see docs/01-architecture.md"*, re-printed on the campaign
+ * **brief**'s editable-control list, where a player reads it. Had this property inherited R10's
+ * exemption out of symmetry, that string would have been exempt exactly where it is a defect and
+ * still swept exactly where it is not. It is registered in `honesty.test.ts`'s `OUTSTANDING`.
+ *
+ * ## Which **surfaces** are judged, and the measurement that decided it
+ *
+ * `surfaces.ts#PLAYER_FACING_SURFACES` — the adapters that draw at least one declaration out of
+ * `everyday/` or `campaign/`. The criterion says *a player surface*, and the Engineer surface is the
+ * other audience by construction ([§ D338](../../../../DECISIONS.md)'s door between the two).
+ *
+ * This is the decision that had to be measured rather than argued, because getting it wrong in
+ * either direction ruins the instrument. Run over **every** surface — measured on the 27 049
+ * **distinct** strings a seven-seed sample of the standard corpus renders, so the figure is a count
+ * of sentences rather than of renderings — the filename clause alone reports **656**; **572** of
+ * them are
+ * `dev/familyControls.ts#familyControlsViewOf` drawing *"Read by
+ * `dispatch/policy.ts#resolveDispatchConfig`, from `dev/state.ts#shiftRunConfigOf`"* — an Engineer
+ * panel doing precisely its job, and a further 40 are the building editor's help text. Scoped to
+ * player surfaces the same clause reports **2**, both real. A guard that reported the other 654
+ * would be the § D91 failure this repository already names: it trains people to ignore it.
+ *
+ * ## What it deliberately does **not** match, with the cost of each stated
+ *
+ * - **A bare camelCase or dotted config path.** `everyday/workshopModel.ts#WORKSHOP_COPY` says
+ *   *"that wrote `idle.parkingStrategy: lobby`"* on **37** of those distinct strings, and it says so because
+ *   § D227 requires a control to state what it writes — the stale-refusal defect is exactly a
+ *   control that does not. Separating `SpecTransportMode` from `parkingStrategy` needs this tree's
+ *   own export list, which `properties.ts` may not read (`boundaries.test.ts` confines the
+ *   filesystem to the test helpers), and a spelling rule that guessed would take those 37 with it.
+ *   So an identifier is caught when its author marked it as code, or when it is a filename, a
+ *   member path or a shouted constant — never by inferring intent from capitals. **If the gate's
+ *   owner rules those 37 in, the fix is to widen this clause and register the findings**, and the
+ *   number is stated here so that ruling is made against a measurement.
+ * - **A bare directory**, per {@link SOURCE_FILENAME}.
+ * - **`§` with no number**, per {@link SECTION_REFERENCE}.
+ *
+ * Each of those is an under-match, and under-matching is the deliberate side to err on: a missed
+ * string is one line of copy the next run of this search will still not see, while a false positive
+ * is a gate nobody believes.
+ */
+function checkInternalNotation(
+  _context: HonestyContext,
+  texts: readonly RenderedText[],
+): readonly HonestyViolation[] {
+  const found: HonestyViolation[] = [];
+  for (const text of texts) {
+    if (!PLAYER_FACING_SURFACES.has(text.surfaceId)) continue;
+    const notation = notationIn(text.text);
+    if (notation.length === 0) continue;
+    const caught = notation.map((one) => `${one.kind} “${one.quote}”`).join(', ');
+    found.push(
+      violation(
+        'internal-notation',
+        text,
+        `carries internal notation where a player reads — ${caught}. ` +
+          'CHARTER_PROGRAMME.md § M2: nothing on a player surface refers to a section number, a ' +
+          'source filename or a code identifier. The screen is the whole of what a player has; a ' +
+          'note to the team left on it is a sentence they cannot follow up.',
+      ),
+    );
+  }
+  return found;
+}
+
+/* -------------------------------------------------------------------------- *
  * The whole check
  * -------------------------------------------------------------------------- */
 
@@ -1237,9 +1443,10 @@ export const PROPERTY_CHECKS: Readonly<
   'goal-without-rate': checkGoalWithoutRate,
   'whole-run-figure-early': checkWholeRunFigureEarly,
   'withheld-figure-published': checkWithheldFigure,
+  'internal-notation': checkInternalNotation,
 });
 
-/** Check all eight against one case's rendered strings. */
+/** Check all nine against one case's rendered strings. */
 export function checkAll(
   context: HonestyContext,
   texts: readonly RenderedText[],

@@ -36,7 +36,7 @@
 
 import { observationsAt } from '../live/observations.js';
 
-import type { HonestyContext } from './surfaces.js';
+import { PLAYER_FACING_SURFACES, type HonestyContext } from './surfaces.js';
 import type { HonestyProperty, RenderedText } from './types.js';
 
 /** The signature `HonestyResources.corruptTexts` takes. */
@@ -347,6 +347,34 @@ export const withheldFigureStale: TextFault = (texts) =>
   );
 
 /**
+ * The charter's M2 gate — a note to the team, left where the audience is.
+ *
+ * Written as a **new** sentence on a `label` string rather than by editing one of the register
+ * entries the search already reports, for two reasons. It has to produce a *new* offending string
+ * for `faults.test.ts`'s freshness assertion, which an edit to an already-failing entry would not.
+ * And it has to prove the property is about **any** player-facing string and not about the shape of
+ * an absence register — a fault confined to the one surface the finding lives on would be a fault
+ * that only proves the finding.
+ *
+ * The sentence carries all three of the criterion's things, in the form the tree writes them, so
+ * every clause's quoting path is exercised — **and that is not the same as a guard per clause**,
+ * which one fault cannot be: any one clause firing produces the violation, so a clause quietly
+ * deleted would still leave this fault passing. Said plainly rather than implied, because a fault
+ * that is believed to cover more than it does is the thing this file exists to prevent. Per-clause
+ * coverage is `honesty.test.ts`'s register, whose nineteen findings between them are caught by the
+ * section, filename, member-path, constant and code-voice clauses on real shipped strings.
+ */
+export const notationOnPlayerSurface: TextFault = (texts) =>
+  replaceFirst(
+    texts,
+    (text) => PLAYER_FACING_SURFACES.has(text.surfaceId) && text.role === 'label',
+    (text) => ({
+      ...text,
+      text: 'Not drawn yet — § 6.5’s third lever, `dev/reportPanel.ts#LEVER_SURFACES`.',
+    }),
+  );
+
+/**
  * One fault per property, so the suite can iterate rather than list.
  *
  * Three of them carry a second, and in every case because the property has two halves a fault for
@@ -391,4 +419,5 @@ export const FAULTS: Readonly<Record<HonestyProperty, readonly { readonly name: 
       { name: 'withheldFigureAsZero', fault: withheldFigureAsZero },
       { name: 'withheldFigureStale', fault: withheldFigureStale },
     ],
+    'internal-notation': [{ name: 'notationOnPlayerSurface', fault: notationOnPlayerSurface }],
   });
