@@ -8301,9 +8301,21 @@ const FAMILY_CONTROLS: SurfaceAdapter = {
  * `live/bands.ts`' own `legendLabel`s, driven here for the first time on a paper-mode surface.
  *
  * `everyday/stageScreen.ts#STAGE_SCREEN` is **not** driven and is excluded in `derive.test.ts` on
- * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. The split
- * is the point: everything the screen *says* is here, and what the mount authors of its own is
- * geometry, class names and two static captions.
+ * the DOM mounts' shared ground — it needs a document, a canvas and an animation frame. **The
+ * exclusion is right and the sentence that used to follow it was wrong.**
+ *
+ * It said *"everything the screen says is here, and what the mount authors of its own is geometry,
+ * class names and two static captions."* Measured, the mount draws five `fillText` sites, and one of
+ * them is **a live figure**: `${occupants}/${capacity}` at `stageScreen.ts:297`, composed in the
+ * mount — neither identifier appears in this model — and therefore read by **no property at all**,
+ * neither the M2 gate nor R6's temporal axis. (`OUT OF SERVICE` beside it is plausibly one of the
+ * two captions meant; the `+N` overflow *is* swept, because `stageCrowdCapOf` composes it here.)
+ *
+ * So this is the stale-refusal class rather than a scoping question — a sentence describing what a
+ * seam says, gone wrong while the seam works. [§ D347](../../../../DECISIONS.md) rules that the
+ * stage's words come inside the corpus before M2 exits, by the pure/DOM split this directory already
+ * has, as its own lane. **Until that lands, this docstring is a description of a known gap rather
+ * than a claim of coverage.**
  */
 const EVERYDAY_STAGE: SurfaceAdapter = {
   id: 'everyday/stageScreenModel.ts#stageHeaderOf',

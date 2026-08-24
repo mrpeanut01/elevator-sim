@@ -1393,9 +1393,14 @@ function notationIn(text: string): readonly { readonly kind: string; readonly qu
  *   own export list, which `properties.ts` may not read (`boundaries.test.ts` confines the
  *   filesystem to the test helpers), and a spelling rule that guessed would take those 37 with it.
  *   So an identifier is caught when its author marked it as code, or when it is a filename, a
- *   member path or a shouted constant — never by inferring intent from capitals. **If the gate's
- *   owner rules those 37 in, the fix is to widen this clause and register the findings**, and the
- *   number is stated here so that ruling is made against a measurement.
+ *   member path or a shouted constant — never by inferring intent from capitals. The number was
+ *   stated here so the ruling could be made against a measurement, and **it has been made**:
+ *   [§ D346](../../../../DECISIONS.md) rules that a control's own write-disclosure is not internal
+ *   notation, so the 37 stay out and the gate's number is 19 rather than 56. The clause is an
+ *   under-match **by decision**, which is the difference between a gate that under-matches on
+ *   purpose and one nobody finished. § D346 also names what would reopen it: this rule cannot tell
+ *   `SpecTransportMode` from `parkingStrategy` without the tree's export list, and if that ever
+ *   becomes readable from here, splitting the two is the option to revisit.
  * - **A bare directory**, per {@link SOURCE_FILENAME}.
  * - **`§` with no number**, per {@link SECTION_REFERENCE}.
  *
