@@ -175,6 +175,22 @@ counts stand; the duration does not. The clean measurement is CI's two-platform 
    **262 files / 4 883 tests / 10 skipped**. Six waves have landed since. The staleness is real and
    the correction runs *towards* the document, which is worth saying only because this programme
    corrects figures in both directions or it is not correcting them at all.
+10. **A `verbatim` claim in `shift/events.ts` had already been false for two of five entries**, and
+   the #216 lane found it while changing a third. The record's docstring read *"Names and notes are
+   **verbatim** from `design.html` :1419–1426"* — but the fire drill had lost `, 14:00` to
+   [§ D175](DECISIONS.md) and the ordinary note had lost its second person, both before this
+   programme opened. It now names the design as the **source** and lists the three deviations.
+   Nobody had caught it because nothing checks a prose claim about provenance; the weekday rule
+   `events.test.ts` now carries is a guard for the *strings*, not for the sentence about them.
+11. **The orchestrator's own commit message omitted that fix**, which is `RISKS.md` **R25** at finer
+   grain than the rule states it. R25's escalation trigger is *"any commit whose diff touches a file
+   its message does not mention"*; `be7fe82` mentions `shift/events.ts` and describes only the
+   string change, while the diff also carries the provenance correction above. **The cause was
+   committing a lane's work before the lane reported** — defensible, since the fix was independently
+   watched failing and passing and `tsc -b` was clean, but a commit written from a diff the author
+   had not yet explained is a commit whose message is a summary of what the integrator noticed. The
+   lane's own report caught it. Recorded rather than amended, because the history is accurate even
+   where the message was incomplete.
 
 ---
 
