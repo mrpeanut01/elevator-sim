@@ -19,10 +19,10 @@ grounds: it is a defect fix rather than a feature, so it needs no specification.
 
 | Lane | Task | Issues | Milestone | Status | Next action |
 |---|---|---|---|---|---|
-| FIX-206 | Close the core loop; journey test watched failing first | #206 | M2, **fast-tracked** | running | integrator review, then merge |
+| FIX-206 | Close the core loop; journey test watched failing first | #206 | M2, **fast-tracked** | **fix pushed** (`c6b39ae`); lane still verifying | record the lane's test evidence |
 | M1-SLICE | docs/25-vertical-slice.md — scope, quality bar, failable exits | #198 | M1 | running | gates every M2 build issue |
 | M1-TELEMETRY | [`docs/26-telemetry-and-privacy.md`](docs/26-telemetry-and-privacy.md) — privacy first | #201, #202 | M1 | **landed** | unblocks charter S1–S4 |
-| M1-FLOWS | docs/27-flow-maps.md — five states per flow | #197 | M1 | running | gates #210; feeds [`TEST_MATRIX.md`](TEST_MATRIX.md) |
+| M1-FLOWS | [`docs/27-flow-maps.md`](docs/27-flow-maps.md) — five states per flow | #197 | M1 | **landed** | gates #210; feeds [`TEST_MATRIX.md`](TEST_MATRIX.md) |
 
 ### Closed — the verification wave
 
