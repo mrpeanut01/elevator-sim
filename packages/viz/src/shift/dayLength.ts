@@ -104,6 +104,8 @@ import type {
   TrafficProfiles,
 } from '@elevator-sim/core/browser';
 
+import type { RunHorizon } from './types.js';
+
 /**
  * A whole authored day, and the three facts a caller needs to run one.
  *
@@ -218,4 +220,89 @@ export function runsWholeDay(
 ): boolean {
   const run = wholeDayRun(day);
   return windowStartS === run.windowStartS && shiftLengthS === run.shiftLengthS;
+}
+
+/**
+ * **What kind of run a state is** — `shift/goals.ts#goalsForDay`'s second argument, derived once
+ * for every surface in both products.
+ *
+ * ## Why this is a function in `shift/` and not three expressions in two shells
+ *
+ * This is a fix for a defect the horizon parameter shipped with. `goalsForDay` grew `over` and
+ * **one of its four callers passed it**: `everyday/host.ts` did, `dev/main.ts#closeShift` and
+ * `dev/leftRail.ts#drawShift` did not, and `honesty/surfaces.ts` correctly does not (see below).
+ * So an Everyday player who pressed *Run* on a whole authored day was told by the Everyday rail
+ * that the day asked for a worst wait inside **460 s** and by the Engineer rail, one door away and
+ * about the same run, that it asked for **230 s**. Neither figure was wrong on its own. Publishing
+ * both about one run is what `TEST_MATRIX.md` T1's *figures consistent* clause forbids, and it is
+ * the class of defect this repository's honesty tier exists to catch.
+ *
+ * `everyday/host.ts` had already written the warning over its own private copy of this lookup —
+ * *"one expression, read by the two things that must not disagree … a second copy of this lookup is
+ * how a ten-hour run comes to be graded against a thirty-minute ceiling"* — and the copy it warned
+ * about was never going to be a second copy in the Everyday shell. It was the Engineer shell having
+ * no copy at all. So the expression moved **down** rather than sideways: here, beside the two
+ * functions it is composed of, in the one directory both shells already import. Copying `horizonOf`
+ * into `dev/` would have been the same defect with a third instance, and
+ * `CLAUDE.md`'s standing rule about the Everyday/Engineer boundary forbids the shorter fix anyway —
+ * `dev/main.ts` may not import the Everyday shell, because `everyday/boot.ts` already imports
+ * `dev/main.ts` and closing that cycle is what produced this directory's last module-init
+ * `undefined`.
+ *
+ * ## Why it takes a `run` object rather than two numbers
+ *
+ * {@link runsWholeDay} takes the two window fields separately because it is the inverse of
+ * {@link wholeDayRun} and answers about a pair. This takes them as one object for the reason
+ * `wholeDayRun`'s docstring gives about writing them: *the pair is one selection and it travels as
+ * one*. A `ViewerState` satisfies the shape structurally, so all three call sites pass their state
+ * whole and no site can split the pair on the way in.
+ *
+ * The building is resolved by the caller rather than looked up here, and that is a layering fact
+ * rather than a preference: resolving one needs `BrowserResources` and `dev/state.ts`, and
+ * `dev/state.ts` imports this module. Nothing in `shift/`'s source imports `dev/`, and a cycle here
+ * would be paid for at module-init time.
+ *
+ * `'period'` for a building with no authored day, which is three of the eight shipped ones and is
+ * {@link wholeDayFor}'s `undefined` passed straight through — **and it is keyed on the day, never on
+ * a number of seconds.** A residential tower whose window happens to say ten hours is running a
+ * long slice of a thirty-minute template, not a day, and `goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR`
+ * carries the measurement that says a long slice truncates its tail exactly as a short one does.
+ *
+ * ## It is not a text producer, and `honesty/derive.test.ts` cannot tell yet
+ *
+ * **This function leaves the tree red on exactly one test, and the red is a classification gap
+ * rather than a defect** — said here rather than left for whoever runs the suite next.
+ * `derive.test-helper.ts` reads two adjacent alphabetic words as prose, so the discriminated-union
+ * tag `'whole-day'` reads as a phrase and this becomes a derived *text producer* that no adapter
+ * drives and no exclusion names. It is the **id/key case** `NOT_PLAYER_FACING` already records three
+ * times — `dev/elementMap.ts#ELEMENT_IDS`, `menu/screens.ts#withChosenValue`,
+ * `everyday/profile.ts#loadProfile` — and the entry it wants is:
+ *
+ * > A union tag with no sentence in it. `runHorizonOf` answers *which of the two kinds of run this
+ * > state is*, and both of its values are members of `shift/types.ts#RunHorizon` — `period`, and
+ * > `whole-day`, which is derived only because the hyphen reads to the two-adjacent-words scanner
+ * > as a phrase. Nothing it returns is shown to anybody: what a player reads is the **bar**
+ * > `goals.ts#goalsForDay` builds from it, and `goalsForDay` is driven already.
+ * > `shift/dayLength.test.ts` asserts both of its answers against the template the same state
+ * > resolves to.
+ *
+ * `packages/viz/src/honesty/` belongs to another lane this wave, so the entry is owed rather than
+ * written. **Three ways to make it green were considered and refused**, and they are worth stating
+ * so nobody re-derives them: spelling the tag `'wholeDay'`, hiding the declaration behind a bare
+ * `export { … }` so the deriver reads it as unexported, and widening `goalsForDay`'s parameter to
+ * take a boolean so the tag never leaves the one span that already carries it. The first two make
+ * an honesty instrument miss something on purpose, which is the false negative its own docstring
+ * warns about; the third distorts a type to satisfy a scanner. A classification entry is the honest
+ * repair, and it belongs to the file that owns the classification.
+ *
+ * A decision number is owed; this docstring is the argument.
+ */
+export function runHorizonOf(
+  trafficProfiles: TrafficProfiles,
+  building: BuildingConfig | undefined,
+  run: { readonly shiftLengthS: number; readonly windowStartS: number | null },
+): RunHorizon {
+  const day = wholeDayFor(trafficProfiles, building);
+  if (day === undefined) return 'period';
+  return runsWholeDay(day, run.shiftLengthS, run.windowStartS) ? 'whole-day' : 'period';
 }

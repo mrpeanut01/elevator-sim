@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { VizRecording } from '../contract/types.js';
 import type { BrowserResources } from '../dev/data.js';
+import { shiftGoalsOf } from '../dev/leftRail.js';
 import { initialState, profileById, type ViewerState } from '../dev/state.js';
 import { wholeDayFor, wholeDayRun } from '../shift/dayLength.js';
 import { GOAL_BARS } from '../shift/goals.js';
@@ -419,6 +420,94 @@ describe('the run actions', () => {
     const off = createEverydayHost(h.bindings).subscribe(() => {});
     off();
     expect(h.calls).toEqual(['onChange', 'unsubscribe']);
+  });
+});
+
+describe('one run, one set of bars — both shells', () => {
+  /**
+   * The defect this file's neighbour lane shipped, and the reason it is asserted from **both call
+   * paths** rather than from two literals.
+   *
+   * `goalsForDay` grew a second argument and one of its four callers passed it. So an Everyday
+   * player who pressed *Run* on a whole authored day was graded by the Everyday rail against a
+   * 460 s worst-wait ceiling and by the Engineer rail — the same run, the same state, one door
+   * away — against 230 s. Neither number is wrong on its own; publishing both about one run is the
+   * thing `TEST_MATRIX.md` T1's *figures consistent* clause forbids, and it is the failure this
+   * repository's honesty tier exists to catch.
+   *
+   * Both sides here are the product's own expressions: `goalsToday()` is what the Everyday rail
+   * draws, `shiftGoalsOf` is what the Engineer rail draws **and** what `dev/main.ts#closeShift`
+   * files the sheet with. Nothing is transcribed — the state is built from the record's own period
+   * through `wholeDayRun`, and the assertion is that the two paths agree, not that either equals a
+   * number this file chose.
+   */
+  const barsOf = (goals: readonly { readonly id: string; readonly bar: number }[]) =>
+    Object.fromEntries(goals.map((goal) => [goal.id, goal.bar]));
+
+  const everydayBars = (state: ViewerState) =>
+    barsOf(
+      createEverydayHost(harnessOf(state).bindings)
+        .goalsToday()
+        .map((reading) => reading.goal),
+    );
+  const engineerBars = (state: ViewerState) => barsOf(shiftGoalsOf(state, resources));
+
+  it('grades a whole day the same on the Everyday rail and the Engineer rail', () => {
+    const day = wholeDayFor(resources.trafficProfiles, configOf('midtown-office'));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+    const whole: ViewerState = {
+      ...base(),
+      buildingId: 'midtown-office',
+      ...wholeDayRun(day),
+    };
+
+    expect(engineerBars(whole)).toEqual(everydayBars(whole));
+
+    /*
+     * And the disagreement is a real one rather than a shape mismatch: on a whole day the ceiling
+     * these two must agree *about* is the slice's, scaled. Asserted from `GOAL_BARS` rather than
+     * from 460, so a lane that moves the factor moves this with it.
+     */
+    const slice: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    expect(everydayBars(whole)['worst-wait']).toBe(
+      (everydayBars(slice)['worst-wait'] ?? Number.NaN) * GOAL_BARS.worstWholeDayFactor,
+    );
+  });
+
+  it('grades a slice the same on both, and every day of a week', () => {
+    // The control. A shell that hard-coded `'whole-day'` would pass the case above and fail here,
+    // which is why the slice is asserted rather than assumed to be the untouched case.
+    const slice: ViewerState = { ...base(), buildingId: 'midtown-office' };
+    expect(engineerBars(slice)).toEqual(everydayBars(slice));
+
+    const day = wholeDayFor(resources.trafficProfiles, configOf('midtown-office'));
+    if (day === undefined) throw new Error('midtown-office has no whole day');
+    for (let dayNumber = 1; dayNumber <= 7; dayNumber += 1) {
+      for (const run of [{}, wholeDayRun(day)]) {
+        const state: ViewerState = {
+          ...slice,
+          ...run,
+          week: { ...slice.week, day: dayNumber },
+        };
+        expect(engineerBars(state), `day ${String(dayNumber)}`).toEqual(everydayBars(state));
+      }
+    }
+  });
+
+  it('grades a crowd with no authored day the same on both, whatever its window says', () => {
+    /*
+     * Garden Apartments is one of the three shipped crowds `dayLength.ts` refuses to hand an office
+     * day to. Its window is set to a day's length anyway, so a shell that keyed the horizon on a
+     * number of seconds instead of on *the building has a day* would disagree here.
+     */
+    const residential: ViewerState = {
+      ...base(),
+      buildingId: 'garden-apartments',
+      shiftLengthS: 36_000,
+      windowStartS: 0,
+    };
+    expect(engineerBars(residential)).toEqual(everydayBars(residential));
+    expect(everydayBars(residential)).toEqual(everydayBars(base()));
   });
 });
 

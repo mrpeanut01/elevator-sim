@@ -37,7 +37,7 @@ import {
 } from '../dev/state.js';
 import { recordRun } from '../record/recordRun.js';
 
-import { runsWholeDay, wholeDayFor, wholeDayRun } from './dayLength.js';
+import { runHorizonOf, runsWholeDay, wholeDayFor, wholeDayRun } from './dayLength.js';
 
 /* -------------------------------------------------------------------------- *
  * Resources — the shipped file, never a fixture
@@ -225,6 +225,64 @@ describe('the template a shift resolves against', () => {
     expect(shiftDemandTemplateId(RESOURCES, state, configOf('midtown-office'))).toBe(
       'lunch-two-way',
     );
+  });
+});
+
+describe('the horizon a state is graded over', () => {
+  const stateFor = (buildingId: string, patch: Partial<ViewerState>): ViewerState => ({
+    ...initialState(RESOURCES, 20260824n),
+    buildingId,
+    ...patch,
+  });
+
+  /**
+   * `runHorizonOf` is the expression both shells read, and it is asserted to be the **same
+   * question** `shiftDemandTemplateId` asks rather than a parallel one.
+   *
+   * That is the property worth holding: the template a run resolves against and the bar it is
+   * judged by come from one predicate, so a state cannot run a day and be graded as a slice — which
+   * is the defect one door up, on the surface instead of in the seam.
+   */
+  it('answers whole-day exactly when the template resolves to the day', () => {
+    for (const id of ['midtown-office', 'secure-tower', 'garden-apartments', 'crown-hotel']) {
+      const day = wholeDayFor(PROFILES, configOf(id));
+      for (const patch of [
+        { shiftLengthS: 1800, windowStartS: null },
+        // The window that turns a day on where there is one — and cannot manufacture one where
+        // there is not, which is why the same numbers are asked of all four crowds.
+        { shiftLengthS: 36000, windowStartS: 0 },
+        // Half of a day is a part of a day and is not one.
+        { shiftLengthS: 18000, windowStartS: 0 },
+      ]) {
+        const state = stateFor(id, patch);
+        const horizon = runHorizonOf(PROFILES, configOf(id), state);
+        const runsTheDay = shiftDemandTemplateId(RESOURCES, state, configOf(id)) === day?.templateId;
+        expect(horizon, `${id} ${JSON.stringify(patch)}`).toBe(
+          runsTheDay ? 'whole-day' : 'period',
+        );
+      }
+    }
+  });
+
+  it('is keyed on the building’s day, never on a number of seconds', () => {
+    // Ten hours of a residential tower is a long *slice* — it truncates its tail exactly as a short
+    // one does, which is the mechanism `goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR` measured. A shell
+    // that read the clock instead of the record would call this a day.
+    expect(
+      runHorizonOf(
+        PROFILES,
+        configOf('garden-apartments'),
+        stateFor('garden-apartments', { shiftLengthS: 36000, windowStartS: 0 }),
+      ),
+    ).toBe('period');
+  });
+
+  it('answers period for a building the file does not carry', () => {
+    // `wholeDayFor`'s `undefined` passed straight through — a state naming a building `data/` does
+    // not ship must not throw on the way to a bar.
+    expect(
+      runHorizonOf(PROFILES, undefined, { shiftLengthS: 36000, windowStartS: 0 }),
+    ).toBe('period');
   });
 });
 
