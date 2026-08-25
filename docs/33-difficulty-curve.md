@@ -493,10 +493,18 @@ Not one cell is `variable` on both sets. The four that are variable on one are `
 **Result 3 — the demand *shape* does not either.** At the same rates, through
 `SimulationDemandOptions`: the PM inversion the residential profile's own `$comment` declares
 (`{0.75, 0.15, 0.10}`), a pure up-peak (`{1, 0, 0}`), a flattened `baselineFraction` of 0.05, and a
-raised geometric group mean of 3. `collective` reads 49 or 50 on the tuning set in every one of them
-and 50 on the holdout in all but the group-mean cell (49 | 47). The group mean is also the only one of
-the four that is not authored anywhere for this profile — `data/traffic-profiles.json` declares 1.8
-and no range — so it would be invented traffic data rather than a declared parameter moved.
+raised geometric group mean of 3. `collective` reads 49 or 50 on the tuning set in every one of them,
+and 50 on the holdout in every one **except** the two group-mean cells — **49 | 47** at `typical` and
+**49 | 44** at `max`.
+
+Those two are the only cells in the entire demand sweep that are `variable` on both sets, and neither
+is taken, for two independent reasons. A mean group size of 3 is **not declared anywhere for this
+profile**: `data/traffic-profiles.json` gives residential `batchSize.mean: 1.8` with no range and the
+comment *"families travel together"*, so authoring 3 per stage is inventing traffic data — the same
+class of move as exceeding `max: 7`, which the ceiling clause already forbids. And 49 of 50 is 98 %:
+a goal the shipped setting misses on one run in fifty is what R12 refuses one run short of, not a
+goal a player can be asked about. **A cell that clears the letter of R12 and none of its point is
+exactly the fix this section exists not to make.**
 
 **Result 4 — the dispatcher axis inverts the problem instead of solving it.** All thirteen shipped
 profiles were measured **as the stage's baseline**, since R12 classifies a goal on the baseline arm

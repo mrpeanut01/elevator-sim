@@ -81,8 +81,11 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
  *   on the other. That is `not-shippable`, not a goal. The building's own file refuses the rest in
  *   capitals: the menu separates at 20 %, *"three times the residential profile's own declared
  *   maximum of 7 %"*, and DC-R1 forbids exceeding it.
- * - **Demand shape.** The PM inversion the profile's own `$comment` declares, a pure up-peak, a
- *   flattened baseline and a raised group mean all leave `collective` at 49 or 50 of 50.
+ * - **Demand shape.** The PM inversion the profile's own `$comment` declares, a pure up-peak and a
+ *   flattened baseline all leave `collective` at 49 or 50 of 50 on both sets. A raised geometric
+ *   group mean of 3 is the one cell that is variable on both — 49 of 50 and 47 of 50 — and it is
+ *   refused twice over: `data/traffic-profiles.json` declares this profile's mean as 1.8 with no
+ *   range, so 3 is invented traffic data, and 49 of 50 is a goal missed on one run in fifty.
  * - **Dispatcher.** All thirteen shipped profiles were measured as the stage's baseline.
  *   `nearest-car` is the only one whose `long-waits-under` is variable on both sets (48 of 50 and 46
  *   of 50) — **and making it the baseline removes the failure rather than creating one**, because
