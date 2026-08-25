@@ -50,7 +50,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /** The tier's one gate — see `dev/browserTier.test-helper.ts`, and GitHub issue #142 for why. */
-import { CHROMIUM, HAS_BROWSER } from '../dev/browserTier.test-helper.js';
+import { CHROMIUM, HAS_BROWSER, openPage } from '../dev/browserTier.test-helper.js';
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -67,7 +67,10 @@ beforeAll(async () => {
   server = await createServer({
     configFile: fileURLToPath(new URL('../../vite.config.ts', import.meta.url)),
     root: fileURLToPath(new URL('../..', import.meta.url)),
-    server: { port: 5207, strictPort: false },
+    /* Its own port — `dev/browserTier.test.ts` asserts no two tier files share one, because
+       `strictPort: false` makes a collision fail quietly rather than loudly. 5213 is the next free
+       number above the block this tier already claims. */
+    server: { port: 5213, strictPort: false },
     logLevel: 'error',
   });
   await server.listen();
@@ -82,7 +85,7 @@ afterAll(async () => {
 });
 
 async function coldLoad(): Promise<Page> {
-  const page = await browser.newPage({ viewport: VIEWPORT });
+  const page = await openPage(browser, { viewport: VIEWPORT });
   await page.goto(`${origin}?building=garden-apartments&seed=424242`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => document.querySelector<HTMLElement>('.menu-overlay')?.hidden === true,
