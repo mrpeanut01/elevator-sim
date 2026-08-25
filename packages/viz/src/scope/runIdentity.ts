@@ -141,7 +141,6 @@ import {
   type CalendarAsk,
   type CalendarShift,
 } from '../shift/calendar.js';
-import { eventSpokenForCarIds } from '../shift/events.js';
 
 import { permits } from './permits.js';
 import { SCOPE_OF } from './surface.js';
@@ -434,21 +433,18 @@ export const CARRY_CHECKS: Readonly<Record<string, CarryCheck>> = Object.freeze(
      * out of passenger service"* about it. Six cells over the whole shipped space, and issue #264's
      * own shape arriving through a second door.
      *
-     * Through `events.ts#eventSpokenForCarIds` rather than a set built here, because a fourth site
-     * answering *which cars are taken?* is what produced the defect in the first place. It takes an
-     * event and a bank, which is all this predicate has — no traffic profile, no demand base, no
-     * resolved fabric — and it derives the choice from the same `eventCarChoice` `shiftRunPatch`
-     * uses, so the ask and the patch cannot pick differently.
+     * The **event** rather than a set of ids built here, because a second site answering *which
+     * cars are taken?* is what produced the defect in the first place. `calendarAsks` derives it
+     * from `events.ts#eventCarChoice` — the same function `shiftRunPatch` uses — so the ask and the
+     * patch cannot pick differently, and this predicate still needs nothing it did not already have:
+     * no traffic profile, no demand base, no resolved fabric.
      */
     const clauses = calendarAsks({
       day: today,
       ...calendarAskInputOf(resources, state, authored),
       building,
-      spokenForCarIds: eventSpokenForCarIds(
-        scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx),
-        building,
-        state.outOfServiceCarIds,
-      ),
+      event: scheduledEventFor(state.calendar, state.week.day, state.week.dayIdx),
+      playerHeldCarIds: state.outOfServiceCarIds,
     })
       .map((ask) => askClause(ask, today.shift))
       .filter((clause): clause is string => clause !== null);

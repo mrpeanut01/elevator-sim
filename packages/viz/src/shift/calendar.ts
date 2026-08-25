@@ -98,9 +98,9 @@ import {
   type SimulationDemandOptions,
 } from '@elevator-sim/core/browser';
 
-import { SHIFT_EVENTS, eventFor } from './events.js';
+import { SHIFT_EVENTS, eventCarChoice, eventFor } from './events.js';
 import { scaledBuilding } from './growth.js';
-import { carRuntimeId, carsToDerate } from './incidents.js';
+import { carsToDerate, type CarRef } from './incidents.js';
 import { weekdayOf, type ShiftEvent, type ShiftEventId, type Weekday } from './types.js';
 
 /* -------------------------------------------------------------------------- *
@@ -671,22 +671,48 @@ export interface CalendarPatchInput {
    */
   readonly templateChosenByPlayer?: boolean | undefined;
   /**
-   * Runtime car ids already spoken for today — the day's whole-shift holds, the cars any incident
-   * has scheduled, and the player's own holds.
+   * **Today's event, so the reservation can step over the cars it has taken — GitHub issue #272.**
    *
-   * Without it a goods car and a move-in derate pick the **same** car by the same total order, and
-   * the incident's return-to-service event would put the movers' car back in passenger service
-   * halfway through the shift. The reservation steps down the same order instead.
+   * A period's goods car and the day's event pick from the same building by the same total order.
+   * Without this, `moving-week` day 1 reserved `main-D` and `move-in`'s derate stood `main-D` down —
+   * one car answering two asks, and the incident's own return-to-service event handed the movers'
+   * car back to passengers at 1 200 s of an 1 800 s shift while the caption still read *"1 car
+   * reserved"*. A hundred and fourteen people rode it.
    *
-   * **Build it with `events.ts#spokenForCarIdsOf` and never by hand — GitHub issue #272.** The
-   * sentence above described the field correctly from the day it was written and the shipped caller
-   * passed `ShiftRunPatch.outOfServiceCarIds` alone, which is `[]` on every day this build can
-   * produce; the only place the correct set existed was `calendar.test.ts`'s harness. So the suite
-   * exercised a configuration the product could not make, and the docstring saying what the field is
-   * for is what a reader trusted instead of a run. There is one expression now, and both callers use
-   * it.
+   * **The event rather than a list of ids, and that is the fix rather than a detail of it.** The
+   * field this replaces took the ids, and the shipped caller built them from the event's whole-shift
+   * holds alone — `[]` on every day this build can produce, because all five shipped events declare
+   * `carsOutOfService: 0`. `calendar.test.ts`'s harness built the right list, so the suite exercised
+   * a configuration the product could not make and nothing was red. Taking the event instead means
+   * **no caller builds the list**: {@link spokenForCarsOf} derives it here, from
+   * `events.ts#eventCarChoice` — the same function `shiftRunPatch` decides the run's own holds and
+   * incidents with — so the run builder and the refusal predicate cannot pick different cars.
+   *
+   * This does **not** make the module an authority on *which event is today*. `scheduledEventFor`
+   * owns that and {@link CalendarAsk} still excludes `eventId`; the caller passes the event it is
+   * already running, exactly as it passes the building it is already on.
+   *
+   * **Optional, and the omission is named rather than left silent.** Every caller that builds a run
+   * passes it — `dev/state.ts#shiftRunConfigOf` and `scope/runIdentity.ts` both already hold the
+   * value, and `calendar.test.ts` sweeps every shipped building × period × day and requires the two
+   * to reserve the same cars. The one caller that omits it is `honesty/surfaces.ts`, which renders
+   * captions for the string corpus rather than building a run; on `garden-apartments` that makes it
+   * render a caption the product would not produce, which is GitHub issue #272's shape one layer
+   * over and is filed separately rather than fixed here.
+   *
+   * What an omission can no longer do is produce a **wrong** set. The field this replaced took a
+   * list of ids, and the shipped caller built the wrong one for the whole life of the feature; the
+   * only thing a caller can pass now is the event it is running.
    */
-  readonly spokenForCarIds?: readonly string[] | undefined;
+  readonly event?: ShiftEvent | undefined;
+  /**
+   * Runtime car ids the **player** is holding out of service — `ViewerState.outOfServiceCarIds`.
+   *
+   * The third source, and the quietest: a reservation that lands on a car the player already held
+   * publishes *"1 car reserved"* over a run in which no further car left passenger service, so the
+   * caption charges the period for something the reader did.
+   */
+  readonly playerHeldCarIds?: readonly string[] | undefined;
 }
 
 export interface CalendarPatch {
@@ -823,7 +849,7 @@ export function calendarPatch(input: CalendarPatchInput): CalendarPatch {
   }
 
   /* --- the goods cars -------------------------------------------------- */
-  const reserved = reservationDecision(shift, building, input.spokenForCarIds);
+  const reserved = reservationDecision(shift, building, spokenForCarsOf(input));
   if (reserved.shortfall > 0) {
     withheld.push(
       `${day.name}: asked to reserve ${String(shift.goodsCars)} car(s) for the day and could ` +
@@ -925,10 +951,49 @@ function biasDecision(
 function reservationDecision(
   shift: CalendarShift,
   building: BankedConfig | undefined,
-  spokenForCarIds: readonly string[] | undefined,
+  spokenForCarIds: readonly string[],
 ): { readonly ids: readonly string[]; readonly shortfall: number } {
   if (shift.goodsCars <= 0 || building === undefined) return { ids: [], shortfall: 0 };
-  return reserveCars(building, shift.goodsCars, spokenForCarIds ?? []);
+  return reserveCars(building, shift.goodsCars, spokenForCarIds);
+}
+
+/**
+ * **Every car today has already spoken for — GitHub issue #272, and the one expression.**
+ *
+ * Both {@link calendarPatch} and {@link calendarAsks} decide `goodsCars` by reserving against a real
+ * bank, and both must step over the same cars or the caption and the refusal describe different
+ * days. They did not: the run builder passed the event's *whole-shift holds* — `[]` on every day
+ * this build can produce — and `scope/runIdentity.ts` passed nothing at all, while
+ * `calendar.test.ts`'s harness built the correct set and quietly measured a configuration the
+ * product could not make. `RISKS.md` R26 in one function.
+ *
+ * Three sources, and each is a car that is not free:
+ *
+ * - **The event's whole-shift holds.** Empty on every shipped event, which `calendar.test.ts` pins
+ *   over the event table rather than asserting here — so an event that holds a car turns a test red
+ *   instead of turning a sentence stale.
+ * - **The cars the event's incident schedules.** The half that was missing, and the dangerous half:
+ *   a hold merely overlaps, while an incident carries a `serviceEvents` entry that puts the car
+ *   *back*. Reserving a car the schedule returns is the one arrangement in which the calendar line
+ *   and the run cannot both be true.
+ * - **The player's own holds.** Milder and still false: a reservation landing on a car the player
+ *   already held publishes *"1 car reserved"* over a run in which no further car left service.
+ *
+ * `eventCarChoice` rather than a branch written here, because it is the same function
+ * `shiftRunPatch` decides the run's real holds and incidents with — including the *both at once*
+ * refusal, so a car the run does not actually stand down is not treated as taken. It returns
+ * {@link CarRef}s so that this module can map them with its own {@link carRuntimeId}; see that
+ * function for why the expression may not be shared.
+ */
+function spokenForCarsOf(input: {
+  readonly building: BankedConfig | undefined;
+  readonly event?: ShiftEvent | undefined;
+  readonly playerHeldCarIds?: readonly string[] | undefined;
+}): readonly string[] {
+  const held = input.playerHeldCarIds ?? [];
+  if (input.building === undefined || input.event === undefined) return held;
+  const cars = eventCarChoice(input.event.effect, input.building);
+  return [...held, ...cars.holdCars.map(carRuntimeId), ...cars.derateCars.map(carRuntimeId)];
 }
 
 /**
@@ -983,27 +1048,31 @@ export interface CalendarReservationInput {
    */
   readonly building: BankedConfig | undefined;
   /**
-   * Runtime car ids already spoken for today, as {@link CalendarPatchInput.spokenForCarIds}.
+   * Today's event and the player's holds, exactly as {@link CalendarPatchInput.event} and
+   * {@link CalendarPatchInput.playerHeldCarIds}.
    *
-   * Optional here and **passed by the only caller — which it was not, and that is GitHub issue
-   * #272's residual rather than its subject.**
+   * **Required here too, and that is GitHub issue #272's residual rather than its subject.** This
+   * interface used to take an optional list of ids that its only caller never passed, on a claim
+   * that was pinned rather than assumed: `shiftRunConfigOf` handed `calendarPatch` the day's
+   * whole-shift holds, all five shipped events declare `carsOutOfService: 0`, so the set was empty
+   * on every day this build could produce and the two functions agreed by construction. Every clause
+   * of that was true and it was **a defect being described as a property** — the product agreed with
+   * this function by passing a set that was always empty, and the movers' car was handed back at
+   * 1 200 s because of it.
    *
-   * It used to be omitted on a claim that was pinned rather than assumed: `shiftRunConfigOf` handed
-   * `calendarPatch` the day's *whole-shift* holds, `SHIFT_EVENTS` declares `carsOutOfService: 0` on
-   * all five, so the set was empty on every day this build could produce and the two functions
-   * agreed by construction. Every clause of that was true and it was **a defect being described as a
-   * property**: the product agreed with this function by passing a set that was always empty, and
-   * the movers' car was handed back to passengers at 1 200 s because of it.
+   * Correcting the run's set made the omission bite, on **six cells** measured over every shipped
+   * building × period × day × one-shaft commissioning: `garden-apartments` / `moving-week`, whose
+   * two-car bank has `move-in`'s derate standing on its only spare — so the patch reserved none and
+   * said so in `withheld`, while this function reserved `main-B` and `scope/runIdentity.ts` printed
+   * *"reserves at least one car out of passenger service"* about a day that reserved none.
    *
-   * Correcting the run's set made the omission bite, and the fix was a field rather than a rewrite —
-   * `scope/runIdentity.ts` now passes `events.ts#eventSpokenForCarIds`, which derives from the same
-   * `eventCarChoice` `shiftRunPatch` uses. Measured over every shipped building × period × day ×
-   * one-shaft commissioning, the gap in between was **six cells**, all `garden-apartments` /
-   * `moving-week`: a two-car bank whose only spare is `move-in`'s derate, so the patch reserved none
-   * and said so in `withheld` while this function reserved `main-B`. `calendar.test.ts` sweeps that
-   * space and expects an empty disagreement list, which is where the next one will show up.
+   * Optional for {@link CalendarPatchInput.event}'s stated reason and pinned the same way:
+   * `calendar.test.ts` sweeps every shipped building × period × day and requires this function and
+   * `calendarPatch` to reserve the same cars, which is the assertion that would have caught the
+   * defect and the one that catches an omission now.
    */
-  readonly spokenForCarIds?: readonly string[] | undefined;
+  readonly event?: ShiftEvent | undefined;
+  readonly playerHeldCarIds?: readonly string[] | undefined;
 }
 
 /**
@@ -1115,7 +1184,7 @@ export function calendarAsks(input: CalendarAskInput & CalendarReservationInput)
     splitBias: bias.kind === 'applied',
     demandTemplateId: template.kind === 'applied',
     // The reservation, not the declaration — issue #264, and the section above carries the argument.
-    goodsCars: reservationDecision(shift, input.building, input.spokenForCarIds).ids.length > 0,
+    goodsCars: reservationDecision(shift, input.building, spokenForCarsOf(input)).ids.length > 0,
     eventId: false,
     note: false,
   };
@@ -1243,6 +1312,20 @@ function populationOf(config: {
  */
 export interface BankedConfig {
   readonly banks: readonly { readonly id: string; readonly cars: readonly { readonly id: string }[] }[];
+}
+
+/**
+ * The id `Simulation` gives a car at run time, and the one `outOfServiceCarIds` is matched on.
+ *
+ * **Private, and it stays private** — GitHub issue #272 tried moving it to `incidents.ts` as a
+ * shared export and that is the change to *not* make. `honesty/derive.test.ts` reads
+ * `${bankId}-${carId}`'s hyphen as a phrase, so the declaration holding it is a text producer, and
+ * `NOT_PLAYER_FACING` excludes {@link calendarAsks} by name **for this exact chain**:
+ * `calendarAsks → reservationDecision → reserveCars → carRuntimeId`. Exporting it emptied that chain
+ * and turned a live exclusion into a ghost. `events.ts` keeps its own copy for the same reason.
+ */
+function carRuntimeId(car: CarRef): string {
+  return `${car.bankId}-${car.carId}`;
 }
 
 /**

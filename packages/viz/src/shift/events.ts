@@ -66,7 +66,7 @@ import type {
   TrafficProfile,
 } from '@elevator-sim/core/browser';
 
-import { carRuntimeId, carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
+import { carsToDerate, type BankedBuilding, type CarRef, type Incident } from './incidents.js';
 import type { EventEffect, ShiftEvent, ShiftEventId } from './types.js';
 
 /**
@@ -407,7 +407,7 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
           toFraction: derate.toFraction,
         }));
 
-  return { demand, outOfServiceCarIds: cars.holdIds, incidents, withheld };
+  return { demand, outOfServiceCarIds: cars.holdCars.map(carRuntimeId), incidents, withheld };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -440,8 +440,18 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
  * bank and a car separately.
  */
 export interface EventCarChoice {
-  /** Whole-shift holds, as runtime ids — `RecordRunOptions.outOfServiceCarIds`. */
-  readonly holdIds: readonly string[];
+  /**
+   * Cars held for the **whole shift**, which `shiftRunPatch` maps to the runtime ids
+   * `RecordRunOptions.outOfServiceCarIds` matches on.
+   *
+   * {@link CarRef} rather than those ids, and that is not a style choice: `${bankId}-${carId}` is
+   * the one expression in `shift/` that `honesty/derive.test.ts`'s two-adjacent-words scanner reads
+   * as prose, so a **new export** containing it becomes an unclassified text producer and turns that
+   * suite red. The two declarations that may hold it — `calendar.ts`'s private `carRuntimeId` and
+   * `shiftRunPatch` — are already classified, and both reach it the way they always did. Keeping the
+   * refs here is what lets this function be shared without moving a classification.
+   */
+  readonly holdCars: readonly CarRef[];
   /** How many of `carsOutOfService` could not be held, because a bank keeps a car. */
   readonly holdShortfall: number;
   /** Cars away for **part** of the run, for `incidents.ts#withIncidents`. */
@@ -460,7 +470,7 @@ export interface EventCarChoice {
 
 export function eventCarChoice(effect: EventEffect, building: BankedBuilding): EventCarChoice {
   const none: EventCarChoice = {
-    holdIds: Object.freeze([]),
+    holdCars: Object.freeze([]),
     holdShortfall: 0,
     derateCars: Object.freeze([]),
     derateShortfall: 0,
@@ -472,7 +482,7 @@ export function eventCarChoice(effect: EventEffect, building: BankedBuilding): E
     effect.carsOutOfService > 0
       ? carsToDerate(building, effect.carsOutOfService)
       : { held: [] as readonly CarRef[], shortfall: 0 };
-  const held = { ...none, holdIds: holds.held.map(carRuntimeId), holdShortfall: holds.shortfall };
+  const held = { ...none, holdCars: holds.held, holdShortfall: holds.shortfall };
 
   if (effect.derate === null) return held;
   if (holds.held.length > 0) return { ...held, derateRefusedForHold: true };
@@ -482,79 +492,23 @@ export function eventCarChoice(effect: EventEffect, building: BankedBuilding): E
 }
 
 /**
- * {@link spokenForCarIdsOf} for a caller that has an event and a bank but no {@link ShiftRunPatch}.
+ * The id `Simulation` gives a car at run time, and the one `RecordRunOptions.outOfServiceCarIds` is
+ * matched on.
  *
- * `scope/runIdentity.ts` is that caller, and its absence is what left GitHub issue #272 with a
- * residual after the run itself was fixed: `calendarAsks` reserved against a building nothing had
- * taken, so on `garden-apartments` / `moving-week` — a two-car bank whose only spare is `move-in`'s
- * derate — the refusal claimed *"reserves at least one car out of passenger service"* about a day
- * whose own caption reserved none. Measured over every shipped building × period × day × one-shaft
- * commissioning, that was **six cells** and no others.
+ * **Private, and there is a second copy in `calendar.ts` that must stay private too** — GitHub issue
+ * #272 first tried to consolidate the two into one exported helper on `incidents.ts`, and that is
+ * the change to *not* make. `honesty/derive.test.ts` derives its surface set from the source tree,
+ * and `${bankId}-${carId}`'s hyphen reads to the two-adjacent-words scanner as a phrase, so the
+ * declaration holding this expression is a **text producer**. Exporting it created an unclassified
+ * one and, worse, emptied the chain `NOT_PLAYER_FACING` cites by name for
+ * `shift/calendar.ts#calendarAsks` — turning a live exclusion into a ghost and that suite red in
+ * three places.
  *
- * `undefined` for a state naming a building this build does not ship, which claims nothing — the
- * same answer `reservationDecision` gives, and for the same reason: there is no run for the clause
- * to be about.
- *
- * `playerHeldCarIds` is here rather than left to the caller so that the two composers take the same
- * three sources in the same order. A caller that spread its own player holds beside this would be
- * the fourth site answering *which cars are taken?*, which is the defect rather than a fix for it.
+ * Two private copies of a five-character expression, each inside a declaration that is already
+ * classified, is the cheaper arrangement. What must not be duplicated is *which cars are taken* —
+ * {@link eventCarChoice} owns that, and it returns {@link CarRef}s precisely so it can be shared
+ * without carrying this string.
  */
-export function eventSpokenForCarIds(
-  event: ShiftEvent,
-  building: BankedBuilding | undefined,
-  playerHeldCarIds: readonly string[],
-): readonly string[] {
-  if (building === undefined) return Object.freeze([]);
-  const cars = eventCarChoice(event.effect, building);
-  return sortedUnique([
-    ...playerHeldCarIds,
-    ...cars.holdIds,
-    ...cars.derateCars.map(carRuntimeId),
-  ]);
-}
-
-function sortedUnique(ids: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(ids)].sort((a, b) => a.localeCompare(b)));
-}
-
-/**
- * **Every car today has already spoken for — GitHub issue #272.**
- *
- * `CalendarPatchInput.spokenForCarIds` in one expression, so that the shipped builder
- * (`dev/state.ts#shiftRunConfigOf`) and `calendar.test.ts`'s harness cannot answer it differently.
- * They did, for the whole life of the feature, and the harness was the one that was right: the
- * product passed `patch.outOfServiceCarIds` alone — **always `[]`**, because all five shipped events
- * declare `carsOutOfService: 0` — so a period's goods car and the day's derate picked the same car
- * by the same total order, and the incident's own return-to-service event handed the movers' car
- * back to passengers at 1 200 s of an 1 800 s shift. The caption said *"1 car reserved"* for the
- * day; 114 people rode it.
- *
- * Three sources, and each is a car that is not free:
- *
- * - {@link ShiftRunPatch.outOfServiceCarIds} — the event's **whole-shift** holds. Empty on every day
- *   this build can produce, and `calendar.test.ts` pins that over the event table rather than
- *   asserting it here, so an event that holds a car turns a test red rather than a sentence stale.
- * - {@link ShiftRunPatch.incidents} — the cars away for **part** of the run. This is the half that
- *   was missing, and it is the dangerous half: a whole-shift hold merely overlaps, while an incident
- *   carries a `serviceEvents` entry that puts the car *back*. Reserving a car the schedule returns
- *   is the one arrangement where the calendar line and the run cannot both be true.
- * - `ViewerState.outOfServiceCarIds` — the **player's** own holds, through `playerHeldCarIds`.
- *   Milder than the incident case and still a false claim: a reservation that lands on a car the
- *   player already held publishes *"1 car reserved"* over a run in which no further car left
- *   passenger service.
- *
- * Sorted and de-duplicated. `reserveCars` reads it into a `Set` and does not care, but a value that
- * reordered itself between two builds of the same day would make *which cars are taken* look like it
- * could depend on call order, and this is the input to a decision whose output is hashed into a
- * leaderboard board.
- */
-export function spokenForCarIdsOf(
-  patch: ShiftRunPatch,
-  playerHeldCarIds: readonly string[],
-): readonly string[] {
-  return sortedUnique([
-    ...playerHeldCarIds,
-    ...patch.outOfServiceCarIds,
-    ...patch.incidents.map((incident) => carRuntimeId(incident.car)),
-  ]);
+function carRuntimeId(car: CarRef): string {
+  return `${car.bankId}-${car.carId}`;
 }

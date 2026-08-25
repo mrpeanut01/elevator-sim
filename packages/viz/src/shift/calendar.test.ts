@@ -52,6 +52,7 @@ import { asBuiltChoices, withBankChoice } from '../commissioning/choices.js';
 import { commissionedBuilding } from '../commissioning/building.js';
 import { commissionableClasses } from '../commissioning/types.js';
 import { recordRun } from '../record/recordRun.js';
+import { runIdentityIssues } from '../scope/runIdentity.js';
 import { RESOURCES, baseState } from '../scope/probes.test-helper.js';
 import { shiftRunConfigOf, type ViewerState } from '../dev/state.js';
 
@@ -66,14 +67,7 @@ import {
   scheduledEventFor,
   type CalendarPeriod,
 } from './calendar.js';
-import {
-  SHIFT_EVENTS,
-  baseDemandOf,
-  eventFor,
-  eventSpokenForCarIds,
-  shiftRunPatch,
-  spokenForCarIdsOf,
-} from './events.js';
+import { SHIFT_EVENTS, baseDemandOf, eventFor, shiftRunPatch } from './events.js';
 import { grownBuilding } from './growth.js';
 import { withIncidents } from './incidents.js';
 
@@ -163,14 +157,13 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
   });
 
   /*
-   * **The shipped expression, called rather than reproduced — GitHub issue #272.** This was three
-   * spread elements written out here, and they were correct; `shiftRunConfigOf` passed
-   * `patch.outOfServiceCarIds` alone and was not. A harness that builds a better input than the
-   * product does is not a stricter test, it is a test of something else, and the assertion that
-   * would have caught it only ran with no period at all.
+   * **The event and the player's holds, exactly as `shiftRunConfigOf` passes them — GitHub issue
+   * #272.** This harness used to build the spoken-for list itself, out of three spread elements, and
+   * the list it built was **correct** while `shiftRunConfigOf`'s was not. A harness that builds a
+   * better input than the product does is not a stricter test, it is a test of something else — and
+   * the one assertion that would have caught it ran only with no period at all. Neither builds a
+   * list now; `calendarPatch` derives it.
    */
-  const spokenForCarIds = spokenForCarIdsOf(patch, state.outOfServiceCarIds);
-
   const calendar = calendarPatch({
     day: calendarDay,
     building: grown,
@@ -178,7 +171,8 @@ function planWith(state: ViewerState, period: CalendarPeriod | null): Plan {
     demandTemplateId: template,
     demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
     runLengthS: state.shiftLengthS,
-    spokenForCarIds,
+    event,
+    playerHeldCarIds: state.outOfServiceCarIds,
   });
 
   const withEvents = withIncidents(calendar.building, patch.incidents, state.shiftLengthS);
@@ -691,13 +685,19 @@ describe('what a period will not do', () => {
       demandTemplateId: 'rise-and-fall',
       demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
       runLengthS: 1800,
-      spokenForCarIds: ['main-B', 'main-C', 'main-D'],
+      // Three of the four already held by the player, so there is no fourth to reserve.
+      playerHeldCarIds: ['main-B', 'main-C', 'main-D'],
     });
     expect(patch.outOfServiceCarIds).toEqual([]);
     expect(patch.withheld[0] ?? '').toContain('could reserve 0');
   });
 
-  it('steps over a car another part of the day has taken', () => {
+  it('steps over the car the day’s own event has taken', () => {
+    /*
+     * `move-in` stands one car down for the first two thirds of the shift, and `carsToDerate` picks
+     * `main-D` by the same total order the reservation uses. The period must reserve the next one
+     * down — anything else is a car the incident's return event hands back to passengers mid-shift.
+     */
     const day = calendarDayFor(CALENDAR_PERIODS['moving-week'], 1, 0);
     const patch = calendarPatch({
       day,
@@ -706,9 +706,27 @@ describe('what a period will not do', () => {
       demandTemplateId: 'rise-and-fall',
       demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
       runLengthS: 1800,
-      spokenForCarIds: ['main-D'],
+      event: SHIFT_EVENTS['move-in'],
     });
     expect(patch.outOfServiceCarIds).toEqual(['main-C']);
+    expect(patch.withheld).toEqual([]);
+  });
+
+  it('reserves the same car the event leaves alone, and says so on the ordinary day', () => {
+    // The negative control for the assertion above: with no event taking a car, the period reserves
+    // the first one the order offers. Without this, `main-C` above could be the only answer this
+    // function ever gives.
+    const day = calendarDayFor(CALENDAR_PERIODS['moving-week'], 1, 0);
+    const patch = calendarPatch({
+      day,
+      building: building(),
+      split: office,
+      demandTemplateId: 'rise-and-fall',
+      demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
+      runLengthS: 1800,
+      event: SHIFT_EVENTS.ordinary,
+    });
+    expect(patch.outOfServiceCarIds).toEqual(['main-D']);
     expect(patch.withheld).toEqual([]);
   });
 
@@ -919,10 +937,15 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
       runLengthS,
       templateChosenByPlayer,
       building: grownBuilding(fabricOf(buildingId, shafts), 1),
+      // The day's event goes into `shared` too — GitHub issue #272. Both functions decide
+      // `goodsCars` by reserving against a real bank, and the cars the event has already taken are
+      // part of that reservation; a caller that could hand them different events does not exist
+      // here either.
+      event: scheduledEventFor(period, 1, 0),
     };
     return {
       asks: calendarAsks(shared),
-      patch: calendarPatch({ ...shared, split: office, spokenForCarIds: [] }),
+      patch: calendarPatch({ ...shared, split: office }),
     };
   }
 
@@ -1066,98 +1089,68 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
   });
 
   /**
-   * **The ask and the patch agree on the whole shipped space, each fed the set its own caller feeds
-   * it — GitHub issue #272.**
+   * **The caption and the refusal agree about the whole shipped space, through the shipped builder —
+   * GitHub issue #272.**
    *
-   * The agreement above is asserted on one `spokenForCarIds` value handed to both, which is the
-   * mechanism. This one is whether the product reaches it, and the two are different questions —
-   * `RISKS.md` R26. In the product the two functions build the set from different places:
-   * `shiftRunConfigOf` from `events.ts#spokenForCarIdsOf`, and `scope/runIdentity.ts` — `calendarAsks`'
-   * only non-test caller — from `events.ts#eventSpokenForCarIds`. Both derive from `eventCarChoice`,
-   * which is the point; this sweep is what says so.
+   * The agreement above is `calendarAsks` against `calendarPatch` on one input, which is the
+   * mechanism. This is whether the product reaches it, and the two are different questions —
+   * `RISKS.md` R26. It drives `dev/state.ts#shiftRunConfigOf` for the caption and
+   * `scope/runIdentity.ts#runIdentityIssues` for the refusal, on the same `ViewerState`, and
+   * requires them to say the same thing about whether a car left passenger service.
    *
-   * **Measured at six cells before `runIdentity.ts` was threaded, and they were the whole residual:**
-   * `garden-apartments` / `moving-week`, days 1–6. Its bank has two cars, `move-in`'s derate takes
-   * `main-B`, and `reserveCars` never empties a bank — so the patch reserved none and said so in
-   * `withheld`, while the ask reserved `main-B` and the refusal printed *"reserves at least one car
-   * out of passenger service"* about a day that reserved none. That is issue #264's own shape
-   * arriving through a second door, and it did not exist before the run's set was corrected: while
-   * the shipped set was always `[]` the two agreed by accident, which is exactly why the docstring
-   * describing the accident as a property survived.
+   * **A first version of this compared the two pure functions and would have measured nothing.**
+   * They share one derivation now (`calendar.ts#spokenForCarsOf`), so feeding both the same event
+   * makes them agree by construction; a sweep that cannot fail is § D163's *description rather than
+   * a gate*. Only the shipped path can disagree, because only it has two callers that must each
+   * remember to pass the event.
    *
-   * The expectation is **empty and stays a sweep** rather than being deleted with the finding. An
-   * empty table is a state that must keep being checked, not a rule that can be retired: the next
-   * event that declares a hold, the next period that reserves two, and the next building whose bank
-   * has no spare all land here first.
+   * It is what caught this lane's own residual. Correcting the run's spoken-for set without
+   * correcting `runIdentity.ts`'s left six cells disagreeing — `garden-apartments` / `moving-week`,
+   * days 1–6, a two-car bank whose only spare is `move-in`'s derate, so the caption reserved none
+   * while the refusal claimed *"reserves at least one car out of passenger service"*. That is issue
+   * #264's own shape arriving through a second door, and it existed for exactly as long as the two
+   * halves of the fix were apart.
+   *
+   * Days 1, 6 and 7 rather than all seven: `moving-week`'s Saturday is its `goodsCars: 2` override
+   * and its Sunday is the `goodsCars: 0` one, so the three reach the period's base shift and both of
+   * its overrides. `scope/runIdentity.test.ts` covers the commissioned-down fabric on the building
+   * where it bites; this one covers every shipped building as authored.
    */
-  it('agrees with the run plan on every fabric, period and day — no cell disagrees', () => {
-    const classes = commissionableClasses(RESOURCES.elevatorSpecs);
+  it('agrees with the run plan about every shipped building, period and day', () => {
+    /*
+     * Quoted from `scope/runIdentity.ts`'s own clause rather than imported: `askClause` builds it
+     * inline and exports nothing, and a test that reached for the private string would be asserting
+     * against an implementation detail. `scope/runIdentity.test.ts` holds the same constant for the
+     * same reason, and if the wording moves both go red — which is correct, because the wording is
+     * what a player reads.
+     */
+    const GOODS_CLAUSE = 'reserves at least one car out of passenger service';
     const found: string[] = [];
     const verdicts: boolean[] = [];
 
     for (const entry of RESOURCES.entries) {
-      const authored = entry.config;
-      const asBuilt = asBuiltChoices(authored, classes);
-      const main = asBuilt[0];
-      if (main === undefined) continue;
-      const profile = RESOURCES.trafficProfiles.profiles.find(
-        (candidate) => candidate.id === authored.trafficProfile,
-      );
-      if (profile === undefined) continue;
+      for (const id of CALENDAR_PERIOD_IDS) {
+        for (const day of [1, 6, 7]) {
+          const state: ViewerState = {
+            ...baseState(),
+            buildingId: entry.config.id,
+            shiftLengthS: 1800,
+            week: { ...baseState().week, day, dayIdx: day - 1 },
+            calendar: periodOnDays(CALENDAR_PERIODS[id], 1, 7),
+          };
+          const plan = shiftRunConfigOf(RESOURCES, state);
+          const message =
+            runIdentityIssues(state, RESOURCES, 'ranked').find(
+              (issue) => issue.key === 'viewer.calendar',
+            )?.message ?? '';
 
-      // The authored fabric and the one-shaft commissioning a player is one select away from —
-      // issue #264's lesson that `data/buildings/` is not the set of banks a run can have.
-      for (const shafts of [main.shafts, Math.max(1, main.shafts - 1)]) {
-        const fabric =
-          shafts === main.shafts
-            ? authored
-            : commissionedBuilding(authored, withBankChoice(asBuilt, { ...main, shafts }), classes);
-
-        for (const id of CALENDAR_PERIOD_IDS) {
-          const period = periodOnDays(CALENDAR_PERIODS[id], 1, 7);
-          for (let day = 1; day <= 7; day += 1) {
-            const today = calendarDayFor(period, day, day - 1);
-            if (today === null) continue;
-
-            const grown = grownBuilding(fabric, day);
-            const patchIn = shiftRunPatch({
-              event: scheduledEventFor(period, day, day - 1),
-              building: resolveBuilding(parseBuilding(grown as unknown), RESOURCES.elevatorSpecs),
-              base: baseDemandOf(profile),
-              templateVariesMix: false,
-            });
-            const shared = {
-              day: today,
-              demandTemplateId: RISE,
-              demandTemplates: RESOURCES.trafficProfiles.demandTemplates,
-              runLengthS: 1800,
-              templateChosenByPlayer: false,
-              building: grown,
-            };
-            /*
-             * Each side gets the set **its own caller builds**, which is the whole point: the ask
-             * through `eventSpokenForCarIds` as `scope/runIdentity.ts` calls it, the patch through
-             * `spokenForCarIdsOf` as `shiftRunConfigOf` calls it. Handing both the same value would
-             * make this the mechanism test one screen up rather than the reach test it is.
-             */
-            const asked = calendarAsks({
-              ...shared,
-              spokenForCarIds: eventSpokenForCarIds(
-                scheduledEventFor(period, day, day - 1),
-                grown,
-                [],
-              ),
-            }).includes('goodsCars');
-            const applied =
-              calendarPatch({
-                ...shared,
-                split: baseDemandOf(profile).split,
-                spokenForCarIds: spokenForCarIdsOf(patchIn, []),
-              }).outOfServiceCarIds.length > 0;
-            verdicts.push(applied);
-            if (asked !== applied) {
-              found.push(`${authored.id} · ${String(shafts)} shafts · ${id} · day ${String(day)}`);
-            }
+          const captionReserves = plan.calendarLine.includes('reserved');
+          const refusalClaims = message.includes(GOODS_CLAUSE);
+          verdicts.push(captionReserves);
+          if (captionReserves !== refusalClaims) {
+            found.push(
+              `${entry.config.id} · ${id} · day ${String(day)}: caption ${String(captionReserves)}, refusal ${String(refusalClaims)}`,
+            );
           }
         }
       }
@@ -1165,7 +1158,7 @@ describe('what a period asks of the run, and what reaches it — issue #140', ()
 
     expect(found).toEqual([]);
     // The sweep has to have reached a cell that reserves and one that does not, or an empty `found`
-    // is a matrix that measured nothing — § D163's *description rather than a gate*.
+    // is a matrix that measured nothing.
     expect(verdicts, 'no cell reserved a car').toContain(true);
     expect(verdicts, 'every cell reserved a car').toContain(false);
   });

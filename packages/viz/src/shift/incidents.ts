@@ -44,7 +44,7 @@
  * Which car goes out is a **total order**, never a draw. CLAUDE.md invariant 2 forbids a random draw
  * outside the injected `StreamSet` — a shared source desynchronises common random numbers and
  * destroys comparison power — and two shifts of the same day that held different cars would not be
- * comparable with each other either. {@link carsToDerate} is that order, and `events.ts#eventCarChoice`
+ * comparable with each other either. {@link carsToDerate} is that order, and `events.ts#carsToHold`
  * now calls it rather than keeping a second copy of the same rule.
  *
  * ## The campaign incident's *answer* rides the intervention log, in this module's own terms
@@ -90,24 +90,6 @@ import type { BuildingConfig, ServiceEventConfig } from '@elevator-sim/core/brow
 export interface CarRef {
   readonly bankId: string;
   readonly carId: string;
-}
-
-/**
- * The id `Simulation` gives a car at run time, and the one `RecordRunOptions.outOfServiceCarIds` is
- * matched on — `${bankId}-${carId}`.
- *
- * Exported, and one line of it, because there were **three** copies of this expression inside
- * `shift/` and GitHub issue #272 grew in the gap between two of them: `events.ts` mapped
- * a {@link CarRef} to it, `calendar.ts` held a private twin for the reservation, and `dev/state.ts`
- * handed the calendar a set that contained neither the day's incident cars nor the player's own
- * holds. Three sites answering *what is this car called?* is how a fourth site comes to answer
- * *which cars are taken?* wrongly and look right doing it.
- *
- * It lives here rather than in `events.ts` because {@link CarRef} does, and the name is a fact about
- * the ref rather than about a patch.
- */
-export function carRuntimeId(car: CarRef): string {
-  return `${car.bankId}-${car.carId}`;
 }
 
 /**
