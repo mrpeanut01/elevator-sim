@@ -268,6 +268,33 @@ export function runsWholeDay(
  * long slice of a thirty-minute template, not a day, and `goals.ts#WORST_WAIT_WHOLE_DAY_FACTOR`
  * carries the measurement that says a long slice truncates its tail exactly as a short one does.
  *
+ * ## It is not a text producer, and `honesty/derive.test.ts` cannot tell yet
+ *
+ * **This function leaves the tree red on exactly one test, and the red is a classification gap
+ * rather than a defect** — said here rather than left for whoever runs the suite next.
+ * `derive.test-helper.ts` reads two adjacent alphabetic words as prose, so the discriminated-union
+ * tag `'whole-day'` reads as a phrase and this becomes a derived *text producer* that no adapter
+ * drives and no exclusion names. It is the **id/key case** `NOT_PLAYER_FACING` already records three
+ * times — `dev/elementMap.ts#ELEMENT_IDS`, `menu/screens.ts#withChosenValue`,
+ * `everyday/profile.ts#loadProfile` — and the entry it wants is:
+ *
+ * > A union tag with no sentence in it. `runHorizonOf` answers *which of the two kinds of run this
+ * > state is*, and both of its values are members of `shift/types.ts#RunHorizon` — `period`, and
+ * > `whole-day`, which is derived only because the hyphen reads to the two-adjacent-words scanner
+ * > as a phrase. Nothing it returns is shown to anybody: what a player reads is the **bar**
+ * > `goals.ts#goalsForDay` builds from it, and `goalsForDay` is driven already.
+ * > `shift/dayLength.test.ts` asserts both of its answers against the template the same state
+ * > resolves to.
+ *
+ * `packages/viz/src/honesty/` belongs to another lane this wave, so the entry is owed rather than
+ * written. **Three ways to make it green were considered and refused**, and they are worth stating
+ * so nobody re-derives them: spelling the tag `'wholeDay'`, hiding the declaration behind a bare
+ * `export { … }` so the deriver reads it as unexported, and widening `goalsForDay`'s parameter to
+ * take a boolean so the tag never leaves the one span that already carries it. The first two make
+ * an honesty instrument miss something on purpose, which is the false negative its own docstring
+ * warns about; the third distorts a type to satisfy a scanner. A classification entry is the honest
+ * repair, and it belongs to the file that owns the classification.
+ *
  * A decision number is owed; this docstring is the argument.
  */
 export function runHorizonOf(
