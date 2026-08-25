@@ -2131,7 +2131,7 @@ on both is a **batch goal**; a cell with any unjudgeable run is neither.
 
 | stage | building, demand | `deliver-everyone` | `no-divergence` | `nobody-abandoned` | `answer-the-demand` | `long-waits-under` ≤ 10 % |
 |---|---|---|---|---|---|---|
-| **1 first call** | `garden-apartments`, shipped | 49/50, 48/50 † | 50/50, 50/50 | 50/50, 50/50 | **38/50, 48/50** | 49/50, 48/50 † |
+| **1 first call** | `garden-apartments`, shipped | 50/50, 50/50 § | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 § | 50/50, 50/50 § |
 | **2 morning rush** | `midtown-office`, 2.5 % | 50/50, 50/50 | 50/50, 50/50 | 50/50, 50/50 | **24/50, 20/50** | **41/50, 45/50** |
 | **3 overwhelmed** | `midtown-office`, shipped | 50/50, 50/50 | 0/50, 0/50 | **28/50, 29/50** | 0/50, 0/50 | 0/50, 0/50 |
 | **4 two banks** | `mixed-use-high-rise`, 1.5 % | **36/50, 34/50** | 50/50, 50/50 | 50/50, 50/50 | **19/50, 20/50** | 50/50, 50/50 |
@@ -2142,13 +2142,32 @@ on both is a **batch goal**; a cell with any unjudgeable run is neither.
 | **9 both ways at once** | `crown-hotel`, 2.5 % | 47/50, 50/50 ‡ | 50/50, 50/50 | 50/50, 50/50 | **40/50, 42/50** | 50/50, 49/50 ‡ |
 | **10 the bed and the visitor** | `st-jude-hospital`, 2 % | **41/50, 41/50** | 50/50, 50/50 | 50/50, 50/50 | **32/50, 30/50** | 50/50, 50/50 |
 
-Bold is a shipping batch goal. † is **unjudgeable**: 1 of 50 tuning seeds and 2 of 50 holdout seeds
-serve nobody in the reporting window, so those runs have no verdict and the judgeable ones are not
-counted on their own — see R12's box. ‡ is **withheld because the two seed sets disagree about the
+Bold is a shipping batch goal. ‡ is **withheld because the two seed sets disagree about the
 kind of answer**: 49/50 is a variable and 50/50 is a constant-pass, and a classification that does
 not survive a disjoint seed set is not one to ship a level on — the hotel's two-way demand sits
 exactly on that boundary. `everyone-can-get-there` and `beat-the-baseline` are withheld on every
 stage, the first blocked on W7 and the second because it compares two arms.
+
+**§ is stage 1's whole row, and it is a correction rather than a measurement that drifted** — GitHub
+issue **#255**. Three of its five cells read `49/50, 48/50 †` and `**38/50, 48/50**` until the
+campaign path was given a reporting window; **†** used to mean *unjudgeable — 1 of 50 tuning seeds
+and 2 of 50 holdout seeds serve nobody in the reporting window*, and that is now nobody's footnote,
+because those seeds served plenty of people and the five-minute band was reading the wrong five
+minutes of a fifteen-minute run. `campaign/stageRun.ts` and `scenario/measure.ts` now take the
+window from `shift/reportWindow.ts#shiftReportWindowFor`, which returns `full-run` on
+`garden-apartments` and on no other stage building, so **stage 1 is the only row this moved** and
+the other nine are byte-identical.
+
+**What it changed is not a rounding.** `deliver-everyone` and `long-waits-under` were withheld as
+unjudgeable and are now constants; `answer-the-demand` was this stage's **only shipping batch goal**
+at `38/50, 48/50` and is now `50/50, 50/50`, which R12 makes a fact for the brief. So all five of
+stage 1's per-run kinds are constants, `data/campaign.json` declares `beat-the-baseline` alone
+there, and the thing to read twice is *why*: `answer-the-demand` is `personsPer5Min >=
+offeredPer5Min`, and over a five-minute band on a building with a dozen arrivals in the run that
+comparison was measuring where the band fell rather than how the building was dispatched. **The
+stage's only count goal was an artefact of the window.** Giving stage 1 something a player can fail
+is a content decision and belongs to the campaign rebalance, not here; `docs/33` § 3.2's row for
+this stage is corrected in place.
 
 > **Five of these ten rows moved on 2026-08-05, and the five that did not are the evidence.**
 > [`DECISIONS.md`](../DECISIONS.md) § D254 deleted an access check that asked about the **pickup**
