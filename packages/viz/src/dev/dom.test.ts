@@ -273,8 +273,16 @@ describe('reconcile survives a removal that redraws its own host', () => {
      * one write behind.
      *
      * So the contract asserted is **it returns**, and the host is left holding a coherent set
-     * rather than a half-emptied one. Without the budget this case does not fail — it hangs, and
-     * vitest reports it three hundred seconds later as a timeout.
+     * rather than a half-emptied one.
+     *
+     * **What this case cannot do is hang, and that is a limit rather than a feature.** The pool
+     * below is twenty rows, so a `reconcile` with the budget deleted converges after twenty passes
+     * instead of spinning — measured, rather than assumed: the mutation reports `expected 20 to be
+     * 8`, which names the cause correctly and is not a timeout. A fake that could actually livelock
+     * would hang the suite for five minutes every time somebody broke this line, which is a worse
+     * test than one that pins where the bound bites. So the assertion is the **budget**, at the
+     * number `dom.ts` promises, and the hang it prevents is argued in that docstring rather than
+     * demonstrated here.
      */
     const p = page();
     /*
