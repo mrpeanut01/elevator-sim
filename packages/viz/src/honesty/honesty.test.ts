@@ -29,6 +29,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  AGREED_FIGURES,
   caseFromSeed,
   DEEP_SPACE,
   deepCampaignRequested,
@@ -108,6 +109,42 @@ describe('the search is alive — the five false-negative shapes, hunted in the 
     // asserted *loud* in the deep tier below, so its silence is a measured fact rather than an
     // unnoticed one.
     expect(silent).toEqual(['campaign/judge.ts#judgeStage']);
+  });
+
+  it('every surface with strings is an adapter or a declared pair — nothing else may appear', () => {
+    /*
+     * **The clause the surfaces column needs, and did not have.** That column is published in
+     * `CLAUDE.md` and `docs/05-roadmap.md`, and its meaning there is *a screen that is not in this
+     * count is a screen the search has never read* — so a `surfaceId` that is neither a screen nor
+     * an adapter silently inflates a figure a reader draws conclusions from. `RISKS.md` R38 is
+     * about exactly that, and this row has already been corrected once for a stale count.
+     *
+     * The tenth property is the first thing in this directory that produces strings under an id
+     * that is **not** an adapter's, and it has to: a declared pair's reading names the shipped
+     * expression it came from, or a violation cannot say which of the two surfaces disagreed. So
+     * the count is `SURFACE_ADAPTERS` **plus the pair sides**, asserted here in both directions,
+     * and the number a reader sees is a number this test can explain.
+     */
+    const adapters = new Set(SURFACE_ADAPTERS.map((adapter) => adapter.id));
+    const sides = new Set(
+      AGREED_FIGURES.flatMap((figure) => [figure.left.surfaceId, figure.right.surfaceId]),
+    );
+    const strays = Object.keys(standard.stats.surfaces)
+      .filter((id) => !adapters.has(id) && !sides.has(id))
+      .sort();
+    expect(
+      strays,
+      'a string was rendered under a surface id that is neither an adapter nor a side of a ' +
+        'declared pair. The surfaces column is published, and a reader takes it for the number of ' +
+        'screens the search has read — so an id that is neither must either become an adapter or ' +
+        'stop being seeded.',
+    ).toEqual([]);
+    // And the other direction: every declared side actually spoke, or the pair is rendering
+    // nothing and `agreement.test.ts`'s clauses are the only thing standing between that and a
+    // green run.
+    for (const side of sides) {
+      expect(standard.stats.surfaces[side] ?? 0, side).toBeGreaterThan(0);
+    }
   });
 
   it('the corpus reaches both halves of the space, so R3 has something to check', () => {
