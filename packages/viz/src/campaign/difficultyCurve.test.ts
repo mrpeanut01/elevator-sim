@@ -94,6 +94,17 @@ import { DATA_DIR } from '../fixtures.test-helper.js';
  * - **Horizon.** 600 s makes `collective` variable on both sets at 49 and 49. It is refused rather
  *   than taken: a goal that becomes failable because the run got shorter is the defect § D355
  *   closed, wearing a different length.
+ * - **Parking.** The axis the building's own `$comment` names — *"parking policy dominates here"* —
+ *   and the one the four above did not touch. Swept in `docs/33` § 3.3c over every declared value,
+ *   crossed with the reposition deadband, the energy price and every legal demand level. It reaches
+ *   the run (all five values move the legs of this stage's own replication) and it moves **only**
+ *   `long-waits-under`, exactly as the four other kinds' 50 | 50 predicted. At the stage's own
+ *   demand under `collective` the one cell variable on both sets is a park at the **top floor**,
+ *   49 | 49 — the 98 % shape refused two paragraphs up — and reaching it at all needs the parking
+ *   value on the **baseline** arm, which no field of `data/campaign.json` can author and which
+ *   `dev/campaignPanel.ts` would then be admitting profiles against the wrong setting. Measured
+ *   shut on the margin **and** unreachable from here; the axis is not exhausted, but this lane's
+ *   half of it is.
  *
  * **What would move it is fabric, and `docs/33` § 3.3 C1 predicted that before it was measured** —
  * *"`garden-apartments` has a hard rate ceiling … so its pressure has to come from fabric too."*
@@ -106,8 +117,9 @@ const DC1_UNFAILABLE: ReadonlyMap<string, string> = new Map([
   [
     'stage-1-first-call',
     'Every count goal is 50 of 50 on both seed sets under the shipped setting, at every demand ' +
-      'level the residential profile declares. No demand or dispatcher change inside DC-R1 moves ' +
-      'one; fabric would. See docs/33 § 3.3 C1.',
+      'level the residential profile declares. No demand, dispatcher or parking change inside ' +
+      'DC-R1 moves one at a margin worth asking a player about; fabric would. See docs/33 ' +
+      '§ 3.3 C1 and § 3.3c.',
   ],
 ]);
 
