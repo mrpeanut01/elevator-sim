@@ -749,6 +749,60 @@ describe('two callers doing the same thing at the same moment', () => {
     expect(await store.setDisplayName(ada, 'Grace')).toMatchObject({ ok: false, reason: 'name-taken' });
   });
 
+  it('makes two submissions of one seed one row, rather than failing the second', async () => {
+    // Nothing to do with deletion. The upsert conflicted on `id` — the primary key — while the
+    // guarantee it exists to keep is over `UNIQUE (config_hash, user_id, seed)`. Two concurrent
+    // submissions of the same seed both read nothing, both mint a fresh id, and the second loses.
+    const { store, sql, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO entries'),
+      contend: async (inner) => {
+        await inner.query(
+          'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
+            'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          ['first-in', 'contested', ada, RUN.seed, JSON.stringify(RUN), 11, 22, 33, 0, 1_770_000_000_000],
+        );
+      },
+    });
+    arm();
+    const row = await store.recordEntry({ configHash: 'contested', userId: ada, run: RUN, measured: metrics(10) });
+    // The winner's row is the row, updated — not a second one and not a rejection. Its id comes
+    // back from the statement, so the caller is told which row it actually wrote.
+    expect(row.id).toBe('first-in');
+    expect(row.measured.awtS).toBe(10);
+    const count = await sql.query('SELECT COUNT(*) AS n FROM entries WHERE config_hash = $1', ['contested']);
+    expect(Number(count.rows[0]?.['n'])).toBe(1);
+  });
+
+  it('does the same for a challenge entry, because it has the same shape', async () => {
+    const { store, sql, ada, arm } = await contendedFixture({
+      fires: (text) => text.startsWith('INSERT INTO challenge_entries'),
+      contend: async (inner) => {
+        await inner.query(
+          'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
+            'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
+            'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
+          ['first-in', issuedChallengeFor(0).id, 'data-1', ada, 'eta', 5, 100, 30, 60, 90, 0, '[]', 1_770_000_000_000],
+        );
+      },
+    });
+    await store.issueChallenge(issuedChallengeFor(0));
+    arm();
+    const row = await store.recordChallengeEntry({
+      challengeId: issuedChallengeFor(0).id,
+      dataHash: 'data-1',
+      userId: ada,
+      dispatcherProfileId: 'collective',
+      score: challengeScore(20),
+    });
+    expect(row.id).toBe('first-in');
+    // Latest wins, which is what the docstring says a challenge entry is: the run a player
+    // currently stands behind, and switching dispatcher is the move the surface exists for.
+    expect(row.dispatcherProfileId).toBe('collective');
+    const count = await sql.query('SELECT COUNT(*) AS n FROM challenge_entries WHERE challenge_id = $1', [
+      issuedChallengeFor(0).id,
+    ]);
+    expect(Number(count.rows[0]?.['n'])).toBe(1);
+  });
 });
 
 describe('an account deleted underneath a write that never read it', () => {

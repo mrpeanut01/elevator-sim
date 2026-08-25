@@ -516,6 +516,23 @@ export class Store {
    * One row per (board, player, seed): re-submitting the same seed **replaces** rather than
    * appends, because a deterministic replay of the same seed is the same run and a board that
    * listed it twice would be counting a refresh as an achievement.
+   *
+   * **The database keeps that promise now, and until #266 a `SELECT` did.** The upsert conflicted on
+   * `id` — the *primary* key — while the guarantee is over `UNIQUE (config_hash, user_id, seed)`, so
+   * the replacement only happened when the pre-read found the row. Two submissions of one seed in
+   * flight together both read nothing, both mint a fresh `randomUUID`, and the second violates the
+   * natural key: a double-tapped submit answered `500` and posted nothing for the losing half.
+   *
+   * Conflicting on the natural key makes exactly one caller win and the other update. The row's id
+   * comes back from `RETURNING`, because the winner's id is the row's id and inventing one here
+   * would be reporting an id that is not in the table. The pre-read is **gone rather than guarded**:
+   * with the write arbitrating there is nothing left for it to decide, and
+   * {@link Store.consumeLoginToken} already argues that shape — *"not a `SELECT` then a `DELETE`:
+   * two statements are a check-then-act"*.
+   *
+   * The `userById` above stays, and stays a check-then-act. It is not there to decide whether to
+   * insert; it is there for `displayName`, which this table does not store. Its race is the foreign
+   * key, and that is mapped rather than closed — see {@link NoSuchUserError}.
    */
   async recordEntry(input: {
     readonly configHash: string;
@@ -525,14 +542,8 @@ export class Store {
   }): Promise<EntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordEntry');
-    const found = await this.#sql.query(
-      'SELECT id FROM entries WHERE config_hash = $1 AND user_id = $2 AND seed = $3',
-      [input.configHash, input.userId, input.run.seed],
-    );
-    const existing = found.rows[0];
 
-    const row: EntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing['id']),
+    const draft = {
       configHash: input.configHash,
       userId: input.userId,
       displayName: user.displayName,
@@ -542,30 +553,32 @@ export class Store {
     };
     // Guarded, because the `userById` above is a check-then-act and `deleteUser` is what made its
     // second half reachable. See {@link NoSuchUserError}.
+    let written;
     try {
-      await this.#sql.query(
+      written = await this.#sql.query(
         'INSERT INTO entries (id, config_hash, user_id, seed, run_json, awt_s, wt95_s, ttd_mean_s, ' +
           'pct_over_long_wait, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ' +
-          'ON CONFLICT (id) DO UPDATE SET run_json = excluded.run_json, awt_s = excluded.awt_s, ' +
-          'wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
-          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms',
+          'ON CONFLICT (config_hash, user_id, seed) DO UPDATE SET run_json = excluded.run_json, ' +
+          'awt_s = excluded.awt_s, wt95_s = excluded.wt95_s, ttd_mean_s = excluded.ttd_mean_s, ' +
+          'pct_over_long_wait = excluded.pct_over_long_wait, submitted_at_ms = excluded.submitted_at_ms ' +
+          'RETURNING id',
         [
-          row.id,
-          row.configHash,
-          row.userId,
-          row.run.seed,
-          JSON.stringify(row.run),
-          row.measured.awtS,
-          row.measured.wt95S,
-          row.measured.ttdMeanS,
-          row.measured.pctOverLongWait,
-          row.submittedAtMs,
+          randomUUID(),
+          draft.configHash,
+          draft.userId,
+          draft.run.seed,
+          JSON.stringify(draft.run),
+          draft.measured.awtS,
+          draft.measured.wt95S,
+          draft.measured.ttdMeanS,
+          draft.measured.pctOverLongWait,
+          draft.submittedAtMs,
         ],
       );
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordEntry');
     }
-    return row;
+    return { id: String(written.rows[0]?.['id']), ...draft };
   }
 
   /**
@@ -665,6 +678,12 @@ export class Store {
    * metric a reader sorted by, so four readers would be looking at four different boards. Latest
    * wins instead — a challenge entry is the run a player currently stands behind, and switching
    * dispatcher is the move the whole surface exists to make possible.
+   *
+   * **Conflicting on `UNIQUE (challenge_id, data_hash, user_id)` rather than on `id`**, for
+   * {@link Store.recordEntry}'s reason and stated here rather than by reference because it is a
+   * different table with a different natural key: the upsert used to name the primary key, so
+   * *latest wins* held only when the pre-read found the row and two submissions in flight together
+   * failed the second. The row's id comes back from `RETURNING`.
    */
   async recordChallengeEntry(input: {
     readonly challengeId: string;
@@ -675,14 +694,8 @@ export class Store {
   }): Promise<ChallengeEntryRow> {
     const user = await this.userById(input.userId);
     if (user === undefined) throw new NoSuchUserError('recordChallengeEntry');
-    const found = await this.#sql.query(
-      'SELECT id FROM challenge_entries WHERE challenge_id = $1 AND data_hash = $2 AND user_id = $3',
-      [input.challengeId, input.dataHash, input.userId],
-    );
-    const existing = found.rows[0];
 
-    const row: ChallengeEntryRow = {
-      id: existing === undefined ? randomUUID() : String(existing['id']),
+    const draft = {
       challengeId: input.challengeId,
       dataHash: input.dataHash,
       userId: input.userId,
@@ -696,36 +709,39 @@ export class Store {
     // vanish under a submission, and inventing a branch for an unreachable case is the defect this
     // repository has a standing rule about. `#asOwnerError` distinguishes them by asking whether
     // the account is what went missing, rather than by reading a generated constraint name.
+    let written;
     try {
-      await this.#sql.query(
+      written = await this.#sql.query(
         'INSERT INTO challenge_entries (id, challenge_id, data_hash, user_id, dispatcher_profile_id, ' +
           'runs, legs, mean_awt_s, mean_wt95_s, mean_ttd_mean_s, mean_pct_over_long_wait, ' +
           'per_seed_json, submitted_at_ms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ' +
-          'ON CONFLICT (id) DO UPDATE SET dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
+          'ON CONFLICT (challenge_id, data_hash, user_id) DO UPDATE SET ' +
+          'dispatcher_profile_id = excluded.dispatcher_profile_id, ' +
           'runs = excluded.runs, legs = excluded.legs, mean_awt_s = excluded.mean_awt_s, ' +
           'mean_wt95_s = excluded.mean_wt95_s, mean_ttd_mean_s = excluded.mean_ttd_mean_s, ' +
           'mean_pct_over_long_wait = excluded.mean_pct_over_long_wait, ' +
-          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms',
+          'per_seed_json = excluded.per_seed_json, submitted_at_ms = excluded.submitted_at_ms ' +
+          'RETURNING id',
         [
-          row.id,
-          row.challengeId,
-          row.dataHash,
-          row.userId,
-          row.dispatcherProfileId,
-          row.score.runs,
-          row.score.legs,
-          row.score.meanAwtS,
-          row.score.meanWt95S,
-          row.score.meanTtdMeanS,
-          row.score.meanPctOverLongWait,
-          JSON.stringify(row.score.perSeed),
-          row.submittedAtMs,
+          randomUUID(),
+          draft.challengeId,
+          draft.dataHash,
+          draft.userId,
+          draft.dispatcherProfileId,
+          draft.score.runs,
+          draft.score.legs,
+          draft.score.meanAwtS,
+          draft.score.meanWt95S,
+          draft.score.meanTtdMeanS,
+          draft.score.meanPctOverLongWait,
+          JSON.stringify(draft.score.perSeed),
+          draft.submittedAtMs,
         ],
       );
     } catch (error) {
       throw await this.#asOwnerError(error, input.userId, 'recordChallengeEntry');
     }
-    return row;
+    return { id: String(written.rows[0]?.['id']), ...draft };
   }
 
   /**
