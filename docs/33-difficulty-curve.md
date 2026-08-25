@@ -742,7 +742,9 @@ makes every repositioning trip not worth taking, so the run collapses **byte-ide
 which is only defensible if *"park them at the ground floor"* is not automatically right. On this
 building it is measurably wrong — behind on average wait and on door-to-door time — and the middle of
 the building wins. The two losing moves are pinned in the same file, so a change that made the lobby
-win would take the brief's last sentence down with it.
+win would take the brief's last sentence down with it. The copy names **no count**, deliberately: the
+briefing already derives *"judged over 50 runs"* from `stage.replications`, and an authored sentence
+repeating it would be a second source for one number and stale the day the batch size moved.
 
 ### 3.3d A structural note on DC-1 that the parking sweep made unavoidable
 
