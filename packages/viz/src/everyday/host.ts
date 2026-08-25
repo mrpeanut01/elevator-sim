@@ -135,6 +135,7 @@ import {
 } from '../mode/plainLevers.js';
 import type { CalendarPeriod } from '../shift/calendar.js';
 import { contractById, statLineOf } from '../shift/contracts.js';
+import { runsWholeDay, wholeDayFor, wholeDayRun, type WholeDay } from '../shift/dayLength.js';
 import { goalsForDay, readGoals } from '../shift/goals.js';
 import { shiftObservationsOf } from '../shift/observations.js';
 import type { ShapedDayReport } from '../shift/report.js';
@@ -143,6 +144,7 @@ import type {
   DayOutcome,
   GoalObservations,
   GoalReading,
+  RunHorizon,
   ScenarioContract,
   WeekState,
 } from '../shift/types.js';
@@ -679,6 +681,74 @@ function openTomorrowPatch(week: WeekState): Partial<ViewerState> {
   };
 }
 
+/* -------------------------------------------------------------------------- *
+ * The day is a whole day — `ISSUE_VERIFICATION_FINDINGS.md` § AB
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The whole authored day the standing selection may run, or `undefined`.
+ *
+ * One expression, read by the two things that must not disagree: {@link dayPatchFor}, which sets
+ * the run up, and {@link horizonOf}, which decides what today's goals ask of it. A second copy of
+ * this lookup is how a ten-hour run comes to be graded against a thirty-minute ceiling.
+ */
+function dayFor(b: EverydayHostBindings): WholeDay | undefined {
+  const state = b.state();
+  return wholeDayFor(
+    b.resources.trafficProfiles,
+    buildingConfigOf(b.resources, state.savedBuildings, state.buildingId),
+  );
+}
+
+/**
+ * The patch that makes today a whole day — `ISSUE_VERIFICATION_FINDINGS.md` § AB, and the seam that
+ * turns a shipped-but-unreachable record into the run a player actually watches.
+ *
+ * ## Why this is here rather than on the contract or in `initialState`
+ *
+ * The product owner's ruling on § AB is **Everyday day only, stages unchanged**, and this is what
+ * *only* looks like in code: the Everyday product's own run press sets the Everyday product's own
+ * day. `dev/state.ts#initialState`, `dev/scenariosPanel.ts`'s *take* and `DEFAULT_SHIFT_LENGTH_S`
+ * are all untouched, so the Engineer shell opens on exactly the thirty minutes every number in
+ * `docs/05-roadmap.md` was measured over, and no published figure moves.
+ *
+ * ## Why it is not the length control § D286 deleted
+ *
+ * Nothing here is offered to anybody. § D286 removed `SHIFT_LENGTHS`' four narrative options and
+ * Free Play's five numeric ones because *a length names the demand schedule and says nothing about
+ * the drain*, and because a longer length **rescaled** the day rather than showing more of it
+ * (issues #80, #81, #82). This writes no length a player picked: it writes the period the record
+ * declares, and it writes it as a window precisely so the schedule is **not** rescaled —
+ * `shift/dayLength.ts#wholeDayRun` carries the argument, and `core` refuses the rescaling override
+ * on a day by name. A part's length is the period it names, which is § D286's own sentence.
+ *
+ * Returns `{}` for a building with no authored day, which is three of the eight shipped ones. An
+ * empty patch is the honest answer there — their day is the slice it always was, and inventing a
+ * day for a residential, hotel or hospital crowd out of an office one is the modelling claim
+ * `dayLength.ts` refuses.
+ */
+function dayPatchFor(b: EverydayHostBindings): Partial<ViewerState> {
+  const day = dayFor(b);
+  return day === undefined ? {} : wholeDayRun(day);
+}
+
+/**
+ * Which kind of run today's goals are being asked of — `shift/goals.ts#goalsForDay`'s second
+ * argument.
+ *
+ * Read off the **state**, not off {@link dayPatchFor}'s intent: until the patch has landed the day
+ * is still a slice, and a rail that graded an unrun slice against a day's ceiling would be the
+ * report describing a run that has not happened. `runsWholeDay` is the same predicate
+ * `shiftDemandTemplateId` asks, so the template the run resolves against and the bar it is judged
+ * by cannot disagree.
+ */
+function horizonOf(b: EverydayHostBindings): RunHorizon {
+  const day = dayFor(b);
+  if (day === undefined) return 'period';
+  const state = b.state();
+  return runsWholeDay(day, state.shiftLengthS, state.windowStartS) ? 'whole-day' : 'period';
+}
+
 /**
  * Build the host over the closure's bindings. Pure over its input: every derivation reads
  * `bindings.state()` fresh, so the host never holds a stale copy of anything.
@@ -720,7 +790,7 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
         state.recording === undefined
           ? NO_RUN_OBSERVATIONS
           : shiftObservationsOf(observationsAt(state.recording, b.playheadS()));
-      return readGoals(goalsForDay(state.week.day), observations);
+      return readGoals(goalsForDay(state.week.day, horizonOf(b)), observations);
     },
     lastReport: () => b.state().report,
     lastOutcome: () => b.state().week.history.at(-1),
@@ -842,6 +912,22 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       };
     },
     startRun: () => {
+      /*
+       * The day is set up on the press rather than on a mount — § AB, and {@link dayPatchFor} for
+       * why the Everyday product's own press is the right owner. On the press, because it is the
+       * one moment a player has asked for *today* rather than for a screen, and because a mount
+       * that patched state would repaint every other surface reading it.
+       *
+       * Before `startRun`, and the order is load-bearing: `dev/main.ts#runShift` reads the state
+       * synchronously to build the config, so a patch landing after the press would run yesterday's
+       * length under today's caption.
+       *
+       * **Nothing at all** for a crowd with no authored day, rather than an empty patch: `applyPatch`
+       * is `MountContext.update`, which re-renders, and a press that repainted every surface to
+       * write no field would be doing work a player could see for a change nobody made.
+       */
+      const day = dayFor(b);
+      if (day !== undefined) b.applyPatch(wholeDayRun(day));
       b.startRun();
     },
     closeDay: () => {
@@ -858,7 +944,10 @@ export function createEverydayHost(bindings: EverydayHostBindings): EverydayHost
       // Nothing to advance from — see the interface docstring. The screen gates its primary on
       // the same fact, so this early return is the API refusing what the control never offers.
       if (state.report === undefined) return;
-      b.applyPatch(openTomorrowPatch(state.week));
+      // Tomorrow is a day of the same kind today was — the whole-day patch rides in the same merge
+      // rather than in a second one, so no render sees a week advanced onto a horizon it is not
+      // running yet.
+      b.applyPatch({ ...openTomorrowPatch(state.week), ...dayPatchFor(b) });
       b.openRunTab();
       b.startRun();
     },

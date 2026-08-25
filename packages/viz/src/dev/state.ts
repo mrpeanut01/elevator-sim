@@ -80,6 +80,7 @@ import type { VizRecording } from '../contract/types.js';
 import type { DisclosureMode } from '../live/types.js';
 import type { ViewMode } from '../mode/types.js';
 import { contractById, contractForBuilding, CONTRACTS } from '../shift/contracts.js';
+import { runsWholeDay, wholeDayFor } from '../shift/dayLength.js';
 import { shiftRunPatch, baseDemandOf } from '../shift/events.js';
 import { grownBuilding } from '../shift/growth.js';
 import { withIncidents } from '../shift/incidents.js';
@@ -164,6 +165,27 @@ export function shiftLengthForContract(contractId: string): number {
  * the run is not using. The calendar's own override is deliberately **not** consulted: a period may
  * swap the template for a scheduled day, and offering the player parts of a template the calendar
  * chose for them would let a control move something the calendar owns.
+ *
+ * ## Three sources, in the order a disagreement between them should be settled
+ *
+ * **Free Play's select wins**, because it is the only one of the three a player typed. Then the
+ * **whole authored day** the state's own window asks for; then the pattern.
+ *
+ * The middle clause is `ISSUE_VERIFICATION_FINDINGS.md` § AB's fix, and it reads the *window*
+ * rather than a new field on purpose. `state.windowStartS`/`shiftLengthS` are already the two
+ * halves § D286 split one control into — *which part of the day you run* — and a run that covers
+ * the whole of a ten-hour period is asking for the record whose period that is. Deriving the
+ * template from the window is what makes the two one decision instead of two that agree by habit,
+ * and the failure the habit would produce is not a wrong caption: `shiftRunConfigOf` writes
+ * `templateOverrides.durationS` exactly when `windowStartS` is `null`, and `core` refuses that
+ * override on a phase-list record **by name** (§ D285), so a state naming a day without naming its
+ * window **throws**. `shift/dayLength.ts` owns both halves and the argument for both.
+ *
+ * The last clause's `'rise-and-fall'` is the line § AB names: `initialState` opens on
+ * `pattern: 'building'`, `selectedPatternSpec` answers `undefined` for it, and so **every**
+ * Everyday day — residential tower and thirty-floor office alike — fell through to one hard-coded
+ * thirty-minute up-peak. It is left exactly where it is, because it is still the right answer for
+ * the three shipped crowds no authored day covers.
  */
 export function shiftDemandTemplateId(
   resources: BrowserResources,
@@ -172,7 +194,13 @@ export function shiftDemandTemplateId(
 ): string {
   const spec = selectedPatternSpec(resources, state, building);
   const fromPattern = spec === undefined ? 'rise-and-fall' : demandFromSpec(spec).demandTemplate;
-  return state.freePlay?.demandTemplateId ?? fromPattern;
+  const chosen = state.freePlay?.demandTemplateId;
+  if (chosen !== undefined) return chosen;
+  const day = wholeDayFor(resources.trafficProfiles, building);
+  if (day !== undefined && runsWholeDay(day, state.shiftLengthS, state.windowStartS)) {
+    return day.templateId;
+  }
+  return fromPattern;
 }
 
 /**
