@@ -381,20 +381,60 @@ from treating them as one.
 | Currency | What it is | Earned by | Spent on | Where it lives |
 |---|---|---|---|---|
 | **Units (`u`)** | Money | Clearing a day, at the contract's rate | Works from the shop, service windows, refurbishment | `economy.ts#purseOf` |
-| **Nights** | The building out of service | Not earned — **only spent** | Every works tier above zero nights | `economy.ts#WorksBooking.nights` |
+| **Nights** | Days of the contract month a booking occupies before its tier counts as fitted | Not earned — **only spent** | Every works tier above zero nights | `economy.ts#WorksBooking.nights` |
 | **Standing** | The record | `cleared × 2 − missed × 3`, summed over towers | Nothing. It is **spent on nothing** and opens slots | `economy.ts#standingOf` |
 
-**Nights are the currency that makes the game.** Units are only interesting because the thing they
-buy takes the building apart while it is being fitted: *a fourth car* costs 34 u and **eight nights
-with two cars out**. So the shape of a campaign decision is not *can I afford this* but *can I
-survive buying it*, and the answer changes with where in the contract you are —
-`economy.ts#daysOfBenefit` refuses a purchase that would go live after the contract ends, and says
-so with `past-contract` rather than silently hiding the tier.
+**Nights are the currency that makes the game**, and what they cost is *time in the contract* rather
+than *cars in the building*. A booking's nights have to fit inside the twenty days and may not
+overlap another booking (`economy.ts#startIsLegal`); the tier does not count as fitted until all of
+them are behind today (`economy.ts#bookingIsLive`, read by `economy.ts#fittedLevel`); and every night
+is a day of benefit not had, which is why `economy.ts#daysOfBenefit` refuses a purchase that would go
+live after the contract ends and says so with `past-contract` rather than silently hiding the tier.
+So the shape of a campaign decision is not *can I afford this* but *can I still get the use of it* —
+*a fourth car* costs 34 u and eight nights, on a month twenty days long.
 
 > **GD11 — Spending must make the near days harder.** A purchase that is purely additive is a
-> number going up. Every works tier above tier 1 in the shipped shop takes capacity away first and
-> gives it back later, and that ordering is the mechanic. A future currency sink that costs nothing
-> in the present is refused under this rule.
+> number going up. The ordering that makes it a decision is **take capacity away first, give it back
+> later**, and a future currency sink that costs nothing in the present is refused under this rule.
+
+**GD11's ordering is the design intent and it is UNBUILT.** This paragraph read *"every works tier
+above tier 1 in the shipped shop takes capacity away first and gives it back later, and that ordering
+is the mechanic"*, stated as a fact about the shipped build, and it was false three ways:
+
+1. **No campaign day takes a car out of passenger service.**
+   `RecordRunOptions.outOfServiceCarIds` has no writer under `packages/viz/src/campaign/`, none in
+   any `everyday/campaign*` module, and none in `everyday/host.ts#runCampaignDay` — which writes a
+   tower's `buildingId` and `dispatcherId`, presses run, and reads no booking at all. This is the
+   same claim GitHub issues **#264** and **#272** withdrew from `everyday/campaignModel.ts`'s
+   calendar tip and from `campaign/economy.ts`'s `shafts` tier ([§ D364](../DECISIONS.md)); the
+   `shafts` L1 line that this document quoted as *"eight nights with two cars out"* now reads only
+   `'The tower stops being one car short.'`
+2. **The other half is unbuilt too**, so *gives it back later* is not a survivor of the correction.
+   Nothing bought reaches a run: `fittedLevel` is read only by `everyday/campaignModel.ts`'s
+   contract and shop screens, and the day a player then watches is built from `buildingId` and
+   `dispatcherId` alone. That is GitHub issue **#181**'s third break, still open.
+3. **"Every works tier above tier 1" is false on its own terms**, before any question of capacity:
+   `tenants` L2 (*Staggered start times*, 10 u) books **zero** nights, as do `doors` L1 and
+   `tenants` L1. Nights are not a function of tier depth.
+
+What *is* built is the ledger: the purse moves, the month grid fills, the tier's nights gate when it
+reads as fitted, and a late purchase is refused. That is a real cost and it is the one stated above.
+It is **not** GD11's ordering, and the difference is the whole of the rule — a delay is not a
+subtraction. Building the ordering means giving a live booking a writer for
+`RecordRunOptions.outOfServiceCarIds` on the path `runCampaignDay` takes, and it is pinned in the
+repository's standing shape when it lands: *move the control and require the run to change, compared
+on the legs*. A works day whose legs match an ordinary one has not taken a car out.
+
+**What holds the three sentences above true, stated because the answer is uncomfortable.** No test
+reads this file — `docs/32-game-design.md` is cited by `docs/33`, `docs/34` and
+`CHARTER_PROGRAMME.md` and is read by nothing under `packages/` — so these sentences are held by
+nobody re-reading them, which is how the withdrawn claim survived here for a wave after it was struck
+from the product. What *is* mechanised is the product side of the same claim, in two places, and
+either going red is the signal that this passage is owed a rewrite:
+`campaign/economy.test.ts` § *no shop tier promises a car the works never take* sweeps every tier of
+every category for the claim, and `everyday/campaignModel.test.ts` § *has no writer for
+outOfServiceCarIds on the path a campaign day runs* derives the writer set from disk and says the
+withdrawn sentences are owed back on the day one appears.
 
 ### 3.2 What a unit means
 
@@ -852,10 +892,14 @@ interest has moved from the run to the dispatcher — is what rows 4–8 of § 2
 this document makes to it:
 
 1. **The economy has become the pacing device.** A contract is twenty days, a perfect Standard month
-   pays 98 u against a shop worth 324 u, and works take the building apart before they help. So the
-   hour-3 session is no longer *how do I make this better* but *what do I buy, and when can I afford
-   to be worse for a week* — which is the same question a real building operator has, arrived at
-   without anybody explaining it.
+   pays 98 u against a shop worth 324 u, and a tier's nights are days of that month spent before it
+   counts as fitted. So the hour-3 session is no longer *how do I make this better* but *what do I
+   buy, and how much of the contract am I willing to spend not having it yet* — which is the same
+   question a real building operator has, arrived at without anybody explaining it.
+   **The sharper version of that question — *when can I afford to be worse for a week* — needs
+   GD11's ordering, which § 3.1 records as UNBUILT.** Works do not take the building apart before
+   they help; today they delay a benefit rather than subtract a car, and the sentence here said
+   otherwise until this correction.
 2. **The ladder is where a verdict is placed, not where it is decided.** `gauntlet/rating.ts` orders
    forty fixed proof cases and emits no verdict, no comparison and no winner; the **bench** is where
    two dispatchers are compared under CRN with an interval. A player at hour 3 is using both, and the
@@ -954,6 +998,14 @@ records:
 - **Nothing files a campaign day** (§ 3.6), so the economy specified in § 3 currently operates over a
   record that play cannot write to. Every rule in § 3 is stated to be true of the economy once that
   is closed.
+- **`docs/32 GD11`'s ordering — *take capacity away first, give it back later* — is unbuilt**, and
+  § 3.1 states it as intent rather than as a description. Neither half ships: no campaign day takes a
+  car out of passenger service (`RecordRunOptions.outOfServiceCarIds` has no writer on the path
+  `everyday/host.ts#runCampaignDay` takes — GitHub issues **#264**, **#272**,
+  [§ D364](../DECISIONS.md)), and nothing bought reaches a run at all (**#181** break 3). § 3.1 said
+  otherwise, as a fact about the shipped shop, for a wave after the product's own copy was corrected
+  — which is this repository's *stale claim* class arriving in a document rather than in a string,
+  and the reason § 3.1 now names what holds it true.
 
 ---
 
