@@ -366,8 +366,14 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
     }
   }
 
+  /*
+   * **Which cars go out is {@link eventCarChoice}'s, and the sentences about it are this
+   * function's.** The refusals below are the ones that used to be pushed inline; the wording did not
+   * move, only the branch that decides which one applies — see that function for why a second caller
+   * needs the decision without the prose.
+   */
+  const { derate } = effect;
   const cars = eventCarChoice(effect, input.building);
-  const { holdIds: outOfServiceCarIds } = cars;
 
   if (cars.holdShortfall > 0) {
     withheld.push(
@@ -383,25 +389,25 @@ export function shiftRunPatch(input: ShiftRunPatchInput): ShiftRunPatch {
         'return, and the two would pick the same car. The window was not applied.',
     );
   }
-  if (cars.derateShortfall > 0 && effect.derate !== null) {
+  if (derate !== null && cars.derateShortfall > 0) {
     withheld.push(
-      `${input.event.name}: asked to stand ${String(effect.derate.cars)} car(s) down for part of ` +
-        `the shift and could stand ${String(effect.derate.cars - cars.derateShortfall)}. Every bank ` +
+      `${input.event.name}: asked to stand ${String(derate.cars)} car(s) down for part of ` +
+        `the shift and could stand ${String(derate.cars - cars.derateShortfall)}. Every bank ` +
         'keeps at least one car in service — a bank with none is a set of floors nobody can reach.',
     );
   }
 
-  const incidents: Incident[] =
-    effect.derate === null
+  const incidents: readonly Incident[] =
+    derate === null
       ? []
       : cars.derateCars.map((car) => ({
           kind: 'maintenance' as const,
           car,
-          fromFraction: effect.derate?.fromFraction ?? 0,
-          toFraction: effect.derate?.toFraction ?? 1,
+          fromFraction: derate.fromFraction,
+          toFraction: derate.toFraction,
         }));
 
-  return { demand, outOfServiceCarIds, incidents, withheld };
+  return { demand, outOfServiceCarIds: cars.holdIds, incidents, withheld };
 }
 
 /* -------------------------------------------------------------------------- *
@@ -453,7 +459,7 @@ export interface EventCarChoice {
 }
 
 export function eventCarChoice(effect: EventEffect, building: BankedBuilding): EventCarChoice {
-  const none = {
+  const none: EventCarChoice = {
     holdIds: Object.freeze([]),
     holdShortfall: 0,
     derateCars: Object.freeze([]),
