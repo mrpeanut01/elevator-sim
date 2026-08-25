@@ -214,8 +214,20 @@ describe.skipIf(!HAS_BROWSER)('the Endless rush setup screen', () => {
       true,
     );
     expect(await page.$('.everyday-bar-timeline')).toBeNull();
-    // The screen's own paragraph still says it — that half was never the defect.
-    expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/);
+    /*
+     * **The screen's own paragraph is gone, and this assertion went with it.**
+     *
+     * It read `expect(await page.textContent('.everyday-rush-refusal')).toMatch(/not built/)` under
+     * the comment *"that half was never the defect"* — true when written, and untrue by the time
+     * the two independent fixes for #262 were merged. The other one moved the sentence into the bar
+     * and deleted the paragraph, on `rushScreen.ts`'s *"one constant, one place on screen"* rule: a
+     * copy at the foot of the paper column is a sentence the player has already read above the
+     * fold, in a place they may never scroll to.
+     *
+     * Keeping both would put the reason on screen **twice**, which the fold case below asserts
+     * against by name (`drawnTimes`). Green on either branch alone; red together — the merge is
+     * what found it.
+     */
 
     /* The control carries the reason: as a tooltip, and by `aria-describedby` — which must resolve
        to a node that is actually in the document, since a description pointing at nothing reads as
