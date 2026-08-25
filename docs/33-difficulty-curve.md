@@ -191,6 +191,14 @@ specified:
 The third column is the one that does work. A lesson is a claim about the player's head; a failure
 mode is a claim about a run, and a claim about a run can be measured.
 
+**And the word *visibly* in that column is carried by nothing in this document, deliberately.**
+`DC-1` discharges it as *at least one non-comparative goal is not met*, which is a figure rather than
+a sight — the strongest testable form available to an instrument that measures runs.
+[`34-problem-per-mode.md`](34-problem-per-mode.md) is the document that carries the other half: what
+the player can **see** of each mode's problem before any figure names it, and what the two renderers
+can and cannot draw. Its `PM-TT2` adds a legibility clause on top of `DC-4` for exactly this reason,
+and its § 9.3 measures the building where the gap is widest.
+
 ### 2.2 DC-1 — the teaching rule, in testable form
 
 > **Every stage must fail at least one goal under at least one plausible player choice.**
@@ -781,6 +789,16 @@ it takes § S's measurement, and it names § S rather than restating the numbers
 **What is not this document's to decide.** Which of #208's three options is taken. This document
 supplies the bar the choice is measured against and refuses the fourth option — moving the goal — and
 that is the whole of the governance § D348 pulled it in to provide.
+
+**One thing `DC-4`'s band cannot see, and where it is specified instead.** A day may miss a goal on a
+single rider at minute 41 and be invisible for the other fifty-nine minutes, which satisfies `DC-4`
+and satisfies nothing #208's AC2 asks for (*the failure is legible on the stage before the report
+explains it*). [`34-problem-per-mode.md`](34-problem-per-mode.md) `PM-TT2` states the additional
+clause — a landing holding somebody in the third wait band for at least 120 contiguous seconds — and
+its § 9.3 measures `garden-apartments` against it: at the shipped day-one configuration the landings
+are empty about **91 %** of the hour, and on **16 of 20 seeds** no instant exists at which anybody has
+been waiting sixty seconds. That is a second, independent reason the tutorial slot cannot be fixed on
+this building, alongside GitHub issue #270's sweep.
 
 ### 4.5 What the curve requires that the shipped week does not have
 

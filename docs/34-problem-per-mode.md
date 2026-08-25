@@ -979,3 +979,145 @@ somebody is visibly standing while a car is visibly still — which the data say
 its own typical rate.
 
 ---
+
+## 10. Every code change this specification implies, listed and not built
+
+**Nothing in this document is built.** The table is the whole cost, ordered by what it buys per unit
+of work rather than by section. Every row names the rule that asks for it.
+
+| # | rule | change | where | size |
+|---|---|---|---|---|
+| 1 | `PM-FB1` | Mount a stage over `session.asBuilt.recording` on the fix-case screen, above the four figures | `everyday/fixitScreen.ts` | **Small.** The recording already exists at `:343`; this is a renderer mount and a transport, not a simulation |
+| 2 | `PM-TT1` | Move the *How hard this looks* plate off the pre-run position, or reword it as configuration | `everyday/today.ts` and its caller | **Small**, and it is a copy-and-ordering change rather than a deletion |
+| 3 | `PM-TT5` | A **provided ghost port** on `EverydayHost`, in `everyday/swap.ts`'s shape, so the Casual stage can reach `dev/ghostRun.ts#ghostPlanOf` without importing across the façade. `STAGE_NO_GHOST` is deleted on the same commit and not before | `everyday/`, `dev/ghostRun.ts` | **Small–medium.** Both halves exist; only the wire is missing |
+| 4 | `PM-FB3` | `fixit/parse.ts` refuses a repair patch carrying `floorPopulations`, with the reason attached | `fixit/parse.ts` | **Small.** One check; it protects the whole mode's basis |
+| 5 | `PM5` | One shared **legs-identity assertion** — two runs agree on `(passengerId, arrivedAt, originFloorId, destinationFloorId)` and differ only on `boardedAt`, `alightedAt`, `carId` — used by the fixit pair, the intervention pair and the campaign works-night pair | a test helper under `packages/viz/src/` | **Small**, and it is the one row that makes three separate honesty claims checkable instead of argued |
+| 6 | `PM-FB2` | `fixit/parse.ts` requires a `symptom` to name a sight rather than carry a raw figure, in the shape it already refuses probability words and engine identifiers. **Two `data/` corrections follow and belong to a content lane, not this rule** | `fixit/parse.ts`, then `data/fixit-cases.json` | **Small** code, **small** content |
+| 7 | `PM-TT4` | `INTERVENTION_KINDS` gains `spread-cars`, writing `idle.parkingStrategy: 'zone-center'`; a label in `live/interventions.ts`; a row on the stage | `core/src/sim/types.ts`, `core/src/dispatch/lifecycle.ts`, `viz/src/live/interventions.ts`, `viz/src/everyday/stageScreenModel.ts` | **Medium.** A `core` change, on the `park-cars-lobby` precedent, which is exactly one union member and one branch |
+| 8 | `PM-CA1`, `PM-CA3` | The day opens on the building with today's event visible in it; a works-night purchase changes the picture as well as the purse | `everyday/`, and **after** GitHub issue #181's wiring | **Medium**, and #181 is the precondition rather than part of it |
+| 9 | `PM-CA4` | Once the shop reaches a run, sweep every item against a no-purchase control on the same seed; an item that moves no leg is removed or given the sentence that says so — `docs/33` `DC-9`'s rule, at campaign scale | `campaign/`, a test | **Medium** |
+| 10 | `PM-RU2` | A climbing demand template, authored in `data/traffic-profiles.json` with its own uncited-assumption note where the rate leaves the profile's cited band | `data/traffic-profiles.json` | **Medium**, and it is `CLAUDE.md` invariant 7 work rather than engine work — **conditional on § 11's unverified item 3** |
+| 11 | `PM-RU1`, `PM-RU3` | The rush's held-time stage, the `Call it` press, and a result screen that publishes the divergence point from `summary.saturation` — never from a second definition — with its across-seed spread measured first | `everyday/rushScreen*.ts`, a measurement | **Large.** This is GitHub issue #220's whole scope |
+| 12 | `PM-PARK` | An idle state on `FrameCar`, and a mark for it on both renderers | `viz/src/contract/types.ts`, both stages, **possibly** `core` | **Large or medium** — see § 11's unverified item 4. It is the highest-value entry in § 3.2 |
+| 13 | `PM-TT2` | A legibility arm on the difficulty sweep: for each contract's day 1, the fraction of seeds holding a third-band landing for 120 contiguous seconds | `docs/33` § 6's instrument | **Medium**, and it is the only way `PM-TT2` stops being an assertion |
+| 14 | `PM-DOOR` | The first-run sequence as a **cover** over the Everyday menu, conditioned on derived state rather than a stored flag, skippable | `everyday/`, `menuPanel.ts#coverShell`'s shape | **Large**, and **blocked on a product-owner decision** ([§ D350](../DECISIONS.md), `charter` non-goal 10) |
+
+**Two obligations every row above inherits and none of them restates.**
+
+- **A surface that renders strings and is absent from `honesty/surfaces.ts` is not finished.** Every
+  new screen, control label, refusal and result row in this document enters the corpus in the same
+  change that draws it, and the figures in [`CLAUDE.md`](../CLAUDE.md)'s Phase 9 row are re-measured
+  **once, after integration**, never per branch.
+- **`charter P4`'s refusal test applies to every control added here**: *move the control and require
+  the run to change, compared on the legs rather than on a window statistic.* Row 7 and row 9 are the
+  two most likely to fail it, and row 5 is the shared instrument.
+
+---
+
+## 11. What is measured, what is read off the code, and what is not
+
+### Measured in this document
+
+**One thing, in § 9.3.** Landing occupancy on `garden-apartments` at the shipped day-one
+configuration over 20 consecutive seeds, with `midtown-office` as a bounded contrast. The instrument
+is named, the harness was cross-checked against the repository's own `overlayAt` and `queueAt` at
+4 001 instants with a maximum discrepancy of 0, and four caveats bound it. **No claim in it compares
+two configurations, so no interval is offered and none is required.**
+
+### Read off the code, and re-checkable by grep
+
+`fixitScreen.ts:343` running the as-built recording at case open · `fixit/run.ts#figureValuesOf`'s
+*"computed from the as-built run, never authored"* · `INTERVENTION_KINDS`' three arms and
+`live/interventions.ts`'s labels, stamp and recomputing beat · `everyday/stageScreenModel.ts:572`
+mounting the intervention row · `STAGE_NO_GHOST` and its stated reason · `PARKING_STRATEGIES`' five
+values and `dispatch/lifecycle.ts#parkingCandidates`' branches · `GroupLevers`' three fields ·
+`RULE_ACTION_WORDS`' eight verbs including `spread-out` · `drawFloors`' lit window band driven by
+`recording.floors[].population` · the absence of any `park`/`idle` reference in `render/` or either
+stage screen · `FrameCar`'s ten fields and the absence of a stop list · `VizLeg`'s fields and the
+absence of `abandonedAt` · the two of eighteen `symptom` strings carrying a raw figure ·
+`gym-on-the-top-floor`'s `arrivalRatePctPop5min: 9.5` against the residential profile's `max: 7` ·
+`traffic/generator.ts:757`'s override semantics and `TRAFFIC_PARAMETERS`' `[0, 25]` range.
+
+### Unverified — nine, each with the check that would settle it
+
+1. **Whether the simulation removes an abandoning rider** while the viewer keeps drawing them. `VizLeg`
+   has no `abandonedAt` and `isWaitingAt` removes only on `boardedAt`/`refusedAt`; the Day report
+   nonetheless publishes `TOOK THE STAIRS`. *Check:* run a building with `sim.patience.distribution`
+   set and assert `queueAt` past the horizon does not still hold a leg the report counts as abandoned.
+   **If it fails, this is a player-facing honesty defect and owes an issue rather than a design rule.**
+2. **Whether the lit window band is legible at Casual row pitches**, and therefore whether growth has a
+   usable antecedent there. *Check:* `docs/28` § 5.1's geometry against `garden-apartments` and
+   `vertical-city`.
+3. **Whether `DemandTemplate.phases` alone expresses a monotone ramp of arbitrary length**, or whether
+   intensity is renormalised over `durationMin` in a way that caps it. *Check:*
+   `traffic/generator.ts:757` and `config/demandPhases.ts`. **Row 10 of § 10 is conditional on this.**
+4. **Whether `Simulation` can publish an unambiguous *idle* state into the frame.** A car stopped with
+   its doors open is not idle; a car repositioning is neither idle nor in service. *Check:* name the
+   field on the simulation's own car state that already distinguishes them —
+   `dispatch/lifecycle.ts#repositionDecisionFor` is where to look. **If none exists, `PM-PARK` is a
+   `core` change and must be priced as one.**
+5. **Whether 120 contiguous seconds is the right legibility window** in `PM-TT2`. It is a design choice
+   with its reasoning attached and **not** a citation. *Check:* § 10 row 13's sweep arm, and a
+   playtest.
+6. **Whether each of the sixteen sight-shaped `symptom` strings is legible at the sizes the stage
+   actually draws.** Capsules are 4.5 px on a 6.5 px pitch. *Check:* `docs/28` `AD-S7` and `AD-S8`
+   landing first, then a playtest.
+7. **Whether a pressed and an unpressed day preserve the passenger trace.** The reasoning is sound —
+   `interventions[]` reaches dispatch and not generation — and it is **stated as a required assertion
+   rather than as a verified fact**, which is § 10 row 5.
+8. **Whether every campaign shop item would move a leg once #181's wiring lands.** *Check:* § 10 row 9.
+9. **Whether the residential profile's declared rate band binds player-facing content.** The code fact
+   is verified (nothing validates it, and one shipped case sits outside it); what is unresolved is
+   whether it *should*. **This is a decision owed rather than a measurement owed** — § 12 `Q1`.
+
+---
+
+## 12. Limitations, and what is open
+
+### Limitations
+
+- **Not one comprehension claim in this document has been tested on a human.** Constraint 3 —
+  *could someone who has never thought about elevators state the problem after thirty seconds?* — is
+  answered here by argument. [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md)
+  § AA is blunt about why: **no lane can produce a first-time tester**, and M2's remaining path is a
+  human one. [`30-playtest-programme.md`](30-playtest-programme.md) is the protocol; every judgement
+  in §§ 8 and 9.1–9.2 is a hypothesis for it.
+- **§ 9.3 measures one building at one configuration.** Twenty seeds, abandonment off, and a duration
+  that is the contract's own but twice the template's authored one. It is a description of a
+  distribution and nothing in it is an interval.
+- **The palette in § 3 is an inventory of two renderers**, not of every screen. A symptom drawn
+  somewhere this document did not look would be missing from it.
+- **§ 6's rush mechanic has never been played.** *Call it* is a design proposal whose appeal is
+  asserted; it is the least evidenced thing here and it is deliberately the cheapest to abandon,
+  because it rides on an engine (#220) that is wanted independently of it.
+- **This document specifies and does not build.** Every row of § 10 is unwritten.
+
+### Open questions
+
+| | question | who owns it |
+|---|---|---|
+| **Q1** | Does a traffic profile's declared `arrivalRatePctPop5min` band bind **player-facing content**, or only the `demandLevel` selector? Nothing in the code enforces either reading, two documents assume the strict one, and `gym-on-the-top-floor` ships outside it | product owner, with `CLAUDE.md` § *Reference data* |
+| **Q2** | Does `PM-DOOR`'s first-run **cover**, conditioned on derived state rather than a stored flag, satisfy `charter` non-goal 10? The intent is clearly met; the letter needs whoever owns [§ D335](../DECISIONS.md) to say so | product owner |
+| **Q3** | Is Endless rush cut, demoted to the bench (`docs/32` `GD4`), or placed at minute one (`PM-RU1`)? Three arguments now exist and none is a decision | product owner |
+| **Q4** | Which building carries the first session, given that `garden-apartments` cannot (#270, § 9.3)? #270's route 1, `dev/defaults.ts`' already-measured preference for `chancery-house`, and `PM-DOOR` are the three candidates | product owner |
+| **Q5** | Is `PM-PARK` a `viz` change or a `core` one? § 11's unverified item 4 decides it, and the answer changes § 10 row 12's size | whoever picks up row 12 |
+
+---
+
+## Sources
+
+- [`22-charter.md`](22-charter.md) — pillars `P1`–`P5`, non-goals 1–10, criteria `S1`–`S10`
+- [`23-audiences-and-core-loop.md`](23-audiences-and-core-loop.md) — the five beats, the per-mode
+  declaration, § 6's honest register
+- [`32-game-design.md`](32-game-design.md) — `GD1`–`GD20`, the mode table, failure, the economy
+- [`33-difficulty-curve.md`](33-difficulty-curve.md) — `DC-R1`–`DC-R3`, `DC-1`–`DC-9`, and the
+  measurements behind them
+- [`28-art-direction.md`](28-art-direction.md) — `charter P3`'s ceiling, the stage's four channels,
+  `AD-S7`–`AD-S10`
+- [`10-experience-layer-contract.md`](10-experience-layer-contract.md) — `R1`–`R13`, § 5.5's
+  never-build list, `U4`'s queue selector
+- [`16-change-scope-contract.md`](16-change-scope-contract.md) — there is no mid-day change
+- [`ISSUE_VERIFICATION_FINDINGS.md`](../ISSUE_VERIFICATION_FINDINGS.md) — § S, § AA
+- [`DECISIONS.md`](../DECISIONS.md) — § D227, § D299, § D310, § D311, § D335, § D338, § D345, § D350
+- `docs/design/design_handoff_casual_mode/GAMEPLAY_AND_NAVIGATION.md` § 10, `ENGINE_CONTRACT.md` § 9
+- GitHub issues #181, #208, #210, #217, #220, #270
