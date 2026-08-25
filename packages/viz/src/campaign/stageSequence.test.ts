@@ -137,13 +137,30 @@ describe('the sequence the Campaign tab runs', () => {
   it('clears a stage on two batches, and names the holdout seeds it cleared on', async () => {
     const stage = stageAt(4);
     let cleared: { outcome: StageSequenceOutcome; asked: readonly Asked[] } | undefined;
+    const everyAsk: Asked[] = [];
     for (const profile of config.dispatcherProfiles.profiles) {
       const played = await play(stage, profile.id);
+      everyAsk.push(...played.asked);
       if (played.outcome.verdict.cleared) {
         cleared = played;
         break;
       }
     }
+
+    /*
+     * **Every** holdout ask in the sweep, before anything about clearing. `judgeStage` refuses a
+     * second batch whose master seed is not the holdout set's, so a sequence that ran the tuning
+     * batch twice would clear nothing and be reported above as *no profile clears this stage* —
+     * true, unhelpful, and pointing at the wrong thing. This says which seed was asked for.
+     */
+    const holdoutAsks = everyAsk.filter((entry) => entry.seedSet === 'holdout');
+    expect(holdoutAsks.length).toBeGreaterThan(0);
+    for (const ask of holdoutAsks) expect(ask.request.seed).toBe(stage.holdoutSeeds.seed);
+    for (const ask of everyAsk.filter((entry) => entry.seedSet === 'tuning')) {
+      expect(ask.request.seed).toBe(stage.seeds.seed);
+    }
+    expect(stage.holdoutSeeds.seed).not.toBe(stage.seeds.seed);
+
     expect(
       cleared,
       'no shipped profile clears stage 5 through the panel’s sequence, so nothing here is measured',
@@ -152,14 +169,6 @@ describe('the sequence the Campaign tab runs', () => {
 
     /* Two batches, in order, over the two seed sets the stage declares — and no third. */
     expect(cleared.asked.map((entry) => entry.seedSet)).toEqual(['tuning', 'holdout']);
-    expect(cleared.asked[0]?.request.seed).toBe(stage.seeds.seed);
-    /*
-     * The seed rather than the name. `judgeStage` refuses a second batch whose master seed is not
-     * the holdout set's, so a sequence that ran the tuning batch twice would be caught there — and
-     * this asserts the same thing one layer earlier, on the request, where it was decided.
-     */
-    expect(cleared.asked[1]?.request.seed).toBe(stage.holdoutSeeds.seed);
-    expect(stage.holdoutSeeds.seed).not.toBe(stage.seeds.seed);
 
     const verdict = cleared.outcome.verdict;
     expect(verdict.metOnTuningSeeds).toBe(true);
