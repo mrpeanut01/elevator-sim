@@ -542,36 +542,40 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
    * no player ever sees and buried a real defect under a green tier. `RISKS.md` R26's shape: the
    * harness and the product disagreeing, and the harness being right.
    *
-   * ## Which scroller, measured — and the one line that is not here
+   * ## Both scrollers, and the correction that got here
    *
-   * At `375×667` the **document does not scroll at all** on this machine
-   * (`documentElement.scrollHeight - innerHeight === 0`); the overflow lives on `.everyday-screen`,
-   * which is scrollable by 334 px on the menu and 3 098 px on the rush screen. On CI's Chromium the
-   * document *does* overflow, which is why `window.scrollY` arrived at **76** there and 0 here.
+   * Which element holds the offset depends on the viewport: at `375×667` the **document does not
+   * scroll at all** — `documentElement.scrollHeight - innerHeight` is `0` on the deployed build and
+   * on a local dev server — and the overflow lives on `.everyday-screen`, scrollable by 366 px on
+   * the menu. On CI's Chromium the document *does* overflow, which is why the browser tier saw
+   * `window.scrollY === 76` there and `0` locally. **Neither element alone is the answer**, which is
+   * why the tier's own helper has always summed the two.
    *
-   * **The screen element needs no reset, and that was measured rather than assumed.** It is the
-   * same element across a navigation — a `data-` probe survives — but `dev/dom.ts#reconcile` drops
-   * every child before inserting the new ones, the container's `scrollHeight` collapses to its
-   * client height while it is empty, and the browser **clamps `scrollTop` to 0** on the way through.
-   * A `screenEl.scrollTop = 0` beside the line below was written, mutation-tested, and **deleted for
-   * doing nothing**: removing it changed no case, because the reconciler had already done it.
+   * **The screen-element line was written, then deleted on a wrong inference, then restored by
+   * measurement — and the middle step is the one worth recording.** The argument for deleting it was
+   * that `dev/dom.ts#reconcile` drops every child before inserting, collapsing `scrollHeight` while
+   * the container is empty, so the browser clamps `scrollTop` to `0` on the way through; a local
+   * mutation appeared to confirm it, because removing the line changed no case. **Driving the
+   * deployed preview at `375×667` refuted it**: scroll the menu to 300, tap the fourth tile, and the
+   * new screen opens at offset **300** with its heading **272 px above the top of the viewport**.
+   * The clamp is real and it is not reliable — it depends on the incoming screen being shorter than
+   * the offset, which `fixit` is not.
    *
-   * So one line, for the one scroller that keeps its offset. `behavior` is left at its default: a
-   * smooth scroll here would animate on a playhead-tied redraw, which `docs/28` § 6's AD-M2 refuses,
-   * and it would race the browser tier's next measurement.
+   * ## Nothing in this repository's suite can pin it, and that is its own finding
    *
-   * ## What pins it, honestly
+   * Two cases were written to bite locally and both were deleted for asserting nothing: removing
+   * either line leaves the whole browser tier green here, on `rush` and on `fixit` alike. The reason
+   * is that the tier drives a **`vite dev` server** while the defect reproduces on the **built
+   * bundle** the preview serves — a different artifact, laid out differently enough that the
+   * reconciler's clamp saves the dev server and does not save production.
    *
-   * **Not a case on this machine.** `standaloneScreens.browser.test.ts`'s
-   * *puts the reason inside the viewport* asserts the offset is zero before it measures, and that
-   * assertion is what found this — **it failed on both CI platforms and passes here**, because the
-   * condition it needs is a document that overflows and this machine's does not. A case written to
-   * bite locally was tried and deleted for asserting nothing: with the reconciler clamping, it
-   * passed with the fix removed.
+   * So this line is pinned by a **driven deployment**, not by a case, and the evidence is quoted
+   * above rather than left as a claim. That gap — the tier asserting things about an artifact
+   * nobody ships — is filed separately; it is `RISKS.md` R26 one level up from the code, and it is
+   * larger than this fix.
    *
-   * That is [§ D201](../../../../DECISIONS.md)'s lesson rather than a gap to paper over — a suite
-   * result is a claim about a **machine** as well as a commit, and the two-platform matrix is the
-   * judge here. Stated so the next reader does not delete this line for looking untested.
+   * `behavior` is left at its default: a smooth scroll here would animate on a playhead-tied redraw,
+   * which `docs/28` § 6's AD-M2 refuses, and it would race the tier's next measurement.
    *
    * A decision number is owed.
    */
@@ -579,6 +583,8 @@ export function mountEverydayShell(doc: Document, options: EverydayShellHost = {
     state = { ...state, screen };
     draw();
     doc.defaultView?.scrollTo(0, 0);
+    const screenEl = root.querySelector<HTMLElement>('.everyday-screen');
+    if (screenEl !== null) screenEl.scrollTop = 0;
   }
 
   /**
