@@ -27,7 +27,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -975,5 +975,203 @@ describe('docs/05-roadmap.md § H-ACCESS-1 — the withdrawn coverage table is t
         `the roadmap's withdrawn row "${row}" is still derivable from the live PINNED_COVERAGE`,
       ).toBe(false);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The charter's own instrument table — GitHub issue #278, § D369
+ * -------------------------------------------------------------------------- */
+
+/**
+ * **`docs/22-charter.md` § 4's second table, derived instead of remembered.**
+ *
+ * That table answers *which success criteria can be evaluated today*, and it is the honest half of
+ * the charter. Every one of its cells is a mechanical measurement written down as prose, and four of
+ * them quoted the command that produces them — while nothing re-ran a single command. Stamped
+ * *"Verified on this tree, 2026-08-24"*, it had **four refuted rows within a day**: S10 was wrong by
+ * seventeen journey rows once wave B re-measured them, S8's criterion had started passing, S6/S7 said
+ * a playtest programme did not exist that had been on `main` since M1 exited, and S5's *"no test
+ * derives the count across all ten"* had been retired by `campaign/difficultyCurve.test.ts`.
+ *
+ * ## The lesson that shaped this file, and it is not "assert the command"
+ *
+ * S1's cell quoted a `grep -ril telemetry` over every package's `src`, and said the answer was
+ * **0 files**. It is
+ * **2** now — `server/src/http/api.ts` and its test, both of which exist to say *there is no
+ * telemetry in this tree*. The claim never moved; the command did, because a word grep matches the
+ * word used to **deny** the thing.
+ *
+ * So the assertions below are written against **what each cell claims**, not against the literal
+ * output of the command it quotes. For S1 that means stripping comments and string literals before
+ * looking, which is the difference between an instrument and a tripwire.
+ *
+ * ## Both directions, per cell
+ *
+ * Each case asserts the derived value **and** that the charter still says what is being pinned. A
+ * cell reworded without re-measuring fails on the reword; a tree that moves under an unchanged cell
+ * fails on the measurement. One direction alone lets the other drift silently — which is how the
+ * table got here.
+ */
+describe('docs/22-charter.md § 4 — the instrument table is derived, not remembered', () => {
+  const charter = (): string => read('docs', '22-charter.md');
+
+  /** The § 4 table only, so a phrase elsewhere in the charter cannot satisfy a cell. */
+  const instrumentTable = (): string => {
+    const source = charter();
+    const start = source.indexOf('### Which of these can be evaluated today');
+    expect(start, 'the § 4 instrument table has been renamed or removed').toBeGreaterThan(0);
+    const end = source.indexOf('\n### ', start + 1);
+    return source.slice(start, end === -1 ? undefined : end);
+  };
+
+  /**
+   * TypeScript with comments and string literals removed.
+   *
+   * Deliberately crude and deliberately *over*-removing: a stray brace inside a template literal
+   * costs a false negative on one file, while a word left inside a docstring costs the whole check
+   * its meaning. S1 is the case that proves it — the only two files naming telemetry are the two
+   * that say there is none.
+   */
+  const code = (source: string): string =>
+    source
+      .replace(/\/\*[\s\S]*?\*\//gu, ' ')
+      .replace(/\/\/[^\n]*/gu, ' ')
+      .replace(/'(?:\\.|[^'\\])*'/gu, "''")
+      .replace(/"(?:\\.|[^"\\])*"/gu, '""')
+      .replace(/`(?:\\.|[^`\\])*`/gu, '``');
+
+  const sourceFilesUnder = (dir: string): readonly string[] => {
+    const found: string[] = [];
+    const walk = (at: string): void => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const path = join(at, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(path);
+        } else if (entry.name.endsWith('.ts')) found.push(path);
+      }
+    };
+    walk(dir);
+    return found;
+  };
+
+  it('S1–S4 — no telemetry in the tree, asked of code rather than of the word', () => {
+    const packages = join(ROOT, 'packages');
+    const naming = sourceFilesUnder(packages)
+      .filter((path) => path.includes(`${sep}src${sep}`))
+      /*
+       * **Non-test code only, and this exclusion is S1's own lesson arriving one level up.**
+       *
+       * The first run of this case failed on exactly one file: *this* one, because the title string
+       * of the case below names telemetry in order to say there is none. That is the same shape as
+       * the two `server/src/http/api.ts` hits the charter cell now records — a word appearing in
+       * service of denying the thing.
+       *
+       * Excluding tests is principled rather than convenient: the charter's claim is that the tree
+       * holds no telemetry **instrument**, and an instrument is non-test code by this repository's
+       * own standing rule. A real one would still be caught, because the module it lives in is not
+       * a test.
+       */
+      .filter((path) => !path.endsWith('.test.ts') && !path.endsWith('.test-helper.ts'))
+      .filter((path) => /telemetry|analytics|\bfunnel\b/iu.test(code(readFileSync(path, 'utf8'))))
+      .map((path) => path.slice(ROOT.length));
+
+    expect(
+      naming,
+      'the charter says S1–S4 have no instrument — no funnel, no event chain, no session record. ' +
+        'These files name one in code rather than in prose. Either the charter cell moves, or they do.',
+    ).toEqual([]);
+
+    // The other direction: the cell must still be making the claim this case pins.
+    expect(instrumentTable()).toMatch(/no funnel, no event chain and no session record/u);
+  });
+
+  it('S5 — the stage count the cell publishes is the stage count the campaign ships', () => {
+    const campaign = JSON.parse(read('data', 'campaign.json')) as { stages: readonly unknown[] };
+    const table = instrumentTable();
+    const claimed = /`data\/campaign\.json` ships \*\*(\d+)\*\*/u.exec(table);
+    expect(claimed, 'S5 no longer publishes a stage count in the form this case reads').not.toBeNull();
+    expect(Number(claimed?.[1]), 'S5 publishes a stage count the campaign does not ship').toBe(
+      campaign.stages.length,
+    );
+
+    /*
+     * And the stages the paired sweep actually plays, by name. The cell used to say "4, 5 and 6
+     * only" and `campaign.test.ts` plays five; a cell that undercounts its own coverage is the same
+     * defect as one that overcounts it, and only one of the two flatters anybody.
+     */
+    const played = [
+      ...read('packages', 'viz', 'src', 'campaign', 'campaign.test.ts').matchAll(
+        /describe\('stage (\d+), played/gu,
+      ),
+    ].map((match) => Number(match[1]));
+    expect(played.length, 'no played-stage suites parsed, so this case is checking nothing')
+      .toBeGreaterThan(0);
+    const listed = /plays stages \*\*([\d, and]+)\*\* by name/u.exec(table);
+    expect(listed, 'S5 no longer lists the stages it plays in the form this case reads').not.toBeNull();
+    const inCell = (listed?.[1] ?? '').match(/\d+/gu)?.map(Number) ?? [];
+    expect([...inCell].sort((a, b) => a - b)).toEqual([...played].sort((a, b) => a - b));
+  });
+
+  it('S6 — the playtest programme exists, and the cell says only that', () => {
+    expect(
+      readdirSync(DOCS).includes('30-playtest-programme.md'),
+      'S6 claims the playtest programme exists',
+    ).toBe(true);
+    const table = instrumentTable();
+    expect(table).toMatch(/30-playtest-programme\.md.*\*\*exists\*\*/u);
+    // The half that has *not* moved, and the half a reader would otherwise go and build.
+    expect(table).toMatch(/the recruited cohort does not/u);
+  });
+
+  it('S9 — the workflows the cell names are the workflows on disk, and none is a load budget', () => {
+    const workflows = readdirSync(join(ROOT, '.github', 'workflows')).sort();
+    const table = instrumentTable();
+    for (const file of workflows) {
+      expect(table, `.github/workflows/${file} exists and S9 does not name it`).toContain(file);
+    }
+    const budgets = workflows.filter((file) =>
+      /budget|lighthouse|cold.?load/iu.test(readFileSync(join(ROOT, '.github', 'workflows', file), 'utf8')),
+    );
+    expect(budgets, 'S9 says there is no load budget in CI').toEqual([]);
+  });
+
+  it('S10 — the journey-row tally is the tally TEST_MATRIX.md holds', () => {
+    const matrix = read('TEST_MATRIX.md');
+    const rows = matrix.split('\n').filter((line) => /^\| T\d+ \|/u.test(line));
+    const tally = (status: string): number =>
+      rows.filter((row) => row.includes(`**${status}**`)).length;
+
+    /*
+     * Counted off the **bolded status cell**, never off the word. `grep -c passing` returns one
+     * more than the truth on this file, because a row's prose contains it — which is the mistake
+     * the issue reporting all this made in its own first measurement.
+     */
+    const table = instrumentTable();
+    const published = /\*\*(\d+)\*\* journey rows[\s\S]*?\*\*(\d+)\*\* `passing`[\s\S]*?\*\*(\d+)\*\* `owned`[\s\S]*?\*\*(\d+)\*\* `planned`/u.exec(
+      table,
+    );
+    expect(published, 'S10 no longer publishes its tally in the form this case reads').not.toBeNull();
+    const [, total, passing, owned, planned] = (published ?? []).map(Number);
+
+    expect(rows.length, 'S10 publishes a journey-row count TEST_MATRIX.md does not hold').toBe(total);
+    expect(tally('passing'), 'S10 publishes a passing count TEST_MATRIX.md does not hold').toBe(passing);
+    expect(tally('owned'), 'S10 publishes an owned count TEST_MATRIX.md does not hold').toBe(owned);
+    expect(tally('planned'), 'S10 publishes a planned count TEST_MATRIX.md does not hold').toBe(planned);
+  });
+
+  it('gives every cell its own date, because one stamp for ten measurements is what failed', () => {
+    const table = instrumentTable();
+    const dated = [...table.matchAll(/^\| S\d+ \| [^|]+\| (\d{4}-\d{2}-\d{2}) \|/gmu)];
+    expect(dated.length, 'the § 4 table has stopped carrying a date per cell').toBe(10);
+    /*
+     * Quoted occurrences do not count. The paragraph above the table *quotes* the retired stamp to
+     * explain why it is retired, and a check that could not tell a quotation from a claim would
+     * make that explanation unwritable — which is the same defect as a register that cannot record
+     * its own deletions.
+     */
+    const unquoted = table.replace(/\*"[^"]*"\*/gu, ' ');
+    expect(unquoted, 'the table has gone back to one stamp for all ten cells').not.toMatch(
+      /Verified on this tree,\s*\d{4}-\d{2}-\d{2}/u,
+    );
   });
 });

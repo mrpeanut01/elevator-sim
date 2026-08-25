@@ -166,23 +166,30 @@ criteria*, which are untouched by this document and remain binding in full.
 
 ### Which of these can be evaluated today, and which cannot
 
-**This table is the honest part of § 4 and it is not flattering.** Verified on this tree,
-2026-08-24.
+**This table is the honest part of § 4 and it is not flattering.**
 
-| # | Instrument exists? | Evidence |
-|---|---|---|
-| S1 | **No** | `grep -ril telemetry packages/*/src --include='*.ts'` returns **0 files**. There is no funnel, no event chain and no session record anywhere in the tree |
-| S2 | **No** | Same measurement |
-| S3 | **No** | Same measurement |
-| S4 | **No** | Same measurement. `packages/server/src/` carries accounts, leaderboard, challenge and store — and no analytics of any kind |
-| S5 | **Partial** | `campaign/campaign.test.ts` runs the paired sweep for stages **4, 5 and 6 only**. `data/campaign.json` ships **10** stages. No test derives the count across all ten, which is why the published figure went stale twice without failing anything |
-| S6 | **Process only** | A moderated playtest needs recruits and a script, not code. Neither exists yet; M1 owns the playtest programme |
-| S7 | **Process only** | As S6, plus a recruited practitioner cohort that does not exist |
-| S8 | **Yes** | `packages/viz/src/honesty/` — the R1–R13 corpus, its surface list and both tiers. The only criterion here with a working instrument today |
-| S9 | **No** | `.github/workflows/` carries `ci.yml`, `deploy-viz.yml`, `review.yml` and **no load budget**. `validation/perfScaling.test.ts` and `perfSweep.test.ts` measure simulation throughput, not page load |
-| S10 | **No** | All **21** journey rows in [`TEST_MATRIX.md`](../TEST_MATRIX.md) read `planned`. Verified: `grep -cE '^\| T[0-9]+ \|' TEST_MATRIX.md` → 21; the single `passing` occurrence in the file is the header's status legend |
+**Every cell carries its own date, and the table carries none** ([§ D369](../DECISIONS.md)). It used
+to be stamped once — *"Verified on this tree, 2026-08-24"* — and four of its ten rows were refuted
+within a day. A single stamp says *all of this was true together*, which is a claim nobody re-checks;
+a date per cell says which measurement a reader is looking at. The mechanical cells are asserted by
+`packages/experiments/src/validation/documentation.test.ts`, so a cell that stops reproducing fails a
+run rather than waiting for an audit.
 
-**Eight of ten criteria cannot currently be evaluated at all, and a ninth only in part.** That is
+| # | Instrument exists? | Measured | Evidence |
+|---|---|---|---|
+| S1 | **No** | 2026-08-25 | There is no funnel, no event chain and no session record anywhere in the tree. **The command this cell used to quote no longer decides it**: `grep -ril telemetry packages/*/src` returned 0 files on 2026-08-24 and returns **2** today — `server/src/http/api.ts` and its test, both of which say *there is no telemetry in this tree*. A word grep matches the word used to deny the thing, which is why the assertion strips comments and string literals before looking |
+| S2 | **No** | 2026-08-25 | Same measurement |
+| S3 | **No** | 2026-08-25 | Same measurement |
+| S4 | **No** | 2026-08-25 | Same measurement. `packages/server/src/` carries accounts, leaderboard, challenge and store — and no analytics of any kind |
+| S5 | **Partial** | 2026-08-25 | `campaign/campaign.test.ts` plays stages **2, 3, 4, 5 and 6** by name; `data/campaign.json` ships **10**. The old clause *"no test derives the count across all ten"* is **retired**: `campaign/difficultyCurve.test.ts` derives DC-1's table-decidable half across every stage, with an unfailable register asserted in both directions. What is still partial is the **paired sweep** — five of ten stages are played |
+| S6 | **Process only** | 2026-08-25 | A moderated playtest needs recruits and a script, not code. [`30-playtest-programme.md`](30-playtest-programme.md) **exists**; the recruited cohort does not. [§ D374](../DECISIONS.md) rules that these gates are recruited for rather than re-scoped |
+| S7 | **Process only** | 2026-08-25 | As S6, plus a recruited practitioner cohort that does not exist |
+| S8 | **Yes — and currently met** | 2026-08-25 | `packages/viz/src/honesty/` — the R1–R13 corpus, its surface list and both tiers. Still the only criterion with a working instrument, and the criterion itself now **passes**: `honesty.test.ts`'s `OUTSTANDING` holds zero entries and both tiers are green. *Instrumented* and *met* are different claims and this column makes both |
+| S9 | **No** | 2026-08-25 | `.github/workflows/` carries `ci.yml`, `deploy-viz.yml`, `review.yml` and **no load budget**. `validation/perfScaling.test.ts` and `perfSweep.test.ts` measure simulation throughput, not page load |
+| S10 | **Partial** | 2026-08-25 | **21** journey rows in [`TEST_MATRIX.md`](../TEST_MATRIX.md): **3** `passing` (T1, T10, T11), **14** `owned`, **4** `planned`. The 2026-08-24 reading — *"all 21 read `planned`"* — was wrong by one row when it was written and by seventeen after wave B re-measured every row |
+
+**Seven of ten criteria cannot currently be evaluated at all, two only in part, and one is both
+instrumented and passing.** That is
 the finding, not a caveat on it. Building the instruments is M1's work (telemetry schema and KPI
 set, privacy posture before any telemetry ships, playtest programme, performance budget), and **no
 criterion may be reported as met before its instrument exists** — a criterion satisfied by
