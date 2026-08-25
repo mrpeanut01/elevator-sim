@@ -683,12 +683,48 @@ demand.
 
 | Mode | The mechanism | Substrate it moves | Shipped? |
 |---|---|---|---|
-| **Campaign career** | The building fills up overnight — `1 + 0.11 × (day − 1)`, **linear, applied as a real edit to a real `BuildingConfig` put back through `parseBuilding` and `resolveBuilding`** | Fabric (floor populations) → demand | Yes — `packages/viz/src/shift/growth.ts` |
-| **Campaign career** | Today's twist: five events, each writing engine fields — a car out of service, a swung directional mix, a raised or lowered rate, an interfloor share | Demand, and service | Yes — `packages/viz/src/shift/events.ts` |
+| **Daily loop** (contract weeks) | The building fills up overnight — `1 + 0.11 × (day − 1)`, **linear, applied as a real edit to a real `BuildingConfig` put back through `parseBuilding` and `resolveBuilding`** | Fabric (floor populations) → demand | Yes — `packages/viz/src/shift/growth.ts` |
+| **Daily loop** (contract weeks) | Today's twist: five events, each writing engine fields — a swung directional mix, a raised or lowered rate, an interfloor share, and a car that leaves service **and comes back** | Demand, and service | Yes — `packages/viz/src/shift/events.ts` and `shift/incidents.ts` |
 | **Campaign career** | Wear: trips since the last service window raise the daily failure odds | Fabric (availability) | Partly — § 3.6 |
+| **Campaign career** | An event calendar behind a contract — a lift failing its safety check, a coach party booked in | Demand, and service | **UNBUILT** — see below |
 | **Campaign stages** | **Mechanism, not level.** Each stage adds one concept and one building | Fabric and demand, chosen per stage | Yes — `data/campaign.json`, 10 stages |
 | **Fix a building** | The case's own fault, authored per case | Whatever the case declares | Yes — 18 cases |
 | **Endless rush** | A demand ramp with no ceiling | Demand | **No** (§ 1.4) |
+
+**Two of these rows used to say *Campaign career* and were wrong about the mode, not the mechanism.**
+Both are real and both ship — and neither is reachable from the campaign. `everyday/host.ts`'s
+`runCampaignDay` writes a tower's `buildingId` and `dispatcherId`, calls `openRunTab()` and
+`startRun()`, and **never touches `state.calendar`**; nothing under `packages/viz/src/campaign/`
+references `shift/growth.ts` at all, and `shift/growth.ts`'s callers are `shift/`, `scope/`,
+`authoring/` and `menu/` — the daily loop's side of the tree. `campaign/career.ts`'s own
+`CAMPAIGN_ABSENCES` says it outright: *"there is no seeded stream for a campaign day and no event
+calendar behind a contract."* So *Shipped? Yes* was true of the mechanism and false of the mode it
+was filed under — issue #181's class (nothing the campaign does reaches a run) pointed at events
+rather than at works.
+
+**The ambition is kept rather than deleted**, as a fourth row marked UNBUILT. A campaign whose
+contracts carry their own events is a better game than one whose difficulty is fabric and wear
+alone, and `career.ts` names the two draws it wants. Deleting the row would have removed the
+ambition along with the false claim.
+
+**And *"a car out of service"* named a field that is `0` everywhere.** All five shipped events
+declare `carsOutOfService: 0` — `shift/events.ts` lines 120, 164, 182, 195 and 234 — and the module
+docstring at `:56` says so in terms. The field is **live and correct**, not dead: it is the right
+instrument for *"this car is not in the building today"*, `shiftRunPatch` still maps it, and
+`events.test.ts` still drives it. What the shipped events actually schedule is an **incident**
+through `shift/incidents.ts`, and that module argues the difference is the interesting part rather
+than a detail: *"A car that never returns is a smaller building for a day; a car that rejoins two
+thirds of the way through is a group that has to absorb a loss and then re-balance around the
+return."* [§ D364](../DECISIONS.md) is the same distinction arriving from the calendar's side — a
+hold merely overlaps a shift, an incident puts the car back.
+
+**What holds these sentences true, since no test reads this file.** Nothing here is derived, and
+saying so is the point: `docs/32-game-design.md` is cited by `docs/33`, `docs/34` and
+`CHARTER_PROGRAMME.md` and read by nothing under `packages/`. Two product-side checks are the signal
+that this passage is owed a rewrite — `campaign/career.ts`'s `CAMPAIGN_ABSENCES` entry, which a
+campaign event calendar would have to retire, and `shift/events.ts`'s own `carsOutOfService`
+assertion in `events.test.ts`. **If either goes red or is edited, the UNBUILT row above and the
+paragraph beside it are the next thing to read.**
 
 **`growth.ts` is the model of how a difficulty mechanism must be built**, and it says so in its own
 docstring: the handoff's version scales the header, and this one edits the building and reloads it

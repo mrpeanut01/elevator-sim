@@ -44,12 +44,25 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
+/**
+ * This file, which is the one source file that must be allowed to quote both markers.
+ *
+ * Not a convenience exclusion — it is load-bearing, and it was **found by the guard rather than
+ * anticipated**: the first run of this test failed on itself, because the docstring above names
+ * `measure-tmp.mjs`'s header and its `/home/user/…` binding in order to explain what it is looking
+ * for. A guard for scratch files cannot describe one without containing one.
+ *
+ * Derived from `import.meta.url` rather than matched by name, so renaming this file cannot silently
+ * widen the exclusion — `dev/browserTier.test.ts`'s `SELF` is the same idiom for the same reason.
+ */
+const SELF = relative(ROOT, fileURLToPath(import.meta.url));
 
 /** Executable source, where a scratch harness can actually live. */
 const SOURCE = /\.(mjs|cjs|js|ts|tsx)$/u;
@@ -67,7 +80,9 @@ function trackedSourceFiles(): readonly string[] {
   const listed = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' });
   return listed
     .split('\n')
-    .filter((path) => path !== '' && SOURCE.test(path) && !path.startsWith(VENDORED));
+    .filter(
+      (path) => path !== '' && SOURCE.test(path) && !path.startsWith(VENDORED) && path !== SELF,
+    );
 }
 
 /** A file's own claim that it was never meant to be here. */
