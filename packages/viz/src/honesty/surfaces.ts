@@ -122,6 +122,7 @@ import {
   RUSH_PRIMARY_REFUSAL,
   RUSH_SCREEN_COPY,
   rushBandViews,
+  rushBarModel,
   rushDrivingLine,
   rushFactViews,
   rushGeneratedRangeLine,
@@ -7497,6 +7498,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
      * drawn once, somewhere a reader goes looking.
      */
     'everyday/rushScreenModel.ts#RUSH_PRIMARY_REFUSAL',
+    /*
+     * **The refinement joined this list on the merge that made it produce words** — GitHub issue
+     * #262. It used to edit one cell (`inert`) and author nothing, so `derive.test.ts` did not see
+     * a text producer and the docstring above claiming *"the rush's bar refinement"* was driven
+     * described a call nothing made. It now substitutes the § 3.3 note and the inert label, which
+     * is the same shape as `#fixitBarModel`, `#briefBarModel` and `#stageBarModelOf` — every one of
+     * which is covered by the adapter for its own screen — and `render` drives it below.
+     */
+    'everyday/rushScreenModel.ts#rushBarModel',
     'everyday/rushScreenModel.ts#RUSH_BANDS',
     'everyday/rushScreenModel.ts#RUSH_BESTS',
     'everyday/rushScreenModel.ts#rushBandViews',
@@ -7538,6 +7548,15 @@ const EVERYDAY_STANDALONE_SCREENS: SurfaceAdapter = {
       });
     }
     seeds.push({ field: 'rush.primary.refusal', text: RUSH_PRIMARY_REFUSAL, role: 'reason' });
+    /*
+     * The § 3.3 row as the player meets it — issue #262 moved the refusal onto it. Seeded from the
+     * refinement's own return rather than from the two constants a second time, because what a
+     * reader sees is the *composition*: a `reason` standing beside a `label` that has to agree with
+     * it. Seeding the constants alone would pass while the row said `Start the rush`.
+     */
+    const rushBar = rushBarModel(actionBarFor({ screen: 'rush', ctx: 'rush' }));
+    seeds.push({ field: 'rush.bar.note', text: rushBar.note ?? '', role: 'reason' });
+    seeds.push({ field: 'rush.bar.primary', text: rushBar.primary.label, role: 'label' });
     seeds.push({ field: 'rush.holdLine.figure', text: rushHoldLineFigure(), role: 'label' });
     seeds.push({ field: 'rush.generated', text: rushGeneratedRangeLine(), role: 'prose' });
     seeds.push({ field: 'rush.opening', text: rushOpeningLine(), role: 'prose' });

@@ -181,13 +181,19 @@ export const RUSH_HOLD_LINE = Object.freeze({
  * -------------------------------------------------------------------------- */
 
 /**
- * Every authored sentence the screen draws, from `docs/design/elevator-sim-casual.dc.html`'s
- * `isRush` block. The handoff wins every disagreement about what the screen says.
+ * Every authored sentence this screen puts in front of a player, from
+ * `docs/design/elevator-sim-casual.dc.html`'s `isRush` block. The handoff wins every disagreement
+ * about what the screen says.
  *
  * Two lines are **not** the prototype's and say so. `holdLine` is the prototype's own wording
  * already corrected to § 20.5 (its screen copy states the two-minute rule that its code did not
  * implement, so the sentence needed no change — only the code behind it, which is why this is a
  * transcription after all). `bandsEyebrow` and `bestsEyebrow` are its eyebrows verbatim.
+ *
+ * `primaryInertLabel` is the third, it is a **bar** cell rather than a screen one, and it is here
+ * on purpose: `honesty/surfaces.ts` seeds every entry of this table into the corpus and would not
+ * have seen a constant of its own. A player-facing claim the search has never read is the thing
+ * this repository counts.
  */
 export const RUSH_SCREEN_COPY = Object.freeze({
   eyebrow: 'ENDLESS RUSH',
@@ -216,6 +222,17 @@ export const RUSH_SCREEN_COPY = Object.freeze({
    */
   /** Drawn where a figure would be if a rush had ever run here. */
   noRun: '—',
+  /**
+   * What the § 3.3 primary is called while there is nothing behind it — GitHub issue #262.
+   *
+   * § 3.3's own cell is *Start the rush*, and it stays the cell: {@link rushBarModel} substitutes
+   * this one only for the inert state, the way `fixitScreenModel.ts#fixitBarModel` substitutes
+   * *Running the day…* for its own. The reason it is worth a string is § 16 rule 4 — *a button
+   * does what it says* — and the accessibility half of #262: a `disabled` button is out of the tab
+   * order and carries no description, so its **name** is the only thing Chromium's AX tree had to
+   * offer about it, and before this it offered *Start the rush*.
+   */
+  primaryInertLabel: 'Start the rush — not built yet',
 } as const);
 
 /**
@@ -245,9 +262,12 @@ export function rushGeneratedRangeLine(): string {
 /**
  * What the rush needs and this build has not got, in the order a reader meets them.
  *
- * On screen, and read by {@link rushBarModel} for the primary's refusal, so the disabled control
- * and the register cannot say different things. Each entry names the missing seam rather than the
- * feeling of one — `docs/18`'s register style, and `shell.ts`'s.
+ * Drawn on the build-information panel (`everyday/buildNotes.ts`) since GitHub issue #207, not on
+ * this screen. **`rushBarModel` does not read it** — it reads {@link RUSH_PRIMARY_REFUSAL}, which
+ * is the one line that belongs to a control — and the sentence here that said otherwise was a
+ * `{@link}` standing in for a caller, which is the shape `CLAUDE.md` names outright. Each entry
+ * names the missing seam rather than the feeling of one — `docs/18`'s register style, and
+ * `shell.ts`'s.
  *
  * ## § 9.2's entry had gone half-stale, which is the shape this register is least able to survive
  *
@@ -278,7 +298,15 @@ export const RUSH_ABSENCES: readonly string[] = Object.freeze([
   'the standings — the five entries below are the handoff’s own fixtures, not runs this build measured',
 ]);
 
-/** The primary's refusal, one sentence, drawn on the disabled button and in the register. */
+/**
+ * The primary's refusal, one sentence, drawn in **one** place: the § 3.3 bar's note, beside the
+ * button it is about — see {@link rushBarModel} for the measurement that moved it there.
+ *
+ * The old wording of this line said *"drawn on the disabled button and in the register"*. Neither
+ * half had been true for a while: the register moved to the build-information panel on the merge
+ * that closed GitHub issue #207, and *on the button* was the claim GitHub issue #262 measured and
+ * found to be 186 px below a 720 px fold.
+ */
 export const RUSH_PRIMARY_REFUSAL =
   'the climbing stream is not built — this screen is the setup, and there is nothing behind it to start yet';
 
@@ -514,16 +542,69 @@ export function rushDrivingLine(name: string): string {
 /**
  * § 3.3's rush row, resolved for the setup screen — the `bar()` refinement `screens.ts` contracts.
  *
- * It edits exactly one cell: the primary is marked **inert**, which `BarPrimary.inert` exists for
- * and which the shell draws as a disabled button with the refusal as its title. The label, the
- * left button and the note are the table's own and are not touched — § 3.3's note here
- * (*Nothing to set up. It ends when it ends.*) stays true of a rush, and replacing it with the
- * refusal would put the same sentence in two places and let them drift.
+ * It edits three cells: the primary is marked **inert**, it is relabelled while it is, and the note
+ * becomes {@link RUSH_PRIMARY_REFUSAL}.
+ *
+ * ## Why it is three and not one — GitHub issue #262
+ *
+ * The one-cell version of this function had a docstring that read *"the shell draws it as a
+ * disabled button with the refusal as its title"*, and that was false. `shell.ts#drawBar` sets a
+ * `title` only on its **refusal route** — the branch for a screen key with no module — and this
+ * screen is registered, so it takes the `inert` branch instead: `disabled`, `opacity:.6`, and no
+ * `title`, no `aria-label`, no `aria-describedby`. Measured on the deployed build at `000852a`,
+ * `scrollY: 0`, and reproduced here before anything was changed:
+ *
+ * | viewport | the refusal's box top | viewport height |
+ * |---|---|---|
+ * | 1280 × 720 | 905.8 | 720 — **186 px below the fold** |
+ * | 1440 × 900 | 896.1 | 900 — top edge in by 4 px, the sentence itself unreadable |
+ * | 375 × 667 | 3443.2 | 667 — **2 776 px below the fold** |
+ *
+ * So a player met a full-amber primary, pressed it, got nothing, and the reason was a scroll away
+ * on the screen behind them. `CLAUDE.md` asks for *visible, dimmed, inert*; it was dimmed and
+ * inert, and **visible** was the half that failed — at the smaller of the two viewports the issue
+ * measured, and at every viewport the support matrix actually supports.
+ *
+ * The bar is the one element that cannot go below a fold: § 3.1 pins it, and `shell.ts` gives
+ * `.everyday-main` a `minmax(0,1fr) auto` grid whose second row is the bar. Putting the reason
+ * there is what makes the refusal readable **by construction** rather than by a viewport being
+ * tall enough, which is why the fix is not a margin.
+ *
+ * ## The note was not neutral either
+ *
+ * The cell being replaced is § 3.3's *Nothing to set up. It ends when it ends.* It stays true of a
+ * rush, and beside a dead button it reads as **confirmation** — the whole of what a player at
+ * 1280 × 720 had was that sentence and an amber button. It is not deleted from the guide's table:
+ * `ACTION_BAR_ROWS` still carries it, and this refinement substitutes over it the way every other
+ * `bar()` substitutes a state-dependent cell.
+ *
+ * The old docstring's reason for *not* doing this was that it would *"put the same sentence in two
+ * places and let them drift"*. That reason is sound and it is why `rushScreen.ts` no longer draws
+ * the sentence at all: there is one constant and one place on screen that renders it.
+ *
+ * ## What the label is for, and what it is not
+ *
+ * A `disabled` button is not in the tab order, so a keyboard user never lands on it — nothing in
+ * this function changes that, and `aria-describedby` would not have either. What the relabel buys
+ * is the one channel a screen module can reach: Chromium's AX node for this control now reads
+ * *Start the rush — not built yet* instead of *Start the rush*, so a reader who meets the button in
+ * browse mode is told. **The description channel is still empty**, because `title` and
+ * `aria-describedby` are written by `shell.ts#drawBar` and a screen may not reach into the shell
+ * (`screens.ts`' own contract for `EverydayScreenContext`). A general *inert primary carries its
+ * reason as a description* belongs in the bar's own code and is GitHub issue #239's.
  *
  * There is no timeline cell to remove: `actionBar.ts`'s rush row carries none, because *a rush has
  * no timeline at all* (§ 3.3), and a refinement that deleted one would be describing a row that
  * never had it.
  */
 export function rushBarModel(base: ActionBarModel): ActionBarModel {
-  return { ...base, primary: { ...base.primary, inert: true } };
+  return {
+    ...base,
+    primary: {
+      ...base.primary,
+      label: RUSH_SCREEN_COPY.primaryInertLabel,
+      inert: true,
+    },
+    note: RUSH_PRIMARY_REFUSAL,
+  };
 }
